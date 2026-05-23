@@ -16,14 +16,14 @@ import {
   type BasicControllerHost,
   // Digest
   decodeDigestCredentials,
-  digestExpectedResponse,
-  digestHa1,
+  expectedResponse,
+  ha1,
   encodeDigestCredentials,
-  digestNonce,
-  digestValidateNonce,
-  digestOpaque,
+  nonce,
+  validateNonce,
+  opaque,
   digestAuthenticationRequest,
-  digestSecretToken,
+  secretToken,
   validateDigestResponse,
   requestHttpDigestAuthentication,
   type DigestControllerHost,
@@ -187,34 +187,34 @@ describe("HttpAuthentication::Digest", () => {
   });
 
   it("opaque is MD5 of secret key", () => {
-    const secretKey = digestSecretToken(makeDigestRequest());
-    const opaque = digestOpaque(secretKey);
-    expect(opaque).toMatch(/^[0-9a-f]{32}$/);
+    const secretKey = secretToken(makeDigestRequest());
+    const opaqueVal = opaque(secretKey);
+    expect(opaqueVal).toMatch(/^[0-9a-f]{32}$/);
   });
 
   it("nonce encodes timestamp + MD5 in base64", () => {
-    const secretKey = digestSecretToken(makeDigestRequest());
-    const nonce = digestNonce(secretKey, 1000000);
-    const decoded = Buffer.from(nonce, "base64").toString("utf-8");
+    const secretKey = secretToken(makeDigestRequest());
+    const nonceVal = nonce(secretKey, 1000000);
+    const decoded = Buffer.from(nonceVal, "base64").toString("utf-8");
     expect(decoded).toMatch(/^1000000:/);
   });
 
   it("validate_nonce accepts a freshly generated nonce", () => {
-    const secretKey = digestSecretToken(makeDigestRequest());
-    const nonce = digestNonce(secretKey);
-    expect(digestValidateNonce(secretKey, makeDigestRequest(), nonce)).toBe(true);
+    const secretKey = secretToken(makeDigestRequest());
+    const nonceVal = nonce(secretKey);
+    expect(validateNonce(secretKey, makeDigestRequest(), nonceVal)).toBe(true);
   });
 
   it("validate_nonce rejects nil", () => {
-    const secretKey = digestSecretToken(makeDigestRequest());
-    expect(digestValidateNonce(secretKey, makeDigestRequest(), null)).toBe(false);
+    const secretKey = secretToken(makeDigestRequest());
+    expect(validateNonce(secretKey, makeDigestRequest(), null)).toBe(false);
   });
 
   it("validate_nonce rejects stale nonce", () => {
-    const secretKey = digestSecretToken(makeDigestRequest());
+    const secretKey = secretToken(makeDigestRequest());
     const staleTime = Math.floor(Date.now() / 1000) - 400;
-    const nonce = digestNonce(secretKey, staleTime);
-    expect(digestValidateNonce(secretKey, makeDigestRequest(), nonce, 300)).toBe(false);
+    const nonceVal = nonce(secretKey, staleTime);
+    expect(validateNonce(secretKey, makeDigestRequest(), nonceVal, 300)).toBe(false);
   });
 
   it("expected_response matches ha1+ha2 digest computation", () => {
@@ -228,9 +228,9 @@ describe("HttpAuthentication::Digest", () => {
       uri: "/",
     };
     const password = "world";
-    const ha1 = digestHa1(creds, password);
-    const response1 = digestExpectedResponse("GET", "/", creds, password, false);
-    const response2 = digestExpectedResponse("GET", "/", creds, ha1, true);
+    const ha1Val = ha1(creds, password);
+    const response1 = expectedResponse("GET", "/", creds, password, false);
+    const response2 = expectedResponse("GET", "/", creds, ha1Val, true);
     expect(response1).toBe(response2);
     expect(response1).toMatch(/^[0-9a-f]{32}$/);
   });
@@ -265,21 +265,21 @@ describe("HttpAuthentication::Digest", () => {
   });
 
   it("validate_digest_response should fail with nil returning password_procedure", () => {
-    const secretKey = digestSecretToken(makeDigestRequest());
-    const nonce = digestNonce(secretKey);
-    const opaque = digestOpaque(secretKey);
+    const secretKey = secretToken(makeDigestRequest());
+    const nonceVal = nonce(secretKey);
+    const opaqueVal = opaque(secretKey);
     const creds = {
       username: "lifo",
       realm: "SuperSecret",
-      nonce,
+      nonce: nonceVal,
       nc: "00000001",
       cnonce: "0a4f113b",
       qop: "auth",
       uri: "/",
-      opaque,
+      opaque: opaqueVal,
     };
-    const response = digestExpectedResponse("GET", "/", creds, "world", false);
-    const header = `Digest username="lifo", realm="SuperSecret", nonce="${nonce}", uri="/", nc=00000001, cnonce="0a4f113b", qop=auth, response="${response}", opaque="${opaque}"`;
+    const response = expectedResponse("GET", "/", creds, "world", false);
+    const header = `Digest username="lifo", realm="SuperSecret", nonce="${nonceVal}", uri="/", nc=00000001, cnonce="0a4f113b", qop=auth, response="${response}", opaque="${opaqueVal}"`;
     const req = { ...makeDigestRequest(header) };
     expect(validateDigestResponse(req, "SuperSecret", () => null)).toBe(false);
   });

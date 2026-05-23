@@ -230,12 +230,12 @@ export function validateDigestResponse(
   realm: string,
   passwordProcedure: (username: string) => string | null | undefined,
 ): boolean {
-  const sk = digestSecretToken(request);
+  const sk = secretToken(request);
   const creds = decodeCredentialsHeader(request);
   if (
-    !digestValidateNonce(sk, request, creds.nonce ?? null) ||
+    !validateNonce(sk, request, creds.nonce ?? null) ||
     realm !== creds.realm ||
-    digestOpaque(sk) !== creds.opaque
+    opaque(sk) !== creds.opaque
   )
     return false;
   const password = passwordProcedure(creds.username ?? "");
@@ -248,27 +248,26 @@ export function validateDigestResponse(
   return [true, false].some((q) =>
     [true, false].some(
       (isHa1) =>
-        digestExpectedResponse(method, q ? `${uri}?` : uri, creds, password, isHa1) ===
-        creds.response,
+        expectedResponse(method, q ? `${uri}?` : uri, creds, password, isHa1) === creds.response,
     ),
   );
 }
 
-export function digestExpectedResponse(
+export function expectedResponse(
   httpMethod: string,
   uri: string,
   credentials: DigestCredentials,
   password: string,
   passwordIsHa1 = true,
 ): string {
-  const ha1 = passwordIsHa1 ? password : digestHa1(credentials, password);
+  const h1 = passwordIsHa1 ? password : ha1(credentials, password);
   const ha2 = md5Hex(`${httpMethod.toUpperCase()}:${uri}`);
   return md5Hex(
-    [ha1, credentials.nonce, credentials.nc, credentials.cnonce, credentials.qop, ha2].join(":"),
+    [h1, credentials.nonce, credentials.nc, credentials.cnonce, credentials.qop, ha2].join(":"),
   );
 }
 
-export function digestHa1(credentials: DigestCredentials, password: string): string {
+export function ha1(credentials: DigestCredentials, password: string): string {
   return md5Hex(`${credentials.username}:${credentials.realm}:${password}`);
 }
 
@@ -279,7 +278,7 @@ export function encodeDigestCredentials(
   passwordIsHa1: boolean,
 ): string {
   const c: DigestCredentials = { ...credentials };
-  c.response = digestExpectedResponse(httpMethod, c.uri ?? "", c, password, passwordIsHa1);
+  c.response = expectedResponse(httpMethod, c.uri ?? "", c, password, passwordIsHa1);
   return (
     "Digest " +
     Object.entries(c)
@@ -310,10 +309,10 @@ export function decodeDigestCredentials(header: string): DigestCredentials {
   return result;
 }
 
-export function digestAuthenticationHeader(controller: DigestControllerLike, realm: string): void {
-  const sk = digestSecretToken(controller.request);
+export function authenticationHeader(controller: DigestControllerLike, realm: string): void {
+  const sk = secretToken(controller.request);
   controller.headers["WWW-Authenticate"] =
-    `Digest realm="${realm}", qop="auth", algorithm=MD5, nonce="${digestNonce(sk)}", opaque="${digestOpaque(sk)}"`;
+    `Digest realm="${realm}", qop="auth", algorithm=MD5, nonce="${nonce(sk)}", opaque="${opaque(sk)}"`;
 }
 
 export function digestAuthenticationRequest(
@@ -321,21 +320,21 @@ export function digestAuthenticationRequest(
   realm: string,
   message?: string | null,
 ): void {
-  digestAuthenticationHeader(controller, realm);
+  authenticationHeader(controller, realm);
   controller.status = 401;
   controller.responseBody = message ?? "HTTP Digest: Access denied.\n";
 }
 
-export function digestSecretToken(request: DigestRequestLike): string {
+export function secretToken(request: DigestRequestLike): string {
   return request.keyGenerator.generateKey(request.httpAuthSalt);
 }
 
-export function digestNonce(secretKey: string, time?: number): string {
+export function nonce(secretKey: string, time?: number): string {
   const t = time ?? Math.floor(Date.now() / 1000);
   return Buffer.from(`${t}:${md5Hex(`${t}:${secretKey}`)}`).toString("base64");
 }
 
-export function digestValidateNonce(
+export function validateNonce(
   secretKey: string,
   _request: DigestRequestLike,
   value: string | null | undefined,
@@ -345,12 +344,12 @@ export function digestValidateNonce(
   const t = parseInt(Buffer.from(value, "base64").toString("utf-8").split(":")[0]!, 10);
   return (
     !isNaN(t) &&
-    digestNonce(secretKey, t) === value &&
+    nonce(secretKey, t) === value &&
     Math.abs(t - Math.floor(Date.now() / 1000)) <= secondsToTimeout
   );
 }
 
-export function digestOpaque(secretKey: string): string {
+export function opaque(secretKey: string): string {
   return md5Hex(secretKey);
 }
 
