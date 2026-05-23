@@ -36,6 +36,17 @@ export * from "./other-dog.js";
 export * from "./owner.js";
 export * from "./pet.js";
 export * from "./pet-treasure.js";
+// Cluster 5: STI / inheritance test bed
+export * from "./arunit2-model.js";
+export * from "./chef.js";
+export * from "./clothing-item.js";
+export * from "./college.js";
+export * from "./content.js";
+export * from "./course.js";
+export * from "./entrant.js";
+export * from "./item.js";
+export * from "./paragraph.js";
+export * from "./vegetables.js";
 // Cluster 8: UUID / type / edge
 export * from "./aircraft.js";
 export * from "./binary.js";
