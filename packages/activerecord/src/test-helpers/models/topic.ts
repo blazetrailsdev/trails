@@ -12,7 +12,7 @@ export class Topic extends Base {
     this.scope("rejected", (q: any) => q.where({ approved: false }));
     this.scope("children", (q: any) => q.whereNot({ parent_id: null }));
     this.scope("hasChildren", (q: any) =>
-      q.where({ id: (Topic as any).children().select("parent_id") }),
+      q.where({ id: q._modelClass.children().select("parent_id") }),
     );
     this.scope("byLifo", (q: any) => q.where({ author_name: "lifo" }));
     this.scope("replied", (q: any) => q.where("replies_count > 0"));
