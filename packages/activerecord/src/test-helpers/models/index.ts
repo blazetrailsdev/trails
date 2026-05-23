@@ -72,8 +72,13 @@ export * from "./rating.js";
 export * from "./speedometer.js";
 export * from "./string-key-object.js";
 export * from "./traffic-light.js";
+export * from "./traffic-light-encrypted.js";
 export * from "./tree.js";
 export * from "./uuid-child.js";
+export * from "./uuid-comment.js";
+export * from "./uuid-entry.js";
+export * from "./uuid-item.js";
+export * from "./uuid-message.js";
 export * from "./uuid-parent.js";
 export * from "./vertex.js";
 export * from "./warehouse-thing.js";
@@ -81,3 +86,8 @@ export * from "./warehouse-thing.js";
 export * from "./developer.js";
 // Cluster 9: post universe
 export * from "./post.js";
+// Cluster 10: encrypted models + post-with-prefetched-pk
+export * from "./author-encrypted.js";
+export * from "./book-encrypted.js";
+export * from "./post-encrypted.js";
+export * from "./post-with-prefetched-pk.js";

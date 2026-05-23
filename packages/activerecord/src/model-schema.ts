@@ -429,7 +429,7 @@ export function isPrefetchPrimaryKey(this: SchemaHost): boolean {
   return false;
 }
 
-export function nextSequenceValue(this: SchemaHost): null {
+export function nextSequenceValue(this: SchemaHost): number | null {
   return null;
 }
 
