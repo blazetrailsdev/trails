@@ -24,8 +24,14 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-const DEPS_PATH = path.join(ROOT, "scripts/test-deps/output/activerecord-test-deps.json");
-const EXCLUDE_PATH = path.join(__dirname, "expected-fixtures-exclude.json");
+// Path overrides via env let tests point at tmp files instead of mutating
+// the committed baseline / gitignored deps artifact.
+const DEPS_PATH =
+  process.env.EXPECTED_FIXTURES_DEPS_PATH ??
+  path.join(ROOT, "scripts/test-deps/output/activerecord-test-deps.json");
+const EXCLUDE_PATH =
+  process.env.EXPECTED_FIXTURES_EXCLUDE_PATH ??
+  path.join(__dirname, "expected-fixtures-exclude.json");
 
 // Both JSONs are tiny (~100KB deps, ~130 paths exclude). Cache by mtime
 // so a single eslint invocation reads each file at most once but tests
@@ -74,7 +80,39 @@ function repoRel(filename) {
   return norm.slice(i + 1);
 }
 
-/** Collect keys of every `useFixtures({...})` call in the program. */
+/**
+ * Inspect a single `useFixtures(...)` call expression and push its
+ * ObjectExpression keys into the supplied Set.
+ */
+function harvestUseFixturesCall(node, keys) {
+  if (
+    !node ||
+    node.type !== "CallExpression" ||
+    !node.callee ||
+    node.callee.type !== "Identifier" ||
+    node.callee.name !== "useFixtures"
+  ) {
+    return false;
+  }
+  const arg = node.arguments && node.arguments[0];
+  if (arg && arg.type === "ObjectExpression") {
+    for (const p of arg.properties) {
+      if (p.type !== "Property") continue;
+      const k = p.key;
+      if (k.type === "Identifier") keys.add(k.name);
+      else if (k.type === "Literal" && typeof k.value === "string") keys.add(k.value);
+    }
+  }
+  return true;
+}
+
+/**
+ * Walk an already-parsed ESTree program collecting all `useFixtures` call
+ * keys. Used by `scripts/test-deps/build-fixture-baseline.ts` (which parses
+ * source files outside an ESLint run). The rule itself uses the standard
+ * `CallExpression` visitor pattern in `create()` — both paths share
+ * `harvestUseFixturesCall` so they can't drift.
+ */
 export function collectUseFixturesKeys(programNode) {
   const keys = new Set();
   let found = false;
@@ -82,23 +120,7 @@ export function collectUseFixturesKeys(programNode) {
   function visit(node) {
     if (!node || typeof node !== "object" || seen.has(node)) return;
     seen.add(node);
-    if (
-      node.type === "CallExpression" &&
-      node.callee &&
-      node.callee.type === "Identifier" &&
-      node.callee.name === "useFixtures"
-    ) {
-      found = true;
-      const arg = node.arguments && node.arguments[0];
-      if (arg && arg.type === "ObjectExpression") {
-        for (const p of arg.properties) {
-          if (p.type !== "Property") continue;
-          const k = p.key;
-          if (k.type === "Identifier") keys.add(k.name);
-          else if (k.type === "Literal" && typeof k.value === "string") keys.add(k.value);
-        }
-      }
-    }
+    if (harvestUseFixturesCall(node, keys)) found = true;
     for (const key in node) {
       if (key === "parent" || key === "loc" || key === "range") continue;
       const v = node[key];
@@ -136,9 +158,13 @@ const rule = {
     if (!entry || !entry.fixtures || entry.fixtures.length === 0) return {};
     const rel = repoRel(filename);
     if (rel && loadExclude().has(rel)) return {};
+    const keys = new Set();
+    let found = false;
     return {
+      CallExpression(node) {
+        if (harvestUseFixturesCall(node, keys)) found = true;
+      },
       "Program:exit"(node) {
-        const { found, keys } = collectUseFixturesKeys(node);
         const expected = entry.fixtures;
         if (!found) {
           context.report({

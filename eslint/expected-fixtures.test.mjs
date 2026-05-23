@@ -1,38 +1,34 @@
 import { RuleTester } from "eslint";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import rule, { trailsToRailsRel, collectUseFixturesKeys } from "./expected-fixtures.mjs";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-const DEPS_PATH = path.join(ROOT, "scripts/test-deps/output/activerecord-test-deps.json");
-const EXCLUDE_PATH = path.join(__dirname, "expected-fixtures-exclude.json");
 
-// Set up fixture data on disk before importing the rule; the rule reads
-// these paths once and caches. We snapshot whatever's there, install our
-// fixtures, then restore at the end.
-const snapshots = new Map();
-function snapshot(p) {
-  snapshots.set(p, fs.existsSync(p) ? fs.readFileSync(p, "utf8") : null);
-}
-function restore() {
-  for (const [p, v] of snapshots) {
-    if (v === null) {
-      if (fs.existsSync(p)) fs.unlinkSync(p);
-    } else {
-      fs.writeFileSync(p, v);
-    }
-  }
-}
+// Point the rule at tmp files via env overrides so the committed
+// expected-fixtures-exclude.json (and the gitignored deps artifact) are
+// never touched — a hard SIGKILL between beforeAll and afterAll can no
+// longer leave a synthetic baseline staged in the worktree.
+const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "expected-fixtures-"));
+const TMP_DEPS = path.join(TMP_DIR, "deps.json");
+const TMP_EXCLUDE = path.join(TMP_DIR, "exclude.json");
+process.env.EXPECTED_FIXTURES_DEPS_PATH = TMP_DEPS;
+process.env.EXPECTED_FIXTURES_EXCLUDE_PATH = TMP_EXCLUDE;
+
+// Imported AFTER env vars are set so the rule's module-level path
+// constants pick them up.
+const {
+  default: rule,
+  trailsToRailsRel,
+  collectUseFixturesKeys,
+} = await import("./expected-fixtures.mjs");
 
 beforeAll(() => {
-  snapshot(DEPS_PATH);
-  snapshot(EXCLUDE_PATH);
-  fs.mkdirSync(path.dirname(DEPS_PATH), { recursive: true });
   fs.writeFileSync(
-    DEPS_PATH,
+    TMP_DEPS,
     JSON.stringify({
       "aggregations_test.rb": {
         requires: ["customer"],
@@ -60,13 +56,11 @@ beforeAll(() => {
       },
     }),
   );
-  fs.writeFileSync(EXCLUDE_PATH, JSON.stringify(["packages/activerecord/src/excluded.test.ts"]));
+  fs.writeFileSync(TMP_EXCLUDE, JSON.stringify(["packages/activerecord/src/excluded.test.ts"]));
 });
-afterAll(restore);
-// Belt-and-suspenders: cover Ctrl-C / watch-mode reloads between beforeAll
-// and afterAll. One of the snapshotted files (EXCLUDE_PATH) is committed,
-// so a leaked test fixture could be staged by mistake.
-process.on("exit", restore);
+afterAll(() => {
+  fs.rmSync(TMP_DIR, { recursive: true, force: true });
+});
 
 describe("trailsToRailsRel", () => {
   it("maps kebab-case basenames to snake_case rails paths", () => {
@@ -96,12 +90,7 @@ describe("expected-fixtures rule", () => {
         parser: (await import("typescript-eslint")).parser,
       },
     });
-    try {
-      runCases(tester);
-    } finally {
-      // If tester.run threw mid-test, still restore on the way out.
-      restore();
-    }
+    runCases(tester);
   });
 });
 
