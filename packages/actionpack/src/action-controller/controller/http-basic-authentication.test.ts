@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   encodeCredentials,
   authenticateOrRequestWithHttpBasic,
+  authenticateWithHttpBasic,
   requestHttpBasicAuthentication,
   httpBasicAuthenticateWith,
   type BasicControllerHost,
@@ -32,52 +33,59 @@ describe("HttpBasicAuthenticationTest", () => {
   });
 
   it("successful authentication with  and long credentials", () => {
-    const longPass = "x".repeat(1024);
-    const c = makeController(encodeCredentials("lifo", longPass));
+    const longCred = "1234567890123456789012345678901234567890";
+    const c = makeController(encodeCredentials(longCred, longCred));
     const result = authenticateOrRequestWithHttpBasic.call(
       c,
       "SuperSecret",
       null,
-      (user, pass) => user === "lifo" && pass === longPass,
+      (user, pass) => user === longCred && pass === longCred,
     );
     expect(result).toBe(true);
   });
 
   it("unsuccessful authentication with ", () => {
-    const c = makeController(encodeCredentials("lifo", "wrong"));
+    const c = makeController(encodeCredentials("h4x0r", "world"));
     const result = authenticateOrRequestWithHttpBasic.call(
       c,
-      "SuperSecret",
+      "Application",
       null,
       (user, pass) => user === "lifo" && pass === "world",
     );
     expect(result).toBe(false);
     expect(c.status).toBe(401);
+    expect(c.responseBody).toBe("HTTP Basic: Access denied.\n");
   });
 
   it("unsuccessful authentication with  and long credentials", () => {
-    const longPass = "x".repeat(1024);
-    const c = makeController(encodeCredentials("lifo", longPass + "extra"));
+    const longUser = "h4x0rh4x0rh4x0rh4x0rh4x0rh4x0rh4x0rh4x0r";
+    const longPass = "worldworldworldworldworldworldworldworld";
+    const longCred = "1234567890123456789012345678901234567890";
+    const c = makeController(encodeCredentials(longUser, longPass));
     const result = authenticateOrRequestWithHttpBasic.call(
       c,
-      "SuperSecret",
+      "Application",
       null,
-      (user, pass) => user === "lifo" && pass === longPass,
+      (user, pass) => user === longCred && pass === longCred,
     );
     expect(result).toBe(false);
     expect(c.status).toBe(401);
+    expect(c.responseBody).toBe("HTTP Basic: Access denied.\n");
   });
 
   it("unsuccessful authentication with  and no credentials", () => {
     const c = makeController();
-    const result = authenticateOrRequestWithHttpBasic.call(c, "SuperSecret", null, () => true);
+    const result = authenticateOrRequestWithHttpBasic.call(c, "Application", null, () => true);
     expect(result).toBe(false);
     expect(c.status).toBe(401);
+    expect(c.responseBody).toBe("HTTP Basic: Access denied.\n");
   });
 
   it("encode credentials has no newline", () => {
-    const header = encodeCredentials("lifo", "world");
-    expect(header).not.toMatch(/\n/);
+    const username = "laskjdfhalksdjfhalkjdsfhalksdjfhklsdjhalksdjfhalksdjfhlakdsjfh";
+    const password = "kjfhueyt9485osdfasdkljfh4lkjhakldjfhalkdsjf";
+    const result = encodeCredentials(username, password);
+    expect(result).not.toMatch(/\n/);
   });
 
   it("successful authentication with uppercase authorization scheme", () => {
@@ -93,44 +101,49 @@ describe("HttpBasicAuthenticationTest", () => {
   });
 
   it("authentication request without credential", () => {
+    // Rails: GET /display with no auth → request_http_basic_authentication("SuperSecret", "Authentication Failed\n")
     const c = makeController();
-    requestHttpBasicAuthentication.call(c, "SuperSecret");
+    requestHttpBasicAuthentication.call(c, "SuperSecret", "Authentication Failed\n");
     expect(c.status).toBe(401);
+    expect(c.responseBody).toBe("Authentication Failed\n");
     expect(c.headers["WWW-Authenticate"]).toBe('Basic realm="SuperSecret"');
   });
 
   it("authentication request with invalid credential", () => {
-    const c = makeController("Basic !!!not_valid_base64!!!");
+    // Rails: encode_credentials("pretty", "foo") — valid base64, wrong user/pass
+    const c = makeController(encodeCredentials("pretty", "foo"));
     const result = authenticateOrRequestWithHttpBasic.call(
       c,
       "SuperSecret",
+      "Authentication Failed\n",
+      (user, pass) => user === "pretty" && pass === "please",
+    );
+    expect(result).toBe(false);
+    expect(c.status).toBe(401);
+    expect(c.headers["WWW-Authenticate"]).toBe('Basic realm="SuperSecret"');
+  });
+
+  it("authentication request with a missing password", () => {
+    // Rails: Base64("David") — no colon, so password is absent
+    const noColon = `Basic ${Buffer.from("David").toString("base64")}`;
+    const c = makeController(noColon);
+    const result = authenticateOrRequestWithHttpBasic.call(
+      c,
+      "Application",
       null,
-      (user, pass) => user === "lifo" && pass === "world",
+      (user, pass) => user === "David" && pass === "Goliath",
     );
     expect(result).toBe(false);
     expect(c.status).toBe(401);
   });
 
-  it("authentication request with a missing password", () => {
-    const c = makeController(encodeCredentials("lifo", ""));
-    const result = authenticateOrRequestWithHttpBasic.call(
-      c,
-      "SuperSecret",
-      null,
-      (_user, pass) => pass === "world",
-    );
-    expect(result).toBe(false);
-  });
-
   it("authentication request with no required password", () => {
-    const c = makeController(encodeCredentials("lifo", ""));
-    const result = authenticateOrRequestWithHttpBasic.call(
-      c,
-      "SuperSecret",
-      null,
-      (user) => user === "lifo",
-    );
-    expect(result).toBe(true);
+    // Rails: Base64("George") — no colon, password is "" (absent)
+    const noColon = `Basic ${Buffer.from("George").toString("base64")}`;
+    const c = makeController(noColon);
+    // Mirrors DummyController#no_password: authenticate_with_http_basic returning [username, password]
+    const result = authenticateWithHttpBasic.call(c, (user, pass) => ({ user, pass }));
+    expect(result).toEqual({ user: "George", pass: "" });
     expect(c.status).toBe(200);
   });
 
@@ -147,12 +160,14 @@ describe("HttpBasicAuthenticationTest", () => {
   });
 
   it("authentication request with valid credential special chars", () => {
-    const c = makeController(encodeCredentials("ÂÑ", "ÂÑ"));
+    const specialUser = "login!@#$%^&*()_+{}[];\"',./<>?`~ \n\r\t";
+    const specialPass = "pwd:!@#$%^&*()_+{}[];\"',./<>?`~ \n\r\t";
+    const c = makeController(encodeCredentials(specialUser, specialPass));
     const result = authenticateOrRequestWithHttpBasic.call(
       c,
       "SuperSecret",
       null,
-      (user, pass) => user === "ÂÑ" && pass === "ÂÑ",
+      (user, pass) => user === specialUser && pass === specialPass,
     );
     expect(result).toBe(true);
     expect(c.status).toBe(200);
@@ -165,17 +180,25 @@ describe("HttpBasicAuthenticationTest", () => {
         beforeActionCalls.push(cb);
       },
     };
-    httpBasicAuthenticateWith.call(host, { name: "lifo", password: "world" });
+    httpBasicAuthenticateWith.call(host, { name: "David", password: "Goliath" });
     expect(beforeActionCalls).toHaveLength(1);
-    const okCtrl = makeController(encodeCredentials("lifo", "world"));
+    const okCtrl = makeController(encodeCredentials("David", "Goliath"));
     expect(beforeActionCalls[0](okCtrl)).toBe(true);
-    const badCtrl = makeController(encodeCredentials("lifo", "wrong"));
+    const badCtrl = makeController(encodeCredentials("David", "WRONG!"));
     expect(beforeActionCalls[0](badCtrl)).toBe(false);
   });
 
   it("authentication request with wrong scheme", () => {
-    const c = makeController("Token abc123");
-    const result = authenticateOrRequestWithHttpBasic.call(c, "SuperSecret", null, () => true);
+    // Rails: "Bearer " + encode_credentials("David","Goliath").split(" ",2)[1]
+    const basicCreds = encodeCredentials("David", "Goliath");
+    const token = basicCreds.split(" ")[1];
+    const c = makeController(`Bearer ${token}`);
+    const result = authenticateOrRequestWithHttpBasic.call(
+      c,
+      "Application",
+      null,
+      (user, pass) => user === "David" && pass === "Goliath",
+    );
     expect(result).toBe(false);
     expect(c.status).toBe(401);
   });
