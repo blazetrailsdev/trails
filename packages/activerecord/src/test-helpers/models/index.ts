@@ -77,3 +77,5 @@ export * from "./uuid-child.js";
 export * from "./uuid-parent.js";
 export * from "./vertex.js";
 export * from "./warehouse-thing.js";
+// PR 12: developer cluster
+export * from "./developer.js";
