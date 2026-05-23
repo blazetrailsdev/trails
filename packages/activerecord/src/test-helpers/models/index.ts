@@ -47,6 +47,8 @@ export * from "./entrant.js";
 export * from "./item.js";
 export * from "./paragraph.js";
 export * from "./vegetables.js";
+// Cluster 6: CPK (composite primary key)
+export * from "./cpk.js";
 // Cluster 8: UUID / type / edge
 export * from "./aircraft.js";
 export * from "./binary.js";
