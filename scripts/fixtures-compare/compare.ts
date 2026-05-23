@@ -67,10 +67,16 @@ interface FileResult { yamlBase: string; tsBase: string | null; status: Status; 
 // the rest of the file comparable instead of dropping it as ERB-UNSUPPORTED.
 export const ERB_SKIP_SENTINEL = "__ERB_SKIP__";
 
-function parseArgs(argv: string[]): { pkg: string; filter: string | null; models: boolean } {
+function parseArgs(argv: string[]): {
+  pkg: string;
+  filter: string | null;
+  models: boolean;
+  incomplete: boolean;
+} {
   let pkg = "activerecord";
   let filter: string | null = null;
   let models = false;
+  let incomplete = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--package") {
@@ -81,9 +87,11 @@ function parseArgs(argv: string[]): { pkg: string; filter: string | null; models
       if (!pkg) throw new Error("--package= requires a value");
     } else if (a === "--models") {
       models = true;
+    } else if (a === "--incomplete") {
+      incomplete = true;
     } else if (!a.startsWith("--") && filter === null) filter = a;
   }
-  return { pkg, filter, models };
+  return { pkg, filter, models, incomplete };
 }
 
 const kebab = (s: string): string => s.replace(/_/g, "-");
@@ -641,7 +649,7 @@ function formatLine(r: FileResult): string {
 }
 
 async function main(): Promise<void> {
-  const { pkg, filter, models } = parseArgs(process.argv.slice(2));
+  const { pkg, filter, models, incomplete } = parseArgs(process.argv.slice(2));
   if (pkg !== "activerecord") {
     console.error(`fixtures:compare: --package ${pkg} not supported yet`);
     process.exit(2);
@@ -692,7 +700,7 @@ async function main(): Promise<void> {
   );
   console.log("(MISSING/DIFF soft per Decision 4 until PR 7; runtime errors hard-fail)");
 
-  if (models) runModelsPass(filter);
+  if (models) runModelsPass(filter, incomplete);
 
   // Decision 4 names DIFF/MISSING as soft; YAML/TS load errors are script-runtime, hard-fail.
   const hard: readonly Status[] = ["YAML-PARSE-ERR", "TS-IMPORT-ERR", "TS-EXPORT-MISSING"];
@@ -862,7 +870,7 @@ function formatModelLine(r: ModelResult): string {
   );
 }
 
-function runModelsPass(filter: string | null): void {
+function runModelsPass(filter: string | null, incomplete = false): void {
   console.log("\n=== models:compare ===");
   let manifest: RubyFileEntry[];
   try {
@@ -907,6 +915,7 @@ function runModelsPass(filter: string | null): void {
   }
 
   for (const r of results) {
+    if (incomplete && r.status === "MATCH") continue;
     console.log(formatModelLine(r));
     if (process.env.FIXTURES_COMPARE_VERBOSE === "1") {
       for (const n of r.notes) console.log(`    ${n}`);
