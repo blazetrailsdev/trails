@@ -2,7 +2,7 @@
 
 > **Status (2026-05-23):**
 >
-> **Fixtures port — complete.** All 122 Rails fixtures translated (PRs 0–6b + 0.5a–h + 0.75 + 4-late, merged 2026-05-20…21). `pnpm fixtures:compare` passes hard-fail (PR 7). Proof-of-concept fixture consumption merged (PR 8 / #2318). Schema port live in `setup-adapter-suite.ts`.
+> **Fixtures port — complete.** All 122 Rails fixtures translated (PRs 0–6b + 0.5a–h + 0.75 + 4-late, merged 2026-05-20…21). `pnpm fixtures:compare` reports 0 MISSING/DIFF (PR 7 closed all gaps; MISSING/DIFF remain soft-fail, runtime errors hard-fail). Proof-of-concept fixture consumption merged (PR 8 / #2318). Schema port live in `setup-adapter-suite.ts`.
 >
 > **Test-models port — in progress.** 70/215 Rails test model files
 > ported. `pnpm fixtures:compare --models --incomplete` lists all gaps.
