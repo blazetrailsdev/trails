@@ -5,18 +5,25 @@
  * Transforms test files from the legacy `createTestAdapter()` + `Model.adapter = adapter`
  * bypass to the Rails-shape `setupHandlerSuite()` + handler-resolved adapter.
  *
- * Handles only the **standard pattern**:
- *   - module-level `let adapter` declaration with `createTestAdapter()` initialization
- *     inside a `beforeAll`
- *   - `defineSchema(adapter, { ... })` called once inside that same `beforeAll`
- *   - optional pre-existing `withTransactionalFixtures(() => adapter)` at
- *     module level (if absent, the codemod inserts the handler-resolved form
- *     — every transformed file ends up calling `withTransactionalFixtures`)
+ * Handles two standard patterns:
+ *
+ * **Module-level** (`scope: "module"`):
+ *   - `let adapter` at module level, initialized in a module-level `beforeAll`
+ *   - `defineSchema(adapter, {...})` inside that `beforeAll`
+ *   - optional `withTransactionalFixtures(() => adapter)` at module level
  *   - `this.adapter = adapter` inside class static blocks
  *
- * Anything more exotic (sidecar adapters, `defineSchema` inside `it()`, adapter
- * declared inside a `describe`, custom adapter wrappers) is detected and skipped
- * with a logged reason so it can be handled manually.
+ * **Describe-level** (`scope: "describe"`):
+ *   - exactly one top-level `describe(name, () => { ... })` with `let adapter`
+ *     declared inside its callback body (not at module level)
+ *   - same `beforeAll`/`defineSchema`/`withTransactionalFixtures` pattern,
+ *     but scoped inside the describe block
+ *   - helpers are inserted inside the describe block; vitest scopes hooks
+ *     to the enclosing `describe` automatically
+ *
+ * Anything more exotic (sidecar adapters, multiple adapters, `defineSchema`
+ * outside `beforeAll`, multiple describes with distinct adapters) is skipped
+ * with a logged reason.
  *
  * Usage:
  *   pnpm tsx scripts/d1-migrate.ts <file>...           # dry-run (default; prints plan)
@@ -31,6 +38,7 @@ import {
   SyntaxKind,
   Node,
   type SourceFile,
+  type Block,
   type CallExpression,
   type ExpressionStatement,
   type ImportDeclaration,
@@ -84,6 +92,11 @@ interface PatternInfo {
   testAdapterImport: ImportDeclaration;
   withTxFixturesCall: CallExpression | null;
   hasFreshAdapterHelper: boolean;
+  scope: "module" | "describe";
+  /** For describe-level: the Block node of the describe callback body. */
+  describeBody?: Block;
+  /** For describe-level: a simple `afterAll(dropAllTables)` to remove — covered by useHandlerTransactionalFixtures. */
+  afterAllToRemove?: ExpressionStatement;
 }
 
 function analyze(sf: SourceFile): PatternInfo | { skip: string } {
@@ -117,7 +130,7 @@ function analyze(sf: SourceFile): PatternInfo | { skip: string } {
   }
   if (!testAdapterImport) return { skip: "no createTestAdapter import" };
 
-  // Must have a module-level `let <adapter>: <Type>` declaration
+  // Try module-level `let <adapter>: <Type>` declaration first.
   let adapterVarName: string | null = null;
   for (const stmt of sf.getVariableStatements()) {
     if (stmt.getDeclarationKind() !== "let") continue;
@@ -132,87 +145,33 @@ function analyze(sf: SourceFile): PatternInfo | { skip: string } {
     }
     if (adapterVarName) break;
   }
-  if (!adapterVarName) return { skip: "no module-level adapter let declaration" };
 
-  // Find beforeAll at module level
-  const beforeAllStmts = sf
-    .getStatements()
-    .filter(
-      (s) =>
-        s.isKind(SyntaxKind.ExpressionStatement) &&
-        s.getExpressionIfKind(SyntaxKind.CallExpression)?.getExpression().getText() === "beforeAll",
-    );
-  if (beforeAllStmts.length === 0) return { skip: "no module-level beforeAll" };
-  if (beforeAllStmts.length > 1) return { skip: "multiple module-level beforeAll blocks" };
-  const beforeAllStmt = beforeAllStmts[0].asKindOrThrow(SyntaxKind.ExpressionStatement);
-  const beforeAllCall = beforeAllStmt.getExpressionIfKindOrThrow(SyntaxKind.CallExpression);
-
-  // Find defineSchema call inside beforeAll
-  const defineSchemaCalls: CallExpression[] = [];
-  beforeAllCall.forEachDescendant((d) => {
-    if (
-      d.isKind(SyntaxKind.CallExpression) &&
-      callNameMatches(d as CallExpression, "defineSchema")
-    ) {
-      defineSchemaCalls.push(d as CallExpression);
-    }
-  });
-  if (defineSchemaCalls.length === 0) return { skip: "no defineSchema in beforeAll" };
-  if (defineSchemaCalls.length > 1) return { skip: "multiple defineSchema calls in beforeAll" };
-  const defineSchemaCall = defineSchemaCalls[0];
-
-  // Check no defineSchema is called outside the beforeAll
-  let externalDefineSchema = false;
-  sf.forEachDescendant((d) => {
-    if (
-      d.isKind(SyntaxKind.CallExpression) &&
-      callNameMatches(d as CallExpression, "defineSchema") &&
-      !defineSchemaCalls.includes(d as CallExpression)
-    ) {
-      externalDefineSchema = true;
-    }
-  });
-  if (externalDefineSchema) return { skip: "defineSchema called outside beforeAll" };
-
-  // Confirm defineSchema args: (adapterVar, <schemaObject>)
-  const dsArgs = defineSchemaCall.getArguments();
-  if (dsArgs.length !== 2) return { skip: `defineSchema expected 2 args, got ${dsArgs.length}` };
-  if (dsArgs[0].getText() !== adapterVarName) {
-    return { skip: `defineSchema first arg is "${dsArgs[0].getText()}", not "${adapterVarName}"` };
-  }
-  const schemaArg = dsArgs[1].getText();
-
-  // Locate withTransactionalFixtures call (optional)
-  const withTxCalls = sf
-    .getStatements()
-    .map((s) => s.getExpressionIfKind?.(SyntaxKind.CallExpression))
-    .filter((c): c is CallExpression => !!c && callNameMatches(c, "withTransactionalFixtures"));
-  if (withTxCalls.length > 1) return { skip: "multiple withTransactionalFixtures calls" };
-  const withTxFixturesCall = withTxCalls[0] ?? null;
-
-  // Ensure no createTable / migration mid-test (best-effort string check)
-  const fullText = sf.getFullText();
-  if (/\b(createTable|migration\.up|migration\.run)\b/.test(fullText)) {
-    return { skip: "looks like DDL inside test body (createTable/migration)" };
+  if (adapterVarName) {
+    return analyzeModuleLevel(sf, adapterVarName, testAdapterImport);
   }
 
-  // Check that the adapter variable is only used as: defineSchema arg, withTransactionalFixtures arrow,
-  // assignment target inside beforeAll, or `this.adapter = <var>` inside static blocks.
-  // If used elsewhere (e.g., adapter.execute()), skip.
+  // Fall back to describe-level pattern.
+  return analyzeDescribeLevel(sf, testAdapterImport);
+}
+
+/** Shared adapter-ref safety check used by both module- and describe-level analysis. */
+function checkAdapterRefs(
+  sf: SourceFile,
+  adapterVarName: string,
+  defineSchemaCall: CallExpression,
+  afterAllToRemove: ExpressionStatement | undefined,
+): { skip: string } | null {
   const adapterRefs = sf.getDescendantsOfKind(SyntaxKind.Identifier).filter((id) => {
     if (id.getText() !== adapterVarName) return false;
     const parent = id.getParent();
     if (!parent) return false;
-    // Skip the declaration itself
     if (Node.isVariableDeclaration(parent) && parent.getNameNode() === id) return false;
-    // Skip property-access *names* (e.g. the `.adapter` in `this.adapter`); only `.expression` is a ref
     if (
       parent.isKind(SyntaxKind.PropertyAccessExpression) &&
       (parent as any).getNameNode() === id
     ) {
       return false;
     }
-    // Skip import/export specifier names
     if (
       parent.isKind(SyntaxKind.ImportSpecifier) ||
       parent.isKind(SyntaxKind.ExportSpecifier) ||
@@ -226,9 +185,7 @@ function analyze(sf: SourceFile): PatternInfo | { skip: string } {
   for (const ref of adapterRefs) {
     const parent = ref.getParent();
     if (!parent) continue;
-    // Allowed: defineSchema(adapter, ...)
     if (parent === defineSchemaCall) continue;
-    // Allowed: `adapter = createTestAdapter()` assignment in beforeAll
     if (
       Node.isBinaryExpression(parent) &&
       parent.getOperatorToken().getKind() === SyntaxKind.EqualsToken &&
@@ -242,7 +199,6 @@ function analyze(sf: SourceFile): PatternInfo | { skip: string } {
         continue;
       }
     }
-    // Allowed: arrow body of withTransactionalFixtures, e.g. `() => adapter`
     if (Node.isArrowFunction(parent) && parent.getBody() === ref) {
       const arrowParent = parent.getParent();
       if (
@@ -253,7 +209,6 @@ function analyze(sf: SourceFile): PatternInfo | { skip: string } {
         continue;
       }
     }
-    // Allowed: `this.adapter = adapter` inside static block / class
     if (
       Node.isBinaryExpression(parent) &&
       parent.getOperatorToken().getKind() === SyntaxKind.EqualsToken &&
@@ -262,15 +217,118 @@ function analyze(sf: SourceFile): PatternInfo | { skip: string } {
       const lhs = parent.getLeft();
       if (lhs.isKind(SyntaxKind.PropertyAccessExpression)) {
         const pae = lhs as any;
-        if (pae.getExpression().getText() === "this" && pae.getName() === "adapter") {
+        // Covers both `this.adapter = adapter` (static blocks) and `ClassName.adapter = adapter`
+        if (pae.getName() === "adapter") {
           continue;
         }
       }
+    }
+    // Allowed: dropAllTables(adapter) inside the afterAll we will remove
+    if (afterAllToRemove) {
+      let ancestor: Node | undefined = ref.getParent();
+      while (ancestor) {
+        if (ancestor === afterAllToRemove) {
+          ancestor = undefined;
+          break;
+        }
+        ancestor = ancestor.getParent();
+      }
+      if (
+        ancestor === undefined &&
+        ref.getFirstAncestorByKind(SyntaxKind.ExpressionStatement) === afterAllToRemove
+      ) {
+        continue;
+      }
+      // Re-check: walk up ref to see if afterAllToRemove is an ancestor
+      let cur: Node | undefined = ref.getParent();
+      let underAfterAll = false;
+      while (cur) {
+        if (cur === afterAllToRemove) {
+          underAfterAll = true;
+          break;
+        }
+        cur = cur.getParent();
+      }
+      if (underAfterAll) continue;
     }
     return {
       skip: `adapter variable "${adapterVarName}" used in unsupported context: ${parent.getKindName()} -> ${parent.getText().slice(0, 80)}`,
     };
   }
+  return null;
+}
+
+/** Shared beforeAll/defineSchema extraction used by both module- and describe-level. */
+function extractBeforeAllAndSchema(
+  stmts: ReturnType<SourceFile["getStatements"]>,
+  label: string,
+): { beforeAllStmt: ExpressionStatement; defineSchemaCall: CallExpression } | { skip: string } {
+  const beforeAllStmts = stmts.filter(
+    (s) =>
+      s.isKind(SyntaxKind.ExpressionStatement) &&
+      s.getExpressionIfKind(SyntaxKind.CallExpression)?.getExpression().getText() === "beforeAll",
+  );
+  if (beforeAllStmts.length === 0) return { skip: `no ${label} beforeAll` };
+  if (beforeAllStmts.length > 1) return { skip: `multiple ${label} beforeAll blocks` };
+  const beforeAllStmt = beforeAllStmts[0].asKindOrThrow(SyntaxKind.ExpressionStatement);
+  const beforeAllCall = beforeAllStmt.getExpressionIfKindOrThrow(SyntaxKind.CallExpression);
+
+  const defineSchemaCalls: CallExpression[] = [];
+  beforeAllCall.forEachDescendant((d) => {
+    if (
+      d.isKind(SyntaxKind.CallExpression) &&
+      callNameMatches(d as CallExpression, "defineSchema")
+    ) {
+      defineSchemaCalls.push(d as CallExpression);
+    }
+  });
+  if (defineSchemaCalls.length === 0) return { skip: "no defineSchema in beforeAll" };
+  if (defineSchemaCalls.length > 1) return { skip: "multiple defineSchema calls in beforeAll" };
+  return { beforeAllStmt, defineSchemaCall: defineSchemaCalls[0] };
+}
+
+function analyzeModuleLevel(
+  sf: SourceFile,
+  adapterVarName: string,
+  testAdapterImport: ImportDeclaration,
+): PatternInfo | { skip: string } {
+  const stmts = sf.getStatements();
+  const result = extractBeforeAllAndSchema(stmts, "module-level");
+  if ("skip" in result) return result;
+  const { beforeAllStmt, defineSchemaCall } = result;
+
+  let externalDefineSchema = false;
+  sf.forEachDescendant((d) => {
+    if (
+      d.isKind(SyntaxKind.CallExpression) &&
+      callNameMatches(d as CallExpression, "defineSchema") &&
+      d !== defineSchemaCall
+    ) {
+      externalDefineSchema = true;
+    }
+  });
+  if (externalDefineSchema) return { skip: "defineSchema called outside beforeAll" };
+
+  const dsArgs = defineSchemaCall.getArguments();
+  if (dsArgs.length !== 2) return { skip: `defineSchema expected 2 args, got ${dsArgs.length}` };
+  if (dsArgs[0].getText() !== adapterVarName) {
+    return { skip: `defineSchema first arg is "${dsArgs[0].getText()}", not "${adapterVarName}"` };
+  }
+  const schemaArg = dsArgs[1].getText();
+
+  const withTxCalls = stmts
+    .map((s) => s.getExpressionIfKind?.(SyntaxKind.CallExpression))
+    .filter((c): c is CallExpression => !!c && callNameMatches(c, "withTransactionalFixtures"));
+  if (withTxCalls.length > 1) return { skip: "multiple withTransactionalFixtures calls" };
+  const withTxFixturesCall = withTxCalls[0] ?? null;
+
+  const fullText = sf.getFullText();
+  if (/\b(createTable|migration\.up|migration\.run)\b/.test(fullText)) {
+    return { skip: "looks like DDL inside test body (createTable/migration)" };
+  }
+
+  const refErr = checkAdapterRefs(sf, adapterVarName, defineSchemaCall, undefined);
+  if (refErr) return refErr;
 
   return {
     adapterVarName,
@@ -280,6 +338,171 @@ function analyze(sf: SourceFile): PatternInfo | { skip: string } {
     testAdapterImport,
     withTxFixturesCall,
     hasFreshAdapterHelper: false,
+    scope: "module",
+  };
+}
+
+function analyzeDescribeLevel(
+  sf: SourceFile,
+  testAdapterImport: ImportDeclaration,
+): PatternInfo | { skip: string } {
+  // Find top-level describe calls
+  const topDescribes = sf
+    .getStatements()
+    .filter(
+      (s): s is ExpressionStatement =>
+        s.isKind(SyntaxKind.ExpressionStatement) &&
+        callNameMatches(s.getExpressionIfKind(SyntaxKind.CallExpression)!, "describe"),
+    );
+  if (topDescribes.length === 0) return { skip: "no module-level adapter let declaration" };
+
+  // Only handle the single-describe case for now; multiple describes with
+  // distinct adapters need manual migration.
+  if (topDescribes.length > 1) {
+    // Check if any describe has a let adapter inside; if so, it's the multi-describe case
+    for (const ds of topDescribes) {
+      const call = ds.getExpressionIfKind(SyntaxKind.CallExpression)!;
+      const cb = call.getArguments()[1] ?? call.getArguments()[0];
+      if (!cb || !Node.isArrowFunction(cb)) continue;
+      const body = cb.getBody();
+      if (!Node.isBlock(body)) continue;
+      for (const stmt of body.getStatements()) {
+        if (stmt.isKind(SyntaxKind.VariableStatement)) {
+          const vs = stmt.asKindOrThrow(SyntaxKind.VariableStatement);
+          if (vs.getDeclarationKind() !== "let") continue;
+          for (const decl of vs.getDeclarations()) {
+            const typeText = decl.getTypeNode()?.getText() ?? "";
+            if (/TestDatabaseAdapter|DatabaseAdapter/.test(typeText) && !decl.getInitializer()) {
+              return { skip: "multiple top-level describes with describe-level adapters" };
+            }
+          }
+        }
+      }
+    }
+    return { skip: "no module-level adapter let declaration" };
+  }
+
+  const describeStmt = topDescribes[0];
+  const describeCall = describeStmt.getExpressionIfKindOrThrow(SyntaxKind.CallExpression);
+  // describe("Name", () => { ... }) — callback is last arg
+  const args = describeCall.getArguments();
+  const cb = args[args.length - 1];
+  if (!cb || !Node.isArrowFunction(cb))
+    return { skip: "describe callback is not an arrow function" };
+  const body = cb.getBody();
+  if (!Node.isBlock(body)) return { skip: "describe callback body is not a block" };
+
+  // Find `let adapter` inside describe body (direct child only)
+  let adapterVarName: string | null = null;
+  for (const stmt of body.getStatements()) {
+    if (!stmt.isKind(SyntaxKind.VariableStatement)) continue;
+    const vs = stmt.asKindOrThrow(SyntaxKind.VariableStatement);
+    if (vs.getDeclarationKind() !== "let") continue;
+    for (const decl of vs.getDeclarations()) {
+      if (decl.getInitializer()) continue;
+      const typeText = decl.getTypeNode()?.getText() ?? "";
+      if (/TestDatabaseAdapter|DatabaseAdapter/.test(typeText)) {
+        if (adapterVarName) return { skip: "multiple let adapter declarations inside describe" };
+        adapterVarName = decl.getName();
+      }
+    }
+  }
+  if (!adapterVarName) return { skip: "no module-level adapter let declaration" };
+
+  // Must have exactly one createTestAdapter() call inside the describe (in beforeAll)
+  const ctaCalls: CallExpression[] = [];
+  body.forEachDescendant((d) => {
+    if (
+      d.isKind(SyntaxKind.CallExpression) &&
+      callNameMatches(d as CallExpression, "createTestAdapter")
+    ) {
+      ctaCalls.push(d as CallExpression);
+    }
+  });
+  if (ctaCalls.length !== 1) {
+    return { skip: `expected 1 createTestAdapter() inside describe, found ${ctaCalls.length}` };
+  }
+
+  const bodyStmts = body.getStatements();
+  const result = extractBeforeAllAndSchema(bodyStmts, "describe-level");
+  if ("skip" in result) return result;
+  const { beforeAllStmt, defineSchemaCall } = result;
+
+  // No defineSchema outside beforeAll
+  let externalDefineSchema = false;
+  sf.forEachDescendant((d) => {
+    if (
+      d.isKind(SyntaxKind.CallExpression) &&
+      callNameMatches(d as CallExpression, "defineSchema") &&
+      d !== defineSchemaCall
+    ) {
+      externalDefineSchema = true;
+    }
+  });
+  if (externalDefineSchema) return { skip: "defineSchema called outside beforeAll" };
+
+  const dsArgs = defineSchemaCall.getArguments();
+  if (dsArgs.length !== 2) return { skip: `defineSchema expected 2 args, got ${dsArgs.length}` };
+  if (dsArgs[0].getText() !== adapterVarName) {
+    return { skip: `defineSchema first arg is "${dsArgs[0].getText()}", not "${adapterVarName}"` };
+  }
+  const schemaArg = dsArgs[1].getText();
+
+  // Find withTransactionalFixtures inside describe body
+  const withTxCalls = bodyStmts
+    .map((s) => s.getExpressionIfKind?.(SyntaxKind.CallExpression))
+    .filter((c): c is CallExpression => !!c && callNameMatches(c, "withTransactionalFixtures"));
+  if (withTxCalls.length > 1) return { skip: "multiple withTransactionalFixtures calls" };
+  const withTxFixturesCall = withTxCalls[0] ?? null;
+
+  // Find afterAll inside describe body that is ONLY `await dropAllTables(adapter)`
+  // (covered by useHandlerTransactionalFixtures — safe to remove).
+  let afterAllToRemove: ExpressionStatement | undefined;
+  for (const stmt of bodyStmts) {
+    if (!stmt.isKind(SyntaxKind.ExpressionStatement)) continue;
+    const call = stmt.getExpressionIfKind(SyntaxKind.CallExpression);
+    if (!call || call.getExpression().getText() !== "afterAll") continue;
+    const cbArg = call.getArguments()[0];
+    if (!cbArg || !Node.isArrowFunction(cbArg)) continue;
+    const cbBody = cbArg.getBody();
+    if (!Node.isBlock(cbBody)) continue;
+    const cbStmts = cbBody.getStatements().filter((s) => !s.isKind(SyntaxKind.EmptyStatement));
+    if (cbStmts.length !== 1) continue;
+    const only = cbStmts[0];
+    if (!only.isKind(SyntaxKind.ExpressionStatement)) continue;
+    const onlyExpr = only.asKindOrThrow(SyntaxKind.ExpressionStatement).getExpression();
+    // Match: `await dropAllTables(adapter)`
+    const awaitExpr = onlyExpr.isKind(SyntaxKind.AwaitExpression)
+      ? (onlyExpr as any).getExpression()
+      : onlyExpr;
+    if (
+      awaitExpr.isKind(SyntaxKind.CallExpression) &&
+      callNameMatches(awaitExpr as CallExpression, "dropAllTables") &&
+      (awaitExpr as CallExpression).getArguments()[0]?.getText() === adapterVarName
+    ) {
+      afterAllToRemove = stmt.asKindOrThrow(SyntaxKind.ExpressionStatement);
+    }
+  }
+
+  const fullText = sf.getFullText();
+  if (/\b(createTable|migration\.up|migration\.run)\b/.test(fullText)) {
+    return { skip: "looks like DDL inside test body (createTable/migration)" };
+  }
+
+  const refErr = checkAdapterRefs(sf, adapterVarName, defineSchemaCall, afterAllToRemove);
+  if (refErr) return refErr;
+
+  return {
+    adapterVarName,
+    beforeAllStmt,
+    defineSchemaCall,
+    schemaArg,
+    testAdapterImport,
+    withTxFixturesCall,
+    hasFreshAdapterHelper: false,
+    scope: "describe",
+    describeBody: body,
+    afterAllToRemove,
   };
 }
 
@@ -310,16 +533,20 @@ function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): strin
   }
   ensureImport(`${helpersRel}/setup-handler-suite.js`, ["setupHandlerSuite"]);
 
-  // 2) Remove the matching declarator from any module-level `let` statement.
-  // If the statement combines multiple declarations (e.g. `let adapter: ..., other = ...`),
-  // only the adapter declarator is removed; the statement itself is dropped only if it
-  // becomes empty.
-  for (const stmt of [...sf.getVariableStatements()]) {
+  // 2) Remove the matching `let adapter` declarator.
+  // For module-level scope: scan sf.getVariableStatements().
+  // For describe-level scope: scan the describe body statements.
+  const letAdapterSearchScope =
+    info.scope === "describe"
+      ? info
+          .describeBody!.getStatements()
+          .filter((s) => s.isKind(SyntaxKind.VariableStatement))
+          .map((s) => s.asKindOrThrow(SyntaxKind.VariableStatement))
+      : sf.getVariableStatements();
+  for (const stmt of [...letAdapterSearchScope]) {
     if (stmt.wasForgotten() || stmt.getDeclarationKind() !== "let") continue;
     for (const decl of [...stmt.getDeclarations()]) {
       if (decl.getName() === info.adapterVarName) {
-        // ts-morph removes the parent VariableStatement automatically when
-        // its last declarator is dropped, so no extra cleanup is needed.
         decl.remove();
         details.push(`removed "let ${info.adapterVarName}" declarator`);
       }
@@ -363,17 +590,24 @@ function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): strin
   beforeAllArrow.setIsAsync(true);
 
   // 4) Insert `setupHandlerSuite(); useHandlerTransactionalFixtures();` before beforeAll.
-  // The helper encapsulates the withTransactionalFixtures registration and the
-  // afterAll dropAllTables + clearAppliedSchemaSignatures teardown. Pool-level
-  // fixture pinning (handled inside ConnectionPool#pinConnectionBang under
-  // `{ fixture: true }`) is what makes the cross-context beforeEach/afterEach
-  // pairing work — no per-file proxy or _txAdapter declaration needed.
-  // `insertStatements` expects an index into `sf.getStatements()`, not the
-  // raw child index (which counts every AST child including syntax-list
-  // wrappers). Look the statement up by identity in the statements array.
-  const beforeAllIdx = sf.getStatements().indexOf(info.beforeAllStmt);
-  if (beforeAllIdx < 0) throw new Error("beforeAllStmt no longer in SourceFile.getStatements()");
-  sf.insertStatements(beforeAllIdx, [`setupHandlerSuite();`, `useHandlerTransactionalFixtures();`]);
+  // For describe-level, insert inside the describe callback body; vitest scopes
+  // hooks to the enclosing describe automatically.
+  if (info.scope === "describe") {
+    const describeBodyStmts = info.describeBody!.getStatements();
+    const beforeAllIdx = describeBodyStmts.indexOf(info.beforeAllStmt);
+    if (beforeAllIdx < 0) throw new Error("beforeAllStmt no longer in describe body statements");
+    info.describeBody!.insertStatements(beforeAllIdx, [
+      `setupHandlerSuite();`,
+      `useHandlerTransactionalFixtures();`,
+    ]);
+  } else {
+    const beforeAllIdx = sf.getStatements().indexOf(info.beforeAllStmt);
+    if (beforeAllIdx < 0) throw new Error("beforeAllStmt no longer in SourceFile.getStatements()");
+    sf.insertStatements(beforeAllIdx, [
+      `setupHandlerSuite();`,
+      `useHandlerTransactionalFixtures();`,
+    ]);
+  }
   ensureImport(`${helpersRel}/use-handler-transactional-fixtures.js`, [
     "useHandlerTransactionalFixtures",
   ]);
@@ -388,6 +622,13 @@ function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): strin
       parentStmt.remove();
       details.push("removed legacy withTransactionalFixtures(() => adapter) call");
     }
+  }
+
+  // 5b) For describe-level: remove afterAll(dropAllTables) that is now covered by
+  // useHandlerTransactionalFixtures.
+  if (info.afterAllToRemove && !info.afterAllToRemove.wasForgotten()) {
+    info.afterAllToRemove.remove();
+    details.push("removed afterAll(dropAllTables) — covered by useHandlerTransactionalFixtures");
   }
 
   // The withTransactionalFixtures import is no longer needed if it was only used
@@ -405,7 +646,7 @@ function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): strin
     if (imp.getNamedImports().length === 0 && !imp.getDefaultImport()) imp.remove();
   }
 
-  // 7) Remove `this.adapter = adapter` inside static blocks; drop empty static blocks
+  // 7) Remove `this.adapter = adapter` (static blocks) and `ClassName.adapter = adapter`
   sf.forEachDescendant((d) => {
     if (!d.isKind(SyntaxKind.ExpressionStatement)) return;
     const expr = d.getExpressionIfKind(SyntaxKind.BinaryExpression);
@@ -414,10 +655,10 @@ function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): strin
     const lhs = expr.getLeft();
     if (!lhs.isKind(SyntaxKind.PropertyAccessExpression)) return;
     const pae = lhs as any;
-    if (pae.getExpression().getText() !== "this" || pae.getName() !== "adapter") return;
+    if (pae.getName() !== "adapter") return;
     if (expr.getRight().getText() !== info.adapterVarName) return;
     d.remove();
-    details.push("removed this.adapter = adapter assignment");
+    details.push("removed .adapter = adapter assignment");
   });
 
   // Remove now-empty static blocks
@@ -448,6 +689,18 @@ function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): strin
         details.push("removed empty test-adapter.js import");
       }
     }
+  }
+  // Remove drop-all-tables.js import if unused
+  for (const imp of [...sf.getImportDeclarations()]) {
+    if (!imp.getModuleSpecifierValue().endsWith("/drop-all-tables.js")) continue;
+    for (const n of [...imp.getNamedImports()]) {
+      if (n.getName() !== "dropAllTables") continue;
+      const refs = sf
+        .getDescendantsOfKind(SyntaxKind.Identifier)
+        .filter((id) => id.getText() === "dropAllTables" && id !== n.getNameNode());
+      if (refs.length === 0) n.remove();
+    }
+    if (imp.getNamedImports().length === 0 && !imp.getDefaultImport()) imp.remove();
   }
   // Remove ./adapter.js DatabaseAdapter import if unused elsewhere
   for (const imp of [...sf.getImportDeclarations()]) {
