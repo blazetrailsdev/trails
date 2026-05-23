@@ -196,6 +196,7 @@ export default defineConfig({
             "scripts/api-compare/*.test.ts",
             "scripts/fixtures-compare/*.test.ts",
             "scripts/parity/**/*.test.ts",
+            "scripts/test-deps/*.test.ts",
             "vendor/*.test.ts",
           ],
           exclude: ["packages/activerecord/**", ...SHARED_EXCLUDE],
