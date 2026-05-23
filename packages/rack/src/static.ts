@@ -54,7 +54,7 @@ export class Static {
       const gzPath = servePath + ".gz";
       const fullGzPath = getPath().join(this.root, gzPath);
       if (getFs().existsSync(fullGzPath) && !getFs().statSync(fullGzPath).isDirectory()) {
-        const [status, headers, body] = this.fileServer.serving(env, gzPath);
+        const [status, headers, body] = this.fileServer.serving(env, fullGzPath);
         if (status === 200 || status === 304) {
           headers["content-encoding"] = "gzip";
           // Use original content type
@@ -69,7 +69,8 @@ export class Static {
       }
     }
 
-    const [status, headers, body] = this.fileServer.serving(env, servePath);
+    const fullServePath = getPath().join(this.root, servePath);
+    const [status, headers, body] = this.fileServer.serving(env, fullServePath);
 
     if (status === 404) {
       if (this.cascade) {

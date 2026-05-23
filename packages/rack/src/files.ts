@@ -146,6 +146,8 @@ export class Files {
       return this.fail(404, "File not found");
     }
 
+    if (!stat.isFile()) return this.fail(404, "File not found");
+
     const lastModified = stat.mtime.toUTCString();
     const ifModSince = env["HTTP_IF_MODIFIED_SINCE"];
     if (ifModSince && new Date(ifModSince) >= stat.mtime) return [304, {}, []]; // boundary: HTTP-date vs mtime
