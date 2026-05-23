@@ -1,5 +1,1 @@
-export {
-  PermissionsPolicy,
-  type PermissionSource,
-  type DirectiveName,
-} from "./http/permissions-policy.js";
+export { PermissionsPolicy, type PolicySource } from "./http/permissions-policy.js";

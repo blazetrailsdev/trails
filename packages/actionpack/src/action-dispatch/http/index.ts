@@ -18,11 +18,7 @@ export {
   type CspRequestHost,
   type NonceGenerator,
 } from "./content-security-policy.js";
-export {
-  PermissionsPolicy,
-  type PermissionSource,
-  type DirectiveName,
-} from "./permissions-policy.js";
+export { PermissionsPolicy, type PolicySource } from "./permissions-policy.js";
 export { Headers } from "./headers.js";
 export { QueryParser, type QueryPair } from "./query-parser.js";
 export { ParamBuilder, type EncodingTemplate } from "./param-builder.js";
