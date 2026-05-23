@@ -10,7 +10,7 @@ export class Topic extends Base {
     );
     this.scope("approved", (q: any) => q.where({ approved: true }));
     this.scope("rejected", (q: any) => q.where({ approved: false }));
-    this.scope("children", (q: any) => q.where.not({ parent_id: null }));
+    this.scope("children", (q: any) => q.whereNot({ parent_id: null }));
     this.scope("hasChildren", (q: any) =>
       q.where({ id: (Topic as any).children().select("parent_id") }),
     );
@@ -69,7 +69,7 @@ export class Topic extends Base {
   afterTouchCalled = 0;
 
   parent() {
-    return Topic.find((this as any).parentId);
+    return Topic.find(this.readAttribute("parent_id") as number);
   }
 
   topicId() {
@@ -79,7 +79,7 @@ export class Topic extends Base {
   /** @internal */
   private async defaultWrittenOn() {
     if (!(this as any).attributePresent("written_on")) {
-      (this as any).writtenOn = Temporal.Now.instant();
+      this.writeAttribute("written_on", Temporal.Now.instant());
     }
   }
 
@@ -91,7 +91,7 @@ export class Topic extends Base {
   /** @internal */
   private async setEmailAddress() {
     if (!(this as any).isPersisted() && !(this as any).willSaveChangeTo("author_email_address")) {
-      (this as any).authorEmailAddress = "test@test.com";
+      this.writeAttribute("author_email_address", "test@test.com");
     }
   }
 

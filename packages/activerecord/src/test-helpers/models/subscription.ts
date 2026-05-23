@@ -7,6 +7,6 @@ export class Subscription extends Base {
   static {
     this.belongsTo("subscriber", { counterCache: "books_count" });
     this.belongsTo("book");
-    this.validatesPresenceOf("subscriberId", "bookId");
+    this.validatesPresenceOf("subscriber_id", "book_id");
   }
 }
