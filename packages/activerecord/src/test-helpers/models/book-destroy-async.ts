@@ -1,6 +1,7 @@
 // vendor/rails/activerecord/test/models/book_destroy_async.rb
 import { Base } from "../../base.js";
 
+// Rails uses dependent: :destroy_async; TS dependent union doesn't include it yet — using "destroy"
 export class BookDestroyAsync extends Base {
   static _tableName = "books";
 

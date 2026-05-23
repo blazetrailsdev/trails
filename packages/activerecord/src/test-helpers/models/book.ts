@@ -12,6 +12,7 @@ export class Book extends Base {
     this.hasOne("essay");
     this.aliasAttribute("title", "name");
     this.enum("status", { proposed: 0, written: 1, published: 2 });
+    // Rails: { unread: 0, reading: 2, read: 3, forgotten: nil } — null value unsupported by enum()
     this.enum("lastRead", { unread: 0, reading: 2, read: 3 });
     this.enum("nullableStatus", { single: 0, married: 1 });
     this.enum("language", { english: 0, spanish: 1, french: 2 }, { prefix: "in" });
@@ -19,8 +20,9 @@ export class Book extends Base {
     this.enum("illustratorVisibility", { visible: 0, invisible: 1 }, { prefix: true });
     this.enum("fontSize", { small: 0, medium: 1, large: 2 }, { prefix: "with", suffix: true });
     this.enum("difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "toRead" });
-    // cover and boolean_status use non-integer values; cast required until enum supports those
+    // Rails: { hard: "hard", soft: "soft" } — string values unsupported by enum(); using integers
     this.enum("cover", { hard: 0, soft: 1 });
+    // Rails: { enabled: true, disabled: false } — boolean values unsupported by enum(); using integers
     this.enum("booleanStatus", { enabled: 0, disabled: 1 });
   }
 }
@@ -29,6 +31,7 @@ export class PublishedBook extends Base {
   static _tableName = "books";
 
   static {
+    // Rails: { hard: "0", soft: "1" } — string values unsupported by enum(); using integers
     this.enum("cover", { hard: 0, soft: 1 });
     this.validates("isbn", { uniqueness: true });
   }

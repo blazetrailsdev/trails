@@ -38,28 +38,28 @@ export class Topic extends Base {
     this.aliasAttribute("heading", "title");
 
     this.beforeCreate(async function (this: Topic) {
-      await this._defaultWrittenOn();
+      await this.defaultWrittenOn();
     });
     this.beforeDestroy(async function (this: Topic) {
-      await this._destroyChildren();
+      await this.destroyChildren();
     });
     this.beforeValidation(async function (this: Topic) {
-      await this._beforeValidationForTransaction();
+      await this.beforeValidationForTransaction();
     });
     this.beforeSave(async function (this: Topic) {
-      await this._beforeSaveForTransaction();
+      await this.beforeSaveForTransaction();
     });
     this.beforeDestroy(async function (this: Topic) {
-      await this._beforeDestroyForTransaction();
+      await this.beforeDestroyForTransaction();
     });
     this.afterSave(async function (this: Topic) {
-      await this._afterSaveForTransaction();
+      await this.afterSaveForTransaction();
     });
     this.afterCreate(async function (this: Topic) {
-      await this._afterCreateForTransaction();
+      await this.afterCreateForTransaction();
     });
     this.afterInitialize(async function (this: Topic) {
-      await this._setEmailAddress();
+      await this.setEmailAddress();
     });
     this.afterTouch(async function (this: any) {
       this.afterTouchCalled = (this.afterTouchCalled ?? 0) + 1;
@@ -77,34 +77,34 @@ export class Topic extends Base {
   }
 
   /** @internal */
-  private async _defaultWrittenOn() {
+  private async defaultWrittenOn() {
     if (!(this as any).attributePresent("written_on")) {
       (this as any).writtenOn = Temporal.Now.instant();
     }
   }
 
   /** @internal */
-  private async _destroyChildren() {
+  private async destroyChildren() {
     await Topic.deleteBy({ parent_id: (this as any).id });
   }
 
   /** @internal */
-  private async _setEmailAddress() {
+  private async setEmailAddress() {
     if (!(this as any).isPersisted() && !(this as any).willSaveChangeTo("author_email_address")) {
       (this as any).authorEmailAddress = "test@test.com";
     }
   }
 
   /** @internal */
-  private async _beforeValidationForTransaction() {}
+  private async beforeValidationForTransaction() {}
   /** @internal */
-  private async _beforeSaveForTransaction() {}
+  private async beforeSaveForTransaction() {}
   /** @internal */
-  private async _beforeDestroyForTransaction() {}
+  private async beforeDestroyForTransaction() {}
   /** @internal */
-  private async _afterSaveForTransaction() {}
+  private async afterSaveForTransaction() {}
   /** @internal */
-  private async _afterCreateForTransaction() {}
+  private async afterCreateForTransaction() {}
 }
 
 export class DefaultRejectedTopic extends Topic {
