@@ -20,11 +20,9 @@ Current (2026-05-23):
 | test:compare | **773/773 tests (100%)** — 40/40 files ✓                                                   |
 | inheritance  | 41/43 (95.3%)                                                                              |
 
-**All remaining 23 api:compare misses live in indefinitely-deferred files**
-(`reloader.rb` 0/7, `directory.rb` 3/11, `files.rb` 4/8, `static.rb` 3/7).
-Modulo those defers, rack is effectively at 100%. The only remaining
-mechanical step is adding the four files to
-`scripts/api-compare/unported-files.ts` so the headline number reads 100%.
+**16 of the remaining 23 api:compare misses are in `directory.rb` (8),
+`files.rb` (4), and `static.rb` (4)** — back in scope via slots 13–14 below.
+The other 7 are in `reloader.rb` (indefinitely deferred).
 
 ---
 
@@ -57,8 +55,7 @@ Rack pieces that unblock work tracked in
 - `Rack::Session::*` (now `rack-session` gem in Rack 3) — needs a separate
   `@blazetrails/rack-session` package.
 - `Rack::Handler::*` server adapters — Node has its own HTTP layer.
-- `Rack::Files` / `Rack::Static` / `Rack::Directory` / `Rack::Reloader` —
-  static file middleware and Ruby-specific reloader; deferred (see
+- `Rack::Reloader` — Ruby `$LOADED_FEATURES` semantics; no Node analog (see
   [Indefinite defers](#indefinite-defers)).
 
 ---
@@ -99,19 +96,63 @@ documented for completeness):
 
 ---
 
+## Remaining partial files
+
+| File           | %   | Miss | Notes / slot                                                                                                                                                  |
+| -------------- | --- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `directory.rb` | 27% | 8    | `get`, `checkBadRequest`, `checkForbidden`, `listDirectory`, `stat`, `listPath`, `entityNotFound`, `filesizeFormat`. Async fs via activesupport. See slot 13. |
+| `files.rb`     | 50% | 4    | `get`, `fail`, `mimeType`, `filesize`. Range-serving (BaseIterator/Iterator) via async fs. See slot 13.                                                       |
+| `static.rb`    | 43% | 4    | `isAddIndexRoot`, `overwriteFilePath`, `routeFile`, `applicableRules`. Pure routing + header-rule logic; delegates to `Files`. See slot 14.                   |
+
+`reloader.rb` (7 misses, 0%) is intentionally unported — see [Indefinite defers](#indefinite-defers).
+
+---
+
+## PR slots
+
+Slots 0–12 are shipped. Two remain.
+
+- Slot 0 — extractor fix (#2257, 2026-05-22) — lifted baseline 52.5% → 60% ✓
+- Slot 1 — `multipart/uploaded_file` + `multipart/generator` (#2260) ✓
+- Slot 2 — `multipart/parser` part A (#2281) ✓
+- Slot 3 — `multipart/parser` part B (#2289) + closeout (#2295, #2302) ✓
+- Slot 4 — `multipart.rb` facade (#2290) ✓
+- Slot 5 — `query_parser` + `utils.rb` config attrs (#2264, #2295) ✓
+- Slot 6 — `request.rb` forwarded headers (#2280) ✓
+- Slot 7 — `request.rb` predicates + accessors (#2282) ✓
+- Slot 8 — `request.rb` parse internals + multipart bridge (#2288) ✓
+- Slot 9 — `null_logger` 100% + `auth/abstract/request` + `auth/basic` (#2266) ✓
+- Slot 10 — `response.rb` 100% (#2287) ✓
+- Slot 11 — 3-miss leaves bundle (#2267) ✓
+- Slot 12 — 2-miss + 1-miss leaves + version cleanup (#2270) ✓
+
+13. **`files.rb` 100% + `directory.rb` 100%** (~250 LOC). `Files` serves
+    static files with range support (BaseIterator/Iterator); `Directory`
+    renders an HTML index for directory entries. Both use async fs via
+    `@blazetrails/activesupport`. `Directory` depends on `Files`.
+14. **`static.rb` 100%** (~80 LOC). Middleware wrapper around `Files`;
+    pure URL-prefix routing + per-rule HTTP header injection. No direct
+    fs access — depends on slot 13 landing first.
+
+After slots 13–14 land, only `reloader.rb` (indefinitely deferred) remains.
+
+**Cross-package follow-up** (not a rack slot): audit
+activesupport/activemodel/actionpack api-compare diffs after #2257 for
+similar `module_function` and sclass `attr_accessor` shifts; tracked in
+the relevant package plan docs as they surface.
+
+---
+
 ## Indefinite defers (do not port)
 
-Add to `scripts/api-compare/unported-files.ts` to bring the headline
-number to 100%:
+The `unported-files.ts` exclusion entry for `reloader.rb` will be added in
+slot 13 (the next implementation PR).
 
 - `reloader.rb` (7 misses) — Ruby `$LOADED_FEATURES` semantics; Node has
-  no analog.
-- `directory.rb` (8 misses) — directory listing middleware.
-- `files.rb` (4 misses) — file serving middleware.
-- `static.rb` (4 misses) — static file middleware.
+  no analog. **Decision: defer indefinitely.**
 
-Serverless deploys handle directory/static at the platform layer. If any
-of these come back into scope, drop the exclusion and port.
+`directory.rb`, `files.rb`, and `static.rb` were previously deferred but
+are now back in scope — see slots 13–14 above.
 
 ---
 
