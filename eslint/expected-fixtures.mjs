@@ -169,8 +169,23 @@ const rule = {
     if (!railsRel) return {};
     const entry = loadDeps()[railsRel];
     if (!entry || !entry.fixtures || entry.fixtures.length === 0) return {};
+    // Only enforce on files whose Rails counterpart actually references a
+    // fixture record (e.g. `customers(:david)`). Class-level `fixtures :foo`
+    // declarations without record references are inherited scaffolding in
+    // Rails — not load-bearing for the test logic. ~70 of 128 baseline
+    // files fall into that bucket and shouldn't be lint targets.
+    if (!entry.tests || Object.keys(entry.tests).length === 0) return {};
     const rel = repoRel(filename);
     if (rel && loadExclude().has(rel)) return {};
+    // Narrow expected to fixture sets the Rails tests actually reference.
+    // A declaration like `fixtures :a, :b` where only :a is dereferenced
+    // shouldn't force porters to load :b too.
+    const referenced = new Set();
+    for (const t of Object.values(entry.tests)) {
+      for (const k of Object.keys(t.fixtures ?? {})) referenced.add(k);
+    }
+    const expected = entry.fixtures.filter((k) => referenced.has(k));
+    if (expected.length === 0) return {};
     const keys = new Set();
     let found = false;
     return {
@@ -178,7 +193,6 @@ const rule = {
         if (harvestUseFixturesCall(node, keys)) found = true;
       },
       "Program:exit"(node) {
-        const expected = entry.fixtures;
         if (!found) {
           context.report({
             node,

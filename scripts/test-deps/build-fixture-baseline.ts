@@ -37,9 +37,23 @@ async function main(): Promise<void> {
   const excluded: string[] = [];
   let candidates = 0;
   let ported = 0;
+  let scaffoldingOnly = 0;
   for (const [railsRel, entry] of Object.entries(deps)) {
     if (entry.fixtures.length === 0) continue;
     candidates++;
+    // Match the rule's filter: only count fixture sets the Rails tests
+    // actually dereference (e.g. `customers(:david)`). Files where Rails
+    // declares `fixtures :foo` but no test ever calls `foo(:bar)` are
+    // scaffolding-only and the rule will no-op on them.
+    const referenced = new Set<string>();
+    for (const t of Object.values(entry.tests)) {
+      for (const k of Object.keys(t.fixtures ?? {})) referenced.add(k);
+    }
+    const required = entry.fixtures.filter((k) => referenced.has(k));
+    if (required.length === 0) {
+      scaffoldingOnly++;
+      continue;
+    }
     const trailsRel = railsToTrailsRel(railsRel);
     const full = path.join(AR_SRC, trailsRel);
     if (!fs.existsSync(full)) continue;
@@ -60,13 +74,14 @@ async function main(): Promise<void> {
       console.error(`[baseline] failed to parse ${trailsRel}:`, err);
       process.exit(1);
     }
-    const hasAllKeys = foundCall && entry.fixtures.every((k) => keys.has(k));
+    const hasAllKeys = foundCall && required.every((k) => keys.has(k));
     if (!hasAllKeys) excluded.push(path.posix.join("packages/activerecord/src", trailsRel));
   }
   excluded.sort();
   fs.writeFileSync(OUT_PATH, JSON.stringify(excluded, null, 2) + "\n");
 
   console.log(`Rails test files declaring fixtures: ${candidates}`);
+  console.log(`  scaffolding-only (no record refs, rule no-ops): ${scaffoldingOnly}`);
   console.log(`  ported to trails: ${ported}`);
   console.log(`  excluded (no/incomplete useFixtures): ${excluded.length}`);
   console.log(`  ratchet-ready (useFixtures complete): ${ported - excluded.length}`);
