@@ -98,7 +98,7 @@ export class Firm extends Company {
       scope: (q: any) => q.order("id"),
       foreignKey: "client_of",
       className: "Client",
-      dependent: "deleteAll" as any,
+      dependent: "delete",
     });
     this.hasMany("limitedClients", { scope: (q: any) => q.limit(1), className: "Client" });
     this.hasMany("clientsWithInterpolatedConditions", {
@@ -123,7 +123,7 @@ export class Firm extends Company {
       className: "Client",
       primaryKey: "name",
       foreignKey: "firm_name",
-      dependent: "deleteAll" as any,
+      dependent: "delete",
     });
     this.hasMany("clientsGroupedByFirmId", {
       scope: (q: any) => q.group("firm_id").select("firm_id"),
@@ -363,19 +363,19 @@ export class ExclusivelyDependentFirm extends Company {
       scope: (q: any) => q.order("id").where("name = 'BigShot Inc.'"),
       foreignKey: "client_of",
       className: "Client",
-      dependent: "deleteAll" as any,
+      dependent: "delete",
     });
     this.hasMany("dependentHashConditionalClientsOfFirm", {
       scope: (q: any) => q.order("id").where({ name: "BigShot Inc." }),
       foreignKey: "client_of",
       className: "Client",
-      dependent: "deleteAll" as any,
+      dependent: "delete",
     });
     this.hasMany("dependentConditionalClientsOfFirm", {
       scope: (q: any) => q.order("id").where("name = ?", "BigShot Inc."),
       foreignKey: "client_of",
       className: "Client",
-      dependent: "deleteAll" as any,
+      dependent: "delete",
     });
   }
 }
