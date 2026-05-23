@@ -143,7 +143,7 @@ the relevant package plan docs as they surface.
 
 ---
 
-## Indefinite defers (do not port)
+## Indefinite defers
 
 The `unported-files.ts` exclusion entry for `reloader.rb` will be added in
 slot 13 (the next implementation PR).
