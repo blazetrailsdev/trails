@@ -79,3 +79,5 @@ export * from "./vertex.js";
 export * from "./warehouse-thing.js";
 // PR 12: developer cluster
 export * from "./developer.js";
+// Cluster 9: post universe
+export * from "./post.js";
