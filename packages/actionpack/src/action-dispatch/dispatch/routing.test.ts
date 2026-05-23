@@ -1930,7 +1930,7 @@ describe("TestRoutingMapper", () => {
   it("optional scoped root", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
-      r.scope("(:locale)", { locale: /en|pl/ } as never, (r) => {
+      r.scope("(:locale)", (r) => {
         r.root("projects#index");
       });
     });
@@ -1944,7 +1944,7 @@ describe("TestRoutingMapper", () => {
   it("optional scoped path", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
-      r.scope("(:locale)", { locale: /en|pl/ } as never, (r) => {
+      r.scope("(:locale)", (r) => {
         r.resources("descriptions");
       });
     });
