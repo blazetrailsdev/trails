@@ -1,4 +1,6 @@
 // vendor/rails/activerecord/test/models/ — ported model classes for fixture-adoption sweep
+export * from "./book.js";
+export * from "./book-destroy-async.js";
 export * from "./category.js";
 export * from "./categorization.js";
 export * from "./club.js";
@@ -9,7 +11,10 @@ export * from "./member-detail.js";
 export * from "./member-type.js";
 export * from "./membership.js";
 export * from "./reader.js";
+export * from "./reference.js";
 export * from "./sponsor.js";
+export * from "./subscriber.js";
+export * from "./subscription.js";
 export * from "./tag.js";
 export * from "./tagging.js";
 // Cluster 2: pirates/ships universe
@@ -18,6 +23,7 @@ export * from "./parrot.js";
 export * from "./pirate.js";
 export * from "./ship.js";
 export * from "./ship-part.js";
+export * from "./topic.js";
 export * from "./treasure.js";
 export * from "./wheel.js";
 // Cluster 4: pets/animals
