@@ -12,7 +12,9 @@ describe("MimeTypeTest", () => {
     const custom = MimeType.register("text/x-custom-test", "x_custom_test");
     expect(MimeType.lookup("x_custom_test")).toBe(custom);
     MimeType.unregister("x_custom_test");
-    expect(MimeType.lookup("x_custom_test")).toBeUndefined();
+    // Rails: Mime::Type.lookup always returns (creates ad-hoc type for unknowns).
+    // The Rails unregister test only asserts Mime[:sym] (lookupByExtension) is nil.
+    expect(MimeType.lookupByExtension("x_custom_test")).toBeUndefined();
   });
 
   it("parse text with trailing star at the beginning", () => {
@@ -202,9 +204,11 @@ describe("MimeTypeTest", () => {
     MimeType.registerAlias("aliased", "aliased_alias");
     expect(MimeType.lookup("aliased_alias")?.symbol).toBe("aliased");
     MimeType.unregister("aliased");
-    expect(MimeType.lookup("aliased")).toBeUndefined();
-    expect(MimeType.lookup("aliased_alias")).toBeUndefined();
-    expect(MimeType.lookup("application/aliased")).toBeUndefined();
+    // Rails lookup creates ad-hoc types; isRegistered is the existence check.
+    expect(MimeType.isRegistered("aliased")).toBe(false);
+    expect(MimeType.isRegistered("aliased_alias")).toBe(false);
+    expect(MimeType.isRegistered("application/aliased")).toBe(false);
+    expect(MimeType.lookupByExtension("aliased")).toBeUndefined();
   });
 
   it("all() picks up a newly registered type and drops it on unregister", () => {

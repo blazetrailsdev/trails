@@ -357,7 +357,10 @@ export async function sendStream(
     typeof type === "string"
       ? type
       : typeof type === "symbol"
-        ? (MimeType.lookup(type.description ?? "")?.toString() ?? null)
+        ? (() => {
+            const desc = type.description;
+            return desc && MimeType.isRegistered(desc) ? MimeType.lookup(desc).toString() : null;
+          })()
         : null;
   if (!resolved) {
     const dot = filename.lastIndexOf(".");

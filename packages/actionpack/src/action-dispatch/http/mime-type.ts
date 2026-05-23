@@ -102,7 +102,7 @@ export class AcceptList {
     list.sort((a, b) => a.compare(b));
 
     let textXmlIdx = AcceptList.findItemByName(list, "text/xml");
-    const xml = MimeType.lookup("xml");
+    const xml = MimeType.lookupByExtension("xml");
     let appXmlIdx = xml ? AcceptList.findItemByName(list, xml.toString()) : null;
 
     if (textXmlIdx !== null && appXmlIdx !== null) {
@@ -138,7 +138,7 @@ export class AcceptList {
     const seen = new Set<string>();
     const out: MimeType[] = [];
     for (const item of list) {
-      const looked = lookupForParse(item.name);
+      const looked = MimeType.lookup(item.name);
       if (!seen.has(looked.toString())) {
         seen.add(looked.toString());
         out.push(looked);
@@ -156,20 +156,6 @@ export class AcceptList {
 const TRAILING_STAR_REGEXP = /^(text|application)\/\*/;
 const PARAMETER_SEPARATOR_REGEXP = /;\s*q="?/;
 const ACCEPT_HEADER_REGEXP = /[^,\s"](?:[^,"]|"[^"]*")*/g;
-
-/**
- * Mirrors Rails' `Mime::Type.lookup` fallback: if the exact string is not
- * registered, drop any media-type parameters (`;level=2`) and try again,
- * otherwise return a fresh ad-hoc type whose `string` is the stripped form.
- * @internal
- */
-function lookupForParse(s: string): MimeType {
-  const direct = MimeType.lookup(s);
-  if (direct) return direct;
-  const stripped = s.split(";")[0].trimEnd();
-  const fallback = MimeType.lookup(stripped);
-  return fallback ?? new MimeType(stripped, stripped);
-}
 
 export class MimeType {
   /** @internal */
@@ -275,8 +261,22 @@ export class MimeType {
     }
   }
 
-  static lookup(symbolOrString: string): MimeType | undefined {
-    return MimeType.registry.get(symbolOrString);
+  static lookup(symbolOrString: string): MimeType {
+    if (MimeType.registry.has(symbolOrString)) return MimeType.registry.get(symbolOrString)!;
+    const stripped = symbolOrString.split(";")[0].trimEnd();
+    return MimeType.registry.get(stripped) ?? new MimeType(stripped, stripped);
+  }
+
+  /**
+   * Returns true when the symbol or string (after stripping media-type
+   * parameters) resolves to a registered type. Use this instead of `lookup`
+   * when you need to distinguish "known format" from "unknown string".
+   * @internal
+   */
+  static isRegistered(symbolOrString: string): boolean {
+    if (MimeType.registry.has(symbolOrString)) return true;
+    const stripped = symbolOrString.split(";")[0].trimEnd();
+    return MimeType.registry.has(stripped);
   }
 
   static lookupByExtension(ext: string): MimeType | undefined {
@@ -340,7 +340,7 @@ export class MimeType {
       if (header === "") return [];
       const trailing = MimeType.parseTrailingStar(header);
       if (trailing) return trailing;
-      return [lookupForParse(header)];
+      return [MimeType.lookup(header)];
     }
 
     const list: AcceptItem[] = [];

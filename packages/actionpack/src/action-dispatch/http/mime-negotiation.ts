@@ -98,7 +98,7 @@ export function contentMimeType(this: MimeNegotiationHost): MimeType | null {
     let v: MimeType | null = null;
     if (raw) {
       const match = raw.match(/^([^,;]*)/);
-      if (match) v = MimeType.lookup(match[1].trim().toLowerCase()) ?? null;
+      if (match) v = MimeType.lookup(match[1].trim().toLowerCase());
     }
     this.setHeader(CONTENT_TYPE_KEY, v);
     return v;
@@ -149,17 +149,17 @@ export function formats(this: MimeNegotiationHost): MimeType[] {
   let extType: MimeType | undefined;
   if (paramsReadable.call(this)) {
     const f = this.parameters["format"];
-    const found = f != null ? MimeType.lookup(String(f)) : undefined;
+    const found = f != null ? MimeType.lookupByExtension(String(f)) : undefined;
     v = found ? [found] : [];
   } else if (useAcceptHeader.call(this) && validAcceptHeader.call(this)) {
     v = [...accepts.call(this)];
   } else if ((extType = formatFromPathExtension.call(this))) {
     v = [extType];
   } else if (this.xhr) {
-    const js = MimeType.lookup("js");
+    const js = MimeType.lookupByExtension("js");
     v = js ? [js] : [];
   } else {
-    const html = MimeType.lookup("html");
+    const html = MimeType.lookupByExtension("html");
     v = html ? [html] : [];
   }
   v = v.filter((f) => f.symbol || f.ref() === "*/*");
@@ -281,6 +281,6 @@ export function formatFromPathExtension(this: MimeNegotiationHost): MimeType | u
     (this.getHeader("action_dispatch.original_path") as string | undefined) ||
     (this.getHeader("PATH_INFO") as string | undefined);
   const match = path && path.match(/\.(\w+)$/);
-  if (match) return MimeType.lookup(match[1]);
+  if (match) return MimeType.lookupByExtension(match[1]);
   return undefined;
 }
