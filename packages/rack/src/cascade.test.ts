@@ -21,9 +21,9 @@ it("dispatch onward on whatever is passed", async () => {
 
 it("include? returns whether app is included", () => {
   const cascade = new Cascade([notFoundApp, okApp]);
-  expect(cascade.includeApp(notFoundApp)).toBe(true);
-  expect(cascade.includeApp(okApp)).toBe(true);
-  expect(cascade.includeApp(forbiddenApp)).toBe(false);
+  expect(cascade.isInclude(notFoundApp)).toBe(true);
+  expect(cascade.isInclude(okApp)).toBe(true);
+  expect(cascade.isInclude(forbiddenApp)).toBe(false);
 });
 
 it("return 404 if empty", async () => {

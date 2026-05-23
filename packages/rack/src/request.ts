@@ -219,19 +219,17 @@ export class Request {
   get host(): string {
     const httpHost = this.env[HTTP_HOST];
     if (httpHost) {
-      // Strip port from host
-      if (httpHost.includes(":")) {
-        return httpHost.split(":")[0];
-      }
-      return httpHost;
+      const [, h] = splitAuthority(httpHost);
+      return h ?? httpHost;
     }
     return this.env[SERVER_NAME] || "localhost";
   }
 
   get port(): number {
     const httpHost = this.env[HTTP_HOST];
-    if (httpHost && httpHost.includes(":")) {
-      return parseInt(httpHost.split(":")[1]);
+    if (httpHost) {
+      const [, , p] = splitAuthority(httpHost);
+      if (p !== null) return p;
     }
     const httpPort = this.env[HTTP_PORT];
     if (httpPort) return parseInt(httpPort);

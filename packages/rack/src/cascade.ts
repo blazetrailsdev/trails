@@ -31,10 +31,6 @@ export class Cascade {
     this.apps.push(app);
   }
 
-  includeApp(app: RackApp): boolean {
-    return this.apps.includes(app);
-  }
-
   isInclude(app: RackApp): boolean {
     return this.apps.includes(app);
   }

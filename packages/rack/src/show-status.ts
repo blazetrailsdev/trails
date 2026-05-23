@@ -23,7 +23,7 @@ export class ShowStatus {
 
         const detailStr = detail != null ? String(detail) : "";
         const message = HTTP_STATUS_CODES[status] || "Unknown";
-        const html = `<!DOCTYPE html><html><head><title>${status} ${escapeHtml(message)}</title></head><body><h1>${status} ${escapeHtml(message)}</h1><p>${escapeHtml(detailStr)}</p></body></html>`;
+        const html = `<!DOCTYPE html><html><head><title>${status} ${this.h(message)}</title></head><body><h1>${status} ${this.h(message)}</h1><p>${this.h(detailStr)}</p></body></html>`;
         headers[CONTENT_TYPE] = "text/html";
         headers[CONTENT_LENGTH] = String(Buffer.byteLength(html));
         response[2] = [html];
