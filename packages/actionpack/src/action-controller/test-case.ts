@@ -37,6 +37,7 @@ import { camelize, getCrypto } from "@blazetrails/activesupport";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
+import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import { Parameters } from "./metal/strong-parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import type { Metal } from "./metal.js";
@@ -430,13 +431,175 @@ export class TestCase {
  * packages.
  */
 export class TestRequest extends AbstractTestRequest {
-  /** Mirrors Rails `ActionController::TestRequest.new_session`. */
+  /** @internal Custom param parsers keyed by MIME type symbol. */
+  private _customParamParsers: Record<string, (raw: string) => unknown> = {
+    xml: (raw) => {
+      // Rails: Hash.from_xml(raw_post)["hash"] — no XML parser in TS; return raw.
+      return raw;
+    },
+  };
+
+  /** @internal Mirrors Rails `ActionController::TestRequest.new_session`. */
   static newSession(): TestSession {
     return new TestSession();
   }
+
+  /**
+   * Mirrors Rails `ActionController::TestRequest.create(controller_class)`.
+   * Builds a fresh request with default env and a new session.
+   */
+  static create(_controllerClass?: unknown): TestRequest {
+    const env: Record<string, unknown> = {};
+    env["rack.request.cookie_hash"] = {};
+    return new TestRequest({ ...TestRequest.defaultEnv(), ...env });
+  }
+
+  /**
+   * @internal Mirrors Rails `ActionController::TestRequest.default_env` (private class method).
+   * Extends the dispatch-layer DEFAULT_ENV and strips PATH_INFO.
+   */
+  static override defaultEnv(): Record<string, unknown> {
+    const base = AbstractTestRequest.defaultEnv();
+    const env = { ...base };
+    delete (env as Record<string, unknown>)["PATH_INFO"];
+    return env;
+  }
+
+  set queryString(string: string) {
+    this.setHeader("QUERY_STRING", string);
+  }
+
+  set contentType(type: string) {
+    this.setHeader("CONTENT_TYPE", type);
+  }
+
+  /**
+   * Mirrors Rails `TestRequest#assign_parameters`.
+   * Splits parameters into path parameters and query/body parameters, then
+   * encodes the body (or query string) based on the request method and
+   * content type.
+   */
+  assignParameters(
+    _routes: unknown,
+    controllerPath: string,
+    action: string,
+    parameters: Record<string, unknown>,
+    generatedPath: string,
+    queryStringKeys: string[],
+  ): void {
+    const nonPathParameters: Record<string, unknown> = {};
+    const pathParameters: Record<string, string> = {};
+
+    for (const [key, value] of Object.entries(parameters)) {
+      if (queryStringKeys.includes(key)) {
+        nonPathParameters[key] = value;
+      } else {
+        const paramValue = Array.isArray(value) ? value.map((v) => String(v)) : String(value ?? "");
+        pathParameters[key] = Array.isArray(paramValue) ? paramValue.join(",") : paramValue;
+      }
+    }
+
+    if (this.method === "GET" || this.method === "HEAD") {
+      if (!this.getHeader("QUERY_STRING")) {
+        this.queryString = toQueryString(nonPathParameters);
+      }
+    } else {
+      if (shouldMultipart(nonPathParameters)) {
+        this.contentType = multipartContentType();
+        // multipart body encoding not fully implemented; leave body empty
+      } else {
+        if (!this.getHeader("CONTENT_TYPE")) {
+          this.setHeader("CONTENT_TYPE", "application/x-www-form-urlencoded");
+        }
+
+        const ct = this.getHeader("CONTENT_TYPE") ?? "";
+        let data: string;
+
+        if (ct.includes("application/json")) {
+          data = JSON.stringify(nonPathParameters);
+        } else if (ct.includes("application/xml")) {
+          data = toQueryString(nonPathParameters);
+        } else {
+          data = toQueryString(nonPathParameters);
+        }
+
+        const encoded = new TextEncoder().encode(data);
+        this.setHeader("CONTENT_LENGTH", String(encoded.byteLength));
+        this.setHeader("rack.input", data);
+      }
+    }
+
+    if (!this.getHeader("PATH_INFO")) {
+      this.setHeader("PATH_INFO", generatedPath);
+    }
+    if (!this.getHeader("ORIGINAL_FULLPATH")) {
+      this.setHeader("ORIGINAL_FULLPATH", generatedPath);
+    }
+
+    pathParameters["controller"] = controllerPath;
+    pathParameters["action"] = action;
+    this.pathParameters = pathParameters;
+  }
+
+  /** @internal Mirrors Rails `TestRequest#params_parsers` (private). */
+  override paramsParsers(): ParameterParsers {
+    const base = super.paramsParsers();
+    return { ...base, ...this._customParamParsers } as ParameterParsers;
+  }
 }
 
-export class LiveTestResponse extends Response {}
+/** @internal Returns true if any value in params is a file-upload object. */
+function shouldMultipart(params: Record<string, unknown>): boolean {
+  const check = (value: unknown): boolean => {
+    if (Array.isArray(value)) return value.some(check);
+    if (value !== null && typeof value === "object") {
+      if ("name" in value && "content" in value) return true;
+      return Object.values(value as object).some(check);
+    }
+    return false;
+  };
+  return Object.values(params).some(check);
+}
+
+const MULTIPART_BOUNDARY = "----RackMultipart";
+
+function multipartContentType(): string {
+  return `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`;
+}
+
+function toQueryString(params: Record<string, unknown>, prefix = ""): string {
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(params)) {
+    const fullKey = prefix ? `${prefix}[${key}]` : key;
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      parts.push(toQueryString(value as Record<string, unknown>, fullKey));
+    } else if (Array.isArray(value)) {
+      for (const item of value) {
+        parts.push(`${encodeURIComponent(`${fullKey}[]`)}=${encodeURIComponent(String(item))}`);
+      }
+    } else {
+      parts.push(`${encodeURIComponent(fullKey)}=${encodeURIComponent(String(value ?? ""))}`);
+    }
+  }
+  return parts.join("&");
+}
+
+export class LiveTestResponse extends Response {
+  /** Mirrors Rails `LiveTestResponse#success?` (alias of `successful?`). */
+  get isSuccess(): boolean {
+    return this.successful;
+  }
+
+  /** Mirrors Rails `LiveTestResponse#missing?` (alias of `not_found?`). */
+  get isMissing(): boolean {
+    return this.notFound;
+  }
+
+  /** Mirrors Rails `LiveTestResponse#error?` (alias of `server_error?`). */
+  get isError(): boolean {
+    return this.serverError;
+  }
+}
 
 export class TestSession {
   private _data = new Map<string, unknown>();
