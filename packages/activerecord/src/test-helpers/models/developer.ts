@@ -207,6 +207,7 @@ export class DeveloperFilteredOnJoins extends Base {
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
+      scope: (q: any) => q.order("projects.id"),
       foreignKey: "developer_id",
       joinTable: "developers_projects",
     });
@@ -327,6 +328,7 @@ export class EagerDeveloperWithDefaultScope extends Base {
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
+      scope: (q: any) => q.order("projects.id"),
       foreignKey: "developer_id",
       joinTable: "developers_projects",
     });
@@ -338,6 +340,7 @@ export class EagerDeveloperWithClassMethodDefaultScope extends Base {
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
+      scope: (q: any) => q.order("projects.id"),
       foreignKey: "developer_id",
       joinTable: "developers_projects",
     });
@@ -349,6 +352,7 @@ export class EagerDeveloperWithLambdaDefaultScope extends Base {
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
+      scope: (q: any) => q.order("projects.id"),
       foreignKey: "developer_id",
       joinTable: "developers_projects",
     });
@@ -360,6 +364,7 @@ export class EagerDeveloperWithBlockDefaultScope extends Base {
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
+      scope: (q: any) => q.order("projects.id"),
       foreignKey: "developer_id",
       joinTable: "developers_projects",
     });
@@ -371,6 +376,7 @@ export class EagerDeveloperWithCallableDefaultScope extends Base {
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
+      scope: (q: any) => q.order("projects.id"),
       foreignKey: "developer_id",
       joinTable: "developers_projects",
     });
