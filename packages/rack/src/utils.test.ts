@@ -646,3 +646,37 @@ it("multipart limit accessors round-trip", () => {
     Utils.setMultipartTotalPartLimit(origTotal);
   }
 });
+
+it("multipartFileLimit getter/setter overload round-trips", () => {
+  const orig = Utils.multipartFileLimit();
+  try {
+    Utils.multipartFileLimit(77);
+    expect(Utils.multipartFileLimit()).toBe(77);
+  } finally {
+    Utils.multipartFileLimit(orig);
+  }
+  expect(Utils.multipartFileLimit()).toBe(orig);
+});
+
+it("multipartTotalPartLimit getter/setter overload round-trips", () => {
+  const orig = Utils.multipartTotalPartLimit();
+  try {
+    Utils.multipartTotalPartLimit(999);
+    expect(Utils.multipartTotalPartLimit()).toBe(999);
+  } finally {
+    Utils.multipartTotalPartLimit(orig);
+  }
+  expect(Utils.multipartTotalPartLimit()).toBe(orig);
+});
+
+it("defaultQueryParser getter/setter overload round-trips", () => {
+  const orig = Utils.defaultQueryParser();
+  const custom = orig.newDepthLimit(5);
+  try {
+    Utils.defaultQueryParser(custom);
+    expect(Utils.defaultQueryParser()).toBe(custom);
+  } finally {
+    Utils.defaultQueryParser(orig);
+  }
+  expect(Utils.defaultQueryParser()).toBe(orig);
+});
