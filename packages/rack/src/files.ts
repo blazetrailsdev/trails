@@ -1,16 +1,92 @@
-/**
- * @boundary-file: static-file middleware compares HTTP `If-Modified-Since`
- *   (RFC 7231 HTTP-date) against the file's mtime; JS `Date` is the
- *   canonical type for both.
- */
-
 import { getFs, getPath } from "@blazetrails/activesupport";
 import type { FsStatResult } from "@blazetrails/activesupport";
 import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
-import { mimeType } from "./mime.js";
+import { mimeType as lookupMime } from "./mime.js";
+
+const ALLOWED_VERBS = ["GET", "HEAD", "OPTIONS"];
+const ALLOW_HEADER = ALLOWED_VERBS.join(", ");
+export const MULTIPART_BOUNDARY = "AaB03x";
+
+export class BaseIterator {
+  path: string;
+  ranges: [number, number][];
+  options: { mimeType: string | null | undefined; size: number };
+
+  constructor(
+    path: string,
+    ranges: [number, number][],
+    options: { mimeType?: string | null; size: number },
+  ) {
+    this.path = path;
+    this.ranges = ranges;
+    this.options = { mimeType: options.mimeType, size: options.size };
+  }
+
+  each(cb: (chunk: string) => void): void {
+    const fs = getFs();
+    const fd = fs.openSync(this.path, "r");
+    try {
+      for (const range of this.ranges) {
+        if (this.multipart()) cb(this.multipartHeading(range));
+        this.eachRangePart(fd, range, cb);
+      }
+      if (this.multipart()) cb(`\r\n--${MULTIPART_BOUNDARY}--\r\n`);
+    } finally {
+      fs.closeSync(fd);
+    }
+  }
+
+  bytesize(): number {
+    let size = 0;
+    for (const range of this.ranges) {
+      if (this.multipart()) size += Buffer.byteLength(this.multipartHeading(range));
+      size += range[1] - range[0] + 1;
+    }
+    if (this.multipart()) size += Buffer.byteLength(`\r\n--${MULTIPART_BOUNDARY}--\r\n`);
+    return size;
+  }
+
+  close(): void {}
+
+  /** @internal */
+  private multipart(): boolean {
+    return this.ranges.length > 1;
+  }
+
+  /** @internal */
+  private multipartHeading(range: [number, number]): string {
+    const ct = this.options.mimeType ? `content-type: ${this.options.mimeType}\r\n` : "";
+    return (
+      `\r\n--${MULTIPART_BOUNDARY}\r\n` +
+      ct +
+      `content-range: bytes ${range[0]}-${range[1]}/${this.options.size}\r\n\r\n`
+    );
+  }
+
+  /** @internal */
+  private eachRangePart(fd: number, range: [number, number], cb: (chunk: string) => void): void {
+    let remaining = range[1] - range[0] + 1;
+    let offset = range[0];
+    while (remaining > 0) {
+      const len = Math.min(8192, remaining);
+      const buf = Buffer.alloc(len);
+      const read = getFs().readSync(fd, buf, 0, len, offset);
+      if (read === 0) break;
+      cb(buf.slice(0, read).toString("binary"));
+      offset += read;
+      remaining -= read;
+    }
+  }
+}
+
+export class Iterator extends BaseIterator {
+  toPath(): string {
+    return this.path;
+  }
+}
 
 export class Files {
-  private root: string;
+  root: string;
   private headers: Record<string, string>;
   private defaultMime: string | null;
 
@@ -26,199 +102,154 @@ export class Files {
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
     const method = env["REQUEST_METHOD"];
-
-    if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
-      return [405, { allow: "GET, HEAD, OPTIONS" }, ["Method Not Allowed"]];
-    }
-
-    if (method === "OPTIONS") {
-      return [200, { allow: "GET, HEAD, OPTIONS", [CONTENT_LENGTH]: "0" }, []];
-    }
-
-    const pathInfo = env["PATH_INFO"] || "/";
-    return this.serving(env, pathInfo);
+    const [status, headers, body] = this.get(env);
+    return method === "HEAD" ? [status, headers, []] : [status, headers, body];
   }
 
-  serving(env: Record<string, any>, pathInfo: string): [number, Record<string, any>, any] {
-    const decodedPath = decodeURIComponent(pathInfo);
-
-    // Null byte check
-    if (decodedPath.includes("\0")) {
-      return [400, { [CONTENT_TYPE]: "text/plain" }, ["Bad Request"]];
+  get(env: Record<string, any>): [number, Record<string, any>, any] {
+    const method = env["REQUEST_METHOD"];
+    if (!ALLOWED_VERBS.includes(method)) {
+      return this.fail(405, "Method Not Allowed", { allow: ALLOW_HEADER });
     }
 
-    const filePath = this.root ? getPath().join(this.root, decodedPath) : decodedPath;
+    let pathInfo: string;
+    try {
+      pathInfo = decodeURIComponent(env["PATH_INFO"] || "/");
+    } catch {
+      return this.fail(400, "Bad Request");
+    }
+    if (!this.validPath(pathInfo)) return this.fail(400, "Bad Request");
+
+    const cleanPath = pathInfo;
+    const filePath = this.root ? getPath().join(this.root, cleanPath) : cleanPath;
     const resolved = getPath().resolve(filePath);
 
-    // Directory traversal check — separator-aware boundary
     if (this.root && resolved !== this.root && !resolved.startsWith(this.root + getPath().sep)) {
-      return [404, { [CONTENT_TYPE]: "text/plain", [CONTENT_LENGTH]: "10" }, ["Not Found\n"]];
+      return this.fail(404, `File not found: ${pathInfo}`);
+    }
+
+    let isFile = false;
+    try {
+      isFile = getFs().statSync(resolved).isFile();
+    } catch {
+      // not found or unreadable
+    }
+
+    return isFile ? this.serving(env, resolved) : this.fail(404, `File not found: ${pathInfo}`);
+  }
+
+  serving(env: Record<string, any>, path: string): [number, Record<string, any>, any] {
+    const method = env["REQUEST_METHOD"];
+
+    if (method === "OPTIONS") {
+      return [200, { allow: ALLOW_HEADER, [CONTENT_LENGTH]: "0" }, []];
     }
 
     let stat: FsStatResult;
     try {
-      stat = getFs().statSync(resolved);
+      stat = getFs().statSync(path);
     } catch {
-      return [404, { [CONTENT_TYPE]: "text/plain", [CONTENT_LENGTH]: "10" }, ["Not Found\n"]];
+      return this.fail(404, "File not found");
     }
 
-    if (stat.isDirectory()) {
-      return [404, { [CONTENT_TYPE]: "text/plain", [CONTENT_LENGTH]: "10" }, ["Not Found\n"]];
-    }
+    if (!stat.isFile()) return this.fail(404, "File not found");
 
-    const size = stat.size;
-    const headers: Record<string, string> = { ...this.headers };
+    const lastModified = stat.mtime.toUTCString();
+    const ifModSince = env["HTTP_IF_MODIFIED_SINCE"];
+    const headers: Record<string, string> = { "last-modified": lastModified };
 
-    // MIME type
-    const ext = getPath().extname(resolved);
-    const mime = mimeType(ext, this.defaultMime);
-    if (mime) {
-      headers[CONTENT_TYPE] = mime;
-    }
+    if (ifModSince && new Date(ifModSince) >= stat.mtime) return [304, headers, []]; // boundary: HTTP-date vs mtime
+    const mime = this.mimeType(path, this.defaultMime);
+    if (mime) headers[CONTENT_TYPE] = mime;
+    Object.assign(headers, this.headers);
 
-    // Last-Modified
-    headers["last-modified"] = stat.mtime.toUTCString();
+    const size = this.filesize(path);
+    const rawRange = env["HTTP_RANGE"] as string | undefined;
 
-    const method = env["REQUEST_METHOD"];
-
-    // Conditional GET
-    const ifModifiedSince = env["HTTP_IF_MODIFIED_SINCE"];
-    if (ifModifiedSince) {
-      const since = new Date(ifModifiedSince);
-      if (stat.mtime <= since) {
-        return [304, headers, []];
+    if (rawRange && size > 0) {
+      const ranges = this.parseByteRanges(rawRange, size);
+      if (!ranges || ranges.length === 0) {
+        const resp = this.fail(416, "Byte range unsatisfiable");
+        resp[1]["content-range"] = `bytes */${size}`;
+        return resp;
       }
+
+      const status = 206;
+      if (ranges.length === 1) {
+        headers["content-range"] = `bytes ${ranges[0][0]}-${ranges[0][1]}/${size}`;
+      } else {
+        headers[CONTENT_TYPE] = `multipart/byteranges; boundary=${MULTIPART_BOUNDARY}`;
+      }
+      const body = new BaseIterator(path, ranges, { mimeType: mime, size });
+      headers[CONTENT_LENGTH] = String(body.bytesize());
+      return method === "HEAD" ? [status, headers, []] : [status, headers, body];
     }
 
-    // Range handling
-    const range = env["HTTP_RANGE"];
-    if (range && size > 0) {
-      return this.serveRange(resolved, size, range, headers, method);
-    }
-
+    const fullRanges: [number, number][] = size > 0 ? [[0, size - 1]] : [];
+    const body = new Iterator(path, fullRanges, { mimeType: mime, size });
     headers[CONTENT_LENGTH] = String(size);
-
-    if (method === "HEAD") {
-      return [200, headers, []];
-    }
-
-    const body = new FileBody(resolved);
-    return [200, headers, body];
+    return method === "HEAD" ? [200, headers, []] : [200, headers, body];
   }
 
-  private serveRange(
-    filePath: string,
-    size: number,
-    range: string,
-    headers: Record<string, string>,
-    method: string,
+  /** @internal */
+  fail(
+    status: number,
+    body: string,
+    extra: Record<string, string> = {},
   ): [number, Record<string, any>, any] {
-    const ranges = this.parseByteRanges(range, size);
-
-    if (!ranges || ranges.length === 0) {
-      headers["content-range"] = `bytes */${size}`;
-      headers[CONTENT_LENGTH] = "0";
-      return [416, headers, []];
-    }
-
-    if (ranges.length === 1) {
-      const [start, end] = ranges[0];
-      const len = end - start + 1;
-      headers["content-range"] = `bytes ${start}-${end}/${size}`;
-      headers[CONTENT_LENGTH] = String(len);
-
-      if (method === "HEAD") {
-        return [206, headers, []];
-      }
-
-      const buf = Buffer.alloc(len);
-      const fd = getFs().openSync(filePath, "r");
-      getFs().readSync(fd, buf, 0, len, start);
-      getFs().closeSync(fd);
-      return [206, headers, [buf.toString()]];
-    }
-
-    // Multiple ranges
-    const boundary = "AaB03x";
-    const ct = headers[CONTENT_TYPE] || "application/octet-stream";
-    const parts: string[] = [];
-    for (const [start, end] of ranges) {
-      const len = end - start + 1;
-      const buf = Buffer.alloc(len);
-      const fd = getFs().openSync(filePath, "r");
-      getFs().readSync(fd, buf, 0, len, start);
-      getFs().closeSync(fd);
-      parts.push(
-        `\r\n--${boundary}\r\ncontent-type: ${ct}\r\ncontent-range: bytes ${start}-${end}/${size}\r\n\r\n${buf.toString()}`,
-      );
-    }
-    parts.push(`\r\n--${boundary}--\r\n`);
-    const bodyStr = parts.join("");
-    headers[CONTENT_TYPE] = `multipart/byteranges; boundary=${boundary}`;
-    headers[CONTENT_LENGTH] = String(Buffer.byteLength(bodyStr));
-    return [206, headers, [bodyStr]];
+    const msg = body + "\n";
+    return [
+      status,
+      {
+        [CONTENT_TYPE]: "text/plain",
+        [CONTENT_LENGTH]: String(Buffer.byteLength(msg)),
+        "x-cascade": "pass",
+        ...extra,
+      },
+      [msg],
+    ];
   }
 
+  /** @internal */
+  mimeType(path: string, defaultMime: string | null): string | null {
+    return lookupMime(getPath().extname(path), defaultMime);
+  }
+
+  /** @internal */
+  filesize(path: string): number {
+    try {
+      return getFs().statSync(path).size ?? 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /** @internal */
+  private validPath(pathInfo: string): boolean {
+    return !pathInfo.includes("\0");
+  }
+
+  /** @internal */
   private parseByteRanges(range: string, size: number): [number, number][] | null {
     const m = range.match(/^bytes=(.+)$/);
     if (!m) return null;
 
-    const specs = m[1].split(",").map((s) => s.trim());
-    const ranges: [number, number][] = [];
-
-    for (const spec of specs) {
+    const result: [number, number][] = [];
+    for (const spec of m[1].split(",").map((s) => s.trim())) {
       if (spec.startsWith("-")) {
-        const suffixLen = parseInt(spec.substring(1));
-        if (isNaN(suffixLen)) return null;
-        const start = Math.max(0, size - suffixLen);
-        ranges.push([start, size - 1]);
+        const len = parseInt(spec.slice(1));
+        if (isNaN(len) || len <= 0) return null;
+        result.push([Math.max(0, size - len), size - 1]);
       } else if (spec.endsWith("-")) {
         const start = parseInt(spec);
         if (isNaN(start) || start >= size) return null;
-        ranges.push([start, size - 1]);
+        result.push([start, size - 1]);
       } else {
-        const [s, e] = spec.split("-").map(Number);
-        if (isNaN(s) || isNaN(e)) return null;
-        if (s > e || s >= size) return null;
-        ranges.push([s, Math.min(e, size - 1)]);
+        const [a, b] = spec.split("-").map(Number);
+        if (isNaN(a) || isNaN(b) || a > b || a >= size) return null;
+        result.push([a, Math.min(b, size - 1)]);
       }
     }
-
-    return ranges.length > 0 ? ranges : null;
-  }
-}
-
-class FileBody {
-  private path: string;
-
-  constructor(filePath: string) {
-    this.path = filePath;
-  }
-
-  toPath(): string {
-    return this.path;
-  }
-
-  forEach(cb: (chunk: string) => void): void {
-    const data = getFs().readFileSync(this.path, "utf-8");
-    cb(data);
-  }
-
-  each(cb: (chunk: string) => void): void {
-    this.forEach(cb);
-  }
-
-  close(): void {}
-
-  [Symbol.iterator](): Iterator<string> {
-    const data = getFs().readFileSync(this.path, "utf-8");
-    let done = false;
-    return {
-      next() {
-        if (done) return { value: undefined, done: true };
-        done = true;
-        return { value: data, done: false };
-      },
-    };
+    return result.length > 0 ? result : null;
   }
 }

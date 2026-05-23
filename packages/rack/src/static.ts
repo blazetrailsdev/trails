@@ -52,9 +52,14 @@ export class Static {
     // Try gzip version first
     if (this.gzip && this.acceptsGzip(env)) {
       const gzPath = servePath + ".gz";
-      const fullGzPath = getPath().join(this.root, gzPath);
-      if (getFs().existsSync(fullGzPath) && !getFs().statSync(fullGzPath).isDirectory()) {
-        const [status, headers, body] = this.fileServer.serving(env, gzPath);
+      const fullGzPath = getPath().resolve(getPath().join(this.root, gzPath));
+      const gzInRoot = fullGzPath === this.root || fullGzPath.startsWith(this.root + getPath().sep);
+      if (
+        gzInRoot &&
+        getFs().existsSync(fullGzPath) &&
+        !getFs().statSync(fullGzPath).isDirectory()
+      ) {
+        const [status, headers, body] = this.fileServer.serving(env, fullGzPath);
         if (status === 200 || status === 304) {
           headers["content-encoding"] = "gzip";
           // Use original content type
@@ -69,7 +74,12 @@ export class Static {
       }
     }
 
-    const [status, headers, body] = this.fileServer.serving(env, servePath);
+    const fullServePath = getPath().resolve(getPath().join(this.root, servePath));
+    if (fullServePath !== this.root && !fullServePath.startsWith(this.root + getPath().sep)) {
+      if (this.cascade) return this.app(env);
+      return [404, {}, []];
+    }
+    const [status, headers, body] = this.fileServer.serving(env, fullServePath);
 
     if (status === 404) {
       if (this.cascade) {
