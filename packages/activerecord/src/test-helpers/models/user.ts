@@ -26,9 +26,9 @@ export class User extends Base {
 }
 
 hasSecurePassword(User, { validations: false });
-hasSecurePassword(User, "recoveryPassword", { validations: false });
+hasSecurePassword(User, "recovery_password", { validations: false });
 hasSecureToken(User);
-hasSecureToken(User, "authToken", { length: 36 });
+hasSecureToken(User, "auth_token", { length: 36 });
 
 export class UserWithNotification extends User {
   static {
