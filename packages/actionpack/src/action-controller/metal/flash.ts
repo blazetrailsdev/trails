@@ -15,15 +15,6 @@ export class FlashTypeRegistry {
     }
   }
 
-  /** Rails: `Flash::ClassMethods#action_methods` — excludes flash type names from routable actions. */
-  actionMethods(allMethods: Set<string>): Set<string> {
-    const result = new Set(allMethods);
-    for (const type of this._types) {
-      result.delete(type);
-    }
-    return result;
-  }
-
   get types(): ReadonlySet<string> {
     return new Set(this._types);
   }
@@ -48,5 +39,14 @@ export class FlashTypeRegistry {
       delete remaining.flash;
     }
     return remaining;
+  }
+
+  /** Rails `Flash::ClassMethods#action_methods` — filters flash type names out of the controller's public action set. @internal */
+  actionMethods(superMethods: Set<string>): Set<string> {
+    const result = new Set(superMethods);
+    for (const type of this._types) {
+      result.delete(type);
+    }
+    return result;
   }
 }
