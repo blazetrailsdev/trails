@@ -38,9 +38,10 @@ stories to pick up next:
 1. **S6a** (~250 LOC) — port `Basic` HTTP-auth module surface. Test suite
    already landed in #2314; unblocks `metal/http_authentication.rb` 13/33 → 19/33
    and pairs naturally with T-AC1/T-AC2 once S6b follows.
-2. **T-AD11a** (~250 LOC) — first split of `dispatch/routing_test.rb` (185
-   missing → 3 PRs). Pure test port, no upstream dependency, biggest single
-   test:compare lever.
+2. **T-AD11 (part 1)** (~250 LOC) — first ~60-test split of
+   `dispatch/routing_test.rb` (185 missing → 3 PRs; group by Rails
+   describe block). Pure test port, no upstream dependency, biggest
+   single test:compare lever.
 3. **S8** (~200 LOC) — routing leaf bundle. Tiny mapper/route-set fixes that
    unblock T-AC9 (`controller/routing_test.rb`, 140 missing) and T-AC12
    (`resources_test.rb`, 78).

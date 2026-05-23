@@ -14,11 +14,11 @@ pnpm run test:compare 2>&1 | grep "^  rack  —"
 
 Current (2026-05-23):
 
-| Signal       | Status                                    |
-| ------------ | ----------------------------------------- |
-| api:compare  | **459/482 methods (95.2%)** — 45/46 files |
-| test:compare | **773/773 tests (100%)** — 40/40 files ✓  |
-| inheritance  | 41/43 (95.3%)                             |
+| Signal       | Status                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------ |
+| api:compare  | **459/482 methods (95.2%)** — 42/46 files at 100%, 4 partial (all in deferred files below) |
+| test:compare | **773/773 tests (100%)** — 40/40 files ✓                                                   |
+| inheritance  | 41/43 (95.3%)                                                                              |
 
 **All remaining 23 api:compare misses live in indefinitely-deferred files**
 (`reloader.rb` 0/7, `directory.rb` 3/11, `files.rb` 4/8, `static.rb` 3/7).
