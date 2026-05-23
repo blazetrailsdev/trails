@@ -2,7 +2,7 @@
 import { Base } from "../../../base.js";
 
 export class AdminAccount extends Base {
-  static _tableName = "accounts";
+  static _tableName = "admin_accounts";
 
   static {
     this.hasMany("users", { className: "AdminUser" });

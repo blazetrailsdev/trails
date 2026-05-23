@@ -18,7 +18,7 @@ class Coder {
 }
 
 export class AdminUserJson extends Base {
-  static _tableName = "admin_users";
+  static _tableName = "admin_user_jsons";
 
   static {
     this.belongsTo("account", { className: "AdminAccount" });
