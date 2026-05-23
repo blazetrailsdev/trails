@@ -17,6 +17,8 @@ export class CpkAuthor extends Base {
 export class CpkBook extends Base {
   static _tableName = "cpk_books";
 
+  failDestroy = false;
+
   static {
     this.belongsTo("order", {
       autosave: true,
@@ -31,7 +33,7 @@ export class CpkBook extends Base {
     this.belongsTo("author", { className: "CpkAuthor" });
     this.hasMany("chapters", { foreignKey: ["author_id", "book_id"] });
     this.beforeDestroy(function (this: CpkBook) {
-      if ((this as any).failDestroy) throw "abort";
+      if (this.failDestroy) throw "abort";
     });
   }
 }
