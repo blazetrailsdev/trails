@@ -77,9 +77,35 @@ describe("trailsToRailsRel", () => {
   });
 });
 
-// collectUseFixturesKeys is exercised indirectly by the RuleTester cases
-// below (matching/extra/missing/nested/union scenarios all route through it).
-void collectUseFixturesKeys;
+describe("collectUseFixturesKeys", () => {
+  // The rule uses ESLint's CallExpression visitor and never invokes this
+  // helper directly. The baseline builder (scripts/test-deps/build-fixture-
+  // baseline.ts) parses source outside an ESLint run and depends entirely
+  // on this walker, so it needs its own coverage.
+  it("walks the program, unions keys across multiple calls, and ignores non-useFixtures calls", async () => {
+    const { parser } = await import("typescript-eslint");
+    const parse = (s) => parser.parseForESLint(s, { loc: true, range: true }).ast;
+    const src = [
+      'describe("A", () => { useFixtures({ customers: x, "warehouse-things": y }); });',
+      'describe("B", () => { useFixtures({ posts: z }); });',
+      "unrelated({ ignored: 1 });",
+      "useFixtures();", // call with no arg — still counts as `found`
+    ].join("\n");
+    const ast = parse(src);
+    const { found, keys } = collectUseFixturesKeys(ast);
+    expect(found).toBe(true);
+    expect([...keys].sort()).toEqual(["customers", "posts", "warehouse-things"]);
+  });
+
+  it("returns found=false when there are no useFixtures calls", async () => {
+    const { parser } = await import("typescript-eslint");
+    const parse = (s) => parser.parseForESLint(s, { loc: true, range: true }).ast;
+    const ast = parse("const x = other({ customers: 1 });");
+    const { found, keys } = collectUseFixturesKeys(ast);
+    expect(found).toBe(false);
+    expect(keys.size).toBe(0);
+  });
+});
 
 describe("expected-fixtures rule", () => {
   it("runs RuleTester cases", async () => {

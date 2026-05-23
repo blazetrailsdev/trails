@@ -72,12 +72,15 @@ export function trailsToRailsRel(absOrRelPath) {
   return m[1].replace(/-/g, "_") + "_test.rb";
 }
 
-/** Repo-relative path for exclude-list lookup. */
+/**
+ * Repo-relative path for exclude-list lookup. Accepts both absolute
+ * filenames (ESLint's normal contract) and already-relative paths, so it
+ * stays in lockstep with `trailsToRailsRel`'s `(?:^|\/)packages/...` match.
+ */
 function repoRel(filename) {
   const norm = filename.replace(/\\/g, "/");
-  const i = norm.indexOf("/packages/activerecord/src/");
-  if (i < 0) return null;
-  return norm.slice(i + 1);
+  const m = norm.match(/(?:^|\/)(packages\/activerecord\/src\/.+\.test\.ts)$/);
+  return m ? m[1] : null;
 }
 
 /**

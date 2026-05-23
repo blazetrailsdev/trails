@@ -54,12 +54,16 @@ function main(): void {
     let foundCall = false;
     let keys = new Set<string>();
     try {
-      const ast = parser.parse(src, { loc: true, range: true });
+      const ast = parser.parseForESLint(src, { loc: true, range: true }).ast;
       const r = collectUseFixturesKeys(ast);
       foundCall = r.found;
       keys = r.keys;
-    } catch {
-      // Parse failure → treat as failing (excluded).
+    } catch (err) {
+      // Parse failures shouldn't silently bucket the file into excluded —
+      // that would let an upstream API mistake (e.g. wrong parser entrypoint)
+      // pass review by emitting a same-shaped baseline. Surface and fail.
+      console.error(`[baseline] failed to parse ${trailsRel}:`, err);
+      process.exitCode = 1;
     }
     const hasAllKeys = foundCall && entry.fixtures.every((k) => keys.has(k));
     if (!hasAllKeys) excluded.push(path.posix.join("packages/activerecord/src", trailsRel));
