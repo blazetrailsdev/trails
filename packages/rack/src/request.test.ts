@@ -57,16 +57,34 @@ describe("RackRequestTest", () => {
 
   it("yields to the block if no value has been set", () => {
     const req = makeReq();
-    const val = req.get("NONEXISTENT", () => "default");
-    expect(val).toBe("default");
+    let capturedKey: string | undefined;
+    req.fetchHeader("FOO", (k) => {
+      capturedKey = k;
+      req.set("FOO", "bar");
+      return "bar";
+    });
+    expect(capturedKey).toBe("FOO");
+    expect(req.get("FOO")).toBe("bar");
+    // raises when key is absent and no block given (mirrors Hash#fetch / env.fetch)
+    const err = (() => {
+      try {
+        req.fetchHeader("MISSING");
+      } catch (e) {
+        return e as Error;
+      }
+    })()!;
+    expect(err.name).toBe("KeyError");
+    expect(err.message).toMatch("MISSING");
   });
 
   it("can iterate over values", () => {
     const req = makeReq();
-    const keys: string[] = [];
-    req.each((k) => keys.push(k));
-    expect(keys.length).toBeGreaterThan(0);
-    expect(keys).toContain("REQUEST_METHOD");
+    req.set("foo", "bar");
+    const hash: Record<string, any> = {};
+    req.eachHeader((k, v) => {
+      hash[k] = v;
+    });
+    expect(hash["foo"]).toBe("bar");
   });
 
   it("can set values in the env", () => {
@@ -349,6 +367,7 @@ describe("RackRequestTest", () => {
   it("should use the query_parser for query parsing", () => {
     const req = makeReq("/?foo=bar&baz=qux");
     expect(req.GET).toEqual({ foo: "bar", baz: "qux" });
+    expect(req.parseQuery("a=1&b=2")).toEqual({ a: "1", b: "2" });
   });
 
   it("does not use semi-colons as separators for query strings in GET", () => {
@@ -1378,11 +1397,28 @@ describe("RackRequestTest", () => {
 
   it("return values for the keys in the order given from values_at", () => {
     const req = makeReq("/?foo=baz&wun=der&bar=ful");
-    const params = req.params;
-    // values_at returns param values in the order of the given keys
-    expect([params["foo"]]).toEqual(["baz"]);
-    expect([params["foo"], params["wun"]]).toEqual(["baz", "der"]);
-    expect([params["bar"], params["foo"], params["wun"]]).toEqual(["ful", "baz", "der"]);
+    expect(req.valuesAt("foo")).toEqual(["baz"]);
+    expect(req.valuesAt("foo", "wun")).toEqual(["baz", "der"]);
+    expect(req.valuesAt("bar", "foo", "wun")).toEqual(["ful", "baz", "der"]);
+  });
+
+  it("expose the HTTP_HOST as hostAuthority", () => {
+    const req = makeReq("/", { HTTP_HOST: "example.com:8080" });
+    expect(req.hostAuthority).toBe("example.com:8080");
+    expect(makeReq("/").hostAuthority).toBeNull();
+  });
+
+  it("detect parseable data media types", () => {
+    expect(makeReq("/", { CONTENT_TYPE: "multipart/related" }).isParseableData()).toBe(true);
+    expect(makeReq("/", { CONTENT_TYPE: "multipart/mixed" }).isParseableData()).toBe(true);
+    expect(makeReq("/", { CONTENT_TYPE: "multipart/form-data" }).isParseableData()).toBe(false);
+    expect(makeReq("/", { CONTENT_TYPE: "application/json" }).isParseableData()).toBe(false);
+  });
+
+  it("restore the path as scriptName + pathInfo", () => {
+    const req = makeReq("http://example.com/foo/bar?q=1");
+    req.env["SCRIPT_NAME"] = "/app";
+    expect(req.path).toBe("/app/foo/bar");
   });
 
   it("respond to isLink, isTrace, isUnlink", () => {
