@@ -73,7 +73,7 @@ describe("modulesForHelpers", () => {
 describe("allHelpersFromPath", () => {
   let root: string;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     root = mkdtempSync(join(tmpdir(), "helpers-pr-b-"));
     mkdirSync(join(root, "nested"), { recursive: true });
     writeFileSync(join(root, "application_helper.ts"), "export const x = 1;");
@@ -82,7 +82,11 @@ describe("allHelpersFromPath", () => {
     writeFileSync(join(root, "nested", "admin_helper.ts"), "export const x = 1;");
     // not a helper file — should be ignored
     writeFileSync(join(root, "controller.ts"), "export const x = 1;");
-  });
+    // allHelpersFromPath does a dynamic import on its first call; warm it up
+    // here so the cold-start cost (tinyglobby/fdir module init) is paid in
+    // beforeAll rather than inside the first it(), which has a 5 s timeout.
+    await allHelpersFromPath(root);
+  }, 15_000);
 
   afterAll(() => rmSync(root, { recursive: true, force: true }));
 
