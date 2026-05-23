@@ -2013,6 +2013,73 @@ describe("TestRoutingMapper", () => {
   it.skip("duplicate route name raises error", () => {
     // RouteSet currently allows duplicate named routes (Mapper emits singular for index+show)
   });
+
+  // draw-time validation not yet implemented in Mapper/RouteSet
+  it.skip("duplicate route name via resources raises error", () => {});
+  it.skip("controller name with leading slash raise error", () => {});
+  it.skip("match with empty via", () => {});
+  it.skip("multiple roots raises error", () => {});
+  it.skip("multiple namespaced roots", () => {});
+
+  // shallow: routing not ported
+  it.skip("resource new actions", () => {});
+  it.skip("shallow false inside nested shallow resource", () => {});
+  it.skip("shallow deeply nested resources", () => {});
+  it.skip("direct children of shallow resources", () => {});
+  it.skip("shallow nested resources within scope", () => {});
+  it.skip("shallow option nested resources within scope", () => {});
+  it.skip("shallow nested routes ignore module", () => {});
+  it.skip("shallow custom param", () => {});
+  it.skip("shallow path inside namespace is not added twice", () => {});
+  it.skip("shallow path and prefix are not added to non shallow routes", () => {});
+  it.skip("scope path is copied to shallow path", () => {});
+  it.skip("scope as is copied to shallow prefix", () => {});
+  it.skip("scope shallow prefix is not overwritten by as", () => {});
+  it.skip("scope shallow path is not overwritten by path", () => {});
+
+  // url_helpers (ActionDispatch::Routing::UrlFor) not ported
+  it.skip("url generator for optional prefix static and dynamic segment", () => {});
+  it.skip("url recognition for optional static segments", () => {});
+  it.skip("except option should override scoped only", () => {});
+  it.skip("only option should override scoped except", () => {});
+  it.skip("only scope should override parent scope", () => {});
+  it.skip("except scope should override parent scope", () => {});
+  it.skip("except scope should override parent only scope", () => {});
+  it.skip("only scope should override parent except scope", () => {});
+  it.skip("resource constraints are pushed to scope", () => {});
+  it.skip("custom resource actions defined using string", () => {});
+  it.skip("named route check", () => {});
+  it.skip("explicitly avoiding the named route", () => {});
+  it.skip("nested route in nested resource", () => {});
+  it.skip("root in deeply nested scope", () => {});
+  it.skip("multiple positional args with the same name", () => {});
+  it.skip("resource where as is empty", () => {});
+  it.skip("resources where as is empty", () => {});
+  it.skip("scope where as is empty", () => {});
+  it.skip("multiple named roots", () => {});
+  it.skip("nested routes under format resource", () => {});
+  it.skip("passing action parameters to url helpers raises error if parameters are not permitted", () => {});
+  it.skip("passing action parameters to url helpers is allowed if parameters are permitted", () => {});
+
+  // redirect() helper not ported
+  it.skip("redirect https", () => {});
+  it.skip("redirect argument error", () => {});
+
+  // HTTP dispatch integration tests — require live request cycle
+  it.skip("greedy resource id regexp doesnt match edit and custom action", () => {});
+  it.skip("path parameters is not stale", () => {});
+  it.skip("action from path is frozen", () => {});
+  it.skip("absolute controller namespace", () => {});
+  it.skip("namespace as controller", () => {});
+  it.skip("route with dashes in path", () => {});
+  it.skip("shorthand route with dashes in path", () => {});
+  it.skip("resource routes with dashes in path", () => {});
+  it.skip("mix string to controller action", () => {});
+  it.skip("mix string to controller", () => {});
+  it.skip("mix string to action", () => {});
+  it.skip("head fetch with mount on root", () => {});
+  it.skip("dynamic action segments are deprecated", () => {});
+  it.skip("routes with double colon", () => {});
 });
 
 // ==========================================================================
@@ -2224,4 +2291,185 @@ describe("TestUrlGenerationErrors", () => {
     const routes = new RouteSet();
     expect(() => routes.pathFor("nonexistent")).toThrow(/No route matches name/);
   });
+});
+
+describe("TestAltApp", () => {
+  // All tests require HTTP dispatch with custom Rack middleware — not ported
+  it.skip("alt request without header", () => {});
+  it.skip("alt request with matched header", () => {});
+  it.skip("alt request with unmatched header", () => {});
+});
+
+describe("TestNamespaceWithControllerOption", () => {
+  // All tests require draw-time validation not yet implemented in Mapper
+  it.skip("missing controller", () => {});
+  it.skip("missing controller with to", () => {});
+  it.skip("implicit controller with to", () => {});
+  it.skip("to is a symbol", () => {});
+  it.skip("missing action with to", () => {});
+  it.skip("valid controller options inside namespace", () => {});
+  it.skip("resources with valid namespaced controller option", () => {});
+  it.skip("warn with ruby constant syntax controller option", () => {});
+  it.skip("warn with ruby constant syntax namespaced controller option", () => {});
+  it.skip("warn with ruby constant syntax no colons", () => {});
+});
+
+describe("TestGlobRoutingMapper", () => {
+  // All tests require HTTP dispatch integration — glob constraint dispatch not ported
+  it.skip("glob constraint", () => {});
+  it.skip("glob constraint skip route", () => {});
+  it.skip("glob constraint skip all", () => {});
+});
+
+describe("TestOptimizedNamedRoutes", () => {
+  // All tests require url_helpers / UrlFor module not ported
+  it.skip("enabled when not mounted and default_url_options is empty", () => {});
+  it.skip("named route called as singleton method", () => {});
+  it.skip("named route called on included module", () => {});
+  it.skip("nested optional segments are removed", () => {});
+  it.skip("segments with same prefix are replaced correctly", () => {});
+  it.skip("segments separated with a period are replaced correctly", () => {});
+  it.skip("segments with question marks are escaped", () => {});
+  it.skip("segments with slashes are escaped", () => {});
+  it.skip("glob segments with question marks are escaped", () => {});
+  it.skip("glob segments with slashes are not escaped", () => {});
+});
+
+describe("TestNamedRouteUrlHelpers", () => {
+  it.skip("URL helpers do not ignore nil parameters when using non-optimized routes", () => {
+    // url_helpers / UrlFor not ported
+  });
+});
+
+describe("TestUrlConstraints", () => {
+  // All tests require url_helpers + constraint propagation to defaults not ported
+  it.skip("constraints are copied to defaults when using constraints method", () => {});
+  it.skip("constraints are copied to defaults when using scope constraints hash", () => {});
+  it.skip("constraints are copied to defaults when using route constraints hash", () => {});
+  it.skip("false constraint expressions check for absence of values", () => {});
+  it.skip("true constraint expressions check for presence of values", () => {});
+});
+
+describe("TestInvalidUrls", () => {
+  // All tests require HTTP dispatch integration — request encoding handling not ported
+  it.skip("invalid UTF-8 encoding returns a bad request", () => {});
+  it.skip("params param_encoding uses ASCII 8bit", () => {});
+  it.skip("does not encode params besides id", () => {});
+});
+
+describe("TestOptionalRootSegments", () => {
+  it.skip("optional root segments", () => {
+    // url_helpers not ported
+  });
+});
+
+describe("TestPortConstraints", () => {
+  // All tests require HTTP dispatch with port-based constraint matching not ported
+  it.skip("integer port constraints", () => {});
+  it.skip("string port constraints", () => {});
+  it.skip("array port constraints", () => {});
+  it.skip("regexp port constraints", () => {});
+});
+
+describe("TestFormatConstraints", () => {
+  // All tests require HTTP dispatch with format constraint matching not ported
+  it.skip("string format constraints", () => {});
+  it.skip("regexp format constraints", () => {});
+  it.skip("enforce with format true with constraint", () => {});
+  it.skip("enforce with string", () => {});
+});
+
+describe("TestCallableConstraintValidation", () => {
+  it.skip("constraint with object not callable", () => {
+    // Draw-time validation of callable constraints not ported
+  });
+});
+
+describe("TestRouteDefaults", () => {
+  // Both tests require url_helpers not ported
+  it.skip("route options are required for url for", () => {});
+  it.skip("route defaults are not required for url for", () => {});
+});
+
+describe("TestRackAppRouteGeneration", () => {
+  it.skip("mounted application doesnt match unnamed route", () => {
+    // url_helpers + Rack app mounting not ported
+  });
+});
+
+describe("TestRedirectRouteGeneration", () => {
+  it.skip("redirect doesnt match unnamed route", () => {
+    // url_helpers + redirect() helper not ported
+  });
+});
+
+describe("TestErrorsInController", () => {
+  // All tests require HTTP dispatch — controller error propagation not ported
+  it.skip("legit no method errors are not caught", () => {});
+  it.skip("legit name errors are not caught", () => {});
+  it.skip("legit routing not found responses", () => {});
+});
+
+describe("TestPartialDynamicPathSegments", () => {
+  it("paths with partial dynamic segments are recognised", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/songs/song-:song", { to: "songs#show" });
+      r.get("/songs/:song-song", { to: "songs#show2" });
+      r.get("/:artist/song-:song", { to: "songs#artist_show" });
+      r.get("/:artist/:song-song", { to: "songs#artist_show2" });
+    });
+    let m = routes.recognize("GET", "/songs/song-changes");
+    expect(m).not.toBeNull();
+    expect(m!.params.song).toBe("changes");
+    m = routes.recognize("GET", "/songs/changes-song");
+    expect(m).not.toBeNull();
+    expect(m!.params.song).toBe("changes");
+    m = routes.recognize("GET", "/david-bowie/song-changes");
+    expect(m).not.toBeNull();
+    expect(m!.params.artist).toBe("david-bowie");
+    expect(m!.params.song).toBe("changes");
+    m = routes.recognize("GET", "/david-bowie/changes-song");
+    expect(m).not.toBeNull();
+    expect(m!.params.artist).toBe("david-bowie");
+    expect(m!.params.song).toBe("changes");
+  });
+});
+
+describe("TestOptionalScopesWithOrWithoutParams", () => {
+  // Both tests require url_helpers with optional scope segments not ported
+  it.skip("stays unscoped with or without params", () => {});
+  it.skip("preserves scope with or without params", () => {});
+});
+
+describe("TestPathParameters", () => {
+  it.skip("path parameters are not mutated", () => {
+    // HTTP dispatch integration test — path_parameters on live request not ported
+  });
+});
+
+describe("TestInternalRoutingParams", () => {
+  it("paths with partial dynamic segments are recognised", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/test_internal/:internal", { to: "internal#internal" });
+    });
+    const m = routes.recognize("GET", "/test_internal/123");
+    expect(m).not.toBeNull();
+    expect(m!.params.internal).toBe("123");
+    expect(m!.route.controller).toBe("internal");
+    expect(m!.route.action).toBe("internal");
+  });
+});
+
+describe("FlashRedirectTest", () => {
+  it.skip("block redirect commits flash", () => {
+    // Requires ActionDispatch::Flash middleware and HTTP dispatch — not ported
+  });
+});
+
+describe("TestRelativeUrlRootGeneration", () => {
+  // Both tests require url_helpers with SCRIPT_NAME/relative_url_root not ported
+  it.skip("url helpers", () => {});
+  it.skip("optimized url helpers", () => {});
 });
