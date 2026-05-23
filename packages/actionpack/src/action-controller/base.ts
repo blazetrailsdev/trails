@@ -38,6 +38,9 @@ import {
   httpBasicAuthenticateOrRequestWith,
   httpBasicAuthenticateWith,
   requestHttpBasicAuthentication,
+  authenticateOrRequestWithHttpDigest,
+  authenticateWithHttpDigest,
+  requestHttpDigestAuthentication,
 } from "./metal/http-authentication.js";
 import { sendFileHeadersBang } from "./metal/data-streaming.js";
 import {
@@ -693,6 +696,12 @@ export class Base extends Metal {
   authenticateOrRequestWithHttpBasic = authenticateOrRequestWithHttpBasic;
   authenticateWithHttpBasic = authenticateWithHttpBasic;
   requestHttpBasicAuthentication = requestHttpBasicAuthentication;
+
+  // --- HTTP Digest authentication ---
+
+  authenticateOrRequestWithHttpDigest = authenticateOrRequestWithHttpDigest;
+  authenticateWithHttpDigest = authenticateWithHttpDigest;
+  requestHttpDigestAuthentication = requestHttpDigestAuthentication;
 
   // --- Rescue ---
 
