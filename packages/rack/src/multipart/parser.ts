@@ -191,6 +191,8 @@ class Collector {
 // ── Parser ────────────────────────────────────────────────────────────────────
 
 type State = "FAST_FORWARD" | "CONSUME_TOKEN" | "MIME_HEAD" | "MIME_BODY" | "DONE";
+const CONTENT_DISPOSITION_MAX_PARAMS = 16;
+const CONTENT_DISPOSITION_MAX_BYTES = 1536;
 
 export class Parser {
   static readonly BUFSIZE = 1_048_576;
@@ -313,7 +315,7 @@ export class Parser {
       ct = MULTIPART_CONTENT_TYPE.exec(head)?.[1] ?? null;
     let name: string | undefined, filename: string | undefined, fstar: string | undefined;
     const dm = MULTIPART_CONTENT_DISPOSITION.exec(head);
-    if (dm && dm[1].length <= 1536) {
+    if (dm && dm[1].length <= CONTENT_DISPOSITION_MAX_BYTES) {
       const p = this.parseDispositionParams(dm[1]);
       name = p.name;
       filename = p.filename;
@@ -391,7 +393,7 @@ export class Parser {
       np = 0;
     while (pos < raw.length) {
       const ei = raw.indexOf("=", pos);
-      if (ei < 0 || ++np > 16) break;
+      if (ei < 0 || ++np > CONTENT_DISPOSITION_MAX_PARAMS) break;
       const pn = raw.slice(pos, ei).trim().toLowerCase();
       pos = ei + 1;
       let v = "";
