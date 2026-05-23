@@ -9,10 +9,14 @@
 import {
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent as Event,
-  type Logger,
 } from "@blazetrails/activesupport";
 
 export class LogSubscriber extends BaseLogSubscriber {
+  /** Rails `ActionController::LogSubscriber#logger` — delegates to `Base.logger`. @internal */
+  override get logger() {
+    return LogSubscriber.logger;
+  }
+
   startProcessing(event: Event): void {
     const { controller, action, format } = event.payload as {
       controller: string;
@@ -69,10 +73,6 @@ export class LogSubscriber extends BaseLogSubscriber {
           .join(", ")} }`
       : "";
     this._debug(`Unpermitted parameter${keys.length > 1 ? "s" : ""}: ${displayKeys}${contextStr}`);
-  }
-
-  override get logger(): Logger | null {
-    return (this.constructor as typeof LogSubscriber).logger;
   }
 }
 
