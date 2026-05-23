@@ -70,7 +70,7 @@ export class Developer extends Base {
     this.hasMany("strictLoadingOptAuditLogs", { strictLoading: true, className: "AuditLog" });
     this.hasMany("contracts");
     this.hasMany("firms", { through: "contracts", source: "firm" });
-    this.hasMany("comments", {});
+    this.hasMany("comments");
     this.hasMany("ratings", { through: "comments" });
 
     this.hasOne("ship", { dependent: "nullify" });
@@ -210,13 +210,9 @@ export class DeveloperFilteredOnJoins extends Base {
       foreignKey: "developer_id",
       joinTable: "developers_projects",
     });
-  }
-
-  static override defaultScope(q?: any) {
-    if (q === undefined) {
-      return (this as any).joins("projects").where({ projects: { name: "Active Controller" } });
-    }
-    return super.defaultScope(q);
+    this.defaultScope((q: any) =>
+      q.joins("projects").where({ projects: { name: "Active Controller" } }),
+    );
   }
 }
 
@@ -263,13 +259,7 @@ export class CallableDeveloperCalledDavid extends Base {
 export class ClassMethodDeveloperCalledDavid extends Base {
   static {
     this.tableName = "developers";
-  }
-
-  static override defaultScope(q?: any) {
-    if (q === undefined) {
-      return (this as any).where({ name: "David" });
-    }
-    return super.defaultScope(q);
+    this.defaultScope((q: any) => q.where({ name: "David" }));
   }
 }
 
@@ -277,13 +267,7 @@ export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
   static {
     this.tableName = "developers";
     this.scope("david", (q: any) => q.where({ name: "David" }));
-  }
-
-  static override defaultScope(q?: any) {
-    if (q === undefined) {
-      return (this as any).david();
-    }
-    return super.defaultScope(q);
+    this.defaultScope((q: any) => (ClassMethodReferencingScopeDeveloperCalledDavid as any).david());
   }
 }
 
@@ -357,13 +341,7 @@ export class EagerDeveloperWithClassMethodDefaultScope extends Base {
       foreignKey: "developer_id",
       joinTable: "developers_projects",
     });
-  }
-
-  static override defaultScope(q?: any) {
-    if (q === undefined) {
-      return (this as any).includes("projects");
-    }
-    return super.defaultScope(q);
+    this.defaultScope((q: any) => q.includes("projects"));
   }
 }
 
@@ -403,13 +381,7 @@ export class EagerDeveloperWithCallableDefaultScope extends Base {
 export class ThreadsafeDeveloper extends Base {
   static {
     this.tableName = "developers";
-  }
-
-  static override defaultScope(q?: any) {
-    if (q === undefined) {
-      return (this as any).limit(1);
-    }
-    return super.defaultScope(q);
+    this.defaultScope((q: any) => q.limit(1));
   }
 }
 
@@ -443,7 +415,7 @@ export class AttributedDeveloper extends Base {
   static {
     this.tableName = "developers";
     this.attribute("name", "developer_name");
-    this.ignoredColumns = [...(this.ignoredColumns ?? []), "name"];
+    this.ignoredColumns = ["name"];
   }
 }
 
