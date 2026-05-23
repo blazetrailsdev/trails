@@ -543,7 +543,7 @@ export class TestRequest extends AbstractTestRequest {
 
         const ct = this.getHeader("CONTENT_TYPE") ?? "";
         let data: string;
-        const mimeSymbol = MimeType.lookup(ct.split(";")[0].trim()).symbol;
+        const mimeSymbol = MimeType.lookup(ct.split(";")[0].trim().toLowerCase()).symbol;
 
         if (mimeSymbol === "json") {
           data = JSON.stringify(nonPathParameters);
