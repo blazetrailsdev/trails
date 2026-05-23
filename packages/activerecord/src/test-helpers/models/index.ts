@@ -6,3 +6,11 @@ export * from "./essay.js";
 export * from "./reader.js";
 export * from "./tag.js";
 export * from "./tagging.js";
+// Cluster 2: pirates/ships universe
+export * from "./bird.js";
+export * from "./parrot.js";
+export * from "./pirate.js";
+export * from "./ship.js";
+export * from "./ship-part.js";
+export * from "./treasure.js";
+export * from "./wheel.js";
