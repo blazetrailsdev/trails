@@ -698,11 +698,11 @@ async function main(): Promise<void> {
   console.log(
     `schema — ported=${ported}/${evaluated.length} extras-flagged=${withExtras} (skipped ${results.length - evaluated.length})`,
   );
-  console.log("(MISSING/DIFF soft per Decision 4 until PR 7; runtime errors hard-fail)");
+  console.log("(fixture MISSING/DIFF soft — currently 0; runtime errors hard-fail)");
 
   if (models) runModelsPass(filter, incomplete);
 
-  // Decision 4 names DIFF/MISSING as soft; YAML/TS load errors are script-runtime, hard-fail.
+  // Fixture MISSING/DIFF are soft (currently 0 after PR 7 closed all gaps). YAML/TS load errors are script-runtime, hard-fail.
   const hard: readonly Status[] = ["YAML-PARSE-ERR", "TS-IMPORT-ERR", "TS-EXPORT-MISSING"];
   if (results.some((r) => hard.includes(r.status))) process.exit(1);
 }
