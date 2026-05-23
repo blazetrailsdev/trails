@@ -126,7 +126,7 @@ export interface AssociationOptions {
   associationForeignKey?: string;
   /** Overrides the column used to store the polymorphic type string.
    * Mirrors Rails' `belongs_to :thing, polymorphic: true, foreign_type: "sponsorable_type"`.
-   * When absent the default is `${associationName}_type`. */
+   * When absent the default is `${underscore(associationName)}_type`. */
   foreignType?: string;
   /** When true, records loaded through this association are marked
    * strict-loading, causing further lazy loads on them to raise.
@@ -2167,7 +2167,7 @@ export async function updateCounterCaches(
     // For polymorphic, resolve model from _type column
     let className: string;
     if (assoc.options.polymorphic) {
-      const typeCol = `${underscore(assoc.name)}_type`;
+      const typeCol = assoc.options.foreignType ?? `${underscore(assoc.name)}_type`;
       const typeName = record._readAttribute(typeCol) as string | null;
       if (!typeName) continue;
       className = typeName;
@@ -2283,7 +2283,7 @@ export function setBelongsTo(
       record._writeAttribute(foreignKey as string, target._readAttribute(primaryKey as string));
     }
     if (options.polymorphic) {
-      const typeCol = `${underscore(assocName)}_type`;
+      const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
       record._writeAttribute(typeCol, targetCtor!.name);
     }
   } else {
@@ -2295,7 +2295,7 @@ export function setBelongsTo(
       record._writeAttribute(foreignKey as string, null);
     }
     if (options.polymorphic) {
-      const typeCol = `${underscore(assocName)}_type`;
+      const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
       record._writeAttribute(typeCol, null);
     }
   }
@@ -2428,7 +2428,7 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
 
     let className: string;
     if (assoc.options.polymorphic) {
-      const typeCol = `${underscore(assoc.name)}_type`;
+      const typeCol = assoc.options.foreignType ?? `${underscore(assoc.name)}_type`;
       const typeName = record._readAttribute(typeCol) as string | null;
       if (!typeName) continue;
       className = typeName;

@@ -233,6 +233,53 @@ describe("BelongsToAssociations", () => {
     expect((loaded as any).name).toBe("Widget");
   });
 
+  it("polymorphic belongs_to with foreignType writes overridden type column on assignment", async () => {
+    await defineSchema(adapter, {
+      ft_targets: { label: "string" },
+      ft_owners: { sponsorable_id: "integer", sponsorable_type: "string" },
+    });
+    class FtTarget extends Base {
+      static {
+        this._tableName = "ft_targets";
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
+    }
+    class FtOwner extends Base {
+      static {
+        this._tableName = "ft_owners";
+        this.attribute("sponsorable_id", "integer");
+        this.attribute("sponsorable_type", "string");
+        this.adapter = adapter;
+        this.belongsTo("thing", {
+          polymorphic: true,
+          foreignType: "sponsorable_type",
+          foreignKey: "sponsorable_id",
+        });
+      }
+    }
+    registerModel(FtTarget);
+    registerModel(FtOwner);
+
+    const target = await FtTarget.create({ label: "Acme" });
+    const owner = FtOwner.new();
+    // Writer path: should write sponsorable_type, not thing_type
+    setBelongsTo(owner, "thing", target, {
+      polymorphic: true,
+      foreignType: "sponsorable_type",
+      foreignKey: "sponsorable_id",
+    });
+    expect(owner._readAttribute("sponsorable_type")).toBe("FtTarget");
+    expect(owner._readAttribute("sponsorable_id")).toBe(target.id);
+    // Clearing should null sponsorable_type
+    setBelongsTo(owner, "thing", null, {
+      polymorphic: true,
+      foreignType: "sponsorable_type",
+      foreignKey: "sponsorable_id",
+    });
+    expect(owner._readAttribute("sponsorable_type")).toBeNull();
+  });
+
   // Rails: test_belongs_to_counter_cache (definition only)
   it("test_belongs_to_registers_counter_cache_option", () => {
     class Reply extends Base {
