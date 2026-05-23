@@ -9,7 +9,7 @@ export class CpkAuthor extends Base {
 
   static {
     // Rails: dependent: :delete_all — "deleteAll" not yet in AssociationOptions.dependent type
-    this.hasMany("books", { className: "CpkBook", dependent: "delete" });
+    this.hasMany("books", { className: "CpkBook", foreignKey: "author_id", dependent: "delete" });
   }
 }
 
@@ -21,6 +21,7 @@ export class CpkBook extends Base {
 
   static {
     this.belongsTo("order", {
+      className: "CpkOrder",
       autosave: true,
       foreignKey: ["shop_id", "order_id"],
       counterCache: true,
@@ -31,7 +32,7 @@ export class CpkBook extends Base {
       primaryKey: ["shop_id", "id"],
     });
     this.belongsTo("author", { className: "CpkAuthor" });
-    this.hasMany("chapters", { foreignKey: ["author_id", "book_id"] });
+    this.hasMany("chapters", { className: "CpkChapter", foreignKey: ["author_id", "book_id"] });
     this.beforeDestroy(function (this: CpkBook) {
       if (this.failDestroy) throw "abort";
     });
@@ -61,13 +62,14 @@ export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
 export class CpkNonCpkBook extends CpkBook {
   static {
     this._primaryKey = "id";
-    this.belongsTo("nonCpkOrder", { foreignKey: ["order_id"] });
+    this.belongsTo("nonCpkOrder", { className: "CpkNonCpkOrder", foreignKey: ["order_id"] });
   }
 }
 
 export class CpkNullifiedBook extends CpkBook {
   static {
     this.hasOne("chapter", {
+      className: "CpkChapter",
       foreignKey: ["author_id", "book_id"],
       dependent: "nullify",
     });
@@ -101,7 +103,7 @@ export class CpkChapter extends Base {
 
   static {
     this._primaryKey = ["author_id", "id"];
-    this.belongsTo("book", { foreignKey: ["author_id", "book_id"] });
+    this.belongsTo("book", { className: "CpkBook", foreignKey: ["author_id", "book_id"] });
   }
 }
 
@@ -125,27 +127,27 @@ export class CpkOrder extends Base {
   static {
     this._primaryKey = ["shop_id", "id"];
     this.aliasAttribute("idValue", "id");
-    this.hasMany("orderAgreements");
-    this.hasMany("books", { foreignKey: ["shop_id", "order_id"] });
-    this.hasOne("book", { foreignKey: ["shop_id", "order_id"] });
-    this.hasMany("orderTags");
-    this.hasMany("tags", { through: "orderTags" });
+    this.hasMany("orderAgreements", { className: "CpkOrderAgreement", foreignKey: "order_id" });
+    this.hasMany("books", { className: "CpkBook", foreignKey: ["shop_id", "order_id"] });
+    this.hasOne("book", { className: "CpkBook", foreignKey: ["shop_id", "order_id"] });
+    this.hasMany("orderTags", { className: "CpkOrderTag", foreignKey: "order_id" });
+    this.hasMany("tags", { className: "CpkTag", through: "orderTags" });
   }
 }
 
 export class CpkBrokenOrder extends CpkOrder {
   static {
     this._primaryKey = ["shop_id", "status"];
-    this.hasMany("books");
-    this.hasOne("book");
+    this.hasMany("books", { className: "CpkBook" });
+    this.hasOne("book", { className: "CpkBook" });
   }
 }
 
 export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
   static {
     this._primaryKey = ["shop_id", "status"];
-    this.hasMany("books", { foreignKey: ["shop_id", "status"] });
-    this.hasOne("book", { foreignKey: ["shop_id", "status"] });
+    this.hasMany("books", { className: "CpkBook", foreignKey: ["shop_id", "status"] });
+    this.hasOne("book", { className: "CpkBook", foreignKey: ["shop_id", "status"] });
   }
 }
 
@@ -165,19 +167,23 @@ export class CpkNonCpkOrder extends CpkOrder {
 
 export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
   static {
-    this.hasOne("book", { foreignKey: "order_id" });
+    this.hasOne("book", { className: "CpkBook", foreignKey: "order_id" });
   }
 }
 
 export class CpkOrderWithNullifiedBook extends CpkOrder {
   static {
-    this.hasOne("book", { foreignKey: ["shop_id", "order_id"], dependent: "nullify" });
+    this.hasOne("book", {
+      className: "CpkBook",
+      foreignKey: ["shop_id", "order_id"],
+      dependent: "nullify",
+    });
   }
 }
 
 export class CpkOrderWithSingularBookChapters extends CpkOrder {
   static {
-    this.hasMany("chapters", { through: "book" });
+    this.hasMany("chapters", { className: "CpkChapter", through: "book" });
   }
 }
 
@@ -186,7 +192,7 @@ export class CpkOrderAgreement extends Base {
   static _tableName = "cpk_order_agreements";
 
   static {
-    this.belongsTo("order");
+    this.belongsTo("order", { className: "CpkOrder" });
   }
 }
 
@@ -195,8 +201,8 @@ export class CpkOrderTag extends Base {
   static _tableName = "cpk_order_tags";
 
   static {
-    this.belongsTo("tag");
-    this.belongsTo("order");
+    this.belongsTo("tag", { className: "CpkTag" });
+    this.belongsTo("order", { className: "CpkOrder" });
   }
 }
 
@@ -205,8 +211,8 @@ export class CpkTag extends Base {
   static _tableName = "cpk_tags";
 
   static {
-    this.hasMany("orderTags");
-    this.hasMany("orders", { through: "orderTags" });
+    this.hasMany("orderTags", { className: "CpkOrderTag", foreignKey: "tag_id" });
+    this.hasMany("orders", { className: "CpkOrder", through: "orderTags" });
   }
 }
 
@@ -257,7 +263,10 @@ export class CpkCar extends Base {
   static _tableName = "cpk_cars";
 
   static {
-    this.hasMany("carReviews", { foreignKey: ["car_make", "car_model"] });
+    this.hasMany("carReviews", {
+      className: "CpkCarReview",
+      foreignKey: ["car_make", "car_model"],
+    });
   }
 }
 
@@ -266,6 +275,6 @@ export class CpkCarReview extends Base {
   static _tableName = "cpk_car_reviews";
 
   static {
-    this.belongsTo("car", { foreignKey: ["car_make", "car_model"] });
+    this.belongsTo("car", { className: "CpkCar", foreignKey: ["car_make", "car_model"] });
   }
 }
