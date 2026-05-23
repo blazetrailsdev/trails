@@ -1,22 +1,19 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { DateTime } from "./date-time.js";
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import { Base } from "../index.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+beforeAll(async () => {
+  await defineSchema({ tasks: { starting: "datetime" } });
+});
 
 describe("DateTimeTest", () => {
-  let adapter: SidecarAdapter;
-
-  beforeAll(async () => {
-    ({ adapter } = createSidecarTestAdapter());
-    await defineSchema(adapter, { tasks: { starting: "datetime" } });
-  });
-  withTransactionalFixtures(() => adapter);
-
   afterAll(() => {
     vi.unstubAllEnvs();
   });
@@ -26,7 +23,6 @@ describe("DateTimeTest", () => {
       static override tableName = "tasks";
       static {
         this.attribute("starting", "datetime");
-        this.adapter = adapter;
       }
     }
 

@@ -1,20 +1,17 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base } from "../index.js";
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+beforeAll(async () => {
+  await defineSchema({ authors: { name: "string" } });
+});
 
 describe("StringTypeTest", () => {
-  let adapter: SidecarAdapter;
-
-  beforeAll(async () => {
-    ({ adapter } = createSidecarTestAdapter());
-    await defineSchema(adapter, { authors: { name: "string" } });
-  });
-  withTransactionalFixtures(() => adapter);
-
   afterAll(() => {
     vi.unstubAllEnvs();
   });
@@ -23,7 +20,6 @@ describe("StringTypeTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const author = await Author.create({ name: "Sean" });

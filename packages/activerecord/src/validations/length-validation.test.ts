@@ -4,23 +4,21 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
-
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+beforeAll(async () => {
+  await defineSchema({ topics: { title: "string" } });
+});
 
 describe("LengthValidationTest", () => {
-  let adapter: SidecarAdapter;
-  beforeAll(async () => {
-    ({ adapter } = createSidecarTestAdapter());
-    await defineSchema(adapter, { topics: { title: "string" } });
-  });
-  withTransactionalFixtures(() => adapter);
   function makeModel() {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validates("title", { length: { minimum: 2, maximum: 10 } });
       }
     }

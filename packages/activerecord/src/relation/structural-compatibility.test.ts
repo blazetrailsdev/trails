@@ -4,22 +4,18 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
-
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-let adapter: SidecarAdapter;
-
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  ({ adapter: adapter } = createSidecarTestAdapter());
-  await defineSchema(adapter, {
+  await defineSchema({
     posts: { title: "string", score: "integer" },
     users: { name: "string" },
   });
 });
-withTransactionalFixtures(() => adapter);
-
 // ==========================================================================
 // StructuralCompatibilityTest — targets relation/structural_compatibility_test.rb
 // ==========================================================================
@@ -28,7 +24,6 @@ describe("StructuralCompatibilityTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const r1 = Post.where({ title: "a" });
@@ -43,7 +38,6 @@ describe("StructuralCompatibilityTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("score", "integer");
-        this.adapter = adapter;
       }
     }
     return { Post };
@@ -83,7 +77,6 @@ describe("structurallyCompatible", () => {
       static _tableName = "users";
     }
     User.attribute("id", "integer");
-    User.adapter = adapter;
 
     const r1 = User.all().where({ id: 1 });
     const r2 = User.all().where({ id: 2 });
@@ -95,13 +88,11 @@ describe("structurallyCompatible", () => {
       static _tableName = "users";
     }
     User.attribute("id", "integer");
-    User.adapter = adapter;
 
     class Post extends Base {
       static _tableName = "posts";
     }
     Post.attribute("id", "integer");
-    Post.adapter = adapter;
 
     const r1 = User.all().where({ id: 1 });
     const r2 = Post.all().where({ id: 2 });

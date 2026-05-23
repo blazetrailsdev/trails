@@ -1,20 +1,18 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+beforeAll(async () => {
+  await defineSchema({
+    users: { name: "string", terms: "string", change_reason: "string" },
+  });
+});
 
 describe("Validation Contexts (Rails-guided)", () => {
-  let adapter: SidecarAdapter;
-
-  beforeAll(async () => {
-    ({ adapter } = createSidecarTestAdapter());
-    await defineSchema(adapter, {
-      users: { name: "string", terms: "string", change_reason: "string" },
-    });
-  });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test "validation on: :create"
   it("valid uses create context when new", async () => {
     class User extends Base {
@@ -23,7 +21,6 @@ describe("Validation Contexts (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("terms", "string");
-        this.adapter = adapter;
         this.validates("terms", { presence: true, on: "create" });
       }
     }
@@ -49,7 +46,6 @@ describe("Validation Contexts (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("change_reason", "string");
-        this.adapter = adapter;
         this.validates("change_reason", { presence: true, on: "update" });
       }
     }

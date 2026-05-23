@@ -1,27 +1,23 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-let adapter: SidecarAdapter;
-
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  ({ adapter: adapter } = createSidecarTestAdapter());
-  await defineSchema(adapter, {
+  await defineSchema({
     arel_posts: { title: "string" },
     posts: { title: "string" },
   });
 });
-withTransactionalFixtures(() => adapter);
-
 describe("DelegationTest", () => {
   it("not respond to arel method", () => {
     class ArelPost extends Base {
       static {
         this._tableName = "arel_posts";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = new ArelPost({ title: "test" });
@@ -33,7 +29,6 @@ describe("DelegationTest", () => {
       class Post extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adapter;
         }
       }
       await Post.create({ title: "a" });
@@ -52,7 +47,6 @@ describe("DelegationTest", () => {
       class Post extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adapter;
         }
       }
       const r1 = Post.where({ title: "x" });

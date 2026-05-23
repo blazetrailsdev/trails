@@ -1,23 +1,19 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, serialize } from "../index.js";
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-let adapter: SidecarAdapter;
-
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  ({ adapter } = createSidecarTestAdapter());
-  await defineSchema(adapter, { topics: { content: "string" } });
+  await defineSchema({ topics: { content: "string" } });
 });
-withTransactionalFixtures(() => adapter);
-
 describe("JSONTest", () => {
   it("returns nil if empty string given", async () => {
     class Topic extends Base {
       static {
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Topic, "content");
@@ -30,7 +26,6 @@ describe("JSONTest", () => {
     class Topic extends Base {
       static {
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Topic, "content");

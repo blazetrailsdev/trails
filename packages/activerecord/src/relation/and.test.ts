@@ -4,21 +4,18 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
-
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-let adapter: SidecarAdapter;
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  ({ adapter: adapter } = createSidecarTestAdapter());
-  await defineSchema(adapter, {
+  await defineSchema({
     posts: { title: "string", body: "string", author: "string" },
     users: { name: "string", role: "string", active: "boolean" },
   });
 });
-withTransactionalFixtures(() => adapter);
-
 // ==========================================================================
 // AndTest — targets relation/and_test.rb
 // ==========================================================================
@@ -28,7 +25,6 @@ describe("AndTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const r1 = Post.where({ title: "a" });
@@ -44,7 +40,6 @@ describe("AndTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
-        this.adapter = adapter;
       }
     }
     return { Post };
@@ -81,7 +76,6 @@ describe("and()", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("role", "string");
-    User.adapter = adapter;
 
     await User.create({ name: "Alice", role: "admin" });
     await User.create({ name: "Bob", role: "user" });
@@ -101,7 +95,6 @@ describe("Relation And (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice", active: true });
