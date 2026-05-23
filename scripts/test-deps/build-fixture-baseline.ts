@@ -26,7 +26,7 @@ const AR_SRC = path.join(ROOT, "packages/activerecord/src");
 async function main(): Promise<void> {
   // Dynamic import avoids the CJS-style top-level / static-`.mjs`-import
   // interop fragility that tsx exposes under module: Node16.
-  const { collectUseFixturesKeys, railsToTrailsRel } =
+  const { collectUseFixturesKeys, railsToTrailsRel, requiredFixtureSets } =
     await import("../../eslint/expected-fixtures.mjs");
   if (!fs.existsSync(DEPS_PATH)) {
     console.error(`Deps JSON not found: ${DEPS_PATH}\nRun: pnpm test:deps`);
@@ -41,15 +41,7 @@ async function main(): Promise<void> {
   for (const [railsRel, entry] of Object.entries(deps)) {
     if (entry.fixtures.length === 0) continue;
     candidates++;
-    // Match the rule's filter: only count fixture sets the Rails tests
-    // actually dereference (e.g. `customers(:david)`). Files where Rails
-    // declares `fixtures :foo` but no test ever calls `foo(:bar)` are
-    // scaffolding-only and the rule will no-op on them.
-    const referenced = new Set<string>();
-    for (const t of Object.values(entry.tests)) {
-      for (const k of Object.keys(t.fixtures ?? {})) referenced.add(k);
-    }
-    const required = entry.fixtures.filter((k) => referenced.has(k));
+    const required = requiredFixtureSets(entry);
     if (required.length === 0) {
       scaffoldingOnly++;
       continue;

@@ -88,6 +88,27 @@ export function railsToTrailsRel(railsRel) {
 }
 
 /**
+ * Returns the subset of `entry.fixtures` that at least one Rails test in
+ * `entry.tests` actually dereferences (e.g. `customers(:david)`).
+ *
+ * Files whose Rails counterpart has no record-level references are
+ * scaffolding-only — `fixtures :foo` declarations inherited from a parent
+ * test class — and the rule no-ops on them rather than push porters to
+ * load fixtures they don't need.
+ *
+ * Shared between the rule (`create()`) and the baseline builder so the
+ * two definitions can't drift.
+ */
+export function requiredFixtureSets(entry) {
+  if (!entry || !entry.tests) return [];
+  const referenced = new Set();
+  for (const t of Object.values(entry.tests)) {
+    for (const k of Object.keys(t.fixtures ?? {})) referenced.add(k);
+  }
+  return (entry.fixtures ?? []).filter((k) => referenced.has(k));
+}
+
+/**
  * Repo-relative path for exclude-list lookup. Accepts both absolute
  * filenames (ESLint's normal contract) and already-relative paths, so it
  * stays in lockstep with `trailsToRailsRel`'s `(?:^|\/)packages/...` match.
@@ -174,22 +195,9 @@ const rule = {
     if (!railsRel) return {};
     const entry = loadDeps()[railsRel];
     if (!entry || !entry.fixtures || entry.fixtures.length === 0) return {};
-    // Only enforce on files whose Rails counterpart actually references a
-    // fixture record (e.g. `customers(:david)`). Class-level `fixtures :foo`
-    // declarations without record references are inherited scaffolding in
-    // Rails — not load-bearing for the test logic. ~70 of 128 baseline
-    // files fall into that bucket and shouldn't be lint targets.
-    if (!entry.tests || Object.keys(entry.tests).length === 0) return {};
     const rel = repoRel(filename);
     if (rel && loadExclude().has(rel)) return {};
-    // Narrow expected to fixture sets the Rails tests actually reference.
-    // A declaration like `fixtures :a, :b` where only :a is dereferenced
-    // shouldn't force porters to load :b too.
-    const referenced = new Set();
-    for (const t of Object.values(entry.tests)) {
-      for (const k of Object.keys(t.fixtures ?? {})) referenced.add(k);
-    }
-    const expected = entry.fixtures.filter((k) => referenced.has(k));
+    const expected = requiredFixtureSets(entry);
     if (expected.length === 0) return {};
     const keys = new Set();
     let found = false;
