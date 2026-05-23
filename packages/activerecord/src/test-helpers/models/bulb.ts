@@ -19,10 +19,10 @@ export class Bulb extends Base {
       record.attributesAfterInitialize = { ...(record as any).attributes };
     });
     this.afterCreate(async function (this: Bulb) {
-      this.countAfterCreate = await Bulb.unscoped(async () => {
-        const car = (this as any)._associations?.car?.target;
-        return car ? (await (car as any).bulbs)?.count?.() : undefined;
-      });
+      const carId = this.readAttribute("car_id") as number | null;
+      this.countAfterCreate = carId
+        ? await Bulb.unscoped(async () => (Bulb as any).where({ car_id: carId }).count())
+        : undefined;
     });
   }
 
@@ -56,8 +56,8 @@ export class FunkyBulb extends Bulb {
 
 export class FailedBulb extends Bulb {
   static {
-    this.beforeDestroy(async function (this: any) {
-      this.throwAbort();
+    this.beforeDestroy(async function () {
+      throw "abort";
     });
   }
 }

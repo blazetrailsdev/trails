@@ -1,5 +1,5 @@
 // vendor/rails/activerecord/test/models/reply.rb
-import { Topic } from "./topic.js";
+import { Topic, WebTopic } from "./topic.js";
 
 export class Reply extends Topic {
   static {
@@ -31,10 +31,6 @@ export class Reply extends Topic {
   static open() {
     return (this as any).approved();
   }
-
-  // These override Kernel methods in Ruby; in TS they conflict with Base statics so we skip the static form.
-  // static load(_opts: { data: any }) {}
-  // static select(_opts: { data: any }) {}
 }
 
 export class SillyReply extends Topic {
@@ -107,10 +103,8 @@ export class WrongReply extends Reply {
   }
 }
 
-// Web namespace equivalent
-export class WebReply extends Topic {
+export class WebReply extends WebTopic {
   static {
-    this._tableName = "replies";
     this.belongsTo("topic", { foreignKey: "parent_id", counterCache: true, className: "WebTopic" });
   }
 }

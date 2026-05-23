@@ -126,3 +126,13 @@ export class TitlePrimaryKeyTopic extends Topic {
     this.aliasAttribute("idValue", "id");
   }
 }
+
+export class WebTopic extends Base {
+  static {
+    this.hasMany("replies", {
+      dependent: "destroy",
+      foreignKey: "parent_id",
+      className: "WebReply",
+    });
+  }
+}
