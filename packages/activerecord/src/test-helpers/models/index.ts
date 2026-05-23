@@ -20,3 +20,13 @@ export * from "./ship.js";
 export * from "./ship-part.js";
 export * from "./treasure.js";
 export * from "./wheel.js";
+// Cluster 4: pets/animals
+export * from "./cat.js";
+export * from "./dog.js";
+export * from "./dog-lover.js";
+export * from "./mouse.js";
+export * from "./squeak.js";
+export * from "./other-dog.js";
+export * from "./owner.js";
+export * from "./pet.js";
+export * from "./pet-treasure.js";
