@@ -54,9 +54,11 @@ export class URLMap {
       if (path === prefix || path.startsWith(prefix + "/") || prefix === "") {
         if (mapping.host) {
           const hostWithPort = httpHost || `${serverName}:${serverPort}`;
-          const hostLower = hostWithPort.toLowerCase();
-          const serverLower = serverName.toLowerCase();
-          if (hostLower !== mapping.host && serverLower !== mapping.host) continue;
+          if (
+            !this.isCasecmp(hostWithPort, mapping.host) &&
+            !this.isCasecmp(serverName, mapping.host)
+          )
+            continue;
         }
 
         const rest = pathInfo.substring(mapping.location.length);

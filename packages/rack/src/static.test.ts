@@ -84,22 +84,29 @@ it("doesn't call index file if :index option was omitted", async () => {
 });
 
 it("serves hidden files", async () => {
-  const app = new Static(fallbackApp, { urls: ["/static"], root: tmpDir });
+  const app = new Static(fallbackApp, {
+    urls: { "/static/.hidden": "static/.hidden" },
+    root: tmpDir,
+  });
   const res = await new MockRequest((env) => app.call(env)).get("/static/.hidden");
   expect(res.status).toBe(200);
   expect(res.bodyString).toBe("hidden");
 });
 
 it("calls down the chain if the URI is not specified", async () => {
-  const app = new Static(fallbackApp, { urls: ["/static"], root: tmpDir });
-  const res = await new MockRequest((env) => app.call(env)).get("/");
+  const app = new Static(fallbackApp, {
+    urls: { "/static/.hidden": "static/.hidden" },
+    root: tmpDir,
+  });
+  const res = await new MockRequest((env) => app.call(env)).get("/something/else");
   expect(res.bodyString).toBe("fallback");
 });
 
 it("allows the root URI to be configured via hash options", async () => {
-  const app = new Static(fallbackApp, { urls: ["/static"], root: tmpDir });
-  const res = await new MockRequest((env) => app.call(env)).get("/static/test.txt");
+  const app = new Static(fallbackApp, { urls: { "/foo": "static/test.txt" }, root: tmpDir });
+  const res = await new MockRequest((env) => app.call(env)).get("/foo");
   expect(res.status).toBe(200);
+  expect(res.bodyString).toBe("static file");
 });
 
 it("serves gzipped files if client accepts gzip encoding and gzip files are present", async () => {
@@ -161,7 +168,7 @@ it("supports header rule :all", async () => {
   const app = new Static(fallbackApp, {
     urls: ["/static"],
     root: tmpDir,
-    header_rules: [[":all", { "x-all": "yes" }]],
+    header_rules: [["all", { "x-all": "yes" }]],
   });
   const res = await new MockRequest((env) => app.call(env)).get("/static/test.txt");
   expect(res.headers["x-all"]).toBe("yes");
@@ -171,7 +178,7 @@ it("supports header rule :fonts", async () => {
   const app = new Static(fallbackApp, {
     urls: ["/static"],
     root: tmpDir,
-    header_rules: [[":fonts", { "access-control-allow-origin": "*" }]],
+    header_rules: [["fonts", { "access-control-allow-origin": "*" }]],
   });
   const res = await new MockRequest((env) => app.call(env)).get("/static/font.woff2");
   expect(res.headers["access-control-allow-origin"]).toBe("*");
@@ -181,7 +188,7 @@ it("supports file extension header rules provided as an Array", async () => {
   const app = new Static(fallbackApp, {
     urls: ["/static"],
     root: tmpDir,
-    header_rules: [[[".txt"], { "x-ext": "txt" }]],
+    header_rules: [[["txt"], { "x-ext": "txt" }]],
   });
   const res = await new MockRequest((env) => app.call(env)).get("/static/test.txt");
   expect(res.headers["x-ext"]).toBe("txt");
@@ -222,7 +229,7 @@ it("prioritizes header rules over fixed cache-control setting (legacy option)", 
     urls: ["/static"],
     root: tmpDir,
     cache_control: "public",
-    header_rules: [[":all", { "cache-control": "private" }]],
+    header_rules: [["all", { "cache-control": "private" }]],
   });
   const res = await new MockRequest((env) => app.call(env)).get("/static/test.txt");
   expect(res.headers["cache-control"]).toBe("private");
