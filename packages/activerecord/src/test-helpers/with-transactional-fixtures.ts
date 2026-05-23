@@ -210,7 +210,12 @@ export function withTransactionalFixtures(
       // leaseConnection ensures the pinned connection is also the
       // execution-context's leased connection so production code that
       // calls `pool.leaseConnection()` resolves to it.
-      await pool.pinConnectionBang(false);
+      // Fixture pins are pool-scoped (visible from any execution context),
+      // matching what Rails gets for free because Ruby tests run on a single
+      // thread that owns the pin. Without this, vitest beforeEach/afterEach
+      // can resolve to different AsyncLocalStorage contexts and the unpin
+      // won't find the pin set in beforeEach.
+      await pool.pinConnectionBang({ fixture: true });
       pool.leaseConnection();
     } else {
       // Non-pooled (wrapper/sidecar) path — preserved verbatim. Mirrors
