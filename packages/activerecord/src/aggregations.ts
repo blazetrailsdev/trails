@@ -132,7 +132,10 @@ function writerMethod(
       }
       if (converter) {
         const converted = converter(value);
-        if (converted instanceof klass) {
+        if (converted == null) {
+          for (const [modelAttr] of mapping) this.writeAttribute(modelAttr, null);
+          cache.delete(name);
+        } else if (converted instanceof klass) {
           for (const [modelAttr, valueAttr] of mapping)
             this.writeAttribute(modelAttr, (converted as any)[valueAttr]);
           cache.set(

@@ -1020,6 +1020,32 @@ describe("composed_of (Rails-guided)", () => {
     expect(fn.last).toBe("Smith");
   });
 
+  it("clears mapped columns and cache when converter returns null", () => {
+    class GpsLocation {
+      constructor(public gpsLocation: string) {}
+    }
+
+    class Vehicle extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("gps_location", "string");
+      }
+    }
+    composedOf(Vehicle, "nonBlankGpsLocation", {
+      className: GpsLocation,
+      mapping: [["gps_location", "gpsLocation"]],
+      converter: (v: unknown) => (v == null || v === "" ? null : new GpsLocation(String(v))),
+    });
+
+    const vehicle = new Vehicle({ gps_location: "12.5x45.3" });
+    expect((vehicle as any).nonBlankGpsLocation).toBeInstanceOf(GpsLocation);
+
+    // assigning blank should clear the column and cache
+    (vehicle as any).nonBlankGpsLocation = "";
+    expect(vehicle.gps_location).toBeNull();
+    expect((vehicle as any).nonBlankGpsLocation).toBeNull();
+  });
+
   it("returns null when constructorFn returns null", () => {
     class Tag {
       constructor(public value: string) {}
