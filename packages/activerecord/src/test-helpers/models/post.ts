@@ -397,7 +397,6 @@ export class FirstPost extends Base {
     this.hasOne("commentWithInverse", {
       className: "Comment",
       inverseOf: "postWithInverse",
-      foreignKey: "post_id",
     });
   }
 }
