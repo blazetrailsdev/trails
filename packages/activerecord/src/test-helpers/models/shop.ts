@@ -5,7 +5,7 @@ export class ShopCollection extends Base {
   static {
     this.tableName = "collections";
 
-    this.hasMany("products", { dependent: "nullify" });
+    this.hasMany("products", { className: "ShopProduct", dependent: "nullify" });
   }
 }
 
@@ -13,7 +13,7 @@ export class ShopProductType extends Base {
   static {
     this.tableName = "product_types";
 
-    this.hasMany("products");
+    this.hasMany("products", { className: "ShopProduct" });
   }
 }
 
@@ -21,7 +21,7 @@ export class ShopProduct extends Base {
   static {
     this.tableName = "products";
 
-    this.hasMany("variants", { dependent: "delete" });
+    this.hasMany("variants", { className: "ShopVariant", dependent: "delete" });
     this.belongsTo("type", { className: "ShopProductType" });
   }
 }

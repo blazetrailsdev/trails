@@ -2,6 +2,7 @@
 import { Base } from "../../base.js";
 import { hasSecurePassword } from "../../secure-password.js";
 import { hasSecureToken } from "../../secure-token.js";
+import { Notification } from "./notification.js";
 
 export class User extends Base {
   static {
@@ -31,8 +32,8 @@ hasSecureToken(User, "authToken", { length: 36 });
 
 export class UserWithNotification extends User {
   static {
-    this.afterCreate(async function (this: UserWithNotification) {
-      void this;
+    this.afterCreate(async function () {
+      await (Notification as any).create({ message: "A new user has been created." });
     });
   }
 }
