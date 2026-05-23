@@ -80,7 +80,7 @@ export function determineTemplateEtag(
   lookupContext: TemplateLookupContext,
 ): string | undefined {
   const template = pickTemplateForEtag(options, controller);
-  if (!template) return undefined;
+  if (template === undefined) return undefined;
   return lookupAndDigestTemplate(template, lookupContext);
 }
 
