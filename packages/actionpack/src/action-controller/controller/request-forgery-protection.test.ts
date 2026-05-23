@@ -162,6 +162,48 @@ describe("ActionController::RequestForgeryProtection", () => {
     expect(result.verified).toBe(true);
   });
 
+  it("should allow delete with token in header", () => {
+    const csrf = new RequestForgeryProtection();
+    const session: Record<string, unknown> = {};
+    const realToken = csrf.getRealToken(session);
+    const headerToken = csrf.maskToken(realToken);
+    const result = csrf.verifyRequest({
+      method: "DELETE",
+      session,
+      token: headerToken,
+      host: "example.com",
+    });
+    expect(result.verified).toBe(true);
+  });
+
+  it("should allow patch with token in header", () => {
+    const csrf = new RequestForgeryProtection();
+    const session: Record<string, unknown> = {};
+    const realToken = csrf.getRealToken(session);
+    const headerToken = csrf.maskToken(realToken);
+    const result = csrf.verifyRequest({
+      method: "PATCH",
+      session,
+      token: headerToken,
+      host: "example.com",
+    });
+    expect(result.verified).toBe(true);
+  });
+
+  it("should allow put with token in header", () => {
+    const csrf = new RequestForgeryProtection();
+    const session: Record<string, unknown> = {};
+    const realToken = csrf.getRealToken(session);
+    const headerToken = csrf.maskToken(realToken);
+    const result = csrf.verifyRequest({
+      method: "PUT",
+      session,
+      token: headerToken,
+      host: "example.com",
+    });
+    expect(result.verified).toBe(true);
+  });
+
   // --- Origin checking ---
 
   it("should allow post with origin checking and correct origin", () => {
@@ -315,14 +357,6 @@ describe("ActionController::RequestForgeryProtection", () => {
     expect(csrf.verifyOrigin("https://evil.com", "example.com")).toBe(false);
   });
 
-  // --- FreeCookieController equivalent (no protection) ---
-
-  it("should allow all methods without token when not protected", () => {
-    const csrf = new RequestForgeryProtection({ protectedMethods: new Set() });
-    expect(csrf.requiresVerification("POST")).toBe(false);
-    expect(csrf.requiresVerification("DELETE")).toBe(false);
-  });
-
   // --- Verify request full flow ---
 
   it("full verification flow with valid token", () => {
@@ -376,7 +410,7 @@ describe("ActionController::RequestForgeryProtection", () => {
     expect(csrf.verifyToken(session, decoded)).toBe(true);
   });
 
-  it("should allow post without token on unsafe action when not required", () => {
+  it("should allow post without token on unsafe action", () => {
     const csrf = new RequestForgeryProtection({
       protectedMethods: new Set(["PATCH", "PUT", "DELETE"]),
     });
@@ -395,6 +429,70 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
     const session: Record<string, unknown> = {};
     expect(() => csrf.handleUnverified(session)).toThrow(InvalidAuthenticityToken);
     expect(() => csrf.handleUnverified(session)).toThrow("Can't verify CSRF token authenticity.");
+  });
+
+  // form-rendering / full-dispatch tests (require ActionView)
+  it.skip("should render form with token tag", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render button to with token tag", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render form without token tag if remote", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render form with token tag if remote and embedding token is on", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render form with token tag if remote and external authenticity token requested and embedding is on", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render form with token tag if remote and external authenticity token requested", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render form with token tag if remote and authenticity token requested", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render form with token tag with authenticity token requested", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render form with with token tag if remote", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render form with without token tag if remote and embedding token is off", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render form with with token tag if remote and external authenticity token requested and embedding is on", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render form with with token tag if remote and external authenticity token requested", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render form with with token tag if remote and authenticity token requested", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render form with with token tag with authenticity token requested", () => {
+    /* requires ActionView */
+  });
+  it.skip("should render form with with token tag if remote and embedding token is on", () => {
+    /* requires ActionView */
+  });
+
+  // same-origin JS protection (requires controller dispatch + response format detection)
+  it.skip("should only allow same origin js get with xhr header", () => {
+    /* requires controller dispatch */
+  });
+  it.skip("should warn on not same origin js", () => {
+    /* requires controller dispatch */
+  });
+  it.skip("should not warn if csrf logging disabled and not same origin js", () => {
+    /* requires controller dispatch */
+  });
+  it.skip("should allow non get js without xhr header", () => {
+    /* requires controller dispatch */
+  });
+  it.skip("should only allow cross origin js get without xhr header if protection disabled", () => {
+    /* requires controller dispatch */
   });
 });
 
@@ -415,6 +513,13 @@ describe("RequestForgeryProtectionControllerUsingNullSessionTest", () => {
     const session: Record<string, unknown> = { user_id: 1, _csrf_token: "abc" };
     csrf.handleUnverified(session);
     expect(session.user_id).toBe(1);
+  });
+
+  it.skip("should allow to set signed cookies", () => {
+    /* requires cookie jar */
+  });
+  it.skip("should allow to set encrypted cookies", () => {
+    /* requires cookie jar */
   });
 });
 
@@ -551,5 +656,131 @@ describe("PerFormTokensControllerTest", () => {
     const session: Record<string, unknown> = {};
     const token = csrf.generatePerFormToken(session, "/posts", "post");
     expect(csrf.verifyToken(session, token, { actionPath: "/posts", method: "POST" })).toBe(true);
+  });
+
+  it.skip("rejects garbage path", () => {
+    /* requires controller dispatch + PATH_INFO */
+  });
+  it.skip("rejects token for incorrect method button to", () => {
+    /* requires ActionView button_to rendering */
+  });
+  it.skip("Accepts proper token for implicit post method on button_to tag", () => {
+    /* requires ActionView */
+  });
+  it.skip("Accepts proper token for delete method on button_to tag", () => {
+    /* requires ActionView */
+  });
+  it.skip("Accepts proper token for post method on button_to tag", () => {
+    /* requires ActionView */
+  });
+  it.skip("Accepts proper token for patch method on button_to tag", () => {
+    /* requires ActionView */
+  });
+  it.skip("does not return old csrf token", () => {
+    /* requires controller dispatch */
+  });
+  it.skip("accepts old csrf token", () => {
+    /* requires controller dispatch */
+  });
+  it.skip("handles relative paths", () => {
+    /* requires controller dispatch + PATH_INFO */
+  });
+  it.skip("handles relative paths with dot", () => {
+    /* requires controller dispatch + PATH_INFO */
+  });
+  it.skip("ignores origin during generation", () => {
+    /* requires controller dispatch */
+  });
+});
+
+describe("PrependProtectForgeryBaseControllerTest", () => {
+  it.skip("verify authenticity token is prepended", () => {
+    /* requires before_action ordering inspection */
+  });
+  it.skip("verify authenticity token is not prepended", () => {
+    /* requires before_action ordering inspection */
+  });
+  it.skip("verify authenticity token is not prepended by default", () => {
+    /* requires before_action ordering inspection */
+  });
+});
+
+describe("FreeCookieControllerTest", () => {
+  it("should allow all methods without token", () => {
+    const csrf = new RequestForgeryProtection({ protectedMethods: new Set() });
+    expect(csrf.requiresVerification("POST")).toBe(false);
+    expect(csrf.requiresVerification("DELETE")).toBe(false);
+  });
+  it.skip("should not render form with token tag", () => {
+    /* requires ActionView */
+  });
+  it.skip("should not render button to with token tag", () => {
+    /* requires ActionView */
+  });
+  it.skip("should not emit a csrf-token meta tag", () => {
+    /* requires ActionView meta_tags */
+  });
+});
+
+describe("SkipProtectionControllerTest", () => {
+  it.skip("should not allow post without token when not skipping", () => {
+    /* requires controller dispatch */
+  });
+  it.skip("should allow post without token when skipping", () => {
+    /* requires controller dispatch */
+  });
+});
+
+describe("SkipProtectionWhenUnprotectedControllerTest", () => {
+  it.skip("should allow skip request when protection is not set", () => {
+    /* requires controller dispatch */
+  });
+});
+
+describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
+  it.skip("csrf token is stored in cookie", () => {
+    /* requires cookie jar */
+  });
+  it.skip("csrf token is stored in custom cookie", () => {
+    /* requires cookie jar */
+  });
+  it.skip("csrf token cookie has same site lax", () => {
+    /* requires cookie jar */
+  });
+  it.skip("csrf token cookie is http only", () => {
+    /* requires cookie jar */
+  });
+  it.skip("csrf token cookie is permanent", () => {
+    /* requires cookie jar */
+  });
+  it.skip("reset csrf token deletes cookie", () => {
+    /* requires cookie jar */
+  });
+  it.skip("should allow when session id in cookie matches session id", () => {
+    /* requires cookie jar + session */
+  });
+  it.skip("should not allow when session id in cookie does not match session id", () => {
+    /* requires cookie jar + session */
+  });
+  it.skip("should allow when session id in cookie and session id are nil", () => {
+    /* requires cookie jar + session */
+  });
+  it.skip("should not allow when session id in cookie but session id is nil", () => {
+    /* requires cookie jar + session */
+  });
+  it.skip("should allow when session id in cookie is nil and session created before token validation", () => {
+    /* requires cookie jar + session */
+  });
+  it.skip("should allow when session id in cookie is nil and session reset before token validation", () => {
+    /* requires cookie jar + session */
+  });
+  it.skip("should not allow when session id in cookie but request made with no session", () => {
+    /* requires cookie jar + session */
+  });
+});
+
+describe("CustomCsrfTokenStorageStrategyControllerTest", () => {
+  it.skip("csrf token is stored in custom location", () => {
+    /* requires custom storage strategy integration */
   });
 });
