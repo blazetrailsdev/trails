@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import * as fs from "fs";
+import * as path from "path";
+import { fileURLToPath } from "node:url";
 import {
   Parser,
   BoundaryTooLongError,
@@ -9,9 +12,44 @@ import {
   MULTIPART,
 } from "./parser.js";
 import { QueryParser } from "../query-parser.js";
+import {
+  getMultipartFileLimit,
+  setMultipartFileLimit,
+  getMultipartTotalPartLimit,
+  setMultipartTotalPartLimit,
+} from "../utils.js";
 
 const qp = QueryParser.makeDefault(100);
 const noopIo = { read: (_size: number) => null as string | null };
+const fixDir = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "test",
+  "multipart",
+);
+function fix(
+  name: string,
+  boundary = "AaB03x",
+  tf: ((f: string, ct: string) => any) | null = null,
+) {
+  const c = fs.readFileSync(path.join(fixDir, name), "binary");
+  let done = false;
+  return Parser.parse(
+    {
+      read: (_n: number) => {
+        if (done) return null;
+        done = true;
+        return c;
+      },
+    },
+    null,
+    `multipart/form-data; boundary=${boundary}`,
+    tf,
+    Parser.BUFSIZE,
+    qp,
+  );
+}
 
 describe("Rack::Multipart::Parser", () => {
   it("returns nil if the content type is not multipart", () => {
@@ -43,15 +81,15 @@ describe("Rack::Multipart::Parser", () => {
   });
 
   it("dequote strips surrounding quotes", () => {
-    expect(new Parser("b", null, 1024, qp)._dequote('"hello"')).toBe("hello");
+    expect(new Parser("b", null, 1024, qp).dequote('"hello"')).toBe("hello");
   });
 
   it("dequote handles backslash escapes", () => {
-    expect(new Parser("b", null, 1024, qp)._dequote('"hel\\"lo"')).toBe('hel"lo');
+    expect(new Parser("b", null, 1024, qp).dequote('"hel\\"lo"')).toBe('hel"lo');
   });
 
   it("dequote returns unquoted string unchanged", () => {
-    expect(new Parser("b", null, 1024, qp)._dequote("plain")).toBe("plain");
+    expect(new Parser("b", null, 1024, qp).dequote("plain")).toBe("plain");
   });
 
   it("EOL is CRLF", () => expect(EOL).toBe("\r\n"));
@@ -67,4 +105,52 @@ describe("Rack::Multipart::Parser", () => {
     expect(new MultipartPartLimitError().name).toBe("MultipartPartLimitError"));
   it("MultipartTotalPartLimitError name", () =>
     expect(new MultipartTotalPartLimitError().name).toBe("MultipartTotalPartLimitError"));
+
+  it("parses multipart content when content type is present but disposition is not", () => {
+    expect(fix("content_type_and_no_disposition").params!["text/plain; charset=US-ASCII"]).toEqual([
+      "contents",
+    ]);
+  });
+
+  it("parses multipart content when content type present but filename is not", () => {
+    expect(fix("content_type_and_no_filename").params!["text"]).toBe("contents");
+  });
+
+  it("sets BINARY encoding on things without content type", () => {
+    expect(fix("none").params!["submit-name"]).toBe("Larry");
+  });
+
+  it("raises for invalid data preceding the boundary", () => {
+    expect(() => fix("preceding_boundary")).toThrow(EmptyContentError);
+  });
+
+  it("reaches a multipart file limit", () => {
+    const prev = getMultipartFileLimit();
+    try {
+      setMultipartFileLimit(1);
+      expect(() =>
+        fix("text", "AaB03x", (_f, _ct) => {
+          let b = "";
+          return {
+            write: (s: string) => {
+              b += s;
+            },
+            read: () => b,
+          };
+        }),
+      ).toThrow(MultipartPartLimitError);
+    } finally {
+      setMultipartFileLimit(prev);
+    }
+  });
+
+  it("reaches a multipart total limit", () => {
+    const prev = getMultipartTotalPartLimit();
+    try {
+      setMultipartTotalPartLimit(1);
+      expect(() => fix("none")).toThrow(MultipartTotalPartLimitError);
+    } finally {
+      setMultipartTotalPartLimit(prev);
+    }
+  });
 });

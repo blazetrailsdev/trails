@@ -1,4 +1,5 @@
 import { QueryParser } from "../query-parser.js";
+import { getMultipartFileLimit, getMultipartTotalPartLimit, unescapePath } from "../utils.js";
 
 // ── Error classes ─────────────────────────────────────────────────────────────
 
@@ -8,21 +9,18 @@ export class MultipartPartLimitError extends Error {
     this.name = "MultipartPartLimitError";
   }
 }
-
 export class MultipartTotalPartLimitError extends Error {
   constructor(message = "Maximum total multiparts in content reached") {
     super(message);
     this.name = "MultipartTotalPartLimitError";
   }
 }
-
 export class EmptyContentError extends Error {
   constructor(message = "bad content body") {
     super(message);
     this.name = "EmptyContentError";
   }
 }
-
 export class BoundaryTooLongError extends Error {
   constructor(message = "multipart boundary is too long") {
     super(message);
@@ -47,119 +45,396 @@ export interface MultipartInfo {
   params: Record<string, any> | null;
   tmpFiles: any[];
 }
-
 const EMPTY: MultipartInfo = { params: null, tmpFiles: [] };
 Object.freeze(EMPTY.tmpFiles);
 Object.freeze(EMPTY);
 
+// ── StringScanner equivalent ──────────────────────────────────────────────────
+
+class SBuf {
+  private s: string;
+  private p = 0;
+  private lm: RegExpExecArray | null = null;
+  constructor(s: string) {
+    this.s = s;
+  }
+  get pos() {
+    return this.p;
+  }
+  set pos(v: number) {
+    this.p = v;
+  }
+  get rest() {
+    return this.s.slice(this.p);
+  }
+  get restSize() {
+    return this.s.length - this.p;
+  }
+  get eos() {
+    return this.p >= this.s.length;
+  }
+  peek(n: number) {
+    return this.s.slice(this.p, this.p + n);
+  }
+  concat(s: string) {
+    this.s += s;
+  }
+  terminate() {
+    this.p = this.s.length;
+  }
+  set string(s: string) {
+    this.s = s;
+    this.p = 0;
+  }
+  cap(i: number) {
+    return this.lm?.[i] ?? "";
+  }
+  scanUntil(re: RegExp): string | null {
+    const sub = this.s.slice(this.p),
+      m = re.exec(sub);
+    if (!m) {
+      this.lm = null;
+      return null;
+    }
+    this.lm = m;
+    const end = m.index + m[0].length;
+    this.p += end;
+    return sub.slice(0, end);
+  }
+  checkUntil(re: RegExp): string | null {
+    const sub = this.s.slice(this.p),
+      m = re.exec(sub);
+    if (!m) {
+      this.lm = null;
+      return null;
+    }
+    this.lm = m;
+    return sub.slice(0, m.index + m[0].length);
+  }
+}
+
+// ── Collector ─────────────────────────────────────────────────────────────────
+
+class Part {
+  isFile = false;
+  constructor(
+    public body: any,
+    public head: string,
+    public filename: string | null | undefined,
+    public contentType: string | null | undefined,
+    public name: string,
+  ) {}
+  close() {
+    if (this.isFile && typeof this.body?.close === "function") this.body.close();
+  }
+  getData(cb: (d: any) => void) {
+    if (this.filename === "") return;
+    let d: any = this.body;
+    if (this.filename != null) {
+      if (typeof this.body?.rewind === "function") this.body.rewind();
+      d = {
+        filename: this.filename.split(/[/\\]/).at(-1) ?? "",
+        type: this.contentType,
+        name: this.name,
+        tempfile: this.body,
+        head: this.head,
+      };
+    }
+    cb(d);
+  }
+}
+
+class Collector {
+  private parts: Part[] = [];
+  private openFiles = 0;
+  constructor(private tf: ((f: string, ct: string) => any) | null) {}
+  each(cb: (p: Part) => void) {
+    this.parts.forEach(cb);
+  }
+  files() {
+    return this.parts.filter((p) => p.isFile);
+  }
+  onMimeHead(
+    i: number,
+    head: string,
+    filename: string | null | undefined,
+    ct: string | null | undefined,
+    name: string,
+  ) {
+    const p = new Part("", head, filename, ct, name);
+    if (filename != null && this.tf) {
+      p.body = this.tf(filename, ct ?? "");
+      if (typeof p.body?.binmode === "function") p.body.binmode();
+      p.isFile = true;
+      this.openFiles++;
+    }
+    this.parts[i] = p;
+    const fl = getMultipartFileLimit(),
+      pl = getMultipartTotalPartLimit();
+    if (fl > 0 && this.openFiles >= fl) {
+      this.parts.forEach((x) => x.close());
+      throw new MultipartPartLimitError();
+    }
+    if (pl > 0 && this.parts.length >= pl) {
+      this.parts.forEach((x) => x.close());
+      throw new MultipartTotalPartLimitError();
+    }
+  }
+  onMimeBody(i: number, c: string) {
+    const p = this.parts[i];
+    if (typeof p.body === "string") p.body += c;
+    else if (typeof p.body?.write === "function") p.body.write(c);
+  }
+  onMimeFinish(_i: number) {}
+}
+
 // ── Parser ────────────────────────────────────────────────────────────────────
 
 type State = "FAST_FORWARD" | "CONSUME_TOKEN" | "MIME_HEAD" | "MIME_BODY" | "DONE";
+const CONTENT_DISPOSITION_MAX_PARAMS = 16;
+const CONTENT_DISPOSITION_MAX_BYTES = 1536;
 
 export class Parser {
   static readonly BUFSIZE = 1_048_576;
   static readonly TEXT_PLAIN = "text/plain";
+  /** @internal */ state: State = "FAST_FORWARD";
+  private qp: QueryParser;
+  private params: ReturnType<QueryParser["makeParams"]>;
+  private bufsize: number;
+  private mi = 0;
+  private col: Collector;
+  private sb: SBuf;
+  private bodyRe: RegExp;
+  private bodyReEnd: RegExp;
+  private endBSz: number;
+  private rxMaxSz: number;
+  private headRe: RegExp;
 
-  /** @internal */
-  state: State = "FAST_FORWARD";
-
-  private _queryParser: QueryParser;
-  private _params: ReturnType<QueryParser["makeParams"]>;
-  private _bufsize: number;
-
-  static parseBoundary(contentType: string | null | undefined): string | null {
-    if (!contentType) return null;
-    const m = MULTIPART.exec(contentType);
+  static parseBoundary(ct: string | null | undefined): string | null {
+    if (!ct) return null;
+    const m = MULTIPART.exec(ct);
     return m ? m[1] : null;
   }
 
   static parse(
-    io: { read(size: number): string | null },
-    contentLength: number | null,
-    contentType: string | null | undefined,
-    tmpfile: ((filename: string, ct: string) => any) | null,
+    io: { read(n: number): string | null },
+    cl: number | null,
+    ct: string | null | undefined,
+    tmpfile: ((f: string, ct: string) => any) | null,
     bufsize: number,
     qp: QueryParser,
   ): MultipartInfo {
-    if (contentLength === 0) return EMPTY;
-    const boundary = Parser.parseBoundary(contentType);
-    if (!boundary) return EMPTY;
-    if (boundary.length > 70) {
-      throw new BoundaryTooLongError(
-        `multipart boundary size too large (${boundary.length} characters)`,
-      );
-    }
-    const parser = new Parser(boundary, tmpfile, bufsize, qp);
-    parser.parse(io);
-    return parser.result();
+    if (cl === 0) return EMPTY;
+    const b = Parser.parseBoundary(ct);
+    if (!b) return EMPTY;
+    if (b.length > 70)
+      throw new BoundaryTooLongError(`multipart boundary size too large (${b.length} characters)`);
+    const p = new Parser(b, tmpfile, bufsize, qp);
+    p.parse(io);
+    return p.result();
   }
 
   constructor(
-    _boundary: string,
-    _tmpfile: ((filename: string, ct: string) => any) | null,
+    boundary: string,
+    tmpfile: ((f: string, ct: string) => any) | null,
     bufsize: number,
     queryParser: QueryParser,
   ) {
-    this._queryParser = queryParser;
-    this._params = queryParser.makeParams();
-    this._bufsize = bufsize;
-    // Part B: SBuf + regex setup
+    this.qp = queryParser;
+    this.params = queryParser.makeParams();
+    this.bufsize = bufsize;
+    this.col = new Collector(tmpfile);
+    this.sb = new SBuf("");
+    const qb = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    this.bodyRe = new RegExp(`(?:${EOL}|^)--${qb}(?:${EOL}|--)`, "s");
+    this.bodyReEnd = new RegExp(`(?:${EOL}|^)--${qb}(?:${EOL}|--)$`, "s");
+    this.endBSz = boundary.length + 4;
+    this.rxMaxSz = boundary.length + 6;
+    this.headRe = new RegExp(`(.*?${EOL})${EOL}`, "s");
   }
 
-  parse(io: { read(size: number): string | null }): void {
-    this._readData(io);
+  parse(io: { read(n: number): string | null }) {
+    this.readData(io);
     while (true) {
-      let status: void | "want_read";
-      switch (this.state) {
-        case "FAST_FORWARD":
-          status = this._handleFastForward();
-          break;
-        case "CONSUME_TOKEN":
-          status = this._handleConsumeToken();
-          break;
-        case "MIME_HEAD":
-          status = this._handleMimeHead();
-          break;
-        case "MIME_BODY":
-          status = this._handleMimeBody();
-          break;
-        default:
-          return;
-      }
-      if (status === "want_read") this._readData(io);
+      let s: void | "want_read";
+      if (this.state === "FAST_FORWARD") s = this.handleFastForward();
+      else if (this.state === "CONSUME_TOKEN") s = this.handleConsumeToken();
+      else if (this.state === "MIME_HEAD") s = this.handleMimeHead();
+      else if (this.state === "MIME_BODY") s = this.handleMimeBody();
+      else return;
+      if (s === "want_read") this.readData(io);
     }
   }
 
   result(): MultipartInfo {
-    // Part B: Collector iteration + tagMultipartEncoding
-    throw new globalThis.Error("not yet implemented (Part B)");
+    this.col.each((p) =>
+      p.getData((d) => {
+        this.tagMultipartEncoding(p.filename, p.contentType, p.name, d);
+        this.qp.normalizeParams(this.params, p.name, d);
+      }),
+    );
+    return { params: this.params.toParamsHash(), tmpFiles: this.col.files().map((p) => p.body) };
   }
 
   /** @internal From WEBrick::HTTPUtils */
-  _dequote(str: string): string {
+  dequote(str: string): string {
     const m = /^"(.*)"$/.exec(str);
     return (m ? m[1] : str).replace(/\\(.)/g, "$1");
   }
 
-  // ── Part B stubs ─────────────────────────────────────────────────────────────
-
-  private _readData(_io: { read(size: number): string | null }): void {
-    throw new globalThis.Error("not yet implemented (Part B)");
+  /** @internal */ private readData(io: { read(n: number): string | null }) {
+    const c = io.read(this.bufsize);
+    this.handleEmptyContentBang(c);
+    this.sb.concat(c!);
   }
 
-  private _handleFastForward(): void | "want_read" {
-    throw new globalThis.Error("not yet implemented (Part B)");
+  /** @internal */ private handleFastForward(): void | "want_read" {
+    while (true) {
+      const t = this.consumeBoundary();
+      if (t === "BOUNDARY") {
+        this.state = "MIME_HEAD";
+        return;
+      }
+      if (t === "END_BOUNDARY") {
+        if (this.sb.pos === this.endBSz && this.sb.rest === EOL) {
+          this.state = "DONE";
+          return;
+        }
+      } else return "want_read";
+    }
   }
 
-  private _handleConsumeToken(): void {
-    throw new globalThis.Error("not yet implemented (Part B)");
+  /** @internal */ private handleConsumeToken() {
+    const t = this.consumeBoundary();
+    this.state = t === "END_BOUNDARY" || (this.sb.eos && t !== "BOUNDARY") ? "DONE" : "MIME_HEAD";
   }
 
-  private _handleMimeHead(): void | "want_read" {
-    throw new globalThis.Error("not yet implemented (Part B)");
+  /** @internal */ private handleMimeHead(): void | "want_read" {
+    if (!this.sb.scanUntil(this.headRe)) return "want_read";
+    const head = this.sb.cap(1),
+      ct = MULTIPART_CONTENT_TYPE.exec(head)?.[1] ?? null;
+    let name: string | undefined, filename: string | undefined, fstar: string | undefined;
+    const dm = MULTIPART_CONTENT_DISPOSITION.exec(head);
+    if (dm && dm[1].length <= CONTENT_DISPOSITION_MAX_BYTES) {
+      const p = this.parseDispositionParams(dm[1]);
+      name = p.name;
+      filename = p.filename;
+      fstar = p.filenameStar;
+    } else {
+      const im = MULTIPART_CONTENT_ID.exec(head);
+      if (im) name = im[1];
+    }
+    if (fstar) filename = this.normalizeFilename(fstar.split("'", 3)[2] ?? "");
+    else if (filename != null) filename = this.normalizeFilename(filename);
+    if (!name) name = filename ?? `${ct ?? Parser.TEXT_PLAIN}[]`;
+    this.col.onMimeHead(this.mi, head, filename, ct, name);
+    this.state = "MIME_BODY";
   }
 
-  private _handleMimeBody(): void | "want_read" {
-    throw new globalThis.Error("not yet implemented (Part B)");
+  /** @internal */ private handleMimeBody(): void | "want_read" {
+    const bwb = this.sb.checkUntil(this.bodyRe);
+    if (bwb != null) {
+      const body = bwb.replace(this.bodyReEnd, "");
+      this.col.onMimeBody(this.mi, body);
+      this.sb.pos += body.length + 2;
+      this.state = "CONSUME_TOKEN";
+      this.mi++;
+    } else {
+      if (this.rxMaxSz < this.sb.restSize) {
+        const d = this.sb.restSize - this.rxMaxSz;
+        this.col.onMimeBody(this.mi, this.sb.peek(d));
+        this.sb.pos += d;
+        this.sb.string = this.sb.rest;
+      }
+      return "want_read";
+    }
+  }
+
+  /** @internal */ private consumeBoundary(): "BOUNDARY" | "END_BOUNDARY" | null {
+    const r = this.sb.scanUntil(this.bodyRe);
+    if (r) return r.endsWith(EOL) ? "BOUNDARY" : "END_BOUNDARY";
+    this.sb.terminate();
+    return null;
+  }
+  /** @internal */ private normalizeFilename(fn: string): string {
+    if (!/%(?![0-9a-fA-F]{2})/.test(fn)) {
+      try {
+        fn = unescapePath(fn);
+      } catch {
+        /* keep as-is for malformed UTF-8 sequences */
+      }
+    }
+    return fn.split(/[/\\]/).at(-1) ?? "";
+  }
+  /** @internal */ private tagMultipartEncoding(
+    _f: string | null | undefined,
+    _ct: string | null | undefined,
+    _n: string,
+    _b: any,
+  ) {}
+  /** @internal */ private findEncoding(enc: string | null | undefined): string {
+    return enc ?? "UTF-8";
+  }
+  /** @internal */ private handleEmptyContentBang(c: string | null | undefined) {
+    if (!c) throw new EmptyContentError();
+  }
+
+  private parseDispositionParams(raw: string): {
+    name?: string;
+    filename?: string;
+    filenameStar?: string;
+  } {
+    const si = raw.indexOf(";");
+    if (si < 0) return {};
+    let pos = si + 1,
+      name: string | undefined,
+      filename: string | undefined,
+      filenameStar: string | undefined,
+      np = 0;
+    while (pos < raw.length) {
+      const ei = raw.indexOf("=", pos);
+      if (ei < 0 || ++np > CONTENT_DISPOSITION_MAX_PARAMS) break;
+      const pn = raw.slice(pos, ei).trim().toLowerCase();
+      pos = ei + 1;
+      let v = "";
+      if (raw[pos] === '"') {
+        pos++;
+        while (pos < raw.length) {
+          const qi = raw.indexOf('"', pos),
+            bi = raw.indexOf("\\", pos);
+          if (bi >= 0 && (qi < 0 || bi < qi)) {
+            v += raw.slice(pos, bi);
+            pos = bi + 1;
+            const e = raw[pos] ?? "";
+            pos++;
+            v += pn === "filename" && e !== '"' ? "\\" + e : e;
+          } else if (qi >= 0) {
+            v += raw.slice(pos, qi);
+            pos = qi + 1;
+            break;
+          } else {
+            v += raw.slice(pos);
+            pos = raw.length;
+            break;
+          }
+        }
+      } else {
+        const nsi = raw.indexOf(";", pos);
+        if (nsi >= 0) {
+          v = raw.slice(pos, nsi);
+          pos = nsi;
+        } else {
+          v = raw.slice(pos).trim();
+          pos = raw.length;
+        }
+      }
+      if (pn === "name") name = v;
+      else if (pn === "filename") filename = v;
+      else if (pn === "filename*") filenameStar = v;
+      const ns = raw.indexOf(";", pos);
+      if (ns >= 0) pos = ns + 1;
+      else break;
+    }
+    return { name, filename, filenameStar };
   }
 }
