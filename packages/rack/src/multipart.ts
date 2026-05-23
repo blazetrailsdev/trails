@@ -1,4 +1,5 @@
 import { UploadedFile } from "./multipart/uploaded-file.js";
+import { Generator } from "./multipart/generator.js";
 
 export { UploadedFile } from "./multipart/uploaded-file.js";
 import {
@@ -615,10 +616,60 @@ export class MultipartParser {
   }
 }
 
+/**
+ * Accumulator for multipart form data.
+ * Mirrors Rack::Multipart::ParamList — toParamsHash() returns an array of
+ * [key, value] pairs (not a Record), matching the Ruby implementation.
+ */
+export class ParamList {
+  private _pairs: [string, unknown][] = [];
+
+  static makeParams(): ParamList {
+    return new ParamList();
+  }
+
+  static normalizeParams(params: ParamList, key: string, value: unknown): void {
+    params._pairs.push([key, value]);
+  }
+
+  push(pair: [string, unknown]): void {
+    this._pairs.push(pair);
+  }
+
+  toParamsHash(): [string, unknown][] {
+    return this._pairs;
+  }
+}
+
+/**
+ * Extract multipart params from a Rack request object.
+ * Mirrors Rack::Multipart.extract_multipart.
+ */
+export function extractMultipart(
+  request: { env: Record<string, any> },
+  _params?: unknown,
+): Record<string, any> | null {
+  return parseMultipart(request.env);
+}
+
+/**
+ * Build a multipart body from a params hash.
+ * Mirrors Rack::Multipart.build_multipart.
+ */
+export function buildMultipart(
+  params: unknown,
+  first: boolean = true,
+): string | Record<string, unknown> | null {
+  return new Generator(params, first).dump();
+}
+
 // Convenience top-level
 export const Multipart = {
   parseMultipart,
   parseBoundary,
+  extractMultipart,
+  buildMultipart,
+  ParamList,
   MultipartParser,
   UploadedFile,
   BoundaryTooLongError,

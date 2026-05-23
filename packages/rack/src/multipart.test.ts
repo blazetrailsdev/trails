@@ -8,6 +8,9 @@ import {
   EmptyContentError,
   MissingInputError,
   parseMultipart,
+  extractMultipart,
+  buildMultipart,
+  ParamList,
   UploadedFile,
 } from "./multipart.js";
 import * as fs from "fs";
@@ -742,4 +745,43 @@ it("parses filename with unescaped percentage characters", () => {
   expect(files.type).toBe("image/jpeg");
   expect(files.filename).toBe("100% of a photo.jpeg");
   expect(files.tempfile.read()).toBe("contents");
+});
+
+it("extractMultipart delegates to parseMultipart via request.env", () => {
+  const env = multipartFixture("content_type_and_no_filename");
+  const result = extractMultipart({ env });
+  expect(result).toEqual(parseMultipart(env));
+});
+
+it("buildMultipart returns null when no UploadedFile present and first=true", () => {
+  const result = buildMultipart({ foo: "bar" });
+  expect(result).toBeNull();
+});
+
+it("buildMultipart returns flattened params hash when first=false", () => {
+  const result = buildMultipart({ name: "Larry" }, false) as Record<string, unknown>;
+  // Generator.flattenedParams() brackets keys when first=false: "[name]" => "Larry"
+  expect(result).toEqual({ "[name]": "Larry" });
+});
+
+it("ParamList.makeParams returns a new ParamList", () => {
+  const list = ParamList.makeParams();
+  expect(list).toBeInstanceOf(ParamList);
+  expect(list.toParamsHash()).toEqual([]);
+});
+
+it("ParamList.normalizeParams appends a key-value pair", () => {
+  const list = ParamList.makeParams();
+  ParamList.normalizeParams(list, "foo", "bar");
+  expect(list.toParamsHash()).toEqual([["foo", "bar"]]);
+});
+
+it("ParamList#toParamsHash returns accumulated pairs", () => {
+  const list = ParamList.makeParams();
+  list.push(["a", "1"]);
+  list.push(["b", "2"]);
+  expect(list.toParamsHash()).toEqual([
+    ["a", "1"],
+    ["b", "2"],
+  ]);
 });
