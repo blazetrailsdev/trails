@@ -1010,7 +1010,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // Route through `getClient()` so unit tests can stub the
     // acquisition (see postgresql-adapter.exec-query.test.ts).
     const client = await this.getClient();
-    return await fn(client);
+    try {
+      return await fn(client);
+    } catch (error) {
+      // A dead socket (08P01, server-side disconnect, etc.) leaves
+      // _rawConnection unusable for all subsequent queries. Tear down
+      // eagerly so the next caller gets a fresh pg.Client rather than
+      // hitting the same corrupted connection repeatedly.
+      if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
+      throw error;
+    }
   }
 
   /**

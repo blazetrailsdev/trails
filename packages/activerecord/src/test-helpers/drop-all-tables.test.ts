@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { afterEach, describe, it, expect, beforeAll, vi } from "vitest";
 import { createTestAdapter } from "../test-adapter.js";
 import { dropAllTables } from "./drop-all-tables.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -32,6 +32,76 @@ beforeAll(() => {
   const sa = createTestAdapter();
 
   adapter = (sa as any).inner ?? sa;
+});
+
+describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("retries exactly once when execute throws a connection error and succeeds on retry", async () => {
+    const connErr = Object.assign(new Error("Connection terminated unexpectedly"), {
+      code: "08006",
+    });
+
+    let executeCallCount = 0;
+    const fakeAdapter = {
+      adapterName: "postgres" as const,
+      execute: vi.fn(async () => {
+        executeCallCount++;
+        if (executeCallCount === 1) throw connErr;
+        // Second call (retry): return empty table list so no DROPs run.
+        return [];
+      }),
+      executeMutation: vi.fn(async () => {}),
+    } as unknown as DatabaseAdapter;
+
+    await expect(dropAllTables(fakeAdapter)).resolves.toBeUndefined();
+    // First attempt: 1 execute call throws. Retry: 3 execute calls (matviews,
+    // views, tables) all return []. Total = 4.
+    expect(executeCallCount).toBe(4);
+  });
+
+  it("rethrows when execute throws a non-connection error", async () => {
+    const appErr = new Error("syntax error");
+    const fakeAdapter = {
+      adapterName: "postgres" as const,
+      execute: vi.fn(async () => {
+        throw appErr;
+      }),
+      executeMutation: vi.fn(async () => {}),
+    } as unknown as DatabaseAdapter;
+
+    await expect(dropAllTables(fakeAdapter)).rejects.toThrow(appErr);
+    expect(fakeAdapter.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries when executeMutation throws a connection error mid-loop", async () => {
+    const connErr = Object.assign(new Error("invalid frontend message type 0"), {
+      code: "08P01",
+    });
+
+    let mutationCallCount = 0;
+    const fakeAdapter = {
+      adapterName: "postgres" as const,
+      execute: vi.fn(async (sql: string) => {
+        // Return one matview on first pass; empty on retry.
+        if (sql.includes("matviewname")) {
+          return mutationCallCount === 0 ? [{ schemaname: "public", name: "mv1" }] : [];
+        }
+        return [];
+      }),
+      executeMutation: vi.fn(async () => {
+        mutationCallCount++;
+        if (mutationCallCount === 1) throw connErr;
+      }),
+    } as unknown as DatabaseAdapter;
+
+    await expect(dropAllTables(fakeAdapter)).resolves.toBeUndefined();
+    // First pass: 1 execute (matviews→mv1) + 1 executeMutation (throws).
+    // Retry: 3 execute calls (matviews/views/tables → all empty) + 0 mutations.
+    // Total execute calls = 4 proves the retry path ran.
+    expect(fakeAdapter.execute).toHaveBeenCalledTimes(4);
+    expect(mutationCallCount).toBe(1);
+  });
 });
 
 describe("dropAllTables", () => {

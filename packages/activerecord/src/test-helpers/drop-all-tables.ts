@@ -20,28 +20,62 @@ export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
   }
 }
 
+function _isPgConnectionError(e: unknown): boolean {
+  const err = e as { code?: string; message?: string } | null;
+  if (!err) return false;
+  if (typeof err.code === "string" && err.code.startsWith("08")) return true;
+  const msg = typeof err.message === "string" ? err.message : "";
+  return (
+    msg.includes("invalid frontend message") ||
+    msg.includes("Connection terminated") ||
+    msg.includes("client has already ended") ||
+    msg.includes("Client has encountered a connection error")
+  );
+}
+
 async function dropAllPgTables(adapter: DatabaseAdapter): Promise<void> {
+  try {
+    await _dropAllPgTablesOnce(adapter);
+  } catch (e) {
+    // withClient() already called reconnect() on the adapter when it caught
+    // the connection error, so _rawConnection is now null and the next
+    // _acquireFreshClient() will open a fresh pg.Client. Retry exactly once.
+    if (_isPgConnectionError(e)) {
+      await _dropAllPgTablesOnce(adapter);
+    } else {
+      throw e;
+    }
+  }
+}
+
+async function _dropAllPgTablesOnce(adapter: DatabaseAdapter): Promise<void> {
   const schema = `ANY(current_schemas(false))`;
   for (const { schemaname: s, name: n } of (await adapter.execute(
     `SELECT schemaname, matviewname AS name FROM pg_matviews WHERE schemaname = ${schema}`,
   )) as { schemaname: string; name: string }[]) {
     try {
       await adapter.executeMutation(`DROP MATERIALIZED VIEW IF EXISTS "${s}"."${n}" CASCADE`);
-    } catch {}
+    } catch (e) {
+      if (_isPgConnectionError(e)) throw e;
+    }
   }
   for (const { schemaname: s, name: n } of (await adapter.execute(
     `SELECT schemaname, viewname AS name FROM pg_views WHERE schemaname = ${schema}`,
   )) as { schemaname: string; name: string }[]) {
     try {
       await adapter.executeMutation(`DROP VIEW IF EXISTS "${s}"."${n}" CASCADE`);
-    } catch {}
+    } catch (e) {
+      if (_isPgConnectionError(e)) throw e;
+    }
   }
   for (const { schemaname: s, tablename: t } of (await adapter.execute(
     `SELECT schemaname, tablename FROM pg_tables WHERE schemaname = ${schema}`,
   )) as { schemaname: string; tablename: string }[]) {
     try {
       await adapter.executeMutation(`DROP TABLE IF EXISTS "${s}"."${t}" CASCADE`);
-    } catch {}
+    } catch (e) {
+      if (_isPgConnectionError(e)) throw e;
+    }
   }
 }
 
