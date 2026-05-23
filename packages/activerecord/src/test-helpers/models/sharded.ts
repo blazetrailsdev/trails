@@ -7,7 +7,7 @@ export class ShardedBlog extends Base {
   static _tableName = "sharded_blogs";
 
   static {
-    this.hasMany("blogPosts", { className: "ShardedBlogPost" });
+    this.hasMany("blogPosts", { className: "ShardedBlogPost", foreignKey: "blog_id" });
     this.hasMany("commentsViaPosts", {
       through: "blogPosts",
       source: "commentsWithCompositePk",
@@ -25,12 +25,22 @@ export class ShardedBlogPost extends Base {
 
     this.belongsTo("parent", { polymorphic: true });
     this.belongsTo("blog", { className: "ShardedBlog" });
-    this.hasMany("comments", { className: "ShardedComment" });
+    this.hasMany("comments", {
+      className: "ShardedComment",
+      foreignKey: ["blog_id", "blog_post_id"],
+    });
     // Rails: dependent: :delete_all — "deleteAll" not yet in AssociationOptions.dependent type
-    this.hasMany("deleteComments", { className: "ShardedComment", dependent: "delete" });
+    this.hasMany("deleteComments", {
+      className: "ShardedComment",
+      foreignKey: ["blog_id", "blog_post_id"],
+      dependent: "delete",
+    });
     this.hasMany("children", { className: "ShardedBlogPost", as: "parent" });
 
-    this.hasMany("blogPostTags", { className: "ShardedBlogPostTag" });
+    this.hasMany("blogPostTags", {
+      className: "ShardedBlogPostTag",
+      foreignKey: ["blog_id", "blog_post_id"],
+    });
     this.hasMany("tags", { through: "blogPostTags", className: "ShardedTag" });
 
     this.hasMany("commentsWithCompositePk", {
@@ -41,6 +51,7 @@ export class ShardedBlogPost extends Base {
 
     this.hasMany("commentsWithInverse", {
       className: "ShardedComment",
+      foreignKey: ["blog_id", "blog_post_id"],
       inverseOf: "blogPostWithInverse",
     });
   }
@@ -91,7 +102,10 @@ export class ShardedTag extends Base {
   static {
     queryConstraints.call(this, "blog_id", "id");
 
-    this.hasMany("blogPostTags", { className: "ShardedBlogPostTag" });
+    this.hasMany("blogPostTags", {
+      className: "ShardedBlogPostTag",
+      foreignKey: ["blog_id", "tag_id"],
+    });
     this.hasMany("blogPosts", { through: "blogPostTags", className: "ShardedBlogPost" });
   }
 }
