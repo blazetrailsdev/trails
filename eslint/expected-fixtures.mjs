@@ -1,9 +1,14 @@
 /**
  * ESLint rule: expected-fixtures
  *
- * For each activerecord test file that maps to a Rails test case declaring
- * `fixtures :a, :b`, require a top-level `useFixtures({ a: …, b: … })` call
- * whose keys are a superset of the Rails declaration.
+ * For each activerecord test file whose Rails counterpart actually
+ * dereferences fixture records (e.g. `customers(:david)` inside a test
+ * body), require a `useFixtures({ … })` call whose keys are a superset
+ * of the dereferenced sets.
+ *
+ * Class-level `fixtures :foo` declarations without record references are
+ * scaffolding (often inherited from a parent test class) and are not
+ * enforced — porting them would be cargo cult.
  *
  * Data sources:
  *   - scripts/test-deps/output/activerecord-test-deps.json — per-file Rails
@@ -153,14 +158,14 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        "Require activerecord test files to load via `useFixtures` the same fixture sets their Rails counterpart declares.",
+        "Require activerecord test files to load via `useFixtures` every fixture set their Rails counterpart actually dereferences (e.g. `customers(:david)`). Scaffolding-only fixture declarations are ignored.",
     },
     schema: [],
     messages: {
       missing:
-        "Expected `useFixtures({ … })` declaring fixture set(s) [{{names}}] — Rails source declares them in {{rails}}.",
+        "Expected `useFixtures({ … })` declaring fixture set(s) [{{names}}] — Rails source {{rails}} dereferences records from them.",
       incomplete:
-        "`useFixtures(...)` is missing fixture set(s) [{{names}}] declared in Rails source {{rails}}.",
+        "`useFixtures(...)` is missing fixture set(s) [{{names}}] dereferenced by Rails source {{rails}}.",
     },
   },
   create(context) {
