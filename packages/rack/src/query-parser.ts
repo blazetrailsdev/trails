@@ -286,6 +286,23 @@ export class QueryParser {
     this._setNestedValue(container, firstKey, restKeys, v, depth + 1);
   }
 
+  /** @internal */
+  private isParamsHashType(obj: any): boolean {
+    return typeof obj === "object" && obj !== null && !Array.isArray(obj);
+  }
+
+  /** @internal */
+  private isParamsHashHasKey(hash: any, key: string): boolean {
+    if (/\[\]/.test(key)) return false;
+    let h: any = hash;
+    for (const part of key.split(/[[\]]+/)) {
+      if (part === "") continue;
+      if (!this.isParamsHashType(h) || !Object.hasOwn(h, part)) return false;
+      h = h[part];
+    }
+    return true;
+  }
+
   private _shouldStartNewHash(lastItem: any, keys: string[]): boolean {
     if (typeof lastItem !== "object" || lastItem === null || Array.isArray(lastItem)) return true;
     let current = lastItem;

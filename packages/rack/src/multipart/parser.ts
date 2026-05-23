@@ -59,6 +59,7 @@ export class BoundedIO {
     private contentLength: number,
   ) {}
 
+  /** @internal */
   read(size: number, _outbuf?: string): string | null {
     if (this.cursor >= this.contentLength) return null;
     const left = this.contentLength - this.cursor;
@@ -173,12 +174,17 @@ export class Collector {
   private parts: Part[] = [];
   private openFiles = 0;
   constructor(private tf: ((f: string, ct: string) => any) | null) {}
+
+  /** @internal */
   each(cb: (p: Part) => void) {
     this.parts.forEach(cb);
   }
+
   files() {
     return this.parts.filter((p) => p.isFile);
   }
+
+  /** @internal */
   onMimeHead(
     i: number,
     head: string,
@@ -196,13 +202,18 @@ export class Collector {
     this.parts[i] = p;
     this.checkPartLimits();
   }
+
+  /** @internal */
   onMimeBody(i: number, c: string) {
     const p = this.parts[i];
     if (typeof p.body === "string") p.body += c;
     else if (typeof p.body?.write === "function") p.body.write(c);
   }
+
+  /** @internal */
   onMimeFinish(_i: number) {}
 
+  /** @internal */
   private checkPartLimits() {
     const fl = getMultipartFileLimit(),
       pl = getMultipartTotalPartLimit();
