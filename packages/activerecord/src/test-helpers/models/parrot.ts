@@ -16,11 +16,19 @@ export class Parrot extends Base {
       function (this: any) {
         this.cancelSaveCallbackMethod();
       },
-      { if: (r: any) => r.cancelSaveFromCallback },
+      { if: (r: any) => r.readAttribute("cancelSaveFromCallback") },
     );
     this.beforeUpdate(function (this: any) {
       this.incrementUpdatedCount();
     });
+  }
+
+  static async deleteAll() {
+    await this.withConnection(async (c: any) => {
+      await c.delete("DELETE FROM parrots_pirates");
+      await c.delete("DELETE FROM parrots_treasures");
+    });
+    return super.deleteAll();
   }
 
   cancelSaveCallbackMethod() {
