@@ -185,8 +185,26 @@ export function parseFile(file: string): FileDeps {
 
 function main(): void {
   if (!fs.existsSync(CASES_DIR)) {
-    console.error(`Rails test dir not found: ${CASES_DIR}\nRun: pnpm vendor:fetch`);
-    process.exit(1);
+    // CI runs `pnpm prelint` without vendor:fetch. Match the pattern used by
+    // build-rails-privates-manifest.ts: emit an empty artifact + warning
+    // rather than failing. The expected-fixtures ESLint rule fails open
+    // when the deps JSON is empty, so lint stays green.
+    //
+    // Only scaffold if the artifact doesn't already exist — otherwise a
+    // dev who ran `pnpm test:deps` once and then runs `pnpm lint` after
+    // detaching vendor would lose their populated manifest.
+    if (!fs.existsSync(OUT_FILE)) {
+      fs.mkdirSync(OUT_DIR, { recursive: true });
+      fs.writeFileSync(OUT_FILE, "{}\n");
+      console.warn(
+        `[rails-test-deps] ${CASES_DIR} missing; wrote empty deps stub. Run \`pnpm vendor:fetch && pnpm test:deps\` to populate.`,
+      );
+    } else {
+      console.warn(
+        `[rails-test-deps] ${CASES_DIR} missing; leaving existing ${path.relative(ROOT, OUT_FILE)} intact.`,
+      );
+    }
+    return;
   }
 
   const files = walk(CASES_DIR).sort();

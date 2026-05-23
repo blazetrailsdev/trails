@@ -12,6 +12,7 @@ import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
 import railsFileStructureMethodOrder from "./eslint/rails-file-structure-method-order.mjs";
+import expectedFixtures from "./eslint/expected-fixtures.mjs";
 
 export default defineConfig(
   {
@@ -111,6 +112,7 @@ export default defineConfig(
           "sqlite-driver-await": sqliteDriverAwait,
           "nie-requires-annotation": nieRequiresAnnotation,
           "rails-file-structure-method-order": railsFileStructureMethodOrder,
+          "expected-fixtures": expectedFixtures,
         },
       },
     },
@@ -215,6 +217,17 @@ export default defineConfig(
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/nie-requires-annotation": "error",
+    },
+  },
+
+  // ── expected-fixtures: activerecord test files must load Rails-declared
+  //    fixture sets via useFixtures({...}). Files currently lacking it are
+  //    tracked in eslint/expected-fixtures-exclude.json and ratcheted down
+  //    as porters migrate. See eslint/expected-fixtures.mjs. ──
+  {
+    files: ["packages/activerecord/src/**/*.test.ts"],
+    rules: {
+      "blazetrails/expected-fixtures": "error",
     },
   },
 
