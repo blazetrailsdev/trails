@@ -1,24 +1,20 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-let adapter: TestDatabaseAdapter;
-
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  adapter = createTestAdapter();
-  await defineSchema(adapter, { events: { start_date: "date" } });
+  await defineSchema({ events: { start_date: "date" } });
 });
-withTransactionalFixtures(() => adapter);
-
 describe("DateTest", () => {
   it("date with time value", async () => {
     class Event extends Base {
       static {
         this.attribute("start_date", "date");
-        this.adapter = adapter;
       }
     }
     const e = await Event.create({ start_date: "2024-01-15" });
@@ -30,7 +26,6 @@ describe("DateTest", () => {
     class Event extends Base {
       static {
         this.attribute("start_date", "date");
-        this.adapter = adapter;
       }
     }
     const e = await Event.create({ start_date: "2024-01-15" });

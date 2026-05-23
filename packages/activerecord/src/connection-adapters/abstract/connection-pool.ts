@@ -240,6 +240,19 @@ export class ConnectionPool implements ReapablePool {
   private _idleTimeout: number | null;
   private _lastCheckinAt = new Map<DatabaseAdapter, number>();
   private _pinnedConnections = new Map<number, { connection: DatabaseAdapter; depth: number }>();
+  /**
+   * Pool-scoped fixture pin. Separate from {@link _pinnedConnections} (which is
+   * keyed by `executionContextId()` for per-request isolation in Rails-shape).
+   *
+   * Test fixtures need a different lifetime: a single pin that spans
+   * `beforeEach` / `it()` / `afterEach`, which under vitest can each resolve to
+   * different `AsyncLocalStorage` contexts. Tracking it as a pool-level field
+   * makes the pin visible from any context, matching what Rails gets for free
+   * because Ruby tests run on a single thread that owns the pin.
+   *
+   * @internal
+   */
+  private _fixturePin: { connection: DatabaseAdapter; depth: number } | null = null;
   private _cacheConfig: ConnectionPoolConfiguration;
 
   constructor(poolConfig: PoolConfig) {
@@ -496,10 +509,28 @@ export class ConnectionPool implements ReapablePool {
 
   // --- Pin / Unpin ---
 
-  async pinConnectionBang(_lockThread = false): Promise<void> {
+  async pinConnectionBang(_lockThread: boolean | { fixture?: boolean } = false): Promise<void> {
+    // Accept `pinConnectionBang(true)` (Rails-compat boolean), `pinConnectionBang()`,
+    // and `pinConnectionBang({ fixture: true })`. The boolean form is retained for
+    // call sites that mirror Rails' `lock_thread` parameter — we do not actually
+    // use it (node has no thread-locking) so the flag is recorded but not enforced.
+    const fixture =
+      typeof _lockThread === "object" && _lockThread !== null
+        ? Boolean(_lockThread.fixture)
+        : false;
+    const slot = fixture ? "fixture" : "ctx";
     const ctxId = executionContextId();
-    let pin = this._pinnedConnections.get(ctxId);
-    const leasedConnection = this._connectionLease().connection;
+    let pin: { connection: DatabaseAdapter; depth: number } | undefined =
+      slot === "fixture" ? (this._fixturePin ?? undefined) : this._pinnedConnections.get(ctxId);
+
+    // Fixture pins can't rely on the per-context lease — vitest's
+    // beforeEach/it/afterEach often run in different AsyncLocalStorage
+    // contexts, so the current context's lease may be empty even when
+    // another context already leased the only connection. Reuse the first
+    // established connection in fixture mode so pool size 1 doesn't trip
+    // ConnectionTimeoutError on `_acquireConnection`.
+    const fixtureSharedConnection = slot === "fixture" ? (this._connections?.[0] ?? null) : null;
+    const leasedConnection = fixtureSharedConnection ?? this._connectionLease().connection;
     const connection = pin?.connection ?? leasedConnection ?? this._acquireConnection();
     const newlyCheckedOut = !pin && leasedConnection == null;
 
@@ -507,7 +538,11 @@ export class ConnectionPool implements ReapablePool {
     // pinConnectionBang calls in the same context from double-acquiring.
     if (!pin) {
       pin = { connection, depth: 0 };
-      this._pinnedConnections.set(ctxId, pin);
+      if (slot === "fixture") {
+        this._fixturePin = pin;
+      } else {
+        this._pinnedConnections.set(ctxId, pin);
+      }
       this._cacheConfig.incrementPinnedCount();
     }
     pin.depth++;
@@ -527,7 +562,11 @@ export class ConnectionPool implements ReapablePool {
     } catch (error) {
       pin.depth--;
       if (pin.depth === 0) {
-        this._pinnedConnections.delete(ctxId);
+        if (slot === "fixture") {
+          this._fixturePin = null;
+        } else {
+          this._pinnedConnections.delete(ctxId);
+        }
         this._cacheConfig.decrementPinnedCount();
         if (newlyCheckedOut) {
           this.checkin(connection);
@@ -538,8 +577,17 @@ export class ConnectionPool implements ReapablePool {
   }
 
   async unpinConnectionBang(): Promise<boolean> {
+    // Prefer the per-context pin when one exists for the current execution
+    // context — that's the Rails-shape request-isolation case and the caller
+    // is unpinning *their* pin, not the fixture-wide one. Fall back to the
+    // pool-level fixture pin only when no context pin is registered. Without
+    // this priority order, an unpin call from a context that owns a per-
+    // context pin would silently roll back the fixture pin instead, leaving
+    // the context pin in place for a double-rollback on the next call.
     const ctxId = executionContextId();
-    const pin = this._pinnedConnections.get(ctxId);
+    const contextPin = this._pinnedConnections.get(ctxId);
+    const fromFixture = contextPin ? null : this._fixturePin;
+    const pin = contextPin ?? fromFixture;
     if (!pin) {
       throw new Error(`There isn't a pinned connection ${this.inspect()}`);
     }
@@ -559,7 +607,11 @@ export class ConnectionPool implements ReapablePool {
     } finally {
       pin.depth--;
       if (pin.depth === 0) {
-        this._pinnedConnections.delete(ctxId);
+        if (fromFixture) {
+          this._fixturePin = null;
+        } else {
+          this._pinnedConnections.delete(ctxId);
+        }
         this._cacheConfig.decrementPinnedCount();
         this.checkin(connection);
       }
@@ -745,6 +797,7 @@ export class ConnectionPool implements ReapablePool {
         (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
       }
       this._pinnedConnections.clear();
+      this._fixturePin = null;
       if (this._connections) this._connections.length = 0;
       this._available?.rejectAll(
         new ConnectionNotEstablished("Connection pool has been disconnected"),
@@ -763,6 +816,7 @@ export class ConnectionPool implements ReapablePool {
   discardBang(): void {
     if (this.isDiscarded()) return;
     this._pinnedConnections.clear();
+    this._fixturePin = null;
     this._connections = null;
     this._available?.rejectAll(new ConnectionNotEstablished("Connection pool has been discarded"));
     this._available?.clear();
@@ -964,6 +1018,9 @@ export class ConnectionPool implements ReapablePool {
         this._pinnedConnections.delete(ctxId);
       }
     }
+    if (this._fixturePin?.connection === conn) {
+      this._fixturePin = null;
+    }
 
     if (this._connections) {
       const connIdx = this._connections.indexOf(conn);
@@ -991,6 +1048,7 @@ export class ConnectionPool implements ReapablePool {
   // --- Private ---
 
   private _isConnectionPinned(conn: DatabaseAdapter): boolean {
+    if (this._fixturePin?.connection === conn) return true;
     for (const pin of this._pinnedConnections.values()) {
       if (pin.connection === conn) return true;
     }
@@ -1008,6 +1066,11 @@ export class ConnectionPool implements ReapablePool {
    * @internal
    */
   private _resolvePinnedConnection(): DatabaseAdapter | undefined {
+    // Pool-level fixture pin (set by `pinConnectionBang({ fixture: true })`)
+    // wins across all execution contexts — that's the whole point of the
+    // fixture slot. Falls back to the per-context map for production
+    // request-scoped pins.
+    if (this._fixturePin) return this._fixturePin.connection;
     if (this._pinnedConnections.size === 0) return undefined;
     return this._pinnedConnections.get(executionContextId())?.connection;
   }

@@ -845,6 +845,44 @@ it("concurrent checkouts within a pinned context all return the pinned connectio
   await pool.unpinConnectionBang();
 });
 
+it("fixture pin survives across execution contexts (vitest beforeEach/afterEach)", async () => {
+  // Vitest can run beforeEach, the `it()` body, and afterEach in different
+  // AsyncLocalStorage scopes. The default per-context pin keys on
+  // executionContextId(), so a pin set in context A is invisible from context B
+  // and `unpinConnectionBang` from B would throw "There isn't a pinned
+  // connection". The `{ fixture: true }` slot is pool-scoped and avoids this.
+  const pool = makeTransactionAwarePool(5);
+  let pinned: DatabaseAdapter | null = null;
+  await withExecutionContext(async () => {
+    await pool.pinConnectionBang({ fixture: true });
+    pinned = pool.checkout();
+  });
+  // Different context — pin must still be visible.
+  await withExecutionContext(async () => {
+    expect(pool.checkout()).toBe(pinned);
+    const clean = await pool.unpinConnectionBang();
+    expect(clean).toBe(true);
+  });
+});
+
+it("context pin takes priority over fixture pin in unpin", async () => {
+  // If both pins are active, an unpinConnectionBang call from a context that
+  // owns the per-context pin must unpin *its* pin, not the fixture-wide one.
+  // Otherwise the context pin lingers and the next unpin double-rollbacks.
+  const pool = makeTransactionAwarePool(5);
+  await pool.pinConnectionBang({ fixture: true });
+  await withExecutionContext(async () => {
+    await pool.pinConnectionBang(); // per-context pin in this scope
+    const before = pool.checkout();
+    await pool.unpinConnectionBang(); // should clear the context pin
+    // Fixture pin still alive — checkout in this nested context now sees
+    // the fixture pin's connection.
+    expect(pool.checkout()).toBe(before);
+  });
+  await pool.unpinConnectionBang(); // clears the fixture pin
+  await expect(pool.unpinConnectionBang()).rejects.toThrow(/isn't a pinned connection/);
+});
+
 it.skip("pin connection nesting lock", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
   // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle

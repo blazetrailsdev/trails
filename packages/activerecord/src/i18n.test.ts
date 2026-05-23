@@ -1,27 +1,23 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base } from "./index.js";
 import { I18n } from "@blazetrails/activemodel";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-let adapter: TestDatabaseAdapter;
-
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  adapter = createTestAdapter();
-  await defineSchema(adapter, { topics: { title: "string" } });
+  await defineSchema({ topics: { title: "string" } });
 });
 beforeEach(() => {
   I18n.reset();
 });
-withTransactionalFixtures(() => adapter);
-
 describe("ActiveRecordI18nTests", () => {
   it("translated model attributes", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -36,7 +32,6 @@ describe("ActiveRecordI18nTests", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -51,7 +46,6 @@ describe("ActiveRecordI18nTests", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Reply extends Topic {}
@@ -67,7 +61,6 @@ describe("ActiveRecordI18nTests", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Reply extends Topic {}
@@ -83,7 +76,6 @@ describe("ActiveRecordI18nTests", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -98,7 +90,6 @@ describe("ActiveRecordI18nTests", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Reply extends Topic {}
@@ -114,7 +105,6 @@ describe("ActiveRecordI18nTests", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Reply extends Topic {}

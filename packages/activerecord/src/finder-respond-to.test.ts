@@ -1,23 +1,21 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, RecordNotFound } from "./index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-let adapter: TestDatabaseAdapter;
 let Topic: typeof Base;
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 
 beforeAll(async () => {
-  adapter = createTestAdapter();
   // `status` is added dynamically by one test below; declare it up front so
   // a later test's INSERT doesn't trigger ALTER ADD COLUMN inside the
   // transactional fixture (MariaDB implicit-commits on DDL).
-  await defineSchema(adapter, {
+  await defineSchema({
     topics: { title: "string", author_name: "string", status: "string" },
   });
 });
-withTransactionalFixtures(() => adapter);
-
 // Recreate the model per test so a test that mutates the class (adds an
 // attribute, primes a finder cache, etc.) can't leak into later tests.
 beforeEach(() => {
@@ -25,7 +23,6 @@ beforeEach(() => {
     static {
       this.attribute("title", "string");
       this.attribute("author_name", "string");
-      this.adapter = adapter;
     }
   };
 });

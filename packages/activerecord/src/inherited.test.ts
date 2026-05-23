@@ -1,27 +1,23 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-let adapter: TestDatabaseAdapter;
-
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  adapter = createTestAdapter();
-  await defineSchema(adapter, {
+  await defineSchema({
     parents: { name: "string" },
     children: { name: "string" },
   });
 });
-withTransactionalFixtures(() => adapter);
-
 describe("InheritedTest", () => {
   it("super before filter attributes", async () => {
     const log: string[] = [];
     class Parent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeCreate(function () {
           log.push("parent_before");
         });
@@ -45,7 +41,6 @@ describe("InheritedTest", () => {
     class Parent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterCreate(function () {
           log.push("parent_after");
         });

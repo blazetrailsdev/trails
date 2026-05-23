@@ -7,27 +7,22 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const BIG = 2n ** 62n; // 4611686018427387904 — above Number.MAX_SAFE_INTEGER
-
-let adapter: TestDatabaseAdapter;
-
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  adapter = createTestAdapter();
-  await defineSchema(adapter, { metrics: { score: "big_integer", label: "string" } });
+  await defineSchema({ metrics: { score: "big_integer", label: "string" } });
 });
-withTransactionalFixtures(() => adapter);
-
 describe("bigint model round-trip (all adapters)", () => {
   function makeModel() {
     class Metric extends Base {
       static {
         this.attribute("score", "big_integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     return Metric;

@@ -4,26 +4,21 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-let adapter: TestDatabaseAdapter;
-
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  adapter = createTestAdapter();
-  await defineSchema(adapter, { topics: { title: "string", approved: "boolean" } });
+  await defineSchema({ topics: { title: "string", approved: "boolean" } });
 });
-withTransactionalFixtures(() => adapter);
-
 describe("BooleanTest", () => {
   function makeModel() {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("approved", "boolean");
-        this.adapter = adapter;
       }
     }
     return { Topic };
