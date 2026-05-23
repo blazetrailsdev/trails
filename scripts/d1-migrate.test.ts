@@ -53,12 +53,16 @@ function normalize(text: string): string {
       return `import ${prefix}{ ${parts.join(", ")} } from "${mod}";`;
     },
   );
+  // Strip blank lines: ts-morph's insertion order produces a denser layout
+  // than the hand-authored reference files (no aesthetic blanks around the
+  // helper calls or before `describe`). Stripping blanks is safe here because
+  // the codemod never emits multi-line string literals — everything it inserts
+  // is plain TS statements, so a "blank line inside a template literal" diff
+  // can't be hidden.
   const lines = sorted
     .split("\n")
     .map((l) => l.trimEnd())
     .filter((l) => l.length > 0);
-  // Sort the leading run of import statements (and any folded multi-line imports
-  // that prettier merged into a single line by this point).
   let start = 0;
   while (start < lines.length && !/^import\s/.test(lines[start])) start++;
   let end = start;
