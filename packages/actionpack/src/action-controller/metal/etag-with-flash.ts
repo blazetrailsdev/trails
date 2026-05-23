@@ -7,17 +7,18 @@
  */
 
 // Rails: `etag { flash if request.respond_to?(:flash) && !flash.empty? }`
-// The flash object is passed to the ETagger which calls `to_param`-style
-// serialization. `toSessionValue` (the session-storable representation)
-// matches what Rails serializes — not `toHash`, which excludes flash.now
-// entries and would fail to bust caches on flash.now changes.
+// Rails passes the flash object itself to the ETagger (serialized via expand_cache_key).
+// That includes flash.now entries — they live in @flashes until swept, so the ETag
+// correctly changes when flash.now changes. toHash() replicates this: it returns all
+// of @flashes (including flash.now entries). toSessionValue() would be wrong here —
+// it calls @flashes.except(*@discard) which strips flash.now entries before hashing.
 export function flashEtagger(request: {
   flash?: {
     empty?: boolean;
-    toSessionValue?(): unknown;
+    toHash?(): unknown;
   };
 }): unknown | undefined {
   const flash = request.flash;
   if (!flash || flash.empty) return undefined;
-  return flash.toSessionValue ? flash.toSessionValue() : flash;
+  return flash.toHash ? flash.toHash() : flash;
 }

@@ -76,6 +76,6 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 }
 
-// "action_controller" is the AS::Notifications channel — snake_case is intentional
-// (cross-package wire identifier; see MEMORY feedback_camelcase_only exception).
+// "action_controller" is the AS::Notifications channel identifier, which uses
+// Rails snake_case naming conventions as a cross-package wire protocol.
 LogSubscriber.attachTo("action_controller");
