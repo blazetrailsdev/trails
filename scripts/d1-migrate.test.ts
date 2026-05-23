@@ -8,6 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { migrateText } from "./d1-migrate.js";
 
@@ -87,22 +88,26 @@ const REFERENCES: { name: string; sha: string; repoPath: string }[] = [
 
 describe("d1-migrate codemod", () => {
   for (const ref of REFERENCES) {
-    it(`reproduces merged result for ${ref.name}`, () => {
+    it(`reproduces post-helper result for ${ref.name}`, () => {
+      // Input is the pre-merge file (legacy `createTestAdapter()` shape).
+      // Expected output is the *current* working-tree file: those four merged
+      // D-1 files were updated in this PR to use useHandlerTransactionalFixtures(),
+      // so the codemod (which now emits that helper) should reproduce them.
       const before = gitShow(`${ref.sha}^`, ref.repoPath);
-      const after = gitShow(ref.sha, ref.repoPath);
       const abs = resolve(ROOT, ref.repoPath);
+      const expected = readFileSync(abs, "utf8");
       const out = migrateText(before, abs);
       if (typeof out !== "string") {
         throw new Error(`codemod skipped: ${out.skip}`);
       }
       const prettyOut = prettify(out);
-      expect(normalize(prettyOut)).toBe(normalize(after));
+      expect(normalize(prettyOut)).toBe(normalize(expected));
     });
   }
 
   it("is idempotent — running on already-migrated file is a no-op", () => {
-    const after = gitShow("271599c7f", "packages/activerecord/src/clone.test.ts");
     const abs = resolve(ROOT, "packages/activerecord/src/clone.test.ts");
+    const after = readFileSync(abs, "utf8");
     const out = migrateText(after, abs);
     expect(out).toEqual({ skip: "already-migrated" });
   });

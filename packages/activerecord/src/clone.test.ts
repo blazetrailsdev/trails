@@ -2,39 +2,21 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { afterAll, describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
-
-import { clearAppliedSchemaSignatures, defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import {
-  withTransactionalFixtures,
-  type TransactionalFixturesAdapter,
-} from "./test-helpers/with-transactional-fixtures.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 setupHandlerSuite();
+useHandlerTransactionalFixtures();
 
-let _txAdapter: TransactionalFixturesAdapter | null = null;
 beforeAll(async () => {
   await defineSchema({
     topics: { title: "string", author_name: "string" },
     posts: { title: "string" },
     users: { name: "string" },
   });
-  const raw = Base.adapter;
-  _txAdapter = new Proxy(raw, {
-    get(target, prop) {
-      if (prop === "pool") return null;
-      return Reflect.get(target, prop, target);
-    },
-  }) as unknown as TransactionalFixturesAdapter;
-});
-withTransactionalFixtures(() => _txAdapter!);
-afterAll(async () => {
-  const adapter = Base.adapter;
-  await dropAllTables(adapter);
-  clearAppliedSchemaSignatures(adapter);
 });
 
 describe("CloneTest", () => {

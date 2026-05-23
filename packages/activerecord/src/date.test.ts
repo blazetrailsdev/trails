@@ -1,32 +1,15 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./index.js";
-import { defineSchema, clearAppliedSchemaSignatures } from "./test-helpers/define-schema.js";
-import {
-  withTransactionalFixtures,
-  type TransactionalFixturesAdapter,
-} from "./test-helpers/with-transactional-fixtures.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+
 setupHandlerSuite();
-let _txAdapter: TransactionalFixturesAdapter | null = null;
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
   await defineSchema({ events: { start_date: "date" } });
-  const raw = Base.adapter;
-  _txAdapter = new Proxy(raw, {
-    get(target, prop) {
-      if (prop === "pool") return null;
-      return Reflect.get(target, prop, target);
-    },
-  }) as unknown as TransactionalFixturesAdapter;
 });
-withTransactionalFixtures(() => _txAdapter!);
-afterAll(async () => {
-  const adapter = Base.adapter;
-  await dropAllTables(adapter);
-  clearAppliedSchemaSignatures(adapter);
-});
-
 describe("DateTest", () => {
   it("date with time value", async () => {
     class Event extends Base {

@@ -1,15 +1,12 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, RecordNotFound } from "./index.js";
-import { defineSchema, clearAppliedSchemaSignatures } from "./test-helpers/define-schema.js";
-import {
-  withTransactionalFixtures,
-  type TransactionalFixturesAdapter,
-} from "./test-helpers/with-transactional-fixtures.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+
 let Topic: typeof Base;
 setupHandlerSuite();
-let _txAdapter: TransactionalFixturesAdapter | null = null;
+useHandlerTransactionalFixtures();
 
 beforeAll(async () => {
   // `status` is added dynamically by one test below; declare it up front so
@@ -18,21 +15,7 @@ beforeAll(async () => {
   await defineSchema({
     topics: { title: "string", author_name: "string", status: "string" },
   });
-  const raw = Base.adapter;
-  _txAdapter = new Proxy(raw, {
-    get(target, prop) {
-      if (prop === "pool") return null;
-      return Reflect.get(target, prop, target);
-    },
-  }) as unknown as TransactionalFixturesAdapter;
 });
-withTransactionalFixtures(() => _txAdapter!);
-afterAll(async () => {
-  const adapter = Base.adapter;
-  await dropAllTables(adapter);
-  clearAppliedSchemaSignatures(adapter);
-});
-
 // Recreate the model per test so a test that mutates the class (adds an
 // attribute, primes a finder cache, etc.) can't leak into later tests.
 beforeEach(() => {

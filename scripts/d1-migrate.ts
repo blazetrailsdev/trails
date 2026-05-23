@@ -321,41 +321,11 @@ function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): strin
     }
   }
 
-  // Ensure vitest import has beforeAll + afterAll
-  const vitestImport = sf
-    .getImportDeclarations()
-    .find((i) => i.getModuleSpecifierValue() === "vitest");
-  if (vitestImport) {
-    const names = vitestImport.getNamedImports().map((n) => n.getName());
-    const toAdd: string[] = [];
-    if (!names.includes("beforeAll")) toAdd.push("beforeAll");
-    if (!names.includes("afterAll")) toAdd.push("afterAll");
-    if (toAdd.length) {
-      vitestImport.addNamedImports(toAdd.map((n) => ({ name: n })));
-    }
-  }
-
-  // Rewrite withTransactionalFixtures import to also include the type
-  for (const imp of sf.getImportDeclarations()) {
-    if (imp.getModuleSpecifierValue().endsWith("/with-transactional-fixtures.js")) {
-      const named = imp.getNamedImports().map((n) => n.getName());
-      if (!named.includes("TransactionalFixturesAdapter")) {
-        imp.addNamedImport({ name: "TransactionalFixturesAdapter", isTypeOnly: true });
-      }
-    }
-  }
-
-  // Update defineSchema import to add clearAppliedSchemaSignatures
-  for (const imp of sf.getImportDeclarations()) {
-    if (imp.getModuleSpecifierValue().endsWith("/define-schema.js")) {
-      const named = imp.getNamedImports().map((n) => n.getName());
-      if (!named.includes("clearAppliedSchemaSignatures")) {
-        imp.addNamedImport({ name: "clearAppliedSchemaSignatures" });
-      }
-    }
-  }
-
-  // Add new imports if missing
+  // Add new imports if missing. The codemod no longer emits beforeAll/afterAll
+  // teardown inline (that lives inside useHandlerTransactionalFixtures), nor
+  // does it reference TransactionalFixturesAdapter, clearAppliedSchemaSignatures,
+  // dropAllTables, or Base.adapter at the call site. The helper imports all of
+  // those internally — keep the per-file import surface minimal.
   function ensureImport(spec: string, names: string[]) {
     let imp = sf.getImportDeclarations().find((i) => i.getModuleSpecifierValue() === spec);
     if (!imp) {
@@ -371,7 +341,6 @@ function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): strin
     }
   }
   ensureImport(`${helpersRel}/setup-handler-suite.js`, ["setupHandlerSuite"]);
-  ensureImport(`${helpersRel}/drop-all-tables.js`, ["dropAllTables"]);
 
   // 2) Remove the matching declarator from any module-level `let` statement.
   // If the statement combines multiple declarations (e.g. `let adapter: ..., other = ...`),
@@ -423,75 +392,43 @@ function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): strin
   // Rewrite defineSchema(adapter, X) → defineSchema(X)
   info.defineSchemaCall.removeArgument(0);
   details.push("rewrote defineSchema(adapter, X) → defineSchema(X)");
-
-  // Append the Proxy setup at end of beforeAll body
-  body.addStatements([
-    `const raw = Base.adapter;`,
-    `_txAdapter = new Proxy(raw, {
-      get(target, prop) {
-        if (prop === "pool") return null;
-        return Reflect.get(target, prop, target);
-      },
-    }) as unknown as TransactionalFixturesAdapter;`,
-  ]);
   beforeAllArrow.setIsAsync(true);
 
-  // Ensure Base is imported
-  const hasBaseImport = sf
-    .getImportDeclarations()
-    .some(
-      (imp) =>
-        imp.getNamedImports().some((n) => n.getName() === "Base") ||
-        imp.getDefaultImport()?.getText() === "Base",
-    );
-  if (!hasBaseImport) {
-    details.push("WARN: `Base` import not found — generated code references Base.adapter");
-  }
-
-  // 4) Insert setupHandlerSuite() and _txAdapter declaration before beforeAll
+  // 4) Insert `setupHandlerSuite(); useHandlerTransactionalFixtures();` before beforeAll.
+  // The helper encapsulates the Proxy(pool=null) + withTransactionalFixtures + afterAll
+  // teardown that every D-1 file would otherwise duplicate inline.
   const beforeAllIdx = info.beforeAllStmt.getChildIndex();
-  sf.insertStatements(beforeAllIdx, [
-    `setupHandlerSuite();`,
-    ``,
-    `let _txAdapter: TransactionalFixturesAdapter | null = null;`,
+  sf.insertStatements(beforeAllIdx, [`setupHandlerSuite();`, `useHandlerTransactionalFixtures();`]);
+  ensureImport(`${helpersRel}/use-handler-transactional-fixtures.js`, [
+    "useHandlerTransactionalFixtures",
   ]);
 
-  // 5) Rewrite or add withTransactionalFixtures(() => _txAdapter!)
+  // 5) Drop any pre-existing module-level `withTransactionalFixtures(...)` call —
+  // `useHandlerTransactionalFixtures()` already registers it.
   if (info.withTxFixturesCall) {
-    const arg = info.withTxFixturesCall.getArguments()[0];
-    if (arg) arg.replaceWithText(`() => _txAdapter!`);
-  } else {
-    // Insert after beforeAll
-    const afterIdx = info.beforeAllStmt.getChildIndex() + 1;
-    sf.insertStatements(afterIdx, [`withTransactionalFixtures(() => _txAdapter!);`]);
-    ensureImport(`${helpersRel}/with-transactional-fixtures.js`, ["withTransactionalFixtures"]);
-    // Always need the type since the generated code declares `_txAdapter: TransactionalFixturesAdapter`.
-    const wtfImport = sf
-      .getImportDeclarations()
-      .find((i) => i.getModuleSpecifierValue().endsWith("/with-transactional-fixtures.js"));
-    if (
-      wtfImport &&
-      !wtfImport.getNamedImports().some((n) => n.getName() === "TransactionalFixturesAdapter")
-    ) {
-      wtfImport.addNamedImport({ name: "TransactionalFixturesAdapter", isTypeOnly: true });
+    const parentStmt = info.withTxFixturesCall.getFirstAncestorByKind(
+      SyntaxKind.ExpressionStatement,
+    );
+    if (parentStmt) {
+      parentStmt.remove();
+      details.push("removed legacy withTransactionalFixtures(() => adapter) call");
     }
   }
 
-  // 6) Add afterAll after withTransactionalFixtures
-  // Find the (now-updated) withTransactionalFixtures call's containing statement
-  const allStmts = sf.getStatements();
-  const wtfIdx = allStmts.findIndex(
-    (s) =>
-      s.isKind(SyntaxKind.ExpressionStatement) &&
-      s.getExpressionIfKind(SyntaxKind.CallExpression)?.getExpression().getText() ===
-        "withTransactionalFixtures",
-  );
-  const afterAllText = `afterAll(async () => {
-  const adapter = Base.adapter;
-  await dropAllTables(adapter);
-  clearAppliedSchemaSignatures(adapter);
-});`;
-  sf.insertStatements(wtfIdx + 1, afterAllText);
+  // The withTransactionalFixtures import is no longer needed if it was only used
+  // by the call we just deleted. Conservatively drop the named import if nothing
+  // else references it.
+  for (const imp of [...sf.getImportDeclarations()]) {
+    if (!imp.getModuleSpecifierValue().endsWith("/with-transactional-fixtures.js")) continue;
+    for (const n of [...imp.getNamedImports()]) {
+      if (n.getName() !== "withTransactionalFixtures") continue;
+      const refs = sf
+        .getDescendantsOfKind(SyntaxKind.Identifier)
+        .filter((id) => id.getText() === "withTransactionalFixtures" && id !== n.getNameNode());
+      if (refs.length === 0) n.remove();
+    }
+    if (imp.getNamedImports().length === 0 && !imp.getDefaultImport()) imp.remove();
+  }
 
   // 7) Remove `this.adapter = adapter` inside static blocks; drop empty static blocks
   sf.forEachDescendant((d) => {
