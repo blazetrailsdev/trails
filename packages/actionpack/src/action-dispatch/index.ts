@@ -74,11 +74,7 @@ export {
   type CsrfStrategy,
 } from "./request-forgery-protection.js";
 export { respondTo, Collector, UnknownFormat } from "./respond-to.js";
-export {
-  PermissionsPolicy,
-  type PermissionSource,
-  type DirectiveName,
-} from "./http/permissions-policy.js";
+export { PermissionsPolicy, type PolicySource } from "./http/permissions-policy.js";
 export { UploadedFile, type UploadedFileOptions } from "./http/upload.js";
 export { ContentDisposition, type ContentDispositionOptions } from "./http/content-disposition.js";
 export { QueryParser, type QueryPair } from "./http/query-parser.js";

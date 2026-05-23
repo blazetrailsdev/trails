@@ -1,173 +1,172 @@
 /**
  * ActionDispatch::PermissionsPolicy
  *
- * Builds Permissions-Policy HTTP headers.
- * Mirrors Rails' permissions_policy configuration DSL.
+ * Emits legacy Feature-Policy header format (e.g. `camera 'self'; usb 'none'`)
+ * matching Rails' output. The header name is `Feature-Policy` per
+ * ActionDispatch::Constants::FEATURE_POLICY.
+ *
+ * Note: Rails itself notes the header was renamed from Feature-Policy to
+ * Permissions-Policy but keeps the legacy implementation for now. We mirror
+ * that decision so `build()` output is byte-for-byte identical to Rails.
  */
 
-export type PermissionSource = "self" | "none" | "*" | string;
+/** @internal */
+const MAPPINGS: Record<string, string> = {
+  self: "'self'",
+  none: "'none'",
+};
 
-const DIRECTIVES = [
-  "accelerometer",
-  "ambient-light-sensor",
-  "autoplay",
-  "bluetooth",
-  "camera",
-  "display-capture",
-  "encrypted-media",
-  "fullscreen",
-  "geolocation",
-  "gyroscope",
-  "hid",
-  "idle-detection",
-  "keyboard-map",
-  "magnetometer",
-  "microphone",
-  "midi",
-  "payment",
-  "picture-in-picture",
-  "publickey-credentials-get",
-  "screen-wake-lock",
-  "serial",
-  "sync-xhr",
-  "usb",
-  "web-share",
-  "xr-spatial-tracking",
-] as const;
-
-export type DirectiveName = (typeof DIRECTIVES)[number];
+export type PolicySource = string | ((context: unknown) => string);
 
 export class PermissionsPolicy {
-  private directives: Map<string, PermissionSource[]> = new Map();
+  /** @internal */
+  directives: Map<string, PolicySource[]> = new Map();
 
-  /** Set a directive to allow specific origins. */
-  allow(directive: string, ...sources: PermissionSource[]): this {
-    const normalized = directive.trim();
-    if (!normalized) {
-      throw new Error("ArgumentError: directive name cannot be empty");
+  constructor(block?: (policy: PermissionsPolicy) => void) {
+    if (block) block(this);
+  }
+
+  accelerometer(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("accelerometer", sources);
+  }
+  ambientLightSensor(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("ambient-light-sensor", sources);
+  }
+  autoplay(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("autoplay", sources);
+  }
+  camera(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("camera", sources);
+  }
+  displayCapture(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("display-capture", sources);
+  }
+  encryptedMedia(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("encrypted-media", sources);
+  }
+  fullscreen(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("fullscreen", sources);
+  }
+  geolocation(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("geolocation", sources);
+  }
+  gyroscope(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("gyroscope", sources);
+  }
+  hid(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("hid", sources);
+  }
+  idleDetection(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("idle-detection", sources);
+  }
+  keyboardMap(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("keyboard-map", sources);
+  }
+  magnetometer(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("magnetometer", sources);
+  }
+  microphone(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("microphone", sources);
+  }
+  midi(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("midi", sources);
+  }
+  payment(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("payment", sources);
+  }
+  pictureInPicture(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("picture-in-picture", sources);
+  }
+  screenWakeLock(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("screen-wake-lock", sources);
+  }
+  serial(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("serial", sources);
+  }
+  syncXhr(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("sync-xhr", sources);
+  }
+  usb(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("usb", sources);
+  }
+  webShare(...sources: Array<PolicySource | null | undefined>): void {
+    this._set("web-share", sources);
+  }
+
+  /** @internal */
+  private _set(directive: string, sources: Array<PolicySource | null | undefined>): void {
+    if (sources.length === 0 || sources[0] == null) {
+      this.directives.delete(directive);
+    } else {
+      this.directives.set(directive, this.applyMappings(sources as PolicySource[]));
     }
-    this.directives.set(normalized, sources);
+  }
+
+  /** @internal */
+  initializeCopy(other: PermissionsPolicy): this {
+    this.directives = new Map(Array.from(other.directives.entries()).map(([k, v]) => [k, [...v]]));
     return this;
   }
 
-  /** Convenience methods for common directives. */
-  accelerometer(...sources: PermissionSource[]): this {
-    return this.allow("accelerometer", ...sources);
-  }
-  camera(...sources: PermissionSource[]): this {
-    return this.allow("camera", ...sources);
-  }
-  geolocation(...sources: PermissionSource[]): this {
-    return this.allow("geolocation", ...sources);
-  }
-  gyroscope(...sources: PermissionSource[]): this {
-    return this.allow("gyroscope", ...sources);
-  }
-  magnetometer(...sources: PermissionSource[]): this {
-    return this.allow("magnetometer", ...sources);
-  }
-  microphone(...sources: PermissionSource[]): this {
-    return this.allow("microphone", ...sources);
-  }
-  midi(...sources: PermissionSource[]): this {
-    return this.allow("midi", ...sources);
-  }
-  payment(...sources: PermissionSource[]): this {
-    return this.allow("payment", ...sources);
-  }
-  usb(...sources: PermissionSource[]): this {
-    return this.allow("usb", ...sources);
-  }
-  fullscreen(...sources: PermissionSource[]): this {
-    return this.allow("fullscreen", ...sources);
-  }
-  autoplay(...sources: PermissionSource[]): this {
-    return this.allow("autoplay", ...sources);
-  }
-  pictureInPicture(...sources: PermissionSource[]): this {
-    return this.allow("picture-in-picture", ...sources);
-  }
-  displayCapture(...sources: PermissionSource[]): this {
-    return this.allow("display-capture", ...sources);
-  }
-  encryptedMedia(...sources: PermissionSource[]): this {
-    return this.allow("encrypted-media", ...sources);
-  }
-  idleDetection(...sources: PermissionSource[]): this {
-    return this.allow("idle-detection", ...sources);
-  }
-  screenWakeLock(...sources: PermissionSource[]): this {
-    return this.allow("screen-wake-lock", ...sources);
-  }
-  serial(...sources: PermissionSource[]): this {
-    return this.allow("serial", ...sources);
-  }
-  syncXhr(...sources: PermissionSource[]): this {
-    return this.allow("sync-xhr", ...sources);
-  }
-  webShare(...sources: PermissionSource[]): this {
-    return this.allow("web-share", ...sources);
-  }
-  xrSpatialTracking(...sources: PermissionSource[]): this {
-    return this.allow("xr-spatial-tracking", ...sources);
-  }
-  hid(...sources: PermissionSource[]): this {
-    return this.allow("hid", ...sources);
-  }
-  bluetooth(...sources: PermissionSource[]): this {
-    return this.allow("bluetooth", ...sources);
-  }
-  ambientLightSensor(...sources: PermissionSource[]): this {
-    return this.allow("ambient-light-sensor", ...sources);
-  }
-  keyboardMap(...sources: PermissionSource[]): this {
-    return this.allow("keyboard-map", ...sources);
-  }
-  publickeyCredentialsGet(...sources: PermissionSource[]): this {
-    return this.allow("publickey-credentials-get", ...sources);
+  build(context?: unknown): string {
+    return this.buildDirectives(context)
+      .filter((v): v is string => v !== null)
+      .join("; ");
   }
 
-  /** Build the Permissions-Policy header value. */
-  build(): string {
-    const parts: string[] = [];
+  /** @internal */
+  private applyMappings(sources: PolicySource[]): PolicySource[] {
+    return sources.map((source) => this.applyMapping(source));
+  }
+
+  /** @internal */
+  private applyMapping(source: PolicySource): PolicySource {
+    if (typeof source === "function") return source;
+    if (typeof source === "string") {
+      if (Object.prototype.hasOwnProperty.call(MAPPINGS, source)) {
+        return MAPPINGS[source];
+      }
+      return source;
+    }
+    throw new ArgumentError(`Invalid HTTP permissions policy source: ${JSON.stringify(source)}`);
+  }
+
+  /** @internal */
+  private buildDirectives(context?: unknown): Array<string | null> {
+    const result: Array<string | null> = [];
     for (const [directive, sources] of this.directives) {
-      const formatted = this.formatSources(sources);
-      parts.push(`${directive}=${formatted}`);
+      if (Array.isArray(sources)) {
+        result.push(`${directive} ${this.buildDirective(sources, context).join(" ")}`);
+      } else if (sources) {
+        result.push(directive);
+      } else {
+        result.push(null);
+      }
     }
-    return parts.join(", ");
+    return result;
   }
 
-  /** Get the header name and value as a tuple. */
-  toHeader(): [string, string] {
-    return ["permissions-policy", this.build()];
+  /** @internal */
+  private buildDirective(sources: PolicySource[], context?: unknown): string[] {
+    return sources.map((source) => this.resolveSource(source, context));
   }
 
-  /** Clone this policy. */
-  dup(): PermissionsPolicy {
-    const copy = new PermissionsPolicy();
-    for (const [k, v] of this.directives) {
-      copy.directives.set(k, [...v]);
+  /** @internal */
+  private resolveSource(source: PolicySource, context?: unknown): string {
+    if (typeof source === "string") return source;
+    if (typeof source === "function") {
+      if (context == null) {
+        throw new Error(`Missing context for the dynamic permissions policy source: ${source}`);
+      }
+      return source(context);
     }
-    return copy;
+    throw new Error(`Unexpected permissions policy source: ${JSON.stringify(source)}`);
   }
+}
 
-  /** Check if any directives are set. */
-  get empty(): boolean {
-    return this.directives.size === 0;
-  }
-
-  private formatSources(sources: PermissionSource[]): string {
-    if (sources.length === 0 || (sources.length === 1 && sources[0] === "none")) {
-      return "()";
-    }
-    if (sources.length === 1 && sources[0] === "*") {
-      return "*";
-    }
-    const formatted = sources.map((s) => {
-      if (s === "self") return "self";
-      if (s === "*") return "*";
-      return `"${s}"`;
-    });
-    return `(${formatted.join(" ")})`;
+class ArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArgumentError";
   }
 }
