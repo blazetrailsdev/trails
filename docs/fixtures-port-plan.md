@@ -37,10 +37,11 @@ Each `*.rb` becomes one TS file under
 `packages/activerecord/src/test-helpers/models/`, kebab-cased.
 Subdir layout is preserved (`cpk/book.rb` → `models/cpk/book.ts`).
 
-- **Class body**: `declare()` for associations, validations, and scopes
-  that the extractor picks up. Match Rails' order.
-- **STI**: set `static override inheritanceColumn` if the model uses STI.
-- **Encrypted attributes**: `encryptsAttribute(...)` calls in body.
+- **Class body**: use a `static { ... }` block with `this.hasMany(...)`,
+  `this.belongsTo(...)`, `this.validates(...)`, `this.scope(...)`, etc.
+  Match Rails' declaration order.
+- **STI**: set `this.inheritanceColumn = "..."` inside the `static` block.
+- **Encrypted attributes**: call `this.encrypts(...)` inside the `static` block.
 - **No inline `defineSchema()`** — canonical schema is loaded by
   `setup-adapter-suite.ts` (PR 0.5).
 - **No comments** describing what a line does; only add comments for
@@ -59,7 +60,7 @@ MISSING/DIFF soft-fail until PR 9 flips to hard-fail (runtime errors and script 
 
 ## Batch plan — PRs 10–23
 
-LOC estimates use Ruby source lines × 1.5 for TS (imports + declare
+LOC estimates use Ruby source lines × 1.5 for TS (imports + static block
 overhead). Ceiling waivers are called out per batch.
 
 ---
@@ -192,7 +193,7 @@ association-rich but compact.
 | `uuid_message.rb`            | 5      | ~8     |
 
 `book_encrypted.rb` carries most of the LOC; encrypted attrs require
-`encryptsAttribute()` calls. UUID models are tiny but grouped here
+`this.encrypts(...)` calls. UUID models are tiny but grouped here
 since they touch the same OID/type infrastructure.
 
 ---
