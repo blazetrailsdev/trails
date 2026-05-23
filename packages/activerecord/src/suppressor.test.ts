@@ -2,26 +2,52 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { clearAppliedSchemaSignatures, defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import {
+  withTransactionalFixtures,
+  type TransactionalFixturesAdapter,
+} from "./test-helpers/with-transactional-fixtures.js";
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+setupHandlerSuite();
+
+let _txAdapter: TransactionalFixturesAdapter | null = null;
+beforeAll(async () => {
+  await defineSchema({
+    posts: { title: "string" },
+    comments: { body: "string" },
+    users: { name: "string" },
+    widgets: { name: "string" },
+    holdables: { name: "string" },
+    concurrent_alphas: { name: "string" },
+    concurrent_betas: { name: "string" },
+    gizmos: { name: "string" },
+  });
+  const raw = Base.adapter;
+  _txAdapter = new Proxy(raw, {
+    get(target, prop) {
+      if (prop === "pool") return null;
+      return Reflect.get(target, prop, target);
+    },
+  }) as unknown as TransactionalFixturesAdapter;
+});
+withTransactionalFixtures(() => _txAdapter!);
+
+afterAll(async () => {
+  const adapter = Base.adapter;
+  await dropAllTables(adapter);
+  clearAppliedSchemaSignatures(adapter);
+});
 
 describe("SuppressorTest", () => {
   it("suppresses create", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { posts: { title: "string" } });
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.suppress(async () => {
@@ -31,12 +57,9 @@ describe("SuppressorTest", () => {
   });
 
   it("suppresses update", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { posts: { title: "string" } });
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = await Post.create({ title: "original" });
@@ -49,18 +72,18 @@ describe("SuppressorTest", () => {
   });
 
   it("suppresses create in callback", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { posts: { title: "string" }, comments: { body: "string" } });
+    // Comment kept inline: ported models/comment.ts targets a full Rails
+    // schema (label enum column, multiple FK columns) that exceeds this
+    // test's minimal { body: "string" } schema. Will consume the ported
+    // model once the fixture schema is unified (Phase G).
     class Comment extends Base {
       static {
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.afterCreate(async function (this: any) {
           await Comment.suppress(async () => {
             await Comment.create({ body: "auto-comment" });
@@ -73,12 +96,9 @@ describe("SuppressorTest", () => {
   });
 
   it("resumes saving after suppression complete", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { posts: { title: "string" } });
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.suppress(async () => {
@@ -89,12 +109,9 @@ describe("SuppressorTest", () => {
   });
 
   it("suppresses validations on create", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { posts: { title: "string" } });
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validates("title", { presence: true });
       }
     }
@@ -106,12 +123,9 @@ describe("SuppressorTest", () => {
   });
 
   it("suppresses when nested multiple times", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { posts: { title: "string" } });
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.suppress(async () => {
@@ -125,13 +139,10 @@ describe("SuppressorTest", () => {
 
 describe("suppress()", () => {
   it("prevents records from being persisted to database", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { users: { name: "string" } });
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -155,12 +166,9 @@ describe("Suppressor.registry", () => {
   });
 
   it("registry reflects active suppression by class name", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { widgets: { name: "string" } });
     class Widget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -179,12 +187,9 @@ describe("Suppressor.registry", () => {
   });
 
   it("a held reference inside the scope observes the active suppression", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { holdables: { name: "string" } });
     class Holdable extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await Holdable.suppress(async () => {
@@ -196,21 +201,14 @@ describe("Suppressor.registry", () => {
   });
 
   it("isolates registry state across concurrent suppress blocks", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, {
-      concurrent_alphas: { name: "string" },
-      concurrent_betas: { name: "string" },
-    });
     class ConcurrentAlpha extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ConcurrentBeta extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -235,12 +233,9 @@ describe("Suppressor.registry", () => {
   });
 
   it("registry stays truthy across nested suppress blocks", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { gizmos: { name: "string" } });
     class Gizmo extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
