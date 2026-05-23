@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import {
   SubclassNotFound,
@@ -24,7 +24,11 @@ import {
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import {
+  createTestAdapter,
+  resetTestAdapterState,
+  type TestDatabaseAdapter,
+} from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
@@ -445,7 +449,7 @@ const UNIVERSAL_HM_SCHEMA: Schema = {
   r_containers: { name: "string" },
 } as const;
 
-async function setupHmAdapter(): Promise<DatabaseAdapter> {
+async function setupHmAdapter(): Promise<TestDatabaseAdapter> {
   const a = createTestAdapter();
   await defineSchema(a, UNIVERSAL_HM_SCHEMA);
   return a;
@@ -2296,11 +2300,12 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await setupHmAdapter();
   });
+  withTransactionalFixtures(() => adapter, { invalidateSchemaCache: false });
 
   // -- Scoped queries --
 
@@ -2562,34 +2567,6 @@ describe("HasManyAssociationsTest", () => {
     expect(posts.length).toBe(2);
   });
 
-  // Skipped tests — DB-specific features, STI, composites, HABTM, etc.
-  it("sti subselect count", async () => {
-    const a = createTestAdapter();
-    await defineSchema(a, {
-      sti_posts: { title: "string", type: "string", tag_id: "integer" },
-    });
-    class StiPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("type", "string");
-        this.attribute("tag_id", "integer");
-        this.adapter = a;
-      }
-    }
-    enableSti(StiPost);
-    class StiSpecialPost extends StiPost {}
-    registerSubclass(StiSpecialPost);
-    registerModel(StiPost);
-    registerModel(StiSpecialPost);
-
-    await StiSpecialPost.create({ title: "A", tag_id: 1 });
-    await StiSpecialPost.create({ title: "B", tag_id: 1 });
-    await StiPost.create({ title: "C", tag_id: 1 }); // base class, not SpecialPost
-
-    // Count on STI subclass with where + limit should use subselect
-    const count = await StiSpecialPost.where({ tag_id: 1 }).limit(10).count();
-    expect(count).toBe(2); // Only SpecialPost, not base StiPost
-  });
   it("anonymous has many", async () => {
     class AnonAuthor extends Base {
       static {
@@ -7932,6 +7909,45 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     expect(remaining.length).toBe(0);
+  });
+});
+
+describe("HasManyAssociationsTest", () => {
+  // This test creates its own adapter with inline DDL and must live outside the
+  // withTransactionalFixtures block above: on MariaDB, DDL auto-commits any open
+  // transaction, which would destroy the outer BEGIN and cause SAVEPOINT errors in afterEach.
+  // afterAll resets state so sti_posts doesn't leak into subsequent describes that
+  // push shouldSkipGlobalReset (withTransactionalFixtures), which would suppress the
+  // global beforeEach reset.
+  afterAll(async () => {
+    await resetTestAdapterState();
+  });
+
+  it("sti subselect count", async () => {
+    const a = createTestAdapter();
+    await defineSchema(a, {
+      sti_posts: { title: "string", type: "string", tag_id: "integer" },
+    });
+    class StiPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("type", "string");
+        this.attribute("tag_id", "integer");
+        this.adapter = a;
+      }
+    }
+    enableSti(StiPost);
+    class StiSpecialPost extends StiPost {}
+    registerSubclass(StiSpecialPost);
+    registerModel(StiPost);
+    registerModel(StiSpecialPost);
+
+    await StiSpecialPost.create({ title: "A", tag_id: 1 });
+    await StiSpecialPost.create({ title: "B", tag_id: 1 });
+    await StiPost.create({ title: "C", tag_id: 1 });
+
+    const count = await StiSpecialPost.where({ tag_id: 1 }).limit(10).count();
+    expect(count).toBe(2);
   });
 });
 
