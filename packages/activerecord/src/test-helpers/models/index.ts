@@ -1,4 +1,3 @@
-// vendor/rails/activerecord/test/models/ — ported model classes for fixture-adoption sweep
 export * from "./book.js";
 export * from "./book-destroy-async.js";
 export * from "./category.js";
@@ -17,7 +16,6 @@ export * from "./subscriber.js";
 export * from "./subscription.js";
 export * from "./tag.js";
 export * from "./tagging.js";
-// Cluster 2: pirates/ships universe
 export * from "./bird.js";
 export * from "./parrot.js";
 export * from "./pirate.js";
@@ -26,7 +24,6 @@ export * from "./ship-part.js";
 export * from "./topic.js";
 export * from "./treasure.js";
 export * from "./wheel.js";
-// Cluster 4: pets/animals
 export * from "./cat.js";
 export * from "./dog.js";
 export * from "./dog-lover.js";
@@ -36,7 +33,6 @@ export * from "./other-dog.js";
 export * from "./owner.js";
 export * from "./pet.js";
 export * from "./pet-treasure.js";
-// Cluster 5: STI / inheritance test bed
 export * from "./arunit2-model.js";
 export * from "./chef.js";
 export * from "./clothing-item.js";
@@ -47,11 +43,8 @@ export * from "./entrant.js";
 export * from "./item.js";
 export * from "./paragraph.js";
 export * from "./vegetables.js";
-// Cluster 6: CPK (composite primary key)
 export * from "./cpk.js";
-// Cluster 7: Sharded models
 export * from "./sharded.js";
-// Cluster 8: UUID / type / edge
 export * from "./aircraft.js";
 export * from "./binary.js";
 export * from "./citation.js";
@@ -83,9 +76,7 @@ export * from "./uuid-parent.js";
 export * from "./vertex.js";
 export * from "./warehouse-thing.js";
 export * from "./developer.js";
-// Cluster 9: post universe
 export * from "./post.js";
-// Cluster 10: encrypted models + post-with-prefetched-pk
 export * from "./author-encrypted.js";
 export * from "./book-encrypted.js";
 export * from "./post-encrypted.js";
@@ -115,3 +106,8 @@ export * from "./session.js";
 export * from "./student.js";
 export * from "./translation.js";
 export * from "./treaty.js";
+export * from "./contact.js";
+export * from "./contract.js";
+export * from "./customer.js";
+export * from "./customer-carrier.js";
+export * from "./organization.js";

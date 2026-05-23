@@ -981,4 +981,89 @@ describe("composed_of (Rails-guided)", () => {
     const p = new Product({});
     expect((p as any).price).toBeNull();
   });
+
+  // Rails: test "composed_of with constructor proc"
+  it("uses constructorFn to build the value object on read", () => {
+    class Fullname {
+      constructor(
+        public first: string,
+        public last: string | null = null,
+      ) {}
+
+      static parse(str: unknown): Fullname | null {
+        if (str == null) return null;
+        const parts = String(str).split(" ");
+        return new Fullname(parts[0], parts[1] ?? null);
+      }
+
+      get toS(): string {
+        return `${this.first} ${(this.last ?? "").toUpperCase()}`;
+      }
+    }
+
+    class Person extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    composedOf(Person, "fullname", {
+      className: Fullname,
+      mapping: [["name", "toS"]],
+      constructorFn: (name: unknown) => Fullname.parse(name),
+    });
+
+    const p = new Person({ name: "John Smith" });
+    const fn = (p as any).fullname as Fullname;
+    expect(fn).toBeInstanceOf(Fullname);
+    expect(fn.first).toBe("John");
+    expect(fn.last).toBe("Smith");
+  });
+
+  it("clears mapped columns and cache when converter returns null", () => {
+    class GpsLocation {
+      constructor(public gpsLocation: string) {}
+    }
+
+    class Vehicle extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("gps_location", "string");
+      }
+    }
+    composedOf(Vehicle, "nonBlankGpsLocation", {
+      className: GpsLocation,
+      mapping: [["gps_location", "gpsLocation"]],
+      converter: (v: unknown) => (v == null || v === "" ? null : new GpsLocation(String(v))),
+    });
+
+    const vehicle = new Vehicle({ gps_location: "12.5x45.3" });
+    expect((vehicle as any).nonBlankGpsLocation).toBeInstanceOf(GpsLocation);
+
+    // assigning blank should clear the column and cache
+    (vehicle as any).nonBlankGpsLocation = "";
+    expect(vehicle.gps_location).toBeNull();
+    expect((vehicle as any).nonBlankGpsLocation).toBeNull();
+  });
+
+  it("returns null when constructorFn returns null", () => {
+    class Tag {
+      constructor(public value: string) {}
+    }
+
+    class Item extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("tag_value", "string");
+      }
+    }
+    composedOf(Item, "tag", {
+      className: Tag,
+      mapping: [["tag_value", "value"]],
+      constructorFn: (v: unknown) => (v ? new Tag(String(v)) : null),
+    });
+
+    const item = new Item({ tag_value: null });
+    expect((item as any).tag).toBeNull();
+  });
 });
