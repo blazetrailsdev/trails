@@ -59,8 +59,8 @@ export class Topic extends Base {
     this.afterCreate(async function (this: Topic) {
       await this.afterCreateForTransaction();
     });
-    this.afterInitialize(function (this: Topic) {
-      this.setEmailAddress();
+    this.afterInitialize((record: Topic) => {
+      (record as any).setEmailAddress();
     });
     this.afterTouch(async function (this: any) {
       this.afterTouchCalled = (this.afterTouchCalled ?? 0) + 1;

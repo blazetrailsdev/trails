@@ -4,55 +4,56 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
+import { Topic } from "./test-helpers/models/topic.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useFixtures } from "./test-helpers/use-fixtures.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  await defineSchema({ topics: { title: "string", approved: "boolean" } });
+  await defineSchema({ topics: TEST_SCHEMA.topics });
+  await Topic.loadSchema();
 });
-describe("BooleanTest", () => {
-  function makeModel() {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("approved", "boolean");
-      }
-    }
-    return { Topic };
-  }
 
+const { topics } = useFixtures(
+  {
+    topics: [
+      Topic,
+      {
+        approved_topic: { title: "Approved", approved: true },
+        unapproved_topic: { title: "Unapproved", approved: false },
+      },
+    ],
+  },
+  () => Base.adapter,
+);
+
+describe("BooleanTest", () => {
   it("boolean", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "bool", approved: true });
-    expect(t.approved).toBe(true);
+    expect(topics("approved_topic").approved).toBe(true);
   });
 
   it("boolean without questionmark", async () => {
-    const { Topic } = makeModel();
-    const t = await Topic.create({ title: "noq", approved: false });
-    expect(t.approved).toBe(false);
+    expect(topics("unapproved_topic").approved).toBe(false);
   });
 
   it("boolean cast from string", async () => {
-    const { Topic } = makeModel();
     const t = new Topic({ title: "str", approved: true });
     expect(t.approved).toBe(true);
   });
 
   it("find by boolean string", async () => {
-    const { Topic } = makeModel();
-    await Topic.create({ title: "fbs", approved: true });
     const results = await Topic.where({ approved: true }).toArray();
     expect(results.length).toBe(1);
+    expect(results[0].id).toBe(topics("approved_topic").id);
   });
 
   it("find by falsy boolean symbol", async () => {
-    const { Topic } = makeModel();
-    await Topic.create({ title: "falsy", approved: false });
     const results = await Topic.where({ approved: false }).toArray();
     expect(results.length).toBe(1);
+    expect(results[0].id).toBe(topics("unapproved_topic").id);
   });
 });

@@ -1617,7 +1617,8 @@ export function internalExecute(
 }
 
 /**
- * Executes each statement by calling rawExecute.
+ * Executes each statement sequentially. Adapters with native batch support
+ * (e.g. a driver that accepts a multi-statement string) should override this.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#execute_batch
  * @internal
@@ -1628,7 +1629,7 @@ export async function executeBatch(
   name?: string | null,
 ): Promise<void> {
   for (const statement of statements) {
-    await (this as any).rawExecute(statement, name);
+    await (this as any).executeMutation(statement);
   }
 }
 
