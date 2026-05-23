@@ -228,10 +228,11 @@ it("detect SystemCallErrors", async () => {
 it("return bodies that respond to #to_path", async () => {
   const app = makeApp();
   const env = MockRequest.envFor("/test.txt");
-  const [status, _headers, body] = app.serving(env, "/test.txt");
+  const fullPath = path.join(tmpDir, "test.txt");
+  const [status, _headers, body] = app.serving(env, fullPath);
   expect(status).toBe(200);
   expect(typeof body.toPath).toBe("function");
-  expect(body.toPath()).toBe(path.join(tmpDir, "test.txt"));
+  expect(body.toPath()).toBe(fullPath);
 });
 
 it("return bodies that do not respond to #to_path if a byte range is requested", async () => {
