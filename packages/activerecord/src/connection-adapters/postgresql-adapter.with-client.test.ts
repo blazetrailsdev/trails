@@ -17,6 +17,7 @@ interface PrivatePgAdapter {
   _inFlightReset: Promise<void> | null;
   withClient: <T>(fn: (client: unknown) => Promise<T>) => Promise<T>;
   _acquireFreshClient: () => Promise<unknown>;
+  reconnect: () => void;
   resetBang: () => void;
   close: () => Promise<void>;
 }
@@ -127,6 +128,58 @@ describe("PostgreSQLAdapter#withClient (single persistent connection)", () => {
     expect(order).toEqual(["discard-start", "discard-end", "acquire-done"]);
     // Barrier is cleared after reset completes.
     expect(adapter._inFlightReset).toBeNull();
+  });
+
+  it("calls reconnect() and rethrows when the callback throws a connection error", async () => {
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
+
+    const persistentClient = { query: async () => ({ rows: [], fields: [] }) };
+    adapter._rawConnection = persistentClient;
+    vi.spyOn(adapter, "_acquireFreshClient").mockResolvedValue(persistentClient);
+
+    const connErr = Object.assign(new Error("Connection terminated unexpectedly"), {
+      code: "08006",
+    });
+
+    let reconnectCalled = false;
+    vi.spyOn(adapter as unknown as { reconnect: () => void }, "reconnect").mockImplementation(
+      () => {
+        reconnectCalled = true;
+        adapter._rawConnection = null;
+      },
+    );
+
+    await expect(
+      adapter.withClient(async () => {
+        throw connErr;
+      }),
+    ).rejects.toThrow(connErr);
+    expect(reconnectCalled).toBe(true);
+    expect(adapter._rawConnection).toBeNull();
+  });
+
+  it("does not call reconnect() for non-connection errors", async () => {
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
+
+    const persistentClient = { query: async () => ({ rows: [], fields: [] }) };
+    adapter._rawConnection = persistentClient;
+    vi.spyOn(adapter, "_acquireFreshClient").mockResolvedValue(persistentClient);
+
+    let reconnectCalled = false;
+    vi.spyOn(adapter as unknown as { reconnect: () => void }, "reconnect").mockImplementation(
+      () => {
+        reconnectCalled = true;
+      },
+    );
+
+    const appErr = new Error("some query error");
+    await expect(
+      adapter.withClient(async () => {
+        throw appErr;
+      }),
+    ).rejects.toThrow(appErr);
+    expect(reconnectCalled).toBe(false);
+    expect(adapter._rawConnection).toBe(persistentClient);
   });
 
   it("serializes the initial connect so concurrent callers share one pg.Client", async () => {

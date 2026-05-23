@@ -40,10 +40,7 @@ async function dropAllPgTables(adapter: DatabaseAdapter): Promise<void> {
     // withClient() already called reconnect() on the adapter when it caught
     // the connection error, so _rawConnection is now null and the next
     // _acquireFreshClient() will open a fresh pg.Client. Retry exactly once.
-    if (
-      _isPgConnectionError(e) &&
-      typeof (adapter as { reconnect?: unknown }).reconnect === "function"
-    ) {
+    if (_isPgConnectionError(e)) {
       await _dropAllPgTablesOnce(adapter);
     } else {
       throw e;
@@ -58,21 +55,27 @@ async function _dropAllPgTablesOnce(adapter: DatabaseAdapter): Promise<void> {
   )) as { schemaname: string; name: string }[]) {
     try {
       await adapter.executeMutation(`DROP MATERIALIZED VIEW IF EXISTS "${s}"."${n}" CASCADE`);
-    } catch {}
+    } catch (e) {
+      if (_isPgConnectionError(e)) throw e;
+    }
   }
   for (const { schemaname: s, name: n } of (await adapter.execute(
     `SELECT schemaname, viewname AS name FROM pg_views WHERE schemaname = ${schema}`,
   )) as { schemaname: string; name: string }[]) {
     try {
       await adapter.executeMutation(`DROP VIEW IF EXISTS "${s}"."${n}" CASCADE`);
-    } catch {}
+    } catch (e) {
+      if (_isPgConnectionError(e)) throw e;
+    }
   }
   for (const { schemaname: s, tablename: t } of (await adapter.execute(
     `SELECT schemaname, tablename FROM pg_tables WHERE schemaname = ${schema}`,
   )) as { schemaname: string; tablename: string }[]) {
     try {
       await adapter.executeMutation(`DROP TABLE IF EXISTS "${s}"."${t}" CASCADE`);
-    } catch {}
+    } catch (e) {
+      if (_isPgConnectionError(e)) throw e;
+    }
   }
 }
 
