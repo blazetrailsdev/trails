@@ -35,9 +35,11 @@
 
 import { camelize, getCrypto } from "@blazetrails/activesupport";
 import { buildNestedQuery } from "@blazetrails/rack";
+import { MultipartParser } from "../../../rack/src/multipart.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
+import { RequestUtils, type ParamValue } from "../action-dispatch/request/utils.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import { UploadedFile } from "../action-dispatch/http/upload.js";
 import { MimeType } from "../action-dispatch/http/mime-type.js";
@@ -510,19 +512,17 @@ export class TestRequest extends AbstractTestRequest {
       }
     }
 
-    if (this.isGet) {
+    if (this.requestMethod === "GET") {
       if (!this.getHeader("QUERY_STRING")) {
         this.queryString = buildNestedQuery(nonPathParameters);
       }
     } else {
       if (shouldMultipart(nonPathParameters)) {
-        // Rails: ENCODER.build_multipart (Rack::Test::Utils) — no TS equivalent.
-        // Fall back to url-encoded so rack.input is parseable; CONTENT_TYPE reflects that.
-        this.setHeader("CONTENT_TYPE", "application/x-www-form-urlencoded");
-        const data = buildNestedQuery(nonPathParameters);
-        const encoded = new TextEncoder().encode(data);
+        const { body, boundary } = MultipartParser.buildMultipartBody(nonPathParameters);
+        this.setHeader("CONTENT_TYPE", `multipart/form-data; boundary=${boundary}`);
+        const encoded = new TextEncoder().encode(body);
         this.setHeader("CONTENT_LENGTH", String(encoded.byteLength));
-        this.setHeader("rack.input", data);
+        this.setHeader("rack.input", body);
       } else {
         if (!this.getHeader("CONTENT_TYPE")) {
           this.setHeader("CONTENT_TYPE", "application/x-www-form-urlencoded");
@@ -552,6 +552,9 @@ export class TestRequest extends AbstractTestRequest {
       }
     }
 
+    // Clear any request-parameters cache established before the body was wired in.
+    delete this.env["action_dispatch.request.request_parameters"];
+
     if (!this.getHeader("PATH_INFO")) {
       this.setHeader("PATH_INFO", generatedPath);
     }
@@ -569,6 +572,31 @@ export class TestRequest extends AbstractTestRequest {
   override paramsParsers(): ParameterParsers {
     const base = super.paramsParsers();
     return { ...base, ...this._customParamParsers } as ParameterParsers;
+  }
+
+  /**
+   * @internal Wires custom param parsers into the request parameter parsing path.
+   * The base `Request#requestParameters` calls `_paramsParsers` directly (bypassing
+   * instance dispatch), so we override to use `this.paramsParsers()` instead.
+   */
+  override get requestParameters(): Record<string, unknown> {
+    const cached = this.env["action_dispatch.request.request_parameters"];
+    if (cached && typeof cached === "object") return cached as Record<string, unknown>;
+    const fallback = (): Record<string, unknown> => {
+      const raw = this.rawPost;
+      if (!raw) return {};
+      const ct = ((this.env["CONTENT_TYPE"] as string) || "").toLowerCase();
+      return ct.includes("application/x-www-form-urlencoded")
+        ? ({} as Record<string, unknown>)
+        : {};
+    };
+    const params = this.parseFormattedParameters(this.paramsParsers(), fallback);
+    const normalized = RequestUtils.normalizeEncodeParams(params as ParamValue) as Record<
+      string,
+      unknown
+    >;
+    this.env["action_dispatch.request.request_parameters"] = normalized;
+    return normalized;
   }
 }
 

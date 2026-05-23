@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TestCase, TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
+import { UploadedFile } from "../action-dispatch/http/upload.js";
 import { Base } from "./base.js";
 
 describe("TestSession Rails-mirroring API", () => {
@@ -151,26 +152,26 @@ describe("ActionController::TestRequest helpers", () => {
     expect(body).toContain("title=Hello");
   });
 
-  it("assignParameters falls back to url-encoded for multipart (no Rack::Test::Utils)", () => {
+  it("assignParameters builds real multipart body when params include an UploadedFile", () => {
     const req = TestRequest.create();
     req.setHeader("REQUEST_METHOD", "POST");
-    req.assignParameters(null, "uploads", "create", { note: "hi" }, "/uploads", ["note"]);
-    // No UploadedFile in params → not multipart; body should be url-encoded
+    const file = new UploadedFile({ filename: "hello.txt", type: "text/plain", content: "hi" });
+    req.assignParameters(null, "uploads", "create", { upload: file }, "/uploads", ["upload"]);
+    const ct = req.getHeader("CONTENT_TYPE") ?? "";
+    expect(ct).toContain("multipart/form-data");
+    expect(ct).toContain("boundary=");
     const body = req.getHeader("rack.input") ?? "";
-    expect(body).toContain("note=hi");
-    expect(req.getHeader("CONTENT_TYPE")).toContain("application/x-www-form-urlencoded");
+    expect(body).toContain("hello.txt");
   });
 
-  it("assignParameters registers custom parser for unknown content types", () => {
+  it("assignParameters registers custom parser for unknown content types, wired into requestParameters", () => {
     const req = TestRequest.create();
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/vnd.custom+json");
     req.assignParameters(null, "api", "create", { x: "1" }, "/api", ["x"]);
-    const parsers = req.paramsParsers();
-    // The key is contentMimeType.symbol for the unknown type
-    const key = "application/vnd.custom+json";
-    expect(parsers).toHaveProperty(key);
-    expect((parsers as Record<string, () => unknown>)[key]()).toEqual({ x: "1" });
+    // Custom parser returns the non-path-parameters hash directly
+    const parsed = req.requestParameters;
+    expect(parsed).toMatchObject({ x: "1" });
   });
 
   it("paramsParsers returns the custom parsers map", () => {
