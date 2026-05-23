@@ -158,6 +158,22 @@ export class Route {
   }
 
   /**
+   * Rails: `def requirements` (journey/route.rb:95-99). Returns defaults merged
+   * with path-capture constraints. Used by `RouteSet#fromRequirements`.
+   */
+  get requirements(): Record<string, string | RegExp> {
+    // Null-prototype so a constraint keyed `__proto__` becomes an own property.
+    const reqs: Record<string, string | RegExp> = Object.create(null);
+    // Merge defaults first so controller/action from dedicated fields win.
+    Object.assign(reqs, this.defaults);
+    // Rails: `path.requirements` — path-capture constraints only.
+    Object.assign(reqs, this.pathConstraints as Record<string, string | RegExp>);
+    if (this.controller) reqs.controller = this.controller;
+    if (this.action) reqs.action = this.action;
+    return reqs;
+  }
+
+  /**
    * The {@link Redirect} endpoint built from {@link redirectTarget}, used by
    * `RouteSet#call` as the production redirect dispatch path. Lazy so the
    * `Redirect` classes (which pull in `Request`/`Response`) aren't constructed

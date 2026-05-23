@@ -162,10 +162,14 @@ export class Mapper {
 
     // For shallow routes, member routes drop *parent resource* segments but
     // keep outer scope/namespace prefixes. Rails: shallow_path = path until
-    // outermost resource.
+    // outermost resource; shallow_prefix preserves outer non-resource as: keys.
     const shallowPrefix = shallow ? this.outerNonResourcePrefix() : prefix;
     const shallowPath = shallow ? `${shallowPrefix}/${name}` : basePath;
-    const shallowName = (suffix: string) => (shallow ? suffix : routeName(suffix));
+    const outerNamePrefix = shallow ? this.outerNonResourceNamePrefix() : undefined;
+    const shallowRouteName = (suffix: string) =>
+      outerNamePrefix ? `${outerNamePrefix}_${suffix}` : suffix;
+    const shallowName = (suffix: string) =>
+      shallow ? shallowRouteName(suffix) : routeName(suffix);
 
     const allowed = allowedActions(options, [
       "index",
@@ -191,18 +195,20 @@ export class Mapper {
       this.routes.push(
         new Route("GET", basePath, controller, "index", {
           name: routeName(name),
+          constraints,
         }),
       );
     }
 
     if (allowed.has("create")) {
-      this.routes.push(new Route("POST", basePath, controller, "create"));
+      this.routes.push(new Route("POST", basePath, controller, "create", { constraints }));
     }
 
     if (allowed.has("new")) {
       this.routes.push(
         new Route("GET", `${basePath}/${newPath}`, controller, "new", {
           name: routeName(`new_${singular}`),
+          constraints,
         }),
       );
     }
@@ -258,10 +264,10 @@ export class Mapper {
 
     if (allowed.has("update")) {
       this.routes.push(
-        new Route("PUT", `${shallowPath}/:id`, controller, "update", { constraints }),
+        new Route("PATCH", `${shallowPath}/:id`, controller, "update", { constraints }),
       );
       this.routes.push(
-        new Route("PATCH", `${shallowPath}/:id`, controller, "update", { constraints }),
+        new Route("PUT", `${shallowPath}/:id`, controller, "update", { constraints }),
       );
     }
 
@@ -333,8 +339,8 @@ export class Mapper {
     }
 
     if (allowed.has("update")) {
-      this.routes.push(new Route("PUT", basePath, controller, "update"));
       this.routes.push(new Route("PATCH", basePath, controller, "update"));
+      this.routes.push(new Route("PUT", basePath, controller, "update"));
     }
 
     if (allowed.has("destroy")) {
@@ -365,6 +371,14 @@ export class Mapper {
   // --- namespace ---
 
   namespace(name: string, callback: MapperCallback): void {
+    // Rails mapper.rb:1626-1632: inside a resource scope, namespace must go
+    // through nested so parent-resource path segments are included correctly.
+    // Use _scope.isResourceScope() (level-based) to avoid infinite recursion —
+    // once nested() is entered the level becomes "nested", not "resources".
+    if (this._scope.isResourceScope()) {
+      this.nested(() => this.namespace(name, callback));
+      return;
+    }
     this.scopeStack.push({
       path: this.currentPrefix() + "/" + name,
       namePrefix: name,
@@ -458,6 +472,31 @@ export class Mapper {
         callback(this);
       }
     });
+  }
+
+  /**
+   * Rails: `new(&block)`. Scopes a block to the "new" action path of the
+   * current resource. Used by `on: "new"` dispatch in `decomposedMatch`.
+   */
+  new(callback: MapperCallback): void {
+    if (!this.isResourceScope()) {
+      throw new Error("can't use new outside resource(s) scope");
+    }
+    const frame = [...this.scopeStack].reverse().find((f) => f.resource);
+    const newSegment = frame?.resourcePathNames?.new ?? "new";
+    // Use frame.path (= nested-children scope, e.g. /posts/:post_id/comments/:comment_id)
+    // so that shallow resources still produce the full nested path for the new action.
+    // memberPath is the shallow path (/comments/:id) and would give the wrong base.
+    const framePath = frame?.path ?? this.currentPrefix();
+    const basePath = framePath.replace(/\/:[^/]+$/, "");
+    const newPath = `${basePath}/${newSegment}`;
+    this.scopeStack.push({
+      path: newPath,
+      namePrefix: undefined,
+      controller: undefined,
+    });
+    callback(this);
+    this.scopeStack.pop();
   }
 
   /**
@@ -808,8 +847,8 @@ export class Mapper {
     optionPath: string | undefined,
     to: string | undefined,
     via: string | string[],
-    _formatted: boolean | undefined,
-    _anchor: boolean,
+    formatted: boolean | undefined,
+    anchor: boolean,
     optionsConstraints: RouteConstraints,
   ): void {
     const recurse = () =>
@@ -820,8 +859,8 @@ export class Mapper {
         optionPath,
         to,
         via,
-        _formatted,
-        _anchor,
+        formatted,
+        anchor,
         optionsConstraints,
       );
     const on = options.on;
@@ -839,6 +878,8 @@ export class Mapper {
     if (Object.keys(mergedConstraints).length > 0) merged.constraints = mergedConstraints;
     if (to) merged.to = to;
     if (controller && !merged.to) merged.controller = controller;
+    if (formatted !== undefined) merged.format = formatted;
+    merged.anchor = anchor;
     this.match(optionPath ?? path, merged);
   }
 
@@ -878,7 +919,12 @@ export class Mapper {
       options = args.pop() as Record<string, unknown>;
     }
     for (const klass of (args as unknown[]).flat()) {
-      this._polymorphicMappings.set(String(klass), { options, block });
+      const typed = klass as { modelName?: { name?: string }; name?: string };
+      const key =
+        klass != null && (typeof klass === "object" || typeof klass === "function")
+          ? typed.modelName?.name || typed.name || String(klass)
+          : String(klass);
+      this._polymorphicMappings.set(key, { options, block });
     }
   }
 
@@ -988,6 +1034,23 @@ export class Mapper {
       last = f.path;
     }
     return last;
+  }
+
+  /**
+   * Name prefix from the outermost non-resource scope frames — mirrors
+   * `@scope[:shallow_prefix]` in Rails. Collects `as:` / `namePrefix` parts
+   * up to (but not including) the outermost resource frame.
+   *
+   * @internal
+   */
+  private outerNonResourceNamePrefix(): string | undefined {
+    const parts: string[] = [];
+    for (const f of this.scopeStack) {
+      if (f.resource) break;
+      if (f.shallow) continue;
+      if (f.namePrefix) parts.push(f.namePrefix);
+    }
+    return parts.length > 0 ? parts.join("_") : undefined;
   }
 
   private prefixedName(name: string): string {

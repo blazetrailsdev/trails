@@ -174,4 +174,51 @@ describe("Mapper public DSL additions", () => {
     expect(() => m.setMemberMappingsForResource()).not.toThrow();
     expect(m.routes).toEqual([]);
   });
+
+  it("shallow inside a namespace preserves the namespace prefix on member route names", () => {
+    const m = new Mapper();
+    m.namespace("admin", () => {
+      m.resources("posts", { shallow: true }, () => {
+        m.resources("comments");
+      });
+    });
+    const commentShow = m.routes.find(
+      (r) => r.action === "show" && r.controller.endsWith("comments"),
+    );
+    expect(commentShow?.name).toBe("admin_comment");
+  });
+
+  it("update routes emit PATCH before PUT (Rails parity)", () => {
+    const m = new Mapper();
+    m.resources("posts");
+    const updates = m.routes.filter((r) => r.action === "update");
+    expect(updates.map((r) => r.verb)).toEqual(["PATCH", "PUT"]);
+  });
+
+  it("new() scope helper scopes to the new action path", () => {
+    const m = new Mapper();
+    let observedPath: string | undefined;
+    m.resources("posts", () => {
+      m.new(() => {
+        observedPath = m["currentPrefix"]();
+      });
+    });
+    expect(observedPath).toBe("/posts/new");
+  });
+
+  it("new() throws outside a resource scope", () => {
+    const m = new Mapper();
+    expect(() => m.new(() => {})).toThrow(/can't use new outside resource\(s\) scope/);
+  });
+
+  it("namespace inside a resource scope nests through nested", () => {
+    const m = new Mapper();
+    m.resources("posts", () => {
+      m.namespace("admin", () => {
+        m.resources("tags");
+      });
+    });
+    const tagIndex = m.routes.find((r) => r.action === "index" && r.controller.includes("tags"));
+    expect(tagIndex?.path).toBe("/posts/:post_id/admin/tags");
+  });
 });
