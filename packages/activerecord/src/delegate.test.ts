@@ -1,20 +1,36 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel, delegate } from "./index.js";
 import { Associations } from "./associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { clearAppliedSchemaSignatures, defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import {
+  withTransactionalFixtures,
+  type TransactionalFixturesAdapter,
+} from "./test-helpers/with-transactional-fixtures.js";
 
-let adapter: TestDatabaseAdapter;
+setupHandlerSuite();
 
+let _txAdapter: TransactionalFixturesAdapter | null = null;
 beforeAll(async () => {
-  adapter = createTestAdapter();
-  await defineSchema(adapter, {
+  await defineSchema({
     authors: { name: "string", city: "string" },
     posts: { title: "string", author_id: "integer" },
   });
+  const raw = Base.adapter;
+  _txAdapter = new Proxy(raw, {
+    get(target, prop) {
+      if (prop === "pool") return null;
+      return Reflect.get(target, prop, target);
+    },
+  }) as unknown as TransactionalFixturesAdapter;
 });
-withTransactionalFixtures(() => adapter);
+withTransactionalFixtures(() => _txAdapter!);
+afterAll(async () => {
+  const adapter = Base.adapter;
+  await dropAllTables(adapter);
+  clearAppliedSchemaSignatures(adapter);
+});
 
 describe("Delegate (Rails-guided)", () => {
   // Rails: test "delegate to association"
@@ -25,7 +41,6 @@ describe("Delegate (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("city", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -36,7 +51,6 @@ describe("Delegate (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "author");
@@ -56,7 +70,6 @@ describe("Delegate (Rails-guided)", () => {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -66,7 +79,6 @@ describe("Delegate (Rails-guided)", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "author");
@@ -85,7 +97,6 @@ describe("Delegate (Rails-guided)", () => {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -95,7 +106,6 @@ describe("Delegate (Rails-guided)", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "author");
