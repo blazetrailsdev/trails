@@ -1,4 +1,6 @@
 // vendor/rails/activerecord/test/models/destroy_async_parent.rb
+// Rails uses dependent: :destroy_async on all associations.
+// Using "destroy" until AssociationOptions.dependent includes "destroyAsync".
 import { Base } from "../../base.js";
 
 export class DestroyAsyncParent extends Base {

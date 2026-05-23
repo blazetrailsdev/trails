@@ -1,4 +1,6 @@
 // vendor/rails/activerecord/test/models/destroy_async_parent_soft_delete.rb
+// Rails uses dependent: :destroy_async + ensuring_owner_was: :deleted? on tags/dlKeyedHasOne.
+// Both options require the type union to include "destroyAsync"; using "destroy" until widened.
 import { Base } from "../../base.js";
 
 export class DestroyAsyncParentSoftDelete extends Base {
@@ -13,7 +15,7 @@ export class DestroyAsyncParentSoftDelete extends Base {
     });
   }
 
-  deleted?() {
+  isDeleted() {
     return (this as any).deleted;
   }
 
