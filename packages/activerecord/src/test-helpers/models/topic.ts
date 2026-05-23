@@ -1,0 +1,127 @@
+// vendor/rails/activerecord/test/models/topic.rb
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Base } from "../../base.js";
+
+export class Topic extends Base {
+  static {
+    this.scope("base", (q: any) => q.all());
+    this.scope("writtenBefore", (q: any, time: any) =>
+      time ? q.where("written_on < ?", time) : q,
+    );
+    this.scope("approved", (q: any) => q.where({ approved: true }));
+    this.scope("rejected", (q: any) => q.where({ approved: false }));
+    this.scope("children", (q: any) => q.where.not({ parent_id: null }));
+    this.scope("hasChildren", (q: any) =>
+      q.where({ id: (Topic as any).children().select("parent_id") }),
+    );
+    this.scope("byLifo", (q: any) => q.where({ author_name: "lifo" }));
+    this.scope("replied", (q: any) => q.where("replies_count > 0"));
+    this.scope("true", (q: any) => q.where({ approved: true }));
+    this.scope("false", (q: any) => q.where({ approved: false }));
+    this.scope("scopeWithLambda", (q: any) => q.all());
+    this.scope("approvedAsString", (q: any) => q.where({ approved: true }));
+    this.scope("anonymousExtension", (q: any) => q);
+    this.scope("scopeStats", (q: any) => q);
+    this.scope("withObject", (q: any) => q.where({ approved: true }));
+    this.scope("withKwargs", (q: any, approved = false) => q.where({ approved }));
+
+    this.hasMany("replies", { dependent: "destroy", autosave: true, inverseOf: "topic" });
+    this.hasMany("approvedReplies", {
+      className: "Reply",
+      foreignKey: "parent_id",
+      counterCache: "replies_count",
+    });
+    this.hasMany("openReplies", { className: "Reply", foreignKey: "parent_id" });
+    this.hasMany("uniqueReplies", { dependent: "destroy", foreignKey: "parent_id" });
+    this.hasMany("sillyUniqueReplies", { dependent: "destroy", foreignKey: "parent_id" });
+
+    this.aliasAttribute("heading", "title");
+
+    this.beforeCreate(async function (this: Topic) {
+      await this._defaultWrittenOn();
+    });
+    this.beforeDestroy(async function (this: Topic) {
+      await this._destroyChildren();
+    });
+    this.beforeValidation(async function (this: Topic) {
+      await this._beforeValidationForTransaction();
+    });
+    this.beforeSave(async function (this: Topic) {
+      await this._beforeSaveForTransaction();
+    });
+    this.beforeDestroy(async function (this: Topic) {
+      await this._beforeDestroyForTransaction();
+    });
+    this.afterSave(async function (this: Topic) {
+      await this._afterSaveForTransaction();
+    });
+    this.afterCreate(async function (this: Topic) {
+      await this._afterCreateForTransaction();
+    });
+    this.afterInitialize(async function (this: Topic) {
+      await this._setEmailAddress();
+    });
+    this.afterTouch(async function (this: any) {
+      this.afterTouchCalled = (this.afterTouchCalled ?? 0) + 1;
+    });
+  }
+
+  afterTouchCalled = 0;
+
+  parent() {
+    return Topic.find((this as any).parentId);
+  }
+
+  topicId() {
+    return (this as any).id;
+  }
+
+  /** @internal */
+  private async _defaultWrittenOn() {
+    if (!(this as any).attributePresent("written_on")) {
+      (this as any).writtenOn = Temporal.Now.instant();
+    }
+  }
+
+  /** @internal */
+  private async _destroyChildren() {
+    await Topic.deleteBy({ parent_id: (this as any).id });
+  }
+
+  /** @internal */
+  private async _setEmailAddress() {
+    if (!(this as any).isPersisted() && !(this as any).willSaveChangeTo("author_email_address")) {
+      (this as any).authorEmailAddress = "test@test.com";
+    }
+  }
+
+  /** @internal */
+  private async _beforeValidationForTransaction() {}
+  /** @internal */
+  private async _beforeSaveForTransaction() {}
+  /** @internal */
+  private async _beforeDestroyForTransaction() {}
+  /** @internal */
+  private async _afterSaveForTransaction() {}
+  /** @internal */
+  private async _afterCreateForTransaction() {}
+}
+
+export class DefaultRejectedTopic extends Topic {
+  static {
+    this.defaultScope((q: any) => q.where({ approved: false }));
+  }
+}
+
+export class BlankTopic extends Topic {
+  blank() {
+    return true;
+  }
+}
+
+export class TitlePrimaryKeyTopic extends Topic {
+  static {
+    this._primaryKey = "title";
+    this.aliasAttribute("idValue", "id");
+  }
+}
