@@ -1667,10 +1667,13 @@ describe("TestRoutingMapper", () => {
         r.get("remove", { action: "destroy", as: "remove" });
       });
     });
+    expect(routes.recognize("GET", "/bookmark/build")!.route.controller).toBe("bookmarks");
     expect(routes.recognize("GET", "/bookmark/build")!.route.action).toBe("new");
     expect(routes.pathFor("bookmark_new")).toBe("/bookmark/build");
+    expect(routes.recognize("POST", "/bookmark/create")!.route.controller).toBe("bookmarks");
     expect(routes.recognize("POST", "/bookmark/create")!.route.action).toBe("create");
-    // as: "" (empty name) produces no named route in our implementation — gap vs Rails
+    // as: "" produces no named route; Rails would register bookmark_path here (gap)
+    expect(() => routes.pathFor("bookmark")).toThrow();
     expect(routes.recognize("PUT", "/bookmark/update")!.route.action).toBe("update");
     expect(routes.pathFor("bookmark_update")).toBe("/bookmark/update");
     expect(routes.recognize("GET", "/bookmark/remove")!.route.action).toBe("destroy");
@@ -1688,8 +1691,10 @@ describe("TestRoutingMapper", () => {
         r.get("", { action: "show", as: "show" });
       });
     });
+    expect(routes.recognize("GET", "/pagemark/build")!.route.controller).toBe("pagemarks");
     expect(routes.recognize("GET", "/pagemark/build")!.route.action).toBe("new");
     expect(routes.pathFor("pagemark_new")).toBe("/pagemark/build");
+    expect(routes.recognize("POST", "/pagemark/create")!.route.controller).toBe("pagemarks");
     expect(routes.recognize("POST", "/pagemark/create")!.route.action).toBe("create");
     expect(routes.recognize("PUT", "/pagemark/update")!.route.action).toBe("update");
     expect(routes.recognize("GET", "/pagemark/remove")!.route.action).toBe("destroy");
@@ -1715,7 +1720,9 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
+    expect(routes.recognize("GET", "/global/export")!.route.controller).toBe("global");
     expect(routes.recognize("GET", "/global/export")!.route.action).toBe("export");
+    expect(routes.recognize("GET", "/global/hide_notice")!.route.controller).toBe("global");
     expect(routes.recognize("GET", "/global/hide_notice")!.route.action).toBe("hide_notice");
     expect(routes.recognize("GET", "/export/123/foo.txt")!.route.action).toBe("export");
     expect(routes.pathFor("export_request")).toBe("/global/export");
