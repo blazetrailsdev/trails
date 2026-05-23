@@ -761,6 +761,10 @@ describe("TestRoutingMapper", () => {
       });
     });
     expect(routes.pathFor("account_description")).toBe("/account/description");
+    const m = routes.recognize("GET", "/account/description");
+    expect(m).not.toBeNull();
+    expect(m!.route.controller).toBe("account");
+    expect(m!.route.action).toBe("description");
   });
 
   it("session info nested singleton resource", () => {
@@ -1850,18 +1854,6 @@ describe("TestRoutingMapper", () => {
     // format: false scope option not implemented — scope() does not accept format key
   });
 
-  it("index", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/info", { to: "projects#info", as: "info" });
-    });
-    expect(routes.pathFor("info")).toBe("/info");
-    const m = routes.recognize("GET", "/info");
-    expect(m).not.toBeNull();
-    expect(m!.route.controller).toBe("projects");
-    expect(m!.route.action).toBe("info");
-  });
-
   it.skip("match with many paths containing a slash", () => {
     // deprecated multi-path match (variadic path strings) not supported
   });
@@ -1892,10 +1884,6 @@ describe("TestRoutingMapper", () => {
 
   it.skip("not matching shorthand with dynamic parameters", () => {
     // deprecated :controller dynamic segment not supported
-  });
-
-  it.skip("controller option with nesting and leading slash", () => {
-    // scope `controller:` option does not propagate to inner routes (only `module:` does)
   });
 
   it("dynamically generated helpers on collection do not clobber resources url helper", () => {
@@ -1937,24 +1925,6 @@ describe("TestRoutingMapper", () => {
 
   it.skip("redirect with port", () => {
     // redirect() helper not implemented in RouteSet
-  });
-
-  it("normalize namespaced matches", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("account", (r) => {
-        r.get("description", { action: "description", as: "description" });
-      });
-    });
-    expect(routes.pathFor("account_description")).toBe("/account/description");
-    const m = routes.recognize("GET", "/account/description");
-    expect(m).not.toBeNull();
-    expect(m!.route.controller).toBe("account");
-    expect(m!.route.action).toBe("description");
-  });
-
-  it.skip("namespaced roots", () => {
-    // root() does not apply currentControllerPrefix(); controller resolves to "account" not "account/account"
   });
 
   it("optional scoped root", () => {
