@@ -1,9 +1,14 @@
 /**
  * ESLint rule: expected-fixtures
  *
- * For each activerecord test file that maps to a Rails test case declaring
- * `fixtures :a, :b`, require a top-level `useFixtures({ a: …, b: … })` call
- * whose keys are a superset of the Rails declaration.
+ * For each activerecord test file whose Rails counterpart actually
+ * dereferences fixture records (e.g. `customers(:david)` inside a test
+ * body), require a `useFixtures({ … })` call whose keys are a superset
+ * of the dereferenced sets.
+ *
+ * Class-level `fixtures :foo` declarations without record references are
+ * scaffolding (often inherited from a parent test class) and are not
+ * enforced — porting them would be cargo cult.
  *
  * Data sources:
  *   - scripts/test-deps/output/activerecord-test-deps.json — per-file Rails
@@ -83,6 +88,27 @@ export function railsToTrailsRel(railsRel) {
 }
 
 /**
+ * Returns the subset of `entry.fixtures` that at least one Rails test in
+ * `entry.tests` actually dereferences (e.g. `customers(:david)`).
+ *
+ * Files whose Rails counterpart has no record-level references are
+ * scaffolding-only — `fixtures :foo` declarations inherited from a parent
+ * test class — and the rule no-ops on them rather than push porters to
+ * load fixtures they don't need.
+ *
+ * Shared between the rule (`create()`) and the baseline builder so the
+ * two definitions can't drift.
+ */
+export function requiredFixtureSets(entry) {
+  if (!entry || !entry.tests) return [];
+  const referenced = new Set();
+  for (const t of Object.values(entry.tests)) {
+    for (const k of Object.keys(t.fixtures ?? {})) referenced.add(k);
+  }
+  return (entry.fixtures ?? []).filter((k) => referenced.has(k));
+}
+
+/**
  * Repo-relative path for exclude-list lookup. Accepts both absolute
  * filenames (ESLint's normal contract) and already-relative paths, so it
  * stays in lockstep with `trailsToRailsRel`'s `(?:^|\/)packages/...` match.
@@ -153,14 +179,14 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        "Require activerecord test files to load via `useFixtures` the same fixture sets their Rails counterpart declares.",
+        "Require activerecord test files to load via `useFixtures` every fixture set their Rails counterpart actually dereferences (e.g. `customers(:david)`). Scaffolding-only fixture declarations are ignored.",
     },
     schema: [],
     messages: {
       missing:
-        "Expected `useFixtures({ … })` declaring fixture set(s) [{{names}}] — Rails source declares them in {{rails}}.",
+        "Expected `useFixtures({ … })` declaring fixture set(s) [{{names}}] — Rails source {{rails}} dereferences records from them.",
       incomplete:
-        "`useFixtures(...)` is missing fixture set(s) [{{names}}] declared in Rails source {{rails}}.",
+        "`useFixtures(...)` is missing fixture set(s) [{{names}}] dereferenced by Rails source {{rails}}.",
     },
   },
   create(context) {
@@ -171,6 +197,8 @@ const rule = {
     if (!entry || !entry.fixtures || entry.fixtures.length === 0) return {};
     const rel = repoRel(filename);
     if (rel && loadExclude().has(rel)) return {};
+    const expected = requiredFixtureSets(entry);
+    if (expected.length === 0) return {};
     const keys = new Set();
     let found = false;
     return {
@@ -178,7 +206,6 @@ const rule = {
         if (harvestUseFixturesCall(node, keys)) found = true;
       },
       "Program:exit"(node) {
-        const expected = entry.fixtures;
         if (!found) {
           context.report({
             node,

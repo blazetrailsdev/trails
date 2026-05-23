@@ -34,25 +34,46 @@ beforeAll(() => {
         requires: ["customer"],
         fixtures: ["customers", "warehouse-things"],
         setFixtureClass: {},
-        tests: {},
+        // Both sets are referenced by at least one Rails test → enforced.
+        tests: {
+          test_find: {
+            fixtures: { customers: ["david"], "warehouse-things": ["one"] },
+          },
+        },
       },
       "associations/eager_test.rb": {
         requires: [],
         fixtures: ["posts", "authors"],
         setFixtureClass: {},
-        tests: {},
+        tests: { test_eager: { fixtures: { posts: ["a"], authors: ["b"] } } },
       },
       "excluded_test.rb": {
         requires: [],
         fixtures: ["topics"],
         setFixtureClass: {},
-        tests: {},
+        tests: { test_t: { fixtures: { topics: ["first"] } } },
       },
       "no_fixtures_test.rb": {
         requires: [],
         fixtures: [],
         setFixtureClass: {},
         tests: {},
+      },
+      "declared_but_unreferenced_test.rb": {
+        requires: [],
+        // fixtures declared but no test references a record — scaffolding-only;
+        // rule should not fire.
+        fixtures: ["topics"],
+        setFixtureClass: {},
+        tests: {},
+      },
+      "partial_reference_test.rb": {
+        requires: [],
+        // Only `posts` is dereferenced; `authors` is scaffolding only. Rule
+        // should require `posts` and ignore `authors`.
+        fixtures: ["posts", "authors"],
+        setFixtureClass: {},
+        tests: { test_p: { fixtures: { posts: ["a"] } } },
       },
     }),
   );
@@ -147,6 +168,16 @@ function runCases(tester) {
         name: "rails file with no fixtures → no-op",
         filename: path.join(ROOT, "packages/activerecord/src/no-fixtures.test.ts"),
         code: `// nothing\n`,
+      },
+      {
+        name: "rails declares fixtures but no test references records → no-op",
+        filename: path.join(ROOT, "packages/activerecord/src/declared-but-unreferenced.test.ts"),
+        code: `// nothing — Rails scaffolding-only, no enforcement\n`,
+      },
+      {
+        name: "partial-reference: only the dereferenced set is required",
+        filename: path.join(ROOT, "packages/activerecord/src/partial-reference.test.ts"),
+        code: `const fx = useFixtures({ posts: [P, {}] });\n`,
       },
       {
         name: "excluded files are skipped",

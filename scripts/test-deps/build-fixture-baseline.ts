@@ -26,7 +26,7 @@ const AR_SRC = path.join(ROOT, "packages/activerecord/src");
 async function main(): Promise<void> {
   // Dynamic import avoids the CJS-style top-level / static-`.mjs`-import
   // interop fragility that tsx exposes under module: Node16.
-  const { collectUseFixturesKeys, railsToTrailsRel } =
+  const { collectUseFixturesKeys, railsToTrailsRel, requiredFixtureSets } =
     await import("../../eslint/expected-fixtures.mjs");
   if (!fs.existsSync(DEPS_PATH)) {
     console.error(`Deps JSON not found: ${DEPS_PATH}\nRun: pnpm test:deps`);
@@ -37,9 +37,15 @@ async function main(): Promise<void> {
   const excluded: string[] = [];
   let candidates = 0;
   let ported = 0;
+  let scaffoldingOnly = 0;
   for (const [railsRel, entry] of Object.entries(deps)) {
     if (entry.fixtures.length === 0) continue;
     candidates++;
+    const required = requiredFixtureSets(entry);
+    if (required.length === 0) {
+      scaffoldingOnly++;
+      continue;
+    }
     const trailsRel = railsToTrailsRel(railsRel);
     const full = path.join(AR_SRC, trailsRel);
     if (!fs.existsSync(full)) continue;
@@ -60,13 +66,14 @@ async function main(): Promise<void> {
       console.error(`[baseline] failed to parse ${trailsRel}:`, err);
       process.exit(1);
     }
-    const hasAllKeys = foundCall && entry.fixtures.every((k) => keys.has(k));
+    const hasAllKeys = foundCall && required.every((k) => keys.has(k));
     if (!hasAllKeys) excluded.push(path.posix.join("packages/activerecord/src", trailsRel));
   }
   excluded.sort();
   fs.writeFileSync(OUT_PATH, JSON.stringify(excluded, null, 2) + "\n");
 
   console.log(`Rails test files declaring fixtures: ${candidates}`);
+  console.log(`  scaffolding-only (no record refs, rule no-ops): ${scaffoldingOnly}`);
   console.log(`  ported to trails: ${ported}`);
   console.log(`  excluded (no/incomplete useFixtures): ${excluded.length}`);
   console.log(`  ratchet-ready (useFixtures complete): ${ported - excluded.length}`);
