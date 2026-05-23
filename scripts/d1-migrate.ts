@@ -18,10 +18,9 @@
  *
  * Usage:
  *   pnpm tsx scripts/d1-migrate.ts [--dry-run] [--write] <file>...
- *   pnpm tsx scripts/d1-migrate.ts --auto      # discovers eligible files
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -30,7 +29,7 @@ import {
   Node,
   type SourceFile,
   type CallExpression,
-  type VariableStatement,
+  type ExpressionStatement,
   type ImportDeclaration,
 } from "ts-morph";
 
@@ -76,7 +75,7 @@ function callNameMatches(call: CallExpression, name: string): boolean {
 
 interface PatternInfo {
   adapterVarName: string;
-  beforeAllStmt: VariableStatement | null; // not actually a var, but the ExpressionStatement
+  beforeAllStmt: ExpressionStatement;
   defineSchemaCall: CallExpression;
   schemaArg: string; // text of schema object
   testAdapterImport: ImportDeclaration;
@@ -142,7 +141,7 @@ function analyze(sf: SourceFile): PatternInfo | { skip: string } {
     );
   if (beforeAllStmts.length === 0) return { skip: "no module-level beforeAll" };
   if (beforeAllStmts.length > 1) return { skip: "multiple module-level beforeAll blocks" };
-  const beforeAllStmt = beforeAllStmts[0];
+  const beforeAllStmt = beforeAllStmts[0].asKindOrThrow(SyntaxKind.ExpressionStatement);
   const beforeAllCall = beforeAllStmt.getExpressionIfKindOrThrow(SyntaxKind.CallExpression);
 
   // Find defineSchema call inside beforeAll
@@ -272,7 +271,7 @@ function analyze(sf: SourceFile): PatternInfo | { skip: string } {
 
   return {
     adapterVarName,
-    beforeAllStmt: beforeAllStmt as any,
+    beforeAllStmt,
     defineSchemaCall,
     schemaArg,
     testAdapterImport,
@@ -383,9 +382,7 @@ function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): strin
 
   // 3) Replace beforeAll body: replace `adapter = createTestAdapter()` and rewrite defineSchema
   // Easiest: rewrite via text by manipulating statements directly.
-  const beforeAllCall = (info.beforeAllStmt as any).getExpressionIfKindOrThrow(
-    SyntaxKind.CallExpression,
-  ) as CallExpression;
+  const beforeAllCall = info.beforeAllStmt.getExpressionIfKindOrThrow(SyntaxKind.CallExpression);
   const beforeAllArrow = beforeAllCall.getArguments()[0];
   if (!beforeAllArrow || !Node.isArrowFunction(beforeAllArrow)) {
     throw new Error("beforeAll arg is not an arrow function");
@@ -459,6 +456,16 @@ function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): strin
     const afterIdx = info.beforeAllStmt.getChildIndex() + 1;
     sf.insertStatements(afterIdx, [`withTransactionalFixtures(() => _txAdapter!);`]);
     ensureImport(`${helpersRel}/with-transactional-fixtures.js`, ["withTransactionalFixtures"]);
+    // Always need the type since the generated code declares `_txAdapter: TransactionalFixturesAdapter`.
+    const wtfImport = sf
+      .getImportDeclarations()
+      .find((i) => i.getModuleSpecifierValue().endsWith("/with-transactional-fixtures.js"));
+    if (
+      wtfImport &&
+      !wtfImport.getNamedImports().some((n) => n.getName() === "TransactionalFixturesAdapter")
+    ) {
+      wtfImport.addNamedImport({ name: "TransactionalFixturesAdapter", isTypeOnly: true });
+    }
   }
 
   // 6) Add afterAll after withTransactionalFixtures

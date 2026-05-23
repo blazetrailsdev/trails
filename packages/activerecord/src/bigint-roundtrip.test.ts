@@ -15,9 +15,9 @@ import {
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 
-const BIG = 2n ** 62n;
+const BIG = 2n ** 62n; // 4611686018427387904 — above Number.MAX_SAFE_INTEGER
 setupHandlerSuite();
-let _txAdapter: TransactionalFixturesAdapter | null = null; // 4611686018427387904 — above Number.MAX_SAFE_INTEGER
+let _txAdapter: TransactionalFixturesAdapter | null = null;
 beforeAll(async () => {
   await defineSchema({ metrics: { score: "big_integer", label: "string" } });
   const raw = Base.adapter;

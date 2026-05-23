@@ -41,14 +41,15 @@ function prettify(text: string): string {
 // on functional equivalence rather than formatter taste.
 function normalize(text: string): string {
   const sorted = text.replace(
-    /import\s*(?:type\s*)?\{\s*([^}]+)\}\s*from\s*"([^"]+)"\s*;?/g,
-    (_m, names: string, mod: string) => {
+    /import\s*(type\s+)?\{\s*([^}]+)\}\s*from\s*"([^"]+)"\s*;?/g,
+    (_m, typePrefix: string | undefined, names: string, mod: string) => {
       const parts = names
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean)
         .sort();
-      return `import { ${parts.join(", ")} } from "${mod}";`;
+      const prefix = typePrefix ? "type " : "";
+      return `import ${prefix}{ ${parts.join(", ")} } from "${mod}";`;
     },
   );
   const lines = sorted
