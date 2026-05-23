@@ -34,9 +34,14 @@
  */
 
 import { camelize, getCrypto } from "@blazetrails/activesupport";
+import { buildNestedQuery } from "@blazetrails/rack";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
+import { RequestUtils, type ParamValue } from "../action-dispatch/request/utils.js";
+import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
+import { UploadedFile } from "../action-dispatch/http/upload.js";
+import { MimeType } from "../action-dispatch/http/mime-type.js";
 import { Parameters } from "./metal/strong-parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import type { Metal } from "./metal.js";
@@ -430,13 +435,229 @@ export class TestCase {
  * packages.
  */
 export class TestRequest extends AbstractTestRequest {
-  /** Mirrors Rails `ActionController::TestRequest.new_session`. */
+  /** @internal Custom param parsers keyed by MIME type symbol. */
+  private _customParamParsers: Record<string, (raw: string) => unknown> = {
+    // Rails: Hash.from_xml(raw_post)["hash"] — no XML parser available; return empty hash.
+    xml: (_raw) => ({}),
+  };
+
+  /** @internal Mirrors Rails `ActionController::TestRequest.new_session`. */
   static newSession(): TestSession {
     return new TestSession();
   }
+
+  /** @internal Mirrors Rails `@controller_class` ivar. */
+  private _testControllerClass: unknown = null;
+
+  /**
+   * Mirrors Rails `ActionController::TestRequest.create(controller_class)`.
+   * Builds a fresh request with default env and a new session.
+   */
+  static create(controllerClass?: unknown): TestRequest {
+    const env: Record<string, unknown> = {};
+    env["rack.request.cookie_hash"] = {};
+    const session = TestRequest.newSession();
+    env["rack.session"] = session;
+    const req = new TestRequest({ ...TestRequest.defaultEnv(), ...env });
+    req._testControllerClass = controllerClass ?? null;
+    return req;
+  }
+
+  /**
+   * @internal Mirrors Rails `ActionController::TestRequest.default_env` (private class method).
+   * Extends the dispatch-layer DEFAULT_ENV and strips PATH_INFO.
+   */
+  static override defaultEnv(): Record<string, unknown> {
+    const base = AbstractTestRequest.defaultEnv();
+    const env = { ...base };
+    delete (env as Record<string, unknown>)["PATH_INFO"];
+    return env;
+  }
+
+  get queryString(): string {
+    return super.queryString;
+  }
+
+  set queryString(string: string) {
+    this.setHeader("QUERY_STRING", string);
+  }
+
+  get contentType(): string | undefined {
+    return super.contentType;
+  }
+
+  set contentType(type: string) {
+    this.setHeader("CONTENT_TYPE", type);
+  }
+
+  /**
+   * Mirrors Rails `TestRequest#assign_parameters`.
+   * Splits parameters into path parameters and query/body parameters, then
+   * encodes the body (or query string) based on the request method and
+   * content type.
+   */
+  assignParameters(
+    _routes: unknown,
+    controllerPath: string,
+    action: string,
+    parameters: Record<string, unknown>,
+    generatedPath: string,
+    queryStringKeys: string[],
+  ): void {
+    const nonPathParameters: Record<string, unknown> = {};
+    // Rails path_parameters uses symbol keys; we mirror with string keys.
+    // Array values are preserved as-is (Rails: value.map(&:to_param)).
+    const pathParameters: Record<string, string | string[]> = {};
+
+    for (const [key, value] of Object.entries(parameters)) {
+      if (queryStringKeys.includes(key)) {
+        nonPathParameters[key] = value;
+      } else if (Array.isArray(value)) {
+        pathParameters[key] = value.map((v) => String(v ?? ""));
+      } else {
+        pathParameters[key] = String(value ?? "");
+      }
+    }
+
+    // Clear any request-parameters cache established before the body was wired in.
+    delete this.env["action_dispatch.request.request_parameters"];
+
+    if (this.requestMethod === "GET") {
+      if (!this.getHeader("QUERY_STRING")) {
+        this.queryString = buildNestedQuery(nonPathParameters);
+      }
+    } else {
+      if (shouldMultipart(nonPathParameters)) {
+        const { body, boundary } = buildMultipartBody(nonPathParameters);
+        this.setHeader("CONTENT_TYPE", `multipart/form-data; boundary=${boundary}`);
+        this.setHeader("CONTENT_LENGTH", String(Buffer.byteLength(body, "binary")));
+        this.setHeader("rack.input", body);
+        // Multipart isn't parsed by the formatted-parameter path; pre-populate the
+        // cache so params/requestParameters expose the uploaded files directly.
+        this.env["action_dispatch.request.request_parameters"] = nonPathParameters;
+      } else {
+        if (!this.getHeader("CONTENT_TYPE")) {
+          this.setHeader("CONTENT_TYPE", "application/x-www-form-urlencoded");
+        }
+
+        const ct = this.getHeader("CONTENT_TYPE") ?? "";
+        let data: string;
+        const mimeSymbol = MimeType.lookup(ct.split(";")[0].trim().toLowerCase()).symbol;
+
+        if (mimeSymbol === "json") {
+          data = JSON.stringify(nonPathParameters);
+        } else if (
+          mimeSymbol === "xml" ||
+          mimeSymbol === "url_encoded_form" ||
+          ct.includes("application/x-www-form-urlencoded")
+        ) {
+          data = buildNestedQuery(nonPathParameters);
+        } else {
+          // Rails: registers a custom parser so the controller sees the raw params hash
+          this._customParamParsers[mimeSymbol] = () => nonPathParameters;
+          data = buildNestedQuery(nonPathParameters);
+        }
+
+        const encoded = new TextEncoder().encode(data);
+        this.setHeader("CONTENT_LENGTH", String(encoded.byteLength));
+        this.setHeader("rack.input", data);
+      }
+    }
+
+    if (!this.getHeader("PATH_INFO")) {
+      this.setHeader("PATH_INFO", generatedPath);
+    }
+    if (!this.getHeader("ORIGINAL_FULLPATH")) {
+      // Rails uses fullpath here (path + query string) not just the generated path
+      this.setHeader("ORIGINAL_FULLPATH", this.fullpath);
+    }
+
+    pathParameters["controller"] = controllerPath;
+    pathParameters["action"] = action;
+    this.pathParameters = pathParameters;
+  }
+
+  /** @internal Mirrors Rails `TestRequest#params_parsers` (private). */
+  override paramsParsers(): ParameterParsers {
+    const base = super.paramsParsers();
+    return { ...base, ...this._customParamParsers } as ParameterParsers;
+  }
+
+  /**
+   * @internal Wires custom param parsers into the request parameter parsing path.
+   * The base `Request#requestParameters` calls `_paramsParsers` directly (bypassing
+   * instance dispatch), so we override to use `this.paramsParsers()` instead.
+   */
+  override get requestParameters(): Record<string, unknown> {
+    const cached = this.env["action_dispatch.request.request_parameters"];
+    if (cached && typeof cached === "object") return cached as Record<string, unknown>;
+    const fallback = (): Record<string, unknown> => this.fallbackRequestParameters();
+    const params = this.parseFormattedParameters(this.paramsParsers(), fallback);
+    const normalized = RequestUtils.normalizeEncodeParams(params as ParamValue) as Record<
+      string,
+      unknown
+    >;
+    this.env["action_dispatch.request.request_parameters"] = normalized;
+    return normalized;
+  }
 }
 
-export class LiveTestResponse extends Response {}
+/** @internal Mirrors Rails Rack::Test::Utils.build_multipart — encodes params with file uploads. */
+function buildMultipartBody(params: Record<string, unknown>): { body: string; boundary: string } {
+  const boundary = "AaB03x";
+  const parts: string[] = [];
+  function addParts(prefix: string, value: unknown): void {
+    if (value instanceof UploadedFile) {
+      parts.push(
+        `--${boundary}\r\n` +
+          `content-disposition: form-data; name="${prefix}"; filename="${value.originalFilename}"\r\n` +
+          `content-type: ${value.contentType}\r\n\r\n` +
+          value.read().toString("binary") +
+          "\r\n",
+      );
+    } else if (Array.isArray(value)) {
+      for (const item of value) addParts(`${prefix}[]`, item);
+    } else if (value !== null && typeof value === "object") {
+      for (const [k, v] of Object.entries(value)) addParts(`${prefix}[${k}]`, v);
+    } else {
+      parts.push(
+        `--${boundary}\r\ncontent-disposition: form-data; name="${prefix}"\r\n\r\n${String(value ?? "")}\r\n`,
+      );
+    }
+  }
+  for (const [k, v] of Object.entries(params)) addParts(k, v);
+  return { body: parts.join("") + `--${boundary}--\r\n`, boundary };
+}
+
+/** @internal Mirrors Rails ENCODER#should_multipart? — true if any param is an UploadedFile. */
+function shouldMultipart(params: Record<string, unknown>): boolean {
+  const check = (value: unknown): boolean => {
+    if (Array.isArray(value)) return value.some(check);
+    if (value instanceof UploadedFile) return true;
+    if (value !== null && typeof value === "object") {
+      return Object.values(value as object).some(check);
+    }
+    return false;
+  };
+  return Object.values(params).some(check);
+}
+
+export class LiveTestResponse extends Response {
+  /** Mirrors Rails `LiveTestResponse#success?` (alias of `successful?`). */
+  get isSuccess(): boolean {
+    return this.successful;
+  }
+
+  /** Mirrors Rails `LiveTestResponse#missing?` (alias of `not_found?`). */
+  get isMissing(): boolean {
+    return this.notFound;
+  }
+
+  /** Mirrors Rails `LiveTestResponse#error?` (alias of `server_error?`). */
+  get isError(): boolean {
+    return this.serverError;
+  }
+}
 
 export class TestSession {
   private _data = new Map<string, unknown>();
