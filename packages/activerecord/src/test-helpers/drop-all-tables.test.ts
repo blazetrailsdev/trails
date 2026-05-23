@@ -96,8 +96,11 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
     } as unknown as DatabaseAdapter;
 
     await expect(dropAllTables(fakeAdapter)).resolves.toBeUndefined();
-    // First pass: DROP mv1 throws connection error → retry on fresh connection.
-    expect(mutationCallCount).toBeGreaterThanOrEqual(1);
+    // First pass: 1 execute (matviews→mv1) + 1 executeMutation (throws).
+    // Retry: 3 execute calls (matviews/views/tables → all empty) + 0 mutations.
+    // Total execute calls = 4 proves the retry path ran.
+    expect(fakeAdapter.execute).toHaveBeenCalledTimes(4);
+    expect(mutationCallCount).toBe(1);
   });
 });
 
