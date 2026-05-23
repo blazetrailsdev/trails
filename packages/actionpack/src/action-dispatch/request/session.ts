@@ -110,6 +110,10 @@ export class Session {
     return this._enabled;
   }
 
+  isLoaded(): boolean {
+    return this.loaded;
+  }
+
   isExists(): boolean {
     if (!this._enabled) return false;
     return this.existed;

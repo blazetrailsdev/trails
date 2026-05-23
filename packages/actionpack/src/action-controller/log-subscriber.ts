@@ -9,6 +9,7 @@
 import {
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent as Event,
+  type Logger,
 } from "@blazetrails/activesupport";
 
 export class LogSubscriber extends BaseLogSubscriber {
@@ -69,4 +70,12 @@ export class LogSubscriber extends BaseLogSubscriber {
       : "";
     this._debug(`Unpermitted parameter${keys.length > 1 ? "s" : ""}: ${displayKeys}${contextStr}`);
   }
+
+  override get logger(): Logger | null {
+    return (this.constructor as typeof LogSubscriber).logger;
+  }
 }
+
+// "action_controller" is the AS::Notifications channel identifier, which uses
+// Rails snake_case naming conventions as a cross-package wire protocol.
+LogSubscriber.attachTo("action_controller");

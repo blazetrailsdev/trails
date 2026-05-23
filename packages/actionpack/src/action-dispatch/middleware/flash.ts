@@ -25,7 +25,7 @@ export interface FlashRequestHost {
   env: RackEnv;
   session: {
     isEnabled?(): boolean;
-    isLoaded?(): boolean;
+    isLoaded(): boolean;
     hasKey(key: string): boolean;
     get(key: string): unknown;
     set(key: string, value: unknown): void;
@@ -87,13 +87,9 @@ export function commitFlash(this: FlashRequestHost): void {
     this.env[FLASH_KEY] = hash.dup();
   }
 
-  // Rails guards this branch with `session.loaded?` to avoid forcing a
-  // session load just to clean up a nil flash entry. trails' Session
-  // already lazily loads on `hasKey`/`get` (action-dispatch/request/
-  // session.ts), so the guard would be redundant — and `isLoaded()` is
-  // optional on the host shape for environments that do expose it
-  // (e.g. a wrapped Rails-style store).
-  if (session.isLoaded ? session.isLoaded() : true) {
+  // Rails guards this with `session.loaded?` to avoid forcing a session
+  // load just to clean up a nil flash entry.
+  if (session.isLoaded()) {
     if (session.hasKey("flash") && session.get("flash") == null) {
       session.delete("flash");
     }

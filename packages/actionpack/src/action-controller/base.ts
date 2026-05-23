@@ -12,7 +12,6 @@ import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import { RequestForgeryProtection } from "../action-dispatch/request-forgery-protection.js";
 import { Collector } from "./metal/mime-responds.js";
 import { UnknownFormat } from "./metal/exceptions.js";
-import { AbstractControllerError } from "../abstract-controller/error.js";
 import type {
   ActionCallback,
   AroundCallback,
@@ -49,7 +48,10 @@ import {
   type ParamsWrapperHost,
 } from "./metal/params-wrapper.js";
 import { Parameters as StrongParameters } from "./metal/strong-parameters.js";
-import { DEFAULT_PROTECTED_INSTANCE_VARIABLES } from "../abstract-controller/rendering.js";
+import {
+  DEFAULT_PROTECTED_INSTANCE_VARIABLES,
+  DoubleRenderError,
+} from "../abstract-controller/rendering.js";
 
 // Re-export callback registration
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
@@ -946,12 +948,7 @@ helperMethod(
   "contentSecurityPolicyNonce",
 );
 
-export class DoubleRenderError extends AbstractControllerError {
-  constructor(message = "Render and/or redirect were called multiple times in this action.") {
-    super(message);
-    this.name = "DoubleRenderError";
-  }
-}
+export { DoubleRenderError };
 
 const JSONP_CALLBACK_RE = /^[a-zA-Z_$][0-9a-zA-Z_$]*(?:\.[a-zA-Z_$][0-9a-zA-Z_$]*)*$/;
 
