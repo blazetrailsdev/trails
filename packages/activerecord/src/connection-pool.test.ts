@@ -880,7 +880,7 @@ it("context pin takes priority over fixture pin in unpin", async () => {
     expect(pool.checkout()).toBe(before);
   });
   await pool.unpinConnectionBang(); // clears the fixture pin
-  expect(() => pool.unpinConnectionBang()).rejects.toThrow(/isn't a pinned connection/);
+  await expect(pool.unpinConnectionBang()).rejects.toThrow(/isn't a pinned connection/);
 });
 
 it.skip("pin connection nesting lock", () => {

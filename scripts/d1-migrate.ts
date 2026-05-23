@@ -400,7 +400,11 @@ function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): strin
   // fixture pinning (handled inside ConnectionPool#pinConnectionBang under
   // `{ fixture: true }`) is what makes the cross-context beforeEach/afterEach
   // pairing work — no per-file proxy or _txAdapter declaration needed.
-  const beforeAllIdx = info.beforeAllStmt.getChildIndex();
+  // `insertStatements` expects an index into `sf.getStatements()`, not the
+  // raw child index (which counts every AST child including syntax-list
+  // wrappers). Look the statement up by identity in the statements array.
+  const beforeAllIdx = sf.getStatements().indexOf(info.beforeAllStmt);
+  if (beforeAllIdx < 0) throw new Error("beforeAllStmt no longer in SourceFile.getStatements()");
   sf.insertStatements(beforeAllIdx, [`setupHandlerSuite();`, `useHandlerTransactionalFixtures();`]);
   ensureImport(`${helpersRel}/use-handler-transactional-fixtures.js`, [
     "useHandlerTransactionalFixtures",
