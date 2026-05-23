@@ -40,6 +40,7 @@ import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import { UploadedFile } from "../action-dispatch/http/upload.js";
+import { MimeType } from "../action-dispatch/http/mime-type.js";
 import { Parameters } from "./metal/strong-parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import type { Metal } from "./metal.js";
@@ -495,16 +496,17 @@ export class TestRequest extends AbstractTestRequest {
     queryStringKeys: string[],
   ): void {
     const nonPathParameters: Record<string, unknown> = {};
-    const pathParameters: Record<string, string> = {};
+    // Rails path_parameters uses symbol keys; we mirror with string keys.
+    // Array values are preserved as-is (Rails: value.map(&:to_param)).
+    const pathParameters: Record<string, string | string[]> = {};
 
     for (const [key, value] of Object.entries(parameters)) {
       if (queryStringKeys.includes(key)) {
         nonPathParameters[key] = value;
+      } else if (Array.isArray(value)) {
+        pathParameters[key] = value.map((v) => String(v ?? ""));
       } else {
-        // Rails: value.is_a?(Array) ? value.map(&:to_param) : value.to_param
-        pathParameters[key] = Array.isArray(value)
-          ? (value.map((v) => String(v ?? "")) as unknown as string)
-          : String(value ?? "");
+        pathParameters[key] = String(value ?? "");
       }
     }
 
@@ -514,9 +516,9 @@ export class TestRequest extends AbstractTestRequest {
       }
     } else {
       if (shouldMultipart(nonPathParameters)) {
-        this.contentType = multipartContentType();
-        // Multipart body building requires Rack::Test::Utils; encode as url-form fallback
-        // so CONTENT_LENGTH and rack.input are always present for the controller.
+        // Rails: ENCODER.build_multipart (Rack::Test::Utils) — no TS equivalent.
+        // Fall back to url-encoded so rack.input is parseable; CONTENT_TYPE reflects that.
+        this.setHeader("CONTENT_TYPE", "application/x-www-form-urlencoded");
         const data = buildNestedQuery(nonPathParameters);
         const encoded = new TextEncoder().encode(data);
         this.setHeader("CONTENT_LENGTH", String(encoded.byteLength));
@@ -528,16 +530,18 @@ export class TestRequest extends AbstractTestRequest {
 
         const ct = this.getHeader("CONTENT_TYPE") ?? "";
         let data: string;
+        const mimeSymbol = MimeType.lookup(ct.split(";")[0].trim()).symbol;
 
-        if (ct.includes("application/json")) {
+        if (mimeSymbol === "json") {
           data = JSON.stringify(nonPathParameters);
-        } else if (ct.includes("application/xml")) {
-          data = buildNestedQuery(nonPathParameters);
-        } else if (ct.includes("application/x-www-form-urlencoded")) {
+        } else if (
+          mimeSymbol === "xml" ||
+          mimeSymbol === "url_encoded_form" ||
+          ct.includes("application/x-www-form-urlencoded")
+        ) {
           data = buildNestedQuery(nonPathParameters);
         } else {
           // Rails: registers a custom parser so the controller sees the raw params hash
-          const mimeSymbol = ct.split(";")[0].trim().replace(/\//g, "_").replace(/-/g, "_");
           this._customParamParsers[mimeSymbol] = () => nonPathParameters;
           data = buildNestedQuery(nonPathParameters);
         }
@@ -579,10 +583,6 @@ function shouldMultipart(params: Record<string, unknown>): boolean {
     return false;
   };
   return Object.values(params).some(check);
-}
-
-function multipartContentType(): string {
-  return `multipart/form-data; boundary=----RackMultipart`;
 }
 
 export class LiveTestResponse extends Response {

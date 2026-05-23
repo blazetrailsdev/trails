@@ -151,6 +151,28 @@ describe("ActionController::TestRequest helpers", () => {
     expect(body).toContain("title=Hello");
   });
 
+  it("assignParameters falls back to url-encoded for multipart (no Rack::Test::Utils)", () => {
+    const req = TestRequest.create();
+    req.setHeader("REQUEST_METHOD", "POST");
+    req.assignParameters(null, "uploads", "create", { note: "hi" }, "/uploads", ["note"]);
+    // No UploadedFile in params → not multipart; body should be url-encoded
+    const body = req.getHeader("rack.input") ?? "";
+    expect(body).toContain("note=hi");
+    expect(req.getHeader("CONTENT_TYPE")).toContain("application/x-www-form-urlencoded");
+  });
+
+  it("assignParameters registers custom parser for unknown content types", () => {
+    const req = TestRequest.create();
+    req.setHeader("REQUEST_METHOD", "POST");
+    req.setHeader("CONTENT_TYPE", "application/vnd.custom+json");
+    req.assignParameters(null, "api", "create", { x: "1" }, "/api", ["x"]);
+    const parsers = req.paramsParsers();
+    // The key is contentMimeType.symbol for the unknown type
+    const key = "application/vnd.custom+json";
+    expect(parsers).toHaveProperty(key);
+    expect((parsers as Record<string, () => unknown>)[key]()).toEqual({ x: "1" });
+  });
+
   it("paramsParsers returns the custom parsers map", () => {
     const req = TestRequest.create();
     const parsers = req.paramsParsers();
