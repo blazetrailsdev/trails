@@ -2,9 +2,8 @@
 import { Base } from "../../base.js";
 
 export class PersonalLegacyThing extends Base {
-  static lockingColumn = "version";
-
   static {
+    this.lockingColumn = "version";
     this.belongsTo("person", { counterCache: true });
   }
 }

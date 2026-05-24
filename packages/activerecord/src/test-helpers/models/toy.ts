@@ -7,6 +7,6 @@ export class Toy extends Base {
   static {
     this.belongsTo("pet");
     this.hasMany("sponsors", { as: "sponsorable", inverseOf: "sponsorable" });
-    this.scope("withPet", () => this.joins("pet"));
+    this.scope("withPet", (q: any) => q.joins("pet"));
   }
 }

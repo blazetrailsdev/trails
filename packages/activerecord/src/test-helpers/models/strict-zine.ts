@@ -2,5 +2,7 @@
 import { Zine } from "./zine.js";
 
 export class StrictZine extends Zine {
-  static strictLoadingByDefault = true;
+  static {
+    this.strictLoadingByDefault = true;
+  }
 }
