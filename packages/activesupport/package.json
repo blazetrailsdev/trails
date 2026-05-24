@@ -91,6 +91,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@blazetrails/nokogiri": "workspace:*",
     "@js-temporal/polyfill": "^0.5.1",
     "tinyglobby": "^0.2.16",
     "yaml": "^2.8.3"

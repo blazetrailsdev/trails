@@ -17,6 +17,7 @@
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",
+    "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "ua-parser-js": "^2.0.9"
   }

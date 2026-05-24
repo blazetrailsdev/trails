@@ -61,7 +61,14 @@ function applySchema(dbPath: string, sql: string): void {
 // is predictable and still fast when already built (tsc incremental).
 beforeAll(() => {
   const packagesRoot = resolve(REPO_ROOT, "packages");
-  const depsInOrder = ["activesupport", "activemodel", "arel", "did-you-mean", "globalid"];
+  const depsInOrder = [
+    "nokogiri",
+    "activesupport",
+    "activemodel",
+    "arel",
+    "did-you-mean",
+    "globalid",
+  ];
   const anyMissing = depsInOrder.some(
     (p) => !existsSync(join(packagesRoot, p, "dist", "index.js")),
   );
