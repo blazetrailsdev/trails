@@ -46,11 +46,11 @@ and bundlers that don't support TLA can still import the package.
 
 ## Consumers (actionpack + activesupport only)
 
-| Rails consumer                          | What it uses                             |
-| --------------------------------------- | ---------------------------------------- |
+| Rails consumer                          | What it uses                                  |
+| --------------------------------------- | --------------------------------------------- |
 | actionpack `assertions.rb`              | `XML::Document.parse(body)` for XML responses |
-| activesupport `xml_mini/nokogiri.rb`    | `Nokogiri::XML(data)` → DOM → `to_hash` |
-| activesupport `xml_mini/nokogirisax.rb` | `SAX::Parser` + `SAX::Document` handler  |
+| activesupport `xml_mini/nokogiri.rb`    | `Nokogiri::XML(data)` → DOM → `to_hash`       |
+| activesupport `xml_mini/nokogirisax.rb` | `SAX::Parser` + `SAX::Document` handler       |
 
 **Important:** the `to_hash` traversal lives in
 `active_support/xml_mini/nokogiri.rb`, not in Nokogiri itself. Our package
@@ -151,34 +151,34 @@ methods our consumers call:
 
 ```ts
 class XmlNode {
-  name: string;            // elem.name for elements; "#text"/"#cdata-section" otherwise
-  isElement(): boolean;    // instanceof XmlElement
-  isText(): boolean;       // instanceof XmlText
-  isCdata(): boolean;      // instanceof XmlCData
-  content: string;         // node.content — text content, recursive for elements
-  children: XmlNode[];     // built from firstChild + next linked-list walk
-  attributeNodes: AttrNode[];  // from elem.attrs
+  name: string; // elem.name for elements; "#text"/"#cdata-section" otherwise
+  isElement(): boolean; // instanceof XmlElement
+  isText(): boolean; // instanceof XmlText
+  isCdata(): boolean; // instanceof XmlCData
+  content: string; // node.content — text content, recursive for elements
+  children: XmlNode[]; // built from firstChild + next linked-list walk
+  attributeNodes: AttrNode[]; // from elem.attrs
 }
 
 interface AttrNode {
-  nodeName: string;        // attr.name
-  value: string;           // attr.value
+  nodeName: string; // attr.name
+  value: string; // attr.value
 }
 ```
 
 **libxml2-wasm mapping:**
 
-| Our API | libxml2-wasm | Notes |
-|---|---|---|
-| `node.name` | `elem.name` | Direct |
-| `node.isElement()` | `instanceof XmlElement` | Type check |
-| `node.isText()` | `instanceof XmlText` | Type check |
-| `node.isCdata()` | `instanceof XmlCData` | Type check |
-| `node.content` | `node.content` | Direct |
-| `node.children` | `firstChild` + `next` loop | Linked list → array |
-| `node.attributeNodes` | `elem.attrs` | Direct array |
-| `attr.nodeName` | `attr.name` | Rename |
-| `attr.value` | `attr.value` | Direct |
+| Our API               | libxml2-wasm               | Notes               |
+| --------------------- | -------------------------- | ------------------- |
+| `node.name`           | `elem.name`                | Direct              |
+| `node.isElement()`    | `instanceof XmlElement`    | Type check          |
+| `node.isText()`       | `instanceof XmlText`       | Type check          |
+| `node.isCdata()`      | `instanceof XmlCData`      | Type check          |
+| `node.content`        | `node.content`             | Direct              |
+| `node.children`       | `firstChild` + `next` loop | Linked list → array |
+| `node.attributeNodes` | `elem.attrs`               | Direct array        |
+| `attr.nodeName`       | `attr.name`                | Rename              |
+| `attr.value`          | `attr.value`               | Direct              |
 
 Rails usage (all from `xml_mini/nokogiri.rb`):
 
@@ -256,14 +256,14 @@ function parseXml(data: string): XmlDocument;
 
 ## LOC budget
 
-| Component | LOC | Where |
-| --- | --- | --- |
-| `XmlDocument` (parse, errors, dispose) | 50 | xml/document.ts |
-| `XmlNode` (predicates, content, children, attrs) | 50 | xml/node.ts |
-| `parseXml` + lazy init + `index.ts` barrel | 40 | xml/parse.ts, index |
-| `SaxDocument` base class | 25 | sax/document.ts |
-| `SaxParser` DOM-walk emitter | 60 | sax/parser.ts |
-| Tests | 75 | *.test.ts |
+| Component                                        | LOC | Where               |
+| ------------------------------------------------ | --- | ------------------- |
+| `XmlDocument` (parse, errors, dispose)           | 50  | xml/document.ts     |
+| `XmlNode` (predicates, content, children, attrs) | 50  | xml/node.ts         |
+| `parseXml` + lazy init + `index.ts` barrel       | 40  | xml/parse.ts, index |
+| `SaxDocument` base class                         | 25  | sax/document.ts     |
+| `SaxParser` DOM-walk emitter                     | 60  | sax/parser.ts       |
+| Tests                                            | 75  | \*.test.ts          |
 
 **Total: ~300 LOC in a single PR.** The DOM and SAX surfaces share the
 same libxml2-wasm engine and parse path, so splitting into two PRs would
