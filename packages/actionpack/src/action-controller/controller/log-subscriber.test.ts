@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { LogSubscriber as BaseLogSubscriber, NotificationEvent } from "@blazetrails/activesupport";
+import {
+  LogSubscriber as BaseLogSubscriber,
+  NotificationEvent,
+  Notifications,
+} from "@blazetrails/activesupport";
 import { LogSubscriber } from "../log-subscriber.js";
 
 class CaptureLogger {
@@ -40,6 +44,7 @@ describe("ACLogSubscriberTest", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    Notifications.unsubscribeAll();
   });
 
   it("start processing", () => {
@@ -94,20 +99,20 @@ describe("ACLogSubscriberTest", () => {
     expect(logger.messages.every((m) => !/Parameters/.test(m))).toBe(true);
   });
 
-  it.skip("process action with parameters");
-  it.skip("multiple process with parameters");
-  it.skip("process action with wrapped parameters");
+  it.skip("process action with parameters", () => {});
+  it.skip("multiple process with parameters", () => {});
+  it.skip("process action with wrapped parameters", () => {});
 
   it("process action with view runtime", () => {
     subscriber.processAction(makeEvent("process_action.action_controller", { status: 200 }, 37));
     expect(logger.messages[0]).toMatch(/Completed 200 OK in \d+ms/);
   });
 
-  it.skip("process action with path");
-  it.skip("process action with throw");
-  it.skip("append info to payload is called even with exception");
-  it.skip("process action headers");
-  it.skip("process action with filter parameters");
+  it.skip("process action with path", () => {});
+  it.skip("process action with throw", () => {});
+  it.skip("append info to payload is called even with exception", () => {});
+  it.skip("process action headers", () => {});
+  it.skip("process action with filter parameters", () => {});
 
   it("redirect to", () => {
     subscriber.redirectTo(
@@ -116,12 +121,12 @@ describe("ACLogSubscriberTest", () => {
     expect(logger.messages[0]).toBe("Redirected to http://foo.bar/");
   });
 
-  it.skip("filter redirect url by string");
-  it.skip("filter redirect url by regexp");
-  it.skip("does not filter redirect params by default");
-  it.skip("filter redirect params by string");
-  it.skip("filter redirect params by regexp");
-  it.skip("filter redirect bad uri");
+  it.skip("filter redirect url by string", () => {});
+  it.skip("filter redirect url by regexp", () => {});
+  it.skip("does not filter redirect params by default", () => {});
+  it.skip("filter redirect params by string", () => {});
+  it.skip("filter redirect params by regexp", () => {});
+  it.skip("filter redirect bad uri", () => {});
 
   it("send data", () => {
     subscriber.sendData(makeEvent("send_data.action_controller", { filename: "file.txt" }));
@@ -134,13 +139,13 @@ describe("ACLogSubscriberTest", () => {
     expect(logger.messages[0]).toMatch(/company\.rb/);
   });
 
-  it.skip("with fragment cache");
-  it.skip("with fragment cache when log disabled");
-  it.skip("with fragment cache if with true");
-  it.skip("with fragment cache if with false");
-  it.skip("with fragment cache unless with true");
-  it.skip("with fragment cache unless with false");
-  it.skip("with fragment cache and percent in key");
+  it.skip("with fragment cache", () => {});
+  it.skip("with fragment cache when log disabled", () => {});
+  it.skip("with fragment cache if with true", () => {});
+  it.skip("with fragment cache if with false", () => {});
+  it.skip("with fragment cache unless with true", () => {});
+  it.skip("with fragment cache unless with false", () => {});
+  it.skip("with fragment cache and percent in key", () => {});
 
   it("process action with exception includes http status code", () => {
     subscriber.processAction(makeEvent("process_action.action_controller", { status: 500 }, 5));
