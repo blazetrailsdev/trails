@@ -96,6 +96,9 @@ importers:
       '@blazetrails/did-you-mean':
         specifier: workspace:*
         version: link:../did-you-mean
+      '@blazetrails/nokogiri':
+        specifier: workspace:*
+        version: link:../nokogiri
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../rack
@@ -159,6 +162,9 @@ importers:
 
   packages/activesupport:
     dependencies:
+      '@blazetrails/nokogiri':
+        specifier: workspace:*
+        version: link:../nokogiri
       '@js-temporal/polyfill':
         specifier: ^0.5.1
         version: 0.5.1
@@ -201,6 +207,12 @@ importers:
       '@types/sanitize-html':
         specifier: ^2.13.0
         version: 2.16.1
+
+  packages/nokogiri:
+    dependencies:
+      libxml2-wasm:
+        specifier: ^0.7.1
+        version: 0.7.1
 
   packages/rack:
     dependencies:
@@ -329,6 +341,9 @@ importers:
       '@blazetrails/html-sanitizer':
         specifier: workspace:*
         version: link:../../packages/html-sanitizer
+      '@blazetrails/nokogiri':
+        specifier: workspace:*
+        version: link:../../packages/nokogiri
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../../packages/rack
@@ -3881,6 +3896,10 @@ packages:
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
     engines: {node: '>= 0.8.0'}
+
+  libxml2-wasm@0.7.1:
+    resolution: {integrity: sha512-aZpJJL/j6T3D+5TmhG4D0ylR3mN6UzmqmBjyb/p+zEAaouG6GpfHiUNUzKR3vKCEoJt/Z2L15XPDCVPuFJIQhg==}
+    engines: {node: '>=18'}
 
   lighthouse-logger@1.4.2:
     resolution: {integrity: sha512-gPWxznF6TKmUHrOQjlVo2UbaL2EJ71mb2CCeRs/2qBpi4L/g4LUVc9+3lKQ6DTUZwJswfM7ainGrLO1+fOqa2g==}
@@ -9394,6 +9413,8 @@ snapshots:
     dependencies:
       prelude-ls: 1.2.1
       type-check: 0.4.0
+
+  libxml2-wasm@0.7.1: {}
 
   lighthouse-logger@1.4.2:
     dependencies:

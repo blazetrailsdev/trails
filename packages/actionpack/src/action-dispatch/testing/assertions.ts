@@ -6,14 +6,24 @@
  * `this`-typed functions so api:compare sees the full mixed-in surface
  * on this file.
  *
- * `htmlDocument` is intentionally not exported: it requires
- * rails-dom-testing (Nokogiri / DOM parser), which is not yet ported. A
- * stub would mislead callers, so the gap is tracked rather than papered
- * over. Restore the export once rails-dom-testing lands.
+ * The HTML branch of `htmlDocument` (rails-dom-testing) remains deferred.
+ * The XML branch is wired via `@blazetrails/nokogiri`.
  */
 
+import { XML } from "@blazetrails/nokogiri";
 import * as response from "./assertions/response.js";
 import * as routing from "./assertions/routing.js";
+
+/** @internal */
+export function htmlDocument(body: string, mimeType?: string) {
+  const mediaType = mimeType?.split(";")[0].trim();
+  if (mediaType === undefined || mediaType.endsWith("xml")) {
+    return XML.Document.parse(body);
+  }
+  throw new Error(
+    `htmlDocument: HTML parsing (rails-dom-testing) is not yet implemented; got mime type "${mediaType}"`,
+  );
+}
 
 export type { AssertionResponseHost, AssertionResponseLike } from "./assertions/response.js";
 
