@@ -85,7 +85,7 @@ describe("ACLogSubscriberTest", () => {
   it("process action", () => {
     subscriber.processAction(makeEvent("process_action.action_controller", { status: 200 }, 42));
     expect(logger.messages[0]).toMatch(/Completed/);
-    expect(logger.messages[0]).toMatch(/200/);
+    expect(logger.messages[0]).toMatch(/200 OK/);
   });
 
   it("process action without parameters", () => {
@@ -100,8 +100,7 @@ describe("ACLogSubscriberTest", () => {
 
   it("process action with view runtime", () => {
     subscriber.processAction(makeEvent("process_action.action_controller", { status: 200 }, 37));
-    expect(logger.messages[0]).toMatch(/Completed 200/);
-    expect(logger.messages[0]).toMatch(/\d+/);
+    expect(logger.messages[0]).toMatch(/Completed 200 OK in \d+ms/);
   });
 
   it.skip("process action with path");
@@ -146,15 +145,18 @@ describe("ACLogSubscriberTest", () => {
   it("process action with exception includes http status code", () => {
     subscriber.processAction(makeEvent("process_action.action_controller", { status: 500 }, 5));
     expect(logger.messages[0]).toMatch(/Completed 500/);
+    expect(logger.messages[0]).toMatch(/Internal Server Error/);
   });
 
   it("process action with rescued exception includes http status code", () => {
     subscriber.processAction(makeEvent("process_action.action_controller", { status: 406 }, 5));
     expect(logger.messages[0]).toMatch(/Completed 406/);
+    expect(logger.messages[0]).toMatch(/Not Acceptable/);
   });
 
   it("process action with with action not found logs 404", () => {
     subscriber.processAction(makeEvent("process_action.action_controller", { status: 404 }, 5));
     expect(logger.messages[0]).toMatch(/Completed 404/);
+    expect(logger.messages[0]).toMatch(/Not Found/);
   });
 });
