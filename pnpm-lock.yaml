@@ -108,6 +108,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/did-you-mean':
+        specifier: workspace:*
+        version: link:../did-you-mean
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler

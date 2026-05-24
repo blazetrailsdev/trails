@@ -20,6 +20,7 @@ import type { RenderContext } from "./template/handlers.js";
 import { TemplateHandlerRegistry } from "./template/handlers.js";
 import type { TemplateResolver } from "./resolver/resolver.js";
 import type { Template } from "./template.js";
+import { Jaro } from "@blazetrails/did-you-mean";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet, type PathSetResolver } from "./path-set.js";
 import { Requested } from "./template-details.js";
@@ -73,11 +74,17 @@ export class MissingTemplate extends Error {
   /** @internal stub - real impl in Phase 1d */
   readonly templateKeys: readonly string[];
 
+  /** Flat list of all template paths known to the resolvers at throw time. @internal */
+  readonly candidatePaths: readonly string[];
+
+  #cachedCorrections?: string[];
+
   constructor(
     public readonly controller: string,
     public readonly action: string,
     public readonly format: string,
     public readonly searchedPaths: string[],
+    candidatePaths: readonly string[] = [],
   ) {
     super(
       `Missing template ${controller}/${action} with format "${format}". ` +
@@ -89,6 +96,42 @@ export class MissingTemplate extends Error {
     this.prefixes = controller ? [controller] : [];
     this.partial = action.startsWith("_");
     this.templateKeys = [format];
+    this.candidatePaths = candidatePaths;
+  }
+
+  /**
+   * Mirrors `ActionView::MissingTemplate#corrections` — suggests the closest
+   * known template paths using `DidYouMean::Jaro.distance`. Rails weights
+   * prefix and basename separately; this port scores the full path string,
+   * which produces equivalent rankings for the common case.
+   */
+  get corrections(): string[] {
+    if (this.#cachedCorrections !== undefined) return this.#cachedCorrections;
+
+    const isPartialBasename = (p: string) => {
+      const slash = p.lastIndexOf("/");
+      const base = slash === -1 ? p : p.slice(slash + 1);
+      return base.startsWith("_");
+    };
+
+    const candidates = this.candidatePaths.filter((p) =>
+      this.partial ? isPartialBasename(p) : !isPartialBasename(p),
+    );
+
+    if (candidates.length === 0) {
+      this.#cachedCorrections = [];
+      return this.#cachedCorrections;
+    }
+
+    const lookup = this.path;
+    const scored = candidates.map((c) => ({ c, score: -Jaro.distance(lookup, c) }));
+    scored.sort((a, b) => a.score - b.score);
+    const top = scored
+      .slice(0, 6)
+      .map(({ c }) => (this.partial ? c.replace(/\/_([^/]*)$/, "/$1") : c));
+
+    this.#cachedCorrections = top;
+    return this.#cachedCorrections;
   }
 }
 
@@ -565,7 +608,13 @@ export class LookupContext {
   ): Promise<string> {
     const template = this.findTemplate(action, controller, format);
     if (!template) {
-      throw new MissingTemplate(controller, action, format, this.resolverNames());
+      throw new MissingTemplate(
+        controller,
+        action,
+        format,
+        this.resolverNames(),
+        this.allCandidatePaths(),
+      );
     }
 
     const context: RenderContext = {
@@ -610,7 +659,13 @@ export class LookupContext {
   ): Promise<string> {
     const template = this.findPartial(name, prefix, format);
     if (!template) {
-      throw new MissingTemplate(prefix, `_${name}`, format, this.resolverNames());
+      throw new MissingTemplate(
+        prefix,
+        `_${name}`,
+        format,
+        this.resolverNames(),
+        this.allCandidatePaths(),
+      );
     }
 
     const context: RenderContext = {
@@ -678,6 +733,18 @@ export class LookupContext {
 
   private resolverNames(): string[] {
     return this.resolvers.map((r) => r.constructor.name);
+  }
+
+  /** @internal Collect all template paths from resolvers that expose them. */
+  private allCandidatePaths(): string[] {
+    const seen = new Set<string>();
+    for (const resolver of this.resolvers) {
+      const paths = resolver.allTemplatePaths?.();
+      if (paths) {
+        for (const p of paths) seen.add(p);
+      }
+    }
+    return Array.from(seen);
   }
 }
 
