@@ -71,4 +71,26 @@ describe("Nokogiri::XML::SAX::Parser", () => {
       '<items><item type="a">one</item><item type="b">two</item></items>',
     );
   });
+
+  it("decodes entities in text content", () => {
+    const texts: string[] = [];
+    class Handler extends SaxDocument {
+      override characters(text: string) {
+        texts.push(text);
+      }
+    }
+    new SaxParser(new Handler()).parse("<root>&amp;&lt;&gt;</root>");
+    expect(texts.join("")).toBe("&<>");
+  });
+
+  it("emits error callback on malformed xml", () => {
+    const errors: string[] = [];
+    class Handler extends SaxDocument {
+      override error(message: string) {
+        errors.push(message);
+      }
+    }
+    new SaxParser(new Handler()).parse("<unclosed");
+    expect(errors.length).toBeGreaterThan(0);
+  });
 });
