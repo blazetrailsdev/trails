@@ -127,10 +127,18 @@ export class CpkOrder extends Base {
   static {
     this._primaryKey = ["shop_id", "id"];
     this.aliasAttribute("idValue", "id");
-    this.hasMany("orderAgreements", { className: "CpkOrderAgreement", foreignKey: "order_id" });
+    this.hasMany("orderAgreements", {
+      className: "CpkOrderAgreement",
+      foreignKey: "order_id",
+      primaryKey: "id",
+    });
     this.hasMany("books", { className: "CpkBook", foreignKey: ["shop_id", "order_id"] });
     this.hasOne("book", { className: "CpkBook", foreignKey: ["shop_id", "order_id"] });
-    this.hasMany("orderTags", { className: "CpkOrderTag", foreignKey: "order_id" });
+    this.hasMany("orderTags", {
+      className: "CpkOrderTag",
+      foreignKey: "order_id",
+      primaryKey: "id",
+    });
     this.hasMany("tags", { className: "CpkTag", through: "orderTags" });
   }
 }
@@ -167,7 +175,7 @@ export class CpkNonCpkOrder extends CpkOrder {
 
 export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
   static {
-    this.hasOne("book", { className: "CpkBook", foreignKey: "order_id" });
+    this.hasOne("book", { className: "CpkBook", foreignKey: "order_id", primaryKey: "id" });
   }
 }
 
@@ -192,7 +200,7 @@ export class CpkOrderAgreement extends Base {
   static _tableName = "cpk_order_agreements";
 
   static {
-    this.belongsTo("order", { className: "CpkOrder" });
+    this.belongsTo("order", { className: "CpkOrder", primaryKey: "id" });
   }
 }
 
@@ -202,7 +210,7 @@ export class CpkOrderTag extends Base {
 
   static {
     this.belongsTo("tag", { className: "CpkTag" });
-    this.belongsTo("order", { className: "CpkOrder" });
+    this.belongsTo("order", { className: "CpkOrder", primaryKey: "id" });
   }
 }
 
