@@ -926,7 +926,7 @@ function runModelsPass(filter: string | null, incomplete = false): void {
   const matched = results.filter((r) => r.status === "MATCH").length;
   const diff = results.filter((r) => r.status === "DIFF").length;
   console.log(`\n${results.length} files — match=${matched} diff=${diff} missing=${missing}`);
-  console.log("(MISSING/DIFF soft until final models-port PR flips to hard-fail)");
+  if (missing > 0 || diff > 0) process.exit(1);
 }
 
 // Run as a script when invoked directly, but stay importable from tests.
