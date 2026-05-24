@@ -59,6 +59,17 @@ export class InMemoryResolver extends Resolver implements TemplateResolver {
     return null;
   }
 
+  /** @internal */
+  allTemplatePaths(): readonly string[] {
+    const paths = new Set<string>();
+    for (const key of this.templates.keys()) {
+      if (!key.endsWith(":*")) {
+        paths.add(key.slice(0, key.lastIndexOf(":")));
+      }
+    }
+    return Array.from(paths);
+  }
+
   clear(): void {
     this.templates.clear();
   }

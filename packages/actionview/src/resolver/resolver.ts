@@ -16,6 +16,16 @@ export interface TemplateResolver {
 
   /** @internal */
   clearCache?(): void;
+
+  /**
+   * Returns all known template paths exposed by this resolver, used by
+   * `MissingTemplate#corrections` to suggest close matches.
+   * Each entry is a slash-separated string like `"posts/index"` or
+   * `"posts/_form"` (partials start with `_` in the basename).
+   * Resolvers that cannot enumerate their paths may omit this method.
+   * @internal
+   */
+  allTemplatePaths?(): readonly string[];
 }
 
 export abstract class Resolver implements TemplateResolver {

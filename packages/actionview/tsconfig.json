@@ -6,5 +6,9 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "references": [{ "path": "../activesupport" }, { "path": "../tse-compiler" }]
+  "references": [
+    { "path": "../activesupport" },
+    { "path": "../did-you-mean" },
+    { "path": "../tse-compiler" }
+  ]
 }
