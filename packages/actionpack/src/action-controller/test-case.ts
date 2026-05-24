@@ -350,9 +350,6 @@ export class TestCase {
     this.response = undefined!;
   }
 
-  // --- Rails Behavior methods ---
-
-  /** Mirrors Rails `TestCase::Behavior#process`. */
   async process(action: string, options: RequestOptions = {}): Promise<void> {
     const {
       method = "GET",
@@ -379,15 +376,9 @@ export class TestCase {
       ...extraEnv,
     };
 
-    let resolvedFormat = format;
-    if (as) {
-      env["CONTENT_TYPE"] = formatToMime(as);
-      resolvedFormat = resolvedFormat ?? as;
-    }
-
-    if (resolvedFormat) {
-      env.HTTP_ACCEPT = formatToMime(resolvedFormat);
-    }
+    if (as) env["CONTENT_TYPE"] = formatToMime(as);
+    const resolvedFormat = format ?? as;
+    if (resolvedFormat) env.HTTP_ACCEPT = formatToMime(resolvedFormat);
 
     if (headers) {
       for (const [name, value] of Object.entries(headers)) {
@@ -451,8 +442,6 @@ export class TestCase {
     return new Response();
   }
 
-  // --- Private helpers ---
-
   /** @internal Mirrors Rails `TestCase::Behavior#process_controller_response`. */
   private async processControllerResponse(action: string, _xhr: boolean): Promise<void> {
     await this.controller.dispatch(action, this.request, this.response);
@@ -472,16 +461,6 @@ export class TestCase {
     delete env["CONTENT_LENGTH"];
     delete env["RAW_POST_DATA"];
     return env;
-  }
-
-  /** @internal Mirrors Rails `TestCase::Behavior#check_required_ivars`. */
-  private checkRequiredIvars(): void {
-    if (!this.controller)
-      throw new Error("@controller is nil: make sure you set it in your test's setup method.");
-    if (!this.request)
-      throw new Error("@request is nil: make sure you set it in your test's setup method.");
-    if (!this.response)
-      throw new Error("@response is nil: make sure you set it in your test's setup method.");
   }
 }
 

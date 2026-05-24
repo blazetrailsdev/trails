@@ -505,10 +505,5 @@ describe("TestCaseTest", () => {
     it("assertTemplate raises (extracted to gem)", () => {
       expect(() => tc.assertTemplate("posts/index")).toThrow(/extracted to a gem/);
     });
-
-    it("checkRequiredIvars throws when controller not initialized", () => {
-      const fresh = new TestCase(PostsController);
-      expect(() => (fresh as any).checkRequiredIvars()).toThrow(/@controller is nil/);
-    });
   });
 });
