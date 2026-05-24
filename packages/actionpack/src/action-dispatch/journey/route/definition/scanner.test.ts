@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Scanner, type Token } from "./scanner.js";
+import { Scanner, type Token } from "../../scanner.js";
 
 function tokens(pattern: string): Token[] {
   const s = new Scanner();

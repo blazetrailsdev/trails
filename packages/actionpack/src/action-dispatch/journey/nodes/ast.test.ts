@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Parser } from "./parser.js";
-import { Ast } from "./ast.js";
-import { Symbol as SymbolNode, Terminal } from "./nodes/node.js";
+import { Parser } from "../parser.js";
+import { Ast } from "../ast.js";
+import { Symbol as SymbolNode, Terminal } from "./node.js";
 
 describe("ActionDispatch::Journey::Nodes::Ast", () => {
   it("test_ast_sets_regular_expressions", () => {
