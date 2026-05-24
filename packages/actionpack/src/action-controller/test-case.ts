@@ -42,7 +42,6 @@ import { RequestUtils, type ParamValue } from "../action-dispatch/request/utils.
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import { UploadedFile } from "../action-dispatch/http/upload.js";
 import { MimeType } from "../action-dispatch/http/mime-type.js";
-import { Parameters } from "./metal/strong-parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import type { Metal } from "./metal.js";
 
@@ -56,7 +55,9 @@ export interface RequestOptions {
   body?: string;
   format?: string;
   xhr?: boolean;
+  as?: string;
   env?: Record<string, unknown>;
+  method?: string;
 }
 
 const STATUS_RANGES: Record<string, [number, number]> = {
@@ -69,6 +70,9 @@ const STATUS_RANGES: Record<string, [number, number]> = {
 export class TestCase {
   /** @internal Backing slot for the `controllerClass` static accessor. */
   private static _controllerClass: ControllerClass | null = null;
+
+  /** Mirrors Rails `executor_around_each_request`. JS has no executor; defaults to false. */
+  static executorAroundEachRequest = false;
 
   /**
    * Mirrors Rails `TestCase.tests(controller_class)`. Accepts a
@@ -170,27 +174,27 @@ export class TestCase {
   // --- HTTP verb methods ---
 
   async get(action: string, options: RequestOptions = {}): Promise<void> {
-    await this._process(action, "GET", options);
+    await this.process(action, { method: "GET", ...options });
   }
 
   async post(action: string, options: RequestOptions = {}): Promise<void> {
-    await this._process(action, "POST", options);
+    await this.process(action, { method: "POST", ...options });
   }
 
   async put(action: string, options: RequestOptions = {}): Promise<void> {
-    await this._process(action, "PUT", options);
+    await this.process(action, { method: "PUT", ...options });
   }
 
   async patch(action: string, options: RequestOptions = {}): Promise<void> {
-    await this._process(action, "PATCH", options);
+    await this.process(action, { method: "PATCH", ...options });
   }
 
   async delete(action: string, options: RequestOptions = {}): Promise<void> {
-    await this._process(action, "DELETE", options);
+    await this.process(action, { method: "DELETE", ...options });
   }
 
   async head(action: string, options: RequestOptions = {}): Promise<void> {
-    await this._process(action, "HEAD", options);
+    await this.process(action, { method: "HEAD", ...options });
   }
 
   // --- Assertions ---
@@ -331,9 +335,14 @@ export class TestCase {
     }
   }
 
-  /**
-   * Reset state for a fresh request cycle.
-   */
+  /** @internal Extracted to rails-controller-testing gem; always raises. */
+  assertTemplate(_options: unknown = {}, _message?: string): never {
+    throw new Error(
+      "assert_template has been extracted to a gem. To continue using it, " +
+        'add `gem "rails-controller-testing"` to your Gemfile.',
+    );
+  }
+
   reset(): void {
     this.session = {};
     this.controller = undefined!;
@@ -341,32 +350,38 @@ export class TestCase {
     this.response = undefined!;
   }
 
-  // --- Internal ---
+  async process(action: string, options: RequestOptions = {}): Promise<void> {
+    const {
+      method = "GET",
+      params,
+      session,
+      body,
+      flash,
+      format,
+      xhr = false,
+      as,
+      env: extraEnv = {},
+      headers,
+    } = options;
 
-  private async _process(action: string, method: string, options: RequestOptions): Promise<void> {
+    const httpMethod = String(method).toUpperCase();
+
     const env: Record<string, unknown> = {
-      REQUEST_METHOD: method,
-      PATH_INFO: options.params?.path ?? `/${action}`,
+      REQUEST_METHOD: httpMethod,
+      PATH_INFO: (params as Record<string, unknown>)?.["path"] ?? `/${action}`,
       HTTP_HOST: "test.host",
       SERVER_NAME: "test.host",
       SERVER_PORT: "80",
-      "rack.session": { ...this.session, ...(options.session ?? {}) },
-      ...(options.env ?? {}),
+      "rack.session": { ...this.session, ...(session ?? {}) },
+      ...extraEnv,
     };
 
-    // Set format
-    if (options.format) {
-      env.HTTP_ACCEPT = formatToMime(options.format);
-    }
+    if (as) env["CONTENT_TYPE"] = formatToMime(as);
+    const resolvedFormat = format ?? as;
+    if (resolvedFormat) env.HTTP_ACCEPT = formatToMime(resolvedFormat);
 
-    // Set XHR
-    if (options.xhr) {
-      env.HTTP_X_REQUESTED_WITH = "XMLHttpRequest";
-    }
-
-    // Set custom headers
-    if (options.headers) {
-      for (const [name, value] of Object.entries(options.headers)) {
+    if (headers) {
+      for (const [name, value] of Object.entries(headers)) {
         const envKey = name.startsWith("HTTP_")
           ? name
           : "HTTP_" + name.toUpperCase().replace(/-/g, "_");
@@ -374,56 +389,83 @@ export class TestCase {
       }
     }
 
-    // Set body
-    if (options.body) {
-      env["rack.input"] = options.body;
+    if (body) {
+      env["RAW_POST_DATA"] = body;
+      env["rack.input"] = body;
+    }
+
+    if (xhr) {
+      env["HTTP_X_REQUESTED_WITH"] = "XMLHttpRequest";
     }
 
     this.request = new Request(env);
-    this.response = new Response();
+    this.response = this.buildResponse();
 
-    // Set path parameters (params from route matching)
-    if (options.params) {
-      const pathParams: Record<string, string> = {};
-      for (const [k, v] of Object.entries(options.params)) {
-        pathParams[k] = String(v);
-      }
-      (this.request as any)._pathParameters = pathParams;
-      env["action_dispatch.request.path_parameters"] = pathParams;
-    }
+    if (params) (this.request as any).parameters = { ...params };
 
-    // Set up request parameters as a Parameters object
-    const allParams = { ...(options.params ?? {}) };
-    (this.request as any).parameters = new Parameters(
-      Object.fromEntries(Object.entries(allParams).map(([k, v]) => [k, v])),
-    );
-
-    // Flash setup
-    if (options.flash) {
-      const flash = new FlashHash();
-      for (const [k, v] of Object.entries(options.flash)) {
-        flash.set(k, v);
-      }
-      env["action_dispatch.request.flash_hash"] = flash;
-    }
-
-    // Instantiate controller and dispatch
     this.controller = new this._controllerClass();
 
-    // Copy session to controller if it has a session property
     if ("session" in this.controller) {
-      (this.controller as any).session = {
-        ...this.session,
-        ...(options.session ?? {}),
-      };
+      (this.controller as any).session = { ...this.session, ...(session ?? {}) };
     }
 
-    await this.controller.dispatch(action, this.request, this.response);
+    (this.request as any).env["action_dispatch.request.path_parameters"] = {
+      controller: (
+        this._controllerClass as unknown as typeof import("./metal.js").Metal
+      ).controllerPath(),
+      action,
+    };
 
-    // Persist session back
-    if ("session" in this.controller) {
-      Object.assign(this.session, (this.controller as any).session);
+    if (flash && "flash" in this.controller) {
+      const fh = new FlashHash();
+      for (const [k, v] of Object.entries(flash)) fh.set(k, v);
+      (this.controller as any).flash = fh;
     }
+
+    await this.processControllerResponse(action, xhr);
+  }
+
+  /** @internal Mirrors Rails `TestCase::Behavior#generated_path`. */
+  generatedPath(generatedExtras: [string, string[]]): string {
+    return generatedExtras[0];
+  }
+
+  /** @internal Mirrors Rails `TestCase::Behavior#query_parameter_names`. */
+  queryParameterNames(generatedExtras: [string, string[]]): string[] {
+    return [...generatedExtras[1], "controller", "action"];
+  }
+
+  /** @internal Mirrors Rails `TestCase::Behavior#build_response`. */
+  buildResponse(): Response {
+    return new Response();
+  }
+
+  /** @internal Mirrors Rails `TestCase::Behavior#wrap_execution`. */
+  wrapExecution(fn: () => Promise<void>): Promise<void> {
+    return fn();
+  }
+  /** @internal Mirrors Rails `TestCase::Behavior#process_controller_response`. */
+  private async processControllerResponse(action: string, _xhr: boolean): Promise<void> {
+    await this.wrapExecution(() =>
+      this.controller.dispatch(action, this.request, this.response).then(() => {}),
+    );
+    if ("session" in this.controller) Object.assign(this.session, (this.controller as any).session);
+  }
+
+  /** @internal Mirrors Rails `TestCase::Behavior#scrub_env!`. */
+  private scrubEnvBang(env: Record<string, unknown>): Record<string, unknown> {
+    for (const key of Object.keys(env)) {
+      if (
+        key.startsWith("rack.request") ||
+        key.startsWith("action_dispatch.request") ||
+        key.startsWith("action_dispatch.rescue")
+      )
+        delete env[key];
+    }
+    delete env["CONTENT_LENGTH"];
+    delete env["RAW_POST_DATA"];
+    env["rack.input"] = "";
+    return env;
   }
 }
 
@@ -599,6 +641,14 @@ export class TestRequest extends AbstractTestRequest {
     >;
     this.env["action_dispatch.request.request_parameters"] = normalized;
     return normalized;
+  }
+
+  /**
+   * @internal Mirrors Rails `ENCODER#should_multipart?` — `true` if any
+   * value in `params` (recursively) is an `UploadedFile`.
+   */
+  static shouldMultipart(params: Record<string, unknown>): boolean {
+    return shouldMultipart(params);
   }
 }
 

@@ -386,4 +386,124 @@ describe("TestCaseTest", () => {
       expect(mtc.responseBody).toBe("metal response");
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Rails test_case_test.rb — process helpers (S7b)
+  // -------------------------------------------------------------------------
+
+  describe("process helpers", () => {
+    class FlashSetController extends Base {
+      async setFlash() {
+        this.flash.set("test", "><");
+        this.render({ plain: "ok" });
+      }
+    }
+    class FlashPrependController extends Base {
+      async setFlash() {
+        const pre = this.flash.get("test") ?? "";
+        this.flash.set("test", `>${pre}<`);
+        this.render({ plain: "ok" });
+      }
+    }
+    class SessionController extends Base {
+      async noOp() {
+        this.render({ plain: "ok" });
+      }
+    }
+    class UriController extends Base {
+      async testUri() {
+        this.render({ plain: this.request.path });
+      }
+    }
+    class ParamController extends Base {
+      async testOnlyOneParam() {
+        const keys = [...this.params.keys].filter((k) => k !== "controller" && k !== "action");
+        this.render({ plain: keys.length === 1 ? "OK" : "FAIL" });
+      }
+    }
+
+    it("test_process_without_flash", async () => {
+      const ftc = new TestCase(FlashSetController);
+      await ftc.process("setFlash");
+      expect(ftc.flash.get("test")).toBe("><");
+    });
+
+    it("test_process_with_flash", async () => {
+      const ftc = new TestCase(FlashPrependController);
+      await ftc.process("setFlash", { method: "GET", flash: { test: "value" } });
+      expect(ftc.flash.get("test")).toBe(">value<");
+    });
+
+    it("test_process_with_session_kwarg", async () => {
+      const stc = new TestCase(SessionController);
+      await stc.process("noOp", { method: "GET", session: { string: "value1", symbol: "value2" } });
+      expect(stc.session["string"]).toBe("value1");
+      expect(stc.session["symbol"]).toBe("value2");
+    });
+
+    it("test_process_merges_session_arg", async () => {
+      const stc = new TestCase(SessionController);
+      stc.session["foo"] = "bar";
+      await stc.get("noOp", { session: { bar: "baz" } });
+      expect(stc.session["foo"]).toBe("bar");
+      expect(stc.session["bar"]).toBe("baz");
+    });
+
+    it("test_merged_session_arg_is_retained_across_requests", async () => {
+      const stc = new TestCase(SessionController);
+      await stc.get("noOp", { session: { foo: "bar" } });
+      expect(stc.session["foo"]).toBe("bar");
+      await stc.get("noOp");
+      expect(stc.session["foo"]).toBe("bar");
+    });
+
+    it("test_process_with_symbol_method", async () => {
+      const utc = new TestCase(UriController);
+      await utc.process("testUri", { method: "get" });
+      expect(utc.controller).toBeDefined();
+    });
+
+    it("test_response_and_request_have_nice_accessors", async () => {
+      const ntc = new TestCase(SessionController);
+      await ntc.process("noOp");
+      expect(ntc.response).toBeDefined();
+      expect(ntc.request).toBeDefined();
+    });
+
+    it("test_multiple_calls", async () => {
+      const ptc = new TestCase(ParamController);
+      await ptc.process("testOnlyOneParam", { method: "GET", params: { left: "true" } });
+      expect(ptc.responseBody).toBe("OK");
+      await ptc.process("testOnlyOneParam", { method: "GET", params: { right: "true" } });
+      expect(ptc.responseBody).toBe("OK");
+    });
+
+    it("build_response returns a new Response", () => {
+      const resp = tc.buildResponse();
+      expect(resp).toBeDefined();
+    });
+
+    it("generatedPath returns the path component", () => {
+      expect(tc.generatedPath(["/posts/1", ["format"]])).toBe("/posts/1");
+    });
+
+    it("queryParameterNames returns extra keys plus controller and action", () => {
+      const names = tc.queryParameterNames(["/posts", ["format", "page"]]);
+      expect(names).toContain("controller");
+      expect(names).toContain("action");
+      expect(names).toContain("format");
+      expect(names).toContain("page");
+    });
+
+    it("executorAroundEachRequest class attribute defaults to false", () => {
+      expect(TestCase.executorAroundEachRequest).toBe(false);
+      TestCase.executorAroundEachRequest = true;
+      expect(TestCase.executorAroundEachRequest).toBe(true);
+      TestCase.executorAroundEachRequest = false;
+    });
+
+    it("assertTemplate raises (extracted to gem)", () => {
+      expect(() => tc.assertTemplate("posts/index")).toThrow(/extracted to a gem/);
+    });
+  });
 });
