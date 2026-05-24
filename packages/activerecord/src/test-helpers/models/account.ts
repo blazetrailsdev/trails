@@ -5,7 +5,7 @@ export class Account extends Base {
   static _destroyedAccountIds: Map<number | string, (number | string)[]> = new Map();
 
   static destroyedAccountIds(): Map<number | string, (number | string)[]> {
-    return Account._destroyedAccountIds;
+    return this._destroyedAccountIds;
   }
 
   static {
