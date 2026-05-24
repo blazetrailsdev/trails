@@ -5,6 +5,6 @@ export class CpkOrderTag extends Base {
 
   static {
     this.belongsTo("tag", { className: "CpkTag" });
-    this.belongsTo("order", { className: "CpkOrder" });
+    this.belongsTo("order", { className: "CpkOrder", primaryKey: "id" });
   }
 }

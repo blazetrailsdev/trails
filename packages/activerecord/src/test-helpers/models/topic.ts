@@ -128,6 +128,8 @@ export class TitlePrimaryKeyTopic extends Topic {
 }
 
 export class WebTopic extends Base {
+  static _tableName = "topics";
+
   static {
     this.hasMany("replies", {
       dependent: "destroy",
