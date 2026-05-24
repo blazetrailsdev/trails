@@ -30,7 +30,8 @@
     { "path": "packages/trailties" },
     { "path": "packages/globalid" },
     { "path": "packages/did-you-mean" },
-    { "path": "packages/html-sanitizer" }
+    { "path": "packages/html-sanitizer" },
+    { "path": "packages/nokogiri" }
   ],
   "exclude": ["node_modules", "dist"]
 }

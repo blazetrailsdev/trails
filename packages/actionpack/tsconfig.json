@@ -11,6 +11,7 @@
     { "path": "../activemodel" },
     { "path": "../activesupport" },
     { "path": "../did-you-mean" },
-    { "path": "../rack" }
+    { "path": "../rack" },
+    { "path": "../nokogiri" }
   ]
 }
