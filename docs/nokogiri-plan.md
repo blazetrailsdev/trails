@@ -19,7 +19,7 @@ deps, MIT license.
   htmlparser2) carry.
 - **Runs everywhere.** Node 18+, browsers (Chrome 89+, Safari 15+), Bun,
   Deno. No native addon, no recompile per Node version. Aligns with the
-  `trails-browser-compat` audit.
+  [browser-compat plan](browser-compat-plan.md).
 - **Zero deps.** The WASM binary is embedded inline (~1 MB uncompressed,
   ~400 KB gzipped). No transitive dependency tree to audit.
 
@@ -258,9 +258,9 @@ function parseXml(data: string): XmlDocument;
 
 ## Dependencies
 
-- Runtime: `libxml2-wasm` `^0.7` — current release (0.7.1). ESM-only,
-  MIT license, zero transitive deps. WASM binary is ~1 MB uncompressed
-  (~400 KB gzipped), embedded inline.
+- Runtime: `libxml2-wasm` `^0.7`. ESM-only, MIT license, zero transitive
+  deps. WASM binary is ~1 MB uncompressed (~400 KB gzipped), embedded
+  inline.
 - Dev: workspace `vitest` only.
 
 ## LOC budget
@@ -298,8 +298,9 @@ grows significantly (actiontext expansion), revisit.
 - `parseXml(data)` convenience function with lazy WASM init.
 - `SaxDocument` base class with all 7 callbacks.
 - `SaxParser` DOM-walk emitter.
-- Wire into `actionpack/src/action-dispatch/testing/assertions.ts`
-  `htmlDocument()` (closes TODO at assertions.ts:9).
+- Wire the XML branch of `htmlDocument()` in
+  `actionpack/src/action-dispatch/testing/assertions.ts` (the HTML branch
+  depends on `rails-dom-testing` and remains deferred).
 - Wire into activesupport `xml-mini/nokogiri-engine.ts` with `toHash`
   traversal.
 - Wire into activesupport `xml-mini/nokogiri-sax-engine.ts`.
@@ -343,7 +344,7 @@ breaking the v1 XML API.
 - [ ] `SaxDocument` base class with all 7 callbacks
 - [ ] `SaxParser(handler).parse(data)` via DOM-walk
 - [ ] `XML` / `SAX` namespace barrel in `index.ts`
-- [ ] `actionpack/src/action-dispatch/testing/assertions.ts` `htmlDocument()` wired (closes TODO at assertions.ts:9)
+- [ ] `actionpack/src/action-dispatch/testing/assertions.ts`: wire the XML branch of `htmlDocument()` (`Nokogiri::XML::Document.parse` for XML responses). The HTML branch depends on `rails-dom-testing` and remains deferred (see comment at assertions.ts:9)
 - [ ] `activesupport/src/xml-mini/nokogiri-engine.ts` written with `toHash` traversal
 - [ ] `activesupport/src/xml-mini/nokogiri-sax-engine.ts` written
 - [ ] Tests: DOM parse/traverse/errors + SAX hash parity + CDATA
