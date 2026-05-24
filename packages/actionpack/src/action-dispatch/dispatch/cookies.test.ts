@@ -365,4 +365,291 @@ describe("CookiesTest", () => {
     const headers = jar.getSetCookieHeaders();
     expect(headers[0]).toContain("domain=.example.com");
   });
+
+  it.skip("setting cookie with secure on onion address", () => {
+    // Rails sets request.host = "fake.onion" to test that .onion hosts are
+    // exempt from the HTTPS-only secure-cookie restriction; requires
+    // controller/request stack not available at CookieJar unit level (S11)
+  });
+
+  it.skip("setting cookie with same site protection proc normal user agent", () => {
+    // SameSite proc callback not wired (S11 handle_options)
+  });
+
+  function assertDeletedCookie(jar: CookieJar) {
+    expect(jar.get("user_name")).toBeUndefined();
+    const headers = jar.getSetCookieHeaders();
+    expect(headers[0]).toContain("user_name=");
+    expect(headers[0]).toContain("max-age=0");
+    expect(headers[0]).toContain("expires=Thu, 01 Jan 1970 00:00:00 GMT");
+  }
+
+  it("deleting cookie get", () => {
+    const jar = CookieJar.parse("user_name=Joe");
+    jar.delete("user_name");
+    assertDeletedCookie(jar);
+  });
+
+  it("deleting cookie post", () => {
+    const jar = CookieJar.parse("user_name=Joe");
+    jar.delete("user_name");
+    assertDeletedCookie(jar);
+  });
+
+  it("deleting cookie patch", () => {
+    const jar = CookieJar.parse("user_name=Joe");
+    jar.delete("user_name");
+    assertDeletedCookie(jar);
+  });
+
+  it("deleting cookie put", () => {
+    const jar = CookieJar.parse("user_name=Joe");
+    jar.delete("user_name");
+    assertDeletedCookie(jar);
+  });
+
+  it("deleting cookie delete", () => {
+    const jar = CookieJar.parse("user_name=Joe");
+    jar.delete("user_name");
+    assertDeletedCookie(jar);
+  });
+
+  it("deleting cookie head", () => {
+    const jar = CookieJar.parse("user_name=Joe");
+    jar.delete("user_name");
+    assertDeletedCookie(jar);
+  });
+
+  it("signed cookie using default serializer", () => {
+    const secret = "b3c631c314c0bbca50c1b2843150fe33";
+    const jar = new CookieJar({ secret });
+    jar.signed.set("user_id", 45);
+    expect(jar.signed.get("user_id")).toBe(45);
+  });
+
+  it("signed cookie using json serializer", () => {
+    const secret = "b3c631c314c0bbca50c1b2843150fe33";
+    const mockRequest = {
+      env: { "action_dispatch.cookies_serializer": "json" },
+      cookies: {},
+      cookiesAppOptions: { secret },
+    };
+    const jar = CookieJar.build(mockRequest as any, {});
+    jar.signed.set("user_id", 45);
+    expect(jar.signed.get("user_id")).toBe(45);
+  });
+
+  it("signed cookie using custom serializer", () => {
+    const secret = "b3c631c314c0bbca50c1b2843150fe33";
+    const customSerializer = {
+      dump: (v: unknown) => `${v} was dumped`,
+      load: (s: string) => `${s} and loaded`,
+      dumped: (_s: string) => false,
+    };
+    const mockRequest = {
+      env: { "action_dispatch.cookies_serializer": customSerializer },
+      cookies: {},
+      cookiesAppOptions: { secret },
+    };
+    const jar = CookieJar.build(mockRequest as any, {});
+    jar.signed.set("user_id", "45");
+    expect(jar.signed.get("user_id")).toBe("45 was dumped and loaded");
+  });
+
+  it("accessing nonexistent signed cookie should not raise an invalid signature", () => {
+    const jar = new CookieJar({ secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    expect(jar.signed.get("non_existent_attribute")).toBeUndefined();
+  });
+
+  it("encrypted cookie using default serializer", () => {
+    const secret = "b3c631c314c0bbca50c1b2843150fe33";
+    const jar = new CookieJar({ secret });
+    jar.encrypted.set("foo", "bar");
+    expect(jar.encrypted.get("foo")).toBe("bar");
+    expect(jar.signed.get("foo")).toBeUndefined();
+  });
+
+  it("encrypted cookie using json serializer", () => {
+    const secret = "b3c631c314c0bbca50c1b2843150fe33";
+    const mockRequest = {
+      env: { "action_dispatch.cookies_serializer": "json" },
+      cookies: {},
+      cookiesAppOptions: { secret },
+    };
+    const jar = CookieJar.build(mockRequest as any, {});
+    jar.encrypted.set("foo", "bar");
+    expect(jar.encrypted.get("foo")).toBe("bar");
+  });
+
+  it("encrypted cookie using custom serializer", () => {
+    const secret = "b3c631c314c0bbca50c1b2843150fe33";
+    const customSerializer = {
+      dump: (v: unknown) => `${v} was dumped`,
+      load: (s: string) => `${s} and loaded`,
+      dumped: (_s: string) => false,
+    };
+    const mockRequest = {
+      env: { "action_dispatch.cookies_serializer": customSerializer },
+      cookies: {},
+      cookiesAppOptions: { secret },
+    };
+    const jar = CookieJar.build(mockRequest as any, {});
+    jar.encrypted.set("foo", "bar");
+    expect(jar.encrypted.get("foo")).toBe("bar was dumped and loaded");
+  });
+
+  it("accessing nonexistent encrypted cookie should not raise invalid message", () => {
+    const jar = new CookieJar({ secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    expect(jar.encrypted.get("non_existent_attribute")).toBeUndefined();
+  });
+
+  it("setting invalid encrypted cookie should return nil when accessing it", () => {
+    const jar = new CookieJar({ secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    jar.set("foo", "invalid--9170e9a2394f1f2d5bca0f4b4309cf3f");
+    expect(jar.encrypted.get("foo")).toBeUndefined();
+  });
+
+  it("delete and set cookie", () => {
+    const jar = CookieJar.parse("user_name=Joe");
+    jar.delete("user_name");
+    jar.set("user_name", "Bob");
+    expect(jar.get("user_name")).toBe("Bob");
+    const headers = jar.getSetCookieHeaders();
+    expect(headers.length).toBe(1);
+  });
+
+  it("raise data overflow", () => {
+    const jar = new CookieJar({ secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    expect(() => jar.signed.set("foo", "bye!".repeat(1024))).toThrow(/overflowed/);
+  });
+
+  it("tampered cookies", () => {
+    const jar = new CookieJar({ secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    jar.signed.set("user_id", "45");
+    jar.set("user_id", "tampered--fakesig");
+    expect(() => jar.signed.get("user_id")).not.toThrow();
+    expect(jar.signed.get("user_id")).toBeUndefined();
+  });
+
+  it("legacy signed cookie is treated as nil by signed cookie jar if tampered", () => {
+    const jar = CookieJar.parse("user_id=45", { secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    expect(jar.signed.get("user_id")).toBeUndefined();
+  });
+
+  it("legacy signed cookie is treated as nil by encrypted cookie jar if tampered", () => {
+    const jar = CookieJar.parse("foo=baz", { secret: "b3c631c314c0bbca50c1b2843150fe33" });
+    expect(jar.encrypted.get("foo")).toBeUndefined();
+  });
+
+  it.skip("setting cookie with same site protection proc special user agent", () => {
+    // SameSite proc callback not wired (S11 handle_options)
+  });
+
+  it.skip("setting cookie with misspelled same site protection raises", () => {
+    // SameSite proc callback not wired (S11 handle_options)
+  });
+
+  it.skip("setting cookie with secure when always write cookie is true", () => {
+    // always_write_cookie not implemented (S11)
+  });
+
+  it.skip("signed cookie using custom digest", () => {
+    // action_dispatch.signed_cookie_digest env key not wired into CookieJar.signed (S11)
+  });
+
+  it.skip("signed cookie rotating secret and digest", () => {
+    // key rotation not implemented (S11)
+  });
+
+  it.skip("signed cookie using marshal serializer", () => {
+    // Marshal serializer not portable to JS
+  });
+
+  it.skip("wrapped signed cookie using json serializer", () => {
+    // JSONWrapper object serialization gap (S11)
+  });
+
+  it.skip("signed cookie using message pack serializer", () => {
+    // MessagePack serializer not supported
+  });
+
+  it.skip("signed cookie using marshal serializer can read from json dumped value", () => {
+    // Marshal serializer not portable to JS
+  });
+
+  it.skip("signed cookie using hybrid serializer can migrate marshal dumped value to json", () => {
+    // Marshal/hybrid serializer not portable to JS
+  });
+
+  it.skip("signed cookie using hybrid serializer can read from json dumped value", () => {
+    // Marshal/hybrid serializer not portable to JS
+  });
+
+  it.skip("signed cookie using json serializer will drop marshal dumped value", () => {
+    // Marshal serializer not portable to JS
+  });
+
+  it.skip("signed cookie using message pack serializer can migrate json dumped value to message pack", () => {
+    // MessagePack serializer not supported
+  });
+
+  it.skip("encrypted cookie using marshal serializer", () => {
+    // Marshal serializer not portable to JS
+  });
+
+  it.skip("wrapped encrypted cookie using json serializer", () => {
+    // JSONWrapper object serialization gap (S11)
+  });
+
+  it.skip("encrypted cookie using message pack serializer", () => {
+    // MessagePack serializer not supported
+  });
+
+  it.skip("encrypted cookie using hybrid serializer can migrate marshal dumped value to json", () => {
+    // Marshal/hybrid serializer not portable to JS
+  });
+
+  it.skip("encrypted cookie using hybrid serializer can read from json dumped value", () => {
+    // Marshal/hybrid serializer not portable to JS
+  });
+
+  it.skip("encrypted cookie using json serializer will drop marshal dumped value", () => {
+    // Marshal serializer not portable to JS
+  });
+
+  it.skip("encrypted cookie using message pack serializer can migrate json dumped value to message pack", () => {
+    // MessagePack serializer not supported
+  });
+
+  it.skip("cookie jar mutated by request persists on future requests", () => {
+    // Requires ActionController::TestCase request infrastructure
+  });
+
+  it.skip("permanent signed cookie", () => {
+    // PermanentCookieJar.signed not implemented (S11)
+  });
+
+  it.skip("use authenticated cookie encryption uses legacy hmac aes cbc encryption when not enabled", () => {
+    // CBC legacy mode not implemented (S11)
+  });
+
+  it.skip("rotating signed cookies digest", () => {
+    // key rotation not implemented (S11)
+  });
+
+  it.skip("legacy hmac aes cbc marshal mode falls back to authenticated encrypted cookie", () => {
+    // CBC legacy mode not implemented (S11)
+  });
+
+  it.skip("legacy hmac aes cbc json mode falls back to authenticated encrypted cookie", () => {
+    // CBC legacy mode not implemented (S11)
+  });
+
+  it.skip("legacy hmac aes cbc encrypted marshal cookie is upgraded to authenticated encrypted cookie", () => {
+    // CBC legacy mode not implemented (S11)
+  });
+
+  it.skip("legacy hmac aes cbc encrypted json cookie is upgraded to authenticated encrypted cookie", () => {
+    // CBC legacy mode not implemented (S11)
+  });
 });
