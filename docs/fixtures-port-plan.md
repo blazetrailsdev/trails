@@ -4,11 +4,11 @@
 >
 > **Fixtures port — complete.** All 122 Rails fixtures translated (PRs 0–6b + 0.5a–h + 0.75 + 4-late, merged 2026-05-20…21). `pnpm fixtures:compare` reports 0 MISSING/DIFF (PR 7 closed all gaps; MISSING/DIFF remain soft-fail, runtime errors hard-fail). Proof-of-concept fixture consumption merged (PR 8 / #2318). Schema port live in `setup-adapter-suite.ts`.
 >
-> **Test-models port — in progress.** 70/215 Rails test model files
-> ported. `pnpm fixtures:compare --models --incomplete` lists all gaps.
-> `--models` pass remains soft-fail until PR 9 (hard-fail flip) ships;
-> that PR is gated on 100% coverage. Batches 10–23 below are the
-> remaining work.
+> **Test-models port — in progress.** 182/215 Rails test model files
+> ported (as of 2026-05-23). `pnpm fixtures:compare --models --incomplete`
+> lists all gaps. `--models` pass remains soft-fail until PR 9 (hard-fail
+> flip) ships; that PR is gated on 100% coverage. PRs 10–22 merged;
+> PR 23 (+ toy/zine additions) is the final batch (33 remaining).
 
 Port Rails `activerecord/test/models/*.rb` files to TS so that ported
 AR tests can import the canonical model classes instead of inlining
@@ -27,9 +27,9 @@ AR tests can import the canonical model classes instead of inlining
 
 ## Current state
 
-70/215 model files ported across PRs 1a–8. The 145 remaining are tracked
+182/215 model files ported across PRs 1a–22. The 33 remaining are tracked
 by `pnpm fixtures:compare --models --incomplete`. Translation rules below;
-PRs 10–23 are the batch plan.
+PR 23 is the final batch (includes toy.rb + zine.rb added 2026-05-23).
 
 ## Translation rules
 
@@ -309,10 +309,12 @@ writing any one need the others for cross-references.
 
 ---
 
-### PR 23 — misc small models batch 2 (~270 LOC)
+### PR 23 — misc small models batch 2 (~284 LOC)
 
-~270 TS LOC total. No-association or minimal models; many are stubs for
-edge-case tests.
+~284 TS LOC total. No-association or minimal models; many are stubs for
+edge-case tests. `notification.rb` already ported; `toy.rb` and `zine.rb`
+added 2026-05-23 (not in original plan). Covers all 33 remaining MISSING
+models after PRs 10–22.
 
 | File                                      | Ruby L | TS est |
 | ----------------------------------------- | ------ | ------ |
@@ -335,12 +337,13 @@ edge-case tests.
 | `carrier.rb`                              | 4      | ~6     |
 | `discount.rb`                             | 4      | ~6     |
 | `cart.rb`                                 | 5      | ~8     |
-| `notification.rb`                         | 5      | ~8     |
 | `event.rb`                                | 5      | ~8     |
 | `keyboard.rb`                             | 5      | ~8     |
 | `possession.rb`                           | 5      | ~8     |
 | `task.rb`                                 | 7      | ~11    |
 | `strict_zine.rb`                          | 7      | ~11    |
+| `zine.rb`                                 | 6      | ~10    |
+| `toy.rb`                                  | 8      | ~12    |
 | `frog.rb`                                 | 8      | ~12    |
 | `hardback.rb`                             | 7      | ~11    |
 | `chat_message.rb`                         | 8      | ~12    |
@@ -351,9 +354,57 @@ edge-case tests.
 
 ---
 
+### Post-merge follow-ups (Copilot review findings from PRs 13–22)
+
+These are bugs in already-merged model files. Fix alongside or just before PR 9.
+
+**CPK order associations — missing `primaryKey: "id"` (#2340 / PR 20)**
+`CpkOrder`, `CpkOrderAgreement`, `CpkOrderTag`, and `CpkOrderWithPrimaryKeyAssociatedBook`
+all have associations where a composite-PK owner joins via a scalar FK (`order_id`)
+without specifying `primaryKey: "id"`. Without it the runtime will raise
+`CompositePrimaryKeyMismatchError` on load. Add `primaryKey: "id"` to each:
+
+- `cpk/order.ts` — `hasMany("orderAgreements")`, `hasMany("orderTags")`, `CpkOrderWithPrimaryKeyAssociatedBook.hasOne("book")`
+- `cpk/order-agreement.ts` — `belongsTo("order")`
+- `cpk/order-tag.ts` — `belongsTo("order")`
+
+**Company association redefinition (#2339 / PR 13)**
+`company.ts` declares `hasOne("account")` on `Company`; subclasses like `Firm` and
+`Agency` re-declare associations with the same name. Association lookup currently
+picks the first definition, so subclass overrides are silently ignored. This is a
+runtime behavior gap; track separately — fixing it may require changes to
+`associations.ts` lookup logic.
+
+**WebTopic tableName (#2342 / PR 14)**
+`WebTopic` in `topic.ts` inherits `Base` and will infer table name `"web_topics"`,
+but the schema has a `"topics"` table. Add `static _tableName = "topics"` (or extend
+`Topic`) to `WebTopic`.
+
+**Eye.ts duplicate callbacks (#2343 / PR 15)**
+`eye.ts` registers `afterCreate`/`afterUpdate`/`afterSave` callbacks twice. Remove
+the duplicate block.
+
+**Account.ts hard-coded class reference (#2343 / PR 15)**
+`Account.destroyedAccountIds()` and its callback hard-code `Account._destroyedAccountIds`
+instead of `this._destroyedAccountIds`. Change to `this` so subclass overrides work.
+
+**destroy() override type mismatch (#2338 / PR 22)**
+`destroy-async-parent-soft-delete.ts` and `dl-keyed-belongs-to-soft-delete.ts` override
+`destroy()` synchronously, returning `boolean | Promise<boolean>` instead of `Promise<this | false>`.
+Make each override `async`, `await` the inner `update`/`runCallbacks` calls, and return
+`this` on success or `false` on failure so callers that `await record.destroy()` work correctly.
+
+**invoice.ts beforeSave lazy-load (#2329 / PR 16)**
+`invoice.ts` sums `lineItems.map(...)` in a `beforeSave` callback without awaiting the
+association load. If `lineItems` hasn't been eager-loaded, `balance` silently computes as 0.
+Make the callback `async` and `await this.lineItems.load()` (or `await this.lineItems`)
+before summing.
+
+---
+
 ### PR 9 (final) — flip `models:compare` to hard-fail
 
-~30 TS LOC. Gated on 100% coverage from PRs 10–23. Three changes that
+~30 TS LOC. Gated on 100% coverage from PRs 10–23 (PR 23 covers the final 33 models). Three changes that
 must land together:
 
 1. Flip `runModelsPass` in `scripts/fixtures-compare/compare.ts` to exit
