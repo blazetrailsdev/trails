@@ -46,7 +46,7 @@ class ActionPackAssertionsController extends Base {
     this.render({ plain: "Mr. Henke" });
   }
   async renderBasedOnParameters() {
-    const name = (this as any).params?.get?.("name") ?? (this as any).params?.name ?? "";
+    const name = this.params.get("name") ?? "";
     this.render({ plain: `Mr. ${name}` });
   }
   async sessionStuffing() {
@@ -54,12 +54,12 @@ class ActionPackAssertionsController extends Base {
     this.render({ plain: "ho ho ho" });
   }
   async raiseExceptionOnGet() {
-    const method = (this as any).request?.method ?? "GET";
+    const method = this.request.method;
     if (method === "GET") throw new Error("get");
     this.render({ plain: `request method: ${method}` });
   }
   async raiseExceptionOnPost() {
-    const method = (this as any).request?.method ?? "POST";
+    const method = this.request.method;
     if (method === "POST") throw new Error("post");
     this.render({ plain: `request method: ${method}` });
   }
@@ -264,7 +264,7 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("redirect invalid external route", async () => {
     await tc.get("redirectInvalidExternalRoute");
-    expect(tc.response.redirectUrl).toContain("ht_tp://www.rubyonrails.org");
+    expect(tc.response.redirectUrl).toBe("ht_tp://www.rubyonrails.org");
   });
 
   it("redirected to url full url", async () => {
