@@ -10,6 +10,7 @@ import {
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent as Event,
 } from "@blazetrails/activesupport";
+import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 
 export class LogSubscriber extends BaseLogSubscriber {
   /** Rails `ActionController::LogSubscriber#logger` — delegates to `Base.logger`. @internal */
@@ -28,7 +29,9 @@ export class LogSubscriber extends BaseLogSubscriber {
 
   processAction(event: Event): void {
     const { status } = event.payload as { status: number | string };
-    this._info(`Completed ${status} in ${event.duration.toFixed(1)}ms`);
+    const statusText = typeof status === "number" ? (HTTP_STATUS_CODES[status] ?? "") : "";
+    const statusStr = statusText ? `${status} ${statusText}` : String(status);
+    this._info(`Completed ${statusStr} in ${Math.round(event.duration)}ms`);
   }
 
   halted(event: Event): void {
@@ -38,12 +41,12 @@ export class LogSubscriber extends BaseLogSubscriber {
 
   sendFile(event: Event): void {
     const { path } = event.payload as { path: string };
-    this._info(`Sent file ${path}`);
+    this._info(`Sent file ${path} (${event.duration.toFixed(1)}ms)`);
   }
 
   sendData(event: Event): void {
     const { filename } = event.payload as { filename?: string };
-    this._info(`Sent data ${filename ?? "(inline)"}`);
+    this._info(`Sent data ${filename ?? "(inline)"} (${event.duration.toFixed(1)}ms)`);
   }
 
   redirect(event: Event): void {

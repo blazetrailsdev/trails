@@ -248,3 +248,72 @@ describe("FragmentCachingTest", () => {
     expect(c.getHeader("cache-control")).toBe("no-cache");
   });
 });
+
+// ==========================================================================
+// action_controller/caching_test.rb — FragmentCachingMetalTest
+// ==========================================================================
+describe("FragmentCachingMetalTest", () => {
+  it.skip("combined fragment cache key", () => {});
+});
+
+// ==========================================================================
+// action_controller/caching_test.rb — FragmentCachingTest
+// ==========================================================================
+describe("FragmentCachingTest", () => {
+  it.skip("combined fragment cache key", () => {});
+  it.skip("read fragment with caching enabled", () => {});
+  it.skip("read fragment with caching disabled", () => {});
+  it.skip("read fragment with versioned model", () => {});
+  it.skip("fragment exist with caching enabled", () => {});
+  it.skip("fragment exist with caching disabled", () => {});
+  it.skip("write fragment with caching enabled", () => {});
+  it.skip("write fragment with caching disabled", () => {});
+  it.skip("expire fragment with simple key", () => {});
+  it.skip("expire fragment with regexp", () => {});
+  it.skip("fragment for", () => {});
+  it.skip("html safety", () => {});
+});
+
+// ==========================================================================
+// action_controller/caching_test.rb — FunctionalFragmentCachingTest
+// ==========================================================================
+describe("FunctionalFragmentCachingTest", () => {
+  it.skip("fragment caching", () => {});
+  it.skip("fragment caching in partials", () => {});
+  it.skip("skipping fragment cache digesting", () => {});
+  it.skip("fragment caching with options", () => {});
+  it.skip("render inline before fragment caching", () => {});
+  it.skip("fragment cache instrumentation", () => {});
+  it.skip("html formatted fragment caching", () => {});
+  it.skip("xml formatted fragment caching", () => {});
+  it.skip("fragment caching with variant", () => {});
+  it.skip("fragment caching with html partials in xml", () => {});
+  it.skip("output buffer", () => {});
+  it.skip("caching works with beginning comment", () => {});
+  it.skip("caching with callable cache key", () => {});
+});
+
+// ==========================================================================
+// action_controller/caching_test.rb — ViewCacheDependencyTest
+// ==========================================================================
+describe("ViewCacheDependencyTest", () => {
+  it.skip("view cache dependencies are empty by default", () => {});
+  it.skip("view cache dependencies are listed in declaration order", () => {});
+});
+
+// ==========================================================================
+// action_controller/caching_test.rb — CollectionCacheTest
+// ==========================================================================
+describe("CollectionCacheTest", () => {
+  it.skip("collection fetches cached views", () => {});
+  it.skip("preserves order when reading from cache plus rendering", () => {});
+  it.skip("explicit render call with options", () => {});
+});
+
+// ==========================================================================
+// action_controller/caching_test.rb — FragmentCacheKeyTest
+// ==========================================================================
+describe("FragmentCacheKeyTest", () => {
+  it.skip("combined fragment cache key", () => {});
+  it.skip("combined fragment cache key with envs", () => {});
+});
