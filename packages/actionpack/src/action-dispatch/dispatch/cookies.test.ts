@@ -366,75 +366,58 @@ describe("CookiesTest", () => {
     expect(headers[0]).toContain("domain=.example.com");
   });
 
-  it("setting cookie with secure on onion address", () => {
-    const jar = new CookieJar();
-    jar.set("user_name", { value: "david", secure: true });
-    const headers = jar.getSetCookieHeaders();
-    expect(headers[0]).toContain("secure");
+  it.skip("setting cookie with secure on onion address", () => {
+    // Rails sets request.host = "fake.onion" to test that .onion hosts are
+    // exempt from the HTTPS-only secure-cookie restriction; requires
+    // controller/request stack not available at CookieJar unit level (S11)
   });
 
   it.skip("setting cookie with same site protection proc normal user agent", () => {
     // SameSite proc callback not wired (S11 handle_options)
   });
 
-  it("deleting cookie get", () => {
-    const jar = CookieJar.parse("user_name=Joe");
-    jar.delete("user_name");
+  function assertDeletedCookie(jar: CookieJar) {
     expect(jar.get("user_name")).toBeUndefined();
     const headers = jar.getSetCookieHeaders();
     expect(headers[0]).toContain("user_name=");
     expect(headers[0]).toContain("max-age=0");
     expect(headers[0]).toContain("expires=Thu, 01 Jan 1970 00:00:00 GMT");
+  }
+
+  it("deleting cookie get", () => {
+    const jar = CookieJar.parse("user_name=Joe");
+    jar.delete("user_name");
+    assertDeletedCookie(jar);
   });
 
   it("deleting cookie post", () => {
     const jar = CookieJar.parse("user_name=Joe");
     jar.delete("user_name");
-    expect(jar.get("user_name")).toBeUndefined();
-    const headers = jar.getSetCookieHeaders();
-    expect(headers[0]).toContain("user_name=");
-    expect(headers[0]).toContain("max-age=0");
-    expect(headers[0]).toContain("expires=Thu, 01 Jan 1970 00:00:00 GMT");
+    assertDeletedCookie(jar);
   });
 
   it("deleting cookie patch", () => {
     const jar = CookieJar.parse("user_name=Joe");
     jar.delete("user_name");
-    expect(jar.get("user_name")).toBeUndefined();
-    const headers = jar.getSetCookieHeaders();
-    expect(headers[0]).toContain("user_name=");
-    expect(headers[0]).toContain("max-age=0");
-    expect(headers[0]).toContain("expires=Thu, 01 Jan 1970 00:00:00 GMT");
+    assertDeletedCookie(jar);
   });
 
   it("deleting cookie put", () => {
     const jar = CookieJar.parse("user_name=Joe");
     jar.delete("user_name");
-    expect(jar.get("user_name")).toBeUndefined();
-    const headers = jar.getSetCookieHeaders();
-    expect(headers[0]).toContain("user_name=");
-    expect(headers[0]).toContain("max-age=0");
-    expect(headers[0]).toContain("expires=Thu, 01 Jan 1970 00:00:00 GMT");
+    assertDeletedCookie(jar);
   });
 
   it("deleting cookie delete", () => {
     const jar = CookieJar.parse("user_name=Joe");
     jar.delete("user_name");
-    expect(jar.get("user_name")).toBeUndefined();
-    const headers = jar.getSetCookieHeaders();
-    expect(headers[0]).toContain("user_name=");
-    expect(headers[0]).toContain("max-age=0");
-    expect(headers[0]).toContain("expires=Thu, 01 Jan 1970 00:00:00 GMT");
+    assertDeletedCookie(jar);
   });
 
   it("deleting cookie head", () => {
     const jar = CookieJar.parse("user_name=Joe");
     jar.delete("user_name");
-    expect(jar.get("user_name")).toBeUndefined();
-    const headers = jar.getSetCookieHeaders();
-    expect(headers[0]).toContain("user_name=");
-    expect(headers[0]).toContain("max-age=0");
-    expect(headers[0]).toContain("expires=Thu, 01 Jan 1970 00:00:00 GMT");
+    assertDeletedCookie(jar);
   });
 
   it("signed cookie using default serializer", () => {
