@@ -423,26 +423,26 @@ describe("TestCaseTest", () => {
       }
     }
 
-    it("test_process_without_flash", async () => {
+    it("process without flash", async () => {
       const ftc = new TestCase(FlashSetController);
       await ftc.process("setFlash");
       expect(ftc.flash.get("test")).toBe("><");
     });
 
-    it("test_process_with_flash", async () => {
+    it("process with flash", async () => {
       const ftc = new TestCase(FlashPrependController);
       await ftc.process("setFlash", { method: "GET", flash: { test: "value" } });
       expect(ftc.flash.get("test")).toBe(">value<");
     });
 
-    it("test_process_with_session_kwarg", async () => {
+    it("process with session kwarg", async () => {
       const stc = new TestCase(SessionController);
       await stc.process("noOp", { method: "GET", session: { string: "value1", symbol: "value2" } });
       expect(stc.session["string"]).toBe("value1");
       expect(stc.session["symbol"]).toBe("value2");
     });
 
-    it("test_process_merges_session_arg", async () => {
+    it("process merges session arg", async () => {
       const stc = new TestCase(SessionController);
       stc.session["foo"] = "bar";
       await stc.get("noOp", { session: { bar: "baz" } });
@@ -450,7 +450,7 @@ describe("TestCaseTest", () => {
       expect(stc.session["bar"]).toBe("baz");
     });
 
-    it("test_merged_session_arg_is_retained_across_requests", async () => {
+    it("merged session arg is retained across requests", async () => {
       const stc = new TestCase(SessionController);
       await stc.get("noOp", { session: { foo: "bar" } });
       expect(stc.session["foo"]).toBe("bar");
@@ -458,20 +458,20 @@ describe("TestCaseTest", () => {
       expect(stc.session["foo"]).toBe("bar");
     });
 
-    it("test_process_with_symbol_method", async () => {
+    it("process with symbol method", async () => {
       const utc = new TestCase(UriController);
       await utc.process("testUri", { method: "get" });
       expect(utc.controller).toBeDefined();
     });
 
-    it("test_response_and_request_have_nice_accessors", async () => {
+    it("response and request have nice accessors", async () => {
       const ntc = new TestCase(SessionController);
       await ntc.process("noOp");
       expect(ntc.response).toBeDefined();
       expect(ntc.request).toBeDefined();
     });
 
-    it("test_multiple_calls", async () => {
+    it("multiple calls", async () => {
       const ptc = new TestCase(ParamController);
       await ptc.process("testOnlyOneParam", { method: "GET", params: { left: "true" } });
       expect(ptc.responseBody).toBe("OK");
@@ -612,60 +612,60 @@ describe("TestCaseTest (ported)", () => {
     tc = new TestCase(TestController);
   });
 
-  it("test_head", async () => {
+  it("head", async () => {
     await tc.process("testParams");
     expect(tc.response.status).toBe(200);
   });
 
-  it("test_process_with_flash_now", async () => {
+  it("process with flash now", async () => {
     // flash.now not yet implemented in FlashHash
   });
 
-  it("test_process_delete_flash", async () => {
+  it("process delete flash", async () => {
     // flash persistence between requests not yet implemented
   });
 
-  it("test_process_with_session", async () => {
+  it("process with session", async () => {
     await tc.process("setSession");
     expect(tc.session["string"]).toBe("A wonder");
     expect(tc.session["symbol"]).toBe("it works");
   });
 
-  it("test_process_overwrites_existing_session_arg", async () => {
+  it("process overwrites existing session arg", async () => {
     tc.session["foo"] = "bar";
     await tc.get("noOp", { session: { foo: "baz" } });
     expect(tc.session["foo"]).toBe("baz");
   });
 
-  it("test_session_is_cleared_from_controller_after_reset_session", async () => {
+  it("session is cleared from controller after reset session", async () => {
     // resetSession() does not clear controller.session plain object; skip until wired
   });
 
-  it("test_session_is_cleared_from_request_after_reset_session", async () => {
+  it("session is cleared from request after reset session", async () => {
     // resetSession() does not clear request.session visible to TestCase; skip until wired
   });
 
-  it("test_response_and_request_have_nice_accessors", async () => {
+  it("response and request have nice accessors", async () => {
     await tc.process("noOp");
     expect(tc.response).toBeInstanceOf(Object);
     expect(tc.request).toBeInstanceOf(Request);
   });
 
-  it.skip("test_process_with_query_string", async () => {
+  it.skip("process with query string", async () => {
     // params are stored in parameters_override; process() does not encode them
     // into QUERY_STRING, so request.queryString returns "". Requires assignParameters wiring.
     await tc.process("testQueryString", { method: "GET", params: { q: "test" } });
     expect(tc.responseBody).toContain("q=test");
   });
 
-  it("test_multiple_calls", async () => {
+  it("multiple calls", async () => {
     await tc.process("testOnlyOneParam", { method: "GET", params: { left: "true" } });
     expect(tc.responseBody).toBe("OK");
     await tc.process("testOnlyOneParam", { method: "GET", params: { right: "true" } });
     expect(tc.responseBody).toBe("OK");
   });
 
-  it("test_remote_addr", async () => {
+  it("remote addr", async () => {
     // Rails default is "0.0.0.0"; ours is "127.0.0.1" (request.ts line 487)
     await tc.get("testRemoteAddr");
     expect(tc.responseBody).toBe("127.0.0.1");
@@ -674,17 +674,17 @@ describe("TestCaseTest (ported)", () => {
     expect(tc.responseBody).toBe("192.0.0.1");
   });
 
-  it("test_header_properly_reset_after_remote_http_request", async () => {
+  it("header properly reset after remote http request", async () => {
     // scrub_env! not called post-request; headers persist on tc.request — skip
   });
 
-  it("test_xhr_with_session", async () => {
+  it("xhr with session", async () => {
     await tc.get("setSession", { xhr: true });
     expect(tc.session["string"]).toBe("A wonder");
     expect(tc.session["symbol"]).toBe("it works");
   });
 
-  it("test_params_reset_between_post_requests", async () => {
+  it("params reset between post requests", async () => {
     await tc.post("noOp", { params: { foo: "bar" } });
     expect(tc.request.parameters["foo"]).toBe("bar");
 
@@ -692,7 +692,7 @@ describe("TestCaseTest (ported)", () => {
     expect(tc.request.parameters["foo"]).toBeUndefined();
   });
 
-  it("test_raw_post_reset_between_post_requests", async () => {
+  it("raw post reset between post requests", async () => {
     await tc.post("noOp", { body: "foo=bar" });
     expect(tc.request.rawPost).toBe("foo=bar");
 
@@ -700,7 +700,7 @@ describe("TestCaseTest (ported)", () => {
     expect(tc.request.rawPost).toBe("foo=baz");
   });
 
-  it.skip("test_request_protocol_is_reset_after_request", async () => {
+  it.skip("request protocol is reset after request", async () => {
     // HTTPS env is not translated to rack.url_scheme in Request constructor;
     // scheme() reads rack.url_scheme (defaulted to "http") not HTTPS directly.
     await tc.get("testProtocol");
@@ -713,7 +713,7 @@ describe("TestCaseTest (ported)", () => {
     expect(tc.responseBody).toBe("http://");
   });
 
-  it.skip("test_request_format", async () => {
+  it.skip("request format", async () => {
     // params-based format requires mimeHost.parameters to read req.parameters
     // (including parameters_override), not req.params (merged path+query+body).
     // Blocked until mimeHost wiring or assignParameters integration is fixed.
@@ -730,7 +730,7 @@ describe("TestCaseTest (ported)", () => {
     expect(tc.responseBody).toBe("text/html");
   });
 
-  it("test_request_format_kwarg", async () => {
+  it("request format kwarg", async () => {
     await tc.get("testFormat", { format: "html" });
     expect(tc.responseBody).toBe("text/html");
 
@@ -744,17 +744,17 @@ describe("TestCaseTest (ported)", () => {
     expect(tc.responseBody).toBe("text/html");
   });
 
-  it("test_request_format_kwarg_overrides_params", async () => {
+  it("request format kwarg overrides params", async () => {
     await tc.get("testFormat", { format: "json", params: { format: "html" } });
     expect(tc.responseBody).toBe("application/json");
   });
 
-  it("test_request_format_kwarg_doesnt_mutate_params", async () => {
+  it("request format kwarg doesnt mutate params", async () => {
     const params = Object.freeze({ foo: "bar" });
     await expect(tc.get("testFormat", { format: "json", params })).resolves.not.toThrow();
   });
 
-  it("test_using_as_json_sets_request_content_type_to_json", async () => {
+  it("using as json sets request content type to json", async () => {
     await tc.post("renderBody", {
       params: { bool_value: true, str_value: "string", num_value: 2 },
       as: "json",
@@ -762,23 +762,23 @@ describe("TestCaseTest (ported)", () => {
     expect(tc.request.getHeader("CONTENT_TYPE")).toContain("application/json");
   });
 
-  it("test_using_as_json_sets_format_json", async () => {
+  it("using as json sets format json", async () => {
     await tc.post("renderBody", { params: { bool_value: true }, as: "json" });
     expect(String(tc.request.format)).toBe("application/json");
   });
 
-  it.skip("test_using_as_json_with_path_parameters", async () => {
+  it.skip("using as json with path parameters", async () => {
     // process() only sets { controller, action } in pathParameters; extra params
     // are in parameters_override and not merged into pathParameters.
     await tc.post("testParams", { params: { id: "12345" }, as: "json" });
     expect(tc.request.pathParameters["id"]).toBe("12345");
   });
 
-  it("test_exception_in_action_reaches_test", async () => {
+  it("exception in action reaches test", async () => {
     await expect(tc.process("boom", { method: "GET" })).rejects.toThrow("boom!");
   });
 
-  it.skip("test_request_state_is_cleared_after_exception", async () => {
+  it.skip("request state is cleared after exception", async () => {
     // params not encoded to QUERY_STRING, so request.queryString is always "";
     // responseBody would be "" not "q=test2". Requires QUERY_STRING wiring.
     await expect(tc.process("boom", { method: "GET", params: { q: "test1" } })).rejects.toThrow();
@@ -786,7 +786,7 @@ describe("TestCaseTest (ported)", () => {
     expect(tc.responseBody).toContain("q=test2");
   });
 
-  it("test_reset_instance_variables_after_each_request", async () => {
+  it("reset instance variables after each request", async () => {
     await tc.get("incrementCount");
     expect(tc.responseBody).toBe("1");
 
@@ -794,11 +794,11 @@ describe("TestCaseTest (ported)", () => {
     expect(tc.responseBody).toBe("1");
   });
 
-  it("test_parsed_body_without_as_option", async () => {
+  it("parsed body without as option", async () => {
     // body: {hash} auto-serialization not supported; use explicit JSON string
   });
 
-  it("test_parsed_body_with_as_option", async () => {
+  it("parsed body with as option", async () => {
     await tc.post("renderJson", { body: JSON.stringify({ foo: "heyo" }), as: "json" });
     expect(tc.parsedBody).toEqual({ foo: "heyo" });
   });
