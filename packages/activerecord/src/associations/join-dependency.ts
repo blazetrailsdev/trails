@@ -275,7 +275,6 @@ export class JoinDependency {
     }
 
     const effectiveName = this._usedTableNames.has(targetTable!) ? tableAlias : targetTable!;
-    this._usedTableNames.add(targetTable!);
 
     const targetArelTable =
       effectiveName === targetTable!
@@ -320,6 +319,9 @@ export class JoinDependency {
 
     const targetModelPk = (targetModel as any).primaryKey ?? "id";
     if (Array.isArray(targetModelPk)) return null;
+
+    // Commit-point: all failure guards passed; register the table name.
+    this._usedTableNames.add(targetTable!);
 
     const columns = getModelColumns(targetModel);
 
@@ -414,7 +416,10 @@ export class JoinDependency {
   }
 
   buildJoinSql(): string {
-    return this._nodes.map((n) => n.joinSql).join(" ");
+    return this._nodes
+      .filter((n) => n.joinSql)
+      .map((n) => n.joinSql)
+      .join(" ");
   }
 
   get baseKlass(): typeof Base {
