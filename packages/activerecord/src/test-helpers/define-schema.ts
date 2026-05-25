@@ -486,22 +486,6 @@ export function restoreCanonicalSchemaSignaturesUnlessAdapter(adapter: DatabaseA
  *
  * @internal
  */
-function isCanonicalSubset(table: string, testSpec: TableSchema): boolean {
-  if (!_canonicalSchema) return false;
-  const canonicalSpec = _canonicalSchema[table];
-  if (!canonicalSpec) return false;
-  const testCols = columnsOf(testSpec);
-  const canonicalCols = columnsOf(canonicalSpec);
-  for (const [col, testColSpec] of Object.entries(testCols)) {
-    const canonicalColSpec = canonicalCols[col];
-    if (canonicalColSpec === undefined) return false;
-    const testType: string = typeof testColSpec === "string" ? testColSpec : testColSpec.type;
-    const canonicalType: string =
-      typeof canonicalColSpec === "string" ? canonicalColSpec : canonicalColSpec.type;
-    if (testType !== canonicalType) return false;
-  }
-  return true;
-}
 
 /** @internal */
 function getCache(adapter: DatabaseAdapter): Map<string, string> {
@@ -603,38 +587,6 @@ async function _defineSchemaImpl(
     let stillExists = known ? known.has(table) : cachedSig !== undefined;
     if (cachedSig === newSig && stillExists) {
       continue;
-    }
-    // Whether canonical sigs are still live in the global cache. After
-    // resetTestAdapterState → clearAppliedSchemaSignatures, they're gone —
-    // meaning tables may have been dropped. The immutable snapshot
-    // (_canonicalPreloadSigs) survives, but we must not fast-path off it
-    // when the tables no longer exist. Also disabled when dropExisting
-    // was requested — those tables were explicitly dropped above.
-    const canonicalSigsLive =
-      !opts?.dropExisting &&
-      _canonicalPreloadKey !== null &&
-      _appliedSchemaSignatures.has(_canonicalPreloadKey);
-    // D-Y fast-path: adapter IS the canonical DB, canonical sigs are still
-    // live (tables not dropped), and the test spec is a subset of what's
-    // already there — skip DDL and keep the canonical signature.
-    //
-    // Only for NON-wrapper adapters (handler-path tests). Wrappers are
-    // old-path tests that define custom schemas; even when the test columns
-    // are a subset, the canonical table may have extra NOT NULL columns the
-    // test doesn't populate.
-    if (canonicalSigsLive && _canonicalPreloadSigs && isCanonicalSubset(table, raw)) {
-      const adapterKey = databaseIdentity(adapter);
-      const isSameDb =
-        adapterKey !== null
-          ? adapterKey === _canonicalPreloadKey
-          : adapter === _canonicalPreloadAdapter;
-      if (isSameDb) {
-        const canonicalSig = _canonicalPreloadSigs.get(table);
-        if (canonicalSig !== undefined) {
-          cache.set(table, canonicalSig);
-          continue;
-        }
-      }
     }
     // On PG/MySQL (shared DB), the canonical preload or a prior defineSchema
     // call may have created this table with a different schema. Always drop
