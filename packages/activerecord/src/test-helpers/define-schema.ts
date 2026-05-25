@@ -636,28 +636,20 @@ async function _defineSchemaImpl(
         }
       }
     }
-    // Canonical preload may have created this table in the DB. The
-    // wrapper's `tables` Set doesn't track canonical tables, so
-    // `stillExists` may be false even though the table exists. Promote
-    // so the drop-and-recreate path fires.
-    if (!stillExists && canonicalSigsLive && _canonicalPreloadSigs?.has(table)) {
+    // On PG/MySQL (shared DB), the canonical preload or a prior defineSchema
+    // call may have created this table with a different schema. Always drop
+    // before recreating. On SQLite :memory: (separate DB per adapter),
+    // _canonicalPreloadKey is null — safe to use IF NOT EXISTS.
+    if (_canonicalPreloadKey !== null) {
+      await ss.dropTable(table, { ifExists: true });
       stillExists = true;
-    }
-    if (stillExists) {
+    } else if (stillExists) {
       await ss.dropTable(table, { ifExists: true });
     } else if (cachedSig !== undefined) {
-      // Cache says we created it, but the adapter no longer reports it as
-      // present (e.g. resetTestAdapterState wiped state). Forget the stale
-      // entry and create fresh.
       cache.delete(table);
     }
     const columns = columnsOf(raw);
     const pk = primaryKeyOf(raw);
-    // Use IF NOT EXISTS when neither branch above ran (no drop, no stale-cache
-    // delete): the cache has no entry and the table may or may not exist in the
-    // DB. Under a shared pooled adapter, another file may have already created
-    // it. When stillExists was true we just dropped it; when cachedSig was set
-    // we cleared it — both cases guarantee the table is absent.
     const createOpts: { id?: boolean; primaryKey?: string[]; ifNotExists?: boolean } = {};
     if (!stillExists && cachedSig === undefined) createOpts.ifNotExists = true;
     if (pk === false) createOpts.id = false;
