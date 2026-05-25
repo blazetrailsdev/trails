@@ -932,19 +932,24 @@ function rebindTableReferences(
   }
   // Nary nodes (Or) — have children array
   if ("children" in node && Array.isArray((node as any).children)) {
-    const Ctor = node.constructor as any;
-    if (node instanceof Nodes.And) return node; // already handled above
+    if (node instanceof Nodes.And) return node;
     const rebound = (node as any).children.map((c: Nodes.Node) =>
       rebindTableReferences(c, fromTableName, toTable),
     );
-    return new Ctor(rebound);
+    const clone = Object.assign(Object.create(Object.getPrototypeOf(node)), node);
+    clone.children = rebound;
+    return clone;
   }
   // Unary nodes (Grouping, Not, etc.) — have expr
   if ("expr" in node && (node as any).expr instanceof Nodes.Node) {
-    const Ctor = node.constructor as any;
-    return new Ctor(rebindTableReferences((node as any).expr, fromTableName, toTable));
+    const rebound = rebindTableReferences((node as any).expr, fromTableName, toTable);
+    if (rebound === (node as any).expr) return node;
+    const clone = Object.assign(Object.create(Object.getPrototypeOf(node)), node);
+    clone.expr = rebound;
+    return clone;
   }
-  // Binary nodes (Equality, In, GreaterThan, Matches, etc.) — have left/right
+  // Binary nodes (Equality, In, InfixOperation, Matches, etc.) — have left/right.
+  // Shallow-clone to preserve extra fields (operator, escape, caseSensitive).
   if ("left" in node && "right" in node) {
     const bin = node as any;
     const left =
@@ -956,8 +961,10 @@ function rebindTableReferences(
         ? rebindTableReferences(bin.right, fromTableName, toTable)
         : bin.right;
     if (left === bin.left && right === bin.right) return node;
-    const Ctor = node.constructor as any;
-    return new Ctor(left, right);
+    const clone = Object.assign(Object.create(Object.getPrototypeOf(node)), node);
+    clone.left = left;
+    clone.right = right;
+    return clone;
   }
   return node;
 }
