@@ -59,6 +59,12 @@ export class AppGenerator extends AppBase {
           version: "0.1.0",
           private: true,
           type: "module",
+          exports: {
+            "./*.tse": {
+              types: "./.trails/views/*.tse.ts",
+              default: "./.trails/views/*.tse.js",
+            },
+          },
           scripts: {
             build: "tsc",
             test: "vitest run",
@@ -68,7 +74,7 @@ export class AppGenerator extends AppBase {
             "db:seed": "trails db seed",
             "db:setup": "trails db create && trails db migrate && trails db seed",
             "db:reset": "trails db drop && trails db setup",
-            postinstall: "trails-tsc-views build --views src/app/views",
+            prepare: "trails-tsc-views build --views src/app/views",
           },
           dependencies: {
             "@blazetrails/activerecord": "*",
@@ -104,8 +110,10 @@ export class AppGenerator extends AppBase {
             strict: true,
             esModuleInterop: true,
             skipLibCheck: true,
+            allowArbitraryExtensions: true,
             rootDir: "src",
             outDir: "dist",
+            plugins: [{ name: "@blazetrails/trails-tsc/ts-plugin", viewsDir: "src/app/views" }],
           },
           include: ["src", ".trails/template-registry-augmentation.d.ts"],
         },

@@ -16,6 +16,10 @@
     "./lsp": {
       "types": "./dist/lsp-plugin.d.ts",
       "default": "./dist/lsp-plugin.js"
+    },
+    "./ts-plugin": {
+      "types": "./dist/lsp-plugin.d.ts",
+      "default": "./dist/lsp-plugin.js"
     }
   },
   "scripts": {
