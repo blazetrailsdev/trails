@@ -77,6 +77,7 @@ function parseArgs() {
   return {
     filterPkg: get("--package") ?? null,
     filterDep: get("--dep") ?? null,
+    showUnmatched: args.includes("--show-unmatched"),
   };
 }
 
@@ -126,7 +127,11 @@ function collectRubyDepMethods(ruby: ApiManifest, pkg: string, dep: string): Rub
 // TS analysis: detect dependency usage per method
 // ---------------------------------------------------------------------------
 
-type TsDepMap = Map<string, Map<string, boolean>>; // file -> method -> usesDep
+interface TsMethodDepInfo {
+  uses: boolean;
+  refs: Set<string>;
+}
+type TsDepMap = Map<string, Map<string, TsMethodDepInfo>>; // file -> method -> dep info
 
 function isPkgSourceFile(sf: ts.SourceFile, pkgSrcDir: string): boolean {
   return (
@@ -276,8 +281,9 @@ function analyzeTsDepUsage(
     const relPath = path.relative(pkgSrcDir, sourceFile.fileName).split(path.sep).join("/");
     const importedNames = collectDirectImports(sourceFile, tsImport);
 
-    const methodMap = new Map<string, boolean>();
+    const methodMap = new Map<string, TsMethodDepInfo>();
     visitMethodDeclarations(sourceFile, (name, methodNode, anchor) => {
+      const refs = new Set<string>();
       const uses = methodUsesDepImport(
         methodNode,
         importedNames,
@@ -285,13 +291,16 @@ function analyzeTsDepUsage(
         dep,
         sourceFile,
         anchor,
-        {
-          checker,
-          taintedSymbols,
-        },
+        { checker, taintedSymbols },
+        refs,
       );
       const existing = methodMap.get(name);
-      if (existing === undefined || uses) methodMap.set(name, uses);
+      if (existing === undefined) {
+        methodMap.set(name, { uses, refs });
+      } else {
+        existing.uses = existing.uses || uses;
+        for (const r of refs) existing.refs.add(r);
+      }
     });
     if (methodMap.size > 0) result.set(relPath, methodMap);
   }
@@ -400,6 +409,7 @@ export function methodUsesDepImport(
   sourceFile: ts.SourceFile,
   anchor: ts.Node = node,
   transitive?: TransitiveContext,
+  collectRefs?: Set<string>,
 ): boolean {
   if (!transitive?.skipIgnoreAnnotation && hasLintDepsIgnore(anchor, dep, sourceFile)) return true;
   let found = false;
@@ -411,23 +421,40 @@ export function methodUsesDepImport(
   //     these DON'T count because they have no runtime effect;
   //   - runtime references — always count.
   const check = (n: ts.Node, inSignatureType: boolean) => {
-    if (found) return;
+    if (found && !collectRefs) return;
+
+    // Resolve namespace property accesses: Nodes.OuterJoin → "OuterJoin"
+    if (ts.isPropertyAccessExpression(n) && ts.isIdentifier(n.expression)) {
+      if (importedNames.has(n.expression.text)) {
+        found = true;
+        collectRefs?.add(n.name.text);
+        if (!collectRefs) return;
+      }
+    }
+
     if (ts.isIdentifier(n)) {
       if (!isDeclarationName(n)) {
-        const inType = isWithinTypeNode(n);
-        if (!inType || inSignatureType) {
-          if (importedNames.has(n.text) || knownIdentifiers.has(n.text)) {
-            found = true;
-            return;
-          }
-          if (transitive && transitive.taintedSymbols.size > 0) {
-            const sym = transitive.checker.getSymbolAtLocation(n);
-            if (sym) {
-              const resolved =
-                sym.flags & ts.SymbolFlags.Alias ? transitive.checker.getAliasedSymbol(sym) : sym;
-              if (transitive.taintedSymbols.has(resolved)) {
-                found = true;
-                return;
+        // Skip namespace identifiers that are the left side of a property
+        // access — the property access handler above captures the leaf.
+        if (collectRefs && ts.isPropertyAccessExpression(n.parent) && n.parent.expression === n) {
+          // don't record the namespace import itself as a ref
+        } else {
+          const inType = isWithinTypeNode(n);
+          if (!inType || inSignatureType) {
+            if (importedNames.has(n.text) || knownIdentifiers.has(n.text)) {
+              found = true;
+              collectRefs?.add(n.text);
+              if (!collectRefs) return;
+            }
+            if (transitive && transitive.taintedSymbols.size > 0) {
+              const sym = transitive.checker.getSymbolAtLocation(n);
+              if (sym) {
+                const resolved =
+                  sym.flags & ts.SymbolFlags.Alias ? transitive.checker.getAliasedSymbol(sym) : sym;
+                if (transitive.taintedSymbols.has(resolved)) {
+                  found = true;
+                  if (!collectRefs) return;
+                }
               }
             }
           }
@@ -435,10 +462,8 @@ export function methodUsesDepImport(
       }
     }
     ts.forEachChild(n, (c) => {
-      // Descending from a function-like into any non-body child means
-      // we're entering signature territory (typeParameters, parameters,
-      // return type). Once we're in signature territory we stay there
-      // for the whole subtree.
+      // Non-body children of a function-like are signature territory
+      // (typeParameters, parameters, return type) — stay in sig mode.
       const childInSig =
         inSignatureType || (ts.isFunctionLike(n) && c !== (n as ts.FunctionLikeDeclaration).body);
       check(c, childInSig);
@@ -494,6 +519,17 @@ interface Violation {
   depRefs: string[];
 }
 
+interface RefMismatch {
+  rubyFile: string;
+  tsFile: string;
+  rubyMethod: string;
+  tsMethod: string;
+  rubyModule: string;
+  rubyRefs: string[];
+  tsRefs: string[];
+  missingInTs: string[];
+}
+
 interface Compliant {
   rubyFile: string;
   tsFile: string;
@@ -508,13 +544,31 @@ interface Unmatched {
   rubyModule: string;
 }
 
-function crossReference(
-  rubyMethods: RubyDepMethod[],
-  tsDepMap: TsDepMap,
-): { violations: Violation[]; compliant: Compliant[]; unmatched: Unmatched[] } {
+interface CrossReferenceResult {
+  violations: Violation[];
+  compliant: Compliant[];
+  unmatched: Unmatched[];
+  refMismatches: RefMismatch[];
+}
+
+const RUBY_NAMESPACE_ROOTS = new Set(["Arel", "ActiveModel", "ActiveRecord", "ActiveSupport"]);
+
+function normalizeRubyRef(ref: string): string | null {
+  const parts = ref.split("::");
+  const leaf = parts.pop() ?? ref;
+  if (RUBY_NAMESPACE_ROOTS.has(leaf)) return null;
+  return leaf;
+}
+
+function snakeToCamel(s: string): string {
+  return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+
+function crossReference(rubyMethods: RubyDepMethod[], tsDepMap: TsDepMap): CrossReferenceResult {
   const violations: Violation[] = [];
   const compliant: Compliant[] = [];
   const unmatched: Unmatched[] = [];
+  const refMismatches: RefMismatch[] = [];
   const seen = new Set<string>();
 
   for (const rm of rubyMethods) {
@@ -522,11 +576,8 @@ function crossReference(
     if (!tsCandidates) continue;
 
     const tsFile = rubyFileToTs(rm.rubyFile);
-    // Key by Ruby method name, not first TS candidate — two distinct
-    // Ruby methods can produce the same first TS candidate
-    // (`is_number?` and `number?` both → "isNumber"), and keying by
-    // the TS candidate would silently drop the second method. Same
-    // fix as compare.ts:dedupeRubyMethodInto.
+    // Key by Ruby method name — two Ruby methods can map to the same TS candidate
+    // (`is_number?` and `number?` both → "isNumber"), keying by TS name drops one.
     const dedupeKey = `${tsFile}:${rm.rubyName}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
@@ -542,16 +593,16 @@ function crossReference(
     }
 
     let matchedTsName: string | null = null;
-    let uses = false;
+    let info: TsMethodDepInfo | undefined;
     for (const candidate of tsCandidates) {
       if (fileMethods.has(candidate)) {
         matchedTsName = candidate;
-        uses = fileMethods.get(candidate)!;
+        info = fileMethods.get(candidate)!;
         break;
       }
     }
 
-    if (!matchedTsName) {
+    if (!matchedTsName || !info) {
       unmatched.push({
         rubyFile: rm.rubyFile,
         rubyMethod: rm.rubyName,
@@ -567,20 +618,44 @@ function crossReference(
       tsMethod: matchedTsName,
       rubyModule: rm.rubyModule,
     };
-    // If the method name matches a Ruby depRef class name (case-insensitive),
-    // treat it as implementing that protocol (e.g., serializeCastValue
-    // implements ActiveModel::Type::SerializeCastValue).
+
+    // Method name matching a Ruby depRef class name counts as implementing
+    // that protocol (e.g., serializeCastValue → ActiveModel::Type::SerializeCastValue).
     const implementsProtocol =
-      !uses &&
+      !info.uses &&
       rm.depRefs.some((ref) => {
         const simpleName = ref.split("::").pop() ?? "";
         return simpleName.toLowerCase() === matchedTsName!.toLowerCase();
       });
-    if (uses || implementsProtocol) compliant.push(entry);
-    else violations.push({ ...entry, depRefs: rm.depRefs });
+    if (info.uses || implementsProtocol) {
+      compliant.push(entry);
+
+      if (rm.depRefs.length > 0 && info.refs.size > 0) {
+        const rubyNormalized = rm.depRefs
+          .map(normalizeRubyRef)
+          .filter((r): r is string => r !== null);
+        const tsRefNames = [...info.refs];
+        const tsSet = new Set(tsRefNames.map((r) => r.toLowerCase()));
+        const missingInTs = rubyNormalized.filter((r) => {
+          const lower = r.toLowerCase();
+          const camel = snakeToCamel(r).toLowerCase();
+          return !tsSet.has(lower) && !tsSet.has(camel) && !tsSet.has("_" + camel);
+        });
+        if (missingInTs.length > 0) {
+          refMismatches.push({
+            ...entry,
+            rubyRefs: rubyNormalized,
+            tsRefs: tsRefNames,
+            missingInTs,
+          });
+        }
+      }
+    } else {
+      violations.push({ ...entry, depRefs: rm.depRefs });
+    }
   }
 
-  return { violations, compliant, unmatched };
+  return { violations, compliant, unmatched, refMismatches };
 }
 
 // ---------------------------------------------------------------------------
@@ -592,10 +667,11 @@ interface LintResult {
   violations: Violation[];
   compliant: Compliant[];
   unmatched: Unmatched[];
+  refMismatches: RefMismatch[];
 }
 
-function printReport(results: LintResult[]) {
-  for (const { rule, violations, compliant, unmatched } of results) {
+function printReport(results: LintResult[], showUnmatched: boolean) {
+  for (const { rule, violations, compliant, unmatched, refMismatches } of results) {
     const total = violations.length + compliant.length;
     const pct = total > 0 ? Math.round((compliant.length / total) * 1000) / 10 : 100;
 
@@ -640,6 +716,19 @@ function printReport(results: LintResult[]) {
       console.log(
         `  ${unmatched.length} Rails ${rule.dependency}-using methods not yet implemented in TS`,
       );
+      if (showUnmatched) {
+        for (const u of unmatched) {
+          console.log(`    ? ${u.rubyModule}#${u.rubyMethod} (${u.rubyFile})`);
+        }
+      }
+    }
+    if (refMismatches.length > 0) {
+      console.log(
+        `\n  ${refMismatches.length} ref mismatches (uses ${rule.dependency} but different types):`,
+      );
+      for (const m of refMismatches) {
+        console.log(`    ≠ ${m.tsMethod} -- missing ${m.missingInTs.join(", ")}  (${m.tsFile})`);
+      }
     }
   }
 }
@@ -649,7 +738,7 @@ function printReport(results: LintResult[]) {
 // ---------------------------------------------------------------------------
 
 function main() {
-  const { filterPkg, filterDep } = parseArgs();
+  const { filterPkg, filterDep, showUnmatched } = parseArgs();
 
   const rubyPath = path.join(OUTPUT_DIR, "rails-api.json");
   if (!fs.existsSync(rubyPath)) {
@@ -686,20 +775,24 @@ function main() {
       rule.dependency,
     );
 
-    const { violations, compliant, unmatched } = crossReference(rubyMethods, tsDepMap);
-    allResults.push({ rule, violations, compliant, unmatched });
+    const { violations, compliant, unmatched, refMismatches } = crossReference(
+      rubyMethods,
+      tsDepMap,
+    );
+    allResults.push({ rule, violations, compliant, unmatched, refMismatches });
   }
 
   // Write JSON report
   const report = {
     generatedAt: new Date().toISOString(),
-    rules: allResults.map(({ rule, violations, compliant, unmatched }) => ({
+    rules: allResults.map(({ rule, violations, compliant, unmatched, refMismatches }) => ({
       package: rule.package,
       dependency: rule.dependency,
       summary: {
         compliant: compliant.length,
         violations: violations.length,
         unmatched: unmatched.length,
+        refMismatches: refMismatches.length,
         total: violations.length + compliant.length,
         percent:
           violations.length + compliant.length > 0
@@ -709,6 +802,7 @@ function main() {
       violations,
       compliant,
       unmatched,
+      refMismatches,
     })),
   };
 
@@ -716,7 +810,7 @@ function main() {
   const jsonPath = path.join(OUTPUT_DIR, "dep-lint.json");
   fs.writeFileSync(jsonPath, JSON.stringify(report, null, 2));
 
-  printReport(allResults);
+  printReport(allResults, showUnmatched);
 
   const blockingViolations = allResults.reduce(
     (sum, r) => sum + (r.rule.blocking ? r.violations.length : 0),

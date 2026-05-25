@@ -130,6 +130,79 @@ describe("methodUsesDepImport — type-position filtering", () => {
   });
 });
 
+describe("methodUsesDepImport — collectRefs mode", () => {
+  it("records runtime references to imported names", () => {
+    const sf = makeSourceFile(`
+      function foo(x: unknown) { return new OuterJoin(x); }
+    `);
+    const node = firstMethod(sf);
+    const refs = new Set<string>();
+    methodUsesDepImport(node, new Set(["OuterJoin"]), new Set(), DEP, sf, node, undefined, refs);
+    expect([...refs]).toEqual(["OuterJoin"]);
+  });
+
+  it("resolves Namespace.Member to the leaf member name", () => {
+    const sf = makeSourceFile(`
+      function foo() { return new Nodes.OuterJoin(); }
+    `);
+    const node = firstMethod(sf);
+    const refs = new Set<string>();
+    methodUsesDepImport(node, new Set(["Nodes"]), new Set(), DEP, sf, node, undefined, refs);
+    expect(refs.has("OuterJoin")).toBe(true);
+    expect(refs.has("Nodes")).toBe(false);
+  });
+
+  it("does not record body-only type-position references", () => {
+    const sf = makeSourceFile(`
+      function foo(x: unknown) { return (x as OuterJoin); }
+    `);
+    const node = firstMethod(sf);
+    const refs = new Set<string>();
+    methodUsesDepImport(node, new Set(["OuterJoin"]), new Set(), DEP, sf, node, undefined, refs);
+    expect(refs.size).toBe(0);
+  });
+
+  it("does record signature-position references", () => {
+    const sf = makeSourceFile(`
+      function foo(): OuterJoin { return null as any; }
+    `);
+    const node = firstMethod(sf);
+    const refs = new Set<string>();
+    methodUsesDepImport(node, new Set(["OuterJoin"]), new Set(), DEP, sf, node, undefined, refs);
+    expect([...refs]).toEqual(["OuterJoin"]);
+  });
+
+  it("collects multiple distinct references", () => {
+    const sf = makeSourceFile(`
+      function foo() { return new OuterJoin(new Equality(), And()); }
+    `);
+    const node = firstMethod(sf);
+    const refs = new Set<string>();
+    methodUsesDepImport(
+      node,
+      new Set(["OuterJoin", "Equality", "And"]),
+      new Set(),
+      DEP,
+      sf,
+      node,
+      undefined,
+      refs,
+    );
+    expect(new Set(refs)).toEqual(new Set(["OuterJoin", "Equality", "And"]));
+  });
+
+  it("yields empty refs when method is lint-deps-ignored", () => {
+    const sf = makeSourceFile(`
+      // lint-deps-ignore: arel — uses raw SQL
+      function foo() { return new OuterJoin(); }
+    `);
+    const node = firstMethod(sf);
+    const refs = new Set<string>();
+    methodUsesDepImport(node, new Set(["OuterJoin"]), new Set(), DEP, sf, node, undefined, refs);
+    expect(refs.size).toBe(0);
+  });
+});
+
 describe("methodUsesDepImport — lint-deps-ignore annotation", () => {
   it("opt-out comment above method marks as covered", () => {
     const sf = makeSourceFile(`
