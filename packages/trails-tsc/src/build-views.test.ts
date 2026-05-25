@@ -168,6 +168,32 @@ describe("buildViews", () => {
     expect(aug).toContain("AUTO-GENERATED");
   });
 
+  it("emits all 6 artifacts with correct source map references", () => {
+    const cwd = mkScratch();
+    const src = "<h1><%= name %></h1>";
+    write(cwd, "app/views/users/show.html.tse", src);
+    buildViews({ cwd });
+    const base = path.join(cwd, ".trails/views/users/show.html.tse");
+    const mapDir = path.dirname(base);
+    const srcPath = path.join(cwd, "app/views/users/show.html.tse");
+    for (const ext of [".ts", ".ts.map", ".js", ".js.map", ".d.ts", ".d.ts.map"]) {
+      expect(fs.existsSync(base + ext), `missing ${ext}`).toBe(true);
+    }
+    const jsMap = JSON.parse(fs.readFileSync(base + ".js.map", "utf8"));
+    expect(jsMap.version).toBe(3);
+    expect(path.resolve(mapDir, jsMap.sources[0])).toBe(srcPath);
+    expect(jsMap.sourcesContent).toEqual([src]);
+    const tsMap = JSON.parse(fs.readFileSync(base + ".ts.map", "utf8"));
+    expect(path.resolve(mapDir, tsMap.sources[0])).toBe(srcPath);
+    expect(tsMap.sourcesContent).toEqual([src]);
+    const dtsMap = JSON.parse(fs.readFileSync(base + ".d.ts.map", "utf8"));
+    expect(dtsMap.sources).toEqual(["show.html.tse.ts"]);
+    const shim = fs.readFileSync(base + ".ts", "utf8");
+    expect(shim).toContain("//# sourceMappingURL=show.html.tse.ts.map");
+    const js = fs.readFileSync(base + ".js", "utf8");
+    expect(js).toContain("//# sourceMappingURL=show.html.tse.js.map");
+  });
+
   it("tse virtual shim includes TemplateRegistry import and render overloads", () => {
     const cwd = mkScratch();
     write(cwd, "app/views/users/_user.html.tse", "<%= name %>");

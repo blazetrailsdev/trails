@@ -5,11 +5,11 @@
 import { tokenize, TseSyntaxError } from "./lexer.js";
 
 export type TseNode =
-  | { kind: "text"; value: string }
-  | { kind: "code"; value: string }
-  | { kind: "expr"; value: string }
-  | { kind: "blockExpr"; value: string }
-  | { kind: "rawExpr"; value: string };
+  | { kind: "text"; value: string; srcLine: number }
+  | { kind: "code"; value: string; srcLine: number }
+  | { kind: "expr"; value: string; srcLine: number }
+  | { kind: "blockExpr"; value: string; srcLine: number }
+  | { kind: "rawExpr"; value: string; srcLine: number };
 
 export interface TseAst {
   nodes: TseNode[];
@@ -30,7 +30,8 @@ export function parse(source: string): TseAst {
 
   for (const tok of tokenize(source)) {
     if (tok.kind === "text") {
-      if (tok.value.length > 0) nodes.push({ kind: "text", value: tok.value });
+      if (tok.value.length > 0)
+        nodes.push({ kind: "text", value: tok.value, srcLine: tok.srcLine });
     } else if (tok.kind === "comment") {
       const m = LOCALS_RE.exec(tok.value);
       if (m && localsSignature === null) localsSignature = m[1].trim() || "**nil";
@@ -46,7 +47,7 @@ export function parse(source: string): TseAst {
         throw new TseSyntaxError(`unknown <%! ... !%> directive: ${tok.value.trim()}`);
       }
     } else {
-      nodes.push({ kind: tok.kind, value: tok.value.trim() } as TseNode);
+      nodes.push({ kind: tok.kind, value: tok.value.trim(), srcLine: tok.srcLine } as TseNode);
     }
   }
   return { nodes, localsSignature, typesAnnotation, formatAnnotation };

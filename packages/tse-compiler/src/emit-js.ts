@@ -5,6 +5,7 @@
 
 import { parse, type TseAst, type TseNode } from "./parser.js";
 import { parseLocalsSignature, type LocalEntry } from "./parse-locals.js";
+import { generateSourceMap, type RawSourceMap, type LineMapping } from "./source-map.js";
 
 export interface EmitJsOptions {
   escapeIgnore?: boolean;
@@ -14,10 +15,15 @@ export interface EmitJsOptions {
   postamble?: string;
   /** Default true when a `locals:` signature is present. */
   raiseOnStrictLocalsMismatch?: boolean;
+  /** File name for the generated output (used in source map `file` field). */
+  fileName?: string;
+  /** Source `.tse` file path (used in source map `sources` field). */
+  sourceFileName?: string;
 }
 
 export interface EmitResult {
   code: string;
+  sourceMap: RawSourceMap | null;
   localsSignature: string | null;
   typesAnnotation: string | null;
 }
@@ -30,8 +36,14 @@ export interface EmitResult {
  */
 export function compileJs(source: string, options: EmitJsOptions = {}): EmitResult {
   const ast = parse(source);
+  const { code, mappings } = emit(ast, options);
+  const sourceMap =
+    options.fileName && options.sourceFileName
+      ? generateSourceMap(options.fileName, options.sourceFileName, source, mappings)
+      : null;
   return {
-    code: emit(ast, options),
+    code,
+    sourceMap,
     localsSignature: ast.localsSignature,
     typesAnnotation: ast.typesAnnotation,
   };
@@ -96,25 +108,28 @@ function emitLocalsBlock(
   return { entries, lines };
 }
 
-function emit(ast: TseAst, options: EmitJsOptions): string {
+function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: LineMapping[] } {
   const exprAppend = options.escapeIgnore === true ? "safeExprAppend" : "append";
   const raiseOnMismatch = options.raiseOnStrictLocalsMismatch ?? ast.localsSignature !== null;
   const { lines: localsLines } = emitLocalsBlock(ast, raiseOnMismatch);
 
   const lines: string[] = [];
-  // Only import StrictLocalsMismatch when the check will actually be emitted.
+  const lineMappings: LineMapping[] = [];
+  let nextGenLine = 0;
+  const push = (line: string, srcLine?: number): void => {
+    if (srcLine !== undefined) lineMappings.push({ genLine: nextGenLine, srcLine });
+    nextGenLine += 1 + (line.match(/\n/g)?.length ?? 0);
+    lines.push(line);
+  };
+
   if (raiseOnMismatch && ast.localsSignature !== null) {
-    lines.push('import { StrictLocalsMismatch } from "@blazetrails/actionview/strict-locals";');
+    push('import { StrictLocalsMismatch } from "@blazetrails/actionview/strict-locals";');
   }
-  lines.push(
-    "export default function render(context, locals) {",
-    "  const _ob = context.outputBuffer;",
-  );
-  if (options.preamble) lines.push("  " + options.preamble);
-  for (const l of localsLines) lines.push(l);
-  // Stack: one entry per open blockExpr, tracking net unclosed `{` inside it.
+  push("export default function render(context, locals) {");
+  push("  const _ob = context.outputBuffer;");
+  if (options.preamble) push("  " + options.preamble);
+  for (const l of localsLines) push(l);
   const innerDepths: number[] = [];
-  // Parallel stack: unclosed `(` parens left open by each blockExpr's callExpr.
   const innerCallExprParens: number[] = [];
   for (const node of ast.nodes) {
     const insideBlock = innerDepths.length > 0;
@@ -122,19 +137,15 @@ function emit(ast: TseAst, options: EmitJsOptions): string {
     if (node.kind === "blockExpr") {
       const trimmed = node.value.trim();
       if (!ARROW_BLOCK_RE.test(trimmed)) {
-        // function(…) { and `do` forms cannot be capture-wrapped correctly — the
-        // emitted closer only closes `context.capture(() => {`, leaving the
-        // function body `{` unclosed and producing invalid JS. Arrow syntax is required.
         throw new Error(
           `TSE: block-expr tag must use arrow syntax (e.g. \`(x) => {\`); function/do forms are not supported. Got: \`${trimmed}\``,
         );
       }
-      // Strip trailing `{` so the helper call ends with `=>` for the capture wrapper.
       const callExpr = trimmed.replace(/\s*\{\s*$/, "").trimEnd();
       innerDepths.push(0);
       innerCallExprParens.push(netUnclosedParens(callExpr));
-      lines.push(`  ${bufRef}.${exprAppend}(${callExpr}`);
-      lines.push("  context.capture(() => {");
+      push(`  ${bufRef}.${exprAppend}(${callExpr}`, node.srcLine);
+      push("  context.capture(() => {");
     } else if (node.kind === "code" && insideBlock) {
       const innerDepth = innerDepths[innerDepths.length - 1]!;
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
@@ -142,17 +153,15 @@ function emit(ast: TseAst, options: EmitJsOptions): string {
         const callExprParens = innerCallExprParens.pop()!;
         const t = node.value.trim();
         const tClean = t.endsWith(";") ? t.slice(0, -1) : t;
-        // 2 emitter-owned parens (bufRef.append + context.capture) plus whatever
-        // the callExpr left open, minus any `)` already in the template's closer.
         const closingParensInT = (tClean.match(/\)/g) ?? []).length;
         const suffix = ")".repeat(Math.max(0, 2 + callExprParens - closingParensInT)) + ";";
-        lines.push(`  ${tClean}${suffix}`);
+        push(`  ${tClean}${suffix}`, node.srcLine);
       } else {
         innerDepths[innerDepths.length - 1]! += netBraceDepth(node.value);
-        lines.push("  " + emitNode(node, exprAppend, "context.outputBuffer"));
+        push("  " + emitNode(node, exprAppend, "context.outputBuffer"), node.srcLine);
       }
     } else {
-      lines.push("  " + emitNode(node, exprAppend, bufRef));
+      push("  " + emitNode(node, exprAppend, bufRef), node.srcLine);
     }
   }
   if (innerDepths.length > 0) {
@@ -160,9 +169,10 @@ function emit(ast: TseAst, options: EmitJsOptions): string {
       `TSE: ${innerDepths.length} block-expr tag(s) were never closed — missing <% } %> or <% }) %>`,
     );
   }
-  if (options.postamble) lines.push("  " + options.postamble);
-  lines.push("  return _ob;", "}");
-  return lines.join("\n") + "\n";
+  if (options.postamble) push("  " + options.postamble);
+  push("  return _ob;");
+  push("}");
+  return { code: lines.join("\n") + "\n", mappings: lineMappings };
 }
 
 function emitNode(node: TseNode, exprAppend: string, bufRef: string): string {

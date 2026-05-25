@@ -41,4 +41,13 @@ describe("tokenize", () => {
     expect(tokenize("<%= name %>")[0].kind).toBe("expr");
     expect(tokenize("<%= x + 1 %>")[0].kind).toBe("expr");
   });
+
+  it("srcLine tracks through escape sequences", () => {
+    const t = tokenize("hello<%%world\nsecond<%= x %>");
+    expect(t[0].kind).toBe("text");
+    expect(t[0].value).toBe("hello<%world\nsecond");
+    expect(t[0].srcLine).toBe(0);
+    expect(t[1].kind).toBe("expr");
+    expect(t[1].srcLine).toBe(1);
+  });
 });

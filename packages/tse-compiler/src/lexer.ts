@@ -18,30 +18,54 @@ export interface Token {
   value: string;
   trimLeft: boolean;
   trimRight: boolean;
+  /** 0-indexed line number in the original `.tse` source. */
+  srcLine: number;
 }
 export class TseSyntaxError extends Error {}
 
 const TAG_RE = /<%%|%%>|<%!([\s\S]*?)!%>|<%(-)?(==|=|#)?([\s\S]*?)(-)?%>/g;
 const KIND: Record<string, TokenKind> = { "=": "expr", "==": "rawExpr", "#": "comment" };
-const text = (value: string): Token => ({ kind: "text", value, trimLeft: false, trimRight: false });
+
+function lineAt(source: string, offset: number): number {
+  let n = 0;
+  for (let i = 0; i < offset; i++) if (source.charCodeAt(i) === 10) n++;
+  return n;
+}
+
+const text = (value: string, srcLine: number): Token => ({
+  kind: "text",
+  value,
+  trimLeft: false,
+  trimRight: false,
+  srcLine,
+});
 
 export function tokenize(source: string): Token[] {
   const tokens: Token[] = [];
+  const line = (offset: number): number => lineAt(source, offset);
   let buf = "";
   let last = 0;
+  let bufStartOffset = 0;
   const flush = (): void => {
-    if (buf.length > 0) tokens.push(text(buf));
+    if (buf.length > 0) tokens.push(text(buf, line(bufStartOffset)));
     buf = "";
   };
 
   for (const m of source.matchAll(TAG_RE)) {
+    if (buf.length === 0) bufStartOffset = last;
     buf += source.slice(last, m.index);
     last = m.index + m[0].length;
     if (m[0] === "<%%") buf += "<%";
     else if (m[0] === "%%>") buf += "%>";
     else if (m[1] !== undefined) {
       flush();
-      tokens.push({ kind: "typesMagic", value: m[1], trimLeft: false, trimRight: false });
+      tokens.push({
+        kind: "typesMagic",
+        value: m[1],
+        trimLeft: false,
+        trimRight: false,
+        srcLine: line(m.index),
+      });
     } else {
       const trimLeft = m[2] === "-";
       const trimRight = m[5] === "-";
@@ -50,9 +74,10 @@ export function tokenize(source: string): Token[] {
       const baseKind = KIND[m[3] ?? ""] ?? "code";
       const kind: TokenKind =
         baseKind === "expr" && BLOCK_EXPR_RE.test(m[4] ?? "") ? "blockExpr" : baseKind;
-      tokens.push({ kind, value: m[4], trimLeft, trimRight });
+      tokens.push({ kind, value: m[4], trimLeft, trimRight, srcLine: line(m.index) });
       if (trimRight) last += (/^[ \t]*\r?\n/.exec(source.slice(last))?.[0] ?? "").length;
     }
+    if (buf.length === 0) bufStartOffset = last;
   }
   buf += source.slice(last);
   flush();

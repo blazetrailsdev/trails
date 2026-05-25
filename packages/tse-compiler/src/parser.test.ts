@@ -10,8 +10,8 @@ describe("parse", () => {
     expect(ast.localsSignature).toBe("name:, count: 0");
     expect(ast.typesAnnotation).toBe("{ name: string }");
     expect(ast.nodes).toEqual([
-      { kind: "text", value: "hi" },
-      { kind: "expr", value: "name" },
+      { kind: "text", value: "hi", srcLine: 0 },
+      { kind: "expr", value: "name", srcLine: 0 },
     ]);
   });
 
@@ -23,7 +23,7 @@ describe("parse", () => {
   it("lifts format: magic block onto the AST root", () => {
     const ast = parse('<%! format: "json" !%>Hello');
     expect(ast.formatAnnotation).toBe("json");
-    expect(ast.nodes).toEqual([{ kind: "text", value: "Hello" }]);
+    expect(ast.nodes).toEqual([{ kind: "text", value: "Hello", srcLine: 0 }]);
   });
 
   it("keeps first format: directive on duplicates", () => {
