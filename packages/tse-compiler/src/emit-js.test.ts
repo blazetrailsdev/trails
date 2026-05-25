@@ -113,6 +113,52 @@ describe("compileJs", () => {
     expect(code).toContain("})));");
   });
 
+  describe("strict locals", () => {
+    it("emits locals destructuring with defaults when a locals signature is present", () => {
+      const { code } = compileJs('<%# locals: (count: 0, name: "x") %><%= name %>');
+      expect(code).toContain('const { count = 0, name = "x" } = locals;');
+    });
+
+    it("emits no destructuring when there are no declared locals (empty parens)", () => {
+      const { code } = compileJs("<%# locals: () %><p>hi</p>");
+      expect(code).not.toContain("const {");
+    });
+
+    it("emits a runtime strict-locals check when a locals signature is present", () => {
+      const { code } = compileJs("<%# locals: (count:) %><%= count %>");
+      expect(code).toContain("StrictLocalsMismatch");
+      expect(code).toContain('["count"]');
+      expect(code).toContain("__extraKeys");
+    });
+
+    it("emits a runtime check for empty locals that rejects any key", () => {
+      const { code } = compileJs("<%# locals: () %><p>hi</p>");
+      expect(code).toContain("StrictLocalsMismatch");
+      expect(code).toContain("__allowedKeys = []");
+    });
+
+    it("does not emit a runtime check when no locals signature is present", () => {
+      const { code } = compileJs("<p>hi</p>");
+      expect(code).not.toContain("StrictLocalsMismatch");
+      expect(code).not.toContain("__allowedKeys");
+    });
+
+    it("suppresses the runtime check when raiseOnStrictLocalsMismatch is false", () => {
+      const { code } = compileJs("<%# locals: (count:) %>", {
+        raiseOnStrictLocalsMismatch: false,
+      });
+      expect(code).not.toContain("StrictLocalsMismatch");
+      expect(code).toContain("const { count } = locals;");
+    });
+
+    it("imports StrictLocalsMismatch from @blazetrails/actionview/strict-locals", () => {
+      const { code } = compileJs("<%# locals: (count:) %>");
+      expect(code).toContain(
+        'import { StrictLocalsMismatch } from "@blazetrails/actionview/strict-locals";',
+      );
+    });
+  });
+
   describe("preamble / postamble", () => {
     it("emits preamble immediately after const _ob line", () => {
       const { code } = compileJs("<p>hi</p>", {

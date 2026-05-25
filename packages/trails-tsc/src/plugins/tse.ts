@@ -7,138 +7,29 @@
  * and the build CLI are Phase 2c.
  */
 
-import { parse, type TseAst } from "@blazetrails/tse-compiler";
+import {
+  parse,
+  parseLocalsSignature,
+  LocalsSignatureError,
+  type TseAst,
+  type LocalEntry,
+} from "@blazetrails/tse-compiler";
 import type { LineDelta, TscPlugin, VirtualizeOutput } from "../plugin.js";
 
-export class TseLocalsSignatureError extends Error {}
-
-interface LocalEntry {
-  name: string;
-  defaultExpr: string | null;
-}
-
-// Words reserved in ES strict mode + module context — every one of
-// these would crash the emitted `const { <name> } = locals;` /
-// `void <name>;`. Strict mode is implicit in ESM, which is what
-// trails-tsc emits.
-// prettier-ignore
-const RESERVED_NAMES = new Set([
-  "break", "case", "catch", "class", "const", "continue", "debugger",
-  "default", "delete", "do", "else", "enum", "export", "extends", "false",
-  "finally", "for", "function", "if", "import", "in", "instanceof", "new",
-  "null", "return", "super", "switch", "this", "throw", "true", "try",
-  "typeof", "var", "void", "while", "with", "yield", "implements",
-  "interface", "let", "package", "private", "protected", "public",
-  "static", "await", "async",
-]);
-
-function isUsableLocalName(name: string): boolean {
-  // Syntactic shape: must look like a TS identifier (rejects empty,
-  // digit-led, punctuation). `ts.createSourceFile` is the bullet-proof
-  // check because it covers Unicode identifier rules, but we keep it
-  // cheap with a guard regex first.
-  if (!/^[A-Za-z_$][\w$]*$/u.test(name)) return false;
-  return !RESERVED_NAMES.has(name);
-}
-
-// Parse `<%# locals: (...) %>` body into entries. Splits on top-level
-// commas only, tracking brackets and quote/template-literal state.
-// Generics in defaults (`Foo<A, B>`) are not recognized — angle brackets
-// alias with `<` comparisons without a full TS scanner; same class of
-// pragmatic limit as Erubi's regex lexer (plan §2.10.1).
-export function parseLocalsSignature(sig: string): LocalEntry[] {
-  if (sig === "**nil" || sig.trim() === "") return [];
-  const CLOSERS: Record<string, string> = { "(": ")", "[": "]", "{": "}" };
-  const parts: string[] = [];
-  const stack: string[] = [];
-  let quote: '"' | "'" | "`" | null = null;
-  let buf = "";
-  for (let i = 0; i < sig.length; i++) {
-    const ch = sig[i]!;
-    if (quote !== null) {
-      buf += ch;
-      if (ch === "\\" && i + 1 < sig.length) {
-        buf += sig[i + 1]!;
-        i++;
-        continue;
-      }
-      if (ch === quote) quote = null;
-      continue;
-    }
-    if (ch === '"' || ch === "'" || ch === "`") {
-      quote = ch;
-      buf += ch;
-      continue;
-    }
-    if (ch === "," && stack.length === 0) {
-      parts.push(buf);
-      buf = "";
-      continue;
-    }
-    if (ch === "(" || ch === "[" || ch === "{") stack.push(CLOSERS[ch]!);
-    else if (ch === ")" || ch === "]" || ch === "}") {
-      const expected = stack.pop();
-      if (expected !== ch) {
-        throw new TseLocalsSignatureError(
-          `mismatched \`${ch}\` (expected \`${expected ?? "<none>"}\`) in locals signature ${JSON.stringify(sig)}`,
-        );
-      }
-    }
-    buf += ch;
-  }
-  if (quote !== null) {
-    throw new TseLocalsSignatureError(
-      `unterminated ${quote === "`" ? "template literal" : "string"} in locals signature ${JSON.stringify(sig)}`,
-    );
-  }
-  if (stack.length !== 0) {
-    throw new TseLocalsSignatureError(
-      `unbalanced brackets in locals signature ${JSON.stringify(sig)}`,
-    );
-  }
-  if (buf.trim() !== "") parts.push(buf);
-
-  const entries: LocalEntry[] = [];
-  for (const raw of parts) {
-    const trimmed = raw.trim();
-    if (trimmed === "") continue;
-    // Rails accepts `**nil` mixed with named kwargs (e.g.
-    // `locals: (user:, **nil)`) to mean "these locals plus no
-    // extras". Skip the sentinel; treat surrounding entries normally.
-    if (trimmed === "**nil") continue;
-    const colon = trimmed.indexOf(":");
-    if (colon === -1) {
-      throw new TseLocalsSignatureError(
-        `malformed locals entry ${JSON.stringify(trimmed)} — expected \`name:\` or \`name: default\``,
-      );
-    }
-    const name = trimmed.slice(0, colon).trim();
-    // Identifier shape + reserved-word rejection. The bullet-proof
-    // check is "would `const { <name> } = x;` parse cleanly?" — let TS
-    // answer it for us via createSourceFile diagnostics. Caches keyed
-    // by name keep this cheap across many entries.
-    if (!isUsableLocalName(name)) {
-      throw new TseLocalsSignatureError(
-        `invalid local name ${JSON.stringify(name)} in locals signature ${JSON.stringify(sig)}`,
-      );
-    }
-    const tail = trimmed.slice(colon + 1).trim();
-    entries.push({ name, defaultExpr: tail === "" ? null : tail });
-  }
-  return entries;
-}
+export { parseLocalsSignature };
+// TseLocalsSignatureError is the name this module previously used.
+export { LocalsSignatureError as TseLocalsSignatureError };
 
 export function localsParamType(ast: TseAst, locals: LocalEntry[]): string {
   if (ast.typesAnnotation !== null) return ast.typesAnnotation;
-  // No `<%# locals: %>` at all → permissive default.
+  // No `<%# locals: %>` at all → permissive default (no strict check).
   if (ast.localsSignature === null) return "Record<string, unknown>";
   // Explicit empty `<%# locals: () %>` → reject any keys (Rails `**nil`).
-  // `Record<never, never>` collapses to `{}` (any object assignable),
-  // so use `Record<string, never>` — every key must map to `never`,
-  // which makes any provided property a type error.
-  if (locals.length === 0) return "Record<string, never>";
+  // `Record<string, never>` makes every key map to `never` — any property is
+  // a type error. Wrap in NoExtraKeys for variable-arg rejection too.
+  if (locals.length === 0) return "NoExtraKeys<Record<string, never>>";
   const fields = locals.map((l) => `${l.name}${l.defaultExpr ? "?" : ""}: unknown`);
-  return `{ ${fields.join("; ")} }`;
+  return `NoExtraKeys<{ ${fields.join("; ")} }>`;
 }
 
 function destructureLines(locals: LocalEntry[]): string[] {
@@ -208,31 +99,38 @@ function emitNode(node: TseAst["nodes"][number]): string {
       return `  _ob.safeExprAppend(${node.value});`;
     case "blockExpr":
       return `  _ob.append(${node.value}`;
+    default:
+      throw new Error(`unreachable: unknown node kind`);
   }
 }
 
-const PREAMBLE = [
-  "/* virtualized from .tse — phase 2b trails-tsc plugin */",
-  'import type { TemplateRegistry, TemplateLocals } from "@blazetrails/actionview";',
-  "interface SafeString { readonly __safeStringBrand: unique symbol }",
-  "interface OutputBuffer extends SafeString {",
-  "  safeAppend(s: string): void;",
-  "  append(value: unknown): void;",
-  "  safeExprAppend(value: unknown): void;",
-  "}",
-  "interface RenderContext {",
-  "  readonly outputBuffer: OutputBuffer;",
-  "  render<P extends string>(options: { partial: P } & (",
-  "    P extends keyof TemplateRegistry",
-  "      ? {} extends TemplateLocals<TemplateRegistry[P]>",
-  "        ? { locals?: TemplateLocals<TemplateRegistry[P]> }",
-  "        : { locals: TemplateLocals<TemplateRegistry[P]> }",
-  "      : { locals?: Record<string, unknown> }",
-  "  )): SafeString;",
-  "  [key: string]: unknown;",
-  "}",
-  "",
-].join("\n");
+function buildPreamble(needsNoExtraKeys: boolean): string {
+  const actionviewImports = needsNoExtraKeys
+    ? "TemplateRegistry, TemplateLocals, NoExtraKeys"
+    : "TemplateRegistry, TemplateLocals";
+  return [
+    "/* virtualized from .tse — phase 2b trails-tsc plugin */",
+    `import type { ${actionviewImports} } from "@blazetrails/actionview";`,
+    "interface SafeString { readonly __safeStringBrand: unique symbol }",
+    "interface OutputBuffer extends SafeString {",
+    "  safeAppend(s: string): void;",
+    "  append(value: unknown): void;",
+    "  safeExprAppend(value: unknown): void;",
+    "}",
+    "interface RenderContext {",
+    "  readonly outputBuffer: OutputBuffer;",
+    "  render<P extends string>(options: { partial: P } & (",
+    "    P extends keyof TemplateRegistry",
+    "      ? {} extends TemplateLocals<TemplateRegistry[P]>",
+    "        ? { locals?: TemplateLocals<TemplateRegistry[P]> }",
+    "        : { locals: TemplateLocals<TemplateRegistry[P]> }",
+    "      : { locals?: Record<string, unknown> }",
+    "  )): SafeString;",
+    "  [key: string]: unknown;",
+    "}",
+    "",
+  ].join("\n");
+}
 
 export interface VirtualizeTseResult {
   ts: string;
@@ -247,9 +145,10 @@ export function virtualizeTseWithDeltas(source: string): VirtualizeTseResult {
   const ast = parse(source);
   const locals = ast.localsSignature === null ? [] : parseLocalsSignature(ast.localsSignature);
   const localsType = localsParamType(ast, locals);
+  const needsNoExtraKeys = localsType.includes("NoExtraKeys");
 
   const header: string[] = [
-    PREAMBLE,
+    buildPreamble(needsNoExtraKeys),
     "export default function render(",
     "  context: RenderContext,",
     `  locals: ${localsType},`,

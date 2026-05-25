@@ -67,3 +67,4 @@ export { deprecator, Deprecator } from "./deprecator.js";
 export type { TemplateRegistry, TemplateLocals } from "./template-registry.js";
 
 export { TseRenderContextImpl, type TseRenderContext } from "./render-context.js";
+export { type NoExtraKeys, StrictLocalsMismatch } from "./strict-locals.js";

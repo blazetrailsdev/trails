@@ -41,30 +41,25 @@ describe("virtualizeTse", () => {
     const ts = virtualizeTse("<p>hi</p>");
     expect(ts).toContain("locals: Record<string, unknown>");
     expect(ts).not.toContain("const {");
+    // NoExtraKeys is not imported when unused — avoids noUnusedLocals diagnostics.
+    expect(ts).not.toContain("NoExtraKeys");
   });
 
-  it("types empty `<%# locals: () %>` as Record<string, never> (Rails **nil parity)", () => {
-    // `Record<never, never>` collapses to `{}`; `Record<string, never>`
-    // actually rejects any provided key. See plan §2.5 / §2.9.
+  it("types empty `<%# locals: () %>` as NoExtraKeys<Record<string, never>> (Rails **nil parity)", () => {
     const out = virtualizeTse("<%# locals: () %><p>hi</p>");
-    expect(out).toContain("locals: Record<string, never>");
-    // Confirm via tsc: passing `{ extra: 1 }` to a `Record<string, never>`
-    // parameter is a type error. (Inline a Record alias because the
-    // diagnose helper runs with `lib: []`.)
-    const probe =
-      "type Record<K extends keyof any, V> = { [P in K]: V };\n" +
-      out +
-      "\nrender({} as RenderContext, { extra: 1 });";
+    expect(out).toContain("locals: NoExtraKeys<Record<string, never>>");
+    // Confirm via tsc: passing `{ extra: 1 }` is a type error.
+    const probe = out + "\nrender({} as RenderContext, { extra: 1 });";
     expect(diagnose(probe).join("\n")).toMatch(/not assignable|extra/i);
   });
 
   it("destructures locals and types them as unknown when no types block", () => {
     const ts = virtualizeTse("<%# locals: (user:, count: 0) %><%= user %>");
-    expect(ts).toContain("locals: { user: unknown; count?: unknown }");
+    expect(ts).toContain("locals: NoExtraKeys<{ user: unknown; count?: unknown }>");
     expect(ts).toContain("const { user, count = 0 } = locals;");
   });
 
-  it("lifts the types annotation verbatim", () => {
+  it("lifts the types annotation verbatim (no NoExtraKeys wrapper when types block present)", () => {
     const ts = virtualizeTse(
       "<%# locals: (user:) %><%! types: { user: { name: string } } !%><%= user.name %>",
     );
@@ -131,7 +126,7 @@ describe("virtualizeTse", () => {
   it("accepts mixed named kwargs + `**nil` sentinel (Rails parity)", () => {
     const out = virtualizeTse("<%# locals: (user:, **nil) %><%= user %>");
     expect(out).toContain("const { user } = locals;");
-    expect(out).toContain("locals: { user: unknown }");
+    expect(out).toContain("locals: NoExtraKeys<{ user: unknown }>");
   });
 
   it("throws on an empty / invalid local name", () => {
@@ -139,9 +134,27 @@ describe("virtualizeTse", () => {
     expect(() => virtualizeTse("<%# locals: (1bad: 1) %>")).toThrow(/invalid local name/);
   });
 
+  it("throws on duplicate local names", () => {
+    expect(() => virtualizeTse("<%# locals: (count:, count: 0) %>")).toThrow(
+      /duplicate local name/,
+    );
+  });
+
   it("rejects TS reserved words as local names", () => {
     expect(() => virtualizeTse("<%# locals: (default: 1) %>")).toThrow(/invalid local name/);
     expect(() => virtualizeTse("<%# locals: (await: 1) %>")).toThrow(/invalid local name/);
+    // eval/arguments are restricted in strict mode — `const { eval } = x;` is a syntax error in ESM.
+    expect(() => virtualizeTse("<%# locals: (eval:) %>")).toThrow(/invalid local name/);
+    expect(() => virtualizeTse("<%# locals: (arguments:) %>")).toThrow(/invalid local name/);
+  });
+
+  it("rejects emitter-reserved names that would produce duplicate-declaration SyntaxErrors", () => {
+    // These are render() parameters or internal bindings in the emitted output.
+    expect(() => virtualizeTse("<%# locals: (context:) %>")).toThrow(/invalid local name/);
+    expect(() => virtualizeTse("<%# locals: (locals:) %>")).toThrow(/invalid local name/);
+    expect(() => virtualizeTse("<%# locals: (_ob:) %>")).toThrow(/invalid local name/);
+    expect(() => virtualizeTse("<%# locals: (__allowedKeys:) %>")).toThrow(/invalid local name/);
+    expect(() => virtualizeTse("<%# locals: (__extraKeys:) %>")).toThrow(/invalid local name/);
   });
 
   it("dispatches expression sites and preserves code chunks raw", () => {
@@ -185,6 +198,18 @@ describe("virtualizeTse", () => {
     );
   });
 
+  it("wraps named locals type in NoExtraKeys so variable-typed excess keys are rejected", () => {
+    // Without NoExtraKeys, a pre-built variable with excess keys would pass tsc.
+    const out = virtualizeTse("<%# locals: (count:) %><%= count %>");
+    expect(out).toContain("locals: NoExtraKeys<{ count: unknown }>");
+    // Variable with excess key — without NoExtraKeys this would pass tsc.
+    const probe =
+      out +
+      "\nconst l: { count: number; extra: string } = { count: 1, extra: 'x' };" +
+      "\nrender({} as RenderContext, l);";
+    expect(diagnose(probe).join("\n")).toMatch(/not assignable|extra/i);
+  });
+
   it("emits TS that type-checks against the declared locals", () => {
     const source =
       "<%# locals: (user:) %><%! types: { user: { name: string } } !%>" +
@@ -209,7 +234,8 @@ function diagnose(source: string): string[] {
   // resolves to an empty module rather than producing TS2307.
   // Minimal stand-in for @blazetrails/actionview so import type { TemplateRegistry, TemplateLocals }
   // resolves without TS2307 or "has no exported member" errors.
-  const stubSrc = "export interface TemplateRegistry {} export type TemplateLocals<T> = T;";
+  const stubSrc =
+    "export interface TemplateRegistry {} export type TemplateLocals<T> = T; export type NoExtraKeys<T> = T & { [K in Exclude<string, keyof T>]?: never };";
   const stubPath = "/stub/module.d.ts";
   const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.ES2022, true);
   const stubFile = ts.createSourceFile(stubPath, stubSrc, ts.ScriptTarget.ES2022, true);
