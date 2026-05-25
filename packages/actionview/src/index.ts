@@ -64,3 +64,4 @@ export * from "./helpers/index.js";
 
 export { Trailtie, type ActionViewConfig } from "./trailtie.js";
 export { deprecator, Deprecator } from "./deprecator.js";
+export type { TemplateRegistry, TemplateLocals } from "./template-registry.js";

@@ -205,25 +205,43 @@ describe("virtualizeTse", () => {
 
 function diagnose(source: string): string[] {
   const fileName = "/virtual/show.html.tse.ts";
+  // Stub out external modules so `import type { ... } from "@blazetrails/actionview"`
+  // resolves to an empty module rather than producing TS2307.
+  // Minimal stand-in for @blazetrails/actionview so import type { TemplateRegistry, TemplateLocals }
+  // resolves without TS2307 or "has no exported member" errors.
+  const stubSrc = "export interface TemplateRegistry {} export type TemplateLocals<T> = T;";
+  const stubPath = "/stub/module.d.ts";
   const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.ES2022, true);
+  const stubFile = ts.createSourceFile(stubPath, stubSrc, ts.ScriptTarget.ES2022, true);
+  // Use the real default host for lib files so built-ins (Record, etc.) resolve.
+  const defaultHost = ts.createCompilerHost({});
   const host: ts.CompilerHost = {
-    fileExists: (f) => f === fileName,
-    readFile: (f) => (f === fileName ? source : undefined),
-    getSourceFile: (f, lv) => (f === fileName ? sourceFile : ts.createSourceFile(f, "", lv, true)),
-    getDefaultLibFileName: () => "lib.d.ts",
-    writeFile: () => {},
-    getCurrentDirectory: () => "/",
-    getCanonicalFileName: (f) => f,
-    useCaseSensitiveFileNames: () => true,
-    getNewLine: () => "\n",
+    ...defaultHost,
+    fileExists: (f) => f === fileName || f === stubPath || defaultHost.fileExists(f),
+    readFile: (f) => (f === fileName ? source : f === stubPath ? stubSrc : defaultHost.readFile(f)),
+    getSourceFile: (f, lv, onError) => {
+      if (f === fileName) return sourceFile;
+      if (f === stubPath) return stubFile;
+      return defaultHost.getSourceFile(f, lv, onError);
+    },
+    resolveModuleNames: (moduleNames, containingFile, _, __, opts) => {
+      const real = defaultHost.resolveModuleNames;
+      const results = real
+        ? real.call(defaultHost, moduleNames, containingFile, _, __, opts)
+        : moduleNames.map(() => undefined);
+      return results.map((r, i) => {
+        if (r) return r;
+        // Any unresolved import → stub (covers @blazetrails/actionview and any other external)
+        void moduleNames[i];
+        return { resolvedFileName: stubPath, isExternalLibraryImport: true };
+      });
+    },
   };
   const program = ts.createProgram({
     rootNames: [fileName],
     options: {
       noEmit: true,
-      noResolve: true,
       types: [],
-      lib: [],
       skipLibCheck: true,
       strict: true,
     },
