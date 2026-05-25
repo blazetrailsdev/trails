@@ -458,6 +458,8 @@ export function methodUsesDepImport(
       }
     }
     ts.forEachChild(n, (c) => {
+      // Non-body children of a function-like are signature territory
+      // (typeParameters, parameters, return type) — stay in sig mode.
       const childInSig =
         inSignatureType || (ts.isFunctionLike(n) && c !== (n as ts.FunctionLikeDeclaration).body);
       check(c, childInSig);
