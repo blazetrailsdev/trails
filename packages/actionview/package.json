@@ -14,6 +14,10 @@
       "types": "./dist/strict-locals.d.ts",
       "default": "./dist/strict-locals.js"
     },
+    "./tse-modules": {
+      "types": "./types/tse-modules.d.ts",
+      "default": "./types/tse-modules.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"
@@ -23,7 +27,8 @@
     "build": "tsc"
   },
   "files": [
-    "dist"
+    "dist",
+    "types"
   ],
   "license": "MIT",
   "dependencies": {

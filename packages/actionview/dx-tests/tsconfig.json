@@ -9,7 +9,8 @@
       "@blazetrails/activesupport": ["../../activesupport/src/index.ts"],
       "@blazetrails/activesupport/yaml": ["../../activesupport/src/yaml.ts"],
       "@blazetrails/did-you-mean": ["../../did-you-mean/src/index.ts"],
-      "@blazetrails/tse-compiler": ["../../tse-compiler/src/index.ts"]
+      "@blazetrails/tse-compiler": ["../../tse-compiler/src/index.ts"],
+      "@blazetrails/actionview/tse-modules": ["../types/tse-modules.d.ts"]
     }
   },
   "include": ["./**/*.test-d.ts"]
