@@ -20,6 +20,26 @@ describe("parse", () => {
     expect(parse("<%# locals: (a:) %><%# locals: (b:) %>").localsSignature).toBe("a:");
   });
 
+  it("lifts format: magic block onto the AST root", () => {
+    const ast = parse('<%! format: "json" !%>Hello');
+    expect(ast.formatAnnotation).toBe("json");
+    expect(ast.nodes).toEqual([{ kind: "text", value: "Hello" }]);
+  });
+
+  it("keeps first format: directive on duplicates", () => {
+    expect(parse('<%! format: "json" !%><%! format: "xml" !%>').formatAnnotation).toBe("json");
+  });
+
+  it("format: and types: can coexist", () => {
+    const ast = parse('<%! format: "json" !%><%! types: { name: string } !%>');
+    expect(ast.formatAnnotation).toBe("json");
+    expect(ast.typesAnnotation).toBe("{ name: string }");
+  });
+
+  it("defaults formatAnnotation to null when absent", () => {
+    expect(parse("Hello").formatAnnotation).toBeNull();
+  });
+
   it("rejects unknown <%! ... !%> directives", () => {
     expect(() => parse("<%! foo: bar !%>")).toThrow(TseSyntaxError);
   });
