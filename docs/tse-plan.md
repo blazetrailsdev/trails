@@ -1241,8 +1241,8 @@ from "./show.html.tse"` typechecks before any `.tse.d.ts` is
 ### Story 5.13 — Package wiring
 
 - [x] `package.json#exports` entry for `*.tse` lists `"types"` before
-      `"default"` so tsc resolves the `.tse.d.ts` ahead of the
-      runtime shim.
+      `"default"` so tsc resolves the `.tse.ts` shim ahead of the
+      runtime `.tse.js`.
 - [x] `tsconfig` starter template enables
       `allowArbitraryExtensions` and lists
       `@blazetrails/trails-tsc/ts-plugin` under `compilerOptions.plugins`.
