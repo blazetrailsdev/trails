@@ -30,6 +30,21 @@ export interface TseRenderContext {
    * Mark `value` as HTML-safe without escaping. Mirrors Rails `raw`.
    */
   raw(value: unknown): SafeBuffer;
+
+  /**
+   * In a layout: return the inner template's rendered output (default yield)
+   * or a named `content_for` buffer. Returns an empty SafeBuffer when the
+   * named section has no content. Mirrors Rails `<%= yield %>` /
+   * `<%= yield :name %>` in layouts.
+   */
+  yield(section?: string): SafeBuffer;
+
+  /**
+   * Capture `callback` output and append it to the named section buffer.
+   * Multiple calls with the same name concatenate (Rails behavior).
+   * Mirrors Rails `<% content_for(:name) { ... } %>`.
+   */
+  contentFor(name: string, callback: () => void): void;
 }
 
 /**
@@ -38,8 +53,23 @@ export interface TseRenderContext {
 export class TseRenderContextImpl implements TseRenderContext {
   outputBuffer: OutputBuffer;
 
+  /** Default yield content (inner template output). Set by the renderer before invoking a layout. */
+  private _defaultYield: SafeBuffer = htmlSafe("");
+
+  /** Named content_for buffers. Multiple appends concatenate per Rails behavior. */
+  private _contentBuffers: Map<string, SafeBuffer> = new Map();
+
   constructor(outputBuffer: OutputBuffer = new OutputBuffer()) {
     this.outputBuffer = outputBuffer;
+  }
+
+  /**
+   * Set the default yield content (inner template output).
+   * Called by the renderer after rendering the inner template and before invoking the layout.
+   * @internal
+   */
+  setDefaultYield(content: SafeBuffer): void {
+    this._defaultYield = content;
   }
 
   capture(callback: () => void): SafeBuffer {
@@ -62,5 +92,16 @@ export class TseRenderContextImpl implements TseRenderContext {
     if (value instanceof OutputBuffer) return value.toString();
     if (value instanceof SafeBuffer) return value;
     return htmlSafe(String(value ?? ""));
+  }
+
+  yield(section?: string): SafeBuffer {
+    if (section === undefined) return this._defaultYield;
+    return this._contentBuffers.get(section) ?? htmlSafe("");
+  }
+
+  contentFor(name: string, callback: () => void): void {
+    const captured = this.capture(callback);
+    const existing = this._contentBuffers.get(name);
+    this._contentBuffers.set(name, existing ? existing.concat(captured) : captured);
   }
 }

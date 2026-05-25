@@ -110,4 +110,69 @@ describe("TseRenderContextImpl", () => {
       expect(parent.outputBuffer.toStr()).toBe("parent-beforechildparent-after");
     });
   });
+
+  describe("#yield", () => {
+    it("returns empty SafeBuffer by default (no layout content set)", () => {
+      const result = ctx.yield();
+      expect(result.toString()).toBe("");
+      expect(isHtmlSafe(result)).toBe(true);
+    });
+
+    it("returns the inner template output set via setDefaultYield", () => {
+      ctx.setDefaultYield(htmlSafe("<p>inner</p>"));
+      expect(ctx.yield().toString()).toBe("<p>inner</p>");
+      expect(isHtmlSafe(ctx.yield())).toBe(true);
+    });
+
+    it("returns empty SafeBuffer for an unknown named section", () => {
+      const result = ctx.yield("title");
+      expect(result.toString()).toBe("");
+      expect(isHtmlSafe(result)).toBe(true);
+    });
+
+    it("returns named section content captured via contentFor", () => {
+      ctx.contentFor("title", () => {
+        ctx.outputBuffer.safeAppend("My Title");
+      });
+      expect(ctx.yield("title").toString()).toBe("My Title");
+    });
+
+    it("multiple contentFor calls with same name concatenate", () => {
+      ctx.contentFor("sidebar", () => {
+        ctx.outputBuffer.safeAppend("first");
+      });
+      ctx.contentFor("sidebar", () => {
+        ctx.outputBuffer.safeAppend(" second");
+      });
+      expect(ctx.yield("sidebar").toString()).toBe("first second");
+    });
+
+    it("different sections are independent", () => {
+      ctx.contentFor("title", () => {
+        ctx.outputBuffer.safeAppend("Title");
+      });
+      ctx.contentFor("footer", () => {
+        ctx.outputBuffer.safeAppend("Footer");
+      });
+      expect(ctx.yield("title").toString()).toBe("Title");
+      expect(ctx.yield("footer").toString()).toBe("Footer");
+    });
+  });
+
+  describe("#contentFor", () => {
+    it("does not write to the outer buffer", () => {
+      ctx.outputBuffer.safeAppend("outer");
+      ctx.contentFor("aside", () => {
+        ctx.outputBuffer.safeAppend("inside");
+      });
+      expect(ctx.outputBuffer.toStr()).toBe("outer");
+    });
+
+    it("HTML-escapes unsafe content written via concat inside callback", () => {
+      ctx.contentFor("title", () => {
+        ctx.concat("<script>");
+      });
+      expect(ctx.yield("title").toString()).toBe("&lt;script&gt;");
+    });
+  });
 });
