@@ -17,7 +17,7 @@ import {
   camelize as _camelize,
   singularize as _singularize,
 } from "@blazetrails/activesupport";
-import { sql as arelSql, Nodes } from "@blazetrails/arel";
+import { Table, sql as arelSql, Nodes } from "@blazetrails/arel";
 import { modelRegistry } from "../associations.js";
 import { reflectOnAssociation } from "../reflection.js";
 import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
@@ -37,6 +37,7 @@ export interface JoinNode {
   assocName: string;
   assocType: "hasMany" | "hasOne" | "belongsTo";
   joinSql: string;
+  arelJoin: Nodes.Join | null;
   /** The immediate association name (without parent prefix) */
   immediateAssocName: string;
   /** Dotted parent path, or null if directly on the base model */
@@ -226,33 +227,28 @@ export class JoinDependency {
 
     let targetModel: typeof Base | undefined;
     let targetTable: string;
-    let joinOn: string;
-    // HABTM is structurally has_many :through under the hood, so collapse
-    // its assoc type to "hasMany" for downstream JoinNode consumers (limit
-    // suppression, singular-vs-collection assignment, etc.).
+    let foreignKey: string;
+    let primaryKey: string;
+    let isBelongsTo = false;
     const assocType: "hasMany" | "hasOne" | "belongsTo" =
       assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type;
 
     if (assocDef.type === "belongsTo") {
       if (assocDef.options.polymorphic) return null;
-      const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
+      foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
       if (Array.isArray(foreignKey)) return null;
       const className = assocDef.options.className ?? _camelize(assocName);
       targetModel = modelRegistry.get(className) as typeof Base | undefined;
       if (!targetModel) return null;
       targetTable = (targetModel as any).tableName;
-      const targetPk = assocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
-      if (Array.isArray(targetPk)) return null;
-      // effectiveName resolved below after targetTable is known
-      joinOn = `PLACEHOLDER.${this._qc(targetPk)} = ${this._qt(sourceAlias)}.${this._qc(foreignKey)}`;
+      primaryKey = assocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
+      if (Array.isArray(primaryKey)) return null;
+      isBelongsTo = true;
     } else if (
       assocDef.type === "hasMany" ||
       assocDef.type === "hasOne" ||
       assocDef.type === "hasAndBelongsToMany"
     ) {
-      // HABTM always has options.through set by the builder (it auto-generates
-      // a join model and routes through it). Mirrors how Rails' HABTM is
-      // structurally a has_many :through against an anonymous join model.
       if (assocDef.options.through) {
         return this._addThroughAssociation(
           assocDef,
@@ -268,67 +264,68 @@ export class JoinDependency {
       targetModel = modelRegistry.get(className) as typeof Base | undefined;
       if (!targetModel) return null;
       targetTable = (targetModel as any).tableName;
-      const foreignKey = assocDef.options.as
+      foreignKey = assocDef.options.as
         ? (assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`)
         : (assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
       if (Array.isArray(foreignKey)) return null;
-      const primaryKey = assocDef.options.primaryKey ?? sourcePk;
+      primaryKey = assocDef.options.primaryKey ?? sourcePk;
       if (Array.isArray(primaryKey)) return null;
-      joinOn = `PLACEHOLDER.${this._qc(foreignKey)} = ${this._qt(sourceAlias)}.${this._qc(primaryKey)}`;
-
-      if (assocDef.options.as) {
-        const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-        joinOn += ` AND PLACEHOLDER.${this._qc(typeCol)} = ${this._quoteString(modelClass.name)}`;
-      }
     } else {
       return null;
     }
 
-    // Rails only aliases a joined table when its real name is already in use
-    // (AliasTracker: aliases[table_name] == 0 → use real name). Mirror that:
-    // use the real table name in SQL when there's no collision, otherwise fall
-    // back to the sequential tN alias.
-    // Track real table names only — collision check is against the real name.
-    // effectiveName is the tN alias when there IS a collision, but we still
-    // record targetTable so future joins against the same real table also alias.
     const effectiveName = this._usedTableNames.has(targetTable!) ? tableAlias : targetTable!;
-    this._usedTableNames.add(targetTable!);
 
-    // Substitute the PLACEHOLDER with the effective SQL name
-    // Function replacer avoids `$&`/`$'`/`` $` ``/`$N` expansion in the
-    // replacement string when an identifier contains `$`.
-    const effectiveQuoted = this._qt(effectiveName);
-    joinOn = joinOn.replace(/PLACEHOLDER/g, () => effectiveQuoted);
+    const targetArelTable =
+      effectiveName === targetTable!
+        ? new Table(targetTable!)
+        : new Table(targetTable!, { as: effectiveName });
+    const sourceArelTable = new Table(sourceAlias);
 
-    // Apply association scope as additional ON conditions
+    // Build ON predicate as Arel nodes (mirrors Rails join_dependency.rb build_constraint)
+    let predicate: Nodes.Node;
+    if (isBelongsTo) {
+      predicate = targetArelTable.get(primaryKey!).eq(sourceArelTable.get(foreignKey!));
+    } else {
+      predicate = targetArelTable.get(foreignKey!).eq(sourceArelTable.get(primaryKey!));
+    }
+
+    // Polymorphic :as type predicate
+    if (!isBelongsTo && assocDef.options.as) {
+      const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
+      const typePred = targetArelTable.get(typeCol).eq(new Nodes.Quoted(modelClass.name));
+      predicate = new Nodes.And([predicate, typePred]);
+    }
+
+    // Association scope predicates
     if (assocDef.options.scope && typeof assocDef.options.scope === "function") {
       const scopeRel = assocDef.options.scope((targetModel as any)._allForPreload());
-      const scopeSql = scopeRel?.toSql?.();
-      if (scopeSql) {
-        const whereMatch = scopeSql.match(/\bWHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s*$)/i);
-        if (whereMatch) {
-          const toQ = this._qt(effectiveName);
-          const scopeWhere = whereMatch[1].replaceAll(this._qt(targetTable!), () => toQ);
-          joinOn += ` AND ${scopeWhere}`;
+      if (scopeRel?._whereClause && !scopeRel._whereClause.isEmpty()) {
+        let scopeAst: Nodes.Node = scopeRel._whereClause.ast;
+        // When the target table was aliased (collision), the scope's AST
+        // references the unaliased table. Rebind attributes to the aliased table.
+        if (effectiveName !== targetTable!) {
+          scopeAst = rebindTableReferences(scopeAst, targetTable!, targetArelTable);
         }
+        predicate =
+          predicate instanceof Nodes.And
+            ? new Nodes.And([...predicate.children, scopeAst])
+            : new Nodes.And([predicate, scopeAst]);
       }
     }
 
-    // Add STI type constraint if target is an STI subclass
-    joinOn = this._addStiConstraint(joinOn, targetModel!, effectiveName);
+    // STI type constraint as Arel predicate
+    predicate = this._addStiConstraintArel(predicate, targetModel!, targetArelTable);
 
-    // Guard against composite PK on target model
     const targetModelPk = (targetModel as any).primaryKey ?? "id";
     if (Array.isArray(targetModelPk)) return null;
 
+    // Commit-point: all failure guards passed; register the table name.
+    this._usedTableNames.add(targetTable!);
+
     const columns = getModelColumns(targetModel);
 
-    // Build JOIN SQL: only emit the alias clause when effectiveName differs
-    // from the real table name (i.e. there was a collision and we used tN).
-    const joinTableExpr =
-      effectiveName === targetTable!
-        ? this._qt(targetTable!)
-        : `${this._qt(targetTable!)} ${this._qt(effectiveName)}`;
+    const arelJoin = new Nodes.OuterJoin(targetArelTable, new Nodes.On(predicate));
 
     const node: JoinNode = {
       tableIndex,
@@ -341,7 +338,8 @@ export class JoinDependency {
       immediateAssocName: assocName,
       parentPath: options?.parentAssocName ?? null,
       assocType,
-      joinSql: `LEFT OUTER JOIN ${joinTableExpr} ON ${joinOn}`,
+      joinSql: "",
+      arelJoin,
     };
 
     for (let i = 0; i < columns.length; i++) {
@@ -418,7 +416,10 @@ export class JoinDependency {
   }
 
   buildJoinSql(): string {
-    return this._nodes.map((n) => n.joinSql).join(" ");
+    return this._nodes
+      .filter((n) => n.joinSql)
+      .map((n) => n.joinSql)
+      .join(" ");
   }
 
   get baseKlass(): typeof Base {
@@ -450,12 +451,12 @@ export class JoinDependency {
     joinsToAdd: JoinDependency[],
     _aliasTracker?: any,
     _references?: string[],
-  ): Nodes.StringJoin[] {
-    const toStringJoin = (n: { joinSql: string }): Nodes.StringJoin =>
-      new Nodes.StringJoin(arelSql(n.joinSql));
-    const joins = this._nodes.map(toStringJoin);
+  ): Nodes.Join[] {
+    const toJoinNode = (n: JoinNode): Nodes.Join =>
+      n.arelJoin ?? new Nodes.StringJoin(arelSql(n.joinSql));
+    const joins = this._nodes.map(toJoinNode);
     for (const oj of joinsToAdd) {
-      joins.push(...oj._nodes.map(toStringJoin));
+      joins.push(...oj._nodes.map(toJoinNode));
     }
     return joins;
   }
@@ -525,6 +526,23 @@ export class JoinDependency {
       joinOn += ` AND ${this._qt(alias)}.${this._qc(inheritanceCol)} IN (${inList})`;
     }
     return joinOn;
+  }
+
+  private _addStiConstraintArel(
+    predicate: Nodes.Node,
+    model: typeof Base,
+    arelTable: Table,
+  ): Nodes.Node {
+    const inheritanceCol = getInheritanceColumn(model);
+    if (inheritanceCol && isStiSubclass(model)) {
+      const stiNames = [model.name, ...((model as any).descendants ?? []).map((d: any) => d.name)];
+      const quotedNames = stiNames.map((n: string) => new Nodes.Quoted(n));
+      const stiPred = arelTable.get(inheritanceCol).in(quotedNames);
+      return predicate instanceof Nodes.And
+        ? new Nodes.And([...predicate.children, stiPred])
+        : new Nodes.And([predicate, stiPred]);
+    }
+    return predicate;
   }
 
   instantiateFromRows(rows: Record<string, unknown>[]): {
@@ -755,6 +773,7 @@ export class JoinDependency {
         parentPath: parentAssocName ?? null,
         assocType: throughAssocDef.type === "hasOne" ? "hasOne" : "hasMany",
         joinSql: throughJoinSql,
+        arelJoin: null,
       });
 
       // Now recursively add the source association from the through model
@@ -891,11 +910,68 @@ export class JoinDependency {
       parentPath: parentAssocName ?? null,
       assocType: assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type,
       joinSql: `${throughJoinSql} LEFT OUTER JOIN ${targetJoinTableExpr} ON ${targetJoinOn}`,
+      arelJoin: null,
     };
 
     this._nodes.push(node);
     return node;
   }
+}
+
+function rebindTableReferences(
+  node: Nodes.Node,
+  fromTableName: string,
+  toTable: Table,
+): Nodes.Node {
+  if (node instanceof Nodes.Attribute) {
+    const rel = node.relation;
+    if (rel instanceof Table && rel.name === fromTableName && !rel.tableAlias) {
+      return toTable.get(node.name);
+    }
+    return node;
+  }
+  if (node instanceof Nodes.And) {
+    return new Nodes.And(
+      node.children.map((c) => rebindTableReferences(c, fromTableName, toTable)),
+    );
+  }
+  // Nary nodes (Or) — have children array
+  if ("children" in node && Array.isArray((node as any).children)) {
+    if (node instanceof Nodes.And) return node;
+    const rebound = (node as any).children.map((c: Nodes.Node) =>
+      rebindTableReferences(c, fromTableName, toTable),
+    );
+    const clone = Object.assign(Object.create(Object.getPrototypeOf(node)), node);
+    clone.children = rebound;
+    return clone;
+  }
+  // Unary nodes (Grouping, Not, etc.) — have expr
+  if ("expr" in node && (node as any).expr instanceof Nodes.Node) {
+    const rebound = rebindTableReferences((node as any).expr, fromTableName, toTable);
+    if (rebound === (node as any).expr) return node;
+    const clone = Object.assign(Object.create(Object.getPrototypeOf(node)), node);
+    clone.expr = rebound;
+    return clone;
+  }
+  // Binary nodes (Equality, In, InfixOperation, Matches, etc.) — have left/right.
+  // Shallow-clone to preserve extra fields (operator, escape, caseSensitive).
+  if ("left" in node && "right" in node) {
+    const bin = node as any;
+    const left =
+      bin.left instanceof Nodes.Node
+        ? rebindTableReferences(bin.left, fromTableName, toTable)
+        : bin.left;
+    const right =
+      bin.right instanceof Nodes.Node
+        ? rebindTableReferences(bin.right, fromTableName, toTable)
+        : bin.right;
+    if (left === bin.left && right === bin.right) return node;
+    const clone = Object.assign(Object.create(Object.getPrototypeOf(node)), node);
+    clone.left = left;
+    clone.right = right;
+    return clone;
+  }
+  return node;
 }
 
 /** @internal */

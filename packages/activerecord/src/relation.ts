@@ -3434,7 +3434,11 @@ export class Relation<T extends Base> {
     const manager = table.project(new Nodes.SqlLiteral(jd.buildSelectSql()));
 
     for (const node of jd.nodes) {
-      manager.appendStringJoin(node.joinSql);
+      if (node.arelJoin) {
+        manager.appendJoinNode(node.arelJoin);
+      } else {
+        manager.appendStringJoin(node.joinSql);
+      }
     }
 
     this._applyJoinsToManager(manager);
@@ -3461,7 +3465,11 @@ export class Relation<T extends Base> {
         const idSubquery = table.project(pkAttr);
         idSubquery.distinct();
         for (const node of jd.nodes) {
-          idSubquery.appendStringJoin(node.joinSql);
+          if (node.arelJoin) {
+            idSubquery.appendJoinNode(node.arelJoin);
+          } else {
+            idSubquery.appendStringJoin(node.joinSql);
+          }
         }
         this._applyJoinsToManager(idSubquery);
         this._applyWheresToManager(idSubquery, table);
