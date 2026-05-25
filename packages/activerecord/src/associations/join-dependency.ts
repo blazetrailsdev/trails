@@ -11,7 +11,6 @@
  */
 
 import type { Base } from "../base.js";
-import type { DatabaseAdapter } from "../adapter.js";
 import {
   underscore as _toUnderscore,
   camelize as _camelize,
@@ -21,9 +20,7 @@ import { Table, sql as arelSql, Nodes } from "@blazetrails/arel";
 import { modelRegistry } from "../associations.js";
 import { reflectOnAssociation } from "../reflection.js";
 import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
-import { ConnectionNotDefined } from "../errors.js";
 import {
-  quote as abstractQuote,
   quoteTableName as abstractQuoteTableName,
   quoteColumnName as abstractQuoteColumnName,
 } from "../connection-adapters/abstract/quoting.js";
@@ -131,72 +128,12 @@ export class JoinDependency {
   // When a joined table's real name is unique, we skip the tN alias in SQL
   // (matching Rails' AliasTracker which only aliases on collision).
   private _usedTableNames: Set<string>;
-  // Connection used for adapter-aware string quoting in polymorphic
-  // source_type / STI type predicates. Resolved eagerly in the constructor;
-  // null only when no pool is wired (mirrors `quoterFor` in sanitization.ts).
-  // Eager resolution is safe because all production call sites construct
-  // JoinDependency immediately before walking it; there is no window in
-  // which the pool could become wired between construction and the first
-  // `_quoteString` call.
-  private _adapter: DatabaseAdapter | null;
 
   constructor(baseModel: typeof Base) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
     this._usedTableNames = new Set([this._baseAlias]);
-    this._adapter = JoinDependency._resolveAdapter(baseModel);
     this._buildBaseAliases();
-  }
-
-  /**
-   * Mirrors `quoterFor` (sanitization.ts:237): only the absence of a
-   * configured pool (`ConnectionNotDefined`) falls back to the portable
-   * escape; other failures (pool exhaustion, adapter errors) propagate so
-   * real connection problems don't silently downgrade the emitted SQL.
-   * Structurally rejects adapters missing `quote` for the same reason.
-   * @internal
-   */
-  private static _resolveAdapter(baseModel: typeof Base): DatabaseAdapter | null {
-    if (typeof (baseModel as any).connection !== "function") return null;
-    let conn: DatabaseAdapter | null | undefined;
-    try {
-      conn = (baseModel as any).connection() as DatabaseAdapter | null | undefined;
-    } catch (err) {
-      if (err instanceof ConnectionNotDefined) return null;
-      throw err;
-    }
-    if (!conn || typeof (conn as any).quote !== "function") return null;
-    return conn;
-  }
-
-  /**
-   * Mirrors Rails' `connection.quote(value)` for string literals embedded
-   * into JOIN predicates (polymorphic source_type, STI type IN-lists).
-   * Falls back to the abstract adapter's `quote` only when no pool is
-   * wired (delegates to a single source of truth for the portable escape).
-   * @internal
-   */
-  private _quoteString(value: string): string {
-    if (this._adapter) return (this._adapter as any).quote(value);
-    return abstractQuote(value);
-  }
-
-  /**
-   * Adapter-aware table identifier quoting for JOIN SQL construction.
-   * Mirrors `_quoteString` resolution: delegate to the active adapter so
-   * MySQL emits backticks (avoids mixed-quote SQL when the MySQL Arel
-   * visitor is active), fall back to the ANSI portable form otherwise.
-   * @internal
-   */
-  private _qt(name: string): string {
-    const fn = (this._adapter as any)?.quoteTableName;
-    return typeof fn === "function" ? fn.call(this._adapter, name) : abstractQuoteTableName(name);
-  }
-
-  /** @internal */
-  private _qc(name: string): string {
-    const fn = (this._adapter as any)?.quoteColumnName;
-    return typeof fn === "function" ? fn.call(this._adapter, name) : abstractQuoteColumnName(name);
   }
 
   get nodes(): JoinNode[] {
@@ -406,8 +343,7 @@ export class JoinDependency {
 
     return this._aliases.map((a) => {
       const effectiveName = effectiveNameByIndex.get(a.tableIndex)!;
-      // Rails emits column aliases as SqlLiteral (bare, not quoted).
-      return `${this._qt(effectiveName)}.${this._qc(a.column)} AS ${a.alias}`;
+      return `${abstractQuoteTableName(effectiveName)}.${abstractQuoteColumnName(a.column)} AS ${a.alias}`;
     });
   }
 
@@ -466,8 +402,6 @@ export class JoinDependency {
   }
 
   applyColumnAliases(relation: any): any {
-    // Rails: aliases.columns.map { |c| Arel::Nodes::As.new(...) }
-    // Trails: build the same SQL strings via the aliases object.
     const effectiveNameByIndex = new Map<number, string>();
     effectiveNameByIndex.set(this._baseTableIndex, this._baseAlias);
     for (const node of this._nodes) {
@@ -477,7 +411,7 @@ export class JoinDependency {
       .columns()
       .map(
         (a) =>
-          `${this._qt(effectiveNameByIndex.get(a.tableIndex)!)}.${this._qc(a.column)} AS ${a.alias}`,
+          `${abstractQuoteTableName(effectiveNameByIndex.get(a.tableIndex)!)}.${abstractQuoteColumnName(a.column)} AS ${a.alias}`,
       );
     if (typeof relation.reselectBang === "function") {
       relation.reselectBang(...selectExprs);
@@ -516,16 +450,6 @@ export class JoinDependency {
         if (value != null) JoinDependency.walkTree(value, hash[key]);
       }
     }
-  }
-
-  private _addStiConstraint(joinOn: string, model: typeof Base, alias: string): string {
-    const inheritanceCol = getInheritanceColumn(model);
-    if (inheritanceCol && isStiSubclass(model)) {
-      const stiNames = [model.name, ...((model as any).descendants ?? []).map((d: any) => d.name)];
-      const inList = stiNames.map((n: string) => this._quoteString(n)).join(", ");
-      joinOn += ` AND ${this._qt(alias)}.${this._qc(inheritanceCol)} IN (${inList})`;
-    }
-    return joinOn;
   }
 
   private _addStiConstraintArel(
@@ -695,54 +619,49 @@ export class JoinDependency {
       : (throughAssocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
     if (Array.isArray(throughFk)) return null;
 
-    // Mirror addAssociation collision-check (Rails AliasTracker): use the
-    // real table name unless it's already in use, in which case fall back
-    // to the sequential tN alias. The mutation of `_usedTableNames` is
-    // deferred to the commit points below so failure paths don't pollute
-    // the set with tables we never actually joined.
     const throughEffective = this._usedTableNames.has(throughTable) ? throughAlias : throughTable;
 
-    let throughJoinOn = `${this._qt(throughEffective)}.${this._qc(throughFk)} = ${this._qt(sourceAlias)}.${this._qc(sourcePk)}`;
+    // Build Arel tables for through join
+    const throughArelTable =
+      throughEffective === throughTable
+        ? new Table(throughTable)
+        : new Table(throughTable, { as: throughEffective });
+    const sourceArelTable = new Table(sourceAlias);
+
+    // Through ON predicate: throughTable.fk = sourceTable.pk
+    let throughPredicate: Nodes.Node = throughArelTable
+      .get(throughFk)
+      .eq(sourceArelTable.get(sourcePk));
+
+    // Polymorphic :as on through association
     if (throughAssocDef.options.as) {
       const typeCol = `${_toUnderscore(throughAssocDef.options.as)}_type`;
-      throughJoinOn += ` AND ${this._qt(throughEffective)}.${this._qc(typeCol)} = ${this._quoteString(String(modelClass.name))}`;
+      const typePred = throughArelTable.get(typeCol).eq(new Nodes.Quoted(modelClass.name));
+      throughPredicate = new Nodes.And([throughPredicate, typePred]);
     }
-    const throughJoinTableExpr =
-      throughEffective === throughTable
-        ? this._qt(throughTable)
-        : `${this._qt(throughTable)} ${this._qt(throughEffective)}`;
-    const throughJoinSql = `LEFT OUTER JOIN ${throughJoinTableExpr} ON ${throughJoinOn}`;
+
+    const throughArelJoin = new Nodes.OuterJoin(throughArelTable, new Nodes.On(throughPredicate));
 
     const sourceName = assocDef.options.source ?? _singularize(assocDef.name);
     const throughAssocs: any[] = (throughModel as any)._associations ?? [];
     const sourceAssocDef = throughAssocs.find((a: any) => a.name === sourceName);
 
     let targetModel: typeof Base | undefined;
-    let targetTable: string;
-    let targetJoinOn: string;
+    let targetTable!: string;
     const targetTableIndex = this._nextTableIndex++;
     const targetAlias = `t${targetTableIndex}`;
 
     if (!sourceAssocDef) return null;
 
     // If the source association is itself a through, recursively resolve
-    // the chain by first adding the through JOIN, then delegating to
-    // addAssociation on the through model for the source name.
     if (sourceAssocDef.options?.through) {
-      // We already consumed a table index for the target, give it back
       this._nextTableIndex--;
 
-      // Snapshot state for rollback if recursive call fails. Includes a
-      // copy of `_usedTableNames` because the recursive `addAssociation`
-      // (and any nested `_addThroughAssociation`) can mutate it before
-      // returning null on its own failure guards (e.g. composite-PK on
-      // a deeper target).
       const snapshotNodes = this._nodes.length;
       const snapshotAliases = this._aliases.length;
       const snapshotNextIndex = this._nextTableIndex;
       const snapshotUsedTableNames = new Set(this._usedTableNames);
 
-      // Add the through table JOIN as a standalone node (intermediate)
       const throughColumns = getModelColumns(throughModel);
       for (let i = 0; i < throughColumns.length; i++) {
         this._aliases.push({
@@ -753,9 +672,6 @@ export class JoinDependency {
         });
       }
 
-      // Commit-point: the through-node push below is the first
-      // observable side-effect that depends on the alias decision.
-      // The pre-recursion snapshot above covers rollback of this add.
       this._usedTableNames.add(throughTable);
 
       const throughNodeName = parentAssocName
@@ -772,11 +688,10 @@ export class JoinDependency {
         immediateAssocName: `_through_${assocDef.options.through}`,
         parentPath: parentAssocName ?? null,
         assocType: throughAssocDef.type === "hasOne" ? "hasOne" : "hasMany",
-        joinSql: throughJoinSql,
-        arelJoin: null,
+        joinSql: "",
+        arelJoin: throughArelJoin,
       });
 
-      // Now recursively add the source association from the through model
       const recursiveNode = this.addAssociation(sourceName, {
         fromModel: throughModel,
         fromAlias: throughEffective,
@@ -784,10 +699,6 @@ export class JoinDependency {
       });
 
       if (!recursiveNode) {
-        // Roll back intermediate state. Restore `_usedTableNames` from
-        // the pre-recursion snapshot so any mutation by the recursive
-        // call (including its own through additions) is undone — the
-        // `throughTableWasNew` delete alone wouldn't cover that.
         this._nodes.length = snapshotNodes;
         this._aliases.length = snapshotAliases;
         this._nextTableIndex = snapshotNextIndex;
@@ -795,7 +706,6 @@ export class JoinDependency {
         return null;
       }
 
-      // Patch the recursive node to reflect the outer association
       recursiveNode.assocName = parentAssocName
         ? `${parentAssocName}.${assocDef.name}`
         : assocDef.name;
@@ -806,10 +716,10 @@ export class JoinDependency {
       return recursiveNode;
     }
 
+    // Build target join predicate as Arel nodes
+    let targetPredicate: Nodes.Node;
+
     if (sourceAssocDef.type === "belongsTo") {
-      // Polymorphic belongs_to as the source of a has_many :through must
-      // be paired with `source_type:` on the outer association so the target
-      // class is resolvable; without it Rails raises HasManyThroughSourceAssociationPolymorphicError.
       const isPoly = sourceAssocDef.options.polymorphic === true;
       if (isPoly && !assocDef.options.sourceType) return null;
       const targetFk = sourceAssocDef.options.foreignKey ?? `${_toUnderscore(sourceName)}_id`;
@@ -822,66 +732,139 @@ export class JoinDependency {
       targetTable = (targetModel as any).tableName;
       const targetPk = sourceAssocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
       if (Array.isArray(targetPk)) return null;
-      targetJoinOn = `TARGET_PLACEHOLDER.${this._qc(targetPk)} = ${this._qt(throughEffective)}.${this._qc(targetFk)}`;
+
+      const targetCollides = this._usedTableNames.has(targetTable) || targetTable === throughTable;
+      const targetEffective = targetCollides ? targetAlias : targetTable;
+      const targetArelTable =
+        targetEffective === targetTable
+          ? new Table(targetTable)
+          : new Table(targetTable, { as: targetEffective });
+
+      // belongsTo: target.pk = through.fk
+      targetPredicate = targetArelTable.get(targetPk).eq(throughArelTable.get(targetFk));
+
       if (isPoly) {
-        // Mirrors Rails ThroughReflection / BelongsToReflection: the
-        // polymorphic type column is `foreign_type` (options[:foreign_type]
-        // || "#{name}_type"), and the value is the literal :source_type.
         const typeCol = sourceAssocDef.options.foreignType ?? `${_toUnderscore(sourceName)}_type`;
-        targetJoinOn += ` AND ${this._qt(throughEffective)}.${this._qc(typeCol)} = ${this._quoteString(String(assocDef.options.sourceType))}`;
+        const typePred = throughArelTable
+          .get(typeCol)
+          .eq(new Nodes.Quoted(assocDef.options.sourceType));
+        targetPredicate = new Nodes.And([targetPredicate, typePred]);
       }
-    } else {
-      const className = sourceAssocDef?.options?.className ?? _camelize(_singularize(sourceName));
-      targetModel = modelRegistry.get(className) as typeof Base | undefined;
-      if (!targetModel) return null;
-      targetTable = (targetModel as any).tableName;
-      const targetFk =
-        sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(throughClassName)}_id`;
-      if (Array.isArray(targetFk)) return null;
-      const throughPk = (throughModel as any).primaryKey ?? "id";
-      if (Array.isArray(throughPk)) return null;
-      targetJoinOn = `TARGET_PLACEHOLDER.${this._qc(targetFk)} = ${this._qt(throughEffective)}.${this._qc(throughPk)}`;
+
+      return this._finishThroughTarget(
+        assocDef,
+        targetModel,
+        targetTable,
+        targetEffective,
+        targetArelTable,
+        targetPredicate,
+        targetTableIndex,
+        targetAlias,
+        throughTable,
+        throughArelJoin,
+        throughTableIndex,
+        throughAlias,
+        throughEffective,
+        throughModel,
+        throughAssocDef,
+        parentAssocName,
+      );
     }
 
-    // Mirror addAssociation collision-check for the target table too.
-    // Read-only here; the commit-point below pushes the resolved name
-    // into `_usedTableNames` after all failure guards have passed.
-    // Treat the pending through-table join as already occupying its name
-    // so a self-through (target table == through table) is forced to a
-    // tN alias rather than colliding on the same unaliased identifier.
+    const className = sourceAssocDef?.options?.className ?? _camelize(_singularize(sourceName));
+    targetModel = modelRegistry.get(className) as typeof Base | undefined;
+    if (!targetModel) return null;
+    targetTable = (targetModel as any).tableName;
+    const targetFk = sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(throughClassName)}_id`;
+    if (Array.isArray(targetFk)) return null;
+    const throughPk = (throughModel as any).primaryKey ?? "id";
+    if (Array.isArray(throughPk)) return null;
+
     const targetCollides = this._usedTableNames.has(targetTable) || targetTable === throughTable;
     const targetEffective = targetCollides ? targetAlias : targetTable;
-    const targetEffectiveQuoted = this._qt(targetEffective);
-    targetJoinOn = targetJoinOn.replaceAll("TARGET_PLACEHOLDER", () => targetEffectiveQuoted);
+    const targetArelTable =
+      targetEffective === targetTable
+        ? new Table(targetTable)
+        : new Table(targetTable, { as: targetEffective });
 
-    // Apply association scope
+    // hasMany/hasOne: target.fk = through.pk
+    targetPredicate = targetArelTable.get(targetFk).eq(throughArelTable.get(throughPk));
+
+    return this._finishThroughTarget(
+      assocDef,
+      targetModel,
+      targetTable,
+      targetEffective,
+      targetArelTable,
+      targetPredicate,
+      targetTableIndex,
+      targetAlias,
+      throughTable,
+      throughArelJoin,
+      throughTableIndex,
+      throughAlias,
+      throughEffective,
+      throughModel,
+      throughAssocDef,
+      parentAssocName,
+    );
+  }
+
+  private _finishThroughTarget(
+    assocDef: any,
+    targetModel: typeof Base,
+    targetTable: string,
+    targetEffective: string,
+    targetArelTable: Table,
+    predicate: Nodes.Node,
+    targetTableIndex: number,
+    targetAlias: string,
+    throughTable: string,
+    throughArelJoin: Nodes.OuterJoin,
+    throughTableIndex: number,
+    throughAlias: string,
+    throughEffective: string,
+    throughModel: typeof Base,
+    throughAssocDef: any,
+    parentAssocName?: string,
+  ): JoinNode | null {
+    // Association scope predicates (Arel-based, no regex)
     if (assocDef.options.scope && typeof assocDef.options.scope === "function") {
       const scopeRel = assocDef.options.scope((targetModel as any)._allForPreload());
-      const scopeSql = scopeRel?.toSql?.();
-      if (scopeSql) {
-        const whereMatch = scopeSql.match(/\bWHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s*$)/i);
-        if (whereMatch) {
-          const toQ = this._qt(targetEffective);
-          const scopeWhere = whereMatch[1].replaceAll(this._qt(targetTable), () => toQ);
-          targetJoinOn += ` AND ${scopeWhere}`;
+      if (scopeRel?._whereClause && !scopeRel._whereClause.isEmpty()) {
+        let scopeAst: Nodes.Node = scopeRel._whereClause.ast;
+        if (targetEffective !== targetTable) {
+          scopeAst = rebindTableReferences(scopeAst, targetTable, targetArelTable);
         }
+        predicate =
+          predicate instanceof Nodes.And
+            ? new Nodes.And([...predicate.children, scopeAst])
+            : new Nodes.And([predicate, scopeAst]);
       }
     }
 
-    // Add STI type constraint on target
-    targetJoinOn = this._addStiConstraint(targetJoinOn, targetModel, targetEffective);
+    // STI type constraint
+    predicate = this._addStiConstraintArel(predicate, targetModel, targetArelTable);
 
-    // Guard against composite PK on target
     const targetModelPk = (targetModel as any).primaryKey ?? "id";
     if (Array.isArray(targetModelPk)) return null;
 
-    // Commit-point for the non-recursive path: all failure guards have
-    // passed, so register both joined tables for AliasTracker collision
-    // checks by later joins.
+    // Commit-point: register both tables
     this._usedTableNames.add(throughTable);
     this._usedTableNames.add(targetTable);
 
     const targetColumns = getModelColumns(targetModel);
+    const throughColumns = getModelColumns(throughModel);
+
+    // Register through-table column aliases
+    for (let i = 0; i < throughColumns.length; i++) {
+      this._aliases.push({
+        alias: `t${throughTableIndex}_r${i}`,
+        tableIndex: throughTableIndex,
+        columnIndex: i,
+        column: throughColumns[i],
+      });
+    }
 
     for (let i = 0; i < targetColumns.length; i++) {
       this._aliases.push({
@@ -894,10 +877,28 @@ export class JoinDependency {
 
     const fullAssocName = parentAssocName ? `${parentAssocName}.${assocDef.name}` : assocDef.name;
 
-    const targetJoinTableExpr =
-      targetEffective === targetTable
-        ? this._qt(targetTable)
-        : `${this._qt(targetTable)} ${this._qt(targetEffective)}`;
+    const targetArelJoin = new Nodes.OuterJoin(targetArelTable, new Nodes.On(predicate));
+
+    // Push intermediate through node
+    const throughNodeName = parentAssocName
+      ? `${parentAssocName}._through_${assocDef.options.through}`
+      : `_through_${assocDef.options.through}`;
+    this._nodes.push({
+      tableIndex: throughTableIndex,
+      tableAlias: throughAlias,
+      tableName: throughTable,
+      effectiveSqlName: throughEffective,
+      modelClass: throughModel as typeof Base,
+      columns: throughColumns,
+      assocName: throughNodeName,
+      immediateAssocName: `_through_${assocDef.options.through}`,
+      parentPath: parentAssocName ?? null,
+      assocType: throughAssocDef.type === "hasOne" ? "hasOne" : "hasMany",
+      joinSql: "",
+      arelJoin: throughArelJoin,
+    });
+
+    // Push target node
     const node: JoinNode = {
       tableIndex: targetTableIndex,
       tableAlias: targetAlias,
@@ -909,8 +910,8 @@ export class JoinDependency {
       immediateAssocName: assocDef.name,
       parentPath: parentAssocName ?? null,
       assocType: assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type,
-      joinSql: `${throughJoinSql} LEFT OUTER JOIN ${targetJoinTableExpr} ON ${targetJoinOn}`,
-      arelJoin: null,
+      joinSql: "",
+      arelJoin: targetArelJoin,
     };
 
     this._nodes.push(node);
