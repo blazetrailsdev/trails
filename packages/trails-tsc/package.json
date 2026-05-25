@@ -25,6 +25,7 @@
     "@blazetrails/tse-compiler": "workspace:*"
   },
   "peerDependencies": {
+    "@blazetrails/actionview": "workspace:*",
     "typescript": "^5.0.0"
   },
   "files": [
