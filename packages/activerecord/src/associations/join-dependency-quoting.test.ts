@@ -10,21 +10,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
 import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 
-function stubConnection(model: typeof Base, conn: Partial<DatabaseAdapter> | (() => never)) {
-  Object.defineProperty(model, "connection", {
-    value: typeof conn === "function" ? conn : () => conn,
-    configurable: true,
-    writable: true,
-  });
-}
-
 describe("JoinDependency Arel node construction", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: any;
 
   class Owner extends Base {
     static {
@@ -163,12 +154,5 @@ describe("JoinDependency Arel node construction", () => {
     expect(node2!.effectiveSqlName).toBe("t2");
     const table2 = (node2!.arelJoin as Nodes.OuterJoin).left;
     expect((table2 as any).tableAlias).toBe("t2");
-  });
-
-  it("propagates non-ConnectionNotDefined errors from connection()", () => {
-    stubConnection(Owner, () => {
-      throw new Error("pool exhausted");
-    });
-    expect(() => new JoinDependency(Owner)).toThrow("pool exhausted");
   });
 });

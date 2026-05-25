@@ -13,6 +13,7 @@ import { Base, registerModel } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
+import { Nodes, Table } from "@blazetrails/arel";
 
 describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
   class JdtAuthor extends Base {
@@ -59,18 +60,25 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     const jd = new JoinDependency(JdtAuthor);
     const node = jd.addAssociation("jdtComments");
     expect(node).not.toBeNull();
-    // Through table joined by real name (jdt_posts), not t1
-    expect(node!.joinSql).toContain(`LEFT OUTER JOIN "jdt_posts"`);
-    expect(node!.joinSql).not.toContain(`"jdt_posts" "t`);
-    // Target table joined by real name (jdt_comments)
-    expect(node!.joinSql).toContain(`LEFT OUTER JOIN "jdt_comments"`);
-    expect(node!.joinSql).not.toContain(`"jdt_comments" "t`);
+    expect(node!.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
     expect(node!.effectiveSqlName).toBe("jdt_comments");
+
+    // Target table uses real name (no alias)
+    const targetTable = (node!.arelJoin as Nodes.OuterJoin).left as Table;
+    expect(targetTable.name).toBe("jdt_comments");
+    expect(targetTable.tableAlias).toBeNull();
+
+    // Through node also uses real name
+    const throughNode = jd.nodes.find((n) => n.tableName === "jdt_posts");
+    expect(throughNode).toBeDefined();
+    expect(throughNode!.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
+    const throughTable = (throughNode!.arelJoin as Nodes.OuterJoin).left as Table;
+    expect(throughTable.name).toBe("jdt_posts");
+    expect(throughTable.tableAlias).toBeNull();
   });
 
   it("falls back to tN alias when the target real name collides", () => {
     const jd = new JoinDependency(JdtAuthor);
-    // Pre-occupy "jdt_comments" via a sibling direct hasMany on the author.
     Associations.hasMany.call(JdtAuthor, "directComments", {
       className: "JdtComment",
       foreignKey: "post_id",
@@ -78,22 +86,42 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     jd.addAssociation("directComments");
     const node = jd.addAssociation("jdtComments");
     expect(node).not.toBeNull();
-    // Through table still uses real name; target now aliased to tN.
-    expect(node!.joinSql).toContain(`LEFT OUTER JOIN "jdt_posts"`);
-    expect(node!.joinSql).toMatch(/LEFT OUTER JOIN "jdt_comments" "t\d+"/);
     expect(node!.effectiveSqlName).toMatch(/^t\d+$/);
+
+    // Target aliased
+    const targetTable = (node!.arelJoin as Nodes.OuterJoin).left as Table;
+    expect(targetTable.name).toBe("jdt_comments");
+    expect(targetTable.tableAlias).toMatch(/^t\d+$/);
+
+    // Through still uses real name
+    const throughNode = jd.nodes.find(
+      (n) => n.tableName === "jdt_posts" && n.assocName.includes("_through_"),
+    );
+    expect(throughNode).toBeDefined();
+    const throughTable = (throughNode!.arelJoin as Nodes.OuterJoin).left as Table;
+    expect(throughTable.name).toBe("jdt_posts");
+    expect(throughTable.tableAlias).toBeNull();
   });
 
-  it("falls back to tN alias when the real name collides", () => {
+  it("falls back to tN alias when the through real name collides", () => {
     const jd = new JoinDependency(JdtAuthor);
-    // First, occupy "jdt_posts" via the direct join so the through table collides.
     jd.addAssociation("jdtPosts");
     const node = jd.addAssociation("jdtComments");
     expect(node).not.toBeNull();
-    // Through table now aliased to tN because jdt_posts already used.
-    expect(node!.joinSql).toMatch(/LEFT OUTER JOIN "jdt_posts" "t\d+"/);
-    // Target still uses real name (first use).
-    expect(node!.joinSql).toContain(`LEFT OUTER JOIN "jdt_comments"`);
-    expect(node!.joinSql).not.toContain(`"jdt_comments" "t`);
+
+    // Through table aliased because jdt_posts already used
+    const throughNode = jd.nodes.find(
+      (n) => n.tableName === "jdt_posts" && n.assocName.includes("_through_"),
+    );
+    expect(throughNode).toBeDefined();
+    expect(throughNode!.effectiveSqlName).toMatch(/^t\d+$/);
+    const throughTable = (throughNode!.arelJoin as Nodes.OuterJoin).left as Table;
+    expect(throughTable.name).toBe("jdt_posts");
+    expect(throughTable.tableAlias).toMatch(/^t\d+$/);
+
+    // Target uses real name (first use)
+    const targetTable = (node!.arelJoin as Nodes.OuterJoin).left as Table;
+    expect(targetTable.name).toBe("jdt_comments");
+    expect(targetTable.tableAlias).toBeNull();
   });
 });
