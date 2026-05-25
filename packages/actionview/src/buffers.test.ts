@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { htmlSafe, SafeBuffer } from "@blazetrails/activesupport";
+import { htmlSafe, isHtmlSafe, SafeBuffer } from "@blazetrails/activesupport";
 import { OutputBuffer, RawOutputBuffer, RawStreamingBuffer, StreamingBuffer } from "./buffers.js";
 
 describe("OutputBuffer", () => {
@@ -16,38 +16,76 @@ describe("OutputBuffer", () => {
 
   it("calls toString on values via concat (number example from Rails docs)", () => {
     const buf = new OutputBuffer("hello");
-    buf.concat(5);
+    buf.append(5);
     expect(buf.toStr()).toBe("hello5");
   });
 
   it("escapes unsafe strings on concat", () => {
     const buf = new OutputBuffer();
-    buf.concat("<script>");
+    buf.append("<script>");
     expect(buf.toStr()).toBe("&lt;script&gt;");
   });
 
   it("does not escape SafeBuffer values on concat", () => {
     const buf = new OutputBuffer();
-    buf.concat(htmlSafe("<b>bold</b>"));
+    buf.append(htmlSafe("<b>bold</b>"));
     expect(buf.toStr()).toBe("<b>bold</b>");
   });
 
   it("skips nil/undefined on concat", () => {
     const buf = new OutputBuffer("x");
-    buf.concat(null);
-    buf.concat(undefined);
+    buf.append(null);
+    buf.append(undefined);
     expect(buf.toStr()).toBe("x");
   });
 
   it("safeConcat bypasses escaping", () => {
     const buf = new OutputBuffer();
-    buf.safeConcat("<b>unsafe</b>");
+    buf.safeAppend("<b>unsafe</b>");
     expect(buf.toStr()).toBe("<b>unsafe</b>");
   });
 
   it("safeConcat throws on nil (Rails parity)", () => {
-    expect(() => new OutputBuffer().safeConcat(null)).toThrow(TypeError);
-    expect(() => new OutputBuffer().safeConcat(undefined)).toThrow(TypeError);
+    expect(() => new OutputBuffer().safeAppend(null)).toThrow(TypeError);
+    expect(() => new OutputBuffer().safeAppend(undefined)).toThrow(TypeError);
+  });
+
+  it("append is the primary method name (emitter parity)", () => {
+    const buf = new OutputBuffer();
+    buf.append("hello");
+    buf.append(htmlSafe(" <b>world</b>"));
+    expect(buf.toStr()).toBe("hello <b>world</b>");
+  });
+
+  it("safeAppend is the primary method name (emitter parity)", () => {
+    const buf = new OutputBuffer();
+    buf.safeAppend("<b>safe</b>");
+    expect(buf.toStr()).toBe("<b>safe</b>");
+  });
+
+  it("concat/safeConcat are deprecated aliases for append/safeAppend", () => {
+    const buf = new OutputBuffer();
+    buf.concat("<x>");
+    expect(buf.toStr()).toBe("&lt;x&gt;");
+    buf.safeConcat("<y>");
+    expect(buf.toStr()).toBe("&lt;x&gt;<y>");
+  });
+
+  it("htmlSafe getter returns true (duck-typed parity with SafeBuffer)", () => {
+    expect(new OutputBuffer().htmlSafe).toBe(true);
+  });
+
+  it("isHtmlSafe recognizes OutputBuffer via duck-typed htmlSafe getter", () => {
+    expect(isHtmlSafe(new OutputBuffer("hello"))).toBe(true);
+  });
+
+  it("safeBuffer.concat(safeBuffer) instanceof SafeBuffer preserves html-safety", () => {
+    const a = htmlSafe("foo");
+    const b = htmlSafe("bar");
+    const result = a.concat(b);
+    expect(result).toBeInstanceOf(SafeBuffer);
+    expect(result.htmlSafe).toBe(true);
+    expect(result.toString()).toBe("foobar");
   });
 
   it("safeExprAppend skips nil and appends raw otherwise", () => {
@@ -73,7 +111,7 @@ describe("OutputBuffer", () => {
   });
 
   it("isHtmlSafe always returns true", () => {
-    expect(new OutputBuffer().isHtmlSafe()).toBe(true);
+    expect(isHtmlSafe(new OutputBuffer())).toBe(true);
   });
 
   it("isEmpty/isBlank reflect underlying buffer", () => {
@@ -85,7 +123,7 @@ describe("OutputBuffer", () => {
   it("capture swaps the buffer and restores it", () => {
     const buf = new OutputBuffer("before-");
     const captured = buf.capture(() => {
-      buf.concat("inside");
+      buf.append("inside");
     });
     expect(captured.toString()).toBe("inside");
     expect(captured.htmlSafe).toBe(true);
@@ -96,7 +134,7 @@ describe("OutputBuffer", () => {
     const buf = new OutputBuffer("kept");
     expect(() =>
       buf.capture(() => {
-        buf.concat("lost");
+        buf.append("lost");
         throw new Error("boom");
       }),
     ).toThrow("boom");
@@ -115,13 +153,13 @@ describe("RawOutputBuffer", () => {
     const buf = new OutputBuffer();
     const raw = buf.raw();
     expect(raw).toBeInstanceOf(RawOutputBuffer);
-    raw.concat("<unsafe>");
+    raw.append("<unsafe>");
     expect(buf.toStr()).toBe("<unsafe>");
   });
 
   it("skips nil values", () => {
     const buf = new OutputBuffer("x");
-    buf.raw().concat(null);
+    buf.raw().append(null);
     expect(buf.toStr()).toBe("x");
   });
 
@@ -135,28 +173,28 @@ describe("StreamingBuffer", () => {
   it("streams concat through the block, escaping unsafe values", () => {
     const chunks: string[] = [];
     const buf = new StreamingBuffer((v) => chunks.push(v));
-    buf.concat("<unsafe>");
-    buf.concat(htmlSafe("<safe>"));
+    buf.append("<unsafe>");
+    buf.append(htmlSafe("<safe>"));
     expect(chunks).toEqual(["&lt;unsafe&gt;", "<safe>"]);
   });
 
   it("safeConcat bypasses escaping", () => {
     const chunks: string[] = [];
-    new StreamingBuffer((v) => chunks.push(v)).safeConcat("<x>");
+    new StreamingBuffer((v) => chunks.push(v)).safeAppend("<x>");
     expect(chunks).toEqual(["<x>"]);
   });
 
   it("concat passes nil through as empty string (Rails parity)", () => {
     const chunks: string[] = [];
-    new StreamingBuffer((v) => chunks.push(v)).concat(null);
+    new StreamingBuffer((v) => chunks.push(v)).append(null);
     expect(chunks).toEqual([""]);
   });
 
   it("safeConcat passes nil through as empty string (Rails parity)", () => {
     const chunks: string[] = [];
     const buf = new StreamingBuffer((v) => chunks.push(v));
-    buf.safeConcat(null);
-    buf.safeConcat(undefined);
+    buf.safeAppend(null);
+    buf.safeAppend(undefined);
     expect(chunks).toEqual(["", ""]);
   });
 
@@ -164,26 +202,26 @@ describe("StreamingBuffer", () => {
     const chunks: string[] = [];
     const buf = new StreamingBuffer((v) => chunks.push(v));
     const ob = new OutputBuffer("<x>");
-    buf.concat(ob);
-    buf.safeConcat(ob);
+    buf.append(ob);
+    buf.safeAppend(ob);
     expect(chunks).toEqual(["<x>", "<x>"]);
   });
 
   it("capture swaps the sink and restores it", () => {
     const chunks: string[] = [];
     const buf = new StreamingBuffer((v) => chunks.push(v));
-    const captured = buf.capture(() => buf.safeConcat("inside"));
+    const captured = buf.capture(() => buf.safeAppend("inside"));
     expect(captured).toBeInstanceOf(SafeBuffer);
     expect(captured.toString()).toBe("inside");
     expect(chunks).toEqual([]);
-    buf.safeConcat("after");
+    buf.safeAppend("after");
     expect(chunks).toEqual(["after"]);
   });
 
-  it("htmlSafe()/isHtmlSafe() report safe", () => {
+  it("htmlSafe getter reports safe (emitter parity)", () => {
     const buf = new StreamingBuffer(() => {});
-    expect(buf.isHtmlSafe()).toBe(true);
-    expect(buf.htmlSafe()).toBe(buf);
+    expect(buf.htmlSafe).toBe(true);
+    expect(isHtmlSafe(buf)).toBe(true);
   });
 
   it("exposes block via reader", () => {
@@ -198,13 +236,13 @@ describe("RawStreamingBuffer", () => {
     const buf = new StreamingBuffer((v) => chunks.push(v));
     const raw = buf.raw();
     expect(raw).toBeInstanceOf(RawStreamingBuffer);
-    raw.concat("<unsafe>");
+    raw.append("<unsafe>");
     expect(chunks).toEqual(["<unsafe>"]);
   });
 
   it("skips nil values", () => {
     const chunks: string[] = [];
-    new StreamingBuffer((v) => chunks.push(v)).raw().concat(null);
+    new StreamingBuffer((v) => chunks.push(v)).raw().append(null);
     expect(chunks).toEqual([]);
   });
 

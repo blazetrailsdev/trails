@@ -200,8 +200,14 @@ export function htmlSafe(str: string): SafeBuffer {
 }
 
 /**
- * isHtmlSafe — returns true if value is a SafeBuffer marked safe.
+ * isHtmlSafe — returns true if value is HTML safe.
+ * Accepts SafeBuffer instances and any duck-typed object with `htmlSafe === true`
+ * (e.g. ActionView::OutputBuffer, which mirrors Rails' OutputBuffer < SafeBuffer).
  */
 export function isHtmlSafe(value: unknown): boolean {
-  return value instanceof SafeBuffer && value.htmlSafe;
+  if (value instanceof SafeBuffer) return value.htmlSafe;
+  if (value !== null && typeof value === "object" && "htmlSafe" in value) {
+    return (value as { htmlSafe: unknown }).htmlSafe === true;
+  }
+  return false;
 }
