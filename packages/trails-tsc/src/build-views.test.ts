@@ -132,6 +132,25 @@ describe("buildViews", () => {
     expect(aug).toContain("AUTO-GENERATED");
   });
 
+  it("intersects locals types when a partial exists as multiple formats", () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/views/users/_user.html.tse",
+      "<%# locals: (name:, role: 'guest') %><%= name %>",
+    );
+    write(cwd, "app/views/users/_user.json.tse", "<%# locals: (name:, email:) %><%= name %>");
+
+    buildViews({ cwd });
+
+    const aug = fs.readFileSync(
+      path.join(cwd, ".trails/template-registry-augmentation.d.ts"),
+      "utf8",
+    );
+    expect(aug).toContain('"users/user"');
+    expect(aug).toMatch(/\(NoExtraKeys<\{[^}]+\}>\)\s*&\s*\(NoExtraKeys<\{[^}]+\}>\)/);
+  });
+
   it("emits an empty augmentation when no partials have a locals directive", () => {
     const cwd = mkScratch();
     write(cwd, "app/views/home.html.tse", "plain template");

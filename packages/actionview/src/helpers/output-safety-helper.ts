@@ -4,6 +4,7 @@ import {
   htmlEscapeOnce as _htmlEscapeOnce,
   htmlSafe,
 } from "@blazetrails/activesupport";
+import { OutputBuffer } from "../buffers.js";
 
 export { htmlEscape };
 export const h = htmlEscape;
@@ -36,6 +37,7 @@ export function jsonEscape(value: unknown): string | SafeBuffer {
  * raw — marks a string as HTML safe without escaping.
  */
 export function raw(stringish: unknown): SafeBuffer {
+  if (stringish instanceof OutputBuffer) return stringish.toString();
   return htmlSafe(String(stringish ?? ""));
 }
 

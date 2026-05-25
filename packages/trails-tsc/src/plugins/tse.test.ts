@@ -226,15 +226,70 @@ describe("virtualizeTse", () => {
     expect(diags.length).toBeGreaterThan(0);
     expect(diags.join("\n")).toMatch(/missingProp/);
   });
+
+  describe("render() conditional locals generic", () => {
+    const registryStub = [
+      "export type NoExtraKeys<T> = T & { [K in Exclude<string, keyof T>]?: never };",
+      "export interface TemplateRegistry {",
+      '  "users/user": { name: string };',
+      '  "shared/empty": {};',
+      "}",
+      "export type TemplateLocals<T> = T;",
+    ].join("\n");
+
+    it("requires locals for a known partial with required properties", () => {
+      const out = virtualizeTse("<%= context.render({ partial: 'users/user' }) %>");
+      const diags = diagnose(out, registryStub);
+      expect(diags.length).toBeGreaterThan(0);
+      expect(diags.join("\n")).toMatch(/locals|name/i);
+    });
+
+    it("accepts omitted locals when all properties are optional", () => {
+      const out = virtualizeTse("<%= context.render({ partial: 'shared/empty' }) %>");
+      expect(diagnose(out, registryStub)).toEqual([]);
+    });
+
+    it("falls back to optional Record<string, unknown> for unknown partials", () => {
+      const out = virtualizeTse("<%= context.render({ partial: 'unknown/thing' }) %>");
+      expect(diagnose(out, registryStub)).toEqual([]);
+    });
+
+    it("rejects wrong-shape locals for a known partial", () => {
+      const out = virtualizeTse(
+        "<%= context.render({ partial: 'users/user', locals: { wrong: 1 } }) %>",
+      );
+      const diags = diagnose(out, registryStub);
+      expect(diags.length).toBeGreaterThan(0);
+      expect(diags.join("\n")).toMatch(/not assignable|wrong/i);
+    });
+  });
+
+  describe("TseRenderContext method signatures on context param", () => {
+    it("accepts context.capture/raw/yield calls", () => {
+      const out = virtualizeTse(
+        "<%= context.capture(() => {}) %><%= context.raw('hi') %><%= context.yield() %>",
+      );
+      expect(diagnose(out)).toEqual([]);
+    });
+
+    it("accepts context.concat and context.contentFor calls", () => {
+      const out = virtualizeTse("<% context.concat('x'); context.contentFor('nav', () => {}); %>");
+      expect(diagnose(out)).toEqual([]);
+    });
+
+    it("rejects calls on index-signature properties (unknown is not callable)", () => {
+      const out = virtualizeTse("<%= context.nonExistentMethod() %>");
+      const diags = diagnose(out);
+      expect(diags.length).toBeGreaterThan(0);
+      expect(diags.join("\n")).toMatch(/not callable|is of type 'unknown'/i);
+    });
+  });
 });
 
-function diagnose(source: string): string[] {
+function diagnose(source: string, customStub?: string): string[] {
   const fileName = "/virtual/show.html.tse.ts";
-  // Stub out external modules so `import type { ... } from "@blazetrails/actionview"`
-  // resolves to an empty module rather than producing TS2307.
-  // Minimal stand-in for @blazetrails/actionview so import type { TemplateRegistry, TemplateLocals }
-  // resolves without TS2307 or "has no exported member" errors.
   const stubSrc =
+    customStub ??
     "export interface TemplateRegistry {} export type TemplateLocals<T> = T; export type NoExtraKeys<T> = T & { [K in Exclude<string, keyof T>]?: never };";
   const stubPath = "/stub/module.d.ts";
   const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.ES2022, true);
