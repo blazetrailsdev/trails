@@ -18,6 +18,7 @@
  * setters either don't exist yet or live in unported namespaces.
  */
 import { Railtie as BaseRailtie, registerRailtie } from "@blazetrails/activesupport";
+import { Base } from "./base.js";
 import { deprecator } from "./deprecator.js";
 
 export interface ActionViewConfig {
@@ -28,6 +29,7 @@ export interface ActionViewConfig {
   imageDecoding: string | null;
   applyStylesheetMediaDefault: boolean;
   prependContentExfiltrationPrevention: boolean;
+  annotateRenderedViewWithFilenames: boolean;
 }
 
 export function defaultActionViewConfig(): ActionViewConfig {
@@ -39,6 +41,7 @@ export function defaultActionViewConfig(): ActionViewConfig {
     imageDecoding: null,
     applyStylesheetMediaDefault: true,
     prependContentExfiltrationPrevention: false,
+    annotateRenderedViewWithFilenames: false,
   };
 }
 
@@ -50,6 +53,11 @@ export class Trailtie extends BaseRailtie {
 
     this.initializer("action_view.deprecator", () => {
       BaseRailtie.deprecators["actionView"] = deprecator();
+    });
+
+    this.initializer("action_view.annotate_rendered_view_with_filenames", () => {
+      const cfg = this.config["actionView"] as ActionViewConfig;
+      Base.annotateRenderedViewWithFilenames = cfg.annotateRenderedViewWithFilenames;
     });
   }
 }

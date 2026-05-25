@@ -1,5 +1,6 @@
 import { chomp } from "@blazetrails/activesupport";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
+import { Base } from "../../base.js";
 import type { RenderContext, TemplateHandler } from "../handlers.js";
 import {
   translateLocation as translateLocationImpl,
@@ -16,10 +17,13 @@ export {
 /**
  * Minimal shape `Tse#call` needs from a template. Mirrors the subset of
  * Rails' `ActionView::Template` that `Handlers::ERB#call` touches:
- * `template.type` (MIME type) drives the `escape_ignore_list` check.
+ * `template.type` (MIME type) drives the `escape_ignore_list` check;
+ * `template.format` and `template.shortIdentifier` drive annotation comments.
  */
 export interface TseTemplate {
   type?: string | null;
+  format?: string | null;
+  shortIdentifier?: string | null;
 }
 
 /**
@@ -124,7 +128,16 @@ export class Tse implements TemplateHandler {
     // here so the Rails-shape default `["text/plain"]` matches regardless.
     const mime = template.type != null ? formatToMimeType(template.type) : null;
     const escapeIgnore = mime != null && ctor.escapeIgnoreList.includes(mime);
-    const result = ctor.implementation(prepared, { escapeIgnore });
+    const options: EmitJsOptions = { escapeIgnore };
+    // Rails erb.rb lines 86–89: annotate HTML output with BEGIN/END comments
+    // when ActionView::Base.annotate_rendered_view_with_filenames is on.
+    const format = template.format ?? (mime === "text/html" ? "html" : null);
+    if (Base.annotateRenderedViewWithFilenames && format === "html" && template.shortIdentifier) {
+      const id = template.shortIdentifier;
+      options.preamble = `_ob.safeAppend(${JSON.stringify(`<!-- BEGIN ${id} -->`)});`;
+      options.postamble = `_ob.safeAppend(${JSON.stringify(`<!-- END ${id} -->`)});`;
+    }
+    const result = ctor.implementation(prepared, options);
     return result.code;
   }
 

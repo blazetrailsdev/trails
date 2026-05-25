@@ -7,6 +7,10 @@ import { parse, type TseAst, type TseNode } from "./parser.js";
 
 export interface EmitJsOptions {
   escapeIgnore?: boolean;
+  /** Injected immediately after `const _ob = …` — Rails `:preamble` analogue. */
+  preamble?: string;
+  /** Injected immediately before `return _ob` — Rails `:postamble` analogue. */
+  postamble?: string;
 }
 
 export interface EmitResult {
@@ -44,6 +48,7 @@ function emit(ast: TseAst, options: EmitJsOptions): string {
     "export default function render(context, locals) {",
     "  const _ob = context.outputBuffer;",
   ];
+  if (options.preamble) lines.push("  " + options.preamble);
   // Stack: one entry per open blockExpr, tracking net unclosed `{` inside it.
   const innerDepths: number[] = [];
   for (const node of ast.nodes) {
@@ -69,6 +74,7 @@ function emit(ast: TseAst, options: EmitJsOptions): string {
       `TSE: ${innerDepths.length} block-expr tag(s) were never closed — missing <% } %> or <% }) %>`,
     );
   }
+  if (options.postamble) lines.push("  " + options.postamble);
   lines.push("  return _ob;", "}");
   return lines.join("\n") + "\n";
 }

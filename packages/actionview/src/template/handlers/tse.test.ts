@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { Base } from "../../base.js";
 import { TemplateHandlers } from "../handlers.js";
 import { Tse, type TseImplementation } from "./tse.js";
 
@@ -7,12 +8,14 @@ describe("Template::Handlers::Tse", () => {
   const originalEscapeIgnore = Tse.escapeIgnoreList;
   const originalStrip = Tse.stripTrailingNewlines;
   const originalTrim = Tse.trimMode;
+  const originalAnnotate = Base.annotateRenderedViewWithFilenames;
 
   afterEach(() => {
     Tse.implementation = originalImpl;
     Tse.escapeIgnoreList = originalEscapeIgnore;
     Tse.stripTrailingNewlines = originalStrip;
     Tse.trimMode = originalTrim;
+    Base.annotateRenderedViewWithFilenames = originalAnnotate;
     TemplateHandlers.clear();
   });
 
@@ -160,6 +163,73 @@ describe("Template::Handlers::Tse", () => {
         lastColumn: 1,
       };
       expect(new Tse().translateLocation(spot, { lineno: 1 }, "<%= name %>")).toBeNull();
+    });
+  });
+
+  describe("annotateRenderedViewWithFilenames", () => {
+    it("defaults to false — no annotation comments emitted", () => {
+      const code = new Tse().call(
+        { type: "text/html", format: "html", shortIdentifier: "app/views/posts/show.html.tse" },
+        "<h1>hi</h1>",
+      );
+      expect(code).not.toContain("BEGIN");
+      expect(code).not.toContain("END");
+    });
+
+    it("wraps html output with BEGIN/END comments when enabled", () => {
+      Base.annotateRenderedViewWithFilenames = true;
+      const id = "app/views/posts/show.html.tse";
+      const code = new Tse().call(
+        { type: "text/html", format: "html", shortIdentifier: id },
+        "<h1>hi</h1>",
+      );
+      expect(code).toContain(`_ob.safeAppend("<!-- BEGIN ${id} -->");`);
+      expect(code).toContain(`_ob.safeAppend("<!-- END ${id} -->");`);
+      // BEGIN before END
+      expect(code.indexOf("BEGIN")).toBeLessThan(code.indexOf("END"));
+    });
+
+    it("does not annotate non-html formats (json)", () => {
+      Base.annotateRenderedViewWithFilenames = true;
+      const code = new Tse().call(
+        {
+          type: "application/json",
+          format: "json",
+          shortIdentifier: "app/views/posts/show.json.tse",
+        },
+        "<%= data %>",
+      );
+      expect(code).not.toContain("BEGIN");
+    });
+
+    it("does not annotate non-html formats (text/plain)", () => {
+      Base.annotateRenderedViewWithFilenames = true;
+      const code = new Tse().call(
+        { type: "text/plain", format: "text", shortIdentifier: "app/views/mailer/body.text.tse" },
+        "hello",
+      );
+      expect(code).not.toContain("BEGIN");
+    });
+
+    it("does not annotate when shortIdentifier is absent", () => {
+      Base.annotateRenderedViewWithFilenames = true;
+      const code = new Tse().call({ type: "text/html", format: "html" }, "<h1>hi</h1>");
+      expect(code).not.toContain("BEGIN");
+    });
+
+    it("annotation appears inside the render function body", () => {
+      Base.annotateRenderedViewWithFilenames = true;
+      const id = "app/views/posts/index.html.tse";
+      const code = new Tse().call(
+        { type: "text/html", format: "html", shortIdentifier: id },
+        "<p>items</p>",
+      );
+      const fnStart = code.indexOf("export default function render");
+      const beginPos = code.indexOf("BEGIN");
+      const endPos = code.indexOf("END");
+      const fnEnd = code.lastIndexOf("}");
+      expect(beginPos).toBeGreaterThan(fnStart);
+      expect(endPos).toBeLessThan(fnEnd);
     });
   });
 

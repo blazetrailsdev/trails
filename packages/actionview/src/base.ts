@@ -16,6 +16,13 @@ export class Base {
   /** @internal stub - real impl in Phase 4 */
   static defaultFormats: string[] = ["html", "text", "js", "css", "xml", "json"];
 
+  /**
+   * When true, HTML responses are wrapped with `<!-- BEGIN/END <identifier> -->`
+   * comments so browser DevTools show which template rendered each region.
+   * Rails: `ActionView::Base.annotate_rendered_view_with_filenames`.
+   */
+  static annotateRenderedViewWithFilenames: boolean = false;
+
   /** @internal stub - real impl in Phase 4 */
   static empty(): Base {
     return new Base();
