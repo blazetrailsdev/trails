@@ -88,4 +88,34 @@ describe("compileJs", () => {
     expect(code).toContain("_ob.safeExprAppend(fn((x) => {");
     expect(code).toContain("}));");
   });
+
+  describe("preamble / postamble", () => {
+    it("emits preamble immediately after const _ob line", () => {
+      const { code } = compileJs("<p>hi</p>", {
+        preamble: "_ob.safeAppend('<!-- BEGIN -->');",
+        postamble: "_ob.safeAppend('<!-- END -->');",
+      });
+      const lines = code.split("\n");
+      const obIdx = lines.findIndex((l) => l.includes("const _ob"));
+      const preIdx = lines.findIndex((l) => l.includes("<!-- BEGIN -->"));
+      expect(preIdx).toBe(obIdx + 1);
+    });
+
+    it("emits postamble immediately before return _ob", () => {
+      const { code } = compileJs("<p>hi</p>", {
+        preamble: "_ob.safeAppend('<!-- BEGIN -->');",
+        postamble: "_ob.safeAppend('<!-- END -->');",
+      });
+      const lines = code.split("\n");
+      const postIdx = lines.findIndex((l) => l.includes("<!-- END -->"));
+      const returnIdx = lines.findIndex((l) => l.trim() === "return _ob;");
+      expect(postIdx).toBe(returnIdx - 1);
+    });
+
+    it("emits nothing extra when preamble/postamble are omitted", () => {
+      const { code } = compileJs("<p>hi</p>");
+      expect(code).not.toContain("BEGIN");
+      expect(code).not.toContain("END");
+    });
+  });
 });
