@@ -222,6 +222,9 @@ importers:
 
   packages/trails-tsc:
     dependencies:
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../actionview
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler
