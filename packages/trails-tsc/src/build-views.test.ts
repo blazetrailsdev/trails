@@ -98,14 +98,18 @@ describe("buildViews", () => {
     expect(fs.existsSync(path.join(cwd, "build/.gen/views-manifest.ts"))).toBe(true);
   });
 
-  it("emits template-registry-augmentation.ts for templates with a locals directive", () => {
+  it("emits template-registry-augmentation.ts keyed by Rails partial name", () => {
     const cwd = mkScratch();
+    // partial: _user.html.tse → "users/user" (strips `_` prefix and format ext)
     write(
       cwd,
       "app/views/users/_user.html.tse",
       "<%# locals: (name:, role: 'guest') %><%= name %>",
     );
-    write(cwd, "app/views/posts/index.html.tse", "no locals directive");
+    // non-partial with locals directive: NOT included (no `_` prefix)
+    write(cwd, "app/views/posts/index.html.tse", "<%# locals: (page:) %>list");
+    // partial without locals directive: NOT included
+    write(cwd, "app/views/shared/_nav.html.tse", "nav");
 
     buildViews({ cwd });
 
@@ -115,17 +119,22 @@ describe("buildViews", () => {
     );
     expect(aug).toContain('declare module "@blazetrails/actionview"');
     expect(aug).toContain("interface TemplateRegistry");
-    expect(aug).toContain('"users/_user.html"');
+    // key matches Rails render call: no `_`, no format extension
+    expect(aug).toContain('"users/user"');
+    expect(aug).not.toContain('"users/_user.html"');
     expect(aug).toContain("name: unknown");
     expect(aug).toContain("role?: unknown");
-    // no-locals-directive template is absent
+    // non-partial excluded even with locals directive
     expect(aug).not.toContain("posts/index");
+    // partial without locals directive excluded
+    expect(aug).not.toContain("shared/nav");
     expect(aug).toContain("AUTO-GENERATED");
   });
 
-  it("emits an empty augmentation when no templates have a locals directive", () => {
+  it("emits an empty augmentation when no partials have a locals directive", () => {
     const cwd = mkScratch();
     write(cwd, "app/views/home.html.tse", "plain template");
+    write(cwd, "app/views/shared/_nav.html.tse", "nav without locals");
 
     buildViews({ cwd });
 
@@ -145,10 +154,12 @@ describe("buildViews", () => {
     buildViews({ cwd });
 
     const shim = fs.readFileSync(path.join(cwd, ".trails/views/users/_user.html.tse.ts"), "utf8");
-    expect(shim).toContain('import type { TemplateRegistry } from "@blazetrails/actionview"');
+    expect(shim).toContain(
+      'import type { TemplateRegistry, TemplateLocals } from "@blazetrails/actionview"',
+    );
     expect(shim).toContain("render<K extends keyof TemplateRegistry>");
     expect(shim).toContain("partial: K;");
-    expect(shim).toContain("locals?: TemplateRegistry[K];");
+    expect(shim).toContain("locals?: TemplateLocals<TemplateRegistry[K]>");
   });
 });
 

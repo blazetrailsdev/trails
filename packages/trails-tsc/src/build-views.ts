@@ -79,10 +79,11 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
     fs.writeFileSync(outBase + ".ts", shim);
     fs.writeFileSync(outBase + ".js", js);
     const ast = parse(src);
-    if (ast.localsSignature !== null) {
+    const registryKey = partialRegistryKey(rel);
+    if (registryKey !== null && ast.localsSignature !== null) {
       const locals = parseLocalsSignature(ast.localsSignature);
       const localsType = localsParamType(ast, locals);
-      registryEntries.push({ key: manifestKey(rel), localsType });
+      registryEntries.push({ key: registryKey, localsType });
     }
   }
   fs.mkdirSync(outDir, { recursive: true });
@@ -130,6 +131,19 @@ function walkTse(dir: string): string[] {
 /** Strip the trailing `.tse` handler. Keeps `<name>.<format>` (e.g. `users/show.html`). */
 function manifestKey(rel: string): string {
   return rel.replace(/\.tse$/u, "");
+}
+
+/**
+ * Rails partial key for a `.tse` path: strips `_` prefix and format extension
+ * so `users/_user.html.tse` → `"users/user"`, matching `render partial: "users/user"`.
+ * Returns `null` for non-partial templates (filename doesn't start with `_`).
+ */
+function partialRegistryKey(rel: string): string | null {
+  const parts = rel.replace(/\.tse$/u, "").split("/");
+  const filename = parts[parts.length - 1]!;
+  if (!filename.startsWith("_")) return null;
+  const nameWithoutUnderscore = filename.slice(1).replace(/\.[^.]+$/u, "");
+  return [...parts.slice(0, -1), nameWithoutUnderscore].join("/");
 }
 
 function emitRegistryAugmentation(entries: Array<{ key: string; localsType: string }>): string {

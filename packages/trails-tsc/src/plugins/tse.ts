@@ -213,7 +213,7 @@ function emitNode(node: TseAst["nodes"][number]): string {
 
 const PREAMBLE = [
   "/* virtualized from .tse — phase 2b trails-tsc plugin */",
-  'import type { TemplateRegistry } from "@blazetrails/actionview";',
+  'import type { TemplateRegistry, TemplateLocals } from "@blazetrails/actionview";',
   "interface SafeString { readonly __safeStringBrand: unique symbol }",
   "interface OutputBuffer extends SafeString {",
   "  safeAppend(s: string): void;",
@@ -224,7 +224,7 @@ const PREAMBLE = [
   "  readonly outputBuffer: OutputBuffer;",
   "  render<K extends keyof TemplateRegistry>(options: {",
   "    partial: K;",
-  "    locals?: TemplateRegistry[K];",
+  "    locals?: TemplateLocals<TemplateRegistry[K]>;",
   "  }): SafeString;",
   "  render(options: { partial: string; locals?: Record<string, unknown> }): SafeString;",
   "  [key: string]: unknown;",
