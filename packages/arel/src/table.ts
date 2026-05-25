@@ -213,8 +213,12 @@ export class Table extends Node {
    *
    * Mirrors: Arel::Table#create_join
    */
-  createJoin(to: Node | string, constraint?: Node | string | null, klass?: typeof InnerJoin): Join {
-    const JoinClass = klass && typeof klass === "function" ? klass : InnerJoin;
+  createJoin(
+    to: Node | string,
+    constraint?: Node | string | null,
+    klass?: new (left: Node, right: Node | null) => Join,
+  ): Join {
+    const JoinClass = klass ?? InnerJoin;
     return new JoinClass(to as Node, (constraint ?? null) as Node | null);
   }
 
