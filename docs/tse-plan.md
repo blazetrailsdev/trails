@@ -1138,29 +1138,21 @@ each phase has a fidelity bar to hit.
 
 ### Package ownership per phase
 
-| Phase | Status                    | New package or file?                                                  | Owning package             | Depends on              |
-| ----- | ------------------------- | --------------------------------------------------------------------- | -------------------------- | ----------------------- |
-| 0a    | open                      | extract trails-tsc                                                    | `@blazetrails/trails-tsc`  | activerecord (existing) |
-| 0b    | closed (#1941 + existing) | SafeString / OutputBuffer                                             | activesupport / actionview | —                       |
-| 2a-0  | closed (#2190)            | **new** `@blazetrails/tse-compiler` (lexer, AST, JS/TS/d.ts emitters) | `tse-compiler`             | activesupport           |
-| 2a-1  | in flight (#2200)         | `Tse` handler class                                                   | `actionview`               | tse-compiler            |
-| 2b    | in flight (#2201)         | `tse` plugin (file I/O + manifest writes)                             | `trails-tsc`               | tse-compiler            |
-| 2c    | blocked on 2a-1 + 2b      | build CLI + watch + TS language service plugin                        | `trails-tsc`               | tse-compiler            |
+| Phase | Status                       | New package or file?                                                  | Owning package             | Depends on              |
+| ----- | ---------------------------- | --------------------------------------------------------------------- | -------------------------- | ----------------------- |
+| 0a    | closed (#1943)               | extract trails-tsc                                                    | `@blazetrails/trails-tsc`  | activerecord (existing) |
+| 0b    | closed (#1941 + existing)    | SafeString / OutputBuffer                                             | activesupport / actionview | —                       |
+| 2a-0  | closed (#2190)               | **new** `@blazetrails/tse-compiler` (lexer, AST, JS/TS/d.ts emitters) | `tse-compiler`             | activesupport           |
+| 2a-1  | closed (#2200)               | `Tse` handler class                                                   | `actionview`               | tse-compiler            |
+| 2b    | closed (#2201)               | `tse` plugin (file I/O + manifest writes)                             | `trails-tsc`               | tse-compiler            |
+| 2c    | closed (#2222, #2223, #2232) | build CLI + watch + TS language service plugin                        | `trails-tsc`               | tse-compiler            |
 
-Phase 2a-0 LANDED in #2190. 2a-1 + 2b are now in flight (#2200, #2201)
-and can land in either order. 2c follows both.
+All infrastructure phases are complete. Remaining work is fidelity
+stories (§5) and packaging (§5, stories 5.9–5.13).
 
 ---
 
 ## 5. Remaining work — stories
-
-What was on the §5A/§5B fidelity checklist is now either landed (audited
-against `vendor/rails/actionview/` in PR #2241) or pulled out into one
-of the stories below. Each story is a self-contained slot; pick one,
-ship it as a single PR. Stories are ordered roughly bottom-up
-(substrate → emitter → handler → renderer → packaging), but they are
-not strictly stacked — anything not marked **blocks** can move in
-parallel.
 
 A story is mergeable when:
 
@@ -1171,127 +1163,52 @@ A story is mergeable when:
 3. `api:compare` and `test:compare` deltas are non-negative for the
    touched packages.
 
+### Completed stories
+
+| Story | Title                                                      | PR    |
+| ----- | ---------------------------------------------------------- | ----- |
+| 5.1   | Handler: annotate-rendered-view-with-filenames             | #2366 |
+| 5.2   | Compiler: BLOCK_EXPR no-paren-wrap                         | #2364 |
+| 5.3   | Strict locals: emit + enforce signature                    | #2368 |
+| 5.4   | OutputBuffer: Rails-faithful shape + method names          | #2363 |
+| 5.6   | RenderContext: capture / concat / raw + block-form helpers | #2367 |
+| 5.7   | Layouts and yield                                          | #2369 |
+| 5.12  | TemplateRegistry augmentation + typed render overload      | #2365 |
+
 ---
 
-### Story 5.1 — Handler: annotate-rendered-view-with-filenames
+### Story 5.8 — Partials (in flight: #2370, +267/−5)
 
-Rails ref: `actionview/lib/action_view/template/handlers/erb.rb` lines
-86–89.
+Rails ref: `actionview/lib/action_view/renderer/partial_renderer.rb`.
 
-- [ ] `Tse#call` reads `ActionView::Base.annotateRenderedViewWithFilenames`
-      (currently absent from the actionview surface — wire it as a
-      class-level boolean on `Base`, default `false`, settable via
-      `config.actionView.annotateRenderedViewWithFilenames`).
-- [ ] When the boolean is on AND `template.format === "html"`, prepend
-      `_ob.safeAppend('<!-- BEGIN ${template.shortIdentifier} -->');`
-      and append the matching END line to the emitted module. Rails
-      threads this through Erubi via `:preamble` / `:postamble`
-      options; `compileJs` needs equivalent options or a wrapping
-      pass.
-
-### Story 5.2 — Compiler: BLOCK_EXPR no-paren-wrap
-
-Rails ref: `actionview/lib/action_view/template/handlers/erb/erubi.rb`
-(BLOCK_EXPR constant) — detects expression tags that end in `do …` or
-`{ …` and emits without paren-wrap so the trailing block parses.
-
-- [ ] Detect the TS analogue: `<%= … (… ) => { %>` or trailing
-      `=> {` / `(…) => {` / `function(…) {` immediately before `%>`.
-      Track these as `blockExpr` token kind in the lexer.
-- [ ] Emit `_ob.append(<expr>` without the closing `);` until the
-      matching `<% } %>` / `<% }) %>` closer; emit `);` then.
-- [ ] Verify with `<%= forEach(items, (item) => { %>…<% }) %>`
-      fixtures that the block body re-enters template mode and the
-      outer append closes correctly.
-
-### Story 5.3 — Strict locals: emit + enforce signature
-
-Rails ref: `actionview/lib/action_view/template.rb` (`strict_locals!`).
-
-- [ ] Empty `<%# locals: () %>` → emitted render signature uses
-      `locals: Record<never, never>` so any keys are a type error.
-- [ ] Names line with defaults (`count: 0`) emits as TS default
-      parameter values in the compiled render function (and falls
-      through to runtime — needs the locals object destructured).
-- [ ] `NoExtraKeys<T>` helper exported from
-      `@blazetrails/actionview/strict-locals` and applied to the
-      `locals` parameter so excess properties are rejected even for
-      variable-typed argument values. See §2.5 caveat.
-- [ ] Runtime `StrictLocalsMismatch` thrown by the compiled module
-      when `raiseOnStrictLocalsMismatch` is on (config flag, default
-      true in dev) and `Object.keys(locals)` doesn't match the
-      declared set.
-
-### Story 5.4 — OutputBuffer: Rails-faithful shape + method names
-
-Rails ref: `actionview/lib/action_view/buffers.rb`,
-`activesupport/lib/active_support/core_ext/string/output_safety.rb`.
-
-- [ ] `OutputBuffer extends SafeBuffer` (currently a plain class
-      wrapping a raw string). Required so `outputBuffer.toString()`
-      satisfies `isHtmlSafe()` without the bespoke override.
-- [ ] Rename `concat` / `safeConcat` → `append` / `safeAppend` to
-      match what the emitter actually calls. Keep the old names as
-      `@deprecated` aliases for one release. Today `compileJs` emits
-      `_ob.append(…)` / `_ob.safeAppend(…)` which would `TypeError` at
-      runtime against the current `OutputBuffer`.
-- [ ] Verify `safeBuffer.concat(safeBuffer) instanceof SafeBuffer`
-      under the activesupport implementation — Rails preserves
-      html-safety across `<<` of two safe strings.
+- [ ] Static partial name → typed locals via the `TemplateRegistry`
+      augmentation manifest (5.12 landed).
+- [ ] Dynamic partial name → string form falls back to
+      `Record<string, unknown>` for the locals parameter.
+- [ ] `collection`, `as`, `counter`, `spacerTemplate` options match
+      Rails 1:1.
 
 ### Story 5.5 — Filename parsing: token lists + format default + override
 
 Rails ref: `actionview/lib/action_view/template/resolver.rb` +
 `actionpack/lib/action_dispatch/http/mime_type.rb`.
 
-- [ ] `parseFilename` consumes a `MimeType` registry instead of
-      blind dot-splitting — `show.en.html+phone.tse` resolves
-      `{ name: "show", locale: "en", format: "html", variant: "phone",
-handler: "tse" }`. Blocked on a `Mime::Type` port.
+`Mime::Type` is already ported in
+`packages/actionpack/src/action-dispatch/http/mime-type.ts` with
+registered defaults in `mime-types.ts`. `parseFilename` (in
+tse-compiler) should accept a `Set<string>` of known format symbols
+as a parameter — the caller (actionview handler or trails-tsc plugin)
+passes `new Set(MimeType.SET.symbols)` at call time so tse-compiler
+stays actionpack-free.
+
+- [ ] `parseFilename` consumes a format-token set instead of
+      blind dot-splitting — e.g. `show.en.html+phone.tse` resolves to
+      `{ name: "show", locale: "en", format: "html", variant: "phone", handler: "tse" }`.
 - [ ] Missing format in the filename defaults to `"html"` (per Rails'
       `Template#format` fallback).
 - [ ] `<%! format: "json" !%>` magic block overrides the filename-
       derived format when present. Today the parser only handles
       `types: …`; extend it to the `format: …` directive.
-
-### Story 5.6 — RenderContext: capture / concat / raw + block-form helpers
-
-Rails ref: `actionview/lib/action_view/helpers/capture_helper.rb`,
-`output_safety_helper.rb`.
-
-- [ ] `RenderContext#capture(callback)` redirects the active
-      `outputBuffer` for the duration of `callback`, returns the
-      captured `SafeBuffer`, restores via `finally`.
-- [ ] `RenderContext#concat(value)` writes to the currently-active
-      buffer.
-- [ ] `RenderContext#raw(value)` is exactly `safe(value)`.
-- [ ] Block-form `<%= helper(() => { %> … <% }) %>` emits with a
-      `capture()` wrapper so the inner block writes don't double-
-      append (see §2.10.3). Depends on Story 5.2.
-- [ ] Nested partial renders inherit the parent context's
-      `outputBuffer` rather than constructing a fresh one.
-
-### Story 5.7 — Layouts and yield
-
-Rails ref: `actionview/lib/action_view/layouts.rb`.
-
-- [ ] `<%= yield %>` returns the inner template output via
-      `RenderContext#yield()`.
-- [ ] `<% contentFor("name", () => …) %>` captures by callback and
-      stores under the given name on the context.
-- [ ] `<%= yield("name") %>` returns the named capture or an empty
-      `SafeBuffer`.
-
-### Story 5.8 — Partials
-
-Rails ref: `actionview/lib/action_view/renderer/partial_renderer.rb`.
-
-- [ ] Static partial name → typed locals via the `TemplateRegistry`
-      augmentation manifest. Depends on Story 5.12.
-- [ ] Dynamic partial name → string form falls back to
-      `Record<string, unknown>` for the locals parameter.
-- [ ] `collection`, `as`, `counter`, `spacerTemplate` options match
-      Rails 1:1.
 
 ### Story 5.9 — Artifact emission
 
@@ -1321,16 +1238,6 @@ from "./show.html.tse"` typechecks before any `.tse.d.ts` is
 - [ ] Emitted `.tse.ts` uses only erasable syntax (passes
       `verbatimModuleSyntax`). No enum, no `import =`, no namespace.
 
-### Story 5.12 — TemplateRegistry
-
-- [ ] `TemplateRegistry` empty interface exported from
-      `@blazetrails/actionview`.
-- [ ] `trails-tsc build` writes a manifest module that augments it
-      via `declare module "@blazetrails/actionview" { interface
-TemplateRegistry { … } }` keyed by partial name → locals type.
-- [ ] `RenderContext#render({ partial: keyof TemplateRegistry, locals
-})` resolves typed locals. Unblocks Story 5.8 typed partials.
-
 ### Story 5.13 — Package wiring
 
 - [ ] `package.json#exports` entry for `*.tse` lists `"types"` before
@@ -1342,6 +1249,25 @@ TemplateRegistry { … } }` keyed by partial name → locals type.
 - [ ] `trails-tsc build` runs from `pnpm prepare` (and the equivalent
       lifecycle for npm/yarn) so a fresh clone typechecks without a
       manual build step.
+
+### Story 5.14 — Post-merge follow-up bundle (~130 LOC)
+
+Sized items from post-merge findings on landed stories. All
+independent, no file overlap — bundled to hit the PR ceiling.
+
+- [ ] ~4 LOC: `packages/actionview/src/helpers/output-safety-helper.ts`
+      `raw()` has the same `String(outputBuffer)` coercion bug fixed
+      in `TseRenderContextImpl.raw` (from #2367).
+- [ ] ~30–50 LOC: `packages/trails-tsc/src/plugins/tse.ts` virtualizer
+      does not enforce the `TseRenderContext` contract on the compiled
+      render function's `context` parameter (from #2367).
+- [ ] ~50 LOC: semantic diagnosis tests for the render conditional
+      generic — required locals for known partials, optional when
+      `{} extends LocalsType`, wrong-shape rejection. Currently
+      string-match only (from #2365).
+- [ ] ~30 LOC: multi-format intersection type (same partial as
+      `.html.tse` + `.json.tse`) needs a `buildViews` integration
+      test (from #2365).
 
 ---
 
