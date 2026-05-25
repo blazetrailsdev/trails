@@ -152,6 +152,39 @@ describe("virtualizeTse", () => {
     expect(out).toContain("}");
   });
 
+  it("virtualizes a blockExpr with deferred append close", () => {
+    const out = virtualizeTse("<%= forEach(items, (item) => { %><li><%= item %></li><% }) %>");
+    const lines = out.split("\n");
+    expect(lines).toContain("  _ob.append(forEach(items, (item) => {");
+    expect(lines).toContain('  _ob.safeAppend("<li>");');
+    expect(lines).toContain("  _ob.append(item);");
+    expect(lines).toContain('  _ob.safeAppend("</li>");');
+    expect(lines).toContain("  }));");
+  });
+
+  it("virtualizes nested blockExprs and closes each in order", () => {
+    const out = virtualizeTse("<%= outer((x) => { %><%= inner((y) => { %><% }) %><% }) %>");
+    const lines = out.split("\n");
+    expect(lines).toContain("  _ob.append(outer((x) => {");
+    expect(lines).toContain("  _ob.append(inner((y) => {");
+    expect(lines.filter((l) => l === "  }));")).toHaveLength(2);
+  });
+
+  it("does not consume a blockExpr closer on inner code braces including } else {", () => {
+    const out = virtualizeTse(
+      "<%= forEach(items, (item) => { %><% if (x) { %><%= item %><% } else { %><%= other %><% } %><% }) %>",
+    );
+    const lines = out.split("\n");
+    expect(lines).toContain("  _ob.append(forEach(items, (item) => {");
+    expect(lines.filter((l) => l === "  }));")).toHaveLength(1);
+  });
+
+  it("throws a clear error when a blockExpr is never closed in virtualization", () => {
+    expect(() => virtualizeTse("<%= forEach(items, (item) => { %>no closer")).toThrow(
+      /block-expr.*never closed/,
+    );
+  });
+
   it("emits TS that type-checks against the declared locals", () => {
     const source =
       "<%# locals: (user:) %><%! types: { user: { name: string } } !%>" +

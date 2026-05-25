@@ -8,6 +8,7 @@ export type TseNode =
   | { kind: "text"; value: string }
   | { kind: "code"; value: string }
   | { kind: "expr"; value: string }
+  | { kind: "blockExpr"; value: string }
   | { kind: "rawExpr"; value: string };
 
 export interface TseAst {

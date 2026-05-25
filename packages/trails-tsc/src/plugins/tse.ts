@@ -152,6 +152,47 @@ function destructureLines(locals: LocalEntry[]): string[] {
   return [`  const { ${pieces.join(", ")} } = locals;`, voids];
 }
 
+const BLOCK_CLOSE_RE = /^\s*\}\s*\)?\s*;?\s*$/;
+
+function netBraceDepth(code: string): number {
+  let depth = 0;
+  for (const ch of code) {
+    if (ch === "{") depth++;
+    else if (ch === "}") depth--;
+  }
+  return depth;
+}
+
+function emitNodes(nodes: TseAst["nodes"]): string[] {
+  const lines: string[] = [];
+  // Stack: one entry per open blockExpr, tracking net unclosed `{` inside it.
+  const innerDepths: number[] = [];
+  for (const node of nodes) {
+    if (node.kind === "blockExpr") {
+      innerDepths.push(0);
+      lines.push(`  _ob.append(${node.value.trim()}`);
+    } else if (node.kind === "code" && innerDepths.length > 0) {
+      const innerDepth = innerDepths[innerDepths.length - 1]!;
+      if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
+        innerDepths.pop();
+        const t = node.value.trim();
+        lines.push(`  ${t.endsWith(";") ? t.slice(0, -1) : t});`);
+      } else {
+        innerDepths[innerDepths.length - 1]! += netBraceDepth(node.value);
+        lines.push(emitNode(node));
+      }
+    } else {
+      lines.push(emitNode(node));
+    }
+  }
+  if (innerDepths.length > 0) {
+    throw new Error(
+      `TSE: ${innerDepths.length} block-expr tag(s) were never closed — missing <% } %> or <% }) %>`,
+    );
+  }
+  return lines;
+}
+
 function emitNode(node: TseAst["nodes"][number]): string {
   switch (node.kind) {
     case "text":
@@ -165,6 +206,8 @@ function emitNode(node: TseAst["nodes"][number]): string {
       return `  _ob.append(${node.value});`;
     case "rawExpr":
       return `  _ob.safeExprAppend(${node.value});`;
+    case "blockExpr":
+      return `  _ob.append(${node.value}`;
   }
 }
 
@@ -208,7 +251,7 @@ export function virtualizeTseWithDeltas(source: string): VirtualizeTseResult {
   ];
   for (const line of destructureLines(locals)) header.push(line);
   const body: string[] = [];
-  for (const node of ast.nodes) body.push(emitNode(node));
+  for (const line of emitNodes(ast.nodes)) body.push(line);
   const footer = ["  return _ob;", "}", ""];
 
   // Two LineDeltas: one for the prepended header, one for the trailing

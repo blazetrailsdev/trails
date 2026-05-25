@@ -28,4 +28,17 @@ describe("tokenize", () => {
     expect(() => tokenize("<% never closed")).toThrow(TseSyntaxError);
     expect(() => tokenize("<%! never closed")).toThrow(TseSyntaxError);
   });
+
+  it("classifies block-expr tags as blockExpr, not expr", () => {
+    expect(tokenize("<%= forEach(items, (item) => { %>")[0].kind).toBe("blockExpr");
+    expect(tokenize("<%= items.map((x) => { %>")[0].kind).toBe("blockExpr");
+    expect(tokenize("<%= fn(x) do %>")[0].kind).toBe("blockExpr");
+    expect(tokenize("<%= fn(x) do |y| %>")[0].kind).toBe("blockExpr");
+    expect(tokenize("<%= fn() { |x| %>")[0].kind).toBe("blockExpr");
+  });
+
+  it("keeps plain expressions as expr", () => {
+    expect(tokenize("<%= name %>")[0].kind).toBe("expr");
+    expect(tokenize("<%= x + 1 %>")[0].kind).toBe("expr");
+  });
 });
