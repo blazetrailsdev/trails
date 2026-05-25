@@ -231,25 +231,28 @@ interface QuoterHost {
 }
 
 /**
- * Resolves quoting through `connection()`, falling back to `adapter` when
- * the adapter is set directly (bypassing the pool). Only `ConnectionNotDefined`
- * (no pool configured) falls back further to `ABSTRACT_QUOTER`; other failures
- * propagate to avoid a silent dialect downgrade. @internal
+ * Resolves quoting via `adapter` first, then `connection()` as a fallback.
+ * `adapter` is checked first because it resolves without leasing a pool
+ * connection — a direct adapter assignment (`this.adapter = x`) short-circuits
+ * the pool entirely, and a pooled `Base.adapter` leases+releases cleanly.
+ * `connection()` is tried second for callers that have no adapter path but do
+ * have an active pool lease (rare). Only `ConnectionNotDefined` triggers
+ * fallback; other errors propagate. @internal
  */
 function quoterFor(host: QuoterHost): Quoter {
   let conn: Quoter | null | undefined;
-  if (typeof host.connection === "function") {
-    try {
-      conn = host.connection() as Quoter | null | undefined;
-    } catch (err) {
-      if (!(err instanceof ConnectionNotDefined)) throw err;
-    }
+  try {
+    conn = host.adapter as Quoter | null | undefined;
+  } catch (err) {
+    if (!(err instanceof ConnectionNotDefined)) throw err;
   }
   if (!conn) {
-    try {
-      conn = host.adapter as Quoter | null | undefined;
-    } catch (err) {
-      if (!(err instanceof ConnectionNotDefined)) throw err;
+    if (typeof host.connection === "function") {
+      try {
+        conn = host.connection() as Quoter | null | undefined;
+      } catch (err) {
+        if (!(err instanceof ConnectionNotDefined)) throw err;
+      }
     }
   }
   if (!conn || typeof conn.quote !== "function") return ABSTRACT_QUOTER;

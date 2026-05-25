@@ -21,7 +21,10 @@ import { inspectExplainOption } from "./adapter.js";
 import type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
 import type { SchemaCache } from "./connection-adapters/schema-cache.js";
-import { clearAppliedSchemaSignatures } from "./test-helpers/define-schema.js";
+import {
+  clearAppliedSchemaSignatures,
+  restoreCanonicalSchemaSignatures,
+} from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { SidecarFixtures } from "./test-helpers/sidecar-fixtures.js";
 import {
@@ -323,6 +326,7 @@ export async function resetTestAdapterState(): Promise<void> {
   // `connection-adapters/**`) also accumulate entries; under the sidecar
   // shape the wrapper isolation that used to mask this is gone.
   clearAppliedSchemaSignatures();
+  restoreCanonicalSchemaSignatures();
   clearDdlTrackers();
   Base._modelsByName.clear();
 }

@@ -408,6 +408,79 @@ export function clearAppliedSchemaSignatures(adapter?: DatabaseAdapter): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// D-Y canonical schema preload — loaded once per worker at startup.
+// Survives clearAppliedSchemaSignatures() calls so handler-path files'
+// defineSchema() calls are always cache-hits (no DDL).
+// ---------------------------------------------------------------------------
+
+/** @internal */
+let _canonicalSchema: Schema | null = null;
+/** @internal */
+let _canonicalPreloadKey: string | null = null;
+/** @internal */
+let _canonicalPreloadAdapter: DatabaseAdapter | null = null;
+/** @internal */
+let _canonicalPreloadSigs: Map<string, string> | null = null;
+
+/**
+ * Register the canonical schema that was loaded at worker startup.  Must be
+ * called after the schema has been applied to the adapter (so signatures are
+ * already in the cache).  Subsequent calls to
+ * {@link restoreCanonicalSchemaSignatures} replay these signatures into the
+ * cache after every {@link clearAppliedSchemaSignatures}.
+ *
+ * @internal
+ */
+export function setCanonicalSchemaPreload(adapter: DatabaseAdapter, schema: Schema): void {
+  _canonicalSchema = schema;
+  _canonicalPreloadKey = databaseIdentity(adapter);
+  _canonicalPreloadAdapter = _canonicalPreloadKey === null ? adapter : null;
+  const cache = _cacheFor(adapter, false);
+  _canonicalPreloadSigs = cache ? new Map(cache) : new Map();
+}
+
+/**
+ * Replay canonical-schema signatures into the cache after
+ * {@link clearAppliedSchemaSignatures}.  Called by `resetTestAdapterState`
+ * so that handler-path files' `defineSchema()` calls remain no-ops even when
+ * an old-path file's `beforeEach` wipes the cache.
+ *
+ * @internal
+ */
+export function restoreCanonicalSchemaSignatures(): void {
+  if (!_canonicalPreloadSigs) return;
+  if (_canonicalPreloadKey !== null) {
+    _appliedSchemaSignatures.set(_canonicalPreloadKey, new Map(_canonicalPreloadSigs));
+  } else if (_canonicalPreloadAdapter) {
+    _fallbackSchemaSignatures.set(_canonicalPreloadAdapter, new Map(_canonicalPreloadSigs));
+  }
+}
+
+/**
+ * Returns true when every column in `testSpec` for `table` is present in the
+ * canonical schema with a compatible base type.  Extra canonical columns are
+ * fine — the test just doesn't use them.
+ *
+ * @internal
+ */
+function isCanonicalSubset(table: string, testSpec: TableSchema): boolean {
+  if (!_canonicalSchema) return false;
+  const canonicalSpec = _canonicalSchema[table];
+  if (!canonicalSpec) return false;
+  const testCols = columnsOf(testSpec);
+  const canonicalCols = columnsOf(canonicalSpec);
+  for (const [col, testColSpec] of Object.entries(testCols)) {
+    const canonicalColSpec = canonicalCols[col];
+    if (canonicalColSpec === undefined) return false;
+    const testType: string = typeof testColSpec === "string" ? testColSpec : testColSpec.type;
+    const canonicalType: string =
+      typeof canonicalColSpec === "string" ? canonicalColSpec : canonicalColSpec.type;
+    if (testType !== canonicalType) return false;
+  }
+  return true;
+}
+
 /** @internal */
 function getCache(adapter: DatabaseAdapter): Map<string, string> {
   return _cacheFor(adapter, true)!;
@@ -508,6 +581,22 @@ async function _defineSchemaImpl(
     const stillExists = known ? known.has(table) : cachedSig !== undefined;
     if (cachedSig === newSig && stillExists) {
       continue;
+    }
+    // D-Y fast-path: adapter IS the canonical DB and the test spec is a subset
+    // of what's already there — skip DDL and keep the canonical signature.
+    if (_canonicalPreloadSigs && isCanonicalSubset(table, raw)) {
+      const adapterKey = databaseIdentity(adapter);
+      const isSameDb =
+        adapterKey !== null
+          ? adapterKey === _canonicalPreloadKey
+          : adapter === _canonicalPreloadAdapter;
+      if (isSameDb) {
+        const canonicalSig = _canonicalPreloadSigs.get(table);
+        if (canonicalSig !== undefined) {
+          cache.set(table, canonicalSig);
+          continue;
+        }
+      }
     }
     if (stillExists) {
       await ss.dropTable(table, { ifExists: true });
