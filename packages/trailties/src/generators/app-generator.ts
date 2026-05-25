@@ -107,7 +107,7 @@ export class AppGenerator extends AppBase {
             rootDir: "src",
             outDir: "dist",
           },
-          include: ["src", ".trails"],
+          include: ["src", ".trails/template-registry-augmentation.d.ts"],
         },
         null,
         2,
