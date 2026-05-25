@@ -122,13 +122,25 @@ describe("AppGenerator", () => {
     expect(pkg.devDependencies.vite).toBeDefined();
   });
 
-  it("emits postinstall hook that builds .tse views", async () => {
+  it("emits prepare hook that builds .tse views", async () => {
     await makeGen().run();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
-    expect(pkg.scripts.postinstall).toBe("trails-tsc-views build --views src/app/views");
+    expect(pkg.scripts.prepare).toBe("trails-tsc-views build --views src/app/views");
+    expect(pkg.scripts.postinstall).toBeUndefined();
     expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toBeDefined();
     const gitignore = fs.readFileSync(appPath(".gitignore"), "utf-8");
     expect(gitignore).toContain("/.trails/");
+  });
+
+  it("exports *.tse with types before default", async () => {
+    await makeGen().run();
+    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
+    const tseExport = pkg.exports["./*.tse"];
+    expect(tseExport).toBeDefined();
+    expect(tseExport.types).toBe("./.trails/views/*.tse.ts");
+    expect(tseExport.default).toBe("./.trails/views/*.tse.js");
+    const keys = Object.keys(tseExport);
+    expect(keys.indexOf("types")).toBeLessThan(keys.indexOf("default"));
   });
 
   it("tsconfig includes .trails alongside src so augmentation participates in type-check", async () => {
@@ -139,6 +151,10 @@ describe("AppGenerator", () => {
     // rootDir: "src" keeps dist layout stable (dist/config/... not dist/src/config/...)
     // .d.ts files in .trails are exempt from rootDir constraints so both coexist.
     expect(tsconfig.compilerOptions.rootDir).toBe("src");
+    expect(tsconfig.compilerOptions.allowArbitraryExtensions).toBe(true);
+    expect(tsconfig.compilerOptions.plugins).toEqual([
+      { name: "@blazetrails/trails-tsc/ts-plugin", viewsDir: "src/app/views" },
+    ]);
   });
 
   it("configures postgres database", async () => {
