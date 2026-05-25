@@ -1,0 +1,16 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@blazetrails/actionview": ["../src/index.ts"],
+      "@blazetrails/activesupport": ["../../activesupport/src/index.ts"],
+      "@blazetrails/activesupport/yaml": ["../../activesupport/src/yaml.ts"],
+      "@blazetrails/did-you-mean": ["../../did-you-mean/src/index.ts"],
+      "@blazetrails/tse-compiler": ["../../tse-compiler/src/index.ts"]
+    }
+  },
+  "include": ["./**/*.test-d.ts"]
+}

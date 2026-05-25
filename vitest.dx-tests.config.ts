@@ -39,6 +39,18 @@ export default defineConfig({
           },
         },
       },
+      {
+        extends: true,
+        test: {
+          name: "actionview",
+          typecheck: {
+            enabled: true,
+            only: true,
+            include: ["packages/actionview/dx-tests/**/*.test-d.ts"],
+            tsconfig: "./packages/actionview/dx-tests/tsconfig.json",
+          },
+        },
+      },
     ],
   },
 });

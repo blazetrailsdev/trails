@@ -66,5 +66,10 @@ export { Trailtie, type ActionViewConfig } from "./trailtie.js";
 export { deprecator, Deprecator } from "./deprecator.js";
 export type { TemplateRegistry, TemplateLocals } from "./template-registry.js";
 
-export { TseRenderContextImpl, type TseRenderContext } from "./render-context.js";
+export {
+  TseRenderContextImpl,
+  type TseRenderContext,
+  type PartialOptions,
+  type DynamicPartialOptions,
+} from "./render-context.js";
 export { type NoExtraKeys, StrictLocalsMismatch } from "./strict-locals.js";

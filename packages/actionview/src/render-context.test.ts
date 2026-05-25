@@ -175,4 +175,76 @@ describe("TseRenderContextImpl", () => {
       expect(ctx.yield("title").toString()).toBe("&lt;script&gt;");
     });
   });
+
+  describe("#render (partials)", () => {
+    class SpyContext extends TseRenderContextImpl {
+      calls: Array<{ partial: string; localName: string; locals: Record<string, unknown> }> = [];
+      protected override _renderPartial(
+        partial: string,
+        localName: string,
+        locals: Record<string, unknown>,
+      ) {
+        this.calls.push({ partial, localName, locals });
+        return super._renderPartial(partial, localName, locals);
+      }
+    }
+
+    let spy: SpyContext;
+    beforeEach(() => {
+      spy = new SpyContext();
+    });
+
+    it("single partial: passes locals, derives localName, returns SafeBuffer", () => {
+      const result = spy.render({ partial: "users/user", locals: { name: "Alice" } });
+      expect(isHtmlSafe(result)).toBe(true);
+      expect(spy.calls[0]).toMatchObject({ localName: "user", locals: { name: "Alice" } });
+      spy.render({ partial: "users/user" });
+      expect(spy.calls[1].locals).toEqual({});
+    });
+
+    it("collection: calls _renderPartial per element with element, counter, and iteration", () => {
+      spy.render({ partial: "users/user", collection: ["Alice", "Bob"] });
+      expect(spy.calls).toHaveLength(2);
+      expect(spy.calls[0].locals).toMatchObject({
+        user: "Alice",
+        user_counter: 0,
+        user_iteration: { index: 0, first: true, last: false },
+      });
+      expect(spy.calls[1].locals).toMatchObject({
+        user: "Bob",
+        user_counter: 1,
+        user_iteration: { index: 1, first: false, last: true },
+      });
+    });
+
+    it("collection: as: overrides local name and counter key", () => {
+      spy.render({ partial: "shared/item", collection: ["x"], as: "entry" });
+      expect(spy.calls[0].locals).toMatchObject({ entry: "x", entry_counter: 0 });
+    });
+
+    it("collection: merges extra locals; strips _prefix and extension from localName", () => {
+      spy.render({ partial: "shared/_form.html", collection: [{}], locals: { role: "admin" } });
+      expect(spy.calls[0].localName).toBe("form");
+      expect(spy.calls[0].locals).toMatchObject({ role: "admin", form: {}, form_counter: 0 });
+    });
+
+    it("collection: empty → no calls, returns empty SafeBuffer", () => {
+      const result = spy.render({ partial: "users/user", collection: [] });
+      expect(result.toString()).toBe("");
+      expect(isHtmlSafe(result)).toBe(true);
+      expect(spy.calls).toHaveLength(0);
+    });
+
+    it("spacerTemplate: N-1 spacer calls between items, none for single-item", () => {
+      spy.render({
+        partial: "users/user",
+        collection: ["a", "b", "c"],
+        spacerTemplate: "shared/divider",
+      });
+      expect(spy.calls.filter((c) => c.partial === "shared/divider")).toHaveLength(2);
+      spy.calls = [];
+      spy.render({ partial: "users/user", collection: ["only"], spacerTemplate: "shared/hr" });
+      expect(spy.calls.filter((c) => c.partial === "shared/hr")).toHaveLength(0);
+    });
+  });
 });
