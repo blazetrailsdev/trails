@@ -1251,6 +1251,25 @@ from "./show.html.tse"` typechecks before any `.tse.d.ts` is
       lifecycle for npm/yarn) so a fresh clone typechecks without a
       manual build step.
 
+### Story 5.14 — Post-merge follow-up bundle (~130 LOC)
+
+Sized items from post-merge findings on landed stories. All
+independent, no file overlap — bundled to hit the PR ceiling.
+
+- [ ] ~4 LOC: `packages/actionview/src/helpers/output-safety-helper.ts`
+      `raw()` has the same `String(outputBuffer)` coercion bug fixed
+      in `TseRenderContextImpl.raw` (from #2367).
+- [ ] ~30–50 LOC: `packages/trails-tsc/src/plugins/tse.ts` virtualizer
+      does not enforce the `TseRenderContext` contract on the compiled
+      render function's `context` parameter (from #2367).
+- [ ] ~50 LOC: semantic diagnosis tests for the render conditional
+      generic — required locals for known partials, optional when
+      `{} extends LocalsType`, wrong-shape rejection. Currently
+      string-match only (from #2365).
+- [ ] ~30 LOC: multi-format intersection type (same partial as
+      `.html.tse` + `.json.tse`) needs a `buildViews` integration
+      test (from #2365).
+
 ---
 
 ### Post-merge follow-ups (from findings)
