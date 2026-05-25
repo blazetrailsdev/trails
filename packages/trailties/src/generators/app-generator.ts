@@ -113,7 +113,7 @@ export class AppGenerator extends AppBase {
             allowArbitraryExtensions: true,
             rootDir: "src",
             outDir: "dist",
-            plugins: [{ name: "@blazetrails/trails-tsc/lsp" }],
+            plugins: [{ name: "@blazetrails/trails-tsc/ts-plugin" }],
           },
           include: ["src", ".trails/template-registry-augmentation.d.ts"],
         },

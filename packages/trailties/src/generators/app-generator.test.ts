@@ -152,7 +152,9 @@ describe("AppGenerator", () => {
     // .d.ts files in .trails are exempt from rootDir constraints so both coexist.
     expect(tsconfig.compilerOptions.rootDir).toBe("src");
     expect(tsconfig.compilerOptions.allowArbitraryExtensions).toBe(true);
-    expect(tsconfig.compilerOptions.plugins).toEqual([{ name: "@blazetrails/trails-tsc/lsp" }]);
+    expect(tsconfig.compilerOptions.plugins).toEqual([
+      { name: "@blazetrails/trails-tsc/ts-plugin" },
+    ]);
   });
 
   it("configures postgres database", async () => {
