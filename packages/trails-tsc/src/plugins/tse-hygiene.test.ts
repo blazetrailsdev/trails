@@ -51,13 +51,27 @@ describe("emitter hygiene — strict flags", () => {
   }
 });
 
+function findNonErasableNodes(source: string): string[] {
+  const sf = ts.createSourceFile("/virtual/check.ts", source, ts.ScriptTarget.ES2022, true);
+  const violations: string[] = [];
+  function walk(node: ts.Node) {
+    if (ts.isEnumDeclaration(node)) violations.push(`enum ${node.name.text}`);
+    if (ts.isImportEqualsDeclaration(node)) violations.push(`import = (${node.name.text})`);
+    if (ts.isModuleDeclaration(node)) violations.push(`namespace ${node.name.text}`);
+    ts.forEachChild(node, walk);
+  }
+  ts.forEachChild(sf, walk);
+  return violations;
+}
+
 describe("emitter hygiene — erasable syntax only", () => {
-  it("emitted output contains no enum, import =, or namespace", () => {
-    for (const source of Object.values(FIXTURES)) {
+  it("emitted output contains no enum, import =, or namespace AST nodes", () => {
+    for (const [name, source] of Object.entries(FIXTURES)) {
       const out = virtualizeTse(source);
-      expect(out).not.toMatch(/\benum\s+/);
-      expect(out).not.toMatch(/\bimport\s*=/);
-      expect(out).not.toMatch(/\bnamespace\s+/);
+      const violations = findNonErasableNodes(out);
+      expect(violations, `"${name}" emitted non-erasable syntax: ${violations.join(", ")}`).toEqual(
+        [],
+      );
     }
   });
 });

@@ -42,11 +42,11 @@ export function diagnose(source: string, options: DiagnoseOptions = {}): string[
   const program = ts.createProgram({
     rootNames: [fileName],
     options: {
+      ...options.extraCompilerOptions,
       noEmit: true,
       types: [],
       skipLibCheck: true,
       strict: true,
-      ...options.extraCompilerOptions,
     },
     host,
   });
