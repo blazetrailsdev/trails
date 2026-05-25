@@ -56,6 +56,7 @@ doesn't forward `--package` to `compare.ts`). Test numbers come from
 | [`self-hosted-runner-restart-plan.md`](self-hosted-runner-restart-plan.md)         | P2       | S    | Post-incident restart plan after the ~1 TB egress event. pnpm store-path + Docker image-layer fixes before scaling `gh-runner` back up.                                                                                                  |
 | [`ci-improvement-plan.md`](ci-improvement-plan.md)                                 | P2       | S    | ActionPack CI split plan — split `packages/actionpack` out of the shared `unit-tests` job into a dedicated no-DB `actionpack-tests` job ahead of the Wave 7 journey port. (Scope narrowed from prior multi-phase roadmap on 2026-05-14.) |
 | [`browser-compat-plan.md`](browser-compat-plan.md)                                 | P2       | S    | ~65% complete. BC-3 adapter registry, 2 ESLint rules, browser-bundle CI smoke, BC-5 audits remain.                                                                                                                                       |
+| [`join-dependency-arel-plan.md`](join-dependency-arel-plan.md)                     | P2       | M    | Full Rails fidelity for JoinDependency. Wire existing JoinAssociation, tree structure, walk dedup, association-proxy hydration, Arel select aliases. 7 core + 2 stretch PRs (~1600 LOC).                                                 |
 
 ## Verification harnesses
 
