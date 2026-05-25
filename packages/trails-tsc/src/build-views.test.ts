@@ -117,6 +117,7 @@ describe("buildViews", () => {
       path.join(cwd, ".trails/template-registry-augmentation.ts"),
       "utf8",
     );
+    expect(aug).toContain("export {};");
     expect(aug).toContain('declare module "@blazetrails/actionview"');
     expect(aug).toContain("interface TemplateRegistry");
     // key matches Rails render call: no `_`, no format extension
@@ -142,6 +143,7 @@ describe("buildViews", () => {
       path.join(cwd, ".trails/template-registry-augmentation.ts"),
       "utf8",
     );
+    expect(aug).toContain("export {};");
     expect(aug).toContain('declare module "@blazetrails/actionview"');
     expect(aug).toContain("interface TemplateRegistry {");
     expect(aug).toContain("AUTO-GENERATED");
