@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { isHtmlSafe, htmlSafe } from "@blazetrails/activesupport";
 import { TseRenderContextImpl } from "./render-context.js";
+import { OutputBuffer } from "./buffers.js";
 
 describe("TseRenderContextImpl", () => {
   let ctx: TseRenderContextImpl;
@@ -80,6 +81,19 @@ describe("TseRenderContextImpl", () => {
       expect(ctx.raw(42).toString()).toBe("42");
       expect(ctx.raw(null).toString()).toBe("");
       expect(ctx.raw(undefined).toString()).toBe("");
+    });
+
+    it("passes SafeBuffer through unchanged", () => {
+      const safe = htmlSafe("<em>safe</em>");
+      expect(ctx.raw(safe)).toBe(safe);
+    });
+
+    it("handles OutputBuffer without coercion error (OutputBuffer.toString() is non-primitive)", () => {
+      const buf = new OutputBuffer();
+      buf.safeAppend("<b>buf</b>");
+      const result = ctx.raw(buf);
+      expect(result.toString()).toBe("<b>buf</b>");
+      expect(isHtmlSafe(result)).toBe(true);
     });
   });
 

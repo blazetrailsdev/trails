@@ -136,6 +136,8 @@ function emitNode(node: TseNode, exprAppend: string, bufRef: string): string {
     case "rawExpr":
       return `${bufRef}.safeExprAppend(${node.value});`;
     case "blockExpr":
-      return `${bufRef}.${exprAppend}(${node.value}`;
+      throw new Error(
+        "unreachable: blockExpr nodes are handled in the emit() loop, not emitNode()",
+      );
   }
 }
