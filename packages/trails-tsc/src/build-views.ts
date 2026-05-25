@@ -15,8 +15,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import ts from "typescript";
-import { compileJs, parse, generateSourceMap, type LineMapping } from "@blazetrails/tse-compiler";
+import { compileJs, parse, generateSourceMap } from "@blazetrails/tse-compiler";
 import { virtualizeTseWithDeltas, parseLocalsSignature, localsParamType } from "./plugins/tse.js";
+import { remapLine } from "./remap.js";
 
 export interface BuildViewsOptions {
   cwd?: string;
@@ -205,27 +206,17 @@ function deltasToSourceMap(
   deltas: readonly import("./plugin.js").LineDelta[],
 ): import("@blazetrails/tse-compiler").RawSourceMap {
   const totalLines = shimText.split("\n").length;
-  const mappings: LineMapping[] = [];
-  for (let vLine = 0; vLine < totalLines; vLine++) {
-    let srcLine: number | null = vLine;
-    for (let i = deltas.length - 1; i >= 0; i--) {
-      const d = deltas[i]!;
-      const injStart = d.insertedAtLine;
-      const injEnd = d.insertedAtLine + d.lineCount;
-      if (srcLine > injEnd) srcLine -= d.lineCount;
-      else if (srcLine > injStart && srcLine <= injEnd) {
-        srcLine = null;
-        break;
-      }
-    }
-    if (srcLine !== null) mappings.push({ genLine: vLine, srcLine });
+  const mappings: import("@blazetrails/tse-compiler").LineMapping[] = [];
+  for (let v = 0; v < totalLines; v++) {
+    const s = remapLine(v, deltas);
+    if (s !== null) mappings.push({ genLine: v, srcLine: s });
   }
   return generateSourceMap(file, sourceFile, sourceContent, mappings);
 }
 
 function emitDeclarations(shimPaths: readonly string[]): void {
   if (shimPaths.length === 0) return;
-  const options: ts.CompilerOptions = {
+  const opts: ts.CompilerOptions = {
     declaration: true,
     declarationMap: true,
     emitDeclarationOnly: true,
@@ -233,12 +224,8 @@ function emitDeclarations(shimPaths: readonly string[]): void {
     moduleResolution: ts.ModuleResolutionKind.Bundler,
     module: ts.ModuleKind.ESNext,
     target: ts.ScriptTarget.ESNext,
-    strict: false,
-    noEmit: false,
   };
-  const host = ts.createCompilerHost(options, true);
-  const program = ts.createProgram([...shimPaths], options, host);
-  program.emit();
+  ts.createProgram([...shimPaths], opts, ts.createCompilerHost(opts, true)).emit();
 }
 
 function emitManifest(files: readonly string[]): string {

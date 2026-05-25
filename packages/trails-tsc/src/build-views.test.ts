@@ -168,81 +168,30 @@ describe("buildViews", () => {
     expect(aug).toContain("AUTO-GENERATED");
   });
 
-  it("emits all artifacts per .tse file (.ts, .ts.map, .js, .js.map, .d.ts, .d.ts.map)", () => {
+  it("emits all 6 artifacts with correct source map references", () => {
     const cwd = mkScratch();
-    write(cwd, "app/views/users/show.html.tse", "<h1><%= name %></h1>");
+    const src = "<h1><%= name %></h1>";
+    write(cwd, "app/views/users/show.html.tse", src);
     buildViews({ cwd });
     const base = path.join(cwd, ".trails/views/users/show.html.tse");
+    const mapDir = path.dirname(base);
+    const srcPath = path.join(cwd, "app/views/users/show.html.tse");
     for (const ext of [".ts", ".ts.map", ".js", ".js.map", ".d.ts", ".d.ts.map"]) {
       expect(fs.existsSync(base + ext), `missing ${ext}`).toBe(true);
     }
-  });
-
-  it(".tse.js.map sources resolve to the original .tse file", () => {
-    const cwd = mkScratch();
-    write(cwd, "app/views/users/show.html.tse", "<h1><%= name %></h1>");
-    buildViews({ cwd });
-    const map = JSON.parse(
-      fs.readFileSync(path.join(cwd, ".trails/views/users/show.html.tse.js.map"), "utf8"),
-    );
-    expect(map.version).toBe(3);
-    const mapDir = path.join(cwd, ".trails/views/users");
-    const resolved = path.resolve(mapDir, map.sources[0]);
-    expect(resolved).toBe(path.join(cwd, "app/views/users/show.html.tse"));
-    expect(map.sourcesContent).toEqual(["<h1><%= name %></h1>"]);
-  });
-
-  it(".tse.ts.map sources resolve to the original .tse file", () => {
-    const cwd = mkScratch();
-    write(cwd, "app/views/users/show.html.tse", "<h1><%= name %></h1>");
-    buildViews({ cwd });
-    const map = JSON.parse(
-      fs.readFileSync(path.join(cwd, ".trails/views/users/show.html.tse.ts.map"), "utf8"),
-    );
-    expect(map.version).toBe(3);
-    const mapDir = path.join(cwd, ".trails/views/users");
-    const resolved = path.resolve(mapDir, map.sources[0]);
-    expect(resolved).toBe(path.join(cwd, "app/views/users/show.html.tse"));
-    expect(map.sourcesContent).toEqual(["<h1><%= name %></h1>"]);
-  });
-
-  it(".tse.ts shim includes sourceMappingURL comment", () => {
-    const cwd = mkScratch();
-    write(cwd, "app/views/home.html.tse", "hello");
-    buildViews({ cwd });
-    const shim = fs.readFileSync(path.join(cwd, ".trails/views/home.html.tse.ts"), "utf8");
-    expect(shim).toContain("//# sourceMappingURL=home.html.tse.ts.map");
-  });
-
-  it(".tse.d.ts.map sources point to the .tse.ts shim", () => {
-    const cwd = mkScratch();
-    write(cwd, "app/views/users/show.html.tse", "<h1><%= name %></h1>");
-    buildViews({ cwd });
-    const map = JSON.parse(
-      fs.readFileSync(path.join(cwd, ".trails/views/users/show.html.tse.d.ts.map"), "utf8"),
-    );
-    expect(map.version).toBe(3);
-    expect(map.sources).toEqual(["show.html.tse.ts"]);
-  });
-
-  it(".tse.js.map maps multi-line template nodes to correct source lines", () => {
-    const cwd = mkScratch();
-    const src = ["<h1><%= title %></h1>", "<p>", "<%= body %>", "</p>"].join("\n");
-    write(cwd, "app/views/posts/show.html.tse", src);
-    buildViews({ cwd });
-    const mapDir = path.join(cwd, ".trails/views/posts");
-    const map = JSON.parse(fs.readFileSync(path.join(mapDir, "show.html.tse.js.map"), "utf8"));
-    const resolved = path.resolve(mapDir, map.sources[0]);
-    expect(resolved).toBe(path.join(cwd, "app/views/posts/show.html.tse"));
-    expect(map.sourcesContent).toEqual([src]);
-  });
-
-  it(".tse.js includes sourceMappingURL comment", () => {
-    const cwd = mkScratch();
-    write(cwd, "app/views/home.html.tse", "hello");
-    buildViews({ cwd });
-    const js = fs.readFileSync(path.join(cwd, ".trails/views/home.html.tse.js"), "utf8");
-    expect(js).toContain("//# sourceMappingURL=home.html.tse.js.map");
+    const jsMap = JSON.parse(fs.readFileSync(base + ".js.map", "utf8"));
+    expect(jsMap.version).toBe(3);
+    expect(path.resolve(mapDir, jsMap.sources[0])).toBe(srcPath);
+    expect(jsMap.sourcesContent).toEqual([src]);
+    const tsMap = JSON.parse(fs.readFileSync(base + ".ts.map", "utf8"));
+    expect(path.resolve(mapDir, tsMap.sources[0])).toBe(srcPath);
+    expect(tsMap.sourcesContent).toEqual([src]);
+    const dtsMap = JSON.parse(fs.readFileSync(base + ".d.ts.map", "utf8"));
+    expect(dtsMap.sources).toEqual(["show.html.tse.ts"]);
+    const shim = fs.readFileSync(base + ".ts", "utf8");
+    expect(shim).toContain("//# sourceMappingURL=show.html.tse.ts.map");
+    const js = fs.readFileSync(base + ".js", "utf8");
+    expect(js).toContain("//# sourceMappingURL=show.html.tse.js.map");
   });
 
   it("tse virtual shim includes TemplateRegistry import and render overloads", () => {
