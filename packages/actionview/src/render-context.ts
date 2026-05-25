@@ -156,19 +156,16 @@ export class TseRenderContextImpl implements TseRenderContext {
     return this._renderPartial(partial, localName, locals);
   }
 
-  /** @internal */
-  private _renderPartial(
-    partial: string,
+  /**
+   * Stub — actual template loading + execution lands in Phase 2c/3 with the
+   * renderer substrate. Subclasses (and tests) may override to inject behavior.
+   * @internal
+   */
+  protected _renderPartial(
+    _partial: string,
     _localName: string,
-    locals: Record<string, unknown>,
+    _locals: Record<string, unknown>,
   ): SafeBuffer {
-    // Runtime partial rendering (loading and executing compiled .tse.js) lands
-    // in Phase 2c/3 with the renderer substrate. For now, capture any output
-    // the caller wrote via concat/raw before this call — matching Rails'
-    // partial-as-sub-context model where the partial writes into the shared
-    // output buffer. Return the locals as a no-op placeholder buffer.
-    void partial;
-    void locals;
     return htmlSafe("");
   }
 
@@ -194,10 +191,9 @@ export class TseRenderContextImpl implements TseRenderContext {
     }
 
     if (spacerTemplate !== undefined && results.length > 1) {
-      const spacer = this._renderPartial(spacerTemplate, "", {});
       const interleaved: SafeBuffer[] = [];
       for (let i = 0; i < results.length; i++) {
-        if (i > 0) interleaved.push(spacer);
+        if (i > 0) interleaved.push(this._renderPartial(spacerTemplate, "", {}));
         interleaved.push(results[i]);
       }
       return interleaved.reduce((acc, s) => acc.concat(s), htmlSafe(""));
