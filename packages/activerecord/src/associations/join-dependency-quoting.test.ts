@@ -1,18 +1,19 @@
 /**
- * Covers the adapter-aware string-quoting dispatch in JoinDependency
- * (polymorphic source_type / STI IN-list / has_many :through polymorphic
- * source_type predicates). Mirrors the spirit of Rails'
- * `connection.quote` usage in `ThroughReflection` — verifies the literal
- * routes through the active adapter's `quote()` rather than a
- * hand-rolled escape.
+ * Covers the Arel node construction in JoinDependency's direct-path
+ * `addAssociation`. Verifies that the returned JoinNode carries an
+ * `arelJoin` (Nodes.OuterJoin) with the correct ON predicate structure
+ * for polymorphic :as, STI subclass IN-list, and basic foreign-key joins.
+ *
+ * Through-associations still use raw SQL strings (joinSql); those are
+ * covered by join-dependency-through-aliasing.test.ts.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { ConnectionNotDefined } from "../errors.js";
 import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
+import { Nodes } from "@blazetrails/arel";
 
 function stubConnection(model: typeof Base, conn: Partial<DatabaseAdapter> | (() => never)) {
   Object.defineProperty(model, "connection", {
@@ -22,7 +23,7 @@ function stubConnection(model: typeof Base, conn: Partial<DatabaseAdapter> | (()
   });
 }
 
-describe("JoinDependency adapter-aware quoting", () => {
+describe("JoinDependency Arel node construction", () => {
   let adapter: DatabaseAdapter;
 
   class Owner extends Base {
@@ -47,20 +48,36 @@ describe("JoinDependency adapter-aware quoting", () => {
     registerModel(Asset);
   });
 
-  it("routes polymorphic :as type literal through the adapter's quote()", () => {
-    const calls: unknown[] = [];
-    stubConnection(Owner, { quote: (v: unknown) => (calls.push(v), `<<${String(v)}>>`) } as any);
-
+  it("emits OuterJoin with polymorphic :as type predicate as Nodes.And", () => {
     Associations.hasMany.call(Owner, "assets", { className: "Asset", as: "owner" });
 
     const jd = new JoinDependency(Owner);
     const node = jd.addAssociation("assets");
     expect(node).not.toBeNull();
-    expect(node!.joinSql).toContain(`"owner_type" = <<Owner>>`);
-    expect(calls).toContain("Owner");
+    expect(node!.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
+
+    const outerJoin = node!.arelJoin as Nodes.OuterJoin;
+    const on = outerJoin.right as Nodes.On;
+    expect(on).toBeInstanceOf(Nodes.On);
+
+    // ON predicate is And(fk=pk, type='Owner')
+    const and = on.expr as Nodes.And;
+    expect(and).toBeInstanceOf(Nodes.And);
+    expect(and.children).toHaveLength(2);
+
+    // First child: fk equality
+    const eq = and.children[0] as Nodes.Equality;
+    expect(eq).toBeInstanceOf(Nodes.Equality);
+    expect((eq.left as any).name).toBe("owner_id");
+
+    // Second child: type equality
+    const typeEq = and.children[1] as Nodes.Equality;
+    expect(typeEq).toBeInstanceOf(Nodes.Equality);
+    expect((typeEq.left as any).name).toBe("owner_type");
+    expect((typeEq.right as any).value ?? (typeEq.right as any).val).toBe("Owner");
   });
 
-  it("routes STI subclass IN-list through the adapter's quote()", () => {
+  it("emits OuterJoin with STI subclass IN-list predicate", () => {
     class Vehicle extends Base {
       static {
         this.attribute("type", "string");
@@ -77,63 +94,75 @@ describe("JoinDependency adapter-aware quoting", () => {
     registerModel(Vehicle);
     registerModel(Car);
 
-    const calls: unknown[] = [];
-    stubConnection(Owner, { quote: (v: unknown) => (calls.push(v), `<<${String(v)}>>`) } as any);
-
     Associations.hasMany.call(Owner, "cars", { className: "Car", foreignKey: "owner_id" });
 
     const jd = new JoinDependency(Owner);
     const node = jd.addAssociation("cars");
     expect(node).not.toBeNull();
-    expect(node!.joinSql).toContain(`"type" IN (<<Car>>)`);
-    expect(calls).toContain("Car");
+    expect(node!.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
+
+    const outerJoin = node!.arelJoin as Nodes.OuterJoin;
+    const on = outerJoin.right as Nodes.On;
+    const and = on.expr as Nodes.And;
+    expect(and).toBeInstanceOf(Nodes.And);
+    expect(and.children).toHaveLength(2);
+
+    // Second child: STI IN predicate
+    const inNode = and.children[1] as Nodes.In;
+    expect(inNode).toBeInstanceOf(Nodes.In);
+    expect((inNode.left as any).name).toBe("type");
   });
 
-  it("falls back to the abstract quote when no pool is wired", () => {
-    stubConnection(Owner, () => {
-      throw new ConnectionNotDefined("no pool");
-    });
-    Associations.hasMany.call(Owner, "assets", { className: "Asset", as: "owner" });
-    const jd = new JoinDependency(Owner);
-    const node = jd.addAssociation("assets");
-    expect(node).not.toBeNull();
-    // Abstract quote emits the same `'Owner'` literal as the inlined escape did.
-    expect(node!.joinSql).toContain(`"owner_type" = 'Owner'`);
-  });
-
-  it("routes JOIN identifiers through the adapter's quoteTableName/quoteColumnName", () => {
-    const tcalls: string[] = [];
-    const ccalls: string[] = [];
-    stubConnection(Owner, {
-      quote: (v: unknown) => `'${String(v)}'`,
-      quoteTableName: (n: string) => (tcalls.push(n), `[T:${n}]`),
-      quoteColumnName: (n: string) => (ccalls.push(n), `[C:${n}]`),
-    } as any);
-
+  it("emits simple OuterJoin for hasMany without polymorphic/STI", () => {
     Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
 
     const jd = new JoinDependency(Owner);
     const node = jd.addAssociation("assets");
     expect(node).not.toBeNull();
-    // Both table and column identifiers in the ON predicate are quoted by the
-    // adapter, not by the ANSI fallback.
-    expect(node!.joinSql).toContain("[T:assets].[C:owner_id] = [T:owners].[C:id]");
-    expect(tcalls).toContain("assets");
-    expect(tcalls).toContain("owners");
-    expect(ccalls).toContain("owner_id");
-    expect(ccalls).toContain("id");
+    expect(node!.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
+
+    const outerJoin = node!.arelJoin as Nodes.OuterJoin;
+    const on = outerJoin.right as Nodes.On;
+    const eq = on.expr as Nodes.Equality;
+    expect(eq).toBeInstanceOf(Nodes.Equality);
+    expect((eq.left as any).name).toBe("owner_id");
+    expect((eq.right as any).name).toBe("id");
   });
 
-  it("falls back to the abstract identifier quoter when the adapter lacks quoteTableName/quoteColumnName", () => {
-    // Stub a quote()-only adapter (resolves through _resolveAdapter but has no
-    // identifier-quoting methods). Should still produce ANSI identifiers.
-    stubConnection(Owner, { quote: (v: unknown) => `'${String(v)}'` } as any);
+  it("emits OuterJoin for belongsTo with correct key direction", () => {
+    Associations.belongsTo.call(Asset, "owner", { className: "Owner", foreignKey: "owner_id" });
+
+    const jd = new JoinDependency(Asset);
+    const node = jd.addAssociation("owner");
+    expect(node).not.toBeNull();
+    expect(node!.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
+
+    const outerJoin = node!.arelJoin as Nodes.OuterJoin;
+    const on = outerJoin.right as Nodes.On;
+    const eq = on.expr as Nodes.Equality;
+    expect(eq).toBeInstanceOf(Nodes.Equality);
+    // belongsTo: targetTable.pk = sourceTable.fk
+    expect((eq.left as any).name).toBe("id");
+    expect((eq.right as any).name).toBe("owner_id");
+  });
+
+  it("uses table alias when name collides", () => {
     Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
 
     const jd = new JoinDependency(Owner);
-    const node = jd.addAssociation("assets");
-    expect(node).not.toBeNull();
-    expect(node!.joinSql).toContain(`"assets"."owner_id" = "owners"."id"`);
+    // First join uses real table name
+    const node1 = jd.addAssociation("assets");
+    expect(node1!.effectiveSqlName).toBe("assets");
+    const table1 = (node1!.arelJoin as Nodes.OuterJoin).left;
+    expect((table1 as any).tableAlias).toBeNull();
+
+    // Register second association to force collision
+    (Owner as any)._associations = [];
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
+    const node2 = jd.addAssociation("assets");
+    expect(node2!.effectiveSqlName).toBe("t2");
+    const table2 = (node2!.arelJoin as Nodes.OuterJoin).left;
+    expect((table2 as any).tableAlias).toBe("t2");
   });
 
   it("propagates non-ConnectionNotDefined errors from connection()", () => {
