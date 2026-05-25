@@ -35,16 +35,18 @@ export class OutputBuffer {
     return this._raw;
   }
 
-  htmlSafe(): SafeBuffer {
-    return this.toString();
-  }
-
-  isHtmlSafe(): boolean {
+  /** Always true — OutputBuffer content is HTML safe. Mirrors Rails `html_safe?`. */
+  get htmlSafe(): true {
     return true;
   }
 
+  /** @deprecated Use {@link htmlSafe} getter or {@link toString} instead. */
+  htmlSafeBuffer(): SafeBuffer {
+    return this.toString();
+  }
+
   /** Append a value, escaping if not html-safe. Nil values are skipped. */
-  concat(value: unknown): this {
+  append(value: unknown): this {
     if (value === null || value === undefined) return this;
     if (isHtmlSafe(value)) {
       this._raw += (value as SafeBuffer).toString();
@@ -61,12 +63,22 @@ export class OutputBuffer {
    * Unlike `safeExprAppend`, this does NOT skip nil — Rails raises TypeError
    * on `String#<<(nil)`, so we throw to match.
    */
-  safeConcat(value: unknown): this {
+  safeAppend(value: unknown): this {
     if (value === null || value === undefined) {
       throw new TypeError("no implicit conversion of nil into String");
     }
     this._raw += value instanceof SafeBuffer ? value.toString() : String(value);
     return this;
+  }
+
+  /** @deprecated Use {@link append} instead. */
+  concat(value: unknown): this {
+    return this.append(value);
+  }
+
+  /** @deprecated Use {@link safeAppend} instead. */
+  safeConcat(value: unknown): this {
+    return this.safeAppend(value);
   }
 
   /** Mirrors Rails `safe_expr_append=` — like safe_concat but skips nil. */
@@ -81,13 +93,13 @@ export class OutputBuffer {
    * appended as an HTML-safe string. Mirrors Rails `capture(*args, &block)`.
    */
   capture<TArgs extends unknown[]>(fn: (...args: TArgs) => void, ...args: TArgs): SafeBuffer {
-    const previous = this._raw;
+    const saved = this._raw;
     this._raw = "";
     try {
       fn(...args);
       return htmlSafe(this._raw);
     } finally {
-      this._raw = previous;
+      this._raw = saved;
     }
   }
 
@@ -117,10 +129,15 @@ export class OutputBuffer {
 export class RawOutputBuffer {
   constructor(private readonly buffer: OutputBuffer) {}
 
-  concat(value: unknown): this {
+  append(value: unknown): this {
     if (value === null || value === undefined) return this;
     this.buffer.appendRaw(value instanceof SafeBuffer ? value.toString() : String(value));
     return this;
+  }
+
+  /** @deprecated Use {@link append} instead. */
+  concat(value: unknown): this {
+    return this.append(value);
   }
 
   raw(): this {
@@ -151,7 +168,7 @@ export class StreamingBuffer {
    * `OutputBuffer`/`RawStreamingBuffer`, nil is NOT skipped: `nil.to_s`
    * produces `""`, which is still passed through to the block.
    */
-  concat(value: unknown): this {
+  append(value: unknown): this {
     const str = toRawString(value);
     const safe = isHtmlSafe(value) || value instanceof OutputBuffer;
     this._block(safe ? str : htmlEscape(str).toString());
@@ -159,13 +176,23 @@ export class StreamingBuffer {
   }
 
   /**
-   * Append without escaping. Mirrors Rails `safe_concat` / `safe_append=`,
+   * Append without escaping. Mirrors Rails `safe_append=` / `safe_concat`,
    * which is `@block.call(value.to_s)` — `nil.to_s` is `""`, so nil flows
    * through as an empty chunk rather than the literal "null"/"undefined".
    */
-  safeConcat(value: unknown): this {
+  safeAppend(value: unknown): this {
     this._block(toRawString(value));
     return this;
+  }
+
+  /** @deprecated Use {@link append} instead. */
+  concat(value: unknown): this {
+    return this.append(value);
+  }
+
+  /** @deprecated Use {@link safeAppend} instead. */
+  safeConcat(value: unknown): this {
+    return this.safeAppend(value);
   }
 
   /**
@@ -186,12 +213,8 @@ export class StreamingBuffer {
     }
   }
 
-  isHtmlSafe(): boolean {
+  get htmlSafe(): true {
     return true;
-  }
-
-  htmlSafe(): this {
-    return this;
   }
 
   raw(): RawStreamingBuffer {
@@ -207,10 +230,15 @@ export class StreamingBuffer {
 export class RawStreamingBuffer {
   constructor(private readonly buffer: StreamingBuffer) {}
 
-  concat(value: unknown): this {
+  append(value: unknown): this {
     if (value === null || value === undefined) return this;
     this.buffer.block(toRawString(value));
     return this;
+  }
+
+  /** @deprecated Use {@link append} instead. */
+  concat(value: unknown): this {
+    return this.append(value);
   }
 
   raw(): this {

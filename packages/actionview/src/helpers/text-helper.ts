@@ -301,7 +301,7 @@ export function simpleFormat(
  * code blocks where you cannot use `<%= %>`. Mirrors `ActionView::Helpers::TextHelper#concat`.
  */
 export function concat(this: TextHelperHost, value: unknown): OutputBuffer {
-  this.outputBuffer.concat(value);
+  this.outputBuffer.append(value);
   return this.outputBuffer;
 }
 
@@ -310,7 +310,7 @@ export function concat(this: TextHelperHost, value: unknown): OutputBuffer {
  * Mirrors `ActionView::Helpers::TextHelper#safe_concat`.
  */
 export function safeConcat(this: TextHelperHost, value: unknown): OutputBuffer {
-  this.outputBuffer.safeConcat(value);
+  this.outputBuffer.safeAppend(value);
   return this.outputBuffer;
 }
 
