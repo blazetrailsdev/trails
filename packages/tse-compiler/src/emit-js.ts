@@ -31,6 +31,9 @@ export function compileJs(source: string, options: EmitJsOptions = {}): EmitResu
 /** Matches `<% } %>` / `<% }) %>` closers that can terminate an open blockExpr. */
 const BLOCK_CLOSE_RE = /^\s*\}\s*\)?\s*;?\s*$/;
 
+/** Arrow-function blockExpr: `(x) => {` or `=> {`. Function form (`function(x) {`) does NOT match. */
+const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
+
 /** Net change in `{}`-brace depth for a code tag value. Counts `{` as +1 and
  * `}` as -1 so that `} else {` correctly resolves to 0, not +1. */
 function netBraceDepth(code: string): number {
@@ -51,26 +54,35 @@ function emit(ast: TseAst, options: EmitJsOptions): string {
   if (options.preamble) lines.push("  " + options.preamble);
   // Stack: one entry per open blockExpr, tracking net unclosed `{` inside it.
   const innerDepths: number[] = [];
+  // Parallel stack: true = arrow form (capture-wrapped), false = function/do form.
+  const innerIsArrow: boolean[] = [];
   for (const node of ast.nodes) {
     const insideBlock = innerDepths.length > 0;
     const bufRef = insideBlock ? "context.outputBuffer" : "_ob";
     if (node.kind === "blockExpr") {
-      // Strip trailing `{` so the helper call ends with `=>` for the capture wrapper.
-      const callExpr = node.value
-        .trim()
-        .replace(/\s*\{\s*$/, "")
-        .trimEnd();
+      const trimmed = node.value.trim();
+      const isArrow = ARROW_BLOCK_RE.test(trimmed);
       innerDepths.push(0);
-      lines.push(`  ${bufRef}.${exprAppend}(${callExpr}`);
-      lines.push("  context.capture(() => {");
+      innerIsArrow.push(isArrow);
+      if (isArrow) {
+        // Strip trailing `{` so the helper call ends with `=>` for the capture wrapper.
+        const callExpr = trimmed.replace(/\s*\{\s*$/, "").trimEnd();
+        lines.push(`  ${bufRef}.${exprAppend}(${callExpr}`);
+        lines.push("  context.capture(() => {");
+      } else {
+        // function(…) { or do form — emit the `{` verbatim; inner content uses context.outputBuffer.
+        lines.push(`  ${bufRef}.${exprAppend}(${trimmed}`);
+        lines.push("  context.capture(() => {");
+      }
     } else if (node.kind === "code" && insideBlock) {
       const innerDepth = innerDepths[innerDepths.length - 1]!;
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
         innerDepths.pop();
+        innerIsArrow.pop();
         const t = node.value.trim();
         const tClean = t.endsWith(";") ? t.slice(0, -1) : t;
-        // Need to close: context.capture(, helper(, and bufRef.exprAppend( — 3 total.
-        // The template's closer t may already contain some `)` (e.g. `})`).
+        // Close: context.capture(, helper(, and bufRef.exprAppend( — 3 total.
+        // Template's closer may already contain `)` characters (e.g. `})`).
         const closingParensInT = (tClean.match(/\)/g) ?? []).length;
         const suffix = ")".repeat(3 - closingParensInT) + ";";
         lines.push(`  ${tClean}${suffix}`);

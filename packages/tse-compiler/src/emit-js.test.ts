@@ -80,6 +80,16 @@ describe("compileJs", () => {
     expect(lines.filter((l) => l === "  })));")).toHaveLength(1);
   });
 
+  it("handles function-form blockExpr without stripping the {", () => {
+    // `function(x) {` is NOT an arrow; the `{` must be kept so generated JS is valid.
+    const src = "<%= helper(function(x) { %><li><%= x %></li><% }) %>";
+    const { code } = compileJs(src);
+    const lines = code.split("\n");
+    expect(lines).toContain("  _ob.append(helper(function(x) {");
+    expect(lines).toContain("  context.capture(() => {");
+    expect(lines).toContain("  })));");
+  });
+
   it("throws a clear error when a blockExpr is never closed", () => {
     expect(() => compileJs("<%= forEach(items, (item) => { %>missing closer")).toThrow(
       /block-expr.*never closed/,

@@ -16,7 +16,7 @@ export interface TseRenderContext {
   /**
    * Redirect output to a fresh buffer for the duration of `callback`, then
    * restore the previous buffer and return captured content as a SafeBuffer.
-   * Mirrors Rails `with_output_buffer`.
+   * Mirrors Rails `capture` (implemented via `with_output_buffer` semantics).
    */
   capture(callback: () => void): SafeBuffer;
 
