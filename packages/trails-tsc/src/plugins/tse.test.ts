@@ -132,6 +132,12 @@ describe("virtualizeTse", () => {
     expect(() => virtualizeTse("<%# locals: (1bad: 1) %>")).toThrow(/invalid local name/);
   });
 
+  it("throws on duplicate local names", () => {
+    expect(() => virtualizeTse("<%# locals: (count:, count: 0) %>")).toThrow(
+      /duplicate local name/,
+    );
+  });
+
   it("rejects TS reserved words as local names", () => {
     expect(() => virtualizeTse("<%# locals: (default: 1) %>")).toThrow(/invalid local name/);
     expect(() => virtualizeTse("<%# locals: (await: 1) %>")).toThrow(/invalid local name/);

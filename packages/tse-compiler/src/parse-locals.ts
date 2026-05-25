@@ -96,6 +96,11 @@ export function parseLocalsSignature(sig: string): LocalEntry[] {
         `invalid local name ${JSON.stringify(name)} in locals signature ${JSON.stringify(sig)}`,
       );
     }
+    if (entries.some((e) => e.name === name)) {
+      throw new LocalsSignatureError(
+        `duplicate local name ${JSON.stringify(name)} in locals signature ${JSON.stringify(sig)}`,
+      );
+    }
     const tail = trimmed.slice(colon + 1).trim();
     entries.push({ name, defaultExpr: tail === "" ? null : tail });
   }
