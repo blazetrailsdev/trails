@@ -1,3 +1,4 @@
+import "@blazetrails/actionview/tse-modules";
 import { describe, it, expectTypeOf } from "vitest";
 import render from "./fixtures/show.html.tse";
 
