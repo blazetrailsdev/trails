@@ -1043,7 +1043,7 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
     }
     expect(
       () =>
-        new InsertAll(Book.all() as any, [{ title: "x" }], {
+        new InsertAll(Book.all() as any, Book.connection, [{ title: "x" }], {
           onDuplicate: "title = 'injected'" as any,
         }),
     ).toThrow("Dangerous query method");
@@ -1061,7 +1061,7 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
     }
     expect(
       () =>
-        new InsertAll(Book.all() as any, [{ id: 1, title: "x" }], {
+        new InsertAll(Book.all() as any, Book.connection, [{ id: 1, title: "x" }], {
           onDuplicate: sql("title = excluded.title"),
         }),
     ).not.toThrow();
@@ -1077,7 +1077,7 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
     }
     expect(
       () =>
-        new InsertAll(Book.all() as any, [{ title: "x" }], {
+        new InsertAll(Book.all() as any, Book.connection, [{ title: "x" }], {
           returning: "DROP TABLE books" as any,
         }),
     ).toThrow("Dangerous query method");
@@ -1094,7 +1094,10 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
     }
     // plain column-name string (Ruby symbol equivalent) must not throw
     expect(
-      () => new InsertAll(Book.all() as any, [{ id: 1, title: "x" }], { returning: "title" }),
+      () =>
+        new InsertAll(Book.all() as any, Book.connection, [{ id: 1, title: "x" }], {
+          returning: "title",
+        }),
     ).not.toThrow();
   });
 });

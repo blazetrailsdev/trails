@@ -2713,7 +2713,7 @@ describe("MigrationTest", () => {
           });
         }
       }
-      const { MigrationRunner } = await import("./migration-runner.js");
+      const { MigrationRunner } = await import("./migrator.js");
       const runner = new MigrationRunner(cpAdapter, [new CPM1()]);
       const status = await runner.status();
       expect(status.length).toBe(1);
