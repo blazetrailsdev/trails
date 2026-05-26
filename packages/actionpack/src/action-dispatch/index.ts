@@ -140,3 +140,23 @@ export {
   type Proxy,
   type CustomProxies,
 } from "./middleware/remote-ip.js";
+export {
+  SystemTestCase,
+  DEFAULT_HOST,
+  type DrivenByOptions,
+  type ServedByOptions,
+} from "./system-test-case.js";
+export {
+  Driver,
+  type BrowserName,
+  type DriverOptions,
+  type PlaywrightBrowser,
+  type PlaywrightBrowserContext,
+  type PlaywrightPage,
+} from "./system-testing/driver.js";
+export {
+  Server,
+  type ServerApp,
+  type ServerHandle,
+  type ServerAddress,
+} from "./system-testing/server.js";

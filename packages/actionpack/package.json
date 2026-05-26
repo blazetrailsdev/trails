@@ -12,6 +12,14 @@
     "dist"
   ],
   "license": "MIT",
+  "peerDependencies": {
+    "playwright": ">=1.40.0"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
