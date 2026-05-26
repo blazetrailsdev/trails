@@ -4,27 +4,24 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
-
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+beforeAll(async () => {
+  await defineSchema({
+    posts: { title: "string", author: "string" },
+  });
+});
 
 describe("RelationMutationTest", () => {
-  let adapter: SidecarAdapter;
-  beforeAll(async () => {
-    ({ adapter: adapter } = createSidecarTestAdapter());
-    await defineSchema(adapter, {
-      posts: { title: "string", author: "string" },
-    });
-  });
-  withTransactionalFixtures(() => adapter);
-
   function makeModel() {
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
-        this.adapter = adapter;
       }
     }
     return { Post };

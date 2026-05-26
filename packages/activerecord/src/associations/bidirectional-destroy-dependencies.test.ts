@@ -1,34 +1,30 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 describe("BidirectionalDestroyDependenciesTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       contents: { title: "string" },
       content_positions: { content_id: "integer", position: "integer" },
     });
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Content extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class ContentPosition extends Base {
       static {
         this.attribute("content_id", "integer");
         this.attribute("position", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Content", Content);

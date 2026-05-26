@@ -4,16 +4,15 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 describe("ModulesTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       accounts: { name: "string" },
       billing_accounts: { name: "string" },
       app_billing_accounts: { name: "string" },
@@ -23,8 +22,6 @@ describe("ModulesTest", () => {
       posts: { title: "string", author_id: "integer" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   it.skip("module spanning associations", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
   });
@@ -42,7 +39,6 @@ describe("ModulesTest", () => {
     class Account extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     expect(Account.tableName).toBeDefined();
@@ -53,7 +49,6 @@ describe("ModulesTest", () => {
     class Account extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const a = await Account.create({ name: "test" });
@@ -69,7 +64,6 @@ describe("ModulesTest", () => {
       static {
         this._tableName = "billing_accounts";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     expect(Account.tableName).toBe("billing_accounts");
@@ -80,7 +74,6 @@ describe("ModulesTest", () => {
       static {
         this._tableName = "app_billing_accounts";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     expect(Account.tableName).toBe("app_billing_accounts");
@@ -91,7 +84,6 @@ describe("ModulesTest", () => {
       static {
         this._tableName = "accounts_archive";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     expect(Account.tableName).toBe("accounts_archive");
@@ -102,7 +94,6 @@ describe("ModulesTest", () => {
       static {
         this._tableName = "accounts_archive_v2";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     expect(Account.tableName).toBe("accounts_archive_v2");

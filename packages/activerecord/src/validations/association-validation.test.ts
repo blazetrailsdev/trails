@@ -5,32 +5,30 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+beforeAll(async () => {
+  await defineSchema({
+    posts: { title: "string" },
+    comments: { body: "string", post_id: "integer" },
+    widgets: { name: "string" },
+    missing_children: { name: "string", parent_id: "integer" },
+    val_bt_parents: { name: "string" },
+    val_bt_children: { title: "string", val_bt_parent_id: "integer" },
+    val_bt_parent2s: { name: "string" },
+    val_bt_child2s: { title: "string", val_bt_parent2_id: "integer" },
+    topic_m_ds: { title: "string" },
+    topic_w_a_ds: { title: "string" },
+    reply_msgs: { title: "string" },
+    reply_ctxs: { title: "string" },
+  });
+});
 
 describe("AssociationValidationTest", () => {
-  let adapter: SidecarAdapter;
-  beforeAll(async () => {
-    ({ adapter } = createSidecarTestAdapter());
-    await defineSchema(adapter, {
-      posts: { title: "string" },
-      comments: { body: "string", post_id: "integer" },
-      widgets: { name: "string" },
-      missing_children: { name: "string", parent_id: "integer" },
-      val_bt_parents: { name: "string" },
-      val_bt_children: { title: "string", val_bt_parent_id: "integer" },
-      val_bt_parent2s: { name: "string" },
-      val_bt_child2s: { title: "string", val_bt_parent2_id: "integer" },
-      topic_m_ds: { title: "string" },
-      topic_w_a_ds: { title: "string" },
-      reply_msgs: { title: "string" },
-      reply_ctxs: { title: "string" },
-    });
-  });
-  withTransactionalFixtures(() => adapter);
-
   it("validates associated many", async () => {
     let cidx = 0;
     const idx = ++cidx;
@@ -38,14 +36,12 @@ describe("AssociationValidationTest", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
         this.validates("body", { presence: true });
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
       static {
         this.validatesAssociated("comments");
@@ -64,7 +60,6 @@ describe("AssociationValidationTest", () => {
     class Widget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -79,7 +74,6 @@ describe("AssociationValidationTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -93,14 +87,12 @@ describe("AssociationValidationTest", () => {
     class ValBtParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ValBtChild extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("val_bt_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(ValBtChild, "valBtParent", {
@@ -119,14 +111,12 @@ describe("AssociationValidationTest", () => {
     class ValBtParent2 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ValBtChild2 extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("val_bt_parent2_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(ValBtChild2, "valBtParent2", {
@@ -155,7 +145,6 @@ describe("AssociationValidationTest", () => {
     class TopicMD extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validatesAssociated("replies");
       }
     }
@@ -177,7 +166,6 @@ describe("AssociationValidationTest", () => {
     class TopicWAD extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validatesAssociated("replies");
       }
     }
@@ -195,7 +183,6 @@ describe("AssociationValidationTest", () => {
     class ReplyMsg extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validatesAssociated("topic", {
           message: "This string contains 'single' and \"double\" quotes",
         });
@@ -219,7 +206,6 @@ describe("AssociationValidationTest", () => {
     class ReplyCtx extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validatesAssociated("topic", { on: "custom" });
       }
     }

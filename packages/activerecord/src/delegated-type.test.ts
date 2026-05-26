@@ -5,11 +5,9 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base, delegatedType, registerModel } from "./index.js";
 import { StringInquirer } from "@blazetrails/activesupport";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -20,18 +18,13 @@ afterAll(() => {
 });
 
 describe("DelegatedTypeTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       entries: { entryable_id: "integer", entryable_type: "string", title: "string" },
       entry2s: { title: "string", custom_type: "string", custom_id: "integer" },
     });
-  });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   function makeModels() {
@@ -40,7 +33,6 @@ describe("DelegatedTypeTest", () => {
         this.attribute("entryable_id", "integer");
         this.attribute("entryable_type", "string");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     delegatedType(Entry, "entryable", { types: ["Message", "Comment"] });
@@ -63,7 +55,6 @@ describe("DelegatedTypeTest", () => {
       static {
         this.attribute("custom_type", "string");
         this.attribute("custom_id", "integer");
-        this.adapter = adapter;
       }
     }
     delegatedType(Entry2, "entryable", {
@@ -98,7 +89,6 @@ describe("DelegatedTypeTest", () => {
       static {
         this.attribute("custom_type", "string");
         this.attribute("custom_id", "integer");
-        this.adapter = adapter;
       }
     }
     delegatedType(Entry2, "entryable", {
@@ -126,7 +116,6 @@ describe("DelegatedTypeTest", () => {
         this.attribute("title", "string");
         this.attribute("custom_type", "string");
         this.attribute("custom_id", "integer");
-        this.adapter = adapter;
       }
     }
     delegatedType(Entry2, "entryable", {
@@ -147,7 +136,6 @@ describe("DelegatedTypeTest", () => {
     class Message extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Message", Message);
@@ -180,7 +168,6 @@ describe("DelegatedTypeTest", () => {
       static {
         this.attribute("entryable_uuid", "string");
         this.attribute("entryable_type", "string");
-        this.adapter = adapter;
       }
     }
     delegatedType(UuidEntry, "entryable", {
@@ -220,7 +207,6 @@ describe("DelegatedTypeTest", () => {
     class Message extends Base {
       static {
         this.attribute("subject", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Message", Message);
@@ -242,14 +228,9 @@ describe("DelegatedTypeTest", () => {
       static {
         this.attribute("entryable_id", "integer");
         this.attribute("entryable_type", "string");
-        this.adapter = adapter;
       }
     }
-    class NoticeMsg extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class NoticeMsg extends Base {}
     registerModel("Access::NoticeMessage", NoticeMsg);
     delegatedType(Entry3, "entryable", { types: ["Access::NoticeMessage"] });
     expect(typeof (Entry3 as any).accessNoticeMessages).toBe("function");
@@ -275,7 +256,6 @@ describe("DelegatedTypeTest", () => {
     class AccessNoticeMessage extends Base {
       static {
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Access::NoticeMessage", AccessNoticeMessage);
@@ -283,7 +263,6 @@ describe("DelegatedTypeTest", () => {
       static {
         this.attribute("entryable_id", "integer");
         this.attribute("entryable_type", "string");
-        this.adapter = adapter;
       }
     }
     delegatedType(Entry4, "entryable", { types: ["Access::NoticeMessage"] });

@@ -4,10 +4,9 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base } from "./index.js";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -18,19 +17,16 @@ afterAll(() => {
 });
 
 describe("Base static query delegations", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { users: { name: "string" } });
+    await defineSchema({ users: { name: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("Base.first() returns the first record", async () => {
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice" });
@@ -46,7 +42,6 @@ describe("Base static query delegations", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice" });
@@ -62,7 +57,6 @@ describe("Base static query delegations", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice" });
@@ -76,7 +70,6 @@ describe("Base static query delegations", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice" });
@@ -91,7 +84,6 @@ describe("Base static query delegations", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Bob" });
@@ -106,7 +98,6 @@ describe("Base static query delegations", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice" });
@@ -122,7 +113,6 @@ describe("Base static query delegations", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice" });
@@ -137,7 +127,6 @@ describe("Base static query delegations", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice" });
@@ -151,7 +140,6 @@ describe("Base static query delegations", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice" });

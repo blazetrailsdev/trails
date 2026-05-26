@@ -5,28 +5,26 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 import { NumericalityValidator } from "./numericality.js";
-
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+beforeAll(async () => {
+  await defineSchema({
+    widgets: { price: "float", quantity: "integer" },
+    widget2s: { price: "float" },
+    decimals: { amount: "decimal" },
+  });
+});
 
 describe("NumericalityValidationTest", () => {
-  let adapter: SidecarAdapter;
-  beforeAll(async () => {
-    ({ adapter } = createSidecarTestAdapter());
-    await defineSchema(adapter, {
-      widgets: { price: "float", quantity: "integer" },
-      widget2s: { price: "float" },
-      decimals: { amount: "decimal" },
-    });
-  });
-  withTransactionalFixtures(() => adapter);
   function makeModel() {
     class Widget extends Base {
       static {
         this.attribute("price", "float");
         this.attribute("quantity", "integer");
-        this.adapter = adapter;
         this.validates("price", { numericality: { greaterThan: 0 } });
       }
     }
@@ -101,7 +99,6 @@ describe("NumericalityValidationTest", () => {
     class Widget2 extends Base {
       static {
         this.attribute("price", "float");
-        this.adapter = adapter;
         this.validates("price", { numericality: { allowNil: true } });
       }
     }
@@ -114,7 +111,6 @@ describe("NumericalityValidationTest", () => {
     class Decimal extends Base {
       static {
         this.attribute("amount", "decimal");
-        this.adapter = adapter;
         this.validatesWith(NumericalityValidator, {
           attributes: ["amount"],
           lessThan: 1000,
@@ -137,7 +133,6 @@ describe("NumericalityValidationTest", () => {
     class Decimal extends Base {
       static {
         this.attribute("amount", "decimal");
-        this.adapter = adapter;
         // greaterThan: 1.23 — value is rounded to scale=2 before compare
         this.validatesWith(NumericalityValidator, {
           attributes: ["amount"],

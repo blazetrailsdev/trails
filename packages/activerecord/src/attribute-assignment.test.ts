@@ -6,9 +6,9 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./index.js";
 import { typeCastAttributeValue, findParameterPosition } from "./attribute-assignment.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
   topics: { title: "string", author: "string" },
@@ -20,21 +20,17 @@ const TEST_SCHEMA = {
 // AttributeAssignmentTest — targets attribute_assignment_test.rb
 // ==========================================================================
 describe("AttributeAssignmentTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("bulk assign attributes", () => {
     class Topic extends Base {
       static {
         this._tableName = "topics";
         this.attribute("title", "string");
         this.attribute("author", "string");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -48,7 +44,6 @@ describe("AttributeAssignmentTest", () => {
       static {
         this._tableName = "people";
         this.attribute("born_on", "date");
-        this.adapter = adapter;
       }
     }
     const person = new Person();
@@ -70,7 +65,6 @@ describe("AttributeAssignmentTest", () => {
       static {
         this._tableName = "events";
         this.attribute("starts_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const event = new Event();
@@ -98,7 +92,6 @@ describe("AttributeAssignmentTest", () => {
       static {
         this._tableName = "people";
         this.attribute("born_on", "date");
-        this.adapter = adapter;
       }
     }
     const person = new Person();
@@ -112,7 +105,6 @@ describe("AttributeAssignmentTest", () => {
         this._tableName = "events";
         this.attribute("title", "string");
         this.attribute("starts_on", "date");
-        this.adapter = adapter;
       }
     }
     const event = new Event();

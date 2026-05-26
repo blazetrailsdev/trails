@@ -1,18 +1,16 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { dropAllTables } from "../test-helpers/drop-all-tables.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 describe("AssociationScope", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       wr_authors: {},
       wr_posts: { wr_author_id: "integer", kind: "string" },
       st_authors: { name: "string" },
@@ -50,18 +48,12 @@ describe("AssociationScope", () => {
       int_tags: { label: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
 
   function makeModels() {
     class AsAuthor extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AsPost extends Base {
@@ -69,7 +61,6 @@ describe("AssociationScope", () => {
         this.attribute("id", "integer");
         this.attribute("as_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(AsAuthor);
@@ -160,7 +151,6 @@ describe("AssociationScope", () => {
     class CountAuthor extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     let calls = 0;
@@ -168,7 +158,6 @@ describe("AssociationScope", () => {
       static {
         this.attribute("count_author_id", "integer");
         this.attribute("published", "boolean");
-        this.adapter = adapter;
       }
     }
     registerModel(CountAuthor);
@@ -202,7 +191,6 @@ describe("AssociationScope", () => {
     class StiOwner extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class StiBase extends Base {
@@ -210,13 +198,11 @@ describe("AssociationScope", () => {
         this.attribute("type", "string");
         this.attribute("sti_owner_id", "integer");
         this._tableName = "sti_things";
-        this.adapter = adapter;
         enableSti(StiBase);
       }
     }
     class StiSpecial extends StiBase {
       static {
-        this.adapter = adapter;
         registerModel(StiSpecial);
         registerSubclass(StiSpecial);
       }
@@ -248,14 +234,12 @@ describe("AssociationScope", () => {
     class DsAuthor extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class DsPost extends Base {
       static {
         this.attribute("ds_author_id", "integer");
         this.attribute("published", "boolean");
-        this.adapter = adapter;
         this.defaultScope((rel: any) => rel.where({ published: true }));
       }
     }
@@ -290,14 +274,12 @@ describe("AssociationScope", () => {
     class WrAuthor extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class WrPost extends Base {
       static {
         this.attribute("wr_author_id", "integer");
         this.attribute("kind", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(WrAuthor);
@@ -330,14 +312,12 @@ describe("AssociationScope", () => {
     class ZeroArityAuthor extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class ZeroArityPost extends Base {
       static {
         this.attribute("zero_arity_author_id", "integer");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     registerModel(ZeroArityAuthor);
@@ -369,14 +349,12 @@ describe("AssociationScope", () => {
     class AsOwner extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class AsComment extends Base {
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(AsOwner);
@@ -398,14 +376,12 @@ describe("AssociationScope", () => {
     class AsOneOwner extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class AsOneImage extends Base {
       static {
         this.attribute("imageable_id", "integer");
         this.attribute("imageable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(AsOneOwner);
@@ -433,14 +409,12 @@ describe("AssociationScope", () => {
     class PolyTarget extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class PolyComment extends Base {
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(PolyTarget);
@@ -468,14 +442,12 @@ describe("AssociationScope", () => {
         this.attribute("a", "integer");
         this.attribute("b", "integer");
         this.primaryKey = ["a", "b"];
-        this.adapter = adapter;
       }
     }
     class CpkAsTarget extends Base {
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CpkAsOwner);
@@ -499,14 +471,12 @@ describe("AssociationScope", () => {
       static {
         this.attribute("uuid", "string");
         this.primaryKey = "uuid";
-        this.adapter = adapter;
       }
     }
     class UuidComment extends Base {
       static {
         this.attribute("commentable_id", "string");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(UuidTarget);
@@ -543,7 +513,6 @@ describe("AssociationScope", () => {
     class CcAuthor extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class CcMembership extends Base {
@@ -551,13 +520,11 @@ describe("AssociationScope", () => {
         this.attribute("cc_author_id", "integer");
         this.attribute("cc_tag_id", "integer");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     class CcTag extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(CcAuthor);
@@ -608,7 +575,6 @@ describe("AssociationScope", () => {
       declare name: string;
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class StGallery extends Base {
@@ -616,21 +582,18 @@ describe("AssociationScope", () => {
         this.attribute("st_author_id", "integer");
         this.attribute("imageable_id", "integer");
         this.attribute("imageable_type", "string");
-        this.adapter = adapter;
       }
     }
     class StPhoto extends Base {
       declare title: string;
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class StVideo extends Base {
       declare title: string;
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(StAuthor);
@@ -686,7 +649,6 @@ describe("AssociationScope", () => {
       declare name: string;
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NpGallery extends Base {
@@ -694,7 +656,6 @@ describe("AssociationScope", () => {
         this.attribute("np_author_id", "integer");
         this.attribute("imageable_uuid", "string");
         this.attribute("imageable_type", "string");
-        this.adapter = adapter;
       }
     }
     class NpPhoto extends Base {
@@ -703,7 +664,6 @@ describe("AssociationScope", () => {
         this.attribute("uuid", "string");
         this.attribute("title", "string");
         this.primaryKey = "uuid";
-        this.adapter = adapter;
       }
     }
     registerModel(NpAuthor);
@@ -752,13 +712,11 @@ describe("AssociationScope", () => {
     class Ho1User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Ho1Account extends Base {
       static {
         this.attribute("ho1_user_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Ho1Pref extends Base {
@@ -766,7 +724,6 @@ describe("AssociationScope", () => {
       static {
         this.attribute("ho1_account_id", "integer");
         this.attribute("theme", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Ho1User);
@@ -810,13 +767,11 @@ describe("AssociationScope", () => {
     class HsAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HsPost extends Base {
       static {
         this.attribute("hs_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HsComment extends Base {
@@ -824,7 +779,6 @@ describe("AssociationScope", () => {
       static {
         this.attribute("hs_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(HsAuthor);
@@ -869,21 +823,18 @@ describe("AssociationScope", () => {
     class HotPost extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class HotPostHook extends Base {
       static {
         this.attribute("hot_post_id", "integer");
         this.attribute("hot_review_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HotReview extends Base {
       declare body: string;
       static {
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(HotPost);
@@ -927,21 +878,18 @@ describe("AssociationScope", () => {
       declare name: string;
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class MgPosting extends Base {
       static {
         this.attribute("mg_author_id", "integer");
         this.attribute("mg_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class MgTag extends Base {
       declare label: string;
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(MgAuthor);
@@ -987,14 +935,12 @@ describe("AssociationScope", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class IntMembership extends Base {
       static {
         this.attribute("int_author_id", "integer");
         this.attribute("int_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class IntTag extends Base {
@@ -1002,7 +948,6 @@ describe("AssociationScope", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(IntAuthor);
@@ -1046,20 +991,17 @@ describe("AssociationScope", () => {
     class HotUser extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class HotAccount extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("hot_user_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HotSettings extends Base {
       static {
         this.attribute("hot_account_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(HotUser);
@@ -1111,20 +1053,17 @@ describe("AssociationScope", () => {
     class ThroughAuthor extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class ThroughMembership extends Base {
       static {
         this.attribute("through_author_id", "integer");
         this.attribute("through_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class ThroughPost extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(ThroughAuthor);
