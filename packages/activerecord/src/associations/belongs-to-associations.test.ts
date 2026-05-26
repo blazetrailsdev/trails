@@ -13,10 +13,11 @@ import {
   touchBelongsToParents,
 } from "../associations.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { createTestAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "../adapter.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -24,21 +25,17 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("BelongsToWithForeignKeyTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       posts: { title: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("destroy linked models", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "linked" });
@@ -49,17 +46,14 @@ describe("BelongsToWithForeignKeyTest", () => {
 });
 
 describe("touch on belongs_to", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       posts: { title: "string", updated_at: "datetime" },
       comments: { body: "string", post_id: "integer" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("touches parent updated_at when child is saved", async () => {
     class Post extends Base {
       static _tableName = "posts";
@@ -67,7 +61,6 @@ describe("touch on belongs_to", () => {
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
     Post.attribute("updated_at", "datetime");
-    Post.adapter = adapter;
     registerModel(Post);
 
     class Comment extends Base {
@@ -76,7 +69,6 @@ describe("touch on belongs_to", () => {
     Comment.attribute("id", "integer");
     Comment.attribute("body", "string");
     Comment.attribute("post_id", "integer");
-    Comment.adapter = adapter;
     Associations.belongsTo.call(Comment, "post", { touch: true });
     registerModel(Comment);
 
@@ -95,17 +87,16 @@ describe("touch on belongs_to", () => {
 });
 
 describe("BelongsToAssociationsTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
     // Schema covers the base Company/Account, counter-cache
     // (Btc/Btcas/Cc/CustomCc/Btcau), polymorphic Post/Comment + Tag
     // (incl. wp_cpk_tags), and Record/Entry table families. Later tests
     // in this describe that reuse these tables also benefit; tests that
     // inline additional unique table families remain uncovered under
     // AR_NO_AUTO_SCHEMA=1 and are deferred to follow-up cluster PRs.
-    await defineSchema(adapter, {
+    await defineSchema({
       posts: { title: "string", updated_at: "datetime" },
       comments: {
         body: "string",
@@ -277,19 +268,15 @@ describe("BelongsToAssociationsTest", () => {
       pk_clients: { firm_name: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("natural assignment", async () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -308,13 +295,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -330,13 +315,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -355,13 +338,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -380,13 +361,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -402,13 +381,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -430,13 +407,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -455,13 +430,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -478,13 +451,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -501,13 +472,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -522,13 +491,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -545,13 +512,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -570,13 +535,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -597,13 +560,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class BtcAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     (BtcAccount as any)._associations = [];
@@ -625,13 +586,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -653,13 +612,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -676,13 +633,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -701,7 +656,6 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Tag);
@@ -714,14 +668,12 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -738,13 +690,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -765,13 +715,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -787,13 +735,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class BtcasAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     (BtcasAccount as any)._associations = [];
@@ -815,13 +761,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     (CcAccount as any)._associations = [];
@@ -847,13 +791,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("custom_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CustomCcAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     (CustomCcAccount as any)._associations = [];
@@ -875,13 +817,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -899,13 +839,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -924,7 +862,6 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -937,7 +874,6 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -950,13 +886,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -971,14 +905,12 @@ describe("BelongsToAssociationsTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -992,14 +924,12 @@ describe("BelongsToAssociationsTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -1016,13 +946,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1040,13 +968,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1063,13 +989,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1086,13 +1010,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1108,13 +1030,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1130,13 +1050,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1189,13 +1107,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1214,13 +1130,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1239,14 +1153,12 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class BtcauAccount extends Base {
       static {
         this.attribute("company_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(BtcauCompany);
@@ -1276,13 +1188,11 @@ describe("BelongsToAssociationsTest", () => {
     class Record extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Entry extends Base {
       static {
         this.attribute("record_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Record);
@@ -1301,13 +1211,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1331,7 +1239,6 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Tag);
@@ -1345,7 +1252,6 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Tag);
@@ -1359,7 +1265,6 @@ describe("BelongsToAssociationsTest", () => {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(WpCpkTag);
@@ -1373,13 +1278,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1395,14 +1298,12 @@ describe("BelongsToAssociationsTest", () => {
     class ElmCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ElmEmployee extends Base {
       static {
         this.attribute("company_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(ElmEmployee, "elmCompany", {
@@ -1427,13 +1328,11 @@ describe("BelongsToAssociationsTest", () => {
     class MaCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class MaEmployee extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
       // Note: no company_id attribute
     }
@@ -1447,13 +1346,11 @@ describe("BelongsToAssociationsTest", () => {
     class NoOrdCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NoOrdAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(NoOrdCompany);
@@ -1471,13 +1368,11 @@ describe("BelongsToAssociationsTest", () => {
     class BpjCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BpjAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(BpjCompany);
@@ -1500,14 +1395,12 @@ describe("BelongsToAssociationsTest", () => {
     class OptCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class OptEmployee extends Base {
       static {
         this.attribute("company_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(OptEmployee, "optCompany", {
@@ -1526,13 +1419,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1550,13 +1441,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1574,13 +1463,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1604,13 +1491,11 @@ describe("BelongsToAssociationsTest", () => {
     class TmCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(TmCompany);
@@ -1623,13 +1508,11 @@ describe("BelongsToAssociationsTest", () => {
     class RtmCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class RtmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(RtmCompany);
@@ -1643,13 +1526,11 @@ describe("BelongsToAssociationsTest", () => {
     class NatPkCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NatPkAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(NatPkCompany);
@@ -1669,13 +1550,11 @@ describe("BelongsToAssociationsTest", () => {
     class EagerPkCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerPkAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerPkAccount, "eagerPkCompany", {
@@ -1696,13 +1575,11 @@ describe("BelongsToAssociationsTest", () => {
     class EagerSymCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerSymAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerSymAccount, "eagerSymCompany", {
@@ -1722,13 +1599,11 @@ describe("BelongsToAssociationsTest", () => {
     class PkBtCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PkBtAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(PkBtCompany);
@@ -1747,7 +1622,6 @@ describe("BelongsToAssociationsTest", () => {
     class CpkCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CpkCompany);
@@ -1766,13 +1640,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("custom_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EcpkAccount extends Base {
       static {
         this.attribute("company_custom_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(EcpkCompany);
@@ -1791,13 +1663,11 @@ describe("BelongsToAssociationsTest", () => {
     class IcpkCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class IcpkAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(IcpkCompany);
@@ -1816,13 +1686,11 @@ describe("BelongsToAssociationsTest", () => {
     class ScfkCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ScfkAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(ScfkCompany);
@@ -2009,7 +1877,6 @@ describe("BelongsToAssociationsTest", () => {
     class BuildPkCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(BuildPkCompany);
@@ -2021,7 +1888,6 @@ describe("BelongsToAssociationsTest", () => {
     class CreateBangCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CreateBangCompany);
@@ -2034,7 +1900,6 @@ describe("BelongsToAssociationsTest", () => {
     class FailCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FailCompany);
@@ -2047,13 +1912,11 @@ describe("BelongsToAssociationsTest", () => {
     class ReloadCacheCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ReloadCacheAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(ReloadCacheCompany);
@@ -2076,13 +1939,11 @@ describe("BelongsToAssociationsTest", () => {
     class NatNilCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NatNilAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(NatNilCompany);
@@ -2102,13 +1963,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
-        this.adapter = adapter;
       }
     }
     class PacMember extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(PacSponsor);
@@ -2127,7 +1986,6 @@ describe("BelongsToAssociationsTest", () => {
     class WpcPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class WpcComment extends Base {
@@ -2135,7 +1993,6 @@ describe("BelongsToAssociationsTest", () => {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(WpcPost);
@@ -2156,13 +2013,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("rating", "integer");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -2180,13 +2035,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcAsgAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(CcAsgCompany);
@@ -2212,13 +2065,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class NsCcAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(NsCcCompany);
@@ -2241,13 +2092,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class TouchMultAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(TouchMultCompany);
@@ -2272,13 +2121,11 @@ describe("BelongsToAssociationsTest", () => {
     class TouchNoUpdCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TouchNoUpdAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(TouchNoUpdCompany);
@@ -2300,13 +2147,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class TouchRmAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(TouchRmCompany);
@@ -2333,14 +2178,12 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class TouchUpdAccount extends Base {
       static {
         this.attribute("company_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(TouchUpdCompany);
@@ -2366,13 +2209,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class TouchEmptyAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(TouchEmptyCompany);
@@ -2399,13 +2240,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class TouchDesAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(TouchDesCompany);
@@ -2432,13 +2271,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class TouchDesPAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(TouchDesPCompany);
@@ -2463,13 +2300,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class TouchReaAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(TouchReaCompany);
@@ -2494,14 +2329,12 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -2518,13 +2351,11 @@ describe("BelongsToAssociationsTest", () => {
     class AsgPkCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AsgPkAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(AsgPkCompany);
@@ -2540,14 +2371,12 @@ describe("BelongsToAssociationsTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -2568,13 +2397,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -2598,13 +2425,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -2618,13 +2443,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcddAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(CcddCompany);
@@ -2648,13 +2471,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CccdAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(CccdCompany);
@@ -2677,13 +2498,11 @@ describe("BelongsToAssociationsTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Article extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
@@ -2691,7 +2510,6 @@ describe("BelongsToAssociationsTest", () => {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -2716,14 +2534,12 @@ describe("BelongsToAssociationsTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -2736,14 +2552,12 @@ describe("BelongsToAssociationsTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -2763,13 +2577,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -2787,13 +2599,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -2812,13 +2622,11 @@ describe("BelongsToAssociationsTest", () => {
     class DhCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DhAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(DhCompany);
@@ -2839,19 +2647,16 @@ describe("BelongsToAssociationsTest", () => {
     class Dh3Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Dh3Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Dh3SubAccount extends Base {
       static {
         this.attribute("account_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Dh3Company);
@@ -2879,14 +2684,12 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -2900,14 +2703,12 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -2920,13 +2721,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -2947,13 +2746,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class DcAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(DcCompany);
@@ -2973,14 +2770,12 @@ describe("BelongsToAssociationsTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -2997,20 +2792,17 @@ describe("BelongsToAssociationsTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Article extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -3029,13 +2821,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -3060,14 +2850,12 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("tags_count", "integer");
-        this.adapter = adapter;
       }
     }
     class PccComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("tags_count", "integer");
-        this.adapter = adapter;
       }
     }
     class PccTagging extends Base {
@@ -3075,7 +2863,6 @@ describe("BelongsToAssociationsTest", () => {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
         this.attribute("tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(PccPost);
@@ -3107,14 +2894,12 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("wheels_count", "integer");
-        this.adapter = adapter;
       }
     }
     class PcnWheel extends Base {
       static {
         this.attribute("wheelable_id", "integer");
         this.attribute("wheelable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(PcnCar);
@@ -3135,14 +2920,12 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class PcntWheel extends Base {
       static {
         this.attribute("wheelable_id", "integer");
         this.attribute("wheelable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(PcntCar);
@@ -3161,7 +2944,6 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -3173,7 +2955,6 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -3187,7 +2968,6 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -3199,13 +2979,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -3219,13 +2997,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -3240,13 +3016,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -3262,13 +3036,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -3285,7 +3057,6 @@ describe("BelongsToAssociationsTest", () => {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
         this.attribute("children_count", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(SrCategory);
@@ -3310,13 +3081,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -3329,14 +3098,12 @@ describe("BelongsToAssociationsTest", () => {
     class PcpkToy extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PcpkSponsor extends Base {
       static {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(PcpkToy);
@@ -3356,14 +3123,12 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class DpcSponsorship extends Base {
       static {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DpcToy);
@@ -3382,7 +3147,6 @@ describe("BelongsToAssociationsTest", () => {
     class PfPost extends Base {
       static {
         this.attribute("category_id", "integer");
-        this.adapter = adapter;
       }
     }
     // polymorphic: false should behave as a normal belongs_to (no error)
@@ -3396,19 +3160,16 @@ describe("BelongsToAssociationsTest", () => {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
         this.attribute("projects_count", "integer");
-        this.adapter = adapter;
       }
     }
     class MccAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     class MccProject extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(MccCompany);
@@ -3436,13 +3197,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -3459,13 +3218,11 @@ describe("BelongsToAssociationsTest", () => {
     class Company extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -3479,20 +3236,17 @@ describe("BelongsToAssociationsTest", () => {
     class TpcPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class TpcComment extends Base {
       static {
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     class TpcTagging extends Base {
       static {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(TpcPost);
@@ -3513,13 +3267,11 @@ describe("BelongsToAssociationsTest", () => {
     class RpcCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class RpcAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(RpcCompany);
@@ -3538,14 +3290,12 @@ describe("BelongsToAssociationsTest", () => {
     class SpcCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SpcAccount extends Base {
       static {
         this.attribute("company_id", "integer");
         this.attribute("notes", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(SpcCompany);
@@ -3566,13 +3316,11 @@ describe("BelongsToAssociationsTest", () => {
     class RvfCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class RvfAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(RvfCompany);
@@ -3593,7 +3341,6 @@ describe("BelongsToAssociationsTest", () => {
     class CpkmAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(CpkmAccount);
@@ -3615,13 +3362,11 @@ describe("BelongsToAssociationsTest", () => {
     class CpkoCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CpkoAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(CpkoCompany);
@@ -3638,13 +3383,11 @@ describe("BelongsToAssociationsTest", () => {
     class QcCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class QcAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(QcCompany);
@@ -3668,13 +3411,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("custom_id", "integer");
-        this.adapter = adapter;
       }
     }
     class WcpkAccount extends Base {
       static {
         this.attribute("company_custom_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(WcpkCompany);
@@ -3694,13 +3435,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("custom_id", "integer");
-        this.adapter = adapter;
       }
     }
     class FbcpkAccount extends Base {
       static {
         this.attribute("company_custom_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(FbcpkCompany);
@@ -3719,13 +3458,11 @@ describe("BelongsToAssociationsTest", () => {
     class DcnFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DcnClient extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(DcnFirm);
@@ -3748,13 +3485,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class NccAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(NccCompany);
@@ -3775,13 +3510,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class PkcAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(PkcCompany);
@@ -3803,13 +3536,11 @@ describe("BelongsToAssociationsTest", () => {
         this.attribute("name", "string");
         this.attribute("accounts_count", "integer");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class CatAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(CatCompany);
@@ -3831,13 +3562,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class TotAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(TotCompany);
@@ -3860,13 +3589,11 @@ describe("BelongsToAssociationsTest", () => {
     class DdCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DdAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(DdCompany);
@@ -3886,13 +3613,11 @@ describe("BelongsToAssociationsTest", () => {
     class BidCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BidAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(BidCompany);
@@ -3911,14 +3636,12 @@ describe("BelongsToAssociationsTest", () => {
     class PcftPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class PcftTagging extends Base {
       static {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(PcftPost);
@@ -3933,27 +3656,23 @@ describe("BelongsToAssociationsTest", () => {
 });
 
 describe("AsyncBelongsToAssociationsTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       albt_companies: { name: "string" },
       albt_accounts: { company_id: "integer" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("async load belongs to", async () => {
     class AlbtCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AlbtAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(AlbtCompany);
@@ -3970,31 +3689,27 @@ describe("AsyncBelongsToAssociationsTest", () => {
 });
 
 describe("BelongsToAssociationsTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       bt_companies: { name: "string" },
       bt_accounts: { company_id: "integer", credit_limit: "integer" },
       pk_firms: { name: "string", firm_name: "string" },
       pk_clients: { firm_name: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("belongs to", async () => {
     // Rails: test_belongs_to
     class BtCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BtAccount extends Base {
       static {
         this.attribute("company_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("BtCompany", BtCompany);
@@ -4020,13 +3735,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("firm_name", "string");
-        this.adapter = adapter;
       }
     }
     class PkClient extends Base {
       static {
         this.attribute("firm_name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("PkFirm", PkFirm);

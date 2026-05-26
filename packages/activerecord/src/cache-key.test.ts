@@ -7,10 +7,11 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base } from "./index.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
   posts: {
@@ -34,19 +35,15 @@ async function freshAdapter(): Promise<DatabaseAdapter> {
 // CacheKeyTest — targets cache_key_test.rb
 // ==========================================================================
 describe("CacheKeyTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("cache_key format is not too precise", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "a" });
@@ -58,7 +55,6 @@ describe("CacheKeyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = new Post({ title: "a" });

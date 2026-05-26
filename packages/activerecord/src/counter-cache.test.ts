@@ -6,10 +6,9 @@ import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { Associations, association } from "./associations.js";
 import { Notifications } from "@blazetrails/activesupport";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   topics: {
@@ -110,37 +109,27 @@ const TEST_SCHEMA: Schema = {
 };
 
 // -- Helpers --
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 // ==========================================================================
 // CounterCacheTest — targets counter_cache_test.rb
 // ==========================================================================
 describe("CounterCacheTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test_counters_are_updated_both_in_memory_and_in_the_database_on_create
   it("counters are updated both in memory and in the database on create", async () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -160,14 +149,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -191,7 +178,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer");
-        this.adapter = adapter;
       }
     }
     const topic = await Topic.create({ title: "Test" });
@@ -206,7 +192,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("views_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const topic = await Topic.create({ title: "Test" });
@@ -221,7 +206,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("views_count", "integer", { default: 5 });
-        this.adapter = adapter;
       }
     }
     const topic = await Topic.create({ title: "Test" });
@@ -236,7 +220,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("views_count", "integer", { default: 10 });
-        this.adapter = adapter;
       }
     }
     const topic = await Topic.create({ title: "Test" });
@@ -251,14 +234,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -278,14 +259,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("items_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("container_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Item, "container", { counterCache: true });
@@ -305,14 +284,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer");
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -333,7 +310,6 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("views_count", "integer", { default: 0 });
         this.attribute("updated_at", "string");
-        this.adapter = adapter;
       }
     }
     const topic = await Topic.create({ title: "Test", updated_at: "2020-01-01" });
@@ -349,14 +325,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -376,14 +350,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("children_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Child extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     // No counterCache — inactive
@@ -401,13 +373,11 @@ describe("CounterCacheTest", () => {
 });
 
 describe("CounterCacheTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   afterEach(() => {
     Notifications.unsubscribeAll();
   });
@@ -429,7 +399,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -442,14 +411,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -471,14 +438,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -499,14 +464,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -530,14 +493,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -556,14 +517,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -579,14 +538,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -607,7 +564,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -620,7 +576,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 10 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test", replies_count: 10 });
@@ -634,7 +589,6 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("views_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -648,13 +602,11 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("num_engines", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Engine extends Base {
       static {
         this.attribute("car_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Engine, "car", { counterCache: "num_engines" });
@@ -675,13 +627,11 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("num_engines", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Engine extends Base {
       static {
         this.attribute("car_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Engine, "car", { counterCache: "num_engines" });
@@ -703,14 +653,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -726,14 +674,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -754,7 +700,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     // Clear any leftover Topic from prior tests so the unloaded path is
@@ -768,7 +713,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     registerModel(Topic);
@@ -784,14 +728,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -813,14 +755,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -838,14 +778,12 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true, touch: true });
@@ -869,14 +807,12 @@ describe("CounterCacheTest", () => {
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", {
@@ -896,14 +832,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("writer_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "writer", {
@@ -923,14 +857,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -946,14 +878,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("taggings_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Tagging extends Base {
       static {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Tagging, "taggable", {
@@ -974,7 +904,6 @@ describe("CounterCacheTest", () => {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
         this.attribute("children_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Category, "parent", {
@@ -993,14 +922,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1019,14 +946,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true, inverseOf: "replies" });
@@ -1043,14 +968,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1072,14 +995,12 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1108,14 +1029,12 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1135,14 +1054,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1161,14 +1078,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1187,14 +1102,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1214,14 +1127,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1239,7 +1150,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1252,7 +1162,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 5 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test", replies_count: 5 });
@@ -1265,14 +1174,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1290,14 +1197,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1317,21 +1222,18 @@ describe("CounterCacheTest", () => {
     class Tag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("taggings_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Tagging extends Base {
       static {
         this.attribute("post_id", "integer");
         this.attribute("tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Tagging, "post", { counterCache: true });
@@ -1354,14 +1256,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1382,14 +1282,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("tags_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Tagging extends Base {
       static {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Tagging, "taggable", {
@@ -1411,7 +1309,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     registerModel(Topic);
@@ -1434,7 +1331,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1449,7 +1345,6 @@ describe("CounterCacheTest", () => {
         this.attribute("id", "integer");
         this.attribute("items_count", "integer", { default: 0 });
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 0 });
@@ -1464,7 +1359,6 @@ describe("CounterCacheTest", () => {
         this.attribute("id", "integer");
         this.attribute("items_count", "integer", { default: 0 });
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     const o1 = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 0 });
@@ -1488,7 +1382,6 @@ describe("CounterCacheTest", () => {
         this.attribute("id", "integer");
         this.attribute("items_count", "integer", { default: 10 });
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 10 });
@@ -1501,14 +1394,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1531,14 +1422,12 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("unique_replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     class UniqueReply extends Base {
@@ -1546,7 +1435,6 @@ describe("CounterCacheTest", () => {
         this._tableName = "unique_replies";
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
@@ -1570,14 +1458,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1604,13 +1490,11 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("engines_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Engine extends Base {
       static {
         this.attribute("car_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Engine, "myCar", {
@@ -1641,14 +1525,12 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1677,14 +1559,12 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1726,7 +1606,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 10 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test", replies_count: 10 });
@@ -1739,7 +1618,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const t1 = await Topic.create({ title: "one" });
@@ -1756,7 +1634,6 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("views_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1772,7 +1649,6 @@ describe("CounterCacheTest", () => {
         this.attribute("id", "integer");
         this.attribute("items_count", "integer", { default: 10 });
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 10 });
@@ -1790,13 +1666,11 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("friends_too_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Friendship extends Base {
       static {
         this.attribute("friend_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Friendship, "friend", {
@@ -1834,7 +1708,6 @@ describe("CounterCacheTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
@@ -1854,7 +1727,6 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({
@@ -1874,7 +1746,6 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const originalTime = new Date("2020-01-01");
@@ -1895,7 +1766,6 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const originalTime = new Date("2020-01-01T00:00:00.000Z");
@@ -1925,7 +1795,6 @@ describe("CounterCacheTest", () => {
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("unique_replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const originalTime = new Date("2020-01-01T00:00:00.000Z");
@@ -1951,14 +1820,12 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1986,21 +1853,18 @@ describe("CounterCacheTest", () => {
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("unique_replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     class UniqueReply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -2032,7 +1896,6 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const originalTime = new Date("2020-01-01");
@@ -2052,7 +1915,6 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 5 });
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const originalTime = new Date("2020-01-01");
@@ -2076,7 +1938,6 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -2093,7 +1954,6 @@ describe("CounterCacheTest", () => {
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("unique_replies_count", "integer", { default: 0 });
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -2114,14 +1974,12 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -2144,21 +2002,18 @@ describe("CounterCacheTest", () => {
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("unique_replies_count", "integer", { default: 0 });
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     class UniqueReply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -2185,7 +2040,6 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -2201,7 +2055,6 @@ describe("CounterCacheTest", () => {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 5 });
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test", replies_count: 5 });
@@ -2218,7 +2071,6 @@ describe("CounterCacheTest", () => {
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -2237,7 +2089,6 @@ describe("CounterCacheTest", () => {
         this.attribute("unique_replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -2260,14 +2111,12 @@ describe("CounterCacheTest", () => {
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -2292,21 +2141,18 @@ describe("CounterCacheTest", () => {
         this.attribute("unique_replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     class UniqueReply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -2337,7 +2183,6 @@ describe("CounterCacheTest", () => {
         this.attribute("replies_count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -2355,7 +2200,6 @@ describe("CounterCacheTest", () => {
         this.attribute("replies_count", "integer", { default: 5 });
         this.attribute("updated_at", "datetime");
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test", replies_count: 5 });
@@ -2369,14 +2213,12 @@ describe("CounterCacheTest", () => {
     class Car extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Person extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("cars_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     // Person has a hasMany :cars — the counter_cache column lives on Person
@@ -2389,13 +2231,11 @@ describe("CounterCacheTest", () => {
 });
 
 describe("counter_cache", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("increment counter", async () => {
     class Post extends Base {
       static _tableName = "posts";
@@ -2403,7 +2243,6 @@ describe("counter_cache", () => {
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
     Post.attribute("comments_count", "integer", { default: 0 });
-    Post.adapter = adapter;
     registerModel(Post);
 
     class Comment extends Base {
@@ -2412,7 +2251,6 @@ describe("counter_cache", () => {
     Comment.attribute("id", "integer");
     Comment.attribute("body", "string");
     Comment.attribute("post_id", "integer");
-    Comment.adapter = adapter;
     Associations.belongsTo.call(Comment, "post", { counterCache: true });
     registerModel(Comment);
 
@@ -2439,7 +2277,6 @@ describe("counter_cache", () => {
     Author.attribute("id", "integer");
     Author.attribute("name", "string");
     Author.attribute("num_books", "integer", { default: 0 });
-    Author.adapter = adapter;
     registerModel(Author);
 
     class Book extends Base {
@@ -2448,7 +2285,6 @@ describe("counter_cache", () => {
     Book.attribute("id", "integer");
     Book.attribute("title", "string");
     Book.attribute("author_id", "integer");
-    Book.adapter = adapter;
     Associations.belongsTo.call(Book, "author", { counterCache: "num_books" });
     registerModel(Book);
 
@@ -2460,13 +2296,11 @@ describe("counter_cache", () => {
 });
 
 describe("Counter Cache (Rails-guided)", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test "increment counter cache on create"
   it("increment counter", async () => {
     class Topic extends Base {
@@ -2475,7 +2309,6 @@ describe("Counter Cache (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     registerModel(Topic);
@@ -2486,7 +2319,6 @@ describe("Counter Cache (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -2507,7 +2339,6 @@ describe("Counter Cache (Rails-guided)", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     registerModel(Topic);
@@ -2517,7 +2348,6 @@ describe("Counter Cache (Rails-guided)", () => {
         this._tableName = "replies";
         this.attribute("id", "integer");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -2540,7 +2370,6 @@ describe("Counter Cache (Rails-guided)", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("num_replies", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     registerModel(Topic);
@@ -2550,7 +2379,6 @@ describe("Counter Cache (Rails-guided)", () => {
         this._tableName = "replies";
         this.attribute("id", "integer");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: "num_replies" });

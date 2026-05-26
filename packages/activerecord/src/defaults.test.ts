@@ -6,10 +6,11 @@ import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -72,18 +73,16 @@ describe("MysqlDefaultExpressionTest", () => {
 });
 
 describe("DefaultNumbersTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { counters: { value: "integer" } });
+    await defineSchema({ counters: { value: "integer" } });
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Counter extends Base {
       static {
         this.attribute("value", "integer");
-        this.adapter = adapter;
       }
     }
     return { Counter };
@@ -109,17 +108,15 @@ describe("DefaultNumbersTest", () => {
 });
 
 describe("DefaultBinaryTest", () => {
-  let adp: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adp = createTestAdapter();
-    await defineSchema(adp, { bin_records: { data: "string" } });
+    await defineSchema({ bin_records: { data: "string" } });
   });
-  withTransactionalFixtures(() => adp);
   it("default varbinary string", async () => {
     class BinRecord extends Base {
       static {
         this.attribute("data", "string");
-        this.adapter = adp;
       }
     }
     const r = await BinRecord.create({ data: "binary_data" });
@@ -129,7 +126,6 @@ describe("DefaultBinaryTest", () => {
     class BinRecord extends Base {
       static {
         this.attribute("data", "string", { default: "" });
-        this.adapter = adp;
       }
     }
     const r = new BinRecord({});
@@ -139,7 +135,6 @@ describe("DefaultBinaryTest", () => {
     class BinRecord extends Base {
       static {
         this.attribute("data", "string");
-        this.adapter = adp;
       }
     }
     const r = await BinRecord.create({ data: "0xDEADBEEF" });
@@ -185,17 +180,15 @@ describe("DefaultsTestWithoutTransactionalFixtures", () => {
 });
 
 describe("DefaultTextTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { posts: { body: "string", title: "string" } });
+    await defineSchema({ posts: { body: "string", title: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
   it("default texts", async () => {
     class Post extends Base {
       static {
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ body: "some text" });
@@ -205,7 +198,6 @@ describe("DefaultTextTest", () => {
     class Post extends Base {
       static {
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ body: "it's some text" });
@@ -214,17 +206,15 @@ describe("DefaultTextTest", () => {
 });
 
 describe("DefaultStringsTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { posts: { title: "string", body: "string" } });
+    await defineSchema({ posts: { title: "string", body: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
   it("default strings", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "hello" });
@@ -234,7 +224,6 @@ describe("DefaultStringsTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "it's a test" });

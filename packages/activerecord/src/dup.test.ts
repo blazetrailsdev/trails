@@ -4,25 +4,22 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 describe("DupTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { topics: { title: "string", body: "string" } });
+    await defineSchema({ topics: { title: "string", body: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     return { Topic };
@@ -164,21 +161,17 @@ describe("DupTest", () => {
 });
 
 describe("DupTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { items: { name: "string" } });
+    await defineSchema({ items: { name: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("creates an unsaved copy without primary key", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     const original = await Item.create({ name: "Original" });
     const copy = original.dup();
     expect(copy.isNewRecord()).toBe(true);
@@ -188,28 +181,23 @@ describe("DupTest", () => {
 });
 
 describe("DupTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { animals: { name: "string" }, users: { name: "string" } });
+    await defineSchema({ animals: { name: "string" }, users: { name: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("transforms a record to another class", async () => {
     class Animal extends Base {
       static _tableName = "animals";
     }
     Animal.attribute("id", "integer");
     Animal.attribute("name", "string");
-    Animal.adapter = adapter;
 
     class Dog extends Base {
       static _tableName = "animals";
     }
     Dog.attribute("id", "integer");
     Dog.attribute("name", "string");
-    Dog.adapter = adapter;
-
     const animal = await Animal.create({ name: "Rex" });
     const dog = animal.becomes(Dog);
     expect(dog).toBeInstanceOf(Dog);
@@ -220,7 +208,6 @@ describe("DupTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "original" });

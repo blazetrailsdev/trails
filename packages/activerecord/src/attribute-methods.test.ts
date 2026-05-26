@@ -8,10 +8,11 @@ import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base, ReadonlyAttributeError } from "./index.js";
 import { formatForInspect } from "./attribute-inspection.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
   posts: {
@@ -1788,8 +1789,6 @@ describe("AttributeMethodsTest", () => {
   });
 });
 describe("AttributeMethodsTest", () => {
-  let adapter: TestDatabaseAdapter;
-
   class Person extends Base {
     static {
       this.attribute("name", "string");
@@ -1798,14 +1797,12 @@ describe("AttributeMethodsTest", () => {
       this.attribute("active", "boolean");
     }
   }
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
-    Person.adapter = adapter;
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   describe("readAttribute / writeAttribute", () => {
     it("reads and writes attributes", () => {
       const p = new Person({ name: "Alice" });
@@ -1877,7 +1874,6 @@ describe("AttributeMethodsTest", () => {
         static {
           this.attribute("title", "string");
           this.aliasAttribute("heading", "title");
-          this.adapter = adapter;
         }
       }
       const t = new Topic({ title: "Hi" });
@@ -1898,7 +1894,6 @@ describe("AttributeMethodsTest", () => {
           this.attribute("code", "string");
           this.attribute("name", "string");
           this.attrReadonly("code");
-          this.adapter = adapter;
         }
       }
       const item = await Item.create({ code: "ABC", name: "Widget" });
@@ -1919,19 +1914,16 @@ describe("AttributeMethodsTest", () => {
 // ==========================================================================
 
 describe("attribute_alias arelTable integration", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("test_attribute_alias_in_where_references_association_name", () => {
     class User extends Base {
       static {
         this.attribute("username", "string");
         this.aliasAttribute("login", "username");
-        this.adapter = adapter;
       }
     }
     const attr = User.arelTable.get("login");
@@ -1943,7 +1935,6 @@ describe("attribute_alias arelTable integration", () => {
       static {
         this.attribute("username", "string");
         this.aliasAttribute("login", "username");
-        this.adapter = adapter;
       }
     }
     const attr = User.arelTable.get("username");

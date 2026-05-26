@@ -4,33 +4,24 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // -- Helpers --
-function freshAdapter(): TestDatabaseAdapter {
-  return createTestAdapter();
-}
-
 // ==========================================================================
 // ExcludingTest — targets excluding_test.rb
 // ==========================================================================
 describe("ExcludingTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { posts: { title: "string" } });
+    await defineSchema({ posts: { title: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("result set does not include single excluded record", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p1 = await Post.create({ title: "a" });
@@ -43,7 +34,6 @@ describe("ExcludingTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const rel = Post.all().excluding();
@@ -52,19 +42,17 @@ describe("ExcludingTest", () => {
 });
 
 describe("ExcludingTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { posts: { title: "string", score: "integer" } });
+    await defineSchema({ posts: { title: "string", score: "integer" } });
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("score", "integer");
-        this.adapter = adapter;
       }
     }
     return { Post };
@@ -149,21 +137,17 @@ describe("ExcludingTest", () => {
 });
 
 describe("excluding() / without()", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { items: { name: "string" } });
+    await defineSchema({ items: { name: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("excludes specific records by PK", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     const a = await Item.create({ name: "A" });
     await Item.create({ name: "B" });
     await Item.create({ name: "C" });
@@ -179,8 +163,6 @@ describe("excluding() / without()", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     const a = await Item.create({ name: "A" });
     await Item.create({ name: "B" });
 
@@ -190,18 +172,15 @@ describe("excluding() / without()", () => {
 });
 
 describe("Excluding (Rails-guided)", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { items: { name: "string" } });
+    await defineSchema({ items: { name: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("excluding removes specific records", async () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const a = await Item.create({ name: "A" });
@@ -217,7 +196,6 @@ describe("Excluding (Rails-guided)", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const a = await Item.create({ name: "A" });
@@ -231,7 +209,6 @@ describe("Excluding (Rails-guided)", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const a = await Item.create({ name: "A" });

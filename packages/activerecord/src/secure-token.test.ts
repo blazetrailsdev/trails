@@ -5,33 +5,26 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 import { hasSecureToken, MinimumLengthError } from "./secure-token.js";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // -- Helpers --
-function freshAdapter(): TestDatabaseAdapter {
-  return createTestAdapter();
-}
-
 describe("SecureTokenTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       users: { name: "string", token: "string" },
       user_with_tokens: { name: "string", token: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("token", "string");
-        this.adapter = adapter;
       }
     }
     hasSecureToken(User, "token");
@@ -86,7 +79,6 @@ describe("SecureTokenTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("token", "string");
-        this.adapter = adapter;
       }
     }
     hasSecureToken(UserWithToken, "token", { length: 24 });
@@ -118,23 +110,20 @@ describe("SecureTokenTest", () => {
 });
 
 describe("has_secure_token", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       api_keys: { token: "string" },
       sessions: { auth_token: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("auto-generates a token on create", async () => {
     class ApiKey extends Base {
       static _tableName = "api_keys";
     }
     ApiKey.attribute("id", "integer");
     ApiKey.attribute("token", "string");
-    ApiKey.adapter = adapter;
     hasSecureToken(ApiKey);
 
     const key = await ApiKey.create({});
@@ -149,7 +138,6 @@ describe("has_secure_token", () => {
     }
     ApiKey.attribute("id", "integer");
     ApiKey.attribute("token", "string");
-    ApiKey.adapter = adapter;
     hasSecureToken(ApiKey);
 
     const key = await ApiKey.create({});
@@ -166,7 +154,6 @@ describe("has_secure_token", () => {
     }
     Session.attribute("id", "integer");
     Session.attribute("auth_token", "string");
-    Session.adapter = adapter;
     hasSecureToken(Session, "auth_token");
 
     const s = await Session.create({});
@@ -175,19 +162,16 @@ describe("has_secure_token", () => {
 });
 
 describe("has_secure_token (Rails-guided)", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       users: { token: "string" },
       sessions: { session_token: "string" },
       user1s: { token: "string" },
       user2s: { token: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test "generates a token on create"
   it("automatically generates a token on create", async () => {
     class User extends Base {
@@ -195,7 +179,6 @@ describe("has_secure_token (Rails-guided)", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("token", "string");
-        this.adapter = adapter;
       }
     }
     hasSecureToken(User);
@@ -212,7 +195,6 @@ describe("has_secure_token (Rails-guided)", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("token", "string");
-        this.adapter = adapter;
       }
     }
     hasSecureToken(User);
@@ -229,7 +211,6 @@ describe("has_secure_token (Rails-guided)", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("token", "string");
-        this.adapter = adapter;
       }
     }
     hasSecureToken(User);
@@ -248,7 +229,6 @@ describe("has_secure_token (Rails-guided)", () => {
     class User1 extends Base {
       static {
         this.attribute("token", "string");
-        this.adapter = adapter;
       }
     }
     expect(() => hasSecureToken(User1, "token", { length: 23 })).toThrow(MinimumLengthError);
@@ -259,7 +239,6 @@ describe("has_secure_token (Rails-guided)", () => {
     class User2 extends Base {
       static {
         this.attribute("token", "string");
-        this.adapter = adapter;
       }
     }
     expect(() => hasSecureToken(User2, "token", { length: 24 })).not.toThrow();
@@ -272,7 +251,6 @@ describe("has_secure_token (Rails-guided)", () => {
         this._tableName = "sessions";
         this.attribute("id", "integer");
         this.attribute("session_token", "string");
-        this.adapter = adapter;
       }
     }
     hasSecureToken(Session, "session_token");

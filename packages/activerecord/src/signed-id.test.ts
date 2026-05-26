@@ -12,7 +12,8 @@ import { SignedGlobalID, setApp, _resetApp } from "@blazetrails/globalid";
 
 import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // Tables referenced by ad-hoc model classes declared per-test in this
 // file. Each `class X extends Base` derives its table via Rails-style
@@ -37,11 +38,11 @@ async function freshAdapter(): Promise<TestDatabaseAdapter> {
 }
 
 describe("SignedIdTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
   beforeEach(() => {
     setSignedIdVerifierSecret("blazetrails-test-secret");
   });
@@ -50,7 +51,6 @@ describe("SignedIdTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     return { User };
@@ -140,7 +140,6 @@ describe("SignedIdTest", () => {
         this._primaryKey = "toy_id";
         this.attribute("toy_id", "string");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Toy.create({ toy_id: "abc-123", name: "Block" });
@@ -155,13 +154,9 @@ describe("SignedIdTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
-        this.adapter = adapter;
       }
     }
-    class Dog extends Animal {
-      // eslint-disable-next-line no-empty-static-block
-      static {}
-    }
+    class Dog extends Animal {}
     const d = await Dog.create({ name: "Rex" });
     const token = d.signedId();
     const found = await Dog.findSigned(token);
@@ -174,7 +169,6 @@ describe("SignedIdTest", () => {
       static {
         this._primaryKey = "";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await expect(Matey.findSigned("this will not be even verified")).rejects.toThrow(
@@ -188,7 +182,6 @@ describe("SignedIdTest", () => {
         this._primaryKey = "toy_id";
         this.attribute("toy_id", "string");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Toy.create({ toy_id: "k-9", name: "Robot" });
@@ -202,13 +195,9 @@ describe("SignedIdTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
-        this.adapter = adapter;
       }
     }
-    class Car extends Vehicle {
-      // eslint-disable-next-line no-empty-static-block
-      static {}
-    }
+    class Car extends Vehicle {}
     const c = await Car.create({ name: "Sedan" });
     const token = c.signedId();
     const found = await Car.findSignedBang(token);
@@ -243,7 +232,6 @@ describe("SignedIdTest", () => {
     class UserShort extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await UserShort.create({ name: "Jake" });
@@ -304,7 +292,6 @@ describe("SignedIdTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -318,7 +305,6 @@ describe("SignedIdTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -334,7 +320,6 @@ describe("SignedIdTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -347,7 +332,6 @@ describe("SignedIdTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -361,7 +345,6 @@ describe("SignedIdTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });

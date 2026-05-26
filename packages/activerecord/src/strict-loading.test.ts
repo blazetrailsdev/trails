@@ -12,10 +12,11 @@ import {
   loadHasMany,
 } from "./associations.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -26,11 +27,10 @@ function freshAdapter(): DatabaseAdapter {
 // StrictLoadingTest — targets strict_loading_test.rb
 // ==========================================================================
 describe("StrictLoadingTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       authors: { name: "string" },
       books: { title: "string", author_id: "integer", publisher_id: "integer" },
       profiles: { bio: "string", author_id: "integer" },
@@ -39,21 +39,17 @@ describe("StrictLoadingTest", () => {
       animals: { name: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
   it("raises on lazy loading a strict loading has many relation", async () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Author, "books", {});
@@ -71,14 +67,12 @@ describe("StrictLoadingTest", () => {
     class Publisher extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("publisher_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Publisher);
@@ -95,14 +89,12 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Profile extends Base {
       static {
         this.attribute("bio", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -119,14 +111,12 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -150,14 +140,12 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -176,14 +164,12 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -204,7 +190,6 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -221,7 +206,6 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const author = new Author({ name: "Grace" });
@@ -237,7 +221,6 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const author = new Author({ name: "Ivy" });
@@ -252,7 +235,6 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const author = new Author({ name: "Jack" });
@@ -274,7 +256,6 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const author = new Author({ name: "Heidi" });
@@ -288,7 +269,6 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     expect(Author.strictLoadingByDefault).toBe(false);
@@ -299,7 +279,6 @@ describe("StrictLoadingTest", () => {
     class Animal extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Animal.strictLoadingByDefault = true;
@@ -317,7 +296,6 @@ describe("StrictLoadingTest", () => {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Tag);
@@ -335,14 +313,12 @@ describe("StrictLoadingTest", () => {
     class Publisher extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("publisher_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Publisher);
@@ -362,14 +338,12 @@ describe("StrictLoadingTest", () => {
     class Publisher extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("publisher_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Publisher);
@@ -392,14 +366,12 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Profile extends Base {
       static {
         this.attribute("bio", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -420,14 +392,12 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -445,11 +415,10 @@ describe("StrictLoadingTest", () => {
 });
 
 describe("StrictLoadingTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       authors: { name: "string" },
       books: { title: "string", author_id: "integer" },
       slvr_authors: { name: "string" },
@@ -496,8 +465,6 @@ describe("StrictLoadingTest", () => {
       slnr_books: { title: "string", sl_nr_author_id: "integer" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
   // Rails: test_raises_on_lazy_loading_a_strict_loading_belongs_to_relation
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_one_relation
@@ -518,7 +485,6 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Author.strictLoadingByDefault = true;
@@ -529,7 +495,6 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Author, "books", {});
@@ -542,7 +507,6 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const a = new Author({ name: "test" });
@@ -554,7 +518,6 @@ describe("StrictLoadingTest", () => {
     class SlvrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("SlvrAuthor", SlvrAuthor);
@@ -570,14 +533,12 @@ describe("StrictLoadingTest", () => {
     class SlBtPublisher extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SlBtBook extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("publisher_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("SlBtPublisher", SlBtPublisher);
@@ -596,14 +557,12 @@ describe("StrictLoadingTest", () => {
     class SlHmAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SlHmBook extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("SlHmAuthor", SlHmAuthor);
@@ -623,14 +582,12 @@ describe("StrictLoadingTest", () => {
     class SlHoAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SlHoProfile extends Base {
       static {
         this.attribute("bio", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("SlHoAuthor", SlHoAuthor);
@@ -646,27 +603,23 @@ describe("StrictLoadingTest", () => {
     class SlThrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SlThrPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("sl_thr_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class SlThrTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SlThrTagging extends Base {
       static {
         this.attribute("sl_thr_post_id", "integer");
         this.attribute("sl_thr_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("SlThrAuthor", SlThrAuthor);
@@ -704,20 +657,17 @@ describe("StrictLoadingTest", () => {
     class SlHotAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SlHotAccount extends Base {
       static {
         this.attribute("sl_hot_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class SlHotProfile extends Base {
       static {
         this.attribute("sl_hot_account_id", "integer");
         this.attribute("bio", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("SlHotAuthor", SlHotAuthor);
@@ -765,7 +715,6 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     expect(Author.strictLoadingByDefault).toBe(false);
@@ -783,7 +732,6 @@ describe("StrictLoadingTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Author, "books", {});
@@ -796,7 +744,6 @@ describe("StrictLoadingTest", () => {
     class SlrmAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("SlrmAuthor", SlrmAuthor);
@@ -822,14 +769,12 @@ describe("StrictLoadingTest", () => {
     class SlAllAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SlAllBook extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("SlAllAuthor", SlAllAuthor);
@@ -873,7 +818,6 @@ describe("StrictLoadingTest", () => {
     class SlcAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await SlcAuthor.create({ name: "Test" });
@@ -885,7 +829,6 @@ describe("StrictLoadingTest", () => {
     class SlpAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await SlpAuthor.create({ name: "Test" });
@@ -898,7 +841,6 @@ describe("StrictLoadingTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
     await SlsAuthor.create({ name: "Test", age: 30 });
@@ -910,7 +852,6 @@ describe("StrictLoadingTest", () => {
     class SlszAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await SlszAuthor.create({ name: "Test" });
@@ -922,7 +863,6 @@ describe("StrictLoadingTest", () => {
     class SleAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await SleAuthor.create({ name: "Test" });
@@ -934,7 +874,6 @@ describe("StrictLoadingTest", () => {
     class SlaAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await SlaAuthor.create({ name: "Test" });
@@ -946,7 +885,6 @@ describe("StrictLoadingTest", () => {
     class SlnAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await SlnAuthor.create({ name: "Test" });
@@ -958,7 +896,6 @@ describe("StrictLoadingTest", () => {
     class SlexAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await SlexAuthor.create({ name: "Test" });
@@ -970,7 +907,6 @@ describe("StrictLoadingTest", () => {
     class SliAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const a = await SliAuthor.create({ name: "Test" });
@@ -982,7 +918,6 @@ describe("StrictLoadingTest", () => {
     class SllAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await SllAuthor.create({ name: "Test" });
@@ -994,7 +929,6 @@ describe("StrictLoadingTest", () => {
     class SlldAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await SlldAuthor.create({ name: "Test" });
@@ -1008,7 +942,6 @@ describe("StrictLoadingTest", () => {
     class SlprAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await SlprAuthor.create({ name: "Test" });
@@ -1020,7 +953,6 @@ describe("StrictLoadingTest", () => {
     class SlBangAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const author = new SlBangAuthor({ name: "Test" });
@@ -1042,14 +974,12 @@ describe("StrictLoadingTest", () => {
     class GmAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class GmBook extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("GmAuthor", GmAuthor);
@@ -1075,14 +1005,12 @@ describe("StrictLoadingTest", () => {
     class RslAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class RslBook extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("RslAuthor", RslAuthor);
@@ -1114,14 +1042,12 @@ describe("StrictLoadingTest", () => {
     class SlcnAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SlcnBook extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("sl_cn_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("SlcnAuthor", SlcnAuthor);
@@ -1142,14 +1068,12 @@ describe("StrictLoadingTest", () => {
     class SlbdAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SlbdBook extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("sl_bd_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("SlbdAuthor", SlbdAuthor);
@@ -1169,14 +1093,12 @@ describe("StrictLoadingTest", () => {
     class SlwrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SlwrBook extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("sl_wr_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("SlwrAuthor", SlwrAuthor);
@@ -1197,14 +1119,12 @@ describe("StrictLoadingTest", () => {
     class SlnrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SlnrBook extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("sl_nr_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("SlnrAuthor", SlnrAuthor);
@@ -1357,25 +1277,22 @@ describe("StrictLoadingFixturesTest", () => {
 });
 
 describe("strict_loading", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       authors: { name: "string" },
       books: { author_id: "integer" },
       authors2: { name: "string" },
       posts: { author2_id: "integer" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("raises StrictLoadingViolationError on lazy association load", async () => {
     class Author extends Base {
       static _tableName = "authors";
     }
     Author.attribute("id", "integer");
     Author.attribute("name", "string");
-    Author.adapter = adapter;
     registerModel("Author", Author);
 
     class Book extends Base {
@@ -1383,7 +1300,6 @@ describe("strict_loading", () => {
     }
     Book.attribute("id", "integer");
     Book.attribute("author_id", "integer");
-    Book.adapter = adapter;
     Associations.belongsTo.call(Book, "author");
 
     const author = await Author.create({ name: "Test" });
@@ -1402,7 +1318,6 @@ describe("strict_loading", () => {
     }
     Author.attribute("id", "integer");
     Author.attribute("name", "string");
-    Author.adapter = adapter;
     registerModel("Author2", Author);
 
     class Post extends Base {
@@ -1410,7 +1325,6 @@ describe("strict_loading", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("author2_id", "integer");
-    Post.adapter = adapter;
     Associations.belongsTo.call(Post, "author2", { className: "Author2" });
 
     const author = await Author.create({ name: "Test" });

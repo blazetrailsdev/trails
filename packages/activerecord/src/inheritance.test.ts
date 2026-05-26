@@ -6,10 +6,9 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass, SubclassNotFound } from "./index.js";
 import { getStiBase, isStiSubclass, setBaseClass } from "./inheritance.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import { quoteTableName } from "./test-helpers/quote-regex.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 const TEST_SCHEMA: Schema = {
@@ -1536,12 +1535,11 @@ describe("InheritanceTest", () => {
 });
 
 describe("InheritanceComputeTypeTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeHierarchy() {
     class Vehicle extends Base {
@@ -1549,7 +1547,6 @@ describe("InheritanceComputeTypeTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.inheritanceColumn = "type";
-        this.adapter = adapter;
       }
     }
     class Car extends Vehicle {}
@@ -1621,14 +1618,11 @@ describe("InheritanceAttributeTest", () => {
 });
 
 describe("STI", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("subclasses share the parent table", () => {
     class Vehicle extends Base {
       static _tableName = "vehicles";
@@ -1648,11 +1642,10 @@ describe("STI", () => {
     Vehicle.attribute("id", "integer");
     Vehicle.attribute("name", "string");
     Vehicle.attribute("type", "string");
-    Vehicle.adapter = adapter;
     enableSti(Vehicle);
 
     class Car extends Vehicle {}
-    Car.adapter = adapter;
+
     registerModel(Car);
 
     const car = await Car.create({ name: "Civic" });
@@ -1666,15 +1659,14 @@ describe("STI", () => {
     Vehicle.attribute("id", "integer");
     Vehicle.attribute("name", "string");
     Vehicle.attribute("type", "string");
-    Vehicle.adapter = adapter;
     enableSti(Vehicle);
 
     class Car extends Vehicle {}
-    Car.adapter = adapter;
+
     registerModel(Car);
 
     class Truck extends Vehicle {}
-    Truck.adapter = adapter;
+
     registerModel(Truck);
 
     await Car.create({ name: "Civic" });
@@ -1700,15 +1692,14 @@ describe("STI", () => {
     Vehicle.attribute("id", "integer");
     Vehicle.attribute("name", "string");
     Vehicle.attribute("type", "string");
-    Vehicle.adapter = adapter;
     enableSti(Vehicle);
 
     class Car extends Vehicle {}
-    Car.adapter = adapter;
+
     registerModel(Car);
 
     class Truck extends Vehicle {}
-    Truck.adapter = adapter;
+
     registerModel(Truck);
 
     await Car.create({ name: "Civic" });
@@ -1721,14 +1712,11 @@ describe("STI", () => {
 });
 
 describe("STI (Rails-guided)", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test "subclass uses parent table"
   it("subclass inherits the base table name", () => {
     class Company extends Base {
@@ -1752,13 +1740,12 @@ describe("STI (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
-        this.adapter = adapter;
       }
     }
     enableSti(Company);
 
     class Firm extends Company {}
-    Firm.adapter = adapter;
+
     registerModel(Firm);
 
     const firm = await Firm.create({ name: "Acme" });
@@ -1773,17 +1760,16 @@ describe("STI (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
-        this.adapter = adapter;
       }
     }
     enableSti(Company);
 
     class Firm extends Company {}
-    Firm.adapter = adapter;
+
     registerModel(Firm);
 
     class Client extends Company {}
-    Client.adapter = adapter;
+
     registerModel(Client);
 
     await Firm.create({ name: "Acme" });
@@ -1803,17 +1789,16 @@ describe("STI (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
-        this.adapter = adapter;
       }
     }
     enableSti(Company);
 
     class Firm extends Company {}
-    Firm.adapter = adapter;
+
     registerModel(Firm);
 
     class Client extends Company {}
-    Client.adapter = adapter;
+
     registerModel(Client);
 
     await Firm.create({ name: "Acme" });
@@ -1862,6 +1847,8 @@ import {
   polymorphicClassFor,
   __resetPrimaryAbstractClass,
 } from "./inheritance.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 describe("InheritanceTest — new parity methods", () => {
   afterEach(() => __resetPrimaryAbstractClass());

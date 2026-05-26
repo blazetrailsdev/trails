@@ -5,11 +5,11 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { Base, serialize, SerializationTypeMismatch } from "./index.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
@@ -19,11 +19,10 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("SerializedAttributeTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       users: { name: "string", preferences: "string" },
       parents: { name: "string", data: "string" },
       topics: { title: "string", content: "string" },
@@ -36,18 +35,12 @@ describe("SerializedAttributeTest", () => {
       },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
 
   function makeModel() {
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("preferences", "string");
-        this.adapter = adapter;
       }
     }
     serialize(User, "preferences");
@@ -60,7 +53,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("prefs", "string");
-        this.adapter = adapter;
       }
     }
     // serialize should work without forcing any column enumeration
@@ -82,7 +74,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("preferences", "string");
-        this.adapter = adapter;
         this.aliasAttribute("prefs", "preferences");
       }
     }
@@ -103,7 +94,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("settings", "string", { default: "{}" });
-        this.adapter = adapter;
       }
     }
     serialize(Post, "settings");
@@ -117,7 +107,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("metadata", "string", { default: '{"version":1}' });
-        this.adapter = adapter;
       }
     }
     serialize(Post, "metadata");
@@ -131,7 +120,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("data", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Parent, "data");
@@ -146,7 +134,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("data", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Parent, "data");
@@ -192,7 +179,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("data", "string");
-        this.adapter = adapter;
       }
     }
     class Child extends Parent {}
@@ -255,7 +241,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Topic, "content", { coder: "json" });
@@ -291,7 +276,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("tags", "string", { default: "[]" });
-        this.adapter = adapter;
       }
     }
     serialize(Post, "tags");
@@ -324,7 +308,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("tags", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Post, "tags", { coder: "array" });
@@ -347,7 +330,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("data", "string", { default: "{}" });
-        this.adapter = adapter;
       }
     }
     serialize(Post, "data");
@@ -360,7 +342,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Topic, "content", { coder: "hash" });
@@ -433,7 +414,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("data", "string");
-        this.adapter = adapter;
       }
     }
     serialize(AbstractBase, "data");
@@ -455,7 +435,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("meta", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Post, "meta", { coder: "hash" });
@@ -469,7 +448,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("tags", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Post, "tags", { coder: "array" });
@@ -519,28 +497,20 @@ describe("SerializedAttributeTest", () => {
 // and re-runs the same tests with use_yaml_unsafe_load=false. In trails we use
 // JSON serialization regardless, so the same assertions apply.
 describe("SerializedAttributeTestWithYamlSafeLoad", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       topics: { title: "string", content: "string" },
       important_topics: { title: "string", content: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   // Rails test_serialized_attribute: create, assert content, reload, assert again
   it("serialized attribute", async () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Topic, "content");
@@ -557,7 +527,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       static {
         this.attribute("title", "string");
         this.attribute("content", "string");
-        this.adapter = adapter;
         this.aliasAttribute("object", "content");
       }
     }
@@ -575,7 +544,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       static {
         this.attribute("title", "string");
         this.attribute("content", "string", { default: '{"key":"value"}' });
-        this.adapter = adapter;
       }
     }
     serialize(Topic, "content");
@@ -589,7 +557,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       static {
         this.attribute("title", "string");
         this.attribute("content", "string", { default: '{"key":"value"}' });
-        this.adapter = adapter;
       }
     }
     serialize(Topic, "content");
@@ -603,7 +570,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       static {
         this.attribute("title", "string");
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
     class VeryImportantTopic extends ImportantTopic {}
@@ -630,7 +596,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       static {
         this.attribute("title", "string");
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Topic, "content");
@@ -649,7 +614,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       static {
         this.attribute("title", "string");
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Topic, "content");
@@ -665,7 +629,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       static {
         this.attribute("title", "string");
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Topic, "content");
@@ -684,7 +647,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       static {
         this.attribute("title", "string");
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
     serialize(Topic, "content");
@@ -704,27 +666,20 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 });
 
 describe("serialize", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       settings: { data: "string" },
       prefs: { tags: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("serializes and deserializes JSON data", async () => {
     class Setting extends Base {
       static _tableName = "settings";
     }
     Setting.attribute("id", "integer");
     Setting.attribute("data", "string");
-    Setting.adapter = adapter;
     serialize(Setting, "data", { coder: "json" });
 
     const s = await Setting.create({ data: JSON.stringify({ theme: "dark", fontSize: 14 }) });
@@ -740,7 +695,6 @@ describe("serialize", () => {
     }
     Pref.attribute("id", "integer");
     Pref.attribute("tags", "string");
-    Pref.adapter = adapter;
     serialize(Pref, "tags", { coder: "array" });
 
     const p = await Pref.create({ tags: JSON.stringify(["ruby", "rails"]) });
@@ -750,20 +704,13 @@ describe("serialize", () => {
 });
 
 describe("serialize (Rails-guided)", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       users: { preferences: "string", roles: "string", settings: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   // Rails: test "serialized attribute"
   it("deserializes JSON data on read", async () => {
     class User extends Base {
@@ -771,7 +718,6 @@ describe("serialize (Rails-guided)", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("preferences", "string");
-        this.adapter = adapter;
       }
     }
     serialize(User, "preferences", { coder: "json" });
@@ -789,7 +735,6 @@ describe("serialize (Rails-guided)", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("roles", "string");
-        this.adapter = adapter;
       }
     }
     serialize(User, "roles", { coder: "array" });
@@ -806,7 +751,6 @@ describe("serialize (Rails-guided)", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     serialize(User, "settings", { coder: "hash" });

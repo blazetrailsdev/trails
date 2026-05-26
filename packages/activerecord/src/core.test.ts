@@ -7,7 +7,8 @@ import { Base } from "./index.js";
 
 import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
   topics: { title: "string", author: "string" },
@@ -22,18 +23,17 @@ async function freshAdapter(): Promise<TestDatabaseAdapter> {
 }
 
 describe("CoreTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
-        this.adapter = adapter;
       }
     }
     return { Topic };
@@ -184,7 +184,6 @@ describe("CoreTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "first" });
@@ -198,7 +197,6 @@ describe("CoreTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = new Topic({ title: "new" });
@@ -448,17 +446,15 @@ describe("toKey()", () => {
 });
 
 describe("Base features (Rails-guided) - core", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("toParam returns id as string", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Dean" });
@@ -479,7 +475,6 @@ describe("Base features (Rails-guided) - core", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -493,7 +488,6 @@ describe("Base features (Rails-guided) - core", () => {
       static {
         this.attribute("name", "string");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice", email: "a@b.com" });
@@ -507,7 +501,6 @@ describe("Base features (Rails-guided) - core", () => {
       static {
         this.attribute("name", "string");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice", email: "a@b.com" });

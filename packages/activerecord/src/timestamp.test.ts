@@ -9,10 +9,11 @@ import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base, MigrationContext, registerModel } from "./index.js";
 import { Associations } from "./associations.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -20,16 +21,15 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("TimestampTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       posts: { title: "string", updated_at: "string", created_at: "string" },
       simples: { name: "string" },
       authors: { name: "string", updated_at: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
 
   function makePost() {
     class Post extends Base {
@@ -37,7 +37,6 @@ describe("TimestampTest", () => {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
         this.attribute("created_at", "datetime");
-        this.adapter = adapter;
       }
     }
     return Post;
@@ -133,7 +132,6 @@ describe("TimestampTest", () => {
     class Simple extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const s = await Simple.create({ name: "x" });
@@ -199,7 +197,6 @@ describe("TimestampTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const author = await Author.create({ name: "Alice" });
@@ -654,21 +651,17 @@ describe("TimestampTest", () => {
 });
 
 describe("TimestampTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { items: { updated_at: "string" } });
+    await defineSchema({ items: { updated_at: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("updates timestamps on all matching records", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("updated_at", "datetime");
-    Item.adapter = adapter;
-
     await Item.create({});
     await Item.create({});
 
@@ -717,23 +710,20 @@ describe("TimestampTest", () => {
 });
 
 describe("TimestampTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       posts: { title: "string", created_at: "string", updated_at: "string" },
       simples: { name: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("sets created_at and updated_at on create", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const before = Temporal.Now.instant();
@@ -756,7 +746,6 @@ describe("TimestampTest", () => {
         this.attribute("title", "string");
         this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const explicit = instant("2020-01-01T00:00:00Z");
@@ -772,7 +761,6 @@ describe("TimestampTest", () => {
         this.attribute("title", "string");
         this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const post = await Post.create({ title: "Hello" });
@@ -792,7 +780,6 @@ describe("TimestampTest", () => {
         this.attribute("title", "string");
         this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const post = await Post.create({ title: "Hello" });
@@ -811,7 +798,6 @@ describe("TimestampTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const post = await Post.create({ title: "Hello" });
@@ -827,7 +813,6 @@ describe("TimestampTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -843,7 +828,6 @@ describe("TimestampTest", () => {
     class Post extends Base {
       static {
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const post = new Post({});
@@ -855,7 +839,6 @@ describe("TimestampTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const post = await Post.create({ title: "Hello" });
@@ -866,18 +849,15 @@ describe("TimestampTest", () => {
 });
 
 describe("TimestampTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { items: { updated_at: "string" } });
+    await defineSchema({ items: { updated_at: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("touchAll updates timestamps on all records", async () => {
     class Item extends Base {
       static {
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     await Item.create({});
@@ -888,8 +868,6 @@ describe("TimestampTest", () => {
 });
 
 describe("TimestampTest", () => {
-  let adapter: TestDatabaseAdapter;
-
   class Article extends Base {
     static {
       this.attribute("title", "string");
@@ -898,16 +876,14 @@ describe("TimestampTest", () => {
       this.attribute("updated_at", "datetime");
     }
   }
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       articles: { title: "string", body: "string", created_at: "string", updated_at: "string" },
     });
-    Article.adapter = adapter;
   });
-  withTransactionalFixtures(() => adapter);
-
   it("created_at and updated_at match on first save", async () => {
     const article = await Article.create({ title: "Hello" });
     const createdAt = article.created_at as Temporal.Instant;
@@ -951,17 +927,14 @@ describe("TimestampTest", () => {
 });
 
 describe("TimestampTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       posts: { title: "string", updated_at: "string" },
       comments: { body: "string", post_id: "integer" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test "touch parent on save"
   it("touches the parent record when child is saved", async () => {
     class Post extends Base {
@@ -970,7 +943,6 @@ describe("TimestampTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -981,7 +953,6 @@ describe("TimestampTest", () => {
         this.attribute("id", "integer");
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Comment, "post", { touch: true });

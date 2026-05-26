@@ -10,11 +10,11 @@ import {
   storeAccessorFor,
   storeAccessor,
 } from "./store.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
@@ -24,17 +24,12 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("StoreTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       users: { name: "string", settings: "string" },
     });
-  });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   function makeModel() {
@@ -42,7 +37,6 @@ describe("StoreTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     store(User, "settings", { accessors: ["theme", "language"] });
@@ -76,7 +70,6 @@ describe("StoreTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
       get theme() {
         return "forced-dark";
@@ -742,27 +735,19 @@ describe("StoreTest", () => {
 });
 
 describe("StoreTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       users: { settings: "json" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("reading store attributes through accessors", () => {
     class User extends Base {
       static _tableName = "users";
     }
     User.attribute("id", "integer");
     User.attribute("settings", "json");
-    User.adapter = adapter;
     store(User, "settings", { accessors: ["theme", "language"] });
 
     const user = new User({});
@@ -786,7 +771,6 @@ describe("StoreTest", () => {
     }
     User.attribute("id", "integer");
     User.attribute("settings", "json");
-    User.adapter = adapter;
     store(User, "settings", { accessors: ["theme", "language"] });
 
     const user = new User({ settings: '{"theme":"light","language":"fr"}' });
@@ -800,7 +784,6 @@ describe("StoreTest", () => {
     }
     User.attribute("id", "integer");
     User.attribute("settings", "json");
-    User.adapter = adapter;
     store(User, "settings", { accessors: ["theme", "language"] });
     registerModel(User);
 
@@ -864,20 +847,13 @@ describe("StoreTest", () => {
 });
 
 describe("StoreTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       users: { settings: "json" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   // Rails: test "reading store attributes through accessors"
   it("reading store attributes through accessors", () => {
     class User extends Base {
@@ -885,7 +861,6 @@ describe("StoreTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("settings", "json");
-        this.adapter = adapter;
       }
     }
     store(User, "settings", { accessors: ["color", "homepage"] });
@@ -902,7 +877,6 @@ describe("StoreTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("settings", "json");
-        this.adapter = adapter;
       }
     }
     store(User, "settings", { accessors: ["color", "homepage"] });
@@ -923,7 +897,6 @@ describe("StoreTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("settings", "json");
-        this.adapter = adapter;
       }
     }
     store(User, "settings", { accessors: ["color"] });
@@ -1080,26 +1053,18 @@ describe("storeAccessorsModule", () => {
 });
 
 describe("IndifferentCoder wiring via store() and Base.store()", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       users: { name: "string", settings: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("Base.store registers an IndifferentCoder for the column", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     User.store("settings", { accessors: ["theme"] });
@@ -1115,7 +1080,6 @@ describe("IndifferentCoder wiring via store() and Base.store()", () => {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     store(User, "settings", { accessors: ["theme"] });
@@ -1129,7 +1093,6 @@ describe("IndifferentCoder wiring via store() and Base.store()", () => {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     User.store("settings", { accessors: ["theme"] });
@@ -1142,7 +1105,6 @@ describe("IndifferentCoder wiring via store() and Base.store()", () => {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     User.store("settings", { accessors: ["theme"] });
@@ -1157,7 +1119,6 @@ describe("IndifferentCoder wiring via store() and Base.store()", () => {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(User);
@@ -1178,7 +1139,6 @@ describe("IndifferentCoder wiring via store() and Base.store()", () => {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     User.store("settings", { accessors: ["theme"] });
@@ -1190,7 +1150,6 @@ describe("IndifferentCoder wiring via store() and Base.store()", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     // "data" was never declared via store() or as a structured type
@@ -1205,7 +1164,6 @@ describe("IndifferentCoder wiring via store() and Base.store()", () => {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     // Pass the global JSON object as the coder — buildColumnSerializer maps it to CodersJSON.

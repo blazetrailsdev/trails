@@ -11,6 +11,8 @@ import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -20,10 +22,10 @@ afterAll(() => {
 });
 
 describe("TokenForTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       users: { name: "string", password_digest: "string" },
       user_short_expiries: { name: "string", password_digest: "string" },
       user2s: { name: "string" },
@@ -35,7 +37,6 @@ describe("TokenForTest", () => {
       no_pk_items: { name: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
   beforeEach(() => {
     setSignedIdVerifierSecret("blazetrails-test-secret");
     setTokenForSecret("blazetrails-test-token-secret");
@@ -44,16 +45,12 @@ describe("TokenForTest", () => {
   afterEach(() => {
     setTokenForSecret(null);
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
 
   function makeModel() {
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("password_digest", "string");
-        this.adapter = adapter;
       }
     }
     generatesTokenFor(User, "password_reset", {
@@ -99,7 +96,6 @@ describe("TokenForTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("password_digest", "string");
-        this.adapter = adapter;
       }
     }
     generatesTokenFor(UserShortExpiry, "quick", { expiresIn: 0.001, generator: () => "" });
@@ -140,7 +136,6 @@ describe("TokenForTest", () => {
     class User2 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     generatesTokenFor(User2, "confirm");
@@ -163,7 +158,6 @@ describe("TokenForTest", () => {
     class UserX extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     generatesTokenFor(UserX, "quick_confirm", { expiresIn: 0.001, generator: () => "" });
@@ -189,7 +183,6 @@ describe("TokenForTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("digest", "string");
-        this.adapter = adapter;
       }
     }
     generatesTokenFor(Parent, "confirm", {
@@ -212,7 +205,6 @@ describe("TokenForTest", () => {
         this._primaryKey = "uuid";
         this.attribute("uuid", "string");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     (CustomPkItem as any).generatesTokenFor = (purpose: string) => ({
@@ -233,7 +225,6 @@ describe("TokenForTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     const item = await CpkItem.create({ shop_id: 1, id: 42, name: "cpk-test" });
@@ -248,7 +239,6 @@ describe("TokenForTest", () => {
       static {
         this._primaryKey = "";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const item = new NoPkItem({ name: "test" });

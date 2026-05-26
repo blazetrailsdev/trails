@@ -8,7 +8,8 @@ import { activeRecordConfig } from "./relation/batches.js";
 
 import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   posts: {
@@ -56,18 +57,15 @@ async function freshAdapter(): Promise<TestDatabaseAdapter> {
 // EachTest — targets batches_test.rb
 // ==========================================================================
 describe("EachTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("find_each should honor limit if passed a block", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 10; i++) await Post.create({ title: `post ${i}` });
@@ -82,7 +80,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post ${i}` });
@@ -97,7 +94,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 10; i++) await Post.create({ title: `post ${i}` });
@@ -112,7 +108,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post ${i}` });
@@ -128,17 +123,15 @@ describe("EachTest", () => {
 // More EachTest — targets batches_test.rb
 // ==========================================================================
 describe("EachTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("in batches has attribute readers", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 3; i++) await Post.create({ title: `post ${i}` });
@@ -152,7 +145,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post ${i}` });
@@ -167,7 +159,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 10; i++) await Post.create({ title: `post ${i}` });
@@ -182,7 +173,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post ${i}` });
@@ -1200,18 +1190,15 @@ describe("EachTest", () => {
 // BatchEnumerator API tests — matches Rails batches_test.rb names
 // ==========================================================================
 describe("EachTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("in_batches each_batch should yield batch relations if block is given", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post-${i}` });
@@ -1228,7 +1215,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `post-${i}` });
@@ -1243,7 +1229,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post-${i}` });
@@ -1260,7 +1245,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 3; i++) await Post.create({ title: `post-${i}` });
@@ -1276,7 +1260,6 @@ describe("EachTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 4; i++) await Post.create({ title: `post-${i}`, active: false });
@@ -1292,7 +1275,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post-${i}` });
@@ -1304,7 +1286,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const count = await Post.where({ title: "nonexistent" })
@@ -1317,7 +1298,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post-${i}` });
@@ -1331,17 +1311,15 @@ describe("EachTest", () => {
 // EachTest3 — additional missing tests from batches_test.rb
 // ==========================================================================
 describe("EachTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("warn if order scope is set", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1350,7 +1328,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1359,7 +1336,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1368,7 +1344,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1377,7 +1352,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1386,7 +1360,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1395,7 +1368,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1404,7 +1376,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -1414,7 +1385,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.order("id")).toBeInstanceOf(Relation);
@@ -1423,7 +1393,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1432,7 +1401,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1441,7 +1409,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1450,7 +1417,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1459,7 +1425,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1468,7 +1433,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1477,7 +1441,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1486,7 +1449,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.where({ title: "a" })).toBeInstanceOf(Relation);
@@ -1495,7 +1457,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1504,7 +1465,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1513,7 +1473,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1522,7 +1481,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1531,7 +1489,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1540,7 +1497,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1549,7 +1505,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1558,7 +1513,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1567,7 +1521,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1576,7 +1529,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1585,7 +1537,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1594,7 +1545,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1603,7 +1553,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1612,7 +1561,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1621,7 +1569,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1630,7 +1577,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1639,7 +1585,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1648,7 +1593,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1657,7 +1601,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1666,7 +1609,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1675,7 +1617,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1684,7 +1625,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1693,7 +1633,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1702,7 +1641,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1711,7 +1649,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1720,7 +1657,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1729,7 +1665,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1738,7 +1673,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1747,7 +1681,6 @@ describe("EachTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1875,20 +1808,17 @@ describe("EachTest", () => {
 });
 
 describe("EachTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("findEach yields each record", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     for (let i = 0; i < 5; i++) await Item.create({ name: `Item ${i}` });
 
     const names: string[] = [];
@@ -1904,8 +1834,6 @@ describe("EachTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     for (let i = 0; i < 7; i++) await Item.create({ name: `Item ${i}` });
 
     const batches: number[] = [];
@@ -1986,17 +1914,15 @@ describe("EachTest", () => {
 });
 
 describe("EachTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("find_in_batches returns batches", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 7; i++) await User.create({ name: `User ${i}` });
@@ -2012,7 +1938,6 @@ describe("EachTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 5; i++) await User.create({ name: `User ${i}` });
@@ -2029,7 +1954,6 @@ describe("EachTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Active1", active: true });
@@ -2047,7 +1971,6 @@ describe("EachTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "A" });
@@ -2062,20 +1985,17 @@ describe("EachTest", () => {
 });
 
 describe("EachTest", () => {
-  let adapter: TestDatabaseAdapter;
-
   class Record extends Base {
     static {
       this.attribute("value", "integer");
     }
   }
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    adapter = await freshAdapter();
-    Record.adapter = adapter;
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("find in batches should return batches", async () => {
     for (let i = 0; i < 10; i++) {
       await Record.create({ value: i });
@@ -2144,20 +2064,17 @@ describe("EachTest", () => {
 });
 
 describe("EachTest", () => {
-  let adapter: TestDatabaseAdapter;
-
   class Record extends Base {
     static {
       this.attribute("value", "integer");
     }
   }
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    adapter = await freshAdapter();
-    Record.adapter = adapter;
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test_find_each_processes_all_records
   it("findEach processes all records", async () => {
     for (let i = 1; i <= 10; i++) {

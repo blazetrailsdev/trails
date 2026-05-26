@@ -1,0 +1,88 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`d1-migrate-multi-describe > transforms freshAdapter pattern that wraps defineSchema 1`] = `
+"import { describe, it, expect, beforeAll } from "vitest";
+import { Base } from "./index.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+
+const TEST_SCHEMA = {
+  posts: { title: "string" },
+} as const;
+describe("AlphaTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+  it("creates", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    await Post.create({ title: "hi" });
+  });
+});
+
+describe("BetaTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+  it("reads", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    await Post.create({ title: "hi" });
+    const p = await Post.first();
+    expect(p!.title).toBe("hi");
+  });
+});"
+`;
+
+exports[`d1-migrate-multi-describe > transforms inline createTestAdapter + defineSchema per describe 1`] = `
+"import { describe, it, expect, beforeAll } from "vitest";
+import { Base } from "./index.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+
+describe("FooTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ items: { name: "string" } });
+  });
+  it("works", async () => {
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const item = await Item.create({ name: "a" });
+    expect(item.name).toBe("a");
+  });
+});
+
+describe("BarTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ users: { email: "string" } });
+  });
+  it("works", async () => {
+    class User extends Base {
+      static {
+        this.attribute("email", "string");
+      }
+    }
+    const u = await User.create({ email: "a@b.com" });
+    expect(u.email).toBe("a@b.com");
+  });
+});"
+`;

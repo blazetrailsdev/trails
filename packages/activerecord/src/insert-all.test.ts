@@ -18,6 +18,8 @@ const supportsConflictTarget = adapterType !== "mysql";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 async function assertUpsertConflictTargetBehavior(
   Book: any,
@@ -922,15 +924,13 @@ describe("InsertAllTest", () => {
 });
 
 describe("insertAll / upsertAll", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       products: { name: "string", price: "integer" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("insert all", async () => {
     class Product extends Base {
       static _tableName = "products";
@@ -938,8 +938,6 @@ describe("insertAll / upsertAll", () => {
     Product.attribute("id", "integer");
     Product.attribute("name", "string");
     Product.attribute("price", "integer");
-    Product.adapter = adapter;
-
     await Product.insertAll([
       { id: 1, name: "Apple", price: 100 },
       { id: 2, name: "Banana", price: 50 },
@@ -955,8 +953,6 @@ describe("insertAll / upsertAll", () => {
       static _tableName = "products";
     }
     Product.attribute("id", "integer");
-    Product.adapter = adapter;
-
     const result = await Product.insertAll([]);
     expect(result).toBe(0);
   });

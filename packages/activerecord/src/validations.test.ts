@@ -7,7 +7,8 @@ import { Base } from "./index.js";
 
 import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
   topics: { title: "string", score: "integer" },
@@ -25,18 +26,17 @@ async function freshAdapter(): Promise<TestDatabaseAdapter> {
 }
 
 describe("ValidationsTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("score", "integer");
-        this.adapter = adapter;
         this.validates("title", { presence: true });
       }
     }
@@ -160,7 +160,6 @@ describe("ValidationsTest", () => {
       static {
         this.attribute("price", "integer");
         this.validates("price", { numericality: { greaterThan: 0 } });
-        this.adapter = adapter;
       }
     }
     const item = Item.new({}) as any;
@@ -177,7 +176,6 @@ describe("ValidationsTest", () => {
       static {
         this.attribute("price", "integer");
         this.validates("price", { numericality: true });
-        this.adapter = adapter;
       }
     }
     const item = Item.new({ price: "abc" }) as any;
@@ -265,18 +263,16 @@ describe("ValidationsTest", () => {
 });
 
 describe("ValidationsTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("validates before save", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     const u = new User();
@@ -289,7 +285,6 @@ describe("ValidationsTest", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     const u = await User.create({});
@@ -302,7 +297,6 @@ describe("ValidationsTest", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     await expect(User.createBang({})).rejects.toThrow("Validation failed");
@@ -313,7 +307,6 @@ describe("ValidationsTest", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -326,7 +319,6 @@ describe("ValidationsTest", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     const u = new User({ name: "Alice" });
@@ -338,7 +330,6 @@ describe("ValidationsTest", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     const u = new User();
@@ -350,7 +341,6 @@ describe("ValidationsTest", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     const u = new User();
@@ -363,17 +353,15 @@ describe("ValidationsTest", () => {
 });
 
 describe("ValidationsTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("validate uniqueness", async () => {
     class Email extends Base {
       static {
         this.attribute("address", "string");
-        this.adapter = adapter;
         this.validatesUniqueness("address");
       }
     }
@@ -388,7 +376,6 @@ describe("ValidationsTest", () => {
       static {
         this.attribute("user_id", "integer");
         this.attribute("resource_id", "integer");
-        this.adapter = adapter;
         this.validatesUniqueness("user_id", { scope: "resource_id" });
       }
     }

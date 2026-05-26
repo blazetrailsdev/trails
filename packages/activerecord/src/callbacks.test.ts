@@ -16,31 +16,25 @@ import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // ==========================================================================
 // CallbacksTest — targets callbacks_test.rb
 // ==========================================================================
 describe("CallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       topics: { title: "string" },
       animals: { name: "string", type: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("create", async () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const log: string[] = [];
@@ -59,7 +53,6 @@ describe("CallbacksTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const log: string[] = [];
@@ -77,7 +70,6 @@ describe("CallbacksTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const created = await Topic.create({ title: "a" });
@@ -94,27 +86,20 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       people: { name: "string" },
       animals: { name: "string", type: "string" },
       topics: { title: "string" },
       cb_posts: { title: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("save person", async () => {
     class Person extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ name: "Alice" });
@@ -126,7 +111,6 @@ describe("CallbacksTest", () => {
     class Person extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ name: "Bob" });
@@ -138,7 +122,6 @@ describe("CallbacksTest", () => {
     class Person extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.validates("name", { presence: true, on: "create" });
       }
     }
@@ -151,7 +134,6 @@ describe("CallbacksTest", () => {
     class Person extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.validates("name", { presence: true, on: "update" });
       }
     }
@@ -164,7 +146,6 @@ describe("CallbacksTest", () => {
     class Animal extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const log: string[] = [];
@@ -182,7 +163,6 @@ describe("CallbacksTest", () => {
       class T extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adapter;
           this.beforeSave(() => {}, { on: "create" } as any);
         }
       }
@@ -195,7 +175,6 @@ describe("CallbacksTest", () => {
       class T extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adapter;
           this.aroundSave((_r, proceed) => proceed(), { on: "create" } as any);
         }
       }
@@ -208,7 +187,6 @@ describe("CallbacksTest", () => {
       class T extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adapter;
           this.afterSave(() => {}, { on: "create" } as any);
         }
       }
@@ -220,7 +198,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validates("title", { presence: true });
         this.beforeValidation(() => false);
       }
@@ -235,7 +212,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => false);
       }
     }
@@ -248,7 +224,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => false);
       }
     }
@@ -260,7 +235,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeSave(() => false);
       }
     }
@@ -274,7 +248,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeCreate(() => false);
       }
     }
@@ -288,7 +261,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await CbPost.create({ title: "test" });
@@ -306,7 +278,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.afterFind(function () {
           log.push("found");
         });
@@ -323,7 +294,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.afterInitialize(function () {
           log.push("initialized");
         });
@@ -337,7 +307,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validates("title", { presence: true });
       }
     }
@@ -351,7 +320,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validates("title", { presence: true });
       }
     }
@@ -366,7 +334,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validates("title", { presence: true });
       }
     }
@@ -380,7 +347,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeCreate(() => false);
       }
     }
@@ -393,7 +359,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await CbPost.create({ title: "test" });
@@ -407,7 +372,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => false);
       }
     }
@@ -420,7 +384,6 @@ describe("CallbacksTest", () => {
     class CbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeSave(() => false);
       }
     }
@@ -688,25 +651,17 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { trackeds: { name: "string" } });
+    await defineSchema({ trackeds: { name: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("runs after_create and after_update at correct times", async () => {
     const log: string[] = [];
 
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterCreate(() => {
           log.push("after_create");
         });
@@ -733,7 +688,6 @@ describe("CallbacksTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterDestroy(() => {
           log.push("after_destroy");
         });
@@ -769,20 +723,14 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       things: { name: "string", status: "string" },
       records: { name: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("fires after_initialize on new records", () => {
     class Thing extends Base {
       static _tableName = "things";
@@ -790,7 +738,6 @@ describe("CallbacksTest", () => {
     Thing.attribute("id", "integer");
     Thing.attribute("name", "string");
     Thing.attribute("status", "string");
-    Thing.adapter = adapter;
     Thing.afterInitialize((r: any) => {
       if (!r.status) {
         r._attributes.set("status", "draft");
@@ -808,7 +755,6 @@ describe("CallbacksTest", () => {
     }
     Record.attribute("id", "integer");
     Record.attribute("name", "string");
-    Record.adapter = adapter;
     Record.afterFind((r: any) => {
       log.push(`found:${r.name}`);
     });
@@ -821,19 +767,13 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       tasks: { name: "string", important: "boolean", skip: "boolean" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("supports if: condition on callbacks", async () => {
     const log: string[] = [];
     class Task extends Base {
@@ -842,7 +782,6 @@ describe("CallbacksTest", () => {
     Task.attribute("id", "integer");
     Task.attribute("name", "string");
     Task.attribute("important", "boolean");
-    Task.adapter = adapter;
     Task.beforeSave(
       (r: any) => {
         log.push("important-save");
@@ -865,7 +804,6 @@ describe("CallbacksTest", () => {
     Task.attribute("id", "integer");
     Task.attribute("name", "string");
     Task.attribute("skip", "boolean");
-    Task.adapter = adapter;
     Task.afterSave(
       (r: any) => {
         log.push("saved");
@@ -882,24 +820,17 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { blocked: { name: "string" } });
+    await defineSchema({ blocked: { name: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("halts save when before_save returns false", async () => {
     class Blocked extends Base {
       static _tableName = "blocked";
     }
     Blocked.attribute("id", "integer");
     Blocked.attribute("name", "string");
-    Blocked.adapter = adapter;
     Blocked.beforeSave(() => false);
 
     const b = new Blocked({ name: "test" });
@@ -910,18 +841,11 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { users: { name: "string", updated_at: "datetime" } });
+    await defineSchema({ users: { name: "string", updated_at: "datetime" } });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("fires after touch() is called", async () => {
     const touched: string[] = [];
     class User extends Base {
@@ -933,8 +857,6 @@ describe("CallbacksTest", () => {
     User.afterTouch((record: any) => {
       touched.push(record.name);
     });
-    User.adapter = adapter;
-
     const user = await User.create({ name: "Alice" });
     await user.touch();
     expect(touched).toEqual(["Alice"]);
@@ -942,10 +864,10 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       trackeds: { name: "string" },
       guardeds: { name: "string" },
       auto_slugs: { title: "string", slug: "string" },
@@ -953,18 +875,11 @@ describe("CallbacksTest", () => {
       multis: { name: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("create callback order", async () => {
     const log: string[] = [];
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -988,7 +903,6 @@ describe("CallbacksTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -1014,7 +928,6 @@ describe("CallbacksTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => {
           log.push("before_destroy");
         });
@@ -1033,7 +946,6 @@ describe("CallbacksTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => {
           log.push("before_destroy");
         });
@@ -1052,7 +964,6 @@ describe("CallbacksTest", () => {
     class Guarded extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeCreate(() => false);
       }
     }
@@ -1066,7 +977,6 @@ describe("CallbacksTest", () => {
     class Guarded extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeSave(() => false);
       }
     }
@@ -1079,7 +989,6 @@ describe("CallbacksTest", () => {
     class Guarded extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeUpdate(() => false);
       }
     }
@@ -1094,7 +1003,6 @@ describe("CallbacksTest", () => {
     class Guarded extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => {
           log.push("before_destroy_ran");
         });
@@ -1111,7 +1019,6 @@ describe("CallbacksTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterInitialize(() => {
           log.push("after_initialize");
         });
@@ -1126,7 +1033,6 @@ describe("CallbacksTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterFind(() => {
           log.push("after_find");
         });
@@ -1159,11 +1065,10 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       trackeds: { name: "string" },
       guardeds: { name: "string" },
       auto_slugs: { title: "string", slug: "string" },
@@ -1171,19 +1076,12 @@ describe("CallbacksTest", () => {
       multis: { name: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("create lifecycle: before_validation → after_validation → before_save → before_create → after_create → after_save", async () => {
     const log: string[] = [];
 
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeValidation(() => {
           log.push("before_validation");
         });
@@ -1222,7 +1120,6 @@ describe("CallbacksTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeValidation(() => {
           log.push("before_validation");
         });
@@ -1264,7 +1161,6 @@ describe("CallbacksTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => {
           log.push("before_destroy");
         });
@@ -1285,7 +1181,6 @@ describe("CallbacksTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeCreate(() => {
           log.push("before_create");
         });
@@ -1310,7 +1205,6 @@ describe("CallbacksTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeCreate(() => {
           log.push("before_create");
         });
@@ -1329,7 +1223,6 @@ describe("CallbacksTest", () => {
     class Guarded extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeSave(() => false);
       }
     }
@@ -1346,7 +1239,6 @@ describe("CallbacksTest", () => {
     class Guarded extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -1376,7 +1268,6 @@ describe("CallbacksTest", () => {
     class Guarded extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => false);
       }
     }
@@ -1396,7 +1287,6 @@ describe("CallbacksTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterSave(() => {
           log.push("after_save");
         });
@@ -1415,7 +1305,6 @@ describe("CallbacksTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("slug", "string");
-        this.adapter = adapter;
         this.beforeSave((record: any) => {
           const title = record.title;
           record.slug = title.toLowerCase().replace(/\s+/g, "-");
@@ -1433,7 +1322,6 @@ describe("CallbacksTest", () => {
     class Counted extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeValidation(() => {
           count++;
         });
@@ -1451,7 +1339,6 @@ describe("CallbacksTest", () => {
     class Counted extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterValidation(() => {
           count++;
         });
@@ -1469,7 +1356,6 @@ describe("CallbacksTest", () => {
     class Multi extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("first");
         });
@@ -1492,7 +1378,6 @@ describe("CallbacksTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => {
           log.push("before_destroy");
         });
@@ -1510,21 +1395,14 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       developers: { name: "string", salary: "integer" },
       animals: { name: "string", type: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   // Rails: test "after_initialize is called on new"
   it("after_initialize fires on Model.new", () => {
     class Developer extends Base {
@@ -1533,7 +1411,6 @@ describe("CallbacksTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("salary", "integer");
-        this.adapter = adapter;
         this.afterInitialize((r: any) => {
           if (r.salary === null) {
             r._attributes.set("salary", 50000);
@@ -1554,7 +1431,6 @@ describe("CallbacksTest", () => {
         this._tableName = "developers";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterInitialize((r: any) => {
           initialized.push(r.name ?? "new");
         });
@@ -1576,7 +1452,6 @@ describe("CallbacksTest", () => {
         this._tableName = "developers";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterFind((r: any) => {
           found.push(r.id);
         });
@@ -1604,7 +1479,6 @@ describe("CallbacksTest", () => {
         this._tableName = "developers";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterFind((r: any) => {
           found.push(r.name);
         });
@@ -1627,7 +1501,6 @@ describe("CallbacksTest", () => {
         this._tableName = "developers";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterInitialize((r: any) => seen.push(r.name));
       }
     }
@@ -1648,7 +1521,6 @@ describe("CallbacksTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
-        this.adapter = adapter;
         enableSti(this);
       }
     }
@@ -1672,11 +1544,10 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       orders: { total: "integer", discount_code: "string", silent: "boolean" },
       widgets: { name: "string" },
       gadgets: { value: "integer" },
@@ -1689,12 +1560,6 @@ describe("CallbacksTest", () => {
       immutables: { locked: "boolean" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   // Rails: test "before_save callback with if condition"
   it("before_save with if: only runs when condition is true", async () => {
     const log: string[] = [];
@@ -1704,7 +1569,6 @@ describe("CallbacksTest", () => {
         this.attribute("id", "integer");
         this.attribute("total", "integer");
         this.attribute("discount_code", "string");
-        this.adapter = adapter;
         this.beforeSave(
           () => {
             log.push("apply_discount");
@@ -1730,7 +1594,6 @@ describe("CallbacksTest", () => {
         this.attribute("id", "integer");
         this.attribute("total", "integer");
         this.attribute("silent", "boolean");
-        this.adapter = adapter;
         this.afterSave(
           (r: any) => {
             notifications.push(`order:${r.total}`);
@@ -1754,7 +1617,6 @@ describe("CallbacksTest", () => {
         this._tableName = "widgets";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeSave(async (r: any) => {
           await Promise.resolve();
           order.push(`before:${r.name}`);
@@ -1776,7 +1638,6 @@ describe("CallbacksTest", () => {
         this._tableName = "gadgets";
         this.attribute("id", "integer");
         this.attribute("value", "integer");
-        this.adapter = adapter;
         this.afterSave(async (r: any) => {
           await Promise.resolve();
           seen.push(r.id);
@@ -1793,7 +1654,6 @@ describe("CallbacksTest", () => {
         this._tableName = "lockeds";
         this.attribute("id", "integer");
         this.attribute("allowed", "boolean");
-        this.adapter = adapter;
         this.beforeSave(async (r: any) => {
           await Promise.resolve();
           return r.allowed === true;
@@ -1817,7 +1677,6 @@ describe("CallbacksTest", () => {
         this._tableName = "envelopes";
         this.attribute("id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
         this.aroundCreate(async (_r: any, proceed: () => void | Promise<void>) => {
           order.push("around:before");
           await proceed();
@@ -1839,7 +1698,6 @@ describe("CallbacksTest", () => {
         this._tableName = "protecteds";
         this.attribute("id", "integer");
         this.attribute("sealed", "boolean");
-        this.adapter = adapter;
         this.beforeDestroy(async (r: any) => {
           await Promise.resolve();
           return r.sealed !== true;
@@ -1864,7 +1722,6 @@ describe("CallbacksTest", () => {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
         this.attribute("updated_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const item = await Item.create({ name: "first" });
@@ -1886,7 +1743,6 @@ describe("CallbacksTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
         (this as any).recordTimestamps = false;
       }
     }
@@ -1906,7 +1762,6 @@ describe("CallbacksTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const item = await Item.create({ name: "first" });
@@ -1923,7 +1778,6 @@ describe("CallbacksTest", () => {
         this._tableName = "immutables";
         this.attribute("id", "integer");
         this.attribute("locked", "boolean");
-        this.adapter = adapter;
         this.beforeSave(() => false, { if: (r: any) => r.locked === true });
       }
     }
@@ -1950,7 +1804,6 @@ describe("CallbacksTest", () => {
         this._tableName = "widgets";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.aroundSave(async (_r: any, proceed: () => Promise<void>) => {
           const countBefore = await Widget.count();
           events.push(`[BEFORE_INSERT:count=${countBefore}]`);

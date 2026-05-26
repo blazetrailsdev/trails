@@ -3,10 +3,10 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { Associations, association, loadHasMany, loadHasManyThrough } from "../associations.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -365,36 +365,25 @@ const TEST_SCHEMA: Schema = {
     primaryKey: false,
   },
 };
-
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 // ==========================================================================
 // EagerAssociationTest — targets associations/eager_test.rb
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("should work inverse of with eager load", async () => {
     class EagerInvParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerInvChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_inv_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerInvParent, "eagerInvChildren", {
@@ -417,14 +406,12 @@ describe("EagerAssociationTest", () => {
     class EagerOrPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerOrComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_or_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerOrPost, "eagerOrComments", {
@@ -476,14 +463,12 @@ describe("EagerAssociationTest", () => {
     class EagerPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerPost, "eagerComments", {
@@ -508,14 +493,12 @@ describe("EagerAssociationTest", () => {
     class EagerOrderPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerOrderComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_order_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerOrderPost, "eagerOrderComments", {
@@ -538,20 +521,17 @@ describe("EagerAssociationTest", () => {
     class EagerHmtAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmtAuthorship extends Base {
       static {
         this.attribute("eager_hmt_author_id", "integer");
         this.attribute("eager_hmt_book_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerHmtBook extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmtAuthor, "eagerHmtAuthorships", {
@@ -595,14 +575,12 @@ describe("EagerAssociationTest", () => {
     class EagerHoRefParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHoRefChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_ho_ref_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(EagerHoRefParent, "eagerHoRefChild", {
@@ -627,14 +605,12 @@ describe("EagerAssociationTest", () => {
     class EagerHoNoPkParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHoNoPkChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_ho_no_pk_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(EagerHoNoPkParent, "eagerHoNoPkChild", {
@@ -659,14 +635,12 @@ describe("EagerAssociationTest", () => {
     class EagerHmNoPkParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmNoPkChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_hm_no_pk_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmNoPkParent, "eagerHmNoPkChildren", {
@@ -711,14 +685,12 @@ describe("EagerAssociationTest", () => {
     class EagerDupParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerDupChild extends Base {
       static {
         this.attribute("label", "string");
         this.attribute("eager_dup_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerDupParent, "eagerDupChildren", {
@@ -741,14 +713,12 @@ describe("EagerAssociationTest", () => {
     class EagerDupAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerDupPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("eager_dup_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerDupPost, "eagerDupAuthor", {
@@ -776,13 +746,11 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("eager_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerArticle extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerArticle, "eagerTags", {
@@ -805,14 +773,12 @@ describe("EagerAssociationTest", () => {
     class EagerHoParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHoChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_ho_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(EagerHoParent, "eagerHoChild", {
@@ -837,14 +803,12 @@ describe("EagerAssociationTest", () => {
     class EagerBtParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerBtChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_bt_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerBtChild, "eagerBtParent", {
@@ -869,14 +833,12 @@ describe("EagerAssociationTest", () => {
     class EagerNullParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerNullChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_null_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerNullChild, "eagerNullParent", {
@@ -903,7 +865,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
         this.attribute("parent_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(EagerPolyChild);
@@ -924,7 +885,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
         this.attribute("parent_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(EagerPolyChild2);
@@ -940,14 +900,12 @@ describe("EagerAssociationTest", () => {
     class EagerAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerBook extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("eager_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerBook, "eagerAuthor", {
@@ -970,7 +928,6 @@ describe("EagerAssociationTest", () => {
     class EagerNlWidget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("EagerNlWidget", EagerNlWidget);
@@ -983,7 +940,6 @@ describe("EagerAssociationTest", () => {
     class EagerTlWidget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("EagerTlWidget", EagerTlWidget);
@@ -995,14 +951,12 @@ describe("EagerAssociationTest", () => {
     class NestHoAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NestHoPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("nest_ho_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(NestHoAuthor, "nestHoPost", {
@@ -1024,14 +978,12 @@ describe("EagerAssociationTest", () => {
     class NestHoOrdAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NestHoOrdPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("nest_ho_ord_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(NestHoOrdAuthor, "nestHoOrdPost", {
@@ -1056,14 +1008,12 @@ describe("EagerAssociationTest", () => {
     class NestHoOaAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NestHoOaPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("nest_ho_oa_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(NestHoOaAuthor, "nestHoOaPost", {
@@ -1088,14 +1038,12 @@ describe("EagerAssociationTest", () => {
     class NestHoOnAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NestHoOnPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("nest_ho_on_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(NestHoOnAuthor, "nestHoOnPost", {
@@ -1120,14 +1068,12 @@ describe("EagerAssociationTest", () => {
     class NestHoCAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NestHoCPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("nest_ho_c_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(NestHoCAuthor, "nestHoCPost", {
@@ -1152,14 +1098,12 @@ describe("EagerAssociationTest", () => {
     class NestHoCaAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NestHoCaPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("nest_ho_ca_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(NestHoCaAuthor, "nestHoCaPost", {
@@ -1184,14 +1128,12 @@ describe("EagerAssociationTest", () => {
     class NestHoCnAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NestHoCnPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("nest_ho_cn_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(NestHoCnAuthor, "nestHoCnPost", {
@@ -1217,14 +1159,12 @@ describe("EagerAssociationTest", () => {
     class EagerFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerClient, "eagerFirm", {
@@ -1246,14 +1186,12 @@ describe("EagerAssociationTest", () => {
     class EagerLimitFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerLimitClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("eager_limit_firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerLimitClient, "eagerLimitFirm", {
@@ -1279,14 +1217,12 @@ describe("EagerAssociationTest", () => {
     class EagerLCFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerLCClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("eager_lc_firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerLCClient, "eagerLCFirm", {
@@ -1311,14 +1247,12 @@ describe("EagerAssociationTest", () => {
     class EagerLOFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerLOClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("eager_lo_firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerLOClient, "eagerLOFirm", {
@@ -1344,14 +1278,12 @@ describe("EagerAssociationTest", () => {
     class EagerLOCFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerLOCClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("eager_loc_firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerLOCClient, "eagerLOCFirm", {
@@ -1373,14 +1305,12 @@ describe("EagerAssociationTest", () => {
     class EagerLOCAFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerLOCAClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("eager_loca_firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerLOCAClient, "eagerLOCAFirm", {
@@ -1405,14 +1335,12 @@ describe("EagerAssociationTest", () => {
     class EagerBtCsuFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerBtCsuClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("eager_bt_csu_firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerBtCsuClient, "eagerBtCsuFirm", {
@@ -1430,14 +1358,12 @@ describe("EagerAssociationTest", () => {
     class EagerCondCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerCondClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("eager_cond_company_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerCondClient, "eagerCondCompany", {
@@ -1462,14 +1388,12 @@ describe("EagerAssociationTest", () => {
     class EagerBtCsqFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerBtCsqClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("eager_bt_csq_firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerBtCsqClient, "eagerBtCsqFirm", {
@@ -1487,14 +1411,12 @@ describe("EagerAssociationTest", () => {
     class EagerBtOuFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerBtOuClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("eager_bt_ou_firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerBtOuClient, "eagerBtOuFirm", {
@@ -1512,14 +1434,12 @@ describe("EagerAssociationTest", () => {
     class EagerBtOqFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerBtOqClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("eager_bt_oq_firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerBtOqClient, "eagerBtOqFirm", {
@@ -1537,13 +1457,11 @@ describe("EagerAssociationTest", () => {
     class EagerLMAFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerLMADept extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     class EagerLMAClient extends Base {
@@ -1551,7 +1469,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
         this.attribute("eager_lma_firm_id", "integer");
         this.attribute("eager_lma_dept_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerLMAClient, "eagerLMAFirm", {
@@ -1587,13 +1504,11 @@ describe("EagerAssociationTest", () => {
     class EagerLOMFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerLOMDept extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     class EagerLOMClient extends Base {
@@ -1601,7 +1516,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
         this.attribute("eager_lom_firm_id", "integer");
         this.attribute("eager_lom_dept_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerLOMClient, "eagerLOMFirm", {
@@ -1649,14 +1563,12 @@ describe("EagerAssociationTest", () => {
     class EagerInferredCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerInferredEmployee extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("eager_inferred_company_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerInferredEmployee, "eagerInferredCompany", {
@@ -1681,14 +1593,12 @@ describe("EagerAssociationTest", () => {
     class EagerQtCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerQtClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("eager_qt_company_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerQtClient, "eagerQtCompany", {
@@ -1706,14 +1616,12 @@ describe("EagerAssociationTest", () => {
     class EagerQtHoParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerQtHoChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_qt_ho_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(EagerQtHoParent, "eagerQtHoChild", {
@@ -1731,14 +1639,12 @@ describe("EagerAssociationTest", () => {
     class EagerQtHmParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerQtHmChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_qt_hm_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerQtHmParent, "eagerQtHmChildren", {
@@ -1756,20 +1662,17 @@ describe("EagerAssociationTest", () => {
     class EagerQtThrOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerQtThrJoin extends Base {
       static {
         this.attribute("eager_qt_thr_owner_id", "integer");
         this.attribute("eager_qt_thr_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerQtThrItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerQtThrOwner, "eagerQtThrJoins", {
@@ -1802,14 +1705,12 @@ describe("EagerAssociationTest", () => {
     class EagerStrParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerStrChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_str_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerStrParent, "eagerStrChildren", {
@@ -1836,20 +1737,17 @@ describe("EagerAssociationTest", () => {
     class EagerStrThrOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerStrThrJoin extends Base {
       static {
         this.attribute("eager_str_thr_owner_id", "integer");
         this.attribute("eager_str_thr_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerStrThrItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerStrThrOwner, "eagerStrThrJoins", {
@@ -1889,14 +1787,12 @@ describe("EagerAssociationTest", () => {
     class EagerStrBtParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerStrBtChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_str_bt_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerStrBtChild, "eagerStrBtParent", {
@@ -1921,14 +1817,12 @@ describe("EagerAssociationTest", () => {
     class EjAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EjPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("ej_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EjAuthor, "ejPosts", {
@@ -1960,14 +1854,12 @@ describe("EagerAssociationTest", () => {
     class EjBtAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EjBtPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("ej_bt_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EjBtPost, "ejBtAuthor", {
@@ -1997,14 +1889,12 @@ describe("EagerAssociationTest", () => {
     class EjHoUser extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EjHoProfile extends Base {
       static {
         this.attribute("bio", "string");
         this.attribute("ej_ho_user_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(EjHoUser, "ejHoProfile", {
@@ -2034,14 +1924,12 @@ describe("EagerAssociationTest", () => {
     class EjEmAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EjEmPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("ej_em_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EjEmAuthor, "ejEmPosts", {
@@ -2064,13 +1952,11 @@ describe("EagerAssociationTest", () => {
     class EjHabtmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EjHabtmCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasAndBelongsToMany.call(EjHabtmPost, "ejHabtmCategories", {
@@ -2111,13 +1997,11 @@ describe("EagerAssociationTest", () => {
     class PrHabtmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class PrHabtmCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasAndBelongsToMany.call(PrHabtmPost, "prHabtmCategories", {
@@ -2146,20 +2030,17 @@ describe("EagerAssociationTest", () => {
     class EagerHmtReader extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmtSubscription extends Base {
       static {
         this.attribute("eager_hmt_reader_id", "integer");
         this.attribute("eager_hmt_magazine_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerHmtMagazine extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmtReader, "eagerHmtSubscriptions", {
@@ -2203,21 +2084,18 @@ describe("EagerAssociationTest", () => {
     class EagerHmtBtAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmtBtPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("eager_hmt_bt_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerHmtBtComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_hmt_bt_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmtBtAuthor, "eagerHmtBtPosts", {
@@ -2265,7 +2143,6 @@ describe("EagerAssociationTest", () => {
     class EagerStiAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerStiPost extends Base {
@@ -2274,13 +2151,11 @@ describe("EagerAssociationTest", () => {
         this.attribute("type", "string");
         this.attribute("eager_sti_author_id", "integer");
         this._tableName = "eager_sti_posts";
-        this.adapter = adapter;
         enableSti(EagerStiPost);
       }
     }
     class EagerSpecialPost extends EagerStiPost {
       static {
-        this.adapter = adapter;
         registerModel(EagerSpecialPost);
         registerSubclass(EagerSpecialPost);
       }
@@ -2289,7 +2164,6 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("body", "string");
         this.attribute("eager_sti_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(EagerStiAuthor);
@@ -2336,20 +2210,17 @@ describe("EagerAssociationTest", () => {
     class EagerImpOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerImpJoin extends Base {
       static {
         this.attribute("eager_imp_owner_id", "integer");
         this.attribute("eager_imp_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerImpItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerImpOwner, "eagerImpJoins", {
@@ -2391,20 +2262,17 @@ describe("EagerAssociationTest", () => {
     class EagerHmtCondAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmtCondAuthorship extends Base {
       static {
         this.attribute("eager_hmt_cond_author_id", "integer");
         this.attribute("eager_hmt_cond_book_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerHmtCondBook extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmtCondAuthor, "eagerHmtCondAuthorships", {
@@ -2448,20 +2316,17 @@ describe("EagerAssociationTest", () => {
     class EagerHmtTopAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmtTopAuthorship extends Base {
       static {
         this.attribute("eager_hmt_top_author_id", "integer");
         this.attribute("eager_hmt_top_book_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerHmtTopBook extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmtTopAuthor, "eagerHmtTopAuthorships", {
@@ -2511,20 +2376,17 @@ describe("EagerAssociationTest", () => {
     class EagerHmtIncAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmtIncAuthorship extends Base {
       static {
         this.attribute("eager_hmt_inc_author_id", "integer");
         this.attribute("eager_hmt_inc_book_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerHmtIncBook extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmtIncAuthor, "eagerHmtIncAuthorships", {
@@ -2571,20 +2433,17 @@ describe("EagerAssociationTest", () => {
     class EagerHmtCjAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmtCjAuthorship extends Base {
       static {
         this.attribute("eager_hmt_cj_author_id", "integer");
         this.attribute("eager_hmt_cj_book_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerHmtCjBook extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmtCjAuthor, "eagerHmtCjAuthorships", {
@@ -2624,20 +2483,17 @@ describe("EagerAssociationTest", () => {
     class EagerHmtDiAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmtDiAuthorship extends Base {
       static {
         this.attribute("eager_hmt_di_author_id", "integer");
         this.attribute("eager_hmt_di_book_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerHmtDiBook extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmtDiAuthor, "eagerHmtDiAuthorships", {
@@ -2676,14 +2532,12 @@ describe("EagerAssociationTest", () => {
     class EagerHmLimitPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmLimitComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_hm_limit_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmLimitPost, "eagerHmLimitComments", {
@@ -2712,14 +2566,12 @@ describe("EagerAssociationTest", () => {
     class EagerHmCondPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmCondComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_hm_cond_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmCondPost, "eagerHmCondComments", {
@@ -2748,14 +2600,12 @@ describe("EagerAssociationTest", () => {
     class EagerHmLcaPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmLcaComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_hm_lca_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmLcaPost, "eagerHmLcaComments", {
@@ -2774,14 +2624,12 @@ describe("EagerAssociationTest", () => {
     class EagerHmLcePost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmLceComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_hm_lce_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmLcePost, "eagerHmLceComments", {
@@ -2799,14 +2647,12 @@ describe("EagerAssociationTest", () => {
     class EagerHmHoPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmHoComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_hm_ho_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmHoPost, "eagerHmHoComments", {
@@ -2828,14 +2674,12 @@ describe("EagerAssociationTest", () => {
     class EagerHmHoacPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmHoacComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_hm_hoac_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmHoacPost, "eagerHmHoacComments", {
@@ -2856,14 +2700,12 @@ describe("EagerAssociationTest", () => {
     class EagerHmHohcPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmHohcComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_hm_hohc_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmHohcPost, "eagerHmHohcComments", {
@@ -2888,14 +2730,12 @@ describe("EagerAssociationTest", () => {
     class EagerCntHoPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerCntHoComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_cnt_ho_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerCntHoPost, "eagerCntHoComments", {
@@ -2915,14 +2755,12 @@ describe("EagerAssociationTest", () => {
     class EagerNoResPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerNoResComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_no_res_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerNoResPost, "eagerNoResComments", {
@@ -2955,13 +2793,11 @@ describe("EagerAssociationTest", () => {
     class HabtmLimPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class HabtmLimCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasAndBelongsToMany.call(HabtmLimPost, "habtmLimCategories", {
@@ -3013,13 +2849,11 @@ describe("EagerAssociationTest", () => {
     class HabtmEagerPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class HabtmEagerCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasAndBelongsToMany.call(HabtmEagerPost, "habtmEagerCategories", {
@@ -3062,7 +2896,6 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
-        this.adapter = adapter;
       }
     }
     class EagerInhFirm extends EagerInhCompany {}
@@ -3070,7 +2903,6 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("eager_inh_company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("EagerInhCompany", EagerInhCompany);
@@ -3093,7 +2925,6 @@ describe("EagerAssociationTest", () => {
     class EagerHoiParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHoiProfile extends Base {
@@ -3101,7 +2932,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("bio", "string");
         this.attribute("type", "string");
         this.attribute("eager_hoi_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerHoiSpecialProfile extends EagerHoiProfile {}
@@ -3130,7 +2960,6 @@ describe("EagerAssociationTest", () => {
     class EagerHmiAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmiPost extends Base {
@@ -3138,7 +2967,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("title", "string");
         this.attribute("type", "string");
         this.attribute("eager_hmi_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerHmiSpecialPost extends EagerHmiPost {}
@@ -3167,14 +2995,12 @@ describe("EagerAssociationTest", () => {
     class HabtmInhPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class HabtmInhCategory extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
-        this.adapter = adapter;
       }
     }
     class HabtmInhSpecialCategory extends HabtmInhCategory {}
@@ -3215,7 +3041,6 @@ describe("EagerAssociationTest", () => {
     class EagerWidget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("EagerWidget", EagerWidget);
@@ -3240,7 +3065,6 @@ describe("EagerAssociationTest", () => {
     class ExSugAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ExSugAuthor);
@@ -3257,20 +3081,17 @@ describe("EagerAssociationTest", () => {
     class EagerHmtOrdAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmtOrdAuthorship extends Base {
       static {
         this.attribute("eager_hmt_ord_author_id", "integer");
         this.attribute("eager_hmt_ord_book_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerHmtOrdBook extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmtOrdAuthor, "eagerHmtOrdAuthorships", {
@@ -3314,20 +3135,17 @@ describe("EagerAssociationTest", () => {
     class EagerHmtMoAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerHmtMoAuthorship extends Base {
       static {
         this.attribute("eager_hmt_mo_author_id", "integer");
         this.attribute("eager_hmt_mo_book_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerHmtMoBook extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerHmtMoAuthor, "eagerHmtMoAuthorships", {
@@ -3378,14 +3196,12 @@ describe("EagerAssociationTest", () => {
     class EagerDsPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerDsComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_ds_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerDsPost, "eagerDsComments", {
@@ -3403,14 +3219,12 @@ describe("EagerAssociationTest", () => {
     class EagerDsCmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerDsCmComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_ds_cm_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerDsCmPost, "eagerDsCmComments", {
@@ -3428,7 +3242,6 @@ describe("EagerAssociationTest", () => {
     class EagerDsFmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("EagerDsFmPost", EagerDsFmPost);
@@ -3440,7 +3253,6 @@ describe("EagerAssociationTest", () => {
     class EagerDsFbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("EagerDsFbPost", EagerDsFbPost);
@@ -3452,14 +3264,12 @@ describe("EagerAssociationTest", () => {
     class EagerDsLPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerDsLComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_ds_l_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerDsLPost, "eagerDsLComments", {
@@ -3477,14 +3287,12 @@ describe("EagerAssociationTest", () => {
     class EagerDsBPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerDsBComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_ds_b_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerDsBPost, "eagerDsBComments", {
@@ -3502,14 +3310,12 @@ describe("EagerAssociationTest", () => {
     class EagerDsCallPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerDsCallComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_ds_call_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerDsCallPost, "eagerDsCallComments", {
@@ -3530,14 +3336,12 @@ describe("EagerAssociationTest", () => {
     class EagerLeoPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerLeoComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_leo_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerLeoPost, "eagerLeoComments", {
@@ -3562,14 +3366,12 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("priority", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerLmoComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_lmo_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerLmoPost, "eagerLmoComments", {
@@ -3592,14 +3394,12 @@ describe("EagerAssociationTest", () => {
     class EagerLnPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerLnComment extends Base {
       static {
         this.attribute("rating", "float");
         this.attribute("eager_ln_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerLnPost, "eagerLnComments", {
@@ -3619,7 +3419,6 @@ describe("EagerAssociationTest", () => {
     class PtcPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class PtcTagging extends Base {
@@ -3627,13 +3426,11 @@ describe("EagerAssociationTest", () => {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
         this.attribute("ptc_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PtcTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PtcPost, "ptcTaggings", { as: "taggable", className: "PtcTagging" });
@@ -3653,20 +3450,17 @@ describe("EagerAssociationTest", () => {
     class MaHabtmAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class MaHabtmPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("ma_habtm_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class MaHabtmCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(MaHabtmAuthor, "maHabtmPosts", {
@@ -3704,14 +3498,12 @@ describe("EagerAssociationTest", () => {
     class EagerMultiHoParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerMultiHoProfile extends Base {
       static {
         this.attribute("bio", "string");
         this.attribute("eager_multi_ho_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(EagerMultiHoParent, "eagerMultiHoProfile", {
@@ -3744,7 +3536,6 @@ describe("EagerAssociationTest", () => {
     class EagerMultiBtCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerMultiBtEmployee extends Base {
@@ -3752,7 +3543,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
         this.attribute("company_id", "integer");
         this.attribute("mentor_company_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerMultiBtEmployee, "company", {
@@ -3788,14 +3578,12 @@ describe("EagerAssociationTest", () => {
     class EagerNode extends Base {
       static {
         this.attribute("value", "string");
-        this.adapter = adapter;
       }
     }
     class EagerEdge extends Base {
       static {
         this.attribute("label", "string");
         this.attribute("eager_node_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerNode, "eagerEdges", {
@@ -3817,14 +3605,12 @@ describe("EagerAssociationTest", () => {
     class EagerFloatItem extends Base {
       static {
         this.attribute("price", "float");
-        this.adapter = adapter;
       }
     }
     class EagerFloatDetail extends Base {
       static {
         this.attribute("info", "string");
         this.attribute("eager_float_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerFloatItem, "eagerFloatDetails", {
@@ -3850,14 +3636,12 @@ describe("EagerAssociationTest", () => {
     class EagerPreHoParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerPreHoChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_pre_ho_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(EagerPreHoParent, "eagerPreHoChild", {
@@ -3887,20 +3671,17 @@ describe("EagerAssociationTest", () => {
     class PciAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PciPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pci_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PciCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PciAuthor, "pciPosts", { foreignKey: "pci_author_id" });
@@ -3936,27 +3717,23 @@ describe("EagerAssociationTest", () => {
     class PcihAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PcihPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pcih_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PcihComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("pcih_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PcihCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PcihAuthor, "pcihPosts", { foreignKey: "pcih_author_id" });
@@ -3999,14 +3776,12 @@ describe("EagerAssociationTest", () => {
     class EagerCountPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EagerCountComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eager_count_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerCountPost, "eagerCountComments", {
@@ -4039,13 +3814,11 @@ describe("EagerAssociationTest", () => {
         this.attribute("body", "string");
         this.attribute("type", "string");
         this.attribute("sti_share_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class StiSharePost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     enableSti(StiShareComment);
@@ -4113,14 +3886,12 @@ describe("EagerAssociationTest", () => {
     class EagerPkAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerPkPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("eager_pk_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerPkAuthor, "eagerPkPosts", {
@@ -4142,14 +3913,12 @@ describe("EagerAssociationTest", () => {
     class IncPkAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class IncPkPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("inc_pk_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(IncPkAuthor, "incPkPosts", {
@@ -4170,14 +3939,12 @@ describe("EagerAssociationTest", () => {
     class EagerEmptyBtParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerEmptyBtChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_empty_bt_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EagerEmptyBtChild, "eagerEmptyBtParent", {
@@ -4201,7 +3968,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("name", "string");
         this.attribute("owner_id", "integer");
         this.attribute("owner_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(PrePolyOrphan);
@@ -4216,20 +3982,17 @@ describe("EagerAssociationTest", () => {
     class EagerDistOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerDistJoin extends Base {
       static {
         this.attribute("eager_dist_owner_id", "integer");
         this.attribute("eager_dist_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerDistItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerDistOwner, "eagerDistJoins", {
@@ -4274,14 +4037,12 @@ describe("EagerAssociationTest", () => {
     class EagerReordParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerReordChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("eager_reord_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(EagerReordParent, "eagerReordChild", {
@@ -4309,14 +4070,12 @@ describe("EagerAssociationTest", () => {
     class JeeoPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class JeeoComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("jeeo_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(JeeoPost, "jeeoComments", {
@@ -4367,34 +4126,29 @@ describe("EagerAssociationTest", () => {
     class ElmarMentor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ElmarDeveloper extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("elmar_mentor_id", "integer");
-        this.adapter = adapter;
       }
     }
     class ElmarContract extends Base {
       static {
         this.attribute("elmar_developer_id", "integer");
-        this.adapter = adapter;
       }
     }
     class ElmarProject extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("elmar_mentor_id", "integer");
-        this.adapter = adapter;
       }
     }
     class ElmarProjectDeveloper extends Base {
       static {
         this.attribute("elmar_project_id", "integer");
         this.attribute("elmar_developer_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(ElmarDeveloper, "elmarMentor", {
@@ -4482,20 +4236,17 @@ describe("EagerAssociationTest", () => {
     class PcsProject extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PcsDeveloper extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PcsContractship extends Base {
       static {
         this.attribute("pcs_project_id", "integer");
         this.attribute("pcs_developer_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(PcsProject);
@@ -4543,14 +4294,12 @@ describe("EagerAssociationTest", () => {
     class BtScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BtScopePost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("bt_scope_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(BtScopePost, "btScopeAuthor", { foreignKey: "bt_scope_author_id" });
@@ -4574,14 +4323,12 @@ describe("EagerAssociationTest", () => {
     class HmScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmScopePost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("hm_scope_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmScopeAuthor, "hmScopePosts", {
@@ -4612,20 +4359,17 @@ describe("EagerAssociationTest", () => {
     class EagerTwiceOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EagerTwiceJoin extends Base {
       static {
         this.attribute("eager_twice_owner_id", "integer");
         this.attribute("eager_twice_target_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EagerTwiceTarget extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EagerTwiceOwner, "eagerTwiceJoins", {
@@ -4701,14 +4445,12 @@ describe("EagerAssociationTest", () => {
     class PIDASAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PIDASPost extends Base {
       static {
         this.attribute("pidas_author_id", "integer");
         this.attribute("mention", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("PIDASAuthor", PIDASAuthor);
@@ -4730,13 +4472,11 @@ describe("EagerAssociationTest", () => {
     class ELIDASAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ELIDASPost extends Base {
       static {
         this.attribute("elidas_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("ELIDASAuthor", ELIDASAuthor);
@@ -4754,14 +4494,12 @@ describe("EagerAssociationTest", () => {
     class POIDASAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class POIDASPost extends Base {
       static {
         this.attribute("poidas_author_id", "integer");
         this.attribute("mention", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("POIDASAuthor", POIDASAuthor);
@@ -4784,13 +4522,11 @@ describe("EagerAssociationTest", () => {
     class EOIDASAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EOIDASPost extends Base {
       static {
         this.attribute("eoidas_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("EOIDASAuthor", EOIDASAuthor);
@@ -4809,7 +4545,6 @@ describe("EagerAssociationTest", () => {
     class PiaWidget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("PiaWidget", PiaWidget);
@@ -4822,14 +4557,12 @@ describe("EagerAssociationTest", () => {
     class AweAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AwePost extends Base {
       static {
         this.attribute("awe_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("AweAuthor", AweAuthor);
@@ -4857,14 +4590,12 @@ describe("EagerAssociationTest", () => {
     class AwexAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AwexPost extends Base {
       static {
         this.attribute("awex_author_id", "integer");
         this.attribute("mention", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("AwexAuthor", AwexAuthor);
@@ -4895,14 +4626,12 @@ describe("EagerAssociationTest", () => {
     class PraAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PraPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pra_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PraAuthor, "praPosts", {
@@ -4922,14 +4651,12 @@ describe("EagerAssociationTest", () => {
     class EnraAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EnraPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("enra_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EnraAuthor, "enraPosts", {
@@ -4950,14 +4677,12 @@ describe("EagerAssociationTest", () => {
     class ElraAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ElraPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("elra_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(ElraAuthor, "elraPosts", {
@@ -4991,21 +4716,18 @@ describe("EagerAssociationTest", () => {
     class PhmtAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PhmtPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("phmt_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PhmtComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("phmt_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PhmtAuthor, "phmtPosts", { foreignKey: "phmt_author_id" });
@@ -5077,7 +4799,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkLineItem extends Base {
@@ -5085,7 +4806,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("order_shop_id", "integer");
         this.attribute("order_id", "integer");
         this.attribute("product", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(CpkLineItem, "cpkOrder", {
@@ -5114,7 +4834,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkHmItem extends Base {
@@ -5122,7 +4841,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("order_shop_id", "integer");
         this.attribute("order_id", "integer");
         this.attribute("product", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkHmOrder, "cpkHmItems", {
@@ -5149,7 +4867,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkHoReceipt extends Base {
@@ -5157,7 +4874,6 @@ describe("EagerAssociationTest", () => {
         this.attribute("order_shop_id", "integer");
         this.attribute("order_id", "integer");
         this.attribute("number", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(CpkHoOrder, "cpkHoReceipt", {
@@ -5210,27 +4926,23 @@ describe("EagerAssociationTest", () => {
     class IdupPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class IdupComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("idup_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class IdupCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class IdupCategoryPost extends Base {
       static {
         this.attribute("idup_post_id", "integer");
         this.attribute("idup_category_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(IdupPost, "idupComments", {
@@ -5307,7 +5019,6 @@ describe("EagerAssociationTest", () => {
     class AlarPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class AlarComment extends Base {
@@ -5315,20 +5026,17 @@ describe("EagerAssociationTest", () => {
         this.attribute("body", "string");
         this.attribute("type", "string");
         this.attribute("alar_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class AlarCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AlarCategoryPost extends Base {
       static {
         this.attribute("alar_post_id", "integer");
         this.attribute("alar_category_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(AlarPost, "alarComments", {
@@ -5387,13 +5095,11 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("lna_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class LnaAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(LnaPost, "lnaAuthor", {
@@ -5416,14 +5122,12 @@ describe("EagerAssociationTest", () => {
     class EabtPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EabtComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("eabt_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EabtComment, "eabtPost", {
@@ -5486,13 +5190,11 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("peb_firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PebFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(PebClient, "pebFirm", {
@@ -5524,20 +5226,17 @@ describe("EagerAssociationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("dp_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class DpAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DpComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("dp_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(DpPost, "dpAuthor", {
@@ -5590,19 +5289,16 @@ describe("EagerAssociationTest", () => {
         this.attribute("psta_member_id", "integer");
         this.attribute("psta_club_id", "integer");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     class PstaClub extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PstaMember extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(PstaMember, "pstaCurrentMembership", {

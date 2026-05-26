@@ -4,28 +4,21 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, RecordNotFound, RecordInvalid, ReadOnlyRecord, UnknownPrimaryKey } from "./index.js";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // -- Helpers --
-function freshAdapter(): TestDatabaseAdapter {
-  return createTestAdapter();
-}
-
 describe("ErrorsTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { posts: { title: "string" } });
+    await defineSchema({ posts: { title: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
   it("can be instantiated with no args", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = new Post();
@@ -35,25 +28,21 @@ describe("ErrorsTest", () => {
 });
 
 describe("error classes", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       items: {},
       widgets: { name: "string" },
       things: { name: "string" },
       empties: {},
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("find throws RecordNotFound with metadata", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
-    Item.adapter = adapter;
-
     try {
       await Item.find(999);
       expect.unreachable("should throw");
@@ -72,8 +61,6 @@ describe("error classes", () => {
     Widget.attribute("id", "integer");
     Widget.attribute("name", "string");
     Widget.validates("name", { presence: true });
-    Widget.adapter = adapter;
-
     const w = new Widget({});
     try {
       await w.saveBang();
@@ -91,8 +78,6 @@ describe("error classes", () => {
     }
     Thing.attribute("id", "integer");
     Thing.attribute("name", "string");
-    Thing.adapter = adapter;
-
     const t = await Thing.create({ name: "test" });
     t.readonlyBang();
     try {
@@ -108,8 +93,6 @@ describe("error classes", () => {
       static _tableName = "empties";
     }
     Empty.attribute("id", "integer");
-    Empty.adapter = adapter;
-
     try {
       await Empty.all().firstBang();
       expect.unreachable("should throw");
@@ -120,14 +103,11 @@ describe("error classes", () => {
 });
 
 describe("Error Classes (Rails-guided)", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { people: { name: "string" } });
+    await defineSchema({ people: { name: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test "RecordNotFound"
   it("find raises RecordNotFound with model, primary_key, and id", async () => {
     class Person extends Base {
@@ -135,7 +115,6 @@ describe("Error Classes (Rails-guided)", () => {
         this._tableName = "people";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -157,7 +136,6 @@ describe("Error Classes (Rails-guided)", () => {
       static {
         this._tableName = "people";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     await Person.create({ id: 1 });
@@ -179,7 +157,6 @@ describe("Error Classes (Rails-guided)", () => {
         this._tableName = "people";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
       static {
         this.validates("name", { presence: true });
@@ -204,7 +181,6 @@ describe("Error Classes (Rails-guided)", () => {
         this._tableName = "people";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
       static {
         this.validates("name", { presence: true });
@@ -221,7 +197,6 @@ describe("Error Classes (Rails-guided)", () => {
         this._tableName = "people";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -235,7 +210,6 @@ describe("Error Classes (Rails-guided)", () => {
         this._tableName = "people";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
