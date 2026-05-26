@@ -451,8 +451,19 @@ export class JoinDependency {
 
     const joins = intersection.flatMap(([l, r]) => {
       if (r instanceof JoinAssociation || r instanceof JoinTreeNode) {
-        const lt = l.table;
-        r.table = typeof lt === "string" ? lt : (lt.tableAlias ?? lt.name);
+        const originalTable = r._joinNode?.effectiveSqlName ?? r.table;
+        const lEffective = l._joinNode?.effectiveSqlName;
+        let resolvedTable: string;
+        if (lEffective) {
+          resolvedTable = lEffective;
+        } else {
+          const lt = l.table;
+          resolvedTable = typeof lt === "string" ? lt : (lt.tableAlias ?? lt.name);
+        }
+        r.table = resolvedTable;
+        if (originalTable !== resolvedTable) {
+          this._rebindChildOnPredicates(r, originalTable, resolvedTable);
+        }
       }
       return this.walk(l, r, joinType);
     });
@@ -476,6 +487,30 @@ export class JoinDependency {
       }
     }
     return joins.concat(child.children.flatMap((c) => this.makeConstraints(child, c, joinType)));
+  }
+
+  /** @internal */
+  private _rebindChildOnPredicates(
+    parent: JoinPart,
+    fromTableName: string,
+    toTableName: string,
+  ): void {
+    const toTable = new Table(toTableName);
+    for (const child of parent.children) {
+      const joinNode = child._joinNode;
+      if (!joinNode?.arelJoin) continue;
+      const arelJoin = joinNode.arelJoin;
+      const on = arelJoin.right;
+      if (!(on instanceof Nodes.On)) continue;
+      const rebound = rebindTableReferences(on.expr as Nodes.Node, fromTableName, toTable);
+      if (rebound !== on.expr) {
+        const JoinClass = arelJoin.constructor as new (
+          left: Nodes.Node,
+          right: Nodes.Node,
+        ) => Nodes.Join;
+        joinNode.arelJoin = new JoinClass(arelJoin.left, new Nodes.On(rebound));
+      }
+    }
   }
 
   instantiate(resultSet: Record<string, unknown>[], strictLoadingValue?: boolean): any[] {
