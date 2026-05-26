@@ -5,7 +5,7 @@
 #
 # Usage: ./scripts/phase-g-hunt/classify.sh
 #
-# Outputs a TSV with: file, LOC, bypass_sites, inline_classes, canonical_pct, has_creates
+# Outputs a TSV with: file, LOC, sites, total_classes, canonical_pct, has_creates, non_canonical
 set -euo pipefail
 
 AR_SRC="packages/activerecord/src"
@@ -14,7 +14,7 @@ AR_SRC="packages/activerecord/src"
 canonical_classes=$(
   ls "$AR_SRC/test-helpers/models/"*.ts 2>/dev/null \
     | xargs -I{} basename {} .ts \
-    | sed -r 's/(^|-)(\w)/\U\2/g' \
+    | perl -pe 's/(^|-)(\w)/uc($2)/ge' \
     | sort -u
 )
 
@@ -27,10 +27,11 @@ grep -rl "this\.adapter = adapter" "$AR_SRC" --include="*.test.ts" 2>/dev/null \
     full="$AR_SRC/$file"
     loc=$(wc -l < "$full")
     sites=$(grep -c "this\.adapter = adapter" "$full" || true)
-    classes=$(grep -oP 'class \K\w+(?=\s+extends\s+(Base|ApplicationRecord|Model))' "$full" 2>/dev/null | sort -u || true)
-    total=0
+    classes=$(perl -ne 'print "$1\n" if /class\s+(\w+)\s+extends\s+(?:Base|ApplicationRecord|Model)\b/' "$full" | sort -u || true)
     if [ -n "$classes" ]; then
-      total=$(echo "$classes" | grep -c . 2>/dev/null || echo 0)
+      total=$(echo "$classes" | wc -l | tr -d ' ')
+    else
+      total=0
     fi
 
     canonical=0
@@ -49,6 +50,7 @@ grep -rl "this\.adapter = adapter" "$AR_SRC" --include="*.test.ts" 2>/dev/null \
     fi
 
     creates=$(grep -cE '\.(create|save|insert)\b' "$full" 2>/dev/null || echo 0)
+    creates=${creates##*$'\n'}
     has_creates="no"
     if [ "$creates" -gt 0 ]; then
       has_creates="yes($creates)"
