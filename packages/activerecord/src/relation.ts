@@ -2149,21 +2149,14 @@ export class Relation<T extends Base> {
     }
 
     for (const parent of parents) {
-      if (!(parent as any)._preloadedAssociations) {
-        (parent as any)._preloadedAssociations = new Map();
-      }
       const pk = parent.readAttribute(basePk);
       const assocs = associations.get(pk);
       for (const node of jd.nodes) {
-        // Skip intermediate through nodes (used only for JOIN chain)
+        // Skip intermediate through nodes and nested nodes (handled in instantiateFromRows).
         if (node.immediateAssocName.startsWith("_through_")) continue;
-        const children = assocs?.get(node.assocName) ?? [];
+        if (node.parentPath !== null) continue;
+        const children = assocs?.get(node.immediateAssocName) ?? [];
         const isSingular = node.assocType === "hasOne" || node.assocType === "belongsTo";
-        if (isSingular) {
-          (parent as any)._preloadedAssociations.set(node.immediateAssocName, children[0] ?? null);
-        } else {
-          (parent as any)._preloadedAssociations.set(node.immediateAssocName, children);
-        }
 
         const inverseName = inverseMap.get(node.immediateAssocName);
         if (inverseName) {

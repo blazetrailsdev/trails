@@ -604,29 +604,27 @@ export class JoinDependency {
     const basePk = (this._baseModel as any).primaryKey ?? "id";
     const parentMap = new Map<unknown, any>();
     const assocMap = new Map<unknown, Map<string, any[]>>();
-    const seenChildren = new Map<unknown, Map<string, Set<unknown>>>();
     const seenRawPks = new Set<unknown>();
     const rawToKey = new Map<unknown, unknown>();
-    const modelCache = new Map<JoinNode, Map<unknown, any>>();
+
+    const modelCache = new Map<JoinPart, Map<unknown, any>>();
+    const seenChildren = new WeakMap<object, Map<string, Set<unknown>>>();
 
     const baseColumns = getModelColumns(this._baseModel);
+    const columnNames = new Set(this._aliases.map((a) => a.alias));
 
-    const allNodes = this.nodes;
     const nodeReadonly = new Map<JoinNode, boolean>();
     const nodeStrictLoading = new Map<JoinNode, boolean>();
-    for (const node of allNodes) {
+    for (const node of this.nodes) {
       nodeReadonly.set(node, this._isNodeReadonly(node));
       nodeStrictLoading.set(node, this._isNodeStrictLoading(node));
     }
-
-    const columnNames = new Set(this._aliases.map((a) => a.alias));
 
     for (const row of rows) {
       const parentAttrs: Record<string, unknown> = Object.create(null);
       for (let i = 0; i < baseColumns.length; i++) {
         parentAttrs[baseColumns[i]] = row[`t${this._baseTableIndex}_r${i}`];
       }
-
       for (const key of Object.keys(row)) {
         if (!columnNames.has(key)) {
           parentAttrs[key] = row[key];
@@ -643,69 +641,157 @@ export class JoinDependency {
         rawToKey.set(rawPk, parentKey);
         parentMap.set(parentKey, parent);
         assocMap.set(parentKey, new Map());
-        seenChildren.set(parentKey, new Map());
       } else {
         parentKey = rawToKey.get(rawPk)!;
         parent = parentMap.get(parentKey);
       }
 
-      for (const node of allNodes) {
-        if (node.isThroughNode) continue;
-
-        const childAttrs: Record<string, unknown> = {};
-        let hasNonNull = false;
-        for (let i = 0; i < node.columns.length; i++) {
-          const val = row[`t${node.tableIndex}_r${i}`];
-          childAttrs[node.columns[i]] = val;
-          if (val !== null && val !== undefined) hasNonNull = true;
-        }
-
-        if (!hasNonNull) {
-          this._markAssociationLoaded(parent, node);
-          continue;
-        }
-
-        const rawChildPk = childAttrs[(node.modelClass as any).primaryKey ?? "id"];
-        const seen = seenChildren.get(parentKey)!;
-        if (!seen.has(node.assocName)) seen.set(node.assocName, new Set());
-        const seenPks = seen.get(node.assocName)!;
-
-        if (!seenPks.has(rawChildPk)) {
-          seenPks.add(rawChildPk);
-
-          let nodeCache = modelCache.get(node);
-          if (!nodeCache) {
-            nodeCache = new Map();
-            modelCache.set(node, nodeCache);
-          }
-          let child = nodeCache.get(rawChildPk);
-          if (!child) {
-            child = this.constructModel(childAttrs, node, strictLoadingValue);
-            if (rawChildPk != null) nodeCache.set(rawChildPk, child);
-          }
-
-          this._wireAssociationProxy(parent, node, child);
-
-          if (nodeReadonly.get(node)) {
-            (child as any)._readonly = true;
-          }
-          if (
-            nodeStrictLoading.get(node) &&
-            typeof (child as any).strictLoadingBang === "function"
-          ) {
-            (child as any).strictLoadingBang();
-          }
-
-          const parentAssocs = assocMap.get(parentKey)!;
-          if (!parentAssocs.has(node.assocName)) {
-            parentAssocs.set(node.assocName, []);
-          }
-          parentAssocs.get(node.assocName)!.push(child);
-        }
-      }
+      this._constructRecursive(
+        this._joinRoot,
+        parent,
+        parentKey,
+        row,
+        modelCache,
+        seenChildren,
+        assocMap,
+        nodeReadonly,
+        nodeStrictLoading,
+        strictLoadingValue,
+      );
     }
 
     return { parents: [...parentMap.values()], associations: assocMap };
+  }
+
+  /**
+   * Recursive tree-walk hydration — mirrors Rails' JoinDependency#construct.
+   * @internal
+   */
+  private _constructRecursive(
+    treeNode: JoinPart,
+    arParent: any,
+    rootParentKey: unknown,
+    row: Record<string, unknown>,
+    modelCache: Map<JoinPart, Map<unknown, any>>,
+    seenChildren: WeakMap<object, Map<string, Set<unknown>>>,
+    assocMap: Map<unknown, Map<string, any[]>>,
+    nodeReadonly: Map<JoinNode, boolean>,
+    nodeStrictLoading: Map<JoinNode, boolean>,
+    strictLoadingValue?: boolean,
+  ): void {
+    for (const child of treeNode.children) {
+      const node = child._joinNode;
+      if (!node) continue;
+
+      if (node.isThroughNode) {
+        this._constructRecursive(
+          child,
+          arParent,
+          rootParentKey,
+          row,
+          modelCache,
+          seenChildren,
+          assocMap,
+          nodeReadonly,
+          nodeStrictLoading,
+          strictLoadingValue,
+        );
+        continue;
+      }
+
+      const childAttrs: Record<string, unknown> = {};
+      let hasNonNull = false;
+      for (let i = 0; i < node.columns.length; i++) {
+        const val = row[`t${node.tableIndex}_r${i}`];
+        childAttrs[node.columns[i]] = val;
+        if (val !== null && val !== undefined) hasNonNull = true;
+      }
+
+      if (!hasNonNull) {
+        this._markAssociationLoaded(arParent, node);
+        continue;
+      }
+
+      const rawChildPk = childAttrs[(node.modelClass as any).primaryKey ?? "id"];
+
+      let parentSeen = seenChildren.get(arParent);
+      if (!parentSeen) {
+        parentSeen = new Map();
+        seenChildren.set(arParent, parentSeen);
+      }
+      let seenPks = parentSeen.get(node.immediateAssocName);
+      if (!seenPks) {
+        seenPks = new Set();
+        parentSeen.set(node.immediateAssocName, seenPks);
+      }
+      const alreadySeen = seenPks.has(rawChildPk);
+
+      let nodeCache = modelCache.get(child);
+      if (!nodeCache) {
+        nodeCache = new Map();
+        modelCache.set(child, nodeCache);
+      }
+      let childInstance = nodeCache.get(rawChildPk);
+      if (!childInstance) {
+        childInstance = this.constructModel(childAttrs, node, strictLoadingValue);
+        if (rawChildPk != null) nodeCache.set(rawChildPk, childInstance);
+      }
+
+      if (!alreadySeen) {
+        seenPks.add(rawChildPk);
+
+        const isCollection = node.assocType === "hasMany";
+
+        // Populate _preloadedAssociations on the correct intermediate parent.
+        if (!(arParent as any)._preloadedAssociations) {
+          (arParent as any)._preloadedAssociations = new Map();
+        }
+        // Initialize collection array before wiring: syncAssociationInstance will setTarget()
+        // it onto the proxy, making proxy.target and _preloadedAssociations share the same
+        // reference so proxy.target.push() keeps both in sync without a double-push.
+        if (
+          isCollection &&
+          !(arParent as any)._preloadedAssociations.has(node.immediateAssocName)
+        ) {
+          (arParent as any)._preloadedAssociations.set(node.immediateAssocName, []);
+        }
+
+        this._wireAssociationProxy(arParent, node, childInstance);
+
+        if (nodeReadonly.get(node)) {
+          (childInstance as any)._readonly = true;
+        }
+        if (
+          nodeStrictLoading.get(node) &&
+          typeof (childInstance as any).strictLoadingBang === "function"
+        ) {
+          (childInstance as any).strictLoadingBang();
+        }
+
+        if (!isCollection) {
+          (arParent as any)._preloadedAssociations.set(node.immediateAssocName, childInstance);
+        }
+
+        if (treeNode === this._joinRoot) {
+          const rootAssocs = assocMap.get(rootParentKey)!;
+          if (!rootAssocs.has(node.immediateAssocName)) rootAssocs.set(node.immediateAssocName, []);
+          rootAssocs.get(node.immediateAssocName)!.push(childInstance);
+        }
+      }
+
+      this._constructRecursive(
+        child,
+        childInstance,
+        rootParentKey,
+        row,
+        modelCache,
+        seenChildren,
+        assocMap,
+        nodeReadonly,
+        nodeStrictLoading,
+        strictLoadingValue,
+      );
+    }
   }
 
   /**
