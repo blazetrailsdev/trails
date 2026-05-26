@@ -541,21 +541,22 @@ export async function defineSchema(
 
 async function _resetAutoIncrement(
   adapter: DatabaseAdapter,
-  ss: SchemaStatements,
+  _ss: SchemaStatements,
   table: string,
 ): Promise<void> {
   try {
+    const qt = adapter.quoteTableName(table);
     switch (adapter.adapterName) {
       case "postgres":
-        await adapter.executeMutation(
-          `SELECT setval(pg_get_serial_sequence('"${table}"', 'id'), 1, false)`,
-        );
+        await adapter.executeMutation(`SELECT setval(pg_get_serial_sequence($1, 'id'), 1, false)`, [
+          table,
+        ]);
         break;
       case "mysql":
-        await adapter.executeMutation(`ALTER TABLE \`${table}\` AUTO_INCREMENT = 1`);
+        await adapter.executeMutation(`ALTER TABLE ${qt} AUTO_INCREMENT = 1`);
         break;
       case "sqlite":
-        await adapter.executeMutation(`DELETE FROM sqlite_sequence WHERE name = '${table}'`);
+        await adapter.executeMutation(`DELETE FROM sqlite_sequence WHERE name = ?`, [table]);
         break;
     }
   } catch {

@@ -18,7 +18,8 @@ import {
  *
  * Phase D-Z: `afterAll` no longer drops tables or clears schema signatures.
  * SAVEPOINT/rollback already cleans up test data; canonical tables persist
- * empty across files so the next file's `defineSchema` is a cache-hit no-op.
+ * empty across files so the next file's `defineSchema` skips DDL (cache hit)
+ * and only resets auto-increment counters.
  * Files with bespoke schemas call `dropAllTables` explicitly (which clears
  * the signature cache so the next `defineSchema` re-creates correctly).
  *
