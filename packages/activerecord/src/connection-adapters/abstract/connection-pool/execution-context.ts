@@ -37,6 +37,8 @@ export function withExecutionContext<T>(fn: () => T): T {
       throw err;
     }
     if (result && typeof (result as unknown as PromiseLike<unknown>).then === "function") {
+      // Wrap via Promise.resolve so bare PromiseLike thenables (which only
+      // need `then`) still get `.finally` for the exit hook.
       return Promise.resolve(result as unknown as PromiseLike<unknown>).finally(
         runHooks,
       ) as unknown as T;

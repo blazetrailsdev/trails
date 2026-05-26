@@ -77,6 +77,8 @@ export class ExplainRegistry {
       const value = await IsolatedExecutionState.scope(SLOT_KEY, slot, fn);
       return { value, queries: [...slot.queries] };
     } finally {
+      // Clear the slot so late subscriber notifications holding a reference
+      // to it don't keep accumulating into an abandoned explain block.
       slot.collect = false;
       slot.queries = [];
     }

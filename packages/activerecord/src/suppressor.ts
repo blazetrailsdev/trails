@@ -41,6 +41,8 @@ export async function suppress<R>(modelClass: typeof Base, fn: () => R | Promise
     return await fn();
   }
   const parent = registry();
+  // Null-prototype copy: keeps `Object.prototype` keys (toString,
+  // constructor, …) from masquerading as suppressed class names.
   const child: Record<string, true | undefined> = Object.create(null);
   Object.assign(child, parent);
   child[name] = true;
