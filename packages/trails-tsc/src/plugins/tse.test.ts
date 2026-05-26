@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import ts from "typescript";
 import {
   createTsePlugin,
   TseLocalsSignatureError,
   virtualizeTse,
   virtualizeTseWithDeltas,
 } from "./tse.js";
+import { diagnose } from "./tse-diagnose.js";
 
 describe("createTsePlugin", () => {
   it("claims the .tse extension", () => {
@@ -239,26 +239,26 @@ describe("virtualizeTse", () => {
 
     it("requires locals for a known partial with required properties", () => {
       const out = virtualizeTse("<%= context.render({ partial: 'users/user' }) %>");
-      const diags = diagnose(out, registryStub);
+      const diags = diagnose(out, { customStub: registryStub });
       expect(diags.length).toBeGreaterThan(0);
       expect(diags.join("\n")).toMatch(/locals|name/i);
     });
 
     it("accepts omitted locals when all properties are optional", () => {
       const out = virtualizeTse("<%= context.render({ partial: 'shared/empty' }) %>");
-      expect(diagnose(out, registryStub)).toEqual([]);
+      expect(diagnose(out, { customStub: registryStub })).toEqual([]);
     });
 
     it("falls back to optional Record<string, unknown> for unknown partials", () => {
       const out = virtualizeTse("<%= context.render({ partial: 'unknown/thing' }) %>");
-      expect(diagnose(out, registryStub)).toEqual([]);
+      expect(diagnose(out, { customStub: registryStub })).toEqual([]);
     });
 
     it("rejects wrong-shape locals for a known partial", () => {
       const out = virtualizeTse(
         "<%= context.render({ partial: 'users/user', locals: { wrong: 1 } }) %>",
       );
-      const diags = diagnose(out, registryStub);
+      const diags = diagnose(out, { customStub: registryStub });
       expect(diags.length).toBeGreaterThan(0);
       expect(diags.join("\n")).toMatch(/not assignable|wrong/i);
     });
@@ -285,51 +285,3 @@ describe("virtualizeTse", () => {
     });
   });
 });
-
-function diagnose(source: string, customStub?: string): string[] {
-  const fileName = "/virtual/show.html.tse.ts";
-  const stubSrc =
-    customStub ??
-    "export interface TemplateRegistry {} export type TemplateLocals<T> = T; export type NoExtraKeys<T> = T & { [K in Exclude<string, keyof T>]?: never };";
-  const stubPath = "/stub/module.d.ts";
-  const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.ES2022, true);
-  const stubFile = ts.createSourceFile(stubPath, stubSrc, ts.ScriptTarget.ES2022, true);
-  // Use the real default host for lib files so built-ins (Record, etc.) resolve.
-  const defaultHost = ts.createCompilerHost({});
-  const host: ts.CompilerHost = {
-    ...defaultHost,
-    fileExists: (f) => f === fileName || f === stubPath || defaultHost.fileExists(f),
-    readFile: (f) => (f === fileName ? source : f === stubPath ? stubSrc : defaultHost.readFile(f)),
-    getSourceFile: (f, lv, onError) => {
-      if (f === fileName) return sourceFile;
-      if (f === stubPath) return stubFile;
-      return defaultHost.getSourceFile(f, lv, onError);
-    },
-    resolveModuleNames: (moduleNames, containingFile, _, __, opts) => {
-      const real = defaultHost.resolveModuleNames;
-      const results = real
-        ? real.call(defaultHost, moduleNames, containingFile, _, __, opts)
-        : moduleNames.map(() => undefined);
-      return results.map((r, i) => {
-        if (r) return r;
-        // Any unresolved import → stub (covers @blazetrails/actionview and any other external)
-        void moduleNames[i];
-        return { resolvedFileName: stubPath, isExternalLibraryImport: true };
-      });
-    },
-  };
-  const program = ts.createProgram({
-    rootNames: [fileName],
-    options: {
-      noEmit: true,
-      types: [],
-      skipLibCheck: true,
-      strict: true,
-    },
-    host,
-  });
-  return program
-    .getSemanticDiagnostics(sourceFile)
-    .concat(program.getSyntacticDiagnostics(sourceFile))
-    .map((d) => ts.flattenDiagnosticMessageText(d.messageText, "\n"));
-}
