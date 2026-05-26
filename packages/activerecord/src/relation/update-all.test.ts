@@ -11,41 +11,30 @@ function epochMs(v: unknown): number {
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-let _adapter: SidecarAdapter;
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
 beforeAll(async () => {
-  ({ adapter: _adapter } = createSidecarTestAdapter());
-  await defineSchema(_adapter, {
+  await defineSchema({
     posts: { title: "string", author: "string", views: "integer", updated_at: "datetime" },
   });
 });
-withTransactionalFixtures(() => _adapter);
-function freshAdapter(): DatabaseAdapter {
-  return _adapter;
-}
 
 // ==========================================================================
 // UpdateAllTest — targets relation/update_all_test.rb
 // ==========================================================================
 describe("UpdateAllTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("update all updates all records", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "old" });
@@ -58,7 +47,6 @@ describe("UpdateAllTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -69,18 +57,12 @@ describe("UpdateAllTest", () => {
 });
 
 describe("UpdateAllTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   function makeModel() {
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
         this.attribute("views", "integer");
-        this.adapter = adapter;
       }
     }
     return { Post };
@@ -272,12 +254,10 @@ describe("UpdateAllTest", () => {
   });
 
   it("touch all updates records timestamps", async () => {
-    const a = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = a;
       }
     }
     const past = instant("2020-01-01T00:00:00Z");
@@ -296,12 +276,10 @@ describe("UpdateAllTest", () => {
   });
 
   it("update all doesnt ignore order", async () => {
-    const a = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("views", "integer");
-        this.adapter = a;
       }
     }
     await Post.create({ title: "a", views: 0 });
