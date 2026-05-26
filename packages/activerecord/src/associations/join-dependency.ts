@@ -131,8 +131,6 @@ export class JoinDependency {
   private readonly _joinRoot: JoinBase;
   private readonly _joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
   private _treeNodesByPath: Map<string, JoinPart> = new Map();
-  private _cachedNodes: JoinNode[] | null = null;
-
   constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
@@ -150,14 +148,12 @@ export class JoinDependency {
   }
 
   get nodes(): JoinNode[] {
-    if (this._cachedNodes) return this._cachedNodes;
     const result: JoinNode[] = [];
     this._joinRoot.each((part) => {
       if (part !== this._joinRoot && part._joinNode) {
         result.push(part._joinNode);
       }
     });
-    this._cachedNodes = result;
     return result;
   }
 
@@ -854,7 +850,6 @@ export class JoinDependency {
   }
 
   private _pushTreeNode(node: JoinNode): void {
-    this._cachedNodes = null;
     const parentPath = node.parentPath;
     let parent: JoinPart;
     if (parentPath) {
@@ -884,7 +879,6 @@ export class JoinDependency {
   }
 
   private _rollbackTree(snapshotPaths: Set<string>): void {
-    this._cachedNodes = null;
     const toRemove: string[] = [];
     for (const key of this._treeNodesByPath.keys()) {
       if (!snapshotPaths.has(key)) toRemove.push(key);
