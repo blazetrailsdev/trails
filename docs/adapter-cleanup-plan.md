@@ -161,19 +161,23 @@ updated in the first Phase 3 PR so subsequent ones are pure renames.
 ## Ordering
 
 ```
-PR 1a (delete adapter getter)
-  ↓
-PR 1b (source call-site rename)
-  ↓
-PR 2a (DatabaseAdapter → AbstractAdapter types) ── PR 3.1 (test helpers + first batch)
-  ↓                                                   ↓
-PR 2b (delete adapter.ts)                         PR 3.2 … 3.N (remaining test batches)
+              PR 1a (delete adapter getter)
+             ╱                              ╲
+PR 1b (source call-site rename)    PR 2a (DatabaseAdapter → AbstractAdapter)
+             ╲                              ╱
+              PR 2b (delete adapter.ts)
+                        ↓
+              PR 3.1 (test helpers + first batch)
+                        ↓
+              PR 3.2 … 3.N (remaining test batches)
 ```
 
-PRs 1a → 1b → 2a are sequential (each depends on the prior). PR 2b
-depends on 2a. Phase 3 PRs can start after 1b lands (tests just need the
-runtime rename done) and run in parallel with Phase 2 as long as they
-don't touch type imports from `adapter.ts`.
+PR 1a is the only prerequisite — it creates `set connection()` and
+deletes `adapter`. After 1a lands, PRs 1b and 2a are independent (1b
+renames runtime call sites, 2a swaps type annotations) and can ship in
+parallel. PR 2b depends on both 1b and 2a (can't delete `adapter.ts`
+until nothing imports from it). Phase 3 depends on 2b (tests import
+`DatabaseAdapter` and use `.adapter` — both must be gone first).
 
 All PRs branch from `main` (no stacking).
 
