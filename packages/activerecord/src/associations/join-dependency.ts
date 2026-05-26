@@ -612,10 +612,18 @@ export class JoinDependency {
       nodeStrictLoading.set(node, this._isNodeStrictLoading(node));
     }
 
+    const columnNames = new Set(this._aliases.map((a) => a.alias));
+
     for (const row of rows) {
-      const parentAttrs: Record<string, unknown> = {};
+      const parentAttrs: Record<string, unknown> = Object.create(null);
       for (let i = 0; i < baseColumns.length; i++) {
         parentAttrs[baseColumns[i]] = row[`t${this._baseTableIndex}_r${i}`];
+      }
+
+      for (const key of Object.keys(row)) {
+        if (!columnNames.has(key)) {
+          parentAttrs[key] = row[key];
+        }
       }
 
       const rawPk = parentAttrs[basePk];
