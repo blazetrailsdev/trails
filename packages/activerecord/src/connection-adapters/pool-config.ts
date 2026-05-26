@@ -255,25 +255,59 @@ export class PoolConfig {
 export interface TrailsAdapterOptions {
   statementLimit?: number;
   preparedStatements?: boolean;
+  // Mirrors: database.yml `insert_returning` — set false to disable RETURNING
   insertReturning?: boolean;
 }
 
+/**
+ * SQLite3-specific adapter options that extend the shared base.
+ */
 export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
   readonly?: boolean;
+  /**
+   * Selects a registered SQLite driver. Pass the registered name string
+   * (e.g. `"better-sqlite3"`, `"node-sqlite"`) or a SqliteDriver instance
+   * directly to bypass the registry. When omitted, resolution follows
+   * AR_SQLITE_DRIVER, then exactly-one-registered fallback.
+   * Mirrors database.yml `driver:`.
+   */
   driver?: string | import("@blazetrails/activesupport/sqlite-adapter").SqliteDriver;
+  // Mirrors: database.yml `pragmas:` — applied via PRAGMA on each connection.
+  // Keys must be simple SQLite pragma identifiers (word characters only, e.g. "cache_size").
+  // String values must be identifier-like enum words (e.g. "WAL", "NORMAL") — arbitrary
+  // strings are warned and skipped. Numbers and booleans are always accepted (boolean → "1"/"0").
   pragmas?: Record<string, string | number | boolean>;
+  // Mirrors: database.yml `strict:` — disables double-quoted string literal fallback
+  // (DQS) at the connection level. Defaults to SQLite3Adapter.strictStringsByDefault.
   strict?: boolean;
 }
 
+/**
+ * MySQL2-specific adapter options that extend the shared base.
+ * Kept separate so PG/SQLite3 destructuring of `TrailsAdapterOptions`
+ * never receives — and leaks — these keys into their driver configs.
+ */
 export interface MysqlAdapterOptions extends TrailsAdapterOptions {
+  // Mirrors: database.yml `strict:` — controls sql_mode STRICT_ALL_TABLES wiring.
+  // true/undefined → add STRICT_ALL_TABLES; false → remove strict flags; "default" → leave global value.
   strict?: boolean | "default";
+  // Mirrors: database.yml `wait_timeout:` — SET SESSION wait_timeout = N on each connection.
   waitTimeout?: number | string;
+  // Mirrors: database.yml `variables:` — SET SESSION key = value on each new connection.
   variables?: Record<string, string | number | boolean | null | ":default" | "default">;
-  /** @internal */
+  // Test-only sentinel: skips pool creation so the adapter can be instantiated without a live DB.
+  // @internal
   _fakeConnection?: boolean;
 }
 
+/**
+ * PostgreSQL-specific adapter options that extend the shared base.
+ * Kept separate so MySQL2/SQLite3 destructuring of `TrailsAdapterOptions`
+ * never receives — and leaks — these keys into their driver configs.
+ */
 export interface PostgreSQLAdapterOptions extends TrailsAdapterOptions {
+  // Mirrors: database.yml `min_messages` — SET client_min_messages on connect (default: "warning")
   minMessages?: string;
+  // Mirrors: database.yml `variables:` — SET SESSION key = value on each new connection
   variables?: Record<string, string | number | boolean | null | "default">;
 }
