@@ -47,7 +47,13 @@ export function parse(source: string): TseAst {
         throw new TseSyntaxError(`unknown <%! ... !%> directive: ${tok.value.trim()}`);
       }
     } else {
-      nodes.push({ kind: tok.kind, value: tok.value.trim(), srcLine: tok.srcLine } as TseNode);
+      const leading = tok.value.slice(0, tok.value.length - tok.value.trimStart().length);
+      const leadingNewlines = (leading.match(/\n/g) ?? []).length;
+      nodes.push({
+        kind: tok.kind,
+        value: tok.value.trim(),
+        srcLine: tok.srcLine + leadingNewlines,
+      } as TseNode);
     }
   }
   return { nodes, localsSignature, typesAnnotation, formatAnnotation };
