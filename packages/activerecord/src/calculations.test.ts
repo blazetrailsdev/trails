@@ -4966,31 +4966,35 @@ describe("CalculationsTest", () => {
   // second INSERT to fail at the DB level, the adapter translates that
   // into RecordNotUnique, createOrFindBy's rescue hits findByBang, and
   // we get the existing row back.
-  it("createOrFindBy retries via findByBang on RecordNotUnique", async () => {
-    class User extends Base {
-      static {
-        this._tableName = "users";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
+  // MySQL: CREATE UNIQUE INDEX is DDL that auto-commits, breaking transactional fixtures.
+  it.skipIf(adapterType === "mysql")(
+    "createOrFindBy retries via findByBang on RecordNotUnique",
+    async () => {
+      class User extends Base {
+        static {
+          this._tableName = "users";
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+        }
       }
-    }
 
-    const existing = await User.create({ name: "Claim" });
-    await Base.adapter.executeMutation(`CREATE UNIQUE INDEX users_name_idx ON users (name)`);
-    try {
-      const retried = await User.createOrFindBy({ name: "Claim" });
-      expect(retried.id).toBe(existing.id);
-      expect(await User.all().count()).toBe(1);
-    } finally {
+      const existing = await User.create({ name: "Claim" });
+      await Base.adapter.executeMutation(`CREATE UNIQUE INDEX users_name_idx ON users (name)`);
       try {
-        const a = Base.adapter;
-        const ss = a.schemaStatements ? a.schemaStatements() : null;
-        if (ss) await ss.removeIndex("users", { name: "users_name_idx" });
-      } catch {
-        /* index may already be rolled back */
+        const retried = await User.createOrFindBy({ name: "Claim" });
+        expect(retried.id).toBe(existing.id);
+        expect(await User.all().count()).toBe(1);
+      } finally {
+        try {
+          const a = Base.adapter;
+          const ss = a.schemaStatements ? a.schemaStatements() : null;
+          if (ss) await ss.removeIndex("users", { name: "users_name_idx" });
+        } catch {
+          /* index may already be rolled back */
+        }
       }
-    }
-  });
+    },
+  );
 
   // Rails: test "lock! reloads with FOR UPDATE"
   // SQLite does not support FOR UPDATE locking.
