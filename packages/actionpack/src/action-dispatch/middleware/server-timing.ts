@@ -7,9 +7,7 @@
 
 import {
   Notifications,
-  getAsyncContext,
-  type AsyncContext,
-  type AsyncContextAdapter,
+  IsolatedExecutionState,
   type NotificationSubscriber,
   type NotificationEvent as Event,
 } from "@blazetrails/activesupport";
@@ -19,31 +17,21 @@ import { SERVER_TIMING } from "../constants.js";
 /** @internal */
 export class Subscriber {
   private static _instance: Subscriber | null = null;
+  private static readonly _EVENTS_KEY = Symbol.for("ad_server_timing_events");
   private _subscriber: NotificationSubscriber | null = null;
-  private _context: AsyncContext<Event[]> | null = null;
-  private _contextAdapter: AsyncContextAdapter | null = null;
 
   static instance(): Subscriber {
     return (this._instance ??= new Subscriber());
   }
 
-  private _events(): AsyncContext<Event[]> {
-    const adapter = getAsyncContext();
-    if (!this._context || this._contextAdapter !== adapter) {
-      this._contextAdapter = adapter;
-      this._context = adapter.create<Event[]>();
-    }
-    return this._context;
-  }
-
   call(event: Event): void {
-    const events = this._events().getStore();
+    const events = IsolatedExecutionState.get<Event[]>(Subscriber._EVENTS_KEY);
     if (events) events.push(event);
   }
 
   async collectEvents(block: () => Promise<void>): Promise<Event[]> {
     const events: Event[] = [];
-    await this._events().run(events, block);
+    await IsolatedExecutionState.scope(Subscriber._EVENTS_KEY, events, block);
     return events;
   }
 
