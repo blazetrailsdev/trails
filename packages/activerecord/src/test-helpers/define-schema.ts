@@ -415,7 +415,6 @@ export function clearAppliedSchemaSignatures(adapter?: DatabaseAdapter): void {
 // ---------------------------------------------------------------------------
 
 /** @internal */
-let _canonicalSchema: Schema | null = null;
 /** @internal */
 let _canonicalPreloadKey: string | null = null;
 /** @internal */
@@ -433,7 +432,6 @@ let _canonicalPreloadSigs: Map<string, string> | null = null;
  * @internal
  */
 export function setCanonicalSchemaPreload(adapter: DatabaseAdapter, schema: Schema): void {
-  _canonicalSchema = schema;
   _canonicalPreloadKey = databaseIdentity(adapter);
   _canonicalPreloadAdapter = _canonicalPreloadKey === null ? adapter : null;
   const cache = _cacheFor(adapter, false);
@@ -478,14 +476,6 @@ export function restoreCanonicalSchemaSignaturesUnlessAdapter(adapter: DatabaseA
     _fallbackSchemaSignatures.set(_canonicalPreloadAdapter, new Map(_canonicalPreloadSigs));
   }
 }
-
-/**
- * Returns true when every column in `testSpec` for `table` is present in the
- * canonical schema with a compatible base type.  Extra canonical columns are
- * fine — the test just doesn't use them.
- *
- * @internal
- */
 
 /** @internal */
 function getCache(adapter: DatabaseAdapter): Map<string, string> {

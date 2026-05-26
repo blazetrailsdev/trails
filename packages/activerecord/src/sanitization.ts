@@ -232,9 +232,11 @@ interface QuoterHost {
 
 /**
  * Resolves quoting via `adapter` first, then `connection()` as a fallback.
- * `adapter` is checked first because it resolves without leasing a pool
- * connection — a direct adapter assignment (`this.adapter = x`) short-circuits
- * the pool entirely, and a pooled `Base.adapter` leases+releases cleanly.
+ * `adapter` is checked first because a direct adapter assignment
+ * (`this.adapter = x`) short-circuits the pool entirely. When no direct
+ * assignment exists, `Base.adapter` checks out a connection from the pool
+ * and caches it on the class (`_adapter`); the checkout is released when
+ * the pool's `releaseConnection` is called (not automatically).
  * `connection()` is tried second for callers that have no adapter path but do
  * have an active pool lease (rare). Only `ConnectionNotDefined` triggers
  * fallback; other errors propagate. @internal
