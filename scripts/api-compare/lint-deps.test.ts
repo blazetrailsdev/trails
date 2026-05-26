@@ -430,4 +430,38 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
     const tainted = collectTaintedSymbols(program, dir, pkg, [], "arel");
     expect(tainted.size).toBe(0);
   });
+
+  it("records tainted-symbol names in collectRefs", () => {
+    const pkg = "@blazetrails/activesupport";
+    const dir = writePkg({
+      "helper.ts": `
+        import { getAsyncContext } from "${pkg}";
+        export function executionContextId() { return getAsyncContext(); }
+      `,
+      "consumer.ts": `
+        import { executionContextId } from "./helper.js";
+        export function checkout() { return executionContextId(); }
+      `,
+    });
+    const program = programFor(dir);
+    const tainted = collectTaintedSymbols(program, dir, pkg, [], "activesupport");
+    const checker = program.getTypeChecker();
+    const consumerSf = program.getSourceFiles().find((sf) => sf.fileName.endsWith("consumer.ts"))!;
+    const importedNames = collectDirectImports(consumerSf, pkg);
+    const fn = consumerSf.statements.find((s): s is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(s),
+    )!;
+    const refs = new Set<string>();
+    methodUsesDepImport(
+      fn,
+      importedNames,
+      new Set(),
+      "activesupport",
+      consumerSf,
+      fn,
+      { checker, taintedSymbols: tainted },
+      refs,
+    );
+    expect(refs.has("executionContextId")).toBe(true);
+  });
 });
