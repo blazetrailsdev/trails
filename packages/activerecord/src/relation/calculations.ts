@@ -40,7 +40,7 @@ interface CalculationRelation {
     arelTable: any;
     primaryKey: string | string[];
     name: string;
-    adapter: {
+    connection: {
       adapterName: AdapterName;
       execute(sql: string): Promise<Record<string, unknown>[]>;
       selectAll(sql: string, name?: string | null): Promise<import("../result.js").Result>;
@@ -177,7 +177,7 @@ function buildAggNode(table: any, fn: AggFn, column: string, distinct: boolean):
  * Both are handled by BigIntegerType.cast without any SQL wrapping.
  */
 function needsBigintCast(rel: CalculationRelation): boolean {
-  return rel._modelClass.adapter.adapterName === "sqlite";
+  return rel._modelClass.connection.adapterName === "sqlite";
 }
 
 /**
@@ -219,7 +219,10 @@ async function singleAggregate(
   const sql =
     isBigintColumn(rel, fn, column) && needsBigintCast(rel) ? wrapBigintAgg(innerSql) : innerSql;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const result = await rel._modelClass.adapter.selectAll(sql, `${rel._modelClass.name} ${opName}`);
+  const result = await rel._modelClass.connection.selectAll(
+    sql,
+    `${rel._modelClass.name} ${opName}`,
+  );
   const rows = result.toArray() as Record<string, unknown>[];
   const val = rows[0]?.val;
   if (val === undefined || val === null) {
@@ -254,7 +257,7 @@ async function groupedAggregate(
       ? wrapBigintAgg(innerSql, true)
       : innerSql;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const queryResult = await rel._modelClass.adapter.selectAll(
+  const queryResult = await rel._modelClass.connection.selectAll(
     sql,
     `${rel._modelClass.name} ${opName}`,
   );
@@ -336,7 +339,7 @@ export async function performCount(
     const countNode = new Nodes.NamedFunction("COUNT", [columnAlias]);
     const outerManager = innerTable.project(countNode.as("count"));
     outerManager.from(subqueryNode);
-    const result = await this._modelClass.adapter.selectAll(
+    const result = await this._modelClass.connection.selectAll(
       outerManager.toSql(),
       `${this._modelClass.name} Count`,
     );
@@ -352,7 +355,7 @@ export async function performCount(
     const manager = table.project(countNode.as("count"));
     this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
-    const result = await this._modelClass.adapter.selectAll(
+    const result = await this._modelClass.connection.selectAll(
       manager.toSql(),
       `${this._modelClass.name} Count`,
     );
@@ -372,7 +375,7 @@ export async function performCount(
       const countAll = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
       const outerManager = table.project(countAll.as("count"));
       outerManager.from(new Nodes.SqlLiteral(`(${innerManager.toSql()}) AS subquery`));
-      const result = await this._modelClass.adapter.selectAll(
+      const result = await this._modelClass.connection.selectAll(
         outerManager.toSql(),
         `${this._modelClass.name} Count`,
       );
@@ -383,7 +386,7 @@ export async function performCount(
     const manager = table.project(countNode.as("count"));
     this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
-    const result = await this._modelClass.adapter.selectAll(
+    const result = await this._modelClass.connection.selectAll(
       manager.toSql(),
       `${this._modelClass.name} Count`,
     );
@@ -395,7 +398,7 @@ export async function performCount(
   const manager = table.project(countAll.as("count"));
   this._applyJoinsToManager(manager);
   this._applyWheresToManager(manager, table);
-  const result = await this._modelClass.adapter.selectAll(
+  const result = await this._modelClass.connection.selectAll(
     manager.toSql(),
     `${this._modelClass.name} Count`,
   );

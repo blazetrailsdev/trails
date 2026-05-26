@@ -87,7 +87,7 @@ export async function transaction<T>(
   fn: (tx: Transaction) => Promise<T>,
   options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
 ): Promise<T | undefined> {
-  const adapter = modelClass.adapter;
+  const adapter = modelClass.connection;
 
   const result = await dbTransaction.call(
     adapter as any,
@@ -532,7 +532,7 @@ export async function withTransactionReturningStatus<T>(
   let status: T;
 
   // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`.
-  const adapter = modelClass.adapter;
+  const adapter = modelClass.connection;
   const hadOuterTransaction = currentTransaction() !== null || adapter.inTransaction;
 
   await transaction(modelClass, async () => {
@@ -648,7 +648,7 @@ export async function addToTransaction(this: Base, ensureFinalize = true): Promi
   const ctor = this.constructor as any;
   // We're always called from within a transaction, so the adapter IS the
   // current connection — no need to go through withConnection.
-  ctor.adapter?.addTransactionRecord?.(this, ensureFinalize);
+  ctor.connection?.addTransactionRecord?.(this, ensureFinalize);
 }
 
 // Mirrors: ActiveRecord::Transactions#has_transactional_callbacks?

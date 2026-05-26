@@ -58,7 +58,7 @@ export async function countBySql(
   const sanitized = typeof sql === "string" ? sql : this.sanitizeSql(sql);
   // Rails: connection.select_value(sanitize_sql(sql)).to_i
   // Our adapters return rows; extract the first scalar value.
-  const rows = await this.adapter.execute(sanitized);
+  const rows = await this.connection.execute(sanitized);
   if (!rows[0]) return 0;
   const firstValue = Object.values(rows[0])[0];
   return Number(firstValue) || 0;
@@ -87,11 +87,11 @@ export async function _queryBySql(
 ): Promise<Record<string, unknown>[]> {
   if (Array.isArray(sql)) {
     // Array form [sql, ...values] — interpolate into the string
-    return this.adapter.execute(this.sanitizeSql(sql));
+    return this.connection.execute(this.sanitizeSql(sql));
   }
   // String SQL with separate binds — pass directly to adapter
   // (matching Rails where binds go to connection.select_all)
-  return this.adapter.execute(sql, binds);
+  return this.connection.execute(sql, binds);
 }
 
 /**

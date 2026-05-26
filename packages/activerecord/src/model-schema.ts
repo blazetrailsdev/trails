@@ -56,7 +56,7 @@ export function resolveTableName(this: typeof Base): string {
  */
 export function buildPkWhere(this: typeof Base, idValue: unknown): string {
   const pk = this.primaryKey;
-  const a = this.adapter;
+  const a = this.connection;
   if (Array.isArray(pk)) {
     if (!Array.isArray(idValue) || idValue.length !== pk.length) return "1=0";
     const conditions: string[] = [];
@@ -157,7 +157,7 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   let adapter: DatabaseAdapterLike | null = null;
   for (const cand of candidates) {
     try {
-      adapter = cand.adapter as DatabaseAdapterLike;
+      adapter = cand.connection as DatabaseAdapterLike;
     } catch {
       adapter = null;
     }
@@ -303,11 +303,11 @@ export function sqlTypeFor(typeName: string, adapterName?: string): string {
 export async function createTable(this: typeof Base): Promise<void> {
   const table = resolveTableName.call(this);
   const pks = Array.isArray(this.primaryKey) ? this.primaryKey : [this.primaryKey];
-  const adapterName = this.adapter.adapterName;
+  const adapterName = this.connection.adapterName;
   const isMysql = adapterName === "mysql";
   const isPg = adapterName === "postgres";
   const pkSet = new Set(pks);
-  const a = this.adapter;
+  const a = this.connection;
 
   await a.executeMutation(`DROP TABLE IF EXISTS ${a.quoteTableName(table)}`);
 
@@ -365,7 +365,7 @@ interface SchemaHost {
   _columns?: any[];
   _attributesBuilder?: any;
   _schemaLoaded?: boolean;
-  adapter: any;
+  connection: any;
   prototype: Record<string, unknown>;
   superclass?: SchemaHost;
   hookAttributeType?(name: string, type: Type): Type;
@@ -377,7 +377,7 @@ export function deriveJoinTableName(this: SchemaHost, otherTableName: string): s
 }
 
 export function quotedTableName(this: SchemaHost): string {
-  return this.adapter.quoteTableName(this.tableName);
+  return this.connection.quoteTableName(this.tableName);
 }
 
 /**
@@ -823,12 +823,12 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   // configuration).
   const schemaHost = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
 
-  let startingAdapter: SchemaHost["adapter"] | undefined;
+  let startingAdapter: SchemaHost["connection"] | undefined;
   let adapterOwner: SchemaHost | undefined;
   const candidates: SchemaHost[] = schemaHost === this ? [schemaHost] : [schemaHost, this];
   for (const cand of candidates) {
     try {
-      startingAdapter = cand.adapter;
+      startingAdapter = cand.connection;
     } catch {
       startingAdapter = undefined;
     }
@@ -872,9 +872,9 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   // *same* host that supplied startingAdapter still has it — checking
   // other candidates would let a stale reflection slip through if the
   // adapter moved.
-  let currentAdapter: SchemaHost["adapter"] | undefined;
+  let currentAdapter: SchemaHost["connection"] | undefined;
   try {
-    currentAdapter = adapterOwner.adapter;
+    currentAdapter = adapterOwner.connection;
   } catch {
     currentAdapter = undefined;
   }
@@ -897,11 +897,11 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
   // Adapter may be configured on the base OR on the subclass. Try base
   // first (Rails-normal), fall back to the originating host. Access can
   // throw when no pool is configured; treat as "no adapter".
-  let adapter: SchemaHost["adapter"] | undefined;
+  let adapter: SchemaHost["connection"] | undefined;
   const candidates = schemaHost === host ? [schemaHost] : [schemaHost, host];
   for (const cand of candidates) {
     try {
-      adapter = cand.adapter;
+      adapter = cand.connection;
     } catch {
       adapter = undefined;
     }
@@ -969,10 +969,10 @@ export function columnDefaults(this: SchemaHost): Record<string, unknown> {
 }
 
 export async function tableExists(this: SchemaHost): Promise<boolean> {
-  const { adapter } = this;
-  const cache = adapter.schemaCache;
+  const conn = this.connection;
+  const cache = conn.schemaCache;
   if (!cache || typeof cache.dataSourceExists !== "function") return true;
-  const pool = adapter.pool ?? adapter;
+  const pool = conn.pool ?? conn;
   const exists = await cache.dataSourceExists(pool, this.tableName);
   return exists !== false;
 }

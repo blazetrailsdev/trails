@@ -118,14 +118,14 @@ export function defaultValue(): Type {
  *
  * Mirrors: ActiveRecord::Type.adapter_name_from
  */
-export function adapterNameFrom(model: { adapter?: unknown }): AdapterName {
-  return (model.adapter as DatabaseAdapter | null | undefined)?.adapterName ?? "sqlite";
+export function adapterNameFrom(model: { connection?: unknown }): AdapterName {
+  return (model.connection as DatabaseAdapter | null | undefined)?.adapterName ?? "sqlite";
 }
 
 // currentAdapterName is private in Rails — exposed here for api:compare parity only.
 // When Base wires setCurrentAdapterResolver(), it reads the real connection adapter.
 /** @internal */
-export function currentAdapterName(getBase?: () => { adapter?: unknown }): AdapterName {
+export function currentAdapterName(getBase?: () => { connection?: unknown }): AdapterName {
   if (getBase) return adapterNameFrom(getBase());
   return _currentAdapterResolver?.() ?? "sqlite";
 }

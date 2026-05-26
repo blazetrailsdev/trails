@@ -24,7 +24,7 @@ export class Connection {
     const column = this.resolveColumn(attrName);
 
     if (column) {
-      const adapter = this._klass?.adapter;
+      const adapter = this._klass?.connection;
       const type = adapter?.lookupCastTypeFromColumn?.(column);
       if (type) return type;
 
@@ -41,7 +41,7 @@ export class Connection {
   private resolveColumn(attrName: string): unknown | undefined {
     // Only consult the schema cache when it's already populated — avoid
     // triggering cache-miss paths that call async adapter methods.
-    const adapter = this._klass?.adapter;
+    const adapter = this._klass?.connection;
     const schemaCache = adapter?.schemaCache;
     if (schemaCache?.isCached(this._tableName)) {
       const hash = schemaCache.getCachedColumnsHash(this._tableName);

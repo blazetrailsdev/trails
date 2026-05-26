@@ -64,7 +64,7 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
   // Only defer when the adapter supports addTransactionRecord AND a real
   // (non-null) transaction is currently open. NullTransaction.addRecord is
   // a no-op, so deferring into it would silently lose the flush.
-  const adapter = ctor.adapter as any;
+  const adapter = ctor.connection as any;
   const hasAddRecord = typeof adapter?.addTransactionRecord === "function";
   const currentTx =
     typeof adapter?.currentTransaction === "function" ? adapter.currentTransaction() : null;

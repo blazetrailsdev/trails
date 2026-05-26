@@ -39,7 +39,7 @@ export class InsertAll {
   private _connectionOverride: ModelClass["adapter"] | null = null;
 
   get connection(): ModelClass["adapter"] {
-    return this._connectionOverride ?? this.model.adapter;
+    return this._connectionOverride ?? this.model.connection;
   }
   readonly inserts: Record<string, unknown>[];
   readonly keys: Set<string>;

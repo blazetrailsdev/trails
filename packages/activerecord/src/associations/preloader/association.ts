@@ -380,7 +380,7 @@ export class LoaderQuery {
     const spec = klass.connectionSpecificationName ?? "";
     let adapter: object;
     try {
-      adapter = klass.adapter;
+      adapter = klass.connection;
     } catch (e) {
       if (e instanceof ConnectionNotDefined) return spec;
       throw e;

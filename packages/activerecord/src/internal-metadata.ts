@@ -45,11 +45,11 @@ export class NullInternalMetadata {
 
 export class InternalMetadata {
   static readonly TABLE_NAME = "ar_internal_metadata";
-  private _adapter: DatabaseAdapter;
+  private _connection: DatabaseAdapter;
   readonly arelTable: Table;
 
   private _q(name: string): string {
-    return this._adapter.quoteIdentifier(name);
+    return this._connection.quoteIdentifier(name);
   }
 
   get primaryKey(): string {
@@ -67,7 +67,7 @@ export class InternalMetadata {
   private _enabled: boolean;
 
   constructor(adapter: DatabaseAdapter, options: { enabled?: boolean } = {}) {
-    this._adapter = adapter;
+    this._connection = adapter;
     this.arelTable = new Table(this.tableName);
     this._enabled = options.enabled ?? true;
   }
@@ -84,10 +84,10 @@ export class InternalMetadata {
 
   async createTable(): Promise<void> {
     if (!this._enabled) return;
-    const tsType = this._adapter.adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
+    const tsType = this._connection.adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
     const q = (n: string) => this._q(n);
-    await this._adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS ${this._adapter.quoteTableName(this.tableName)} (` +
+    await this._connection.executeMutation(
+      `CREATE TABLE IF NOT EXISTS ${this._connection.quoteTableName(this.tableName)} (` +
         `${q("key")} VARCHAR(255) NOT NULL PRIMARY KEY, ` +
         `${q("value")} VARCHAR(255), ` +
         `${q("created_at")} ${tsType} NOT NULL, ` +
@@ -114,8 +114,8 @@ export class InternalMetadata {
     // reaching over and dropping ar_internal_metadata that another
     // config or adapter is actively using.
     if (!this._enabled) return;
-    await this._adapter.executeMutation(
-      `DROP TABLE IF EXISTS ${this._adapter.quoteTableName(this.tableName)}`,
+    await this._connection.executeMutation(
+      `DROP TABLE IF EXISTS ${this._connection.quoteTableName(this.tableName)}`,
     );
   }
 
@@ -163,7 +163,7 @@ export class InternalMetadata {
     if (!this._enabled) return;
     const dm = new DeleteManager();
     dm.from(this.arelTable);
-    await this._adapter.executeMutation(dm.toSql());
+    await this._connection.executeMutation(dm.toSql());
   }
 
   async count(): Promise<number> {
@@ -173,7 +173,7 @@ export class InternalMetadata {
     if (!this._enabled) return 0;
     const sm = new SelectManager(this.arelTable);
     sm.project(new Nodes.NamedFunction("COUNT", [star]).as("cnt"));
-    const rows = await this._adapter.execute(sm.toSql());
+    const rows = await this._connection.execute(sm.toSql());
     return Number(rows[0]?.cnt ?? 0);
   }
 
@@ -194,7 +194,7 @@ export class InternalMetadata {
       const sm = new SelectManager(this.arelTable);
       sm.project(new Nodes.Quoted(1));
       sm.take(1);
-      await this._adapter.execute(sm.toSql());
+      await this._connection.execute(sm.toSql());
       return true;
     } catch {
       return false;
@@ -221,7 +221,7 @@ export class InternalMetadata {
     sm.where(this.arelTable.get(this.primaryKey).eq(key));
     sm.order(this.arelTable.get(this.primaryKey).asc());
     sm.take(1);
-    const rows = await this._adapter.execute(sm.toSql());
+    const rows = await this._connection.execute(sm.toSql());
     return rows[0] ?? null;
   }
 
@@ -234,7 +234,7 @@ export class InternalMetadata {
       [this.arelTable.get("created_at"), now],
       [this.arelTable.get("updated_at"), now],
     ]);
-    await this._adapter.executeMutation(im.toSql());
+    await this._connection.executeMutation(im.toSql());
   }
 
   private async updateEntry(key: string, newValue: string): Promise<void> {
@@ -246,6 +246,6 @@ export class InternalMetadata {
       [this.arelTable.get("updated_at"), now],
     ]);
     um.where(this.arelTable.get(this.primaryKey).eq(key));
-    await this._adapter.executeMutation(um.toSql());
+    await this._connection.executeMutation(um.toSql());
   }
 }

@@ -99,13 +99,13 @@ export async function touch(
     }
   }
 
-  const adapter = ctor.adapter as any;
+  const adapter = ctor.connection as any;
   let affected: number;
   if (typeof adapter.update === "function") {
     affected = await adapter.update(um);
   } else {
     const sql = adapter.toSql ? adapter.toSql(um) : um.toSql();
-    affected = await ctor.adapter.execUpdate(sql, `${ctor.name} Touch`);
+    affected = await ctor.connection.execUpdate(sql, `${ctor.name} Touch`);
   }
   if (ctor.lockingEnabled && affected === 0) {
     throw new StaleObjectError(this, "touch");

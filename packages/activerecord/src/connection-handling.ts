@@ -410,6 +410,8 @@ export function isConnectedQ(this: typeof Base): boolean {
 export const isConnected = isConnectedQ;
 
 export function connection(this: typeof Base): DatabaseAdapter {
+  // Fast path: directly assigned via `Model.adapter = x` (tests + simple setups)
+  if ((this as any)._adapter) return (this as any)._adapter;
   const pool = connectionPool.call(this);
   if (pool.isPermanentLease()) return pool.leaseConnection();
   return pool.activeConnection ?? pool.leaseConnection();

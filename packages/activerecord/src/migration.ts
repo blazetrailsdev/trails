@@ -247,7 +247,7 @@ export abstract class Migration {
 
   /** Return the normalized adapter name from the configured adapter. */
   protected get _adapterName(): "sqlite" | "postgres" | "mysql" {
-    return this.adapter.adapterName;
+    return this.connection.adapterName;
   }
 
   private _schema?: SchemaStatements;
@@ -1161,7 +1161,7 @@ export abstract class Migration {
   async revert(migrationOrFn?: Migration | (() => Promise<void>)): Promise<void> {
     if (migrationOrFn === undefined) return;
     if (migrationOrFn instanceof Migration) {
-      (migrationOrFn as any).adapter = this.adapter;
+      (migrationOrFn as any).connection = this.connection;
       await migrationOrFn.down();
     } else {
       // Record operations and reverse them, preserving outer recorder state
@@ -1228,7 +1228,7 @@ export abstract class Migration {
   async migrate(direction: "up" | "down"): Promise<void> {
     this.announce(direction === "up" ? "migrating" : "reverting");
     const start = Date.now();
-    await this.execMigration(this.adapter, direction);
+    await this.execMigration(this.connection, direction);
     const elapsed = ((Date.now() - start) / 1000).toFixed(4);
     this.announce(`${direction === "up" ? "migrated" : "reverted"} (${elapsed}s)`);
     this.write();
@@ -1269,7 +1269,7 @@ export abstract class Migration {
    * Execute the migration on a given adapter.
    */
   async run(adapter?: DatabaseAdapter, direction: "up" | "down" = "up"): Promise<void> {
-    if (adapter) this.adapter = adapter;
+    if (adapter) this.connection = adapter;
     if (direction === "up") {
       await this.up();
     } else {
@@ -1559,19 +1559,19 @@ export abstract class Migration {
 
   /** Instance delegation target — returns the current adapter. Distinct from the class-level `Migration.delegate`. */
   get delegate(): DatabaseAdapter {
-    return this.adapter;
+    return this.connection;
   }
 
   get nearestDelegate(): DatabaseAdapter {
-    return this.adapter;
+    return this.connection;
   }
 
   /** @internal */
   methodMissing(name: string, ...args: unknown[]): unknown {
-    const conn = this.adapter as unknown as Record<string, unknown>;
+    const conn = this.connection as unknown as Record<string, unknown>;
     if (typeof conn[name] !== "function") {
       // JS has no NoMethodError; TypeError is the closest stdlib equivalent.
-      throw new TypeError(`undefined method '${name}' for ${this.adapter.constructor.name}`);
+      throw new TypeError(`undefined method '${name}' for ${this.connection.constructor.name}`);
     }
     return (conn[name] as (...a: unknown[]) => unknown).apply(conn, args);
   }
@@ -1605,7 +1605,7 @@ export abstract class Migration {
 
   /** @internal */
   commandRecorder(): CommandRecorder {
-    return new CommandRecorder(this.adapter);
+    return new CommandRecorder(this.connection);
   }
 
   /** @internal */
@@ -1678,10 +1678,10 @@ export class MigrationContext {
     this._tableNameSuffix = value;
   }
 
-  constructor(private adapter: DatabaseAdapter) {}
+  constructor(private connection: DatabaseAdapter) {}
 
   private get _adapterName(): "sqlite" | "postgres" | "mysql" {
-    return this.adapter.adapterName;
+    return this.connection.adapterName;
   }
 
   /** @internal Query catalog for column names+types — used after CTAS where columns derive from the SELECT. */
@@ -1696,7 +1696,7 @@ export class MigrationContext {
     }[]
   > {
     const a = this._adapterName;
-    const qt = this.adapter.quoteTableName(name);
+    const qt = this.connection.quoteTableName(name);
     let sql: string;
     if (a === "sqlite") {
       sql = `PRAGMA table_info(${qt})`;
@@ -1710,7 +1710,7 @@ export class MigrationContext {
     } else {
       sql = `SHOW COLUMNS FROM ${qt}`;
     }
-    const rows = await this.adapter.execute(sql);
+    const rows = await this.connection.execute(sql);
     return rows.map((r) => {
       const x = r as Record<string, unknown>;
       const colName = (x.name ?? x.column_name ?? x.Field) as string;
@@ -1732,7 +1732,7 @@ export class MigrationContext {
       // hard-coding Rails' default — abstract-mysql-adapter exposes it.
       const emulateBooleans =
         a === "mysql"
-          ? ((this.adapter as { emulateBooleans?: boolean }).emulateBooleans ?? true)
+          ? ((this.connection as { emulateBooleans?: boolean }).emulateBooleans ?? true)
           : true;
       const normalized = MigrationContext._normalizeIntrospectedType(rawType, a, {
         emulateBooleans,
@@ -1915,12 +1915,12 @@ export class MigrationContext {
       collation: options?.collation,
       as: options?.as,
       adapterName: this._adapterName,
-      adapter: this.adapter,
+      adapter: this.connection,
     });
     if (fn) fn(td);
-    await this.adapter.executeMutation(td.toSql());
+    await this.connection.executeMutation(td.toSql());
     if (options?.comment != null && options.comment.length > 0) {
-      const adapterWithComments = this.adapter as {
+      const adapterWithComments = this.connection as {
         supportsComments?: () => boolean;
         supportsCommentsInCreate?: () => boolean;
         changeTableComment?: (name: string, comment: string | null) => Promise<void>;
@@ -1993,7 +1993,7 @@ export class MigrationContext {
     this._columnMeta.set(name, meta);
 
     // Create indexes from table definition — skip for adapters that emit them inline in CREATE TABLE
-    const adapterWithIndexInCreate = this.adapter as { supportsIndexesInCreate?: () => boolean };
+    const adapterWithIndexInCreate = this.connection as { supportsIndexesInCreate?: () => boolean };
     if (adapterWithIndexInCreate.supportsIndexesInCreate?.()) {
       for (const idx of td.indexes) {
         const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_and_")}`;
@@ -2033,8 +2033,8 @@ export class MigrationContext {
     const ifExists = options?.ifExists === false ? "" : " IF EXISTS";
     const cascade =
       options?.force === "cascade" && this._adapterName === "postgres" ? " CASCADE" : "";
-    const quoted = this.adapter.quoteTableName(name);
-    await this.adapter.executeMutation(`DROP${temporary} TABLE${ifExists} ${quoted}${cascade}`);
+    const quoted = this.connection.quoteTableName(name);
+    await this.connection.executeMutation(`DROP${temporary} TABLE${ifExists} ${quoted}${cascade}`);
     this._tables.delete(name);
     this._columns.delete(name);
     this._columnMeta.delete(name);
@@ -2042,7 +2042,7 @@ export class MigrationContext {
   }
 
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
-    await (this.adapter as any).enableExtension?.(name, options);
+    await (this.connection as any).enableExtension?.(name, options);
   }
 
   async createEnum(
@@ -2050,17 +2050,17 @@ export class MigrationContext {
     values: string[],
     options?: Record<string, unknown>,
   ): Promise<void> {
-    await (this.adapter as any).createEnum?.(name, values, options);
+    await (this.connection as any).createEnum?.(name, values, options);
   }
 
   async createSchema(name: string, options?: Record<string, unknown>): Promise<void> {
-    await (this.adapter as any).createSchema?.(name, options);
+    await (this.connection as any).createSchema?.(name, options);
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#create_virtual_table
   async createVirtualTable(name: string, moduleName: string, args: string[]): Promise<void> {
-    if (typeof (this.adapter as any).createVirtualTable === "function") {
-      await (this.adapter as any).createVirtualTable(name, moduleName, args);
+    if (typeof (this.connection as any).createVirtualTable === "function") {
+      await (this.connection as any).createVirtualTable(name, moduleName, args);
       this._tables.add(name);
     }
     // Non-SQLite adapters: no-op; virtual tables are SQLite-specific.
@@ -2129,7 +2129,7 @@ export class MigrationContext {
       }
       return;
     }
-    await this.adapter.executeMutation(
+    await this.connection.executeMutation(
       `ALTER TABLE "${table}" ADD COLUMN "${column}" ${this._mapType(type, _options)}`,
     );
     if (!this._columns.has(table)) this._columns.set(table, new Set());
@@ -2159,7 +2159,7 @@ export class MigrationContext {
       }
       const allCols = [columnOrColumns, optionsOrColumn, ...rest];
       for (const col of allCols) {
-        await this.adapter.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${col}"`);
+        await this.connection.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${col}"`);
         this._columns.get(table)?.delete(col);
         this._columnMeta.get(table)?.delete(col);
       }
@@ -2168,13 +2168,17 @@ export class MigrationContext {
     if (optionsOrColumn?.ifExists && !this.columnExists(table, columnOrColumns)) {
       return;
     }
-    await this.adapter.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${columnOrColumns}"`);
+    await this.connection.executeMutation(
+      `ALTER TABLE "${table}" DROP COLUMN "${columnOrColumns}"`,
+    );
     this._columns.get(table)?.delete(columnOrColumns);
     this._columnMeta.get(table)?.delete(columnOrColumns);
   }
 
   async renameColumn(table: string, from: string, to: string): Promise<void> {
-    await this.adapter.executeMutation(`ALTER TABLE "${table}" RENAME COLUMN "${from}" TO "${to}"`);
+    await this.connection.executeMutation(
+      `ALTER TABLE "${table}" RENAME COLUMN "${from}" TO "${to}"`,
+    );
     const cols = this._columns.get(table);
     if (cols) {
       cols.delete(from);
@@ -2195,11 +2199,11 @@ export class MigrationContext {
     _options?: ColumnOptions,
   ): Promise<void> {
     if (this._adapterName === "mysql") {
-      await this.adapter.executeMutation(
+      await this.connection.executeMutation(
         `ALTER TABLE "${table}" MODIFY COLUMN "${column}" ${this._mapType(type, _options)}`,
       );
     } else {
-      await this.adapter.executeMutation(
+      await this.connection.executeMutation(
         `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${this._mapType(type, _options)}`,
       );
     }
@@ -2246,7 +2250,7 @@ export class MigrationContext {
     const colsStr = cols
       .map((c) => {
         const isExpr = /\W/.test(c);
-        let col = isExpr ? c : this.adapter.quoteIdentifier(c);
+        let col = isExpr ? c : this.connection.quoteIdentifier(c);
         if (an !== "mysql") {
           const ord = options?.order?.[c];
           if (ord) col += ` ${ord.toUpperCase()}`;
@@ -2258,14 +2262,14 @@ export class MigrationContext {
       an === "postgres" && options?.using && options.using !== "btree"
         ? ` USING ${options.using}`
         : "";
-    let sql = `CREATE ${uniqueStr}INDEX ${ifNotExistsStr}${this.adapter.quoteIdentifier(indexName)} ON ${this.adapter.quoteTableName(table)}${usingStr} (${colsStr})`;
+    let sql = `CREATE ${uniqueStr}INDEX ${ifNotExistsStr}${this.connection.quoteIdentifier(indexName)} ON ${this.connection.quoteTableName(table)}${usingStr} (${colsStr})`;
     // Clause order mirrors Rails' visit_CreateIndexDefinition
     // (abstract/schema_creation.rb): INCLUDE → NULLS NOT DISTINCT → WHERE.
     if (an === "postgres" && options?.include && options.include.length > 0)
-      sql += ` INCLUDE (${options.include.map((c) => this.adapter.quoteIdentifier(c)).join(", ")})`;
+      sql += ` INCLUDE (${options.include.map((c) => this.connection.quoteIdentifier(c)).join(", ")})`;
     if (an === "postgres" && options?.nullsNotDistinct) sql += " NULLS NOT DISTINCT";
     if (an !== "mysql" && options?.where) sql += ` WHERE ${options.where}`;
-    await this.adapter.executeMutation(sql);
+    await this.connection.executeMutation(sql);
     if (!this._indexes.has(table)) this._indexes.set(table, []);
     this._indexes.get(table)!.push({
       columns: cols,
@@ -2289,10 +2293,10 @@ export class MigrationContext {
       indexName = `index_${table}_on_${cols.join("_and_")}`;
     }
     if (indexName) {
-      if (this.adapter.adapterName === "mysql") {
-        await this.adapter.executeMutation(`DROP INDEX \`${indexName}\` ON \`${table}\``);
+      if (this.connection.adapterName === "mysql") {
+        await this.connection.executeMutation(`DROP INDEX \`${indexName}\` ON \`${table}\``);
       } else {
-        await this.adapter.executeMutation(`DROP INDEX "${indexName}"`);
+        await this.connection.executeMutation(`DROP INDEX "${indexName}"`);
       }
       const tableIndexes = this._indexes.get(table);
       if (tableIndexes) {
@@ -2307,7 +2311,7 @@ export class MigrationContext {
   async renameTable(from: string, to: string): Promise<void> {
     const fullFrom = `${this.tableNamePrefix}${from}${this.tableNameSuffix}`;
     const fullTo = `${this.tableNamePrefix}${to}${this.tableNameSuffix}`;
-    await this.adapter.executeMutation(`ALTER TABLE "${fullFrom}" RENAME TO "${fullTo}"`);
+    await this.connection.executeMutation(`ALTER TABLE "${fullFrom}" RENAME TO "${fullTo}"`);
     this._tables.delete(fullFrom);
     this._tables.add(fullTo);
     const cols = this._columns.get(fullFrom);

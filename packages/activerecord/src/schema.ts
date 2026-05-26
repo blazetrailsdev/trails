@@ -122,7 +122,7 @@ export class Schema extends Current {
 
   constructor(adapter: DatabaseAdapter) {
     super();
-    this.adapter = adapter;
+    this.connection = adapter;
   }
 }
 

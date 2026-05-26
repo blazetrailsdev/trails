@@ -29,7 +29,7 @@ export async function lockBang<T extends Base>(
     .project(arelStar)
     .where((ctor as any)._buildPkWhereNode(this.id))
     .lock(lockClause);
-  const rows = await ctor.adapter.execute(sm.toSql());
+  const rows = await ctor.connection.execute(sm.toSql());
 
   if (rows.length === 0) {
     throw new RecordNotFound(
