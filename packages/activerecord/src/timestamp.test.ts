@@ -9,7 +9,6 @@ import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base, MigrationContext, registerModel } from "./index.js";
 import { Associations } from "./associations.js";
 
-import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -940,23 +939,25 @@ describe("TimestampTest", () => {
 // MySQL/MariaDB datetime wire format (Temporal ISO Z suffix) is a pre-existing
 // gap tracked separately; these tests cover the SQLite/PG paths only.
 describe("TimestampTest — t.timestamps() end-to-end", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    const ctx = new MigrationContext(Base.adapter);
+    await ctx.createTable("timed_authors", {}, (t) => {
+      t.string("name");
+      t.timestamps();
+    });
+  });
+
   it.skipIf(adapterType === "mysql")(
     "create fills both columns when table has NOT NULL timestamp columns from t.timestamps()",
     async () => {
-      const adapter = createTestAdapter();
-      const ctx = new MigrationContext(adapter);
-      await ctx.createTable("authors", {}, (t) => {
-        t.string("name");
-        t.timestamps();
-      });
-
       class Author extends Base {
         static {
-          this._tableName = "authors";
+          this._tableName = "timed_authors";
           this.attribute("name", "string");
           this.attribute("created_at", "datetime");
           this.attribute("updated_at", "datetime");
-          this.adapter = adapter;
         }
       }
 
@@ -965,25 +966,29 @@ describe("TimestampTest — t.timestamps() end-to-end", () => {
       expect(author.updated_at).toBeInstanceOf(Temporal.Instant);
     },
   );
+});
+
+describe("TimestampTest — t.timestamps() end-to-end", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    const ctx = new MigrationContext(Base.adapter);
+    await ctx.createTable("nullable_timed_authors", {}, (t) => {
+      t.string("name");
+      t.timestamps({ null: true });
+    });
+  });
 
   it.skipIf(adapterType === "mysql")(
     "insert does not fail when recordTimestamps is false and columns are nullable",
     async () => {
-      const adapter = createTestAdapter();
-      const ctx = new MigrationContext(adapter);
-      await ctx.createTable("authors", {}, (t) => {
-        t.string("name");
-        t.timestamps({ null: true });
-      });
-
       class Author extends Base {
         static {
-          this._tableName = "authors";
+          this._tableName = "nullable_timed_authors";
           this.attribute("name", "string");
           this.attribute("created_at", "datetime");
           this.attribute("updated_at", "datetime");
           this.recordTimestamps = false;
-          this.adapter = adapter;
         }
       }
 
