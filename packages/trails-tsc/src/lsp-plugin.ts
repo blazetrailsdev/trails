@@ -1,7 +1,7 @@
 /**
  * TS language service plugin — Phase 2c-b (plan §2.4). Registered in
  * a host project's `tsconfig.json` under `compilerOptions.plugins` as
- * `{ "name": "@blazetrails/trails-tsc/ts-plugin" }` (or the `/lsp` alias). Virtualizes `.tse`
+ * `{ "name": "@blazetrails/trails-tsc/ts-plugin" }`. Virtualizes `.tse`
  * sources on the fly so tsserver type-checks them in the IDE without
  * a prebuild. The on-disk mirror is still required at runtime —
  * `trails-tsc-views dev` covers that.

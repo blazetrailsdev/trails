@@ -49,15 +49,15 @@ Collected from post-merge findings across all story PRs. Grouped by area.
 
 **Rails fidelity**
 
-- [ ] ~3 LOC (#2375): `TseRenderContextImpl.raw()` short-circuits on `SafeBuffer` inputs — Rails `raw()` always calls `.to_s.html_safe`. Remove the short-circuit, keep only the OutputBuffer guard. File: `packages/actionview/src/render-context.ts`.
+- [x] ~3 LOC (#2375/#2393): `TseRenderContextImpl.raw()` short-circuits on `SafeBuffer` inputs — Rails `raw()` always calls `.to_s.html_safe`. Remove the short-circuit, keep only the OutputBuffer guard. File: `packages/actionview/src/render-context.ts`.
 
 **Build tooling**
 
 - [ ] ~30 LOC (#2382): multi-line `<% %>` code tags only map the first generated line in `.tse.js.map`. Fix: emit one mapping per output line. Requires column-level spans in lexer tokens first.
-- [ ] ~15 LOC (#2382): `emitDeclarations()` in `build-views.ts` ignores `program.emit()` return value — `throw` on `emitSkipped` for fail-fast.
-- [ ] ~10 LOC (#2382): `lineAt()` in lexer is O(n) per call (O(n²) total). Replace with precomputed line-start index + binary search if templates grow large.
-- [ ] ~30 LOC (#2377): `trails-tsc-views build` should emit `.tse.d.ts` alongside `.tse.js` so exports `types` condition points at declaration files instead of `.tse.ts` source shims.
-- [ ] ~5 LOC (#2377): `./lsp` and `./ts-plugin` exports on `@blazetrails/trails-tsc` are duplicates. Deprecate and remove `./lsp` once downstream migrates.
+- [x] ~15 LOC (#2382): `emitDeclarations()` in `build-views.ts` ignores `program.emit()` return value — `throw` on `emitSkipped` for fail-fast.
+- [x] ~10 LOC (#2382): `lineAt()` in lexer is O(n) per call (O(n²) total). Replace with precomputed line-start index + binary search if templates grow large.
+- [x] ~30 LOC (#2377): `trails-tsc-views build` should emit `.tse.d.ts` alongside `.tse.js` so exports `types` condition points at declaration files instead of `.tse.ts` source shims.
+- [x] ~5 LOC (#2377): `./lsp` and `./ts-plugin` exports on `@blazetrails/trails-tsc` are duplicates. Deprecate and remove `./lsp` once downstream migrates.
 
 **Sync / maintenance**
 

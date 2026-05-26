@@ -26,10 +26,23 @@ export class TseSyntaxError extends Error {}
 const TAG_RE = /<%%|%%>|<%!([\s\S]*?)!%>|<%(-)?(==|=|#)?([\s\S]*?)(-)?%>/g;
 const KIND: Record<string, TokenKind> = { "=": "expr", "==": "rawExpr", "#": "comment" };
 
-function lineAt(source: string, offset: number): number {
-  let n = 0;
-  for (let i = 0; i < offset; i++) if (source.charCodeAt(i) === 10) n++;
-  return n;
+function buildLineStarts(source: string): number[] {
+  const starts = [0];
+  for (let i = 0; i < source.length; i++) {
+    if (source.charCodeAt(i) === 10) starts.push(i + 1);
+  }
+  return starts;
+}
+
+function lineAt(lineStarts: readonly number[], offset: number): number {
+  let lo = 0;
+  let hi = lineStarts.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (lineStarts[mid]! <= offset) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo - 1;
 }
 
 const text = (value: string, srcLine: number): Token => ({
@@ -42,7 +55,8 @@ const text = (value: string, srcLine: number): Token => ({
 
 export function tokenize(source: string): Token[] {
   const tokens: Token[] = [];
-  const line = (offset: number): number => lineAt(source, offset);
+  const starts = buildLineStarts(source);
+  const line = (offset: number): number => lineAt(starts, offset);
   let buf = "";
   let last = 0;
   let bufStartOffset = 0;
