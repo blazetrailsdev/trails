@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } 
 import { Base } from "./index.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 
-setupHandlerSuite();
-
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 });
+
+setupHandlerSuite();
 
 afterAll(() => {
   vi.unstubAllEnvs();
