@@ -539,6 +539,31 @@ export async function defineSchema(
   return _defineSchemaImpl(adapter, schema, resolvedOpts);
 }
 
+async function _resetAutoIncrement(
+  adapter: DatabaseAdapter,
+  _ss: SchemaStatements,
+  table: string,
+): Promise<void> {
+  try {
+    const qt = adapter.quoteTableName(table);
+    switch (adapter.adapterName) {
+      case "postgres":
+        await adapter.executeMutation(`SELECT setval(pg_get_serial_sequence($1, 'id'), 1, false)`, [
+          table,
+        ]);
+        break;
+      case "mysql":
+        await adapter.executeMutation(`ALTER TABLE ${qt} AUTO_INCREMENT = 1`);
+        break;
+      case "sqlite":
+        await adapter.executeMutation(`DELETE FROM sqlite_sequence WHERE name = ?`, [table]);
+        break;
+    }
+  } catch {
+    // Table may lack an auto-increment column (e.g. composite PK).
+  }
+}
+
 async function _defineSchemaImpl(
   adapter: DatabaseAdapter,
   schema: Schema,
@@ -573,26 +598,24 @@ async function _defineSchemaImpl(
     const raw = schema[table];
     const newSig = tableSignature(raw);
     const cachedSig = cache.get(table);
-    let stillExists = known ? known.has(table) : cachedSig !== undefined;
+    const stillExists = known ? known.has(table) : cachedSig !== undefined;
     if (cachedSig === newSig && stillExists) {
+      // D-Z: table persists across files. Reset auto-increment so tests
+      // that depend on id=1 (e.g. toParam, findEach start/finish) work.
+      // Skip for tables without a default id PK (composite/false).
+      const pk = primaryKeyOf(raw);
+      if (pk === undefined) {
+        await _resetAutoIncrement(adapter, ss, table);
+      }
       continue;
     }
-    // On PG/MySQL (shared DB), the canonical preload or a prior defineSchema
-    // call may have created this table with a different schema. Always drop
-    // before recreating. On SQLite :memory: (separate DB per adapter),
-    // _canonicalPreloadKey is null — safe to use IF NOT EXISTS.
-    if (_canonicalPreloadKey !== null) {
-      await ss.dropTable(table, { ifExists: true });
-      stillExists = true;
-    } else if (stillExists) {
-      await ss.dropTable(table, { ifExists: true });
-    } else if (cachedSig !== undefined) {
-      cache.delete(table);
-    }
+    // D-Z: always drop the specific table before recreating. Together with
+    // dropAllTables clearing the signature cache, this eliminates the need
+    // for afterAll(dropAllTables) in useHandlerTransactionalFixtures.
+    await ss.dropTable(table, { ifExists: true });
     const columns = columnsOf(raw);
     const pk = primaryKeyOf(raw);
-    const createOpts: { id?: boolean; primaryKey?: string[]; ifNotExists?: boolean } = {};
-    if (!stillExists && cachedSig === undefined) createOpts.ifNotExists = true;
+    const createOpts: { id?: boolean; primaryKey?: string[] } = {};
     if (pk === false) createOpts.id = false;
     else if (Array.isArray(pk)) {
       createOpts.primaryKey = pk;

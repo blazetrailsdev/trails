@@ -1,12 +1,17 @@
 import type { DatabaseAdapter } from "../adapter.js";
+import { clearAppliedSchemaSignatures } from "./define-schema.js";
 
 /**
- * Drops every user table/view/matview in the database. Idempotent; per-DROP
- * errors are swallowed so teardown noise never aborts the sequence.
+ * Drops every user table/view/matview in the database and clears the
+ * `defineSchema` signature cache for this adapter so a subsequent
+ * `defineSchema(sameSpec)` re-creates the tables instead of no-oping
+ * over missing ones. Idempotent; per-DROP errors are swallowed so
+ * teardown noise never aborts the sequence.
  * PG covers all schemas in `current_schemas(false)` (not just `public`).
  * MySQL uses a pinned pool connection with `FOREIGN_KEY_CHECKS=0`.
  */
 export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
+  clearAppliedSchemaSignatures(adapter);
   switch (adapter.adapterName) {
     case "postgres":
       await dropAllPgTables(adapter);
