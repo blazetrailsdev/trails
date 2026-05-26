@@ -28,8 +28,7 @@ import {
   currentShard as coreCurrentShard,
   isApplicationRecordClass as coreIsApplicationRecordClass,
 } from "./core.js";
-import { getAsyncContext } from "@blazetrails/activesupport";
-import type { AsyncContext } from "@blazetrails/activesupport";
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
 
 /**
  * Connection establishment and management for ActiveRecord models.
@@ -37,17 +36,7 @@ import type { AsyncContext } from "@blazetrails/activesupport";
  * Mirrors: ActiveRecord::ConnectionHandling
  */
 
-let _prohibitContext: AsyncContext<boolean> | null = null;
-let _prohibitContextAdapter: ReturnType<typeof getAsyncContext> | null = null;
-
-function getProhibitContext(): AsyncContext<boolean> {
-  const adapter = getAsyncContext();
-  if (!_prohibitContext || _prohibitContextAdapter !== adapter) {
-    _prohibitContextAdapter = adapter;
-    _prohibitContext = adapter.create<boolean>();
-  }
-  return _prohibitContext;
-}
+const PROHIBIT_SHARD_SWAPPING_KEY = Symbol.for("ar_prohibit_shard_swapping");
 
 // --- ConnectionHandling module methods (mixed into Base as static methods) ---
 
@@ -342,11 +331,11 @@ export function whilePreventingWrites<T>(this: typeof Base, fn: () => T, enabled
 }
 
 export function prohibitShardSwapping<T>(fn: () => T, enabled = true): T {
-  return getProhibitContext().run(enabled, fn);
+  return IsolatedExecutionState.scope(PROHIBIT_SHARD_SWAPPING_KEY, enabled, fn);
 }
 
 export function isShardSwappingProhibited(): boolean {
-  return getProhibitContext().getStore() ?? false;
+  return IsolatedExecutionState.get<boolean>(PROHIBIT_SHARD_SWAPPING_KEY) ?? false;
 }
 
 export function clearQueryCachesForCurrentThread(this: typeof Base): void {

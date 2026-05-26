@@ -9,9 +9,8 @@ import {
   type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
 import {
-  getAsyncContext,
+  IsolatedExecutionState,
   peekCallbackChain as asPeekCallbackChain,
-  type AsyncContext,
 } from "@blazetrails/activesupport";
 import { Rollback } from "./errors.js";
 export { Rollback };
@@ -22,25 +21,13 @@ import { transaction as dbTransaction } from "./connection-adapters/abstract/dat
 
 type TransactionAction = "create" | "update" | "destroy";
 
-// Per-async-context transaction tracking via activesupport's adapter
-// (uses AsyncLocalStorage in Node, fallback in browsers).
-let _transactionStorage: AsyncContext<Transaction | null> | null = null;
-let _transactionStorageAdapter: ReturnType<typeof getAsyncContext> | null = null;
-
-function getTransactionStorage(): AsyncContext<Transaction | null> {
-  const asyncContext = getAsyncContext();
-  if (!_transactionStorage || _transactionStorageAdapter !== asyncContext) {
-    _transactionStorage = asyncContext.create<Transaction | null>();
-    _transactionStorageAdapter = asyncContext;
-  }
-  return _transactionStorage;
-}
+const CURRENT_TRANSACTION_KEY = Symbol.for("ar_current_transaction");
 
 /**
  * Get the currently active transaction, if any.
  */
 export function currentTransaction(): Transaction | null {
-  return getTransactionStorage().getStore() ?? null;
+  return IsolatedExecutionState.get<Transaction | null>(CURRENT_TRANSACTION_KEY) ?? null;
 }
 
 /**
@@ -101,7 +88,9 @@ export async function transaction<T>(
         const tmCurrent = (adapter as any).currentTransaction?.();
         internalTx = tmCurrent instanceof Transaction ? tmCurrent : new Transaction(adapter);
       }
-      return getTransactionStorage().run(internalTx, () => fn(internalTx));
+      return IsolatedExecutionState.scope(CURRENT_TRANSACTION_KEY, internalTx, () =>
+        fn(internalTx),
+      );
     },
     {
       requiresNew: options?.requiresNew,
