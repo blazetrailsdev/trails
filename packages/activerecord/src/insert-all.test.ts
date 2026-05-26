@@ -6,7 +6,7 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, defineEnum } from "./index.js";
 import { InsertAll } from "./insert-all.js";
 import { UnknownAttributeError } from "./errors.js";
-import { adapterType, createTestAdapter } from "./test-adapter.js";
+import { adapterType } from "./test-adapter.js";
 
 // Rails' insert_all_test.rb skips uniqueBy-dependent tests via
 // `skip unless supports_insert_conflict_target?`. MySQL's ON DUPLICATE KEY
@@ -1036,26 +1036,38 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
 // Regression: upsertAll on returning DBs (cache miss path)
 // ==========================================================================
 describe("InsertAll async uniqueIndexes regression", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
+      pkgs: { name: "string", sha: "string" },
+      flags: { key: "string", active: "boolean" },
+    });
+    const ss = new SchemaStatements(Base.adapter);
+    await ss.addIndex("pkgs", ["sha", "name"], { unique: true, name: "idx_pkgs_sha_name" });
+    // WHERE "active" works on both SQLite (1=true) and PG (boolean column).
+    // Avoid '"active" = 1' which PG rejects (boolean ≠ integer).
+    await ss.addIndex("flags", ["key"], {
+      unique: true,
+      name: "idx_flags_key_active",
+      where: '"active"',
+    });
+  });
+
   it.skipIf(!supportsConflictTarget)(
     "upsertAll with uniqueBy succeeds when schema cache is cold (returning DB scenario)",
     async () => {
-      const adapter = createTestAdapter();
-      await defineSchema(adapter, { pkgs: { name: "string", sha: "string" } });
-      const ss = new SchemaStatements(adapter);
-      await ss.addIndex("pkgs", ["sha", "name"], { unique: true, name: "idx_pkgs_sha_name" });
-
       class Pkg extends Base {
         static {
           this.attribute("id", "integer");
           this.attribute("name", "string");
           this.attribute("sha", "string");
           this._tableName = "pkgs";
-          this.adapter = adapter;
         }
       }
 
       // Clear the cache to simulate a returning DB where migrateDb skipped createTable.
-      adapter.schemaCache?.clear();
+      Base.adapter.schemaCache?.clear();
 
       // Should succeed — async _uniqueIndexes() fetches from the live DB.
       await expect(
@@ -1067,33 +1079,19 @@ describe("InsertAll async uniqueIndexes regression", () => {
   it.skipIf(!supportsConflictTarget)(
     "upsertAll with partial unique index emits WHERE in conflict target",
     async () => {
-      const adapter = createTestAdapter();
-      await defineSchema(adapter, {
-        flags: { key: "string", active: "boolean" },
-      });
-      const ss = new SchemaStatements(adapter);
-      // WHERE "active" works on both SQLite (1=true) and PG (boolean column).
-      // Avoid '"active" = 1' which PG rejects (boolean ≠ integer).
-      await ss.addIndex("flags", ["key"], {
-        unique: true,
-        name: "idx_flags_key_active",
-        where: '"active"',
-      });
-
       class Flag extends Base {
         static {
           this.attribute("id", "integer");
           this.attribute("key", "string");
           this.attribute("active", "boolean");
           this._tableName = "flags";
-          this.adapter = adapter;
         }
       }
 
       // vi.spyOn passes through to the original by default and records calls;
       // mockRestore in finally guarantees the patched method is restored even
       // if the upsert throws, so the adapter never leaks a spied method.
-      const spy = vi.spyOn(adapter, "executeMutation");
+      const spy = vi.spyOn(Base.adapter, "executeMutation");
       let upsertSql: string | undefined;
       try {
         await Flag.upsertAll([{ key: "feature_x", active: true }], { uniqueBy: "key" });
