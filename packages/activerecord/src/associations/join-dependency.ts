@@ -654,16 +654,15 @@ export class JoinDependency {
    */
   private _isNodeReadonly(node: JoinNode): boolean {
     const refl = node.reflection;
-    if (!refl) return false;
-    if (typeof refl.scope === "function") {
-      try {
-        const scopeRel = refl.scope((node.modelClass as any)._allForPreload?.());
-        return !!scopeRel?._isReadonly;
-      } catch {
-        return false;
-      }
+    if (!refl || typeof refl.scopeFor !== "function") return false;
+    try {
+      const baseRel = (node.modelClass as any)._allForPreload?.();
+      if (!baseRel) return false;
+      const scopeRel = refl.scopeFor(baseRel);
+      return !!scopeRel?._isReadonly;
+    } catch {
+      return false;
     }
-    return false;
   }
 
   /**
