@@ -99,7 +99,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const table = new ArelTable("citexts");
       const attr = table.get("cival");
       const comparison = await adapter.caseInsensitiveComparison(attr, null);
-      const sql = adapter.arelVisitor.compile(comparison);
+      const sql = adapter.visitor.compile(comparison);
       expect(sql).not.toMatch(/lower/i);
     });
 

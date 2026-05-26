@@ -7,7 +7,7 @@
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { type Nodes, Visitors, Collectors, setToSqlVisitor } from "@blazetrails/arel";
+import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
 import {
   ReadOnlyError,
   ActiveRecordError,
@@ -406,6 +406,7 @@ export interface AbstractAdapter {
     comment: string | null | Record<string, string | null>,
   ): Promise<void>;
   currentDatabase(): Promise<string>;
+  /** @internal */
   createAlterTable?(name: string): AlterTable;
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -414,14 +415,10 @@ export class AbstractAdapter implements Quoting {
 
   constructor() {
     // Mirrors Rails abstract_adapter.rb:155 — @visitor = arel_visitor
-    const visitor = this.arelVisitor;
-    if (visitor) {
-      setToSqlVisitor(
-        (visitor as object).constructor as new () => { compile(node: Nodes.Node): string },
-      );
-    }
+    this._visitor = this.arelVisitor();
   }
 
+  protected _visitor!: Visitors.ToSql;
   protected _connection: AbstractAdapter | null = null;
   private _owner: string | null = null;
   private _inUse = false;
@@ -1114,19 +1111,22 @@ export class AbstractAdapter implements Quoting {
     return (this.pool as any)?.connectionDescriptor ?? null;
   }
 
-  get visitor(): unknown {
-    return (this.pool as any)?.visitor ?? null;
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter — `attr_reader :visitor`
+   */
+  get visitor(): Visitors.ToSql {
+    return this._visitor;
   }
 
   /**
-   * Returns the Arel visitor for this adapter's SQL dialect.
-   * Subclasses override to return MySQL/PostgreSQL visitors.
+   * Factory — builds a new Arel visitor for this adapter's SQL dialect.
+   * Subclasses override to return dialect-specific visitors.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#arel_visitor
    *
    * @internal
    */
-  get arelVisitor(): Visitors.ToSql {
+  arelVisitor(): Visitors.ToSql {
     return new Visitors.ToSql(this);
   }
 

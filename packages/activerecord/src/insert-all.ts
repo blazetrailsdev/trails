@@ -643,7 +643,7 @@ export class Builder {
   }
 
   private _visitor(): Visitors.ToSql {
-    const v = this._insertAll.connection.arelVisitor;
+    const v = this._insertAll.connection.visitor;
     if (v) return v;
     const q = this._insertAll.connection as unknown as Visitors.ArelQuoter;
     if (this._dialect === "mysql") return new Visitors.MySQL(q);

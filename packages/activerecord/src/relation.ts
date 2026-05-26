@@ -3629,23 +3629,23 @@ export class Relation<T extends Base> {
 
   private _arelVisitor(): Visitors.ToSql {
     const adapter = this._resolveAdapter();
-    return adapter?.arelVisitor ?? new Visitors.ToSql(adapter ?? undefined);
+    return adapter?.visitor ?? new Visitors.ToSql(adapter ?? undefined);
   }
 
   /**
    * Returns the adapter's SELECT visitor when one is defined, or null.
    *
-   * Real adapters (PG, SQLite, MySQL) expose `arelVisitor` — use it to
+   * Real adapters (PG, SQLite, MySQL) expose `visitor` — use it to
    * get dialect-correct quoting. `TestAdapterFixtures` delegates
-   * `arelVisitor` to its inner adapter, so wrapped real adapters resolve
+   * `visitor` to its inner adapter, so wrapped real adapters resolve
    * through here the same as a bare adapter. Returns null when no
    * adapter is established (e.g. HABTM join models where adapter resolution throws) or
-   * when the adapter is a mock/partial that doesn't define `arelVisitor`;
+   * when the adapter is a mock/partial that doesn't define `visitor`;
    * callers then fall back to `manager.toSql()` / `node.toSql()` (global
    * registry visitor = ANSI double-quotes).
    */
   private _selectVisitor(): Visitors.ToSql | null {
-    return this._resolveAdapter()?.arelVisitor ?? null;
+    return this._resolveAdapter()?.visitor ?? null;
   }
 
   /**

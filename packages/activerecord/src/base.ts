@@ -969,9 +969,10 @@ export class Base extends Model {
       return;
     }
     this._adapter = adapter;
-    // Re-wire the global arel visitor so Node#toSql() uses the correct
-    // dialect for the assigned adapter (e.g. SQLite strips FOR UPDATE).
-    const visitor = (adapter as { arelVisitor?: object }).arelVisitor;
+    // Sync the global Arel visitor so Node#toSql() / TreeManager#toSql()
+    // produce dialect-correct SQL for code paths that lack adapter context.
+    // Long-term those callers should migrate to connection.visitor.compile().
+    const visitor = (adapter as { visitor?: object }).visitor;
     if (visitor) {
       setToSqlVisitor(
         (visitor as object).constructor as new () => { compile(node: Nodes.Node): string },
@@ -2561,7 +2562,7 @@ export class Base extends Model {
         return [table.get(c), val];
       });
       im.insert(insertValues);
-      const imVisitor = ctor.connection.arelVisitor;
+      const imVisitor = ctor.connection.visitor;
       sql = imVisitor ? imVisitor.compile(im.ast) : im.toSql();
     }
     this._pendingOperation = ctor.connection
@@ -2675,7 +2676,7 @@ export class Base extends Model {
     }
     _Persistence.applyDefaultAndGlobalConstraints(um as any, ctor);
 
-    const umVisitor = ctor.connection.arelVisitor;
+    const umVisitor = ctor.connection.visitor;
     this._pendingOperation = ctor.connection
       .execUpdate(umVisitor ? umVisitor.compile(um.ast) : um.toSql(), `${ctor.name} Update`)
       .then((affected) => {
