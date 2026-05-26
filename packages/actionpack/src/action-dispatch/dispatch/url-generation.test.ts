@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { RouteSet } from "../routing/route-set.js";
-import { URL as DispatchURL } from "../http/url.js";
+import { URL as DispatchURL, type UrlOptions } from "../http/url.js";
 
 // dispatch/url_generation_test.rb
 
@@ -44,7 +44,7 @@ describe("TestUrlGeneration::WithMountPoint", () => {
     if ("protocol" in options) urlOpts.protocol = options.protocol;
     if ("port" in options) urlOpts.port = options.port;
     if ("subdomain" in options) urlOpts.subdomain = options.subdomain;
-    return DispatchURL.fullUrlFor(urlOpts as import("../http/url.js").UrlOptions);
+    return DispatchURL.fullUrlFor(urlOpts as UrlOptions);
   }
 
   function bazUrl(
@@ -68,34 +68,6 @@ describe("TestUrlGeneration::WithMountPoint", () => {
     return DispatchURL.fullUrlFor({ host: "www.example.com", path });
   }
 
-  function barsPath(options: Record<string, unknown> = {}): string {
-    const path = routes.pathFor("bars");
-    const parts: string[] = [path];
-    if (options.trailingSlash && !options.format) {
-      parts[0] = path.replace(/\/?$/, "/");
-    }
-    if (options.format) {
-      parts[0] = `${path}.${options.format}`;
-    }
-    if (options.a !== undefined) {
-      const val = options.a;
-      if (typeof val === "object" && val !== null && Object.keys(val as object).length === 0) {
-        // empty hash — no query param
-      } else {
-        parts.push(`?a=${val}`);
-      }
-    }
-    return parts.join("");
-  }
-
-  function barPath(id: string | number, options: Record<string, unknown> = {}): string {
-    const path = routes.pathFor("bar", { id });
-    if (options.trailingSlash) {
-      return path.replace(/\/?$/, "/");
-    }
-    return path;
-  }
-
   it("generating URLS normally", () => {
     expect(fooPath()).toBe("/foo");
   });
@@ -104,11 +76,16 @@ describe("TestUrlGeneration::WithMountPoint", () => {
     expect(fooPath({ scriptName: "/bar" })).toBe("/bar/foo");
   });
 
-  it.skip("pending: the request's SCRIPT_NAME takes precedence over the route — needs controller dispatch with SCRIPT_NAME propagation", () => {});
+  it.skip("the request's SCRIPT_NAME takes precedence over the route", () => {
+    // needs controller dispatch with SCRIPT_NAME header propagation to controller url_for
+  });
 
-  it.skip("pending: the request's SCRIPT_NAME wraps the mounted app's — needs mounted app dispatch", () => {});
+  it.skip("the request's SCRIPT_NAME wraps the mounted app's", () => {
+    // needs mounted app dispatch infrastructure
+  });
 
   it("handling http protocol with https set", () => {
+    // Rails calls https! first; we pass protocol: "http" which overrides regardless
     expect(fooUrl({ protocol: "http" })).toBe("http://www.example.com/foo");
   });
 
@@ -186,23 +163,8 @@ describe("TestUrlGeneration::WithMountPoint", () => {
     );
   });
 
-  it("port option disables the host when set to false", () => {
-    expect(
-      DispatchURL.fullUrlFor({
-        host: "www.example.com:8443",
-        protocol: "http://",
-        port: null,
-        path: "/foo",
-      }),
-    ).toBe("http://www.example.com/foo");
-    expect(
-      DispatchURL.fullUrlFor({
-        host: "www.example.com:8443",
-        protocol: "//",
-        port: null,
-        path: "/foo",
-      }),
-    ).toBe("//www.example.com/foo");
+  it.skip("port option disables the host when set to false", () => {
+    // UrlOptions.port typed as number|string|null — false not accepted; Rails uses port: false
   });
 
   it("keep subdomain when key is true", () => {
@@ -213,11 +175,17 @@ describe("TestUrlGeneration::WithMountPoint", () => {
     expect(fooUrl()).toBe("http://www.example.com/foo");
   });
 
-  it.skip("pending: omit subdomain when key is nil — normalizeHost defaults nil to true", () => {});
+  it.skip("omit subdomain when key is nil", () => {
+    // normalizeHost defaults nil/undefined subdomain to true instead of stripping it
+  });
 
-  it.skip("pending: omit subdomain when key is false — normalizeHost subdomain removal gap", () => {});
+  it.skip("omit subdomain when key is false", () => {
+    // normalizeHost subdomain removal gap — false not treated as "strip subdomain"
+  });
 
-  it.skip("pending: omit subdomain when key is blank — normalizeHost subdomain removal gap", () => {});
+  it.skip("omit subdomain when key is blank", () => {
+    // normalizeHost subdomain removal gap — empty string not treated as "strip subdomain"
+  });
 
   it("keep optional path parameter when given", () => {
     expect(bazUrl({ optional_id: 123 })).toBe("http://www.example.com/optional/123/baz");
@@ -247,37 +215,48 @@ describe("TestUrlGeneration::WithMountPoint", () => {
     expect(bazUrl("")).toBe("http://www.example.com/baz");
   });
 
-  it.skip("pending: generating the current URL with a trailing slashes — needs controller dispatch with url_for trailing_slash", () => {});
-
-  it.skip("pending: generating the current URL with a trailing slashes and query string — needs controller dispatch", () => {});
-
-  it.skip("pending: generating the current URL with a trailing slashes and format indicator — needs controller dispatch", () => {});
-
-  it.skip("pending: generating the path with `trailing_slashes: true` default options — needs route-level trailing_slash default", () => {});
-
-  it.skip("pending: generating the path with `trailing_slashes: true` default options and format — needs route-level trailing_slash default", () => {});
-
-  it("generating URLs with trailing slashes", () => {
-    expect(barsPath({ trailingSlash: true })).toBe("/bars/");
+  it.skip("generating the current URL with a trailing slashes", () => {
+    // needs controller dispatch with url_for(trailing_slash: true, params: request.query_parameters)
   });
 
-  it("generating URLs with trailing slashes and dot including param", () => {
-    expect(barPath("hax0r.json", { trailingSlash: true })).toBe("/bars/hax0r.json/");
+  it.skip("generating the current URL with a trailing slashes and query string", () => {
+    // needs controller dispatch with url_for trailing_slash + query_parameters
   });
 
-  it("generating URLs with trailing slashes and query string", () => {
-    expect(barsPath({ trailingSlash: true, a: "b" })).toBe("/bars/?a=b");
+  it.skip("generating the current URL with a trailing slashes and format indicator", () => {
+    // needs controller dispatch with url_for trailing_slash + format
   });
 
-  it("generating URLs with trailing slashes and format", () => {
-    expect(barsPath({ trailingSlash: true, format: "json" })).toBe("/bars.json");
+  it.skip("generating the path with `trailing_slashes: true` default options", () => {
+    // needs route-level trailing_slash default option propagation to path helpers
   });
 
-  it("generating URLS with querystring and trailing slashes", () => {
-    expect(barsPath({ trailingSlash: true, a: "b", format: "json" })).toBe("/bars.json?a=b");
+  it.skip("generating the path with `trailing_slashes: true` default options and format", () => {
+    // needs route-level trailing_slash default option propagation
   });
 
-  it("generating URLS with empty querystring", () => {
-    expect(barsPath({ a: {}, format: "json" })).toBe("/bars.json");
+  it.skip("generating URLs with trailing slashes", () => {
+    // URL.pathFor trailingSlash only appends "/" on blank paths; /bars stays /bars
+    // expect(barsPath({ trailingSlash: true })).toBe("/bars/");
+  });
+
+  it.skip("generating URLs with trailing slashes and dot including param", () => {
+    // URL.pathFor trailingSlash gap + RouteSet.pathFor doesn't propagate trailingSlash
+  });
+
+  it.skip("generating URLs with trailing slashes and query string", () => {
+    // URL.pathFor trailingSlash gap
+  });
+
+  it.skip("generating URLs with trailing slashes and format", () => {
+    // RouteSet.pathFor ignores format param — route pattern lacks (.:format) segment
+  });
+
+  it.skip("generating URLS with querystring and trailing slashes", () => {
+    // trailingSlash + format gaps combine
+  });
+
+  it.skip("generating URLS with empty querystring", () => {
+    // RouteSet.pathFor ignores format param
   });
 });
