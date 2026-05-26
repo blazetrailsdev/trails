@@ -7,10 +7,7 @@ import { Base } from "./index.js";
 import { generatesTokenFor, setTokenForSecret } from "./generates-token-for.js";
 import { setSignedIdVerifierSecret } from "./signed-id.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
@@ -247,14 +244,13 @@ describe("TokenForTest", () => {
 });
 
 describe("TokenForTest", () => {
-  let adapter2: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter2 = createTestAdapter();
-    await defineSchema(adapter2, {
+    await defineSchema({
       users: { name: "string", password_digest: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter2);
   beforeEach(() => {
     setTokenForSecret("blazetrails-test-token-secret");
   });
@@ -262,19 +258,14 @@ describe("TokenForTest", () => {
   afterEach(() => {
     setTokenForSecret(null);
   });
-  afterAll(async () => {
-    await dropAllTables(adapter2);
-  });
 
   it("generates and resolves a token", async () => {
     const { generatesTokenFor } = await import("./generates-token-for.js");
-    const adapter = adapter2;
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("password_digest", "string");
-        this.adapter = adapter;
       }
     }
     generatesTokenFor(User, "password_reset", {
@@ -294,12 +285,10 @@ describe("TokenForTest", () => {
 
   it("returns null for invalid token", async () => {
     const { generatesTokenFor } = await import("./generates-token-for.js");
-    const adapter = adapter2;
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     generatesTokenFor(User, "confirm", {});
@@ -309,11 +298,9 @@ describe("TokenForTest", () => {
   });
   it("finds record by token", async () => {
     const { generatesTokenFor } = await import("./generates-token-for.js");
-    const adapter = adapter2;
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     generatesTokenFor(User, "lookup");
@@ -326,11 +313,9 @@ describe("TokenForTest", () => {
 
   it("does not find record when token is invalid", async () => {
     const { generatesTokenFor } = await import("./generates-token-for.js");
-    const adapter = adapter2;
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     generatesTokenFor(User, "lookup");

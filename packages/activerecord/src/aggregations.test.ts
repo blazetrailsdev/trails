@@ -2,20 +2,12 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base, composedOf } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -467,12 +459,6 @@ describe("AggregationsTest", () => {
 });
 
 describe("AggregationsTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   // Rails: test_find_multiple_value_object
   // Rails: test_change_single_value_object
   // Rails: test_nil_assignment_results_in_nil
@@ -600,14 +586,16 @@ describe("OverridingAggregationsTest", () => {
 });
 
 describe("Aggregations", () => {
-  it("should sum field", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { orders: { amount: "integer" } });
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ orders: { amount: "integer", status: "string" } });
+  });
 
+  it("should sum field", async () => {
     class Order extends Base {
       static {
         this.attribute("amount", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -619,13 +607,9 @@ describe("Aggregations", () => {
   });
 
   it("should average field", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { orders: { amount: "integer" } });
-
     class Order extends Base {
       static {
         this.attribute("amount", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -637,13 +621,9 @@ describe("Aggregations", () => {
   });
 
   it("should get minimum of field", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { orders: { amount: "integer" } });
-
     class Order extends Base {
       static {
         this.attribute("amount", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -655,13 +635,9 @@ describe("Aggregations", () => {
   });
 
   it("should get maximum of field", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { orders: { amount: "integer" } });
-
     class Order extends Base {
       static {
         this.attribute("amount", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -673,14 +649,10 @@ describe("Aggregations", () => {
   });
 
   it("should sum field with conditions", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { orders: { amount: "integer", status: "string" } });
-
     class Order extends Base {
       static {
         this.attribute("amount", "integer");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -692,12 +664,9 @@ describe("Aggregations", () => {
   });
 
   it("no queries for empty relation on sum", async () => {
-    const adapter = freshAdapter();
-
     class Order extends Base {
       static {
         this.attribute("amount", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -705,12 +674,9 @@ describe("Aggregations", () => {
   });
 
   it("no queries for empty relation on average", async () => {
-    const adapter = freshAdapter();
-
     class Order extends Base {
       static {
         this.attribute("amount", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -719,14 +685,16 @@ describe("Aggregations", () => {
 });
 
 describe("Aggregation edge cases", () => {
-  it("no queries for empty relation on minimum", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { orders: { amount: "integer" } });
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ orders: { amount: "integer", status: "string" } });
+  });
 
+  it("no queries for empty relation on minimum", async () => {
     class Order extends Base {
       static {
         this.attribute("amount", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -734,13 +702,9 @@ describe("Aggregation edge cases", () => {
   });
 
   it("no queries for empty relation on maximum", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { orders: { amount: "integer" } });
-
     class Order extends Base {
       static {
         this.attribute("amount", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -748,13 +712,9 @@ describe("Aggregation edge cases", () => {
   });
 
   it("minimum on none() returns null", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { orders: { amount: "integer" } });
-
     class Order extends Base {
       static {
         this.attribute("amount", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -763,13 +723,9 @@ describe("Aggregation edge cases", () => {
   });
 
   it("maximum on none() returns null", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { orders: { amount: "integer" } });
-
     class Order extends Base {
       static {
         this.attribute("amount", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -846,17 +802,10 @@ describe("composed_of", () => {
 });
 
 describe("composed_of (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
-      products: { price_amount: "integer", price_currency: "string" },
-    });
-  });
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ products: { price_amount: "integer", price_currency: "string" } });
   });
 
   // Rails: test "reading a composed-of attribute"
@@ -874,7 +823,6 @@ describe("composed_of (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("price_amount", "integer");
         this.attribute("price_currency", "string");
-        this.adapter = adapter;
       }
     }
     composedOf(Product, "price", {
@@ -907,7 +855,6 @@ describe("composed_of (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("price_amount", "integer");
         this.attribute("price_currency", "string");
-        this.adapter = adapter;
       }
     }
     composedOf(Product, "price", {

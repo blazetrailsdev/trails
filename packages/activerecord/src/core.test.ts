@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -14,13 +13,6 @@ const TEST_SCHEMA = {
   topics: { title: "string", author: "string" },
   users: { name: "string", email: "string" },
 } as const;
-
-// -- Helpers --
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
 
 describe("CoreTest", () => {
   setupHandlerSuite();
@@ -208,27 +200,31 @@ describe("CoreTest", () => {
 });
 
 describe("frozen / isFrozen", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   it("is not frozen by default", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
-      static _tableName = "users";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
     }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
 
     const user = new User({ name: "Alice" });
     expect(user.isFrozen()).toBe(false);
   });
 
   it("is frozen after destroy", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
-      static _tableName = "users";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
     }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
 
     const user = await User.create({ name: "Alice" });
     await user.destroy();
@@ -236,13 +232,12 @@ describe("frozen / isFrozen", () => {
   });
 
   it("is frozen after delete", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
-      static _tableName = "users";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
     }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
 
     const user = await User.create({ name: "Alice" });
     await user.delete();
@@ -250,13 +245,12 @@ describe("frozen / isFrozen", () => {
   });
 
   it("prevents modification of frozen record", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
-      static _tableName = "users";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
     }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
 
     const user = await User.create({ name: "Alice" });
     await user.destroy();
@@ -264,13 +258,12 @@ describe("frozen / isFrozen", () => {
   });
 
   it("can be manually frozen", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
-      static _tableName = "users";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
     }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
 
     const user = new User({ name: "Alice" });
     user.freeze();
@@ -279,13 +272,12 @@ describe("frozen / isFrozen", () => {
   });
 
   it("deleting an unpersisted record still marks it destroyed and frozen", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
-      static _tableName = "users";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
     }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
 
     // Matches Rails' `delete` which only issues the DELETE when persisted?
     // is true, but always ends with `@destroyed = true; freeze`.
@@ -300,13 +292,12 @@ describe("frozen / isFrozen", () => {
   // and that the pre-freeze reference is left untouched so records sharing
   // an attribute map (e.g. via clone/becomes) aren't frozen together.
   it("freeze clones the attribute set so prior references stay mutable", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
-      static _tableName = "users";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
     }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
 
     const user = await User.create({ name: "Alice" });
     const preFreezeAttrs = (user as any)._attributes;
@@ -320,13 +311,17 @@ describe("frozen / isFrozen", () => {
 });
 
 describe("Base#isEqual", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   it("returns true for same class and same id", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u1 = await User.create({ name: "Alice" });
@@ -335,12 +330,10 @@ describe("Base#isEqual", () => {
   });
 
   it("returns false for different ids", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u1 = await User.create({ name: "Alice" });
@@ -361,12 +354,10 @@ describe("Base#isEqual", () => {
   });
 
   it("returns false for non-Base objects", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -376,23 +367,25 @@ describe("Base#isEqual", () => {
 });
 
 describe("Base.logger", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   it("defaults to null", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     expect(User.logger).toBe(null);
   });
 
   it("can set and get a logger", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     const myLogger = { debug: () => {}, info: () => {} };
@@ -403,14 +396,19 @@ describe("Base.logger", () => {
 });
 
 describe("Base.new()", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   it("creates an unsaved record instance", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
-      static _tableName = "users";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
     }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
 
     const user = User.new({ name: "Alice" });
     expect(user.isNewRecord()).toBe(true);
@@ -419,26 +417,30 @@ describe("Base.new()", () => {
 });
 
 describe("toKey()", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   it("returns [id] for persisted records", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
-      static _tableName = "users";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
     }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.adapter = adapter;
 
     const user = await User.create({ name: "Alice" });
     expect(user.toKey()).toEqual([user.id]);
   });
 
   it("returns null for new records", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
-      static _tableName = "users";
+      static {
+        this.attribute("id", "integer");
+      }
     }
-    User.attribute("id", "integer");
-    User.adapter = adapter;
 
     const user = new User({});
     expect(user.toKey()).toBeNull();

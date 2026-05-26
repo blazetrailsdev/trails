@@ -461,25 +461,26 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
 });
 
 describe("PrimaryKeyIntegerNilDefaultTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   it("schema dump primary key integer with default nil", async () => {
-    // In Rails, this tests schema.rb dump format. We verify integer PK with null default works.
-    const adapter = await freshAdapter();
     class NilDefaultPk extends Base {
       static {
         this.attribute("id", "integer", { default: null });
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     expect(NilDefaultPk.primaryKey).toBe("id");
   });
   it("schema dump primary key bigint with default nil", async () => {
-    const adapter = await freshAdapter();
     class BigNilDefaultPk extends Base {
       static {
         this.attribute("id", "big_integer", { default: null });
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     expect(BigNilDefaultPk.primaryKey).toBe("id");

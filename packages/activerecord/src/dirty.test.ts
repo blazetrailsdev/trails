@@ -2,16 +2,13 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { TimeWithZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -823,25 +820,16 @@ describe("DirtyTest", () => {
 });
 
 describe("DirtyTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
-      users: { name: "string", email: "string", age: "integer" },
-    });
-  });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-    vi.unstubAllEnvs();
+    await defineSchema({ users: { name: "string", email: "string", age: "integer" } });
   });
 
   it("attribute changes", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -856,7 +844,6 @@ describe("DirtyTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice", email: "a@b.com" });
@@ -870,7 +857,6 @@ describe("DirtyTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -884,7 +870,6 @@ describe("DirtyTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -899,7 +884,6 @@ describe("DirtyTest", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -913,7 +897,6 @@ describe("DirtyTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -927,7 +910,6 @@ describe("DirtyTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -941,7 +923,6 @@ describe("DirtyTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = new User({ name: "Alice" });
@@ -954,7 +935,6 @@ describe("DirtyTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -967,7 +947,6 @@ describe("DirtyTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -981,7 +960,6 @@ describe("DirtyTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice", age: 30 });
@@ -998,20 +976,10 @@ describe("DirtyTest", () => {
 // (test_changes_in_place) for the post-save forgettingAssignment reset
 // ==========================================================================
 describe("MutableAttributeAfterSave", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
-      json_models: { payload: "string" },
-    });
-  });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-    vi.unstubAllEnvs();
+    await defineSchema({ json_models: { payload: "string" } });
   });
 
   it("mutable attribute is not dirty after changesApplied resets baseline", async () => {
@@ -1019,7 +987,6 @@ describe("MutableAttributeAfterSave", () => {
       static tableName = "json_models";
       static {
         this.attribute("payload", "json");
-        this.adapter = adapter;
       }
     }
     const record = await JsonModel.create({ payload: { one: "two" } });

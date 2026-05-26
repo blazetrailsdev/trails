@@ -12,16 +12,9 @@ import {
   loadHasMany,
 } from "./associations.js";
 
-import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
 
 // ==========================================================================
 // StrictLoadingTest — targets strict_loading_test.rb
@@ -1388,11 +1381,11 @@ describe("strict_loading", () => {
 });
 
 describe("strictLoadingByDefault", () => {
-  async function setupUsersAdapter(): Promise<DatabaseAdapter> {
-    const a = freshAdapter();
-    await defineSchema(a, { users: { name: "string" } });
-    return a;
-  }
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ users: { name: "string" } });
+  });
 
   it("defaults to false", () => {
     class User extends Base {
@@ -1405,12 +1398,10 @@ describe("strictLoadingByDefault", () => {
   });
 
   it("sets strict loading on instantiated records when enabled", async () => {
-    const adapter = await setupUsersAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.strictLoadingByDefault = true;
       }
     }
@@ -1422,12 +1413,10 @@ describe("strictLoadingByDefault", () => {
   });
 
   it("does not affect records when disabled", async () => {
-    const adapter = await setupUsersAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Bob" });

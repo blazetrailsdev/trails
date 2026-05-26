@@ -6,8 +6,6 @@ import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -18,11 +16,6 @@ beforeAll(() => {
 afterAll(() => {
   vi.unstubAllEnvs();
 });
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
 
 describe("MysqlDefaultExpressionTest", () => {
   it.skip("schema dump includes default expression", () => {
@@ -143,12 +136,19 @@ describe("DefaultBinaryTest", () => {
 });
 
 describe("DefaultTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
+      posts: { title: "string", body: "string" },
+      users: { name: "string", active: "boolean" },
+    });
+  });
+
   it("nil defaults for not null columns", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = new Post({});
@@ -156,11 +156,9 @@ describe("DefaultTest", () => {
   });
 
   it("multiline default text", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("body", "string", { default: "line1\nline2\nline3" });
-        this.adapter = adapter;
       }
     }
     const p = new Post({});
@@ -248,16 +246,15 @@ describe("Sqlite3DefaultExpressionTest", () => {
 });
 
 describe("DefaultTest", () => {
-  const adapter = freshAdapter();
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ items: { count: { type: "integer", default: 7 } } });
+  });
 
   it("default attribute value overrides from database", async () => {
-    const adp = freshAdapter();
-    await defineSchema(adp, { items: { count: { type: "integer", default: 7 } } });
     class Item extends Base {
       static override tableName = "items";
-      static {
-        this.adapter = adp;
-      }
     }
     await loadSchemaFromAdapter.call(Item);
     expect(new Item().count).toBe(7);
@@ -267,7 +264,6 @@ describe("DefaultTest", () => {
     class M extends Base {
       static {
         this.attribute("count", "integer", { default: 42 });
-        this.adapter = adapter;
       }
     }
     expect(new M().count).toBe(42);
@@ -277,7 +273,6 @@ describe("DefaultTest", () => {
     class M extends Base {
       static {
         this.attribute("name", "string", { default: "hello" });
-        this.adapter = adapter;
       }
     }
     expect(new M().name).toBe("hello");
@@ -287,7 +282,6 @@ describe("DefaultTest", () => {
     class M extends Base {
       static {
         this.attribute("active", "boolean", { default: true });
-        this.adapter = adapter;
       }
     }
     expect(new M().active).toBe(true);
@@ -375,7 +369,6 @@ describe("DefaultTest", () => {
     class M extends Base {
       static {
         this.attribute("score", "float", { default: 3.14 });
-        this.adapter = adapter;
       }
     }
     expect(new M().score).toBeCloseTo(3.14);
@@ -385,7 +378,6 @@ describe("DefaultTest", () => {
     class M extends Base {
       static {
         this.attribute("bio", "string", { default: "none" });
-        this.adapter = adapter;
       }
     }
     expect(new M().bio).toBe("none");
@@ -395,7 +387,6 @@ describe("DefaultTest", () => {
     class M extends Base {
       static {
         this.attribute("status", "string", { default: "draft" });
-        this.adapter = adapter;
       }
     }
     const m = new M();
@@ -406,7 +397,6 @@ describe("DefaultTest", () => {
     class M extends Base {
       static {
         this.attribute("role", "string", { default: "user" });
-        this.adapter = adapter;
       }
     }
     const defaults = M.columnDefaults;
@@ -415,14 +405,21 @@ describe("DefaultTest", () => {
 });
 
 describe("Base.columnDefaults", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
+      posts: { title: "string", body: "string" },
+      users: { name: "string", active: "boolean" },
+    });
+  });
+
   it("returns default values for all attributes", () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string", { default: "Anonymous" });
         this.attribute("active", "boolean", { default: true });
-        this.adapter = adapter;
       }
     }
     const defaults = User.columnDefaults;

@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base, registerModel, store, storedAttributes, localStoredAttributes } from "./index.js";
 import {
   IndifferentHashAccessor,
@@ -10,18 +10,11 @@ import {
   storeAccessorFor,
   storeAccessor,
 } from "./store.js";
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
 
 describe("StoreTest", () => {
   setupHandlerSuite();
@@ -123,12 +116,10 @@ describe("StoreTest", () => {
   });
 
   it("overriding a read accessor using super", () => {
-    const a2 = freshAdapter();
     class SongUser extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     store(SongUser, "settings", { accessors: ["color"] });
@@ -213,12 +204,10 @@ describe("StoreTest", () => {
   });
 
   it("dirty methods for suffixed accessors", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "settings", { accessors: ["theme"], suffix: true });
@@ -230,12 +219,10 @@ describe("StoreTest", () => {
   });
 
   it("dirty methods for prefixed accessors", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "settings", { accessors: ["theme"], prefix: true });
@@ -263,12 +250,10 @@ describe("StoreTest", () => {
   });
 
   it("object initialization with not nullable column", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("data", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "data", { accessors: ["color"] });
@@ -278,12 +263,10 @@ describe("StoreTest", () => {
   });
 
   it("writing with not nullable column", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("data", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "data", { accessors: ["color"] });
@@ -311,12 +294,10 @@ describe("StoreTest", () => {
   });
 
   it("overriding a write accessor using super", () => {
-    const a2 = freshAdapter();
     class SongUser extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     store(SongUser, "settings", { accessors: ["color"] });
@@ -396,12 +377,10 @@ describe("StoreTest", () => {
   });
 
   it("object initialization with not nullable column encoded with JSON", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("data", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "data", { accessors: ["color"] });
@@ -410,12 +389,10 @@ describe("StoreTest", () => {
   });
 
   it("writing with not nullable column encoded with JSON", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("data", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "data", { accessors: ["color"] });
@@ -425,13 +402,11 @@ describe("StoreTest", () => {
   });
 
   it("all stored attributes are returned", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
         this.attribute("prefs", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "settings", { accessors: ["theme", "language"] });
@@ -442,19 +417,16 @@ describe("StoreTest", () => {
   });
 
   it("stored_attributes are tracked per class", () => {
-    const a2 = freshAdapter();
     class A extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("data", "string");
-        this.adapter = a2;
       }
     }
     class B extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("config", "string");
-        this.adapter = a2;
       }
     }
     store(A, "data", { accessors: ["x"] });
@@ -466,12 +438,10 @@ describe("StoreTest", () => {
   });
 
   it("stored_attributes are tracked per subclass", () => {
-    const a2 = freshAdapter();
     class Parent extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     class Child extends Parent {}
@@ -504,12 +474,10 @@ describe("StoreTest", () => {
   });
 
   it("read store attributes through accessors with default suffix", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "settings", { accessors: ["theme"], suffix: true });
@@ -518,12 +486,10 @@ describe("StoreTest", () => {
   });
 
   it("write store attributes through accessors with default suffix", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "settings", { accessors: ["theme"], suffix: true });
@@ -533,12 +499,10 @@ describe("StoreTest", () => {
   });
 
   it("read store attributes through accessors with custom suffix", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "settings", { accessors: ["theme"], suffix: "config" });
@@ -547,12 +511,10 @@ describe("StoreTest", () => {
   });
 
   it("write store attributes through accessors with custom suffix", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "settings", { accessors: ["theme"], suffix: "config" });
@@ -562,12 +524,10 @@ describe("StoreTest", () => {
   });
 
   it("read accessor without pre/suffix in the same store as other pre/suffixed accessors still works", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "settings", { accessors: ["language"] });
@@ -581,12 +541,10 @@ describe("StoreTest", () => {
   });
 
   it("write accessor without pre/suffix in the same store as other pre/suffixed accessors still works", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "settings", { accessors: ["language"] });
@@ -599,12 +557,10 @@ describe("StoreTest", () => {
   });
 
   it("prefix/suffix do not affect stored attributes", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "settings", { accessors: ["theme", "language"], prefix: true });
@@ -613,11 +569,9 @@ describe("StoreTest", () => {
   });
 
   it("store_accessor raises an exception if the column is not either serializable or a structured type", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a2;
       }
     }
     // storeAccessor on a plain string column (no store() called → no coder wired)
@@ -630,12 +584,10 @@ describe("StoreTest", () => {
   });
 
   it("reading store attributes through accessors with prefix", () => {
-    const a = freshAdapter();
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("parent", "string");
-        this.adapter = a;
       }
     }
     store(User, "parent", { accessors: ["name", "birthday"], prefix: true });
@@ -648,12 +600,10 @@ describe("StoreTest", () => {
   });
 
   it("writing store attributes through accessors with prefix", () => {
-    const a = freshAdapter();
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("partner", "string");
-        this.adapter = a;
       }
     }
     store(User, "partner", { accessors: ["name", "birthday"], prefix: true });
@@ -673,12 +623,10 @@ describe("StoreTest", () => {
   });
 
   it("Base.store() writes are visible through localStoredAttributes()", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     Item.store("settings", { accessors: ["theme", "language"] });
@@ -687,12 +635,10 @@ describe("StoreTest", () => {
   });
 
   it("store() function writes are visible through Base.localStoredAttributes class method", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("prefs", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "prefs", { accessors: ["notify", "digest"] });
@@ -701,12 +647,10 @@ describe("StoreTest", () => {
   });
 
   it("store() called twice with overlapping keys deduplicates (Rails |= union)", () => {
-    const a2 = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     store(Item, "settings", { accessors: ["theme"] });
@@ -716,12 +660,10 @@ describe("StoreTest", () => {
   });
 
   it("storedAttributes() merges parent and child registries", () => {
-    const a2 = freshAdapter();
     class Parent extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("settings", "string");
-        this.adapter = a2;
       }
     }
     class Child extends Parent {}
@@ -800,13 +742,18 @@ describe("StoreTest", () => {
 });
 
 describe("StoreTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ users: { name: "string", settings: "string" } });
+  });
+
   it("defines accessor methods for stored attributes", () => {
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("settings", "json");
-        this.adapter = freshAdapter();
         this.store("settings", { accessors: ["theme", "locale"] });
       }
     }
@@ -820,7 +767,6 @@ describe("StoreTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("settings", "json");
-        this.adapter = freshAdapter();
         this.store("settings", { accessors: ["theme"] });
       }
     }
@@ -835,7 +781,6 @@ describe("StoreTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("settings", "json");
-        this.adapter = freshAdapter();
         this.store("settings", { accessors: ["theme"] });
       }
     }
@@ -912,9 +857,10 @@ describe("StoreTest", () => {
 });
 
 describe("store private helpers — tested through public accessor API", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ users: { name: "string", settings: "string" } });
   });
 
   it("store accessor reads via readStoreAttribute (public get behavior)", () => {
@@ -923,7 +869,6 @@ describe("store private helpers — tested through public accessor API", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(User);
@@ -938,7 +883,6 @@ describe("store private helpers — tested through public accessor API", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(User);
@@ -954,7 +898,6 @@ describe("store private helpers — tested through public accessor API", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -967,9 +910,10 @@ describe("store private helpers — tested through public accessor API", () => {
 });
 
 describe("storeAccessorsModule", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ users: { name: "string", settings: "string" } });
   });
 
   it("contains accessor names registered by store()", async () => {
@@ -978,7 +922,6 @@ describe("storeAccessorsModule", () => {
       static {
         this._tableName = "users";
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(User);
@@ -994,7 +937,6 @@ describe("storeAccessorsModule", () => {
       static {
         this._tableName = "posts";
         this.attribute("prefs", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -1010,14 +952,12 @@ describe("storeAccessorsModule", () => {
       static {
         this._tableName = "as";
         this.attribute("data", "string");
-        this.adapter = adapter;
       }
     }
     class B extends Base {
       static {
         this._tableName = "bs";
         this.attribute("data", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(A);
@@ -1036,7 +976,6 @@ describe("storeAccessorsModule", () => {
       static {
         this._tableName = "parents";
         this.attribute("settings", "string");
-        this.adapter = adapter;
       }
     }
     class Child extends Parent {}
