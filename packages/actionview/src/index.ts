@@ -69,7 +69,6 @@ export type { TemplateRegistry, TemplateLocals } from "./template-registry.js";
 export {
   TseRenderContextImpl,
   type TseRenderContext,
-  type PartialOptions,
-  type DynamicPartialOptions,
+  type RenderOptions,
 } from "./render-context.js";
 export { type NoExtraKeys, StrictLocalsMismatch } from "./strict-locals.js";
