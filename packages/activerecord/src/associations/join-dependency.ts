@@ -22,6 +22,7 @@ import { reflectOnAssociation } from "../reflection.js";
 import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinPart } from "./join-dependency/join-part.js";
+import { AssociationNotFoundError } from "./errors.js";
 
 export interface JoinNode {
   tableIndex: number;
@@ -32,8 +33,10 @@ export interface JoinNode {
   assocName: string;
   assocType: "hasMany" | "hasOne" | "belongsTo";
   arelJoin: Nodes.Join | null;
-  /** Reflection for this association — used by hydration to wire association proxies. */
+  /** Reflection for this association — used by hydration for readonly/strictLoading propagation. */
   reflection: any | null;
+  /** True for intermediate through-table nodes (JOIN chain only, not hydrated). */
+  isThroughNode: boolean;
   /** The immediate association name (without parent prefix) */
   immediateAssocName: string;
   /** Dotted parent path, or null if directly on the base model */
@@ -284,6 +287,7 @@ export class JoinDependency {
       assocType,
       arelJoin,
       reflection: reflection ?? null,
+      isThroughNode: false,
     };
 
     for (let i = 0; i < columns.length; i++) {
@@ -498,7 +502,7 @@ export class JoinDependency {
       }
 
       for (const node of this._nodes) {
-        if (node.immediateAssocName.startsWith("_through_")) continue;
+        if (node.isThroughNode) continue;
 
         const childAttrs: Record<string, unknown> = {};
         let hasNonNull = false;
@@ -626,8 +630,8 @@ export class JoinDependency {
       if (typeof proxy.setInverseInstance === "function") {
         proxy.setInverseInstance(child);
       }
-    } catch {
-      // Association not defined — fall back to legacy path
+    } catch (e) {
+      if (!(e instanceof AssociationNotFoundError)) throw e;
     }
   }
 
@@ -642,8 +646,8 @@ export class JoinDependency {
       if (!proxy || proxy.loaded) return;
       const isCollection = node.assocType === "hasMany";
       proxy.setTarget(isCollection ? [] : null);
-    } catch {
-      // Association not defined
+    } catch (e) {
+      if (!(e instanceof AssociationNotFoundError)) throw e;
     }
   }
 
@@ -1095,6 +1099,7 @@ export class JoinDependency {
       assocType: assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type,
       arelJoin: targetArelJoin,
       reflection: targetReflection ?? null,
+      isThroughNode: false,
     };
     this._nodes.push(node);
     this._pushTreeNode(node);
