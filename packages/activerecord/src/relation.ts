@@ -2139,7 +2139,11 @@ export class Relation<T extends Base> {
 
     const rows = await this._modelClass.connection.execute(sql);
 
-    const { parents, associations } = jd.instantiateFromRows(rows, this._isStrictLoading);
+    const { parents, associations } = jd.instantiateFromRows(
+      rows,
+      this._isStrictLoading,
+      this._isReadonly,
+    );
 
     const inverseMap = new Map<string, string | undefined>();
     const modelAssocs: any[] = (this._modelClass as any)._associations ?? [];

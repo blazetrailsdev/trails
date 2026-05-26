@@ -453,7 +453,11 @@ export class JoinDependency {
     const joins: Nodes.Join[] = [];
     const arelJoin = child._joinNode?.arelJoin;
     if (arelJoin) {
-      joins.push(arelJoin);
+      if (!(arelJoin instanceof joinType) && arelJoin instanceof Nodes.Join) {
+        joins.push(new joinType(arelJoin.left, arelJoin.right));
+      } else {
+        joins.push(arelJoin);
+      }
     }
     return joins.concat(child.children.flatMap((c) => this.makeConstraints(child, c, joinType)));
   }
@@ -523,6 +527,7 @@ export class JoinDependency {
   instantiateFromRows(
     rows: Record<string, unknown>[],
     strictLoadingValue?: boolean,
+    readonlyValue?: boolean,
   ): {
     parents: any[];
     associations: Map<unknown, Map<string, any[]>>;
@@ -555,7 +560,7 @@ export class JoinDependency {
       let parent: any;
       if (!seenRawPks.has(rawPk)) {
         seenRawPks.add(rawPk);
-        parent = this.constructModel(parentAttrs, null, strictLoadingValue);
+        parent = this.constructModel(parentAttrs, null, strictLoadingValue, readonlyValue);
         parentKey = parent._readAttribute(basePk);
         rawToKey.set(rawPk, parentKey);
         parentMap.set(parentKey, parent);
@@ -674,9 +679,13 @@ export class JoinDependency {
     attrs: Record<string, unknown>,
     node: JoinNode | null,
     strictLoadingValue?: boolean,
+    readonlyValue?: boolean,
   ): any {
     const modelClass = node ? node.modelClass : this._baseModel;
     const model = (modelClass as any)._instantiate(attrs);
+    if (readonlyValue) {
+      model._readonly = true;
+    }
     if (strictLoadingValue && typeof model.strictLoadingBang === "function") {
       model.strictLoadingBang();
     }

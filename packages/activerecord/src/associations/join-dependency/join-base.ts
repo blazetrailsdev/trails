@@ -7,6 +7,7 @@
  */
 
 import type { Base } from "../../base.js";
+import type { Table } from "@blazetrails/arel";
 import { JoinPart } from "./join-part.js";
 
 export class JoinBase extends JoinPart {
@@ -16,6 +17,10 @@ export class JoinBase extends JoinPart {
 
   get table(): string {
     return this.baseKlass.tableName;
+  }
+
+  get arelTable(): Table {
+    return this.baseKlass.arelTable;
   }
 
   isMatch(other: JoinPart): boolean {
