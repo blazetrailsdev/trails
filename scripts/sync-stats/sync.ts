@@ -81,11 +81,11 @@ function checkRateLimitBudget() {
 // of the loop until this time passes. Outlives a single gh() invocation so
 // later calls inherit the cooldown without re-tripping the limit.
 function gh(args: string): string {
-  checkRateLimitBudget();
   const MAX_RETRIES = 5;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    waitForCooldownAndInterval();
     ghCallCount++;
+    checkRateLimitBudget();
+    waitForCooldownAndInterval();
     try {
       const result = execSync(`gh ${args}`, { encoding: "utf-8", maxBuffer: 50_000_000 });
       lastGhCallAt = Date.now();
