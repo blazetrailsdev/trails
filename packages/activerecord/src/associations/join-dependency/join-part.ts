@@ -8,6 +8,7 @@
  */
 
 import type { Base } from "../../base.js";
+import type { Table } from "@blazetrails/arel";
 import type { JoinNode } from "../join-dependency.js";
 
 export abstract class JoinPart {
@@ -21,7 +22,7 @@ export abstract class JoinPart {
     if (children) this.children.push(...children);
   }
 
-  abstract get table(): string;
+  abstract get table(): Table | string;
 
   isMatch(other: JoinPart): boolean {
     return this.constructor === other.constructor;

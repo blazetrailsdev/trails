@@ -24,7 +24,7 @@ Items not captured in the existing PR slots above.
 - [x] ~200 LOC: `walk()` deduplication — shipped in #2405.
 - [ ] ~100 LOC: eliminate `_nodes` array — replace flat array with tree traversal once PR 3 tree structure is fully in use.
 - [ ] ~150 LOC: use real `JoinAssociation` nodes in tree (PR 3/5 follow-on).
-- [ ] ~20 LOC: `JoinBase.table` should return an Arel `Table` node, not a string.
+- [x] ~20 LOC: `JoinBase.table` should return an Arel `Table` node, not a string. — shipped in #2417 (`table` now returns `Table` directly, matching Rails' `attr_reader :table`).
 
 **From #2384 (PR 4 — joinSql / dead helpers)**
 
@@ -48,7 +48,7 @@ Items not captured in the existing PR slots above.
 **From #2405 (PR 5 — walk() deduplication)**
 
 - [ ] ~50 LOC: `makeConstraints` ON-predicate rebinding — PR 8 (AliasTracker). Pre-built `arelJoin` nodes don't rebind ON predicates to the merged parent's table alias. `rebindTableReferences()` is applicable.
-- [ ] ~20 LOC: `joinType` not applied to emitted joins — pre-built joins are always `OuterJoin`. Fix when `makeConstraints` is upgraded to rebuild joins.
+- [x] ~20 LOC: `joinType` not applied to emitted joins — pre-built joins are always `OuterJoin`. Fixed in #2417.
 - Note: `JoinTreeNode.isMatch()` matches on `immediateAssocName + modelClass` instead of Rails' reflection identity. Correct proxy for now.
 
 **From #2398 (PR 7b — eager-load hydration)**
@@ -56,7 +56,7 @@ Items not captured in the existing PR slots above.
 - [ ] ~200 LOC: nested eager-load proxy wiring — flat-node iteration only wires children to root parent. Needs recursive tree walk (depends on tree refactor).
 - [ ] ~50 LOC: readonly/strictLoading propagation tests.
 - [ ] ~30 LOC: cross-parent model cache for belongsTo dedup.
-- [ ] ~5 LOC: Relation-level `_isReadonly` not propagated to parent records in eager-load join path.
+- [x] ~5 LOC: Relation-level `_isReadonly` not propagated to parent records in eager-load join path. — non-issue: `_executeEagerLoad` returns to the caller which applies `_isReadonly` at line 1972 (same as Rails' `exec_queries`).
 
 ## Status quo
 

@@ -136,8 +136,9 @@ export class JoinDependency {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
     this._usedTableNames = new Set([this._baseAlias]);
-    this._arelTablesByIndex.set(this._baseTableIndex, (baseModel as any).arelTable);
-    this._joinRoot = new JoinBase(baseModel);
+    const baseTable = (baseModel as any).arelTable;
+    this._arelTablesByIndex.set(this._baseTableIndex, baseTable);
+    this._joinRoot = new JoinBase(baseModel, baseTable);
     this._joinType = joinType ?? Nodes.OuterJoin;
     this._buildBaseAliases();
   }
@@ -436,7 +437,8 @@ export class JoinDependency {
 
     const joins = intersection.flatMap(([l, r]) => {
       if (r instanceof JoinTreeNode) {
-        (r as JoinTreeNode).table = l.table;
+        const lt = l.table;
+        (r as JoinTreeNode).table = typeof lt === "string" ? lt : (lt.tableAlias ?? lt.name);
       }
       return this.walk(l, r, joinType);
     });
@@ -453,7 +455,11 @@ export class JoinDependency {
     const joins: Nodes.Join[] = [];
     const arelJoin = child._joinNode?.arelJoin;
     if (arelJoin) {
-      joins.push(arelJoin);
+      if (!(arelJoin instanceof joinType) && arelJoin instanceof Nodes.Join) {
+        joins.push(new joinType(arelJoin.left, arelJoin.right));
+      } else {
+        joins.push(arelJoin);
+      }
     }
     return joins.concat(child.children.flatMap((c) => this.makeConstraints(child, c, joinType)));
   }
