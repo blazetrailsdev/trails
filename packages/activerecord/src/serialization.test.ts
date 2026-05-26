@@ -1,38 +1,33 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, serialize } from "./index.js";
 import { modelRegistry } from "./associations.js";
-
-import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
+let Contact: typeof Base;
+
+beforeAll(async () => {
+  await defineSchema({
+    contacts: { name: "string", age: "integer", created_at: "string" },
+    authors: { name: "string" },
+    serialized_posts: { author_id: "integer", title: "string" },
+  });
+  Contact = class Contact extends Base {
+    static {
+      this._tableName = "contacts";
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.attribute("age", "integer");
+      this.attribute("created_at", "string");
+    }
+  };
+});
 
 describe("SerializationTest", () => {
-  let adapter: DatabaseAdapter;
-  let Contact: typeof Base;
-
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
-      contacts: { name: "string", age: "integer", created_at: "string" },
-    });
-    Contact = class extends Base {};
-    Contact._tableName = "contacts";
-    Contact.attribute("id", "integer");
-    Contact.attribute("name", "string");
-    Contact.attribute("age", "integer");
-    Contact.attribute("created_at", "string");
-    Contact.adapter = adapter;
-  });
-
   it("include root in json is false by default", () => {
     expect((Contact as any).includeRootInJson).toBeFalsy();
   });
@@ -61,13 +56,16 @@ describe("SerializationTest", () => {
 
   it("include root in json allows inheritance", async () => {
     (Contact as any).includeRootInJson = true;
-    const Sub = class extends Contact {};
-    Sub._tableName = "contacts";
-    const contact = await Sub.create({ name: "David", age: 30 });
-    const json = contact.asJson();
-    const keys = Object.keys(json);
-    expect(keys.length).toBe(1);
-    (Contact as any).includeRootInJson = false;
+    try {
+      const Sub = class extends Contact {};
+      Sub._tableName = "contacts";
+      const contact = await Sub.create({ name: "David", age: 30 });
+      const json = contact.asJson();
+      const keys = Object.keys(json);
+      expect(keys.length).toBe(1);
+    } finally {
+      (Contact as any).includeRootInJson = false;
+    }
   });
 
   it("read attribute for serialization with format without method missing", async () => {
@@ -91,18 +89,11 @@ describe("SerializationTest", () => {
   });
 
   it("find records by serialized attributes through join", async () => {
-    const joinAdapter = freshAdapter();
-    await defineSchema(joinAdapter, {
-      authors: { name: "string" },
-      serialized_posts: { author_id: "integer", title: "string" },
-    });
-
     class Author extends Base {
       static {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = joinAdapter;
         this.hasMany("serializedPosts", { className: "SerializedPost", foreignKey: "author_id" });
       }
     }
@@ -113,7 +104,6 @@ describe("SerializationTest", () => {
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = joinAdapter;
         this.belongsTo("author", { className: "Author" });
         serialize(this, "title");
       }
@@ -136,17 +126,16 @@ describe("SerializationTest", () => {
     }
   });
 
-  // Mirrors ActiveRecord::Serialization#serializable_hash — when a model
-  // declares an inheritance column (STI), serializableHash must exclude
-  // it without callers having to pass `except`.
   it("excludes the inheritance column from serializable_hash for STI models", () => {
-    class Vehicle extends Base {}
-    Vehicle._tableName = "vehicles";
-    Vehicle.attribute("id", "integer");
-    Vehicle.attribute("name", "string");
-    Vehicle.attribute("type", "string");
-    Vehicle.inheritanceColumn = "type";
-    Vehicle.adapter = adapter;
+    class Vehicle extends Base {
+      static {
+        this._tableName = "vehicles";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.inheritanceColumn = "type";
+      }
+    }
 
     const car = new Vehicle({ id: 1, name: "Camry", type: "Car" });
     const hash = car.serializableHash();
@@ -154,13 +143,9 @@ describe("SerializationTest", () => {
     expect(hash).not.toHaveProperty("type");
   });
 
-  // Mirrors Rails' `private def attribute_names_for_serialization;
-  // attribute_names; end` hook — overriding it must actually affect
-  // serializableHash output.
   it("respects an overridden attributeNamesForSerialization", () => {
     class SecretModel extends Base {
       attributeNamesForSerialization() {
-        // Only expose "name"; hide other attributes from serialization.
         return ["name"];
       }
     }
@@ -168,7 +153,6 @@ describe("SerializationTest", () => {
     SecretModel.attribute("id", "integer");
     SecretModel.attribute("name", "string");
     SecretModel.attribute("ssn", "string");
-    SecretModel.adapter = adapter;
 
     const s = new SecretModel({ id: 1, name: "Visible", ssn: "111-22-3333" });
     const hash = s.serializableHash();
@@ -178,17 +162,17 @@ describe("SerializationTest", () => {
   });
 
   it("does not duplicate the inheritance column when caller already passes it in except", () => {
-    class Vehicle extends Base {}
-    Vehicle._tableName = "vehicles";
-    Vehicle.attribute("id", "integer");
-    Vehicle.attribute("name", "string");
-    Vehicle.attribute("type", "string");
-    Vehicle.inheritanceColumn = "type";
-    Vehicle.adapter = adapter;
+    class Vehicle extends Base {
+      static {
+        this._tableName = "vehicles";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.inheritanceColumn = "type";
+      }
+    }
 
     const car = new Vehicle({ id: 1, name: "Camry", type: "Car" });
-    // Caller redundantly excludes "type" — final except list should still
-    // be deduped (Ruby's `|=` set-union semantics).
     const hash = car.serializableHash({ except: ["type"] });
     expect(hash).not.toHaveProperty("type");
     expect(hash).toMatchObject({ id: 1, name: "Camry" });
@@ -197,12 +181,10 @@ describe("SerializationTest", () => {
 
 describe("toXml() on Base", () => {
   it("serializes a record to XML", () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = new User({ name: "Alice" });
@@ -215,17 +197,14 @@ describe("toXml() on Base", () => {
 
 describe("serializableHash with include", () => {
   it("includes nested associations when preloaded", async () => {
-    const adapter = freshAdapter();
-    await defineSchema(adapter, { authors: { name: "string" } });
     class Author extends Base {
       static {
+        this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const author = await Author.create({ name: "Alice" });
-    // Simulate preloaded associations
     const fakePost = {
       _attributes: new Map<string, string | number>([
         ["title", "Hello"],
@@ -244,12 +223,10 @@ describe("serializableHash with include", () => {
 
 describe("fromJson on Base", () => {
   it("sets attributes from JSON", () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = new User({});
@@ -258,12 +235,10 @@ describe("fromJson on Base", () => {
   });
 
   it("supports includeRoot", () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = new User({});

@@ -1,23 +1,23 @@
-import { describe, it, expect, beforeAll, beforeEach, vi, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, Relation, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 
 describe("Thenable", () => {
-  let adapter: TestDatabaseAdapter;
   let ThenableUser: typeof Base;
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       thenable_users: { name: "string", active: "integer" },
       thenable_posts: { title: "string" },
       thenable_comments: { body: "string", thenable_post_id: "integer" },
     });
   });
-  withTransactionalFixtures(() => adapter);
 
   beforeEach(() => {
     ThenableUser = class ThenableUser extends Base {
@@ -25,13 +25,8 @@ describe("Thenable", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("active", "integer");
-        this.adapter = adapter;
       }
     };
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it("Relation is directly awaitable", async () => {
@@ -80,13 +75,11 @@ describe("Thenable", () => {
   it("does not eagerly evaluate on construction", async () => {
     await ThenableUser.create({ name: "Alice", active: 1 });
 
-    const spy = vi.spyOn(adapter, "execute");
-
     const relation = ThenableUser.where({ active: 1 });
-    expect(spy).not.toHaveBeenCalled();
+    expect(relation.isLoaded).toBe(false);
 
     await relation;
-    expect(spy).toHaveBeenCalled();
+    expect(relation.isLoaded).toBe(true);
   });
 
   it("Relation is not instanceof Promise", () => {
@@ -143,7 +136,6 @@ describe("Thenable", () => {
         static {
           this.attribute("id", "integer");
           this.attribute("title", "string");
-          this.adapter = adapter;
         }
       };
       ThenableComment = class ThenableComment extends Base {
@@ -151,7 +143,6 @@ describe("Thenable", () => {
           this.attribute("id", "integer");
           this.attribute("body", "string");
           this.attribute("thenable_post_id", "integer");
-          this.adapter = adapter;
         }
       };
       registerModel(ThenablePost);
