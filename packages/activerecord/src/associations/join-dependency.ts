@@ -24,6 +24,7 @@ import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
 import { AssociationNotFoundError } from "./errors.js";
+import { AliasTracker } from "./alias-tracker.js";
 
 export interface JoinNode {
   tableIndex: number;
@@ -126,7 +127,7 @@ export class JoinDependency {
   private _baseTableIndex = 0;
   private _nextTableIndex = 1;
   private _aliases: AliasMap[] = [];
-  private _usedTableNames: Set<string>;
+  private _aliasTracker: AliasTracker;
   private _arelTablesByIndex: Map<number, Table> = new Map();
   private readonly _joinRoot: JoinBase;
   private readonly _joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
@@ -134,7 +135,7 @@ export class JoinDependency {
   constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
-    this._usedTableNames = new Set([this._baseAlias]);
+    this._aliasTracker = new AliasTracker(undefined, new Map([[this._baseAlias, 1]]));
     const baseTable = (baseModel as any).arelTable;
     this._arelTablesByIndex.set(this._baseTableIndex, baseTable);
     this._joinRoot = new JoinBase(baseModel, baseTable);
@@ -241,7 +242,8 @@ export class JoinDependency {
       return null;
     }
 
-    const effectiveName = this._usedTableNames.has(targetTable!) ? tableAlias : targetTable!;
+    const effectiveName =
+      (this._aliasTracker.aliases.get(targetTable!) ?? 0) > 0 ? tableAlias : targetTable!;
 
     const targetArelTable =
       effectiveName === targetTable!
@@ -254,7 +256,10 @@ export class JoinDependency {
     if (Array.isArray(targetModelPk)) return null;
 
     // Commit-point: all failure guards passed; register the table name.
-    this._usedTableNames.add(targetTable!);
+    this._aliasTracker.aliases.set(
+      targetTable!,
+      (this._aliasTracker.aliases.get(targetTable!) ?? 0) + 1,
+    );
 
     const columns = getModelColumns(targetModel);
 
@@ -267,6 +272,7 @@ export class JoinDependency {
         sourceArelTable,
         modelClass,
         this._joinType,
+        this._aliasTracker,
         (_refl, _remaining) => [targetArelTable, false],
       );
       arelJoin = joins[0] as Nodes.Join;
@@ -348,7 +354,7 @@ export class JoinDependency {
     const snapshotPaths = new Set(this._treeNodesByPath.keys());
     const snapshotAliases = this._aliases.length;
     const snapshotNextIndex = this._nextTableIndex;
-    const snapshotUsedTableNames = new Set(this._usedTableNames);
+    const snapshotTrackerAliases = new Map(this._aliasTracker.aliases);
 
     let currentModel = this._baseModel as any;
     let currentAlias = this._baseAlias;
@@ -365,7 +371,8 @@ export class JoinDependency {
         this._rollbackTree(snapshotPaths);
         this._aliases.length = snapshotAliases;
         this._nextTableIndex = snapshotNextIndex;
-        this._usedTableNames = snapshotUsedTableNames;
+        this._aliasTracker.aliases.clear();
+        for (const [k, v] of snapshotTrackerAliases) this._aliasTracker.aliases.set(k, v);
         return null;
       }
       lastNode = node;
@@ -406,10 +413,6 @@ export class JoinDependency {
   }
 
   /**
-   * @todo `_aliasTracker` is a stub — needs real `JoinDependency` alias-tracking
-   *   (Rails' `AliasTracker`) to deconflict table aliases in complex multi-join queries.
-   */
-  /**
    * Mirrors: ActiveRecord::Associations::JoinDependency#join_type
    *
    * The default join type used when building this dependency's constraints.
@@ -423,9 +426,10 @@ export class JoinDependency {
 
   joinConstraints(
     joinsToAdd: JoinDependency[],
-    _aliasTracker?: any,
+    aliasTracker?: AliasTracker,
     _references?: string[],
   ): Nodes.Join[] {
+    if (aliasTracker) this._aliasTracker = aliasTracker;
     const joins = this.makeJoinConstraints(this._joinRoot, this._joinType);
 
     for (const oj of joinsToAdd) {
@@ -938,7 +942,8 @@ export class JoinDependency {
       const tableIndex = this._nextTableIndex++;
       const tableAlias = `t${tableIndex}`;
       const collides =
-        this._usedTableNames.has(tableName) || chainTables.some((ct) => ct.tableName === tableName);
+        (this._aliasTracker.aliases.get(tableName) ?? 0) > 0 ||
+        chainTables.some((ct) => ct.tableName === tableName);
       const effectiveName = collides ? tableAlias : tableName;
       const arelTable =
         effectiveName === tableName
@@ -959,6 +964,7 @@ export class JoinDependency {
       sourceArelTable,
       modelClass,
       this._joinType,
+      this._aliasTracker,
       (_refl, remaining) => {
         const idx = chain.length - remaining.length;
         const entry = chainTables[idx];
@@ -1005,7 +1011,10 @@ export class JoinDependency {
       const arelJoin = joins[i] as Nodes.Join;
 
       this._arelTablesByIndex.set(entry.tableIndex, entry.table);
-      this._usedTableNames.add(entry.tableName);
+      this._aliasTracker.aliases.set(
+        entry.tableName,
+        (this._aliasTracker.aliases.get(entry.tableName) ?? 0) + 1,
+      );
 
       const columns = getModelColumns(entry.model);
       for (let c = 0; c < columns.length; c++) {
@@ -1089,7 +1098,8 @@ export class JoinDependency {
       : (throughAssocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
     if (Array.isArray(throughFk)) return null;
 
-    const throughEffective = this._usedTableNames.has(throughTable) ? throughAlias : throughTable;
+    const throughEffective =
+      (this._aliasTracker.aliases.get(throughTable) ?? 0) > 0 ? throughAlias : throughTable;
 
     // Build Arel tables for through join
     const throughArelTable =
@@ -1131,7 +1141,7 @@ export class JoinDependency {
       const snapshotPaths = new Set(this._treeNodesByPath.keys());
       const snapshotAliases = this._aliases.length;
       const snapshotNextIndex = this._nextTableIndex;
-      const snapshotUsedTableNames = new Set(this._usedTableNames);
+      const snapshotTrackerAliases = new Map(this._aliasTracker.aliases);
 
       const throughColumns = getModelColumns(throughModel);
       for (let i = 0; i < throughColumns.length; i++) {
@@ -1143,7 +1153,10 @@ export class JoinDependency {
         });
       }
 
-      this._usedTableNames.add(throughTable);
+      this._aliasTracker.aliases.set(
+        throughTable,
+        (this._aliasTracker.aliases.get(throughTable) ?? 0) + 1,
+      );
 
       const throughNodeName = parentAssocName
         ? `${parentAssocName}._through_${assocDef.options.through}`
@@ -1175,7 +1188,8 @@ export class JoinDependency {
         this._rollbackTree(snapshotPaths);
         this._aliases.length = snapshotAliases;
         this._nextTableIndex = snapshotNextIndex;
-        this._usedTableNames = snapshotUsedTableNames;
+        this._aliasTracker.aliases.clear();
+        for (const [k, v] of snapshotTrackerAliases) this._aliasTracker.aliases.set(k, v);
         return null;
       }
 
@@ -1228,7 +1242,8 @@ export class JoinDependency {
       const targetPk = sourceAssocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
       if (Array.isArray(targetPk)) return null;
 
-      const targetCollides = this._usedTableNames.has(targetTable) || targetTable === throughTable;
+      const targetCollides =
+        (this._aliasTracker.aliases.get(targetTable) ?? 0) > 0 || targetTable === throughTable;
       const targetEffective = targetCollides ? targetAlias : targetTable;
       const targetArelTable =
         targetEffective === targetTable
@@ -1275,7 +1290,8 @@ export class JoinDependency {
     const throughPk = (throughModel as any).primaryKey ?? "id";
     if (Array.isArray(throughPk)) return null;
 
-    const targetCollides = this._usedTableNames.has(targetTable) || targetTable === throughTable;
+    const targetCollides =
+      (this._aliasTracker.aliases.get(targetTable) ?? 0) > 0 || targetTable === throughTable;
     const targetEffective = targetCollides ? targetAlias : targetTable;
     const targetArelTable =
       targetEffective === targetTable
@@ -1345,8 +1361,14 @@ export class JoinDependency {
     if (Array.isArray(targetModelPk)) return null;
 
     // Commit-point: register both tables
-    this._usedTableNames.add(throughTable);
-    this._usedTableNames.add(targetTable);
+    this._aliasTracker.aliases.set(
+      throughTable,
+      (this._aliasTracker.aliases.get(throughTable) ?? 0) + 1,
+    );
+    this._aliasTracker.aliases.set(
+      targetTable,
+      (this._aliasTracker.aliases.get(targetTable) ?? 0) + 1,
+    );
 
     const targetColumns = getModelColumns(targetModel);
     const throughColumns = getModelColumns(throughModel);

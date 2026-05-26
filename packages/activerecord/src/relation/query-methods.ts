@@ -19,6 +19,7 @@ import { disallowRawSqlBang } from "../sanitization.js";
 import { sanitizeLimit } from "../connection-adapters/abstract/database-statements.js";
 import { columnNameWithOrderMatcher as abstractOrderMatcher } from "../connection-adapters/abstract/sql-formatting.js";
 import { JoinDependency } from "../associations/join-dependency.js";
+import type { AliasTracker } from "../associations/alias-tracker.js";
 import { foreignKey } from "@blazetrails/activesupport";
 
 /**
@@ -2047,7 +2048,11 @@ export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] 
 }
 
 /** @internal */
-export function buildArel(this: QueryMethodsHost, _connection?: unknown, aliases?: unknown): any {
+export function buildArel(
+  this: QueryMethodsHost,
+  _connection?: unknown,
+  aliases?: AliasTracker,
+): any {
   const mc = (this as any)._modelClass;
   const table: any = mc?.arelTable;
   const arel = new SelectManager(table);
@@ -2213,7 +2218,7 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
 }
 
 /** @internal */
-export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: unknown): void {
+export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTracker): void {
   const hasEagerAssocs =
     this._eagerLoadAssociations.length > 0 || this._leftOuterJoinsValues.length > 0;
   if (this._joinClauses.length === 0 && this._joinValues.length === 0 && !hasEagerAssocs) return;

@@ -12,6 +12,7 @@ import type { Base } from "../../base.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
+import type { AliasTracker } from "../alias-tracker.js";
 
 type JoinType = typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
 type TableResolver = (
@@ -75,6 +76,7 @@ export class JoinAssociation extends JoinPart {
     foreignTable: Table,
     foreignKlass: typeof Base,
     joinType: JoinType,
+    aliasTracker?: AliasTracker,
     resolveTable?: TableResolver,
   ): Nodes.Node[] {
     const joins: Nodes.Node[] = [];

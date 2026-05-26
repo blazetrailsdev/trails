@@ -105,6 +105,7 @@ import { inspectExplainOption } from "./adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import { JoinDependency } from "./associations/join-dependency.js";
+import type { AliasTracker } from "./associations/alias-tracker.js";
 
 /**
  * A Relation returned from `load()` / `reload()` — a normal Relation with
@@ -4860,7 +4861,7 @@ export class Relation<T extends Base> {
   }
 
   /** @internal */
-  private buildArel(connection?: unknown, aliases?: unknown): unknown {
+  private buildArel(connection?: unknown, aliases?: AliasTracker): unknown {
     return _qm.buildArel.call(this as any, connection, aliases);
   }
 
