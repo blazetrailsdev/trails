@@ -163,6 +163,7 @@ export default defineConfig({
             ...(process.env.MYSQL_TEST_URL
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
+            "./packages/activerecord/src/test-setup-dy.ts",
           ],
           // Real-DB tests share a per-worker DB; the module-level state in
           // test-adapter.ts has known race windows (see PR #1114 for prior

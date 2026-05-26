@@ -304,7 +304,7 @@ function databaseIdentity(adapter: DatabaseAdapter): string | null {
     return null;
   }
   if (real.adapterName === "postgres") {
-    const opts = a["_pgPoolOptions"] as { connectionString?: unknown } | undefined;
+    const opts = a["_pgClientOptions"] as { connectionString?: unknown } | undefined;
     const cs = opts?.connectionString;
     if (typeof cs === "string" && cs !== "") return `postgres:${_stripUrlCredentials(cs)}`;
     return null;
@@ -408,6 +408,74 @@ export function clearAppliedSchemaSignatures(adapter?: DatabaseAdapter): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// D-Y canonical schema preload — loaded once per worker at startup.
+// Survives clearAppliedSchemaSignatures() calls so handler-path files'
+// defineSchema() calls are always cache-hits (no DDL).
+// ---------------------------------------------------------------------------
+
+/** @internal */
+let _canonicalPreloadKey: string | null = null;
+/** @internal */
+let _canonicalPreloadAdapter: DatabaseAdapter | null = null;
+/** @internal */
+let _canonicalPreloadSigs: Map<string, string> | null = null;
+
+/**
+ * Register the canonical schema that was loaded at worker startup.  Must be
+ * called after the schema has been applied to the adapter (so signatures are
+ * already in the cache).  Subsequent calls to
+ * {@link restoreCanonicalSchemaSignatures} replay these signatures into the
+ * cache after every {@link clearAppliedSchemaSignatures}.
+ *
+ * @internal
+ */
+export function setCanonicalSchemaPreload(adapter: DatabaseAdapter): void {
+  _canonicalPreloadKey = databaseIdentity(adapter);
+  _canonicalPreloadAdapter = _canonicalPreloadKey === null ? adapter : null;
+  const cache = _cacheFor(adapter, false);
+  _canonicalPreloadSigs = cache ? new Map(cache) : new Map();
+}
+
+/**
+ * Replay canonical-schema signatures into the cache after
+ * {@link clearAppliedSchemaSignatures}.  Called by `resetTestAdapterState`
+ * so that handler-path files' `defineSchema()` calls remain no-ops even when
+ * an old-path file's `beforeEach` wipes the cache.
+ *
+ * @internal
+ */
+export function restoreCanonicalSchemaSignatures(): void {
+  if (!_canonicalPreloadSigs) return;
+  if (_canonicalPreloadKey !== null) {
+    _appliedSchemaSignatures.set(_canonicalPreloadKey, new Map(_canonicalPreloadSigs));
+  } else if (_canonicalPreloadAdapter) {
+    _fallbackSchemaSignatures.set(_canonicalPreloadAdapter, new Map(_canonicalPreloadSigs));
+  }
+}
+
+/**
+ * Like {@link restoreCanonicalSchemaSignatures} but skips the restore when
+ * `adapter` resolves to the same DB identity as the canonical preload.  Used
+ * by `resetTestAdapterState` after `dropAllTables(_sharedAdapter)`: if the
+ * shared adapter points at the canonical DB, the canonical tables no longer
+ * exist, so restoring their signatures would make the fast-path lie and skip
+ * DDL for tables that were just dropped.
+ *
+ * @internal
+ */
+export function restoreCanonicalSchemaSignaturesUnlessAdapter(adapter: DatabaseAdapter): void {
+  if (!_canonicalPreloadSigs) return;
+  if (_canonicalPreloadKey !== null) {
+    const adapterKey = databaseIdentity(adapter);
+    if (adapterKey !== null && adapterKey === _canonicalPreloadKey) return;
+    _appliedSchemaSignatures.set(_canonicalPreloadKey, new Map(_canonicalPreloadSigs));
+  } else if (_canonicalPreloadAdapter) {
+    if (adapter === _canonicalPreloadAdapter) return;
+    _fallbackSchemaSignatures.set(_canonicalPreloadAdapter, new Map(_canonicalPreloadSigs));
+  }
+}
+
 /** @internal */
 function getCache(adapter: DatabaseAdapter): Map<string, string> {
   return _cacheFor(adapter, true)!;
@@ -505,25 +573,24 @@ async function _defineSchemaImpl(
     const raw = schema[table];
     const newSig = tableSignature(raw);
     const cachedSig = cache.get(table);
-    const stillExists = known ? known.has(table) : cachedSig !== undefined;
+    let stillExists = known ? known.has(table) : cachedSig !== undefined;
     if (cachedSig === newSig && stillExists) {
       continue;
     }
-    if (stillExists) {
+    // On PG/MySQL (shared DB), the canonical preload or a prior defineSchema
+    // call may have created this table with a different schema. Always drop
+    // before recreating. On SQLite :memory: (separate DB per adapter),
+    // _canonicalPreloadKey is null — safe to use IF NOT EXISTS.
+    if (_canonicalPreloadKey !== null) {
+      await ss.dropTable(table, { ifExists: true });
+      stillExists = true;
+    } else if (stillExists) {
       await ss.dropTable(table, { ifExists: true });
     } else if (cachedSig !== undefined) {
-      // Cache says we created it, but the adapter no longer reports it as
-      // present (e.g. resetTestAdapterState wiped state). Forget the stale
-      // entry and create fresh.
       cache.delete(table);
     }
     const columns = columnsOf(raw);
     const pk = primaryKeyOf(raw);
-    // Use IF NOT EXISTS when neither branch above ran (no drop, no stale-cache
-    // delete): the cache has no entry and the table may or may not exist in the
-    // DB. Under a shared pooled adapter, another file may have already created
-    // it. When stillExists was true we just dropped it; when cachedSig was set
-    // we cleared it — both cases guarantee the table is absent.
     const createOpts: { id?: boolean; primaryKey?: string[]; ifNotExists?: boolean } = {};
     if (!stillExists && cachedSig === undefined) createOpts.ifNotExists = true;
     if (pk === false) createOpts.id = false;
