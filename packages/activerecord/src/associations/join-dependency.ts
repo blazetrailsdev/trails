@@ -200,6 +200,19 @@ export class JoinDependency {
       assocDef.type === "hasAndBelongsToMany"
     ) {
       if (assocDef.options.through) {
+        this._nextTableIndex--;
+        if (reflection && reflection.isThroughReflection()) {
+          const snapshotIndex = this._nextTableIndex;
+          const result = this._addThroughViaJoinAssociation(
+            assocDef,
+            reflection,
+            modelClass,
+            sourceAlias,
+            options?.parentAssocName,
+          );
+          if (result) return result;
+          this._nextTableIndex = snapshotIndex;
+        }
         return this._addThroughAssociation(
           assocDef,
           modelClass,
@@ -903,6 +916,169 @@ export class JoinDependency {
       throw new Error(`JoinDependency tree (${caller}): parent path "${parentPath}" not found`);
     }
     return found;
+  }
+
+  private _addThroughViaJoinAssociation(
+    assocDef: any,
+    reflection: any,
+    modelClass: any,
+    sourceAlias: string,
+    parentAssocName?: string,
+  ): JoinNode | null {
+    const chain = reflection.chain;
+    if (!chain || chain.length < 2) return null;
+
+    const joinAssoc = new JoinAssociation(reflection);
+    const sourceArelTable = new Table(sourceAlias);
+
+    // Pre-allocate table indices and resolve tables for each chain entry.
+    // chain[0] is the target reflection (ThroughReflection),
+    // chain[1..N] are intermediate through reflections.
+    // joinConstraints reverses internally, so the resolver sees them
+    // in forward order but joins are emitted reversed.
+    const chainTables: Array<{
+      table: Table;
+      tableName: string;
+      effectiveName: string;
+      tableIndex: number;
+      tableAlias: string;
+      model: typeof Base;
+    }> = [];
+
+    for (let i = 0; i < chain.length; i++) {
+      const refl = chain[i];
+      const model = refl.klass as typeof Base;
+      const tableName = (model as any).tableName;
+      const tableIndex = this._nextTableIndex++;
+      const tableAlias = `t${tableIndex}`;
+      const collides =
+        this._usedTableNames.has(tableName) || chainTables.some((ct) => ct.tableName === tableName);
+      const effectiveName = collides ? tableAlias : tableName;
+      const arelTable =
+        effectiveName === tableName
+          ? new Table(tableName)
+          : new Table(tableName, { as: effectiveName });
+
+      chainTables.push({
+        table: arelTable,
+        tableName,
+        effectiveName,
+        tableIndex,
+        tableAlias,
+        model,
+      });
+    }
+
+    const joins = joinAssoc.joinConstraints(
+      sourceArelTable,
+      modelClass,
+      this._joinType,
+      (_refl, remaining) => {
+        const idx = chain.length - remaining.length;
+        const entry = chainTables[idx];
+        if (!entry) return [new Table((_refl.klass as any).tableName), false];
+        return [entry.table, false];
+      },
+    );
+
+    if (joins.length === 0) return null;
+
+    // Rebind ON predicates when tables were aliased (scope/STI predicates
+    // from klass.all() reference the unaliased table name).
+    for (let i = 0; i < joins.length; i++) {
+      const chainIdx = chain.length - 1 - i;
+      const entry = chainTables[chainIdx];
+      if (entry.effectiveName !== entry.tableName) {
+        const on = (joins[i] as Nodes.Join).right as Nodes.On;
+        if (on instanceof Nodes.On) {
+          const rebound = rebindTableReferences(
+            on.expr as Nodes.Node,
+            entry.tableName,
+            entry.table,
+          );
+          if (rebound !== on.expr) {
+            joins[i] = new this._joinType(entry.table, new Nodes.On(rebound));
+          }
+        }
+      }
+    }
+
+    // joins are in reversed-chain order: first N-1 are intermediate (through),
+    // last is the target. chainTables is in forward order.
+    // After joinConstraints reversal: joins[0] corresponds to chain[last],
+    // joins[last] corresponds to chain[0] (the target/ThroughReflection).
+    // Register all tables and create JoinNodes.
+    let targetNode: JoinNode | null = null;
+
+    // Map each join to its chain entry. joinConstraints reverses the chain,
+    // so joins[i] corresponds to chainTables[chain.length - 1 - i].
+    for (let i = 0; i < joins.length; i++) {
+      const chainIdx = chain.length - 1 - i;
+      const entry = chainTables[chainIdx];
+      const isTarget = chainIdx === 0;
+      const arelJoin = joins[i] as Nodes.Join;
+
+      this._arelTablesByIndex.set(entry.tableIndex, entry.table);
+      this._usedTableNames.add(entry.tableName);
+
+      const columns = getModelColumns(entry.model);
+      for (let c = 0; c < columns.length; c++) {
+        this._aliases.push({
+          alias: `t${entry.tableIndex}_r${c}`,
+          tableIndex: entry.tableIndex,
+          columnIndex: c,
+          column: columns[c],
+        });
+      }
+
+      if (isTarget) {
+        const fullAssocName = parentAssocName
+          ? `${parentAssocName}.${assocDef.name}`
+          : assocDef.name;
+        const node: JoinNode = {
+          tableIndex: entry.tableIndex,
+          tableAlias: entry.tableAlias,
+          tableName: entry.tableName,
+          effectiveSqlName: entry.effectiveName,
+          modelClass: entry.model,
+          columns,
+          assocName: fullAssocName,
+          immediateAssocName: assocDef.name,
+          parentPath: parentAssocName ?? null,
+          assocType: assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type,
+          arelJoin,
+          reflection,
+          isThroughNode: false,
+        };
+        this._nodes.push(node);
+        this._pushTreeNode(node);
+        targetNode = node;
+      } else {
+        const reflName = chain[chainIdx].name ?? entry.tableName;
+        const throughName = `_through_${reflName}`;
+        const throughNodeName = parentAssocName ? `${parentAssocName}.${throughName}` : throughName;
+        const refl = chain[chainIdx];
+        const node: JoinNode = {
+          tableIndex: entry.tableIndex,
+          tableAlias: entry.tableAlias,
+          tableName: entry.tableName,
+          effectiveSqlName: entry.effectiveName,
+          modelClass: entry.model,
+          columns,
+          assocName: throughNodeName,
+          immediateAssocName: throughName,
+          parentPath: parentAssocName ?? null,
+          assocType: ((refl as any)._reflection ?? refl).macro === "hasOne" ? "hasOne" : "hasMany",
+          arelJoin,
+          reflection: null,
+          isThroughNode: true,
+        };
+        this._nodes.push(node);
+        this._pushTreeNode(node);
+      }
+    }
+
+    return targetNode;
   }
 
   private _addThroughAssociation(
