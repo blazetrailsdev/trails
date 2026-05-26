@@ -1629,6 +1629,9 @@ export class PolymorphicReflection extends AbstractReflection {
         [];
       scopes.push(...prevScopes);
     }
+    const sourceTypeFn = this.sourceTypeScope();
+    const typeScope = this.buildScope(table, predicateBuilder, klass);
+    scopes.push(sourceTypeFn(typeScope));
     return scopes;
   }
 
