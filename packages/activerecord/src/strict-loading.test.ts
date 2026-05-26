@@ -463,6 +463,10 @@ describe("StrictLoadingTest", () => {
       slwr_books: { title: "string", sl_wr_author_id: "integer" },
       slnr_authors: { name: "string" },
       slnr_books: { title: "string", sl_nr_author_id: "integer" },
+      elsl_devs: { name: "string" },
+      elsl_logs: { message: "string", elsl_dev_id: "integer" },
+      elslhm_devs: { name: "string" },
+      elslhm_logs: { message: "string", elslhm_dev_id: "integer" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -1185,15 +1189,59 @@ describe("StrictLoadingTest", () => {
     // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
     // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
   });
-  it.skip("eager load audit logs are strict loading because parent is strict loading in hm relation", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("eager load audit logs are strict loading because parent is strict loading in hm relation", async () => {
+    class ElslhmDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class ElslhmLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("elslhm_dev_id", "integer");
+      }
+    }
+    Associations.hasMany.call(ElslhmDev, "elslhmLogs", {
+      className: "ElslhmLog",
+      foreignKey: "elslhm_dev_id",
+      strictLoading: true,
+    });
+    registerModel("ElslhmDev", ElslhmDev);
+    registerModel("ElslhmLog", ElslhmLog);
+    const dev = await ElslhmDev.create({ name: "D" });
+    await ElslhmLog.create({ message: "M", elslhm_dev_id: dev.id });
+    const loaded = await ElslhmDev.all().eagerLoad("elslhmLogs").toArray();
+    const logs = (loaded[0] as any)._preloadedAssociations?.get("elslhmLogs") ?? [];
+    expect(logs).toHaveLength(1);
+    expect(logs.every((l: any) => l._strictLoading)).toBe(true);
   });
-  it.skip("eager load audit logs are strict loading because parent is strict loading", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+
+  it("eager load audit logs are strict loading because parent is strict loading", async () => {
+    class ElslDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class ElslLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("elsl_dev_id", "integer");
+      }
+    }
+    Associations.hasMany.call(ElslDev, "elslLogs", {
+      className: "ElslLog",
+      foreignKey: "elsl_dev_id",
+    });
+    registerModel("ElslDev", ElslDev);
+    registerModel("ElslLog", ElslLog);
+    const dev = await ElslDev.create({ name: "D" });
+    await ElslLog.create({ message: "M1", elsl_dev_id: dev.id });
+    await ElslLog.create({ message: "M2", elsl_dev_id: dev.id });
+    const loaded = await ElslDev.all().eagerLoad("elslLogs").strictLoading().toArray();
+    expect((loaded[0] as any)._strictLoading).toBe(true);
+    const logs = (loaded[0] as any)._preloadedAssociations?.get("elslLogs") ?? [];
+    expect(logs).toHaveLength(2);
+    expect(logs.every((l: any) => l._strictLoading)).toBe(true);
   });
   it.skip("eager load audit logs are strict loading because it is strict loading by default", () => {
     // BLOCKED: relation — StrictLoadingViolation not wired into association loading

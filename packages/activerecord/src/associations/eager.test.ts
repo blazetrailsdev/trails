@@ -4667,7 +4667,7 @@ describe("EagerAssociationTest", () => {
     registerModel("EnraPost", EnraPost);
     const a = await EnraAuthor.create({ name: "A" });
     await EnraPost.create({ title: "P", enra_author_id: a.id });
-    const authors = await EnraAuthor.all().includes("enraPosts").toArray();
+    const authors = await EnraAuthor.all().eagerLoad("enraPosts").toArray();
     const posts = (authors[0] as any)._preloadedAssociations?.get("enraPosts") ?? [];
     expect(posts).toHaveLength(1);
     expect((posts[0] as any)._readonly).not.toBe(true);
@@ -4688,15 +4688,18 @@ describe("EagerAssociationTest", () => {
     Associations.hasMany.call(ElraAuthor, "elraPosts", {
       className: "ElraPost",
       foreignKey: "elra_author_id",
+      scope: (rel: any) => rel.readonly(),
     });
     registerModel("ElraAuthor", ElraAuthor);
     registerModel("ElraPost", ElraPost);
     const a = await ElraAuthor.create({ name: "A" });
     await ElraPost.create({ title: "P", elra_author_id: a.id });
-    const authors = await ElraAuthor.all().includes("elraPosts").toArray();
+    const authors = await ElraAuthor.all().eagerLoad("elraPosts").toArray();
     const posts = (authors[0] as any)._preloadedAssociations?.get("elraPosts") ?? [];
     expect(posts).toHaveLength(1);
+    expect((posts[0] as any)._readonly).toBe(true);
   });
+
   it.skip("preloading a polymorphic association with references to the associated table", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
