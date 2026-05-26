@@ -17,17 +17,17 @@ pnpm run test:compare 2>&1 | grep -E "(actiondispatch|actioncontroller|abstractc
 > `pnpm api:compare` is a chained `&&` script and won't forward
 > `--package`; invoke `compare.ts` directly for scoped totals.
 
-## Status (2026-05-23)
+## Status (2026-05-24)
 
 | Package            | api:compare       | files at 100% | inheritance   | test:compare     |
 | ------------------ | ----------------- | ------------- | ------------- | ---------------- |
 | abstractcontroller | 82/82 (100%)      | 11/11         | 3/4 (75%)     | 42/52 (81%)      |
 | actiondispatch     | 1277/1350 (94.6%) | 75/83         | 58/66 (87.9%) | 577/1622 (35.6%) |
-| actioncontroller   | 463/578 (80.1%)   | 42/43         | 16/16 (100%)  | 552/1860 (29.7%) |
+| actioncontroller   | 496/578 (85.8%)   | 42/43         | 16/16 (100%)  | 552/1860 (29.7%) |
 
 **Two large bodies of work remain:**
 
-1. **api:compare** — 188 methods across 10 partial files (most upstream-blocked on ActionView). See [Stories — API surface](#stories--api-surface).
+1. **api:compare** — 82 methods across 5 partial files (most upstream-blocked on ActionView). See [Stories — API surface](#stories--api-surface).
 2. **test:compare** — ~2350 Rails test cases not yet ported. Heaviest on routing, test_case, integration, render. See [Stories — Test ports](#stories--test-ports).
 
 ### Start here (next ~3 PRs to pick up)

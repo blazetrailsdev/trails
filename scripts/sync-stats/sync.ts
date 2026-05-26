@@ -14,20 +14,43 @@ mkdirSync(dirname(DB_PATH), { recursive: true });
 // Throttle gh calls to stay under GitHub's secondary rate limit (~80 req/min
 // for bursty patterns). 250ms between calls = ~240/min, comfortably safe for
 // read-only traffic.
-const GH_MIN_INTERVAL_MS = 250;
+const GH_MIN_INTERVAL_MS = 500;
 const sleepBuf = new Int32Array(new SharedArrayBuffer(4));
 let lastGhCallAt = 0;
+let rateLimitCooldownUntil = 0;
 
 function gh(args: string): string {
-  const elapsed = Date.now() - lastGhCallAt;
-  if (elapsed < GH_MIN_INTERVAL_MS) {
-    Atomics.wait(sleepBuf, 0, 0, GH_MIN_INTERVAL_MS - elapsed);
+  const MAX_RETRIES = 5;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const now = Date.now();
+    const cooldownRemaining = rateLimitCooldownUntil - now;
+    if (cooldownRemaining > 0) {
+      Atomics.wait(sleepBuf, 0, 0, cooldownRemaining);
+    }
+    const elapsed = Date.now() - lastGhCallAt;
+    if (elapsed < GH_MIN_INTERVAL_MS) {
+      Atomics.wait(sleepBuf, 0, 0, GH_MIN_INTERVAL_MS - elapsed);
+    }
+    try {
+      const result = execSync(`gh ${args}`, { encoding: "utf-8", maxBuffer: 50_000_000 });
+      lastGhCallAt = Date.now();
+      return result;
+    } catch (err) {
+      lastGhCallAt = Date.now();
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/rate limit|secondary rate|abuse detection/i.test(msg) && attempt < MAX_RETRIES) {
+        const backoffMs = Math.min(120_000, 5_000 * Math.pow(2, attempt));
+        rateLimitCooldownUntil = Date.now() + backoffMs;
+        console.warn(
+          `  Rate limited, cooling down ${backoffMs / 1000}s (retry ${attempt + 1}/${MAX_RETRIES})...`,
+        );
+        Atomics.wait(sleepBuf, 0, 0, backoffMs);
+        continue;
+      }
+      throw err;
+    }
   }
-  try {
-    return execSync(`gh ${args}`, { encoding: "utf-8", maxBuffer: 50_000_000 });
-  } finally {
-    lastGhCallAt = Date.now();
-  }
+  throw new Error("unreachable");
 }
 
 function ghJson<T>(args: string): T {
@@ -1322,40 +1345,10 @@ async function syncPrTimelineEvents() {
 }
 
 async function syncPrReactions() {
-  const prsToSync = await PullRequest.findBySql(
-    `SELECT number FROM pull_requests WHERE reactions_synced = 0 ORDER BY number`,
+  // Skipped — no reactions on this repo, not worth the API calls.
+  await Base.adapter.executeMutation(
+    `UPDATE pull_requests SET reactions_synced = 1 WHERE reactions_synced = 0`,
   );
-
-  if (prsToSync.length === 0) return;
-  console.log(`Fetching reactions for ${prsToSync.length} PRs...`);
-
-  for (const pr of prsToSync) {
-    const number = pr.readAttribute("number") as number;
-    try {
-      const reactions = ghJson<GhReactionData[]>(
-        `api repos/${REPO}/issues/${number}/reactions --paginate`,
-      );
-      await PrReaction.adapter.executeMutation(`DELETE FROM pr_reactions WHERE pr_number = ?`, [
-        number,
-      ]);
-      if (reactions.length > 0) {
-        await PrReaction.insertAll(
-          reactions.map((r) => ({
-            reaction_id: r.id,
-            pr_number: number,
-            user: r.user?.login ?? null,
-            content: r.content,
-            created_at: r.created_at,
-          })),
-        );
-      }
-      await PullRequest.where({ number }).updateAll({ reactions_synced: 1 });
-    } catch (err) {
-      console.warn(
-        `  Failed to fetch reactions for PR #${number}: ${err instanceof Error ? err.message : err}`,
-      );
-    }
-  }
 }
 
 async function syncWorkflowRuns(mode: "latest" | "refresh" | "backfill"): Promise<number> {
