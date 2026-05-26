@@ -633,7 +633,10 @@ export class JoinDependency {
       const fullPath = node.parentPath
         ? `${node.parentPath}.${node.immediateAssocName}`
         : node.immediateAssocName;
-      this._treeNodesByPath.delete(fullPath);
+      const mapped = this._treeNodesByPath.get(fullPath);
+      if (mapped && mapped._joinNode === node) {
+        this._treeNodesByPath.delete(fullPath);
+      }
       const parentPath = node.parentPath;
       const parent: JoinPart = parentPath
         ? (this._treeNodesByPath.get(parentPath) ?? this._joinRoot)
