@@ -554,8 +554,14 @@ interface CrossReferenceResult {
 
 const RUBY_NAMESPACE_ROOTS = new Set(["Arel", "ActiveModel", "ActiveRecord", "ActiveSupport"]);
 
+// Ruby method calls that appear as depRefs (e.g. Rails calls `arel_table`
+// on a model). Not type/class references — the TS equivalent is a property
+// access on `this`, not an import from the dep package.
 const RUBY_METHOD_REFS = new Set(["arel_table", "arel_column", "resolve_arel_attribute"]);
 
+// Ruby mixins whose methods are applied structurally at build time in the
+// dep package (e.g. `include(NodeExpression, Expressions)`). AR code calls
+// the mixed-in methods but never references the module name itself.
 const RUBY_MIXIN_REFS = new Set(["Predications", "Expressions"]);
 
 function normalizeRubyRef(ref: string): string | null {
@@ -646,12 +652,7 @@ function crossReference(rubyMethods: RubyDepMethod[], tsDepMap: TsDepMap): Cross
         const missingInTs = rubyNormalized.filter((r) => {
           const lower = r.toLowerCase();
           const camel = snakeToCamel(r).toLowerCase();
-          return (
-            !tsSet.has(lower) &&
-            !tsSet.has(camel) &&
-            !tsSet.has("_" + camel) &&
-            !tsSet.has("_" + lower)
-          );
+          return !tsSet.has(lower) && !tsSet.has(camel) && !tsSet.has("_" + camel);
         });
         if (missingInTs.length > 0) {
           refMismatches.push({

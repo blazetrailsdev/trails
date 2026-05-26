@@ -2,7 +2,7 @@
 
 ## Phase 1 — Linter improvements ✅ DONE
 
-Landed in-tree (not yet committed). Three fixes:
+Three fixes:
 
 1. **Tainted-symbol ref recording** — `methodUsesDepImport` now records
    the identifier name when a tainted symbol is detected, so
