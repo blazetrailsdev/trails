@@ -590,14 +590,7 @@ export function migrateText(text: string, filePath: string): string | { skip: st
 }
 
 function migrateSourceFile(sf: SourceFile, filePath: string): Result {
-  // Already-migrated check
-  for (const imp of sf.getImportDeclarations()) {
-    if (imp.getModuleSpecifierValue().endsWith("/setup-handler-suite.js")) {
-      return { file: filePath, status: "already-migrated" };
-    }
-  }
-
-  // Must import createTestAdapter
+  // Must import createTestAdapter — if absent, nothing left to migrate
   let testAdapterImport: ImportDeclaration | undefined;
   for (const imp of sf.getImportDeclarations()) {
     const spec = imp.getModuleSpecifierValue();
@@ -609,8 +602,13 @@ function migrateSourceFile(sf: SourceFile, filePath: string): Result {
       }
     }
   }
-  if (!testAdapterImport)
+  if (!testAdapterImport) {
+    const hasHandlerImport = sf
+      .getImportDeclarations()
+      .some((i) => i.getModuleSpecifierValue().endsWith("/setup-handler-suite.js"));
+    if (hasHandlerImport) return { file: filePath, status: "already-migrated" };
     return { file: filePath, status: "skipped", reason: "no createTestAdapter import" };
+  }
 
   // Find freshAdapter helper
   const freshAdapter = analyzeFreshAdapterHelper(sf);
