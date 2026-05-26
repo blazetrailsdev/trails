@@ -423,6 +423,28 @@ lives in **CLAUDE.md** — start there. actionpack-specific notes only:
 
 ---
 
+## Post-merge follow-ups
+
+**From #2360 (IntegrationProcessTest part 1)**
+
+- [ ] ~64 tests: `IntegrationProcessTest` part 2 — process-lifecycle and
+      multi-request session cases deferred from #2360. Depends on
+      `Rack::MockSession` analogue landing (upstream blocker row in the table
+      above). Track as a new T-AC11 split once the blocker is cleared.
+
+**From #2358 (integration test infrastructure)**
+
+- [ ] 5 infrastructure gaps documented as `it.skip` in the test file
+      (session-cookie propagation across requests, multi-session interleaving,
+      process-restart state, remote-addr spoofing, and chunked response drain).
+      Each needs a targeted follow-up PR; do not bundle — they have different
+      upstream blockers.
+
+**From #2359 / #2354 (test-port batches)**
+
+- No open follow-ups; standard test-port closures. Count included in
+  the test:compare totals in the Status table above.
+
 ## Indefinite defers (do not port)
 
 - **system_testing/** (5 files), **system_test_case.rb**,

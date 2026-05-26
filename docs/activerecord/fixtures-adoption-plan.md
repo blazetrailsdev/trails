@@ -269,6 +269,24 @@ the canary pattern is settled.
    toward the 300-LOC ceiling; consider paths-filter narrowing if
    minutes get noisy.
 
+## Post-merge follow-ups
+
+**From #2391 (Phase G batch 1 — first 2 D-1 migrated files)**
+
+Only 2 of the 25 D-1 migrated files in #2397 met fixture-adoption criteria
+(compatible schema + all fixtures MATCH + no loader gap). The other 23 are
+blocked on:
+
+- Schema-reflected attributes don't generate dirty-tracking methods (~20 LOC
+  in `model-schema.ts`; tracked in connection-pooled-test-adapter-plan.md).
+  This is the primary gate — it blocks ~23 candidate files from reaching Tier 1.
+- Remaining D-1 codemod variants (multi-describe, sidecar, adapter-specific
+  files) haven't been migrated yet; Phase G can't adopt those files until
+  their pool wiring is in place.
+
+Status note: Phase G is in flight but at ~8% of target scope until the
+schema-reflected dirty-tracking gap and remaining D-1 variants land.
+
 ## Cross-references
 
 - fixtures port (complete) — the data substrate;

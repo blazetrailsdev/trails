@@ -193,6 +193,34 @@ and handles all test-file changes.
 
 All PRs branch from `main` (no stacking).
 
+## Post-merge follow-ups
+
+Items surfaced during PRs that land adjacent to this plan. Add to the
+appropriate Phase above once ready to schedule; listed here to avoid loss.
+
+**From #2402 (PG addIndex cleanup)**
+
+- [ ] ~5 LOC: `addIndex` return type inconsistency on PG adapter — fix return type annotation to match AbstractAdapter.
+
+**From #2401 (set connection() rename)**
+
+- [ ] ~16 LOC: rename `migration-runner.ts` to match Rails-natural file layout.
+- [ ] ~schema-ar-models.ts: `set connection()` setter in schema-ar-models.ts is blocked on the `set connection()` rename in Phase 1a landing first.
+- Discovery: `extend()` overwrites class getters — any future getter that must survive `extend()` needs a post-extend `Object.defineProperty` call. Document this in contributor notes if/when it re-surfaces.
+
+**From #2395 (InsertAll / visitor)**
+
+- [ ] ~20 LOC: remove `InsertAll` legacy constructor deprecation shim once Phase G test files are migrated.
+- [ ] Pre-existing: global visitor singleton (`setToSqlVisitor`) vs per-adapter visitor — Rails uses per-adapter. Low-risk now, but flagged for the Phase 2 cleanup window.
+
+**From #2386 (PR 1b first batch)**
+
+- Remaining PR 1b sites not yet migrated: `associations/preloader/association.ts`, `relation/query-methods.ts`, `validations/uniqueness.ts`, `attribute-methods/primary-key.ts`. These are the Phase 1b remainder; tracked here until Phase 1b lands.
+
+**From #2392 (QueryMethods double-fallback removal)**
+
+- No new follow-ups; confirms Phase 1b pattern is safe.
+
 ## Non-goals (this plan)
 
 - **Deleting `set connection()` and the `get adapter()` compat alias** —

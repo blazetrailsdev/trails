@@ -1,5 +1,49 @@
 # JoinDependency → Full Rails Fidelity Plan
 
+## Merge status
+
+| Plan PR | Shipped as | Status  |
+| ------- | ---------- | ------- |
+| PR 1    | #2378      | merged  |
+| PR 2    | #2379      | merged  |
+| PR 3    | #2381      | merged  |
+| PR 4    | #2384      | merged  |
+| PR 5    | —          | open    |
+| PR 6    | #2394      | merged  |
+| PR 7    | #2387      | merged  |
+| PR 8    | —          | stretch |
+| PR 9    | —          | stretch |
+
+## Post-merge follow-ups
+
+Items not captured in the existing PR slots above.
+
+**From #2394 (PR 6 — Arel select aliases)**
+
+- [ ] ~200 LOC: `walk()` deduplication — after PR 5 (tree structure) lands, implement the shared-prefix reuse pass so `comments.author` + `comments.likes` share one join node.
+- [ ] ~100 LOC: eliminate `_nodes` array — replace flat array with tree traversal once PR 3 tree structure is fully in use.
+- [ ] ~150 LOC: use real `JoinAssociation` nodes in tree (PR 3/5 follow-on).
+- [ ] ~20 LOC: `JoinBase.table` should return an Arel `Table` node, not a string.
+
+**From #2384 (PR 4 — joinSql / dead helpers)**
+
+- [x] ~5 LOC: delete `joinSql` from `JoinNode` — done in PR 7 (#2387).
+- [x] ~5 LOC: delete `buildJoinSql()` — done in PR 7 (#2387).
+- [x] ~40 LOC: delete dead helper functions — done in PR 7 (#2387).
+- [x] ~15 LOC: delete dead `aliases()` — done in PR 7 (#2387).
+- [x] remove `arelSql` import — done in PR 7 (#2387).
+
+**From #2381 (PR 3 — tree structure)**
+
+- [ ] ~100 LOC: SELECT projections as Arel nodes (currently string-built in `buildSelectSql`).
+- [ ] ~200 LOC: wire `JoinAssociation#joinConstraints` for through-associations with scope predicates.
+
+**From #2379 (PR 2 — through-association path)**
+
+- [ ] ~250 LOC: full through-association path via Arel nodes (PR 2 partial; remainder in PR 5).
+- [ ] ~150 LOC: `buildSelectSql`/`applyColumnAliases` still use `_qt`/`_qc` internally — finish migration in PR 6 follow-on.
+- `rebindTableReferences` is a stopgap and should be removed once alias resolution is wired through `AliasTracker`.
+
 ## Status quo
 
 We have two parallel implementations:
