@@ -4,10 +4,9 @@
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { Base } from "./index.js";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -17,17 +16,15 @@ afterAll(() => {
 });
 
 describe("JsonSerializationTest", () => {
-  let adapter: TestDatabaseAdapter;
   let Contact: typeof Base;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       contacts: { name: "string", age: "integer", created_at: "string", type: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   beforeEach(() => {
     Contact = class extends Base {};
     Contact._tableName = "contacts";
@@ -35,7 +32,6 @@ describe("JsonSerializationTest", () => {
     Contact.attribute("name", "string");
     Contact.attribute("age", "integer");
     Contact.attribute("created_at", "string");
-    Contact.adapter = adapter;
   });
 
   it("should demodulize root in json", async () => {
@@ -137,10 +133,10 @@ describe("JsonSerializationTest", () => {
 });
 
 describe("DatabaseConnectedJsonEncodingTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       post_j1s: { title: "string" },
       comment_j1s: { body: "string", post_id: "integer" },
       post_j2s: { title: "string" },
@@ -163,20 +159,16 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       post_j11s: { title: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("includes uses association name", async () => {
     class CommentJ1 extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PostJ1 extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = await PostJ1.create({ title: "Hello" });
@@ -194,13 +186,11 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PostJ2 extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = await PostJ2.create({ title: "Hello" });
@@ -216,20 +206,17 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       static {
         this.attribute("text", "string");
         this.attribute("comment_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CommentJ3 extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PostJ3 extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = await PostJ3.create({ title: "Hello" });
@@ -247,19 +234,16 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     class DeepJ4 extends Base {
       static {
         this.attribute("val", "string");
-        this.adapter = adapter;
       }
     }
     class MidJ4 extends Base {
       static {
         this.attribute("val", "string");
-        this.adapter = adapter;
       }
     }
     class TopJ4 extends Base {
       static {
         this.attribute("val", "string");
-        this.adapter = adapter;
       }
     }
     const top = await TopJ4.create({ val: "top" });
@@ -276,14 +260,12 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PostJ5 extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
-        this.adapter = adapter;
       }
     }
     const post = await PostJ5.create({ title: "Hello", author: "Alice" });
@@ -300,7 +282,6 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     class PostJ6 extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = await PostJ6.create({ title: "Hello" });
@@ -314,7 +295,6 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
     const a1 = await AuthorJ7.create({ name: "Alice", age: 30 });
@@ -330,7 +310,6 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
     const a1 = await AuthorJ8.create({ name: "Alice", age: 30 });
@@ -344,13 +323,11 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class AuthorJ9 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const a1 = await AuthorJ9.create({ name: "Alice" });
@@ -366,14 +343,12 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class AuthorJ10 extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
     const a1 = await AuthorJ10.create({ name: "Alice", age: 30 });
@@ -390,7 +365,6 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     class PostJ11 extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await PostJ11.create({ title: "First" });

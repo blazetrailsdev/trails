@@ -7,15 +7,11 @@ import { sql, Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base, Relation, IrreversibleOrderError } from "./index.js";
 import { Associations, registerModel, modelRegistry } from "./associations.js";
 
-import {
-  createTestAdapter,
-  resetTestAdapterState,
-  type TestDatabaseAdapter,
-} from "./test-adapter.js";
+import { createTestAdapter, resetTestAdapterState } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -61,11 +57,10 @@ describe("isBlank / isPresent", () => {
 // RelationTest — targets relations_test.rb
 // ==========================================================================
 describe("RelationTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       posts: { title: "string", body: "string", status: "string", author_id: "integer" },
       developers: { commits: "integer" },
       orders: { created_at: "string", total: "integer" },
@@ -82,17 +77,10 @@ describe("RelationTest", () => {
       eager_articles: { title: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("reload", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -107,7 +95,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -120,7 +107,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -133,7 +119,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = Post.where({ title: "hello" }).build();
@@ -144,7 +129,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = await Post.where({ title: "new" }).create();
@@ -156,7 +140,6 @@ describe("RelationTest", () => {
       static _tableName = "posts";
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     // Rails never strips or re-qualifies cross-table references in string form.
@@ -169,7 +152,6 @@ describe("RelationTest", () => {
       static _tableName = "posts";
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     // Computed select alias — must not be qualified as "posts"."avg_rating"
@@ -188,9 +170,6 @@ describe("RelationTest", () => {
     // but must remain table-qualified to avoid ambiguous-column errors on JOINs.
     class Post extends Base {
       static _tableName = "posts";
-      static {
-        this.adapter = adapter;
-      }
     }
     expect(Post.order({ id: "desc" }).toSql()).toContain('"posts"."id" DESC');
   });
@@ -200,7 +179,6 @@ describe("RelationTest", () => {
       static _tableName = "developers";
       static {
         this.attribute("commits", "integer");
-        this.adapter = adapter;
       }
     }
     const RANKED = "(SELECT id, commits AS hotness FROM developers) developers";
@@ -214,7 +192,6 @@ describe("RelationTest", () => {
       static _tableName = "developers";
       static {
         this.attribute("commits", "integer");
-        this.adapter = adapter;
       }
     }
     const sql = Developer.order({ commits: "desc" }).toSql();
@@ -227,7 +204,6 @@ describe("RelationTest", () => {
       static {
         this.attribute("created_at", "string");
         this.attribute("total", "integer");
-        this.adapter = adapter;
       }
     }
     const sql = Order.group("created_at").toSql();
@@ -241,7 +217,6 @@ describe("RelationTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("published_year", "integer");
-        this.adapter = adapter;
       }
     }
     const sql = Book.group("author_id", "published_year").toSql();
@@ -256,7 +231,6 @@ describe("RelationTest", () => {
       static _tableName = "orders";
       static {
         this.attribute("created_at", "string");
-        this.adapter = adapter;
       }
     }
     // Function expressions pass through as raw SQL (not quoted as identifier)
@@ -276,7 +250,6 @@ describe("RelationTest", () => {
       static _tableName = "books";
       static {
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     const sql = Book.group("authors.name").toSql();
@@ -288,7 +261,6 @@ describe("RelationTest", () => {
     class User extends Base {
       static {
         this.tableName = "users";
-        this.adapter = adapter;
       }
     }
     const sql = User.order({ created_at: "desc" }).limit(10).toSql();
@@ -303,7 +275,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.tableName = "posts";
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ active: true }).order("created_at").unscoped().order("title").toSql();
@@ -316,13 +287,11 @@ describe("RelationTest", () => {
     class Author extends Base {
       static {
         this.tableName = "authors";
-        this.adapter = adapter;
       }
     }
     class Book extends Base {
       static {
         this.tableName = "books";
-        this.adapter = adapter;
       }
     }
     const books = Book.arelTable;
@@ -341,21 +310,18 @@ describe("RelationTest", () => {
     class Author extends Base {
       static {
         this.tableName = "authors";
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.tableName = "posts";
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.tableName = "comments";
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("CJDAuthor", Author);
@@ -377,21 +343,18 @@ describe("RelationTest", () => {
     class Author extends Base {
       static {
         this.tableName = "authors";
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.tableName = "posts";
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.tableName = "comments";
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("HashAuthor", Author);
@@ -430,14 +393,12 @@ describe("RelationTest", () => {
     class Author extends Base {
       static {
         this.tableName = "authors";
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.tableName = "posts";
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("LeftJoinAuthor2", Author);
@@ -463,14 +424,12 @@ describe("RelationTest", () => {
     class Author extends Base {
       static {
         this.tableName = "authors";
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.tableName = "posts";
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("RefLeftAuthor", Author);
@@ -494,14 +453,12 @@ describe("RelationTest", () => {
     class Author extends Base {
       static {
         this.tableName = "authors";
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.tableName = "posts";
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("EagerLeftAuthor", Author);
@@ -522,7 +479,6 @@ describe("RelationTest", () => {
     class Book extends Base {
       static {
         this.tableName = "books";
-        this.adapter = adapter;
       }
     }
     const authors = new ArelTable("authors");
@@ -543,7 +499,6 @@ describe("RelationTest", () => {
     class Book extends Base {
       static {
         this.tableName = "books";
-        this.adapter = adapter;
       }
     }
     const authors = new ArelTable("authors");
@@ -573,7 +528,6 @@ describe("RelationTest", () => {
     class Book extends Base {
       static {
         this.tableName = "books";
-        this.adapter = adapter;
       }
     }
     const authors = new ArelTable("authors");
@@ -606,7 +560,6 @@ describe("RelationTest", () => {
       static {
         this.tableName = "books";
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     const authors = new ArelTable("authors");
@@ -634,7 +587,6 @@ describe("RelationTest", () => {
     class Book extends Base {
       static {
         this.tableName = "books";
-        this.adapter = adapter;
       }
     }
     const authors = new ArelTable("authors");
@@ -659,7 +611,6 @@ describe("RelationTest", () => {
     class Book extends Base {
       static {
         this.tableName = "books";
-        this.adapter = adapter;
       }
     }
     const authors = new ArelTable("authors");
@@ -679,7 +630,6 @@ describe("RelationTest", () => {
     class Book extends Base {
       static {
         this.tableName = "books";
-        this.adapter = adapter;
       }
     }
     expect(Book.order("title").toSql()).toContain('"books"."title"');
@@ -689,7 +639,6 @@ describe("RelationTest", () => {
     class Developer extends Base {
       static {
         this.tableName = "developers";
-        this.adapter = adapter;
       }
     }
     const RANKED = "SELECT id, commits AS hotness FROM developers";
@@ -703,7 +652,6 @@ describe("RelationTest", () => {
       static {
         this.tableName = "books";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // SelectManager#as produces a Nodes.TableAlias — mirrors Rails'
@@ -721,7 +669,6 @@ describe("RelationTest", () => {
     class Book extends Base {
       static {
         this.tableName = "books";
-        this.adapter = adapter;
       }
     }
     const sql = Book.optimizerHints("SeqScan(books)").where({ active: true }).toSql();
@@ -785,7 +732,6 @@ describe("RelationTest", () => {
     class Book extends Base {
       static {
         this.tableName = "books";
-        this.adapter = adapter;
       }
     }
     const sql = Book.whereNot({ status: "draft", active: false }).toSql();
@@ -802,7 +748,6 @@ describe("RelationTest", () => {
     class Book extends Base {
       static {
         this.tableName = "books";
-        this.adapter = adapter;
       }
     }
     const sql = Book.all().inOrderOf("status", ["published", "draft", "archived"]).toSql();
@@ -819,7 +764,6 @@ describe("RelationTest", () => {
     class Book extends Base {
       static {
         this.tableName = "books";
-        this.adapter = adapter;
       }
     }
     const sql = Book.all().inOrderOf("status", ["published", "draft"], false).toSql();
@@ -887,7 +831,6 @@ describe("RelationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     // reselect replaces previous select
@@ -899,7 +842,6 @@ describe("RelationTest", () => {
     class Book extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Book.select(Book.arelTable.get("title").as("t")).toSql();
@@ -911,7 +853,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const created = await Post.create({ title: "target" });
@@ -923,7 +864,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -936,7 +876,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -949,7 +888,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.select("title").from("posts").toSql();
@@ -961,7 +899,6 @@ describe("RelationTest", () => {
       static {
         this.tableName = "books";
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     const sql = Book.from(Book.where({ active: true }), "books").toSql();
@@ -974,7 +911,6 @@ describe("RelationTest", () => {
     class Book extends Base {
       static {
         this.tableName = "books";
-        this.adapter = adapter;
       }
     }
     const sql = Book.from("(SELECT * FROM books WHERE active = 1) books", "books").toSql();
@@ -986,7 +922,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.all().annotate("my comment").toSql();
@@ -997,7 +932,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const rel = Post.where({ title: "scoped" });
@@ -1009,7 +943,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "old" });
@@ -1021,7 +954,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const exists = await Post.all().none().exists();
@@ -1032,7 +964,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -1045,7 +976,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const rel = Post.all().readonly();
@@ -1056,7 +986,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -1070,7 +999,6 @@ describe("RelationTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all().whereValuesHash()).toEqual({});
@@ -1089,7 +1017,6 @@ describe("RelationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const rel = Post.all().createWith({ body: "default" });
@@ -1101,7 +1028,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -1113,7 +1039,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // Subquery in where
@@ -1126,7 +1051,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -1138,7 +1062,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -1150,7 +1073,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "test" });
@@ -1161,7 +1083,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.all().annotate("counting").toSql();
@@ -1217,7 +1138,6 @@ describe("RelationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "t", body: "b" });
@@ -1231,7 +1151,6 @@ describe("RelationTest", () => {
         this._tableName = "posts";
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
     return Post;
@@ -1277,7 +1196,6 @@ describe("RelationTest", () => {
       static {
         this._tableName = "comments";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     const rel = Post.all().where(Comment.arelTable.get("id").eq(10));
@@ -1534,7 +1452,6 @@ describe("RelationTest", () => {
     class PostClass extends Base {
       static {
         this.tableName = "posts";
-        this.adapter = adapter;
         this.attribute("title", "string");
         this.attribute("body", "string");
       }
@@ -1552,7 +1469,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1562,7 +1478,6 @@ describe("RelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(() => Post.order("LOWER(title) ASC").reverseOrder()).toThrow(IrreversibleOrderError);
@@ -1573,7 +1488,6 @@ describe("RelationTest", () => {
       class Author extends Base {
         static {
           this.attribute("name", "string");
-          this.adapter = adapter;
           registerModel(this);
         }
       }
@@ -1582,7 +1496,6 @@ describe("RelationTest", () => {
           this.attribute("title", "string");
           this.attribute("author_id", "integer");
           Associations.belongsTo.call(this, "author", { className: "Author" });
-          this.adapter = adapter;
           registerModel(this);
         }
       }
@@ -1602,7 +1515,6 @@ describe("RelationTest", () => {
       class Author extends Base {
         static {
           this.attribute("name", "string");
-          this.adapter = adapter;
           registerModel(this);
         }
       }
@@ -1611,7 +1523,6 @@ describe("RelationTest", () => {
           this.attribute("title", "string");
           this.attribute("author_id", "integer");
           Associations.belongsTo.call(this, "author", { className: "Author" });
-          this.adapter = adapter;
           registerModel(this);
         }
       }
@@ -1631,7 +1542,6 @@ describe("RelationTest", () => {
           this.tableName = "eager_comments";
           this.attribute("body", "string");
           this.attribute("eager_article_id", "integer");
-          this.adapter = adapter;
           registerModel(this);
         }
       }
@@ -1643,7 +1553,6 @@ describe("RelationTest", () => {
             className: "EagerComment",
             foreignKey: "eager_article_id",
           });
-          this.adapter = adapter;
           registerModel(this);
         }
       }
@@ -1663,7 +1572,6 @@ describe("RelationTest", () => {
       class Author extends Base {
         static {
           this.attribute("name", "string");
-          this.adapter = adapter;
           registerModel(this);
         }
       }
@@ -1672,7 +1580,6 @@ describe("RelationTest", () => {
           this.attribute("title", "string");
           this.attribute("author_id", "integer");
           Associations.belongsTo.call(this, "author", { className: "Author" });
-          this.adapter = adapter;
           registerModel(this);
         }
       }

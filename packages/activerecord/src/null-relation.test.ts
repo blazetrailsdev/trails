@@ -4,10 +4,9 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base } from "./index.js";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -21,19 +20,15 @@ afterAll(() => {
 // NullRelationTest — targets null_relation_test.rb
 // ==========================================================================
 describe("NullRelationTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { posts: { title: "string" } });
+    await defineSchema({ posts: { title: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("none chainable", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const results = await Post.all().none().where({ title: "a" }).toArray();
@@ -44,7 +39,6 @@ describe("NullRelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const rel = Post.all().none();
@@ -57,7 +51,6 @@ describe("NullRelationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const rel = Post.all().none();
@@ -67,18 +60,16 @@ describe("NullRelationTest", () => {
 });
 
 describe("NullRelationTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { posts: { title: "string" } });
+    await defineSchema({ posts: { title: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     return { Post };
@@ -127,18 +118,15 @@ describe("NullRelationTest", () => {
 });
 
 describe("NullRelationTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { items: { name: "string" }, devs: { name: "string" } });
+    await defineSchema({ items: { name: "string" }, devs: { name: "string" } });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("none returns empty for all terminal methods", async () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await Item.create({ name: "A" });
@@ -159,7 +147,6 @@ describe("NullRelationTest", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await Item.create({ name: "A" });
@@ -171,7 +158,6 @@ describe("NullRelationTest", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await Item.create({ name: "A" });
@@ -182,7 +168,6 @@ describe("NullRelationTest", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await Item.create({ name: "A" });
@@ -192,7 +177,6 @@ describe("NullRelationTest", () => {
     class Dev extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await Dev.create({ name: "Alice" });

@@ -32,7 +32,8 @@ import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
 import { UnknownPrimaryKey } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc model
 // classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must be
@@ -216,32 +217,28 @@ async function freshAdapter(): Promise<TestDatabaseAdapter> {
 }
 
 describe("ReflectionTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Chapter extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("book_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Book, "author", {});
@@ -348,7 +345,6 @@ describe("ReflectionTest", () => {
     class Post extends Base {
       static {
         this.attribute("writer_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "author", { foreignKey: "writer_id" });
@@ -360,7 +356,6 @@ describe("ReflectionTest", () => {
     class Post extends Base {
       static {
         this.attribute("writer_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "writer", { className: "Author" });
@@ -404,7 +399,6 @@ describe("ReflectionTest", () => {
     class Standalone extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const all = reflectOnAllAssociations(Standalone);
@@ -415,7 +409,6 @@ describe("ReflectionTest", () => {
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "author", { counterCache: true, foreignKey: "author_id" });
@@ -428,7 +421,6 @@ describe("ReflectionTest", () => {
     class BlogPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(BlogPost, "comments", {});
@@ -440,7 +432,6 @@ describe("ReflectionTest", () => {
     class Library extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Library, "categories", {});
@@ -474,13 +465,11 @@ describe("ReflectionTest", () => {
     class ScHotel extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ScDept extends Base {
       static {
         this.attribute("hotel_id", "integer");
-        this.adapter = adapter;
       }
     }
     class ScChef extends Base {
@@ -488,19 +477,10 @@ describe("ReflectionTest", () => {
         this.attribute("department_id", "integer");
         this.attribute("employable_id", "integer");
         this.attribute("employable_type", "string");
-        this.adapter = adapter;
       }
     }
-    class ScCake extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
-    class ScDrink extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class ScCake extends Base {}
+    class ScDrink extends Base {}
     registerModel("ScHotel", ScHotel);
     registerModel("ScDept", ScDept);
     registerModel("ScChef", ScChef);
@@ -556,7 +536,6 @@ describe("ReflectionTest", () => {
     class SC2Hotel extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SC2ChefList extends Base {
@@ -565,14 +544,9 @@ describe("ReflectionTest", () => {
         this.attribute("employable_list_type", "string");
         this.attribute("employable_id", "integer");
         this.attribute("employable_type", "string");
-        this.adapter = adapter;
       }
     }
-    class SC2Mocktail extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class SC2Mocktail extends Base {}
     registerModel("SC2Hotel", SC2Hotel);
     registerModel("SC2ChefList", SC2ChefList);
     registerModel("SC2Mocktail", SC2Mocktail);
@@ -614,7 +588,6 @@ describe("ReflectionTest", () => {
     class SC3Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SC3Book extends Base {
@@ -622,16 +595,11 @@ describe("ReflectionTest", () => {
         this.attribute("author_id", "integer");
         this.attribute("format_record_id", "integer");
         this.attribute("format_record_type", "string");
-        this.adapter = adapter;
       }
     }
-    class SC3Hardback extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class SC3Hardback extends Base {}
     class SC3BestHardback extends SC3Hardback {}
-    SC3BestHardback.adapter = adapter;
+
     registerModel("SC3Author", SC3Author);
     registerModel("SC3Book", SC3Book);
     registerModel("SC3Hardback", SC3Hardback);
@@ -673,13 +641,11 @@ describe("ReflectionTest", () => {
     class SC4Hotel extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SC4Dept extends Base {
       static {
         this.attribute("hotel_id", "integer");
-        this.adapter = adapter;
       }
     }
     class SC4Chef extends Base {
@@ -687,19 +653,13 @@ describe("ReflectionTest", () => {
         this.attribute("department_id", "integer");
         this.attribute("employable_id", "integer");
         this.attribute("employable_type", "string");
-        this.adapter = adapter;
       }
     }
-    class SC4Drink extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class SC4Drink extends Base {}
     class SC4Recipe extends Base {
       static {
         this.attribute("chef_id", "integer");
         this.attribute("hotel_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("SC4Hotel", SC4Hotel);
@@ -773,20 +733,17 @@ describe("ReflectionTest", () => {
     class Subscriber extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Subscription extends Base {
       static {
         this.attribute("subscriber_id", "integer");
         this.attribute("book_id", "integer");
-        this.adapter = adapter;
       }
     }
     class SubBook extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Subscriber", Subscriber);
@@ -813,19 +770,16 @@ describe("ReflectionTest", () => {
     class HotOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HotAccount extends Base {
       static {
         this.attribute("hot_owner_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HotProfile extends Base {
       static {
         this.attribute("hot_account_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("HotOwner", HotOwner);
@@ -877,7 +831,6 @@ describe("ReflectionTest", () => {
       static {
         this.attribute("balance_amount", "integer");
         this.attribute("balance_currency", "string");
-        this.adapter = adapter;
       }
     }
     composedOf(Customer, "balance", {
@@ -903,13 +856,11 @@ describe("ReflectionTest", () => {
     class Category extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HabtmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Category", Category);
@@ -926,19 +877,16 @@ describe("ReflectionTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -992,7 +940,6 @@ describe("ReflectionTest", () => {
       static {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Tagging", Tagging);
@@ -1004,7 +951,6 @@ describe("ReflectionTest", () => {
     class Comment extends Base {
       static {
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Comment", Comment);
@@ -1023,7 +969,6 @@ describe("ReflectionTest", () => {
     class Bookmark extends Base {
       static {
         this.attribute("author_name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Bookmark", Bookmark);
@@ -1054,19 +999,16 @@ describe("ReflectionTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -1089,19 +1031,16 @@ describe("ReflectionTest", () => {
     class Author extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -1177,7 +1116,6 @@ describe("ReflectionTest", () => {
         this.attribute("title", "string");
         this.attribute("author_name", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const names = columnNames(Topic);
@@ -1192,7 +1130,6 @@ describe("ReflectionTest", () => {
         this.attribute("author_name", "string");
         this.attribute("body", "string");
         this.attribute("category_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Topic", Topic);
@@ -1211,7 +1148,6 @@ describe("ReflectionTest", () => {
     class Topic2 extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const type = Topic2.typeForAttribute("attribute_that_doesnt_exist");
@@ -1298,19 +1234,16 @@ describe("ReflectionTest", () => {
     class Ship extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Part extends Base {
       static {
         this.attribute("ship_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Crew extends Base {
       static {
         this.attribute("ship_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Ship", Ship);
@@ -1332,7 +1265,6 @@ describe("ReflectionTest", () => {
         this.attribute("isbn", "string");
         this.attribute("author_id", "integer");
         this.primaryKey = "isbn";
-        this.adapter = adapter;
       }
     }
     registerModel("SpecialBook", SpecialBook);
@@ -1344,13 +1276,11 @@ describe("ReflectionTest", () => {
     class NoPkModel extends Base {
       static {
         this._primaryKey = "";
-        this.adapter = adapter;
       }
     }
     class Owner extends Base {
       static {
         this.attribute("no_pk_model_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("NoPkModel", NoPkModel);
@@ -1363,14 +1293,9 @@ describe("ReflectionTest", () => {
     class NoPkOwner extends Base {
       static {
         this._primaryKey = "";
-        this.adapter = adapter;
       }
     }
-    class Target extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class Target extends Base {}
     registerModel("NoPkOwner", NoPkOwner);
     registerModel("Target", Target);
     Associations.hasMany.call(NoPkOwner, "targets", {});
@@ -1383,7 +1308,6 @@ describe("ReflectionTest", () => {
     class EssayCat extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EssayModel extends Base {
@@ -1392,13 +1316,11 @@ describe("ReflectionTest", () => {
         this.attribute("writer_id", "integer");
         this.attribute("writer_type", "string");
         this.attribute("category_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EssayAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("EssayCat", EssayCat);
@@ -1447,7 +1369,6 @@ describe("ReflectionTest", () => {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
         this.attribute("sponsor_club_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Sponsor", Sponsor);
@@ -1464,13 +1385,11 @@ describe("ReflectionTest", () => {
     class Owner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Pet extends Base {
       static {
         this.attribute("owner_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Owner", Owner);
@@ -1483,13 +1402,11 @@ describe("ReflectionTest", () => {
     class Owner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Pet extends Base {
       static {
         this.attribute("owner_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Owner", Owner);
@@ -1502,13 +1419,11 @@ describe("ReflectionTest", () => {
     class Owner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Pet extends Base {
       static {
         this.attribute("owner_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Owner", Owner);
@@ -1521,13 +1436,11 @@ describe("ReflectionTest", () => {
     class Owner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Pet extends Base {
       static {
         this.attribute("owner_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Owner", Owner);
@@ -1543,13 +1456,11 @@ describe("ReflectionTest", () => {
     class Firm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Client extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Firm", Firm);
@@ -1565,13 +1476,11 @@ describe("ReflectionTest", () => {
     class NsTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NsPost extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("NsTag", NsTag);
@@ -1592,13 +1501,11 @@ describe("ReflectionTest", () => {
     class NsTagB extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NsPostB extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("NsTagB", NsTagB);
@@ -1626,13 +1533,11 @@ describe("ReflectionTest", () => {
     class HostA extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TargetA extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HostA", HostA);
@@ -1649,13 +1554,11 @@ describe("ReflectionTest", () => {
     class CatalogCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CatalogProduct extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CatalogCategory", CatalogCategory);
@@ -1673,13 +1576,11 @@ describe("ReflectionTest", () => {
     class CatCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ContentPage extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CatCategory", CatCategory);
@@ -1696,13 +1597,11 @@ describe("ReflectionTest", () => {
     class JtCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class JtProduct extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("JtCategory", JtCategory);
@@ -1718,21 +1617,18 @@ describe("ReflectionTest", () => {
     class Hotel extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Department extends Base {
       static {
         this.attribute("hotel_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Chef extends Base {
       static {
         this.attribute("department_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Hotel", Hotel);
@@ -1765,13 +1661,11 @@ describe("ReflectionTest", () => {
     class MsHotel extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class MsDepartment extends Base {
       static {
         this.attribute("hotel_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("MsHotel", MsHotel);
@@ -1804,14 +1698,12 @@ describe("ReflectionTest", () => {
     class Car extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Bulb extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("car_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Car);
@@ -1833,14 +1725,12 @@ describe("ReflectionTest", () => {
     class Comment extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Rating extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("comment_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Comment);
@@ -1857,14 +1747,12 @@ describe("ReflectionTest", () => {
     class User extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Room extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("owner_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(User);
@@ -1880,7 +1768,6 @@ describe("ReflectionTest", () => {
     class Doctor extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Appointment extends Base {
@@ -1888,13 +1775,11 @@ describe("ReflectionTest", () => {
         this.attribute("id", "integer");
         this.attribute("doctor_id", "integer");
         this.attribute("patient_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Patient extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Doctor);
@@ -1915,13 +1800,11 @@ describe("ReflectionTest", () => {
         this.attribute("id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Tag);
@@ -1937,14 +1820,12 @@ describe("ReflectionTest", () => {
     class Parent extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Child extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Parent);
@@ -1962,14 +1843,12 @@ describe("ReflectionTest", () => {
       class Company extends Base {
         static {
           this.attribute("id", "integer");
-          this.adapter = adapter;
         }
       }
       class Contract extends Base {
         static {
           this.attribute("id", "integer");
           this.attribute("company_id", "integer");
-          this.adapter = adapter;
         }
       }
       registerModel(Company);
@@ -1987,7 +1866,6 @@ describe("ReflectionTest", () => {
       class Company2 extends Base {
         static {
           this.attribute("id", "integer");
-          this.adapter = adapter;
         }
       }
       class Contract2 extends Base {
@@ -1995,7 +1873,6 @@ describe("ReflectionTest", () => {
         static {
           this.attribute("id", "integer");
           this.attribute("company2_id", "integer");
-          this.adapter = adapter;
         }
       }
       registerModel("Company2", Company2);
@@ -2017,7 +1894,6 @@ describe("ReflectionTest", () => {
       static automaticScopeInversing = true;
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Magazine extends Base {
@@ -2025,7 +1901,6 @@ describe("ReflectionTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("publisher_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Publisher);
@@ -2042,7 +1917,6 @@ describe("ReflectionTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // Model human name should be derived from the class name
@@ -2053,7 +1927,6 @@ describe("ReflectionTest", () => {
     class Article extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const cols = (Article as any).columnsHash();
@@ -2065,7 +1938,6 @@ describe("ReflectionTest", () => {
     class Article extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const cols = (Article as any).columnsHash();
@@ -2076,7 +1948,6 @@ describe("ReflectionTest", () => {
     class Article extends Base {
       static {
         this.attribute("body_text", "string");
-        this.adapter = adapter;
       }
     }
     const cols = (Article as any).columnsHash();
@@ -2088,7 +1959,6 @@ describe("ReflectionTest", () => {
     class Article extends Base {
       static {
         this.attribute("views", "integer");
-        this.adapter = adapter;
       }
     }
     const cols = (Article as any).columnsHash();
@@ -2100,7 +1970,6 @@ describe("ReflectionTest", () => {
     class Article extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const cols = (Article as any).columnsHash();
@@ -2112,13 +1981,11 @@ describe("ReflectionTest", () => {
     class Comment extends Base {
       static {
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         Associations.hasMany.call(this, "comments", { className: "Comment" });
       }
     }
@@ -2132,13 +1999,11 @@ describe("ReflectionTest", () => {
     class Profile extends Base {
       static {
         this.attribute("user_id", "integer");
-        this.adapter = adapter;
       }
     }
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         Associations.hasOne.call(this, "profile", { className: "Profile" });
       }
     }
@@ -2151,13 +2016,11 @@ describe("ReflectionTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
         Associations.belongsTo.call(this, "author", { className: "Author" });
       }
     }
@@ -2171,13 +2034,11 @@ describe("ReflectionTest", () => {
     class Comment extends Base {
       static {
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         Associations.hasMany.call(this, "comments", { className: "Comment" });
       }
     }
@@ -2190,21 +2051,18 @@ describe("ReflectionTest", () => {
     class Tag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PostTag extends Base {
       static {
         this.attribute("post_id", "integer");
         this.attribute("tag_id", "integer");
-        this.adapter = adapter;
         Associations.belongsTo.call(this, "tag", { className: "Tag" });
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         Associations.hasMany.call(this, "post_tags", { className: "PostTag" });
         Associations.hasMany.call(this, "tags", { through: "post_tags", className: "Tag" });
       }
@@ -2217,13 +2075,11 @@ describe("ReflectionTest", () => {
     class Comment extends Base {
       static {
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         Associations.hasMany.call(this, "comments", { className: "Comment" });
       }
     }
@@ -2235,13 +2091,11 @@ describe("ReflectionTest", () => {
     class Comment extends Base {
       static {
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         Associations.hasMany.call(this, "comments", { className: "Comment" });
       }
     }
@@ -2253,13 +2107,11 @@ describe("ReflectionTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
         Associations.belongsTo.call(this, "author", { className: "Author" });
       }
     }
@@ -2271,13 +2123,11 @@ describe("ReflectionTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
         Associations.belongsTo.call(this, "post", { className: "Post" });
       }
     }
@@ -2289,7 +2139,6 @@ describe("ReflectionTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const reflection = reflectOnAssociation(Post, "nonexistent");
@@ -2301,7 +2150,6 @@ describe("ReflectionTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const reflection = reflectOnAssociation(Post, "does_not_exist");
@@ -2312,7 +2160,6 @@ describe("ReflectionTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.primaryKey).toBe("id");
@@ -2322,7 +2169,6 @@ describe("ReflectionTest", () => {
     class Orphan extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Orphan, "ghosts", {});
@@ -2336,7 +2182,6 @@ describe("ReflectionTest", () => {
     class Orphan2 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Orphan2, "items", { className: "NonExistentModel" });
@@ -2349,13 +2194,11 @@ describe("ReflectionTest", () => {
     class Parent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Child extends Base {
       static {
         this.attribute("parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Parent, "children", { className: "Child" });
@@ -2434,7 +2277,6 @@ describe("ReflectionTest", () => {
       static {
         this.attribute("address_street", "string");
         this.attribute("address_city", "string");
-        this.adapter = adapter;
       }
     }
     class Address {
@@ -2547,7 +2389,6 @@ describe("ReflectionTest", () => {
     class Developer extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasAndBelongsToMany.call(Developer, "projects", {
@@ -2563,7 +2404,6 @@ describe("ReflectionTest", () => {
     class ReflCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ReflEssay extends Base {
@@ -2572,19 +2412,16 @@ describe("ReflectionTest", () => {
         this.attribute("writer_id", "integer");
         this.attribute("writer_type", "string");
         this.attribute("category_id", "integer");
-        this.adapter = adapter;
       }
     }
     class ReflAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ReflOrganization extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("ReflCategory", ReflCategory);
@@ -2631,38 +2468,32 @@ describe("ReflectionTest", () => {
     class NPost extends Base {
       static {
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NComment extends Base {
       static {
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NTagging extends Base {
       static {
         this.attribute("post_id", "integer");
         this.attribute("tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("NPost", NPost);
@@ -2719,7 +2550,6 @@ describe("ReflectionTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Author, "books", { primaryKey: "custom_id" });
@@ -2734,14 +2564,12 @@ describe("ReflectionTest", () => {
       static {
         this.attribute("blog_id", "integer");
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("blog_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(BlogPost);
@@ -2760,14 +2588,12 @@ describe("ReflectionTest", () => {
       static {
         this.attribute("tenant_id", "integer");
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Item extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("tenant_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Tenant);
@@ -2784,7 +2610,6 @@ describe("ReflectionTest", () => {
     class Order extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class LineItem extends Base {
@@ -2792,7 +2617,6 @@ describe("ReflectionTest", () => {
         this.attribute("id", "integer");
         this.attribute("order_id", "integer");
         this.attribute("shop_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Order);
@@ -2812,13 +2636,11 @@ describe("ReflectionTest", () => {
     class Org extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Team extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Org);
@@ -2894,13 +2716,11 @@ describe("ReflectionTest", () => {
 });
 
 describe("ReflectionTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test "columns"
   it("columns", () => {
     class Person extends Base {
@@ -2910,7 +2730,6 @@ describe("ReflectionTest", () => {
         this.attribute("name", "string");
         this.attribute("age", "integer");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
 
@@ -2926,7 +2745,6 @@ describe("ReflectionTest", () => {
         this._tableName = "people";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2939,7 +2757,6 @@ describe("ReflectionTest", () => {
       static {
         this._tableName = "authors";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2949,7 +2766,6 @@ describe("ReflectionTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "author");
@@ -2974,7 +2790,6 @@ describe("ReflectionTest", () => {
       static {
         this._tableName = "users";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(User, "posts");
@@ -2998,7 +2813,6 @@ describe("ReflectionTest", () => {
       static {
         this._tableName = "people";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     expect(reflectOnAssociation(Person, "nonexistent")).toBeNull();

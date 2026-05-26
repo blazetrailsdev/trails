@@ -8,44 +8,33 @@ import { TimeWithZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
-
 // ==========================================================================
 // DirtyTest — targets dirty_test.rb
 // ==========================================================================
 describe("DirtyTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       topics: { title: "string" },
       people: { first_name: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("attribute changes", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = new Topic({ title: "old" });
@@ -57,7 +46,6 @@ describe("DirtyTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = new Topic({ title: "old" });
@@ -69,7 +57,6 @@ describe("DirtyTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = new Topic({ title: "old" });
@@ -83,7 +70,6 @@ describe("DirtyTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -97,7 +83,6 @@ describe("DirtyTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = new Topic({ title: "old" });
@@ -110,7 +95,6 @@ describe("DirtyTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -124,7 +108,6 @@ describe("DirtyTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = new Topic({ title: "original" });
@@ -139,7 +122,6 @@ describe("DirtyTest", () => {
       static {
         this.attribute("name", "string");
         this.aliasAttribute("title", "name");
-        this.adapter = adapter;
       }
     }
     const parrot = new Parrot();
@@ -156,7 +138,6 @@ describe("DirtyTest", () => {
     class Person extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ first_name: "Sean" });
@@ -171,7 +152,6 @@ describe("DirtyTest", () => {
     class Person extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ first_name: "Sean" });
@@ -185,7 +165,6 @@ describe("DirtyTest", () => {
     class Person extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ first_name: "Sean" });
@@ -198,7 +177,6 @@ describe("DirtyTest", () => {
     class Person extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
         this.afterSave(function (record: any) {
           if (record.changed) throw new Error("changed? should be false");
           if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
@@ -214,11 +192,10 @@ describe("DirtyTest", () => {
 // DirtyTest2 — more targets for dirty_test.rb
 // ==========================================================================
 describe("DirtyTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       posts: {
         title: "string",
         views: "integer",
@@ -229,18 +206,11 @@ describe("DirtyTest", () => {
       authors: { name: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("attribute changes", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("views", "integer");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "hello", views: 0 })) as any;
@@ -255,7 +225,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "hello" })) as any;
@@ -267,7 +236,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -282,7 +250,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "hello" })) as any;
@@ -298,7 +265,6 @@ describe("DirtyTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("views", "integer");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original", views: 0 })) as any;
@@ -312,7 +278,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -326,7 +291,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -339,7 +303,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Post.validates("title", { presence: true });
@@ -355,7 +318,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("views", "integer");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ views: null })) as any;
@@ -367,7 +329,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("count", "integer");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ count: 0 })) as any;
@@ -379,7 +340,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "hello" })) as any;
@@ -392,7 +352,6 @@ describe("DirtyTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("meta", "string");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "test", meta: "data" })) as any;
@@ -406,7 +365,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -421,14 +379,12 @@ describe("DirtyTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     const author = (await Author.create({ name: "Alice" })) as any;
@@ -441,7 +397,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -455,7 +410,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -470,10 +424,10 @@ describe("DirtyTest", () => {
 // DirtyTest3 — additional missing tests from dirty_test.rb
 // ==========================================================================
 describe("DirtyTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       posts: { title: "string" },
       pirates: {
         catchphrase: "string",
@@ -483,12 +437,6 @@ describe("DirtyTest", () => {
       },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("time attributes changes with time zone", async () => {
     await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
       class Pirate extends Base {
@@ -496,7 +444,6 @@ describe("DirtyTest", () => {
           this.tableName = "pirates";
           this.attribute("created_on", "datetime");
           this.attribute("catchphrase", "string");
-          this.adapter = adapter;
         }
       }
       const zone = getZone()!;
@@ -526,7 +473,6 @@ describe("DirtyTest", () => {
           this.tableName = "pirates";
           this.attribute("created_at", "datetime");
           this.attribute("catchphrase", "string");
-          this.adapter = adapter;
         }
       }
       const zone = getZone()!;
@@ -549,7 +495,6 @@ describe("DirtyTest", () => {
           this.tableName = "pirates";
           this.attribute("created_on", "datetime");
           this.attribute("catchphrase", "string");
-          this.adapter = adapter;
         }
       }
       const pirate = await Pirate.create({ catchphrase: "yo ho" });
@@ -566,7 +511,6 @@ describe("DirtyTest", () => {
           this.skipTimeZoneConversionForAttributes = ["created_on"];
           this.attribute("created_on", "datetime");
           this.attribute("catchphrase", "string");
-          this.adapter = adapter;
         }
       }
       const pirate = new Pirate();
@@ -585,7 +529,6 @@ describe("DirtyTest", () => {
           this.tableName = "pirates";
           this.attribute("created_on", "datetime");
           this.attribute("catchphrase", "string");
-          this.adapter = adapter;
         }
       }
       const pirate = new Pirate();
@@ -646,7 +589,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "partial" });
@@ -656,7 +598,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({});
@@ -699,7 +640,6 @@ describe("DirtyTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = (await Post.create({ title: "a" })) as any;
@@ -724,27 +664,19 @@ describe("DirtyTest", () => {
 });
 
 describe("DirtyTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       items: { name: "string", age: "integer" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("tracks changes from the last save", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     const item = await Item.create({ name: "Original" });
     item.name = "Updated";
     await item.save();
@@ -758,8 +690,6 @@ describe("DirtyTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     const item = await Item.create({ name: "Original" });
     item.name = "Updated";
     await item.save();
@@ -769,27 +699,19 @@ describe("DirtyTest", () => {
 });
 
 describe("DirtyTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       users: { name: "string", age: "integer" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("attributeInDatabase returns the pre-change value", async () => {
     class User extends Base {
       static _tableName = "users";
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
-
     const user = await User.create({ name: "Alice" });
     user.name = "Bob";
     expect(user.attributeInDatabase("name")).toBe("Alice");
@@ -801,8 +723,6 @@ describe("DirtyTest", () => {
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
-
     const user = await User.create({ name: "Alice" });
     await user.update({ name: "Bob" });
     expect(user.attributeBeforeLastSave("name")).toBe("Alice");
@@ -815,8 +735,6 @@ describe("DirtyTest", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("age", "integer");
-    User.adapter = adapter;
-
     const user = await User.create({ name: "Alice", age: 25 });
     user.name = "Bob";
     expect(user.changedAttributeNamesToSave).toContain("name");
@@ -825,27 +743,19 @@ describe("DirtyTest", () => {
 });
 
 describe("DirtyTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       users: { name: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("returns true for new records", () => {
     class User extends Base {
       static _tableName = "users";
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
-
     const user = new User({ name: "Alice" });
     expect(user.isChangedForAutosave()).toBe(true);
   });
@@ -856,8 +766,6 @@ describe("DirtyTest", () => {
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
-
     const user = await User.create({ name: "Alice" });
     expect(user.isChangedForAutosave()).toBe(false);
   });
@@ -868,8 +776,6 @@ describe("DirtyTest", () => {
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
-
     const user = await User.create({ name: "Alice" });
     user.name = "Bob";
     expect(user.isChangedForAutosave()).toBe(true);
@@ -877,25 +783,18 @@ describe("DirtyTest", () => {
 });
 
 describe("DirtyTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       users: { name: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("attributeChanged with from and to after save", async () => {
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -911,7 +810,6 @@ describe("DirtyTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 

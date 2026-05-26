@@ -5,10 +5,11 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, RecordNotFound, SoleRecordExceeded } from "./index.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
   topics: {
@@ -2740,21 +2741,17 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("sole() returns the only matching record", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "Widget" });
     const item = await Item.all().where({ name: "Widget" }).sole();
     expect(item.name).toBe("Widget");
@@ -2766,8 +2763,6 @@ describe("FinderTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await expect(Item.all().where({ name: "Missing" }).sole()).rejects.toThrow(RecordNotFound);
   });
 
@@ -2777,8 +2772,6 @@ describe("FinderTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "Widget" });
     await Item.create({ name: "Widget" });
     await expect(Item.all().where({ name: "Widget" }).sole()).rejects.toThrow(SoleRecordExceeded);
@@ -2790,8 +2783,6 @@ describe("FinderTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
     const item = await Item.all().take();
@@ -2804,8 +2795,6 @@ describe("FinderTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
     await Item.create({ name: "C" });
@@ -2818,28 +2807,22 @@ describe("FinderTest", () => {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
-    Item.adapter = adapter;
-
     await expect(Item.all().takeBang()).rejects.toThrow(RecordNotFound);
   });
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("returns the sole matching record", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "Unique" });
     const item = await Item.findSoleBy({ name: "Unique" });
     expect(item.name).toBe("Unique");
@@ -2851,8 +2834,6 @@ describe("FinderTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "Dup" });
     await Item.create({ name: "Dup" });
     await expect(Item.findSoleBy({ name: "Dup" })).rejects.toThrow(SoleRecordExceeded);
@@ -2860,21 +2841,17 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("accepts conditions hash", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "Found" });
     expect(await Item.all().exists({ name: "Found" })).toBe(true);
     expect(await Item.all().exists({ name: "Missing" })).toBe(false);
@@ -2886,8 +2863,6 @@ describe("FinderTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     const item = await Item.create({ name: "Found" });
     expect(await Item.all().exists(item.id)).toBe(true);
     expect(await Item.all().exists(999)).toBe(false);
@@ -2895,21 +2870,17 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("second() returns the second record", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
     await Item.create({ name: "C" });
@@ -2924,8 +2895,6 @@ describe("FinderTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
     await Item.create({ name: "C" });
@@ -2939,8 +2908,6 @@ describe("FinderTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     for (const n of ["A", "B", "C", "D", "E"]) {
       await Item.create({ name: n });
     }
@@ -2956,8 +2923,6 @@ describe("FinderTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
     await Item.create({ name: "C" });
@@ -2971,8 +2936,6 @@ describe("FinderTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
     await Item.create({ name: "C" });
@@ -2987,8 +2950,6 @@ describe("FinderTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "A" });
     const item = await Item.all().second();
     expect(item).toBeNull();
@@ -3000,8 +2961,6 @@ describe("FinderTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
     const item = await Item.second();
@@ -3382,22 +3341,18 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
-
   class Bird extends Base {
     static {
       this.attribute("name", "string");
       this.attribute("color", "string");
     }
   }
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
-    Bird.adapter = adapter;
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("find_or_create_by finds existing", async () => {
     await Bird.create({ name: "Parrot", color: "green" });
     const found = await Bird.findOrCreateBy({ name: "Parrot" });
@@ -3435,8 +3390,6 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
-
   class User extends Base {
     static {
       this.attribute("name", "string");
@@ -3444,14 +3397,12 @@ describe("FinderTest", () => {
       this.attribute("active", "boolean");
     }
   }
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
-    User.adapter = adapter;
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test_find_with_array_of_ids
   it("find with single id returns instance", async () => {
     const user = await User.create({ name: "Alice" });
@@ -3505,19 +3456,16 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("finds a record by a single attribute", async () => {
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice" });
@@ -3532,7 +3480,6 @@ describe("FinderTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const found = await User.findByAttribute("name", "Nobody");
@@ -3541,20 +3488,17 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("returns true for valid dynamic finders", () => {
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
     expect(User.respondToMissingFinder("findByName")).toBe(true);
@@ -3566,7 +3510,6 @@ describe("FinderTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     expect(User.respondToMissingFinder("findByFoo")).toBe(false);
@@ -3575,18 +3518,15 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("first(n) returns array of n records", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "A" });
@@ -3601,7 +3541,6 @@ describe("FinderTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "A" });

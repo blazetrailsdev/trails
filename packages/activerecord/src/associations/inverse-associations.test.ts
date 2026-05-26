@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/inverse_associations_test.rb
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, association, registerModel, InverseOfAssociationNotFoundError } from "../index.js";
 import {
   Associations,
@@ -12,22 +12,16 @@ import {
   setHasOne,
   setHasMany,
 } from "../associations.js";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { dropAllTables } from "../test-helpers/drop-all-tables.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 // -- Helpers --
-function freshAdapter(): TestDatabaseAdapter {
-  return createTestAdapter();
-}
-
 describe("InverseBelongsToTests", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       men: { name: "string" },
       faces: { description: "string", man_id: "integer", human_id: "integer" },
       authors: { name: "string" },
@@ -38,23 +32,16 @@ describe("InverseBelongsToTests", () => {
     });
   });
 
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-  withTransactionalFixtures(() => adapter);
-
   function makeModels() {
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Face extends Base {
       static {
         this.attribute("description", "string");
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(Man, "face", { inverseOf: "man" });
@@ -107,14 +94,12 @@ describe("InverseBelongsToTests", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Author, "books", { inverseOf: "author" });
@@ -134,14 +119,12 @@ describe("InverseBelongsToTests", () => {
     class Human extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Interest extends Base {
       static {
         this.attribute("topic", "string");
         this.attribute("human_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Human, "interests", { foreignKey: "human_id" });
@@ -204,7 +187,6 @@ describe("InverseBelongsToTests", () => {
       static {
         this.attribute("name", "string");
         this.attribute("node_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Node, "children", {
@@ -241,14 +223,12 @@ describe("InverseBelongsToTests", () => {
     class Human extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Interest extends Base {
       static {
         this.attribute("topic", "string");
         this.attribute("human_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Human, "interests");
@@ -273,14 +253,12 @@ describe("InverseBelongsToTests", () => {
     class Human extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Interest extends Base {
       static {
         this.attribute("topic", "string");
         this.attribute("human_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Human, "interests");
@@ -309,14 +287,12 @@ describe("InverseBelongsToTests", () => {
     class Human extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Face extends Base {
       static {
         this.attribute("description", "string");
         this.attribute("human_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(Human, "confusedFace", {
@@ -343,14 +319,12 @@ describe("InverseBelongsToTests", () => {
     class Human extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Face extends Base {
       static {
         this.attribute("description", "string");
         this.attribute("human_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(Human, "confusedFace", {
@@ -375,14 +349,12 @@ describe("InverseBelongsToTests", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Author, "books", { inverseOf: "author" });
@@ -397,10 +369,10 @@ describe("InverseBelongsToTests", () => {
 });
 
 describe("InverseHasManyTests", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       men: { name: "string" },
       interests: { topic: "string", man_id: "integer", human_id: "integer" },
       humen: { name: "string" },
@@ -421,23 +393,16 @@ describe("InverseHasManyTests", () => {
     });
   });
 
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-  withTransactionalFixtures(() => adapter);
-
   function makeModels() {
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Interest extends Base {
       static {
         this.attribute("topic", "string");
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
@@ -635,7 +600,6 @@ describe("InverseHasManyTests", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkInterest extends Base {
@@ -644,7 +608,6 @@ describe("InverseHasManyTests", () => {
         this.attribute("cpk_man_region_id", "integer");
         this.attribute("cpk_man_id", "integer");
         this.attribute("topic", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkMan, "cpkInterests", {
@@ -687,14 +650,12 @@ describe("InverseHasManyTests", () => {
     class Human extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Interest extends Base {
       static {
         this.attribute("topic", "string");
         this.attribute("human_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Human, "secretInterests", {
@@ -737,7 +698,6 @@ describe("InverseHasManyTests", () => {
       static {
         this.attribute("name", "string");
         this.attribute("node_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Node, "children", {
@@ -771,40 +731,31 @@ describe("InverseHasManyTests", () => {
 });
 
 describe("InverseMultipleHasManyInversesForSameModel", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       men: { name: "string" },
       interests: { topic: "string", man_id: "integer" },
       hobbies: { name: "string", man_id: "integer" },
     });
   });
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-  withTransactionalFixtures(() => adapter);
-
   it("that we can load associations that have the same reciprocal name from different models", async () => {
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Interest extends Base {
       static {
         this.attribute("topic", "string");
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Hobby extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
@@ -825,14 +776,12 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Interest extends Base {
       static {
         this.attribute("topic", "string");
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
@@ -846,10 +795,10 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 });
 
 describe("AutomaticInverseFindingTests", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       men: { name: "string" },
       faces: { description: "string", man_id: "integer" },
       interests: { topic: "string", man_id: "integer" },
@@ -858,24 +807,16 @@ describe("AutomaticInverseFindingTests", () => {
       posts: { title: "string" },
     });
   });
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-  withTransactionalFixtures(() => adapter);
-
   it("has one and belongs to should find inverse automatically on multiple word name", () => {
     // Automatic inverse finding is not yet implemented; inverseOf must be explicit
     class MixedCaseMonkey extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(Man, "mixedCaseMonkey", { inverseOf: "man" });
@@ -896,13 +837,11 @@ describe("AutomaticInverseFindingTests", () => {
     class Face extends Base {
       static {
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(Man, "face", { inverseOf: "man" });
@@ -915,13 +854,11 @@ describe("AutomaticInverseFindingTests", () => {
     class Interest extends Base {
       static {
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
@@ -947,13 +884,11 @@ describe("AutomaticInverseFindingTests", () => {
     class WeirdFace extends Base {
       static {
         this.attribute("the_man_id", "integer");
-        this.adapter = adapter;
       }
     }
     class ManA extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(ManA, "weirdFace", {
@@ -978,13 +913,11 @@ describe("AutomaticInverseFindingTests", () => {
     class CustomFace extends Base {
       static {
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     class ManB extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     // "oddFace" doesn't match "CustomFace" / "manB" pattern — no auto-detection without inverseOf
@@ -1008,13 +941,11 @@ describe("AutomaticInverseFindingTests", () => {
         // automaticScopeInversing on the TARGET of the scoped hasMany enables scope inversing
         this.automaticScopeInversing = true;
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     class Boss extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     // "boss" = underscore(demodulize("Boss")) — the inverse name automaticInverseOf derives
@@ -1041,13 +972,11 @@ describe("AutomaticInverseFindingTests", () => {
       static {
         this.automaticScopeInversing = true;
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     class Deck extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     // "deck" = underscore(demodulize("Deck"))
@@ -1072,13 +1001,11 @@ describe("AutomaticInverseFindingTests", () => {
     class Chip extends Base {
       static {
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     class Board extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     // "board" = underscore("Board") — correct inverse name
@@ -1104,13 +1031,11 @@ describe("AutomaticInverseFindingTests", () => {
       static {
         this.attribute("man_id", "integer");
         this.attribute("description", "string");
-        this.adapter = adapter;
       }
     }
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(Man, "face", { inverseOf: "man" });
@@ -1129,13 +1054,11 @@ describe("AutomaticInverseFindingTests", () => {
       static {
         this.attribute("score", "integer");
         this.attribute("comment_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Comment, "ratings", { inverseOf: "comment" });
@@ -1154,13 +1077,11 @@ describe("AutomaticInverseFindingTests", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", { inverseOf: "post" });
@@ -1179,13 +1100,11 @@ describe("AutomaticInverseFindingTests", () => {
       static {
         this.attribute("topic", "string");
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
@@ -1207,13 +1126,11 @@ describe("AutomaticInverseFindingTests", () => {
       static {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class TaggableParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     // Polymorphic belongs_to → automatic inverse detection is disabled
@@ -1240,13 +1157,11 @@ describe("AutomaticInverseFindingTests", () => {
       static {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class AutoPolyPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // as: "taggable" → inverseName = underscore("taggable") = "taggable"
@@ -1269,47 +1184,40 @@ describe("AutomaticInverseFindingTests", () => {
     // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* Composite FK associations use queryConstraints (not options.foreignKey scalar).
-       canFindInverseOfAutomatically currently checks options.foreignKey only, so composite
-       FK associations passed via queryConstraints may still auto-detect. Needs validation
-       that the right path is exercised and inverse detection works correctly for composite FKs. */
+           canFindInverseOfAutomatically currently checks options.foreignKey only, so composite
+           FK associations passed via queryConstraints may still auto-detect. Needs validation
+           that the right path is exercised and inverse detection works correctly for composite FKs. */
   });
   it.skip("belongs to inverse of derived automatically despite of composite foreign key", () => {
     // BLOCKED: associations — inverse-of feature gap
     // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* Same as above — verify canFindInverseOfAutomatically behavior for queryConstraints vs
-       scalar foreignKey, and that automatic detection works for composite FK associations. */
+           scalar foreignKey, and that automatic detection works for composite FK associations. */
   });
 });
 
 describe("InversePolymorphicBelongsToTests", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       men: { name: "string" },
       faces: { description: "string", man_id: "integer" },
       tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
     });
   });
 
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-  withTransactionalFixtures(() => adapter);
-
   function makeModels() {
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Face extends Base {
       static {
         this.attribute("description", "string");
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Tag extends Base {
@@ -1317,7 +1225,6 @@ describe("InversePolymorphicBelongsToTests", () => {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Man, "tags", { as: "taggable" });
@@ -1485,7 +1392,6 @@ describe("InversePolymorphicBelongsToTests", () => {
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Tag extends Base {
@@ -1493,7 +1399,6 @@ describe("InversePolymorphicBelongsToTests", () => {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Tag, "taggable", { polymorphic: true, inverseOf: "nonexistent" });
@@ -1508,35 +1413,27 @@ describe("InversePolymorphicBelongsToTests", () => {
 });
 
 describe("InverseCachedPathTests", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   // Tests for the _cachedAssociations / _preloadedAssociations fast-paths in loadBelongsTo.
-  let adapter: TestDatabaseAdapter;
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       cached_men: { name: "string" },
       cached_faces: { cached_man_id: "integer" },
       null_men: { name: "string" },
       null_faces: { man_id: "integer" },
     });
   });
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-  withTransactionalFixtures(() => adapter);
-
   it("wires inverseOf on the cached-associations fast-path", async () => {
     class CachedFace extends Base {
       static {
         // Default FK for belongsTo :cachedMan is cached_man_id
         this.attribute("cached_man_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CachedMan extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(CachedMan, "cachedFace", { inverseOf: "cachedMan" });
@@ -1565,13 +1462,11 @@ describe("InverseCachedPathTests", () => {
     class NullFace extends Base {
       static {
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NullMan extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     // NullMan must have at least one association so validateInverseOf actually validates
@@ -1597,33 +1492,25 @@ describe("InverseCachedPathTests", () => {
 });
 
 describe("InverseAssociationTests", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       men: { name: "string" },
       faces: { man_id: "integer" },
       interests: { topic: "string", man_id: "integer" },
       comments: { commentable_id: "integer", commentable_type: "string" },
     });
   });
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-  withTransactionalFixtures(() => adapter);
-
   it("should allow for inverse of options in associations", () => {
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Face extends Base {
       static {
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(Man, "face", { inverseOf: "man" });
@@ -1636,7 +1523,6 @@ describe("InverseAssociationTests", () => {
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
@@ -1652,7 +1538,6 @@ describe("InverseAssociationTests", () => {
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
@@ -1665,7 +1550,6 @@ describe("InverseAssociationTests", () => {
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Man, "interests", {});
@@ -1679,7 +1563,6 @@ describe("InverseAssociationTests", () => {
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Comment, "commentable", { polymorphic: true });
@@ -1693,14 +1576,12 @@ describe("InverseAssociationTests", () => {
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Interest extends Base {
       static {
         this.attribute("topic", "string");
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Man, "interests", { inverseOf: "man" });
@@ -1717,29 +1598,22 @@ describe("InverseAssociationTests", () => {
 });
 
 describe("inverse_of", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       authors: { name: "string" },
       books: { title: "string", author_id: "integer" },
       posts: { title: "string" },
       comments: { body: "string", post_id: "integer" },
     });
   });
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-  withTransactionalFixtures(() => adapter);
-
   it("sets inverse reference on loaded belongs_to", async () => {
     class Author extends Base {
       static _tableName = "authors";
     }
     Author.attribute("id", "integer");
     Author.attribute("name", "string");
-    Author.adapter = adapter;
     registerModel(Author);
 
     class Book extends Base {
@@ -1748,7 +1622,6 @@ describe("inverse_of", () => {
     Book.attribute("id", "integer");
     Book.attribute("title", "string");
     Book.attribute("author_id", "integer");
-    Book.adapter = adapter;
     Associations.belongsTo.call(Book, "author", { inverseOf: "books" });
     registerModel(Book);
 
@@ -1766,7 +1639,6 @@ describe("inverse_of", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
-    Post.adapter = adapter;
     Associations.hasMany.call(Post, "comments", { inverseOf: "post" });
     registerModel(Post);
 
@@ -1776,7 +1648,6 @@ describe("inverse_of", () => {
     Comment.attribute("id", "integer");
     Comment.attribute("body", "string");
     Comment.attribute("post_id", "integer");
-    Comment.adapter = adapter;
     Associations.belongsTo.call(Comment, "post");
     registerModel(Comment);
 
@@ -1793,33 +1664,26 @@ describe("inverse_of", () => {
 });
 
 describe("InverseHasOneTests", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       men: { name: "string" },
       faces: { description: "string", man_id: "integer", human_id: "integer" },
       humen: { name: "string" },
     });
   });
 
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-  withTransactionalFixtures(() => adapter);
-
   function makeModels() {
     class Man extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Face extends Base {
       static {
         this.attribute("description", "string");
         this.attribute("man_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(Man, "face", { inverseOf: "man" });
@@ -1900,14 +1764,12 @@ describe("InverseHasOneTests", () => {
     class Human extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Face extends Base {
       static {
         this.attribute("description", "string");
         this.attribute("human_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Face, "confusedHuman", {
@@ -1927,14 +1789,12 @@ describe("InverseHasOneTests", () => {
     class Human extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Face extends Base {
       static {
         this.attribute("description", "string");
         this.attribute("human_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Face, "confusedHuman", {

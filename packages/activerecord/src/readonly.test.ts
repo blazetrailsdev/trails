@@ -5,10 +5,9 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, ReadOnlyRecord } from "./index.js";
 import { ReadonlyAttributeError } from "./readonly-attributes.js";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
   posts: { title: "string" },
@@ -19,24 +18,17 @@ const TEST_SCHEMA = {
 } as const;
 
 // -- Helpers --
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 describe("ReadonlyTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     return { Post };
@@ -178,17 +170,16 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     return { Post };
@@ -199,7 +190,6 @@ describe("ReadonlyTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const dev = await Dev.create({ name: "Alice" });
@@ -212,7 +202,6 @@ describe("ReadonlyTest", () => {
     class Dev extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const dev = await Dev.create({ name: "Alice" });
@@ -223,21 +212,17 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("cant save readonly record", async () => {
     class Post extends Base {
       static _tableName = "posts";
     }
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
-    Post.adapter = adapter;
-
     const post = await Post.create({ title: "Hello" });
     post.readonlyBang();
 
@@ -251,8 +236,6 @@ describe("ReadonlyTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
-    Post.adapter = adapter;
-
     const post = await Post.create({ title: "Hello" });
     post.readonlyBang();
 
@@ -261,20 +244,17 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("marks loaded records as readonly", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
-
     await Item.create({ name: "Widget" });
     const items = await Item.all().readonly().toArray();
     expect(items[0].isReadonly()).toBe(true);
@@ -283,12 +263,11 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("allows setting readonly attributes on create", async () => {
     class Product extends Base {
       static _tableName = "products";
@@ -296,7 +275,6 @@ describe("ReadonlyTest", () => {
     Product.attribute("id", "integer");
     Product.attribute("sku", "string");
     Product.attribute("name", "string");
-    Product.adapter = adapter;
     Product.attrReadonly("sku");
 
     const product = await Product.create({ sku: "ABC-123", name: "Widget" });
@@ -314,7 +292,6 @@ describe("ReadonlyTest", () => {
     Product.attribute("id", "integer");
     Product.attribute("sku", "string");
     Product.attribute("name", "string");
-    Product.adapter = adapter;
     Product.attrReadonly("sku");
 
     const product = await Product.create({ sku: "ABC-123", name: "Widget" });
@@ -336,7 +313,6 @@ describe("ReadonlyTest", () => {
     }
     Product.attribute("id", "integer");
     Product.attribute("sku", "string");
-    Product.adapter = adapter;
     Product.attrReadonly("sku");
 
     expect(Product.readonlyAttributes).toContain("sku");
@@ -344,17 +320,15 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("readonly records cannot be saved", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice" });
@@ -366,13 +340,11 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test "readonly record cannot be saved"
   it("cant save readonly record", async () => {
     class Post extends Base {
@@ -380,7 +352,6 @@ describe("ReadonlyTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = await Post.create({ title: "Hello" });
@@ -395,7 +366,6 @@ describe("ReadonlyTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const post = await Post.create({ title: "Hello" });
@@ -412,7 +382,6 @@ describe("ReadonlyTest", () => {
         this._tableName = "products";
         this.attribute("id", "integer");
         this.attribute("sku", "string");
-        this.adapter = adapter;
       }
     }
     Product.attrReadonly("sku");
@@ -429,7 +398,6 @@ describe("ReadonlyTest", () => {
       static {
         this._tableName = "posts";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     const post = await Post.create({});

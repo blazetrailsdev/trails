@@ -17,7 +17,8 @@ import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -150,25 +151,21 @@ async function freshAdapter(): Promise<TestDatabaseAdapter> {
 // NestedAttributesTest — targets nested_attributes_test.rb
 // ==========================================================================
 describe("NestedAttributesTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("should not build a new record if reject all blank does not return false", async () => {
     class NTag0 extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("npirate0_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NPirate0 extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NPirate0, "nTag0s", {
@@ -194,13 +191,11 @@ describe("NestedAttributesTest", () => {
       static {
         this.attribute("body", "string");
         this.attribute("npost5_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NPost5 extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NPost5, "nComment5s", {
@@ -225,13 +220,11 @@ describe("NestedAttributesTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("narticle6_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NArticle6 extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NArticle6, "nTag6s", {
@@ -257,13 +250,11 @@ describe("NestedAttributesTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("narticle7_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NArticle7 extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NArticle7, "nTag7s", {
@@ -295,13 +286,11 @@ describe("NestedAttributesTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("narticle8_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NArticle8 extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NArticle8, "nTag8s", {
@@ -327,13 +316,11 @@ describe("NestedAttributesTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("narticle9_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NArticle9 extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NArticle9, "nTag9s", {
@@ -359,13 +346,11 @@ describe("NestedAttributesTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("narticleA_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NArticleA extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NArticleA, "nTagAs", {
@@ -389,13 +374,11 @@ describe("NestedAttributesTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("narticleB_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NArticleB extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NArticleB, "nTagBs", {
@@ -421,13 +404,11 @@ describe("NestedAttributesTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("narticleC_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NArticleC extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NArticleC, "nTagCs", {
@@ -451,13 +432,11 @@ describe("NestedAttributesTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("narticleD_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NArticleD extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NArticleD, "nTagDs", {
@@ -481,13 +460,11 @@ describe("NestedAttributesTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("narticleE_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NArticleE extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NArticleE, "nTagEs", {
@@ -511,13 +488,11 @@ describe("NestedAttributesTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("narticleH_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NArticleH extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NArticleH, "nTagHs", {
@@ -540,11 +515,11 @@ describe("NestedAttributesTest", () => {
 });
 
 describe("TestNestedAttributesOnAHasOneAssociation", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModels(
     opts: {
@@ -557,13 +532,11 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
       static {
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Pirate extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(Pirate, "ship", { className: "Ship", foreignKey: "pirate_id" });
@@ -577,14 +550,12 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     class PolyTarget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PolyOwner extends Base {
       static {
         this.attribute("target_type", "string");
         this.attribute("target_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(PolyOwner, "target", {
@@ -824,11 +795,11 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
 });
 
 describe("TestNestedAttributesOnABelongsToAssociation", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModels(
     opts: {
@@ -840,14 +811,12 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     class Pirate extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
       }
     }
     class Ship extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Ship, "pirate", { className: "Pirate", foreignKey: "pirate_id" });
@@ -1061,17 +1030,15 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
 });
 
 describe("TestNestedAttributesInGeneral", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("base should have an empty nested attributes options", () => {
     class Plain extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const configs = (Plain as any)._nestedAttributeConfigs;
@@ -1085,13 +1052,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
@@ -1109,13 +1074,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
@@ -1134,13 +1097,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
@@ -1160,7 +1121,6 @@ describe("TestNestedAttributesInGeneral", () => {
     class Plain extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     expect(() => acceptsNestedAttributesFor(Plain, "nonExistent")).toThrow(/No association found/);
@@ -1170,13 +1130,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("name", "string");
         this.attribute("ua_pirate_id", "integer");
-        this.adapter = adapter;
       }
     }
     class UAPirate extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(UAPirate, "uaShip", {
@@ -1195,7 +1153,6 @@ describe("TestNestedAttributesInGeneral", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const item = new Item({ name: "test" });
@@ -1208,13 +1165,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
@@ -1233,13 +1188,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
@@ -1259,13 +1212,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
@@ -1285,13 +1236,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Pirate extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(Pirate, "ship", { className: "Ship", foreignKey: "pirate_id" });
@@ -1323,13 +1272,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Pirate extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Pirate, "birds", { className: "Bird", foreignKey: "pirate_id" });
@@ -1348,13 +1295,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
@@ -1379,13 +1324,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("name", "string");
         this.attribute("ov_pirate_id", "integer");
-        this.adapter = adapter;
       }
     }
     class OvPirate extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(OvPirate, "ovShips", {
@@ -1410,13 +1353,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("name", "string");
         this.attribute("sub_pirate_id", "integer");
-        this.adapter = adapter;
       }
     }
     class SubPirate extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(SubPirate, "subBirds", {
@@ -1435,11 +1376,7 @@ describe("TestNestedAttributesInGeneral", () => {
     expect(parentBirds.length).toBe(0);
 
     // Subclass re-declares with different options (no reject)
-    class SubSubPirate extends SubPirate {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class SubSubPirate extends SubPirate {}
     Associations.hasMany.call(SubSubPirate, "subBirds", {
       className: "SubBird",
       foreignKey: "sub_pirate_id",
@@ -1473,13 +1410,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("name", "string");
         this.attribute("npirate1_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NPirate1 extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NPirate1, "nBird1s", {
@@ -1506,13 +1441,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("name", "string");
         this.attribute("npirate2_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NPirate2 extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NPirate2, "nShip2s", {
@@ -1538,13 +1471,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("name", "string");
         this.attribute("narticleF_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NArticleF extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NArticleF, "nTagFs", {
@@ -1573,13 +1504,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("name", "string");
         this.attribute("nboat3_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NBoat3 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NBoat3, "nPart3s", { className: "NPart3", foreignKey: "nboat3_id" });
@@ -1605,13 +1534,11 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this.attribute("topic", "string");
         this.attribute("nhuman4_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NHuman4 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NHuman4, "nInterest4s", {
@@ -2430,12 +2357,11 @@ describe("validate presence of parent works with inverse of", () => {
 });
 
 describe("acceptsNestedAttributesFor", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   it("creates child records through parent", async () => {
     class Comment extends Base {
       static _tableName = "comments";
@@ -2443,7 +2369,6 @@ describe("acceptsNestedAttributesFor", () => {
     Comment.attribute("id", "integer");
     Comment.attribute("body", "string");
     Comment.attribute("post_id", "integer");
-    Comment.adapter = adapter;
     registerModel(Comment);
 
     class Post extends Base {
@@ -2451,7 +2376,6 @@ describe("acceptsNestedAttributesFor", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
-    Post.adapter = adapter;
     Associations.hasMany.call(Post, "comments");
     acceptsNestedAttributesFor(Post, "comments");
     registerModel(Post);
@@ -2475,7 +2399,6 @@ describe("acceptsNestedAttributesFor", () => {
     Tag.attribute("id", "integer");
     Tag.attribute("name", "string");
     Tag.attribute("article_id", "integer");
-    Tag.adapter = adapter;
     registerModel(Tag);
 
     class Article extends Base {
@@ -2483,7 +2406,6 @@ describe("acceptsNestedAttributesFor", () => {
     }
     Article.attribute("id", "integer");
     Article.attribute("title", "string");
-    Article.adapter = adapter;
     Associations.hasMany.call(Article, "tags");
     acceptsNestedAttributesFor(Article, "tags", { allowDestroy: true });
     registerModel(Article);
@@ -2500,12 +2422,11 @@ describe("acceptsNestedAttributesFor", () => {
 });
 
 describe("Nested Attributes (Rails-guided)", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
 
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
@@ -2531,9 +2452,7 @@ describe("Nested Attributes (Rails-guided)", () => {
         this.validates("name", { presence: true });
       }
     }
-    Pirate.adapter = adapter;
-    Ship.adapter = adapter;
-    Part.adapter = adapter;
+
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
     registerModel("Part", Part);
@@ -2558,7 +2477,6 @@ describe("Nested Attributes (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Comment);
@@ -2568,7 +2486,6 @@ describe("Nested Attributes (Rails-guided)", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments");
@@ -2595,7 +2512,6 @@ describe("Nested Attributes (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Comment);
@@ -2605,7 +2521,6 @@ describe("Nested Attributes (Rails-guided)", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments");
@@ -2630,7 +2545,6 @@ describe("Nested Attributes (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Comment);
@@ -2640,7 +2554,6 @@ describe("Nested Attributes (Rails-guided)", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments");
@@ -2667,7 +2580,6 @@ describe("Nested Attributes (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Comment);
@@ -2677,7 +2589,6 @@ describe("Nested Attributes (Rails-guided)", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments");
@@ -2704,14 +2615,12 @@ describe("Nested Attributes (Rails-guided)", () => {
         this._tableName = "ae1_tags";
         this.attribute("name", "string");
         this.attribute("ae1_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class AE1Article extends Base {
       static {
         this._tableName = "ae1_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(AE1Article, "ae1Tags", {
@@ -2728,13 +2637,11 @@ describe("Nested Attributes (Rails-guided)", () => {
 });
 
 describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
-
   afterEach(() => {
     Notifications.unsubscribeAll();
   });
@@ -2763,9 +2670,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
         this.validates("name", { presence: true });
       }
     }
-    Pirate.adapter = adapter;
-    Ship.adapter = adapter;
-    Part.adapter = adapter;
+
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
     registerModel("Part", Part);
@@ -2796,20 +2701,17 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
       static {
         this.attribute("text", "string");
         this.attribute("ggc_comment_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GGCComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("ggc_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GGCPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GGCPost, "ggcComments", {
@@ -2842,20 +2744,17 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
       static {
         this.attribute("text", "string");
         this.attribute("ggd_comment_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GGDComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("ggd_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GGDPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GGDPost, "ggdComments", {
@@ -2888,20 +2787,17 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
       static {
         this.attribute("text", "string");
         this.attribute("gga_comment_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GGAComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("gga_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GGAPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GGAPost, "ggaComments", {
@@ -2954,12 +2850,11 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 });
 
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
 
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
@@ -2985,9 +2880,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
         this.validates("name", { presence: true });
       }
     }
-    Pirate.adapter = adapter;
-    Ship.adapter = adapter;
-    Part.adapter = adapter;
+
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
     registerModel("Part", Part);
@@ -3031,20 +2924,17 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
       static {
         this.attribute("name", "string");
         this.attribute("gc_comment_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GCComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("gc_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GCPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GCPost, "gcComments", {
@@ -3077,20 +2967,17 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
       static {
         this.attribute("name", "string");
         this.attribute("gc_d_comment_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GCDComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("gc_d_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GCDPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GCDPost, "gcdComments", {
@@ -3123,20 +3010,17 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
       static {
         this.attribute("name", "string");
         this.attribute("gc_comment2_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GCComment2 extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("gc_post2_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GCPost2 extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GCPost2, "gcComment2s", {
@@ -3209,11 +3093,11 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 // Rails: NestedAttributesOnACollectionAssociationTests is mixed into
 // TestNestedAttributesOnAHasManyAssociation and TestNestedAttributesOnAHasAndBelongsToManyAssociation.
 describe("TestNestedAttributesOnAHasManyAssociation", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
   afterEach(() => {
     Notifications.unsubscribeAll();
   });
@@ -3223,13 +3107,11 @@ describe("TestNestedAttributesOnAHasManyAssociation", () => {
       static {
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Pirate extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Pirate, "birds", { className: "Bird", foreignKey: "pirate_id" });

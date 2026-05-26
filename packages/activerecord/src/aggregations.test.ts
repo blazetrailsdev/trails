@@ -5,11 +5,12 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
 import { Base, composedOf } from "./index.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -28,11 +29,10 @@ afterAll(() => {
 // AggregationsTest — targets aggregations_test.rb
 // ==========================================================================
 describe("AggregationsTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       customers: { name: "string", address_street: "string", address_city: "string" },
       locations: { name: "string", lat: "float", lng: "float" },
       orders: { label: "string", price_amount: "float", price_currency: "string" },
@@ -43,12 +43,6 @@ describe("AggregationsTest", () => {
       shapes: { name: "string", coord_x: "float", coord_y: "float" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   // Rails: test_find_multiple_value_object
   it("find multiple value object", async () => {
     class Address {
@@ -62,7 +56,6 @@ describe("AggregationsTest", () => {
         this.attribute("name", "string");
         this.attribute("address_street", "string");
         this.attribute("address_city", "string");
-        this.adapter = adapter;
       }
     }
     composedOf(Customer, "address", {
@@ -97,7 +90,6 @@ describe("AggregationsTest", () => {
         this.attribute("name", "string");
         this.attribute("address_street", "string");
         this.attribute("address_city", "string");
-        this.adapter = adapter;
       }
     }
     composedOf(Customer, "address", {
@@ -127,7 +119,6 @@ describe("AggregationsTest", () => {
         this.attribute("name", "string");
         this.attribute("address_street", "string");
         this.attribute("address_city", "string");
-        this.adapter = adapter;
       }
     }
     composedOf(Customer, "address", {
@@ -162,7 +153,6 @@ describe("AggregationsTest", () => {
         this.attribute("name", "string");
         this.attribute("lat", "float");
         this.attribute("lng", "float");
-        this.adapter = adapter;
       }
     }
     composedOf(Location, "gps", {
@@ -192,7 +182,6 @@ describe("AggregationsTest", () => {
         this.attribute("name", "string");
         this.attribute("address_street", "string");
         this.attribute("address_city", "string");
-        this.adapter = adapter;
       }
     }
     composedOf(Customer, "address", {
@@ -221,7 +210,6 @@ describe("AggregationsTest", () => {
         this.attribute("label", "string");
         this.attribute("price_amount", "float");
         this.attribute("price_currency", "string");
-        this.adapter = adapter;
       }
     }
     composedOf(Order, "price", {
@@ -259,7 +247,6 @@ describe("AggregationsTest", () => {
       static {
         this.attribute("label", "string");
         this.attribute("temp_degrees", "float");
-        this.adapter = adapter;
       }
     }
     composedOf(Reading, "temperature", {
@@ -286,7 +273,6 @@ describe("AggregationsTest", () => {
         this.attribute("name", "string");
         this.attribute("coord_x", "float");
         this.attribute("coord_y", "float");
-        this.adapter = adapter;
       }
     }
     composedOf(Shape, "origin", {
@@ -316,7 +302,6 @@ describe("AggregationsTest", () => {
         this.attribute("name", "string");
         this.attribute("coord_x", "float");
         this.attribute("coord_y", "float");
-        this.adapter = adapter;
       }
     }
     composedOf(Shape, "origin", {
@@ -349,7 +334,6 @@ describe("AggregationsTest", () => {
         this.attribute("name", "string");
         this.attribute("latitude", "float");
         this.attribute("longitude", "float");
-        this.adapter = adapter;
       }
     }
     composedOf(Waypoint, "gps", {
@@ -382,7 +366,6 @@ describe("AggregationsTest", () => {
         this.attribute("name", "string");
         this.attribute("latitude", "float");
         this.attribute("longitude", "float");
-        this.adapter = adapter;
       }
     }
     composedOf(Waypoint, "gps", {
@@ -407,7 +390,6 @@ describe("AggregationsTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("tag_name", "string");
-        this.adapter = adapter;
       }
     }
     composedOf(Article, "tag", {
@@ -434,7 +416,6 @@ describe("AggregationsTest", () => {
         this.attribute("name", "string");
         this.attribute("address_street", "string");
         this.attribute("address_city", "string");
-        this.adapter = adapter;
       }
     }
     composedOf(Customer, "address", {
@@ -471,7 +452,6 @@ describe("AggregationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("balance_amount", "float");
-        this.adapter = adapter;
       }
     }
     composedOf(Account, "balance", {
@@ -799,19 +779,13 @@ describe("Aggregation edge cases", () => {
 });
 
 describe("composed_of", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       customers: { address_street: "string", address_city: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   it("composes value objects from multiple attributes", async () => {
     class Address {
       constructor(
@@ -826,7 +800,6 @@ describe("composed_of", () => {
     Customer.attribute("id", "integer");
     Customer.attribute("address_street", "string");
     Customer.attribute("address_city", "string");
-    Customer.adapter = adapter;
     composedOf(Customer, "address", {
       className: Address,
       mapping: [
@@ -856,7 +829,6 @@ describe("composed_of", () => {
     Customer.attribute("id", "integer");
     Customer.attribute("address_street", "string");
     Customer.attribute("address_city", "string");
-    Customer.adapter = adapter;
     composedOf(Customer, "address", {
       className: Address,
       mapping: [

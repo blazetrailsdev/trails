@@ -3,39 +3,31 @@ import { performance } from "node:perf_hooks";
 import { Base } from "./index.js";
 import { hasSecurePassword } from "./secure-password.js";
 import { setTokenForSecret } from "./generates-token-for.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // -- Helpers --
 
 // Union of every column referenced by tests in this file; per-test attribute
 // differences are immaterial (sqlite ignores unread columns).
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, {
-    users: {
-      name: "string",
-      token: "string",
-      email: "string",
-      password_digest: "string",
-      auth_token_digest: "string",
-      recovery_password_digest: "string",
-    },
-  });
-  return adapter;
-}
-
 // -- Phase 2000: Core --
 
 describe("secure_password", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema({
+      users: {
+        name: "string",
+        token: "string",
+        email: "string",
+        password_digest: "string",
+        auth_token_digest: "string",
+        recovery_password_digest: "string",
+      },
+    });
   });
-  withTransactionalFixtures(() => adapter);
-
   it("hashes password on save and authenticates", async () => {
     class User extends Base {
       static _tableName = "users";
@@ -43,7 +35,6 @@ describe("secure_password", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("password_digest", "string");
-    User.adapter = adapter;
     hasSecurePassword(User, { validations: false });
 
     const user = new User({ name: "Alice" });
@@ -69,7 +60,6 @@ describe("secure_password", () => {
     }
     User.attribute("id", "integer");
     User.attribute("password_digest", "string");
-    User.adapter = adapter;
     hasSecurePassword(User);
 
     const user = new User({});
@@ -84,7 +74,6 @@ describe("secure_password", () => {
     }
     User.attribute("id", "integer");
     User.attribute("password_digest", "string");
-    User.adapter = adapter;
     hasSecurePassword(User);
 
     const user = new User({});
@@ -99,13 +88,20 @@ describe("secure_password", () => {
 });
 
 describe("SecurePassword (Rails-guided)", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema({
+      users: {
+        name: "string",
+        token: "string",
+        email: "string",
+        password_digest: "string",
+        auth_token_digest: "string",
+        recovery_password_digest: "string",
+      },
+    });
   });
-  withTransactionalFixtures(() => adapter);
-
   // Rails: test "authenticate with correct password"
   it("authenticate returns the user on success", async () => {
     class User extends Base {
@@ -114,7 +110,6 @@ describe("SecurePassword (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("password_digest", "string");
-        this.adapter = adapter;
       }
     }
     hasSecurePassword(User, { validations: false });
@@ -133,7 +128,6 @@ describe("SecurePassword (Rails-guided)", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("password_digest", "string");
-        this.adapter = adapter;
       }
     }
     hasSecurePassword(User, { validations: false });
@@ -152,7 +146,6 @@ describe("SecurePassword (Rails-guided)", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("password_digest", "string");
-        this.adapter = adapter;
       }
     }
     hasSecurePassword(User);
@@ -169,7 +162,6 @@ describe("SecurePassword (Rails-guided)", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("password_digest", "string");
-        this.adapter = adapter;
       }
     }
     hasSecurePassword(User);
@@ -183,13 +175,20 @@ describe("SecurePassword (Rails-guided)", () => {
 });
 
 describe("password reset token", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema({
+      users: {
+        name: "string",
+        token: "string",
+        email: "string",
+        password_digest: "string",
+        auth_token_digest: "string",
+        recovery_password_digest: "string",
+      },
+    });
   });
-  withTransactionalFixtures(() => adapter);
-
   beforeEach(() => {
     setTokenForSecret("test-reset-token-secret");
   });
@@ -206,7 +205,6 @@ describe("password reset token", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("password_digest", "string");
-        this.adapter = adapter;
       }
     }
     hasSecurePassword(User);
@@ -226,7 +224,6 @@ describe("password reset token", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("password_digest", "string");
-        this.adapter = adapter;
       }
     }
     hasSecurePassword(User);
@@ -251,7 +248,6 @@ describe("password reset token", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("password_digest", "string");
-        this.adapter = adapter;
       }
     }
     hasSecurePassword(User);
@@ -278,7 +274,6 @@ describe("password reset token", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("password_digest", "string");
-        this.adapter = adapter;
       }
     }
     hasSecurePassword(User);
@@ -303,7 +298,6 @@ describe("password reset token", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("password_digest", "string");
-        this.adapter = adapter;
       }
     }
     hasSecurePassword(User, { resetToken: false });
@@ -313,13 +307,20 @@ describe("password reset token", () => {
 });
 
 describe("SecurePasswordTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema({
+      users: {
+        name: "string",
+        token: "string",
+        email: "string",
+        password_digest: "string",
+        auth_token_digest: "string",
+        recovery_password_digest: "string",
+      },
+    });
   });
-  withTransactionalFixtures(() => adapter);
-
   // Builds a User class with the union of attributes used across these tests.
   // Per-test attribute differences in Rails are immaterial for these tests
   // (sqlite ignores unread columns); a single shared class halves the LOC
@@ -334,7 +335,6 @@ describe("SecurePasswordTest", () => {
         this.attribute("password_digest", "string");
         this.attribute("auth_token_digest", "string");
         this.attribute("recovery_password_digest", "string");
-        this.adapter = adapter;
       }
     }
     hasSecurePassword(User, { validations: false });
@@ -498,12 +498,20 @@ describe("SecurePasswordTest", () => {
 });
 
 describe("hasSecurePassword — per-attribute confirmation, challenge, and salt", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema({
+      users: {
+        name: "string",
+        token: "string",
+        email: "string",
+        password_digest: "string",
+        auth_token_digest: "string",
+        recovery_password_digest: "string",
+      },
+    });
   });
-  withTransactionalFixtures(() => adapter);
-
   const makeModel = () => {
     class User extends Base {
       static {
@@ -514,7 +522,6 @@ describe("hasSecurePassword — per-attribute confirmation, challenge, and salt"
       }
     }
     hasSecurePassword(User, "recovery_password", { validations: true });
-    User.adapter = adapter;
     return User;
   };
 
