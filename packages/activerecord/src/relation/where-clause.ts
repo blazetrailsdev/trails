@@ -63,9 +63,6 @@ export class WhereClause {
   }
 
   or(other: WhereClause): WhereClause {
-    if (this.isEmpty()) return other.clone();
-    if (other.isEmpty()) return this.clone();
-
     const selfPreds = this.predicates;
     const otherPreds = other.predicates;
 
