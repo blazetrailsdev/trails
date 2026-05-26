@@ -99,7 +99,8 @@ export interface TseRenderContext {
    * shape has required properties). A plain `string` falls back to
    * `Record<string, unknown>`. Collection renders (`collection:` present)
    * omit auto-injected keys (item, counter, iteration) from the locals
-   * requirement; remaining required keys must still be provided.
+   * requirement when `as` is a literal type; a wide `string` preserves
+   * all locals requirements. Remaining required keys must still be provided.
    * `spacerTemplate` is only accepted on collection renders.
    * `rails partial_renderer.rb`.
    *
