@@ -137,6 +137,45 @@ describe("JoinDependency Arel node construction", () => {
     expect((eq.right as any).name).toBe("owner_id");
   });
 
+  it("builds joinRoot tree with children for each association", () => {
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
+
+    const jd = new JoinDependency(Owner);
+    jd.addAssociation("assets");
+
+    expect(jd.joinRoot.baseKlass).toBe(Owner);
+    expect(jd.joinRoot.children).toHaveLength(1);
+    expect(jd.joinRoot.children[0]._joinNode).not.toBeNull();
+    expect(jd.joinRoot.children[0]._joinNode!.immediateAssocName).toBe("assets");
+    expect(jd.joinRoot.children[0].baseKlass).toBe(Asset);
+  });
+
+  it("builds nested tree for nested association paths", () => {
+    class Comment extends Base {
+      static {
+        this.attribute("asset_id", "integer");
+        this.attribute("body", "string");
+      }
+    }
+    Comment.adapter = adapter;
+    (Comment as any)._associations = [];
+    registerModel(Comment);
+
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
+    Associations.hasMany.call(Asset, "comments", { className: "Comment", foreignKey: "asset_id" });
+
+    const jd = new JoinDependency(Owner);
+    jd.addNestedAssociation("assets.comments");
+
+    expect(jd.joinRoot.children).toHaveLength(1);
+    const assetsNode = jd.joinRoot.children[0];
+    expect(assetsNode._joinNode!.immediateAssocName).toBe("assets");
+    expect(assetsNode.children).toHaveLength(1);
+    const commentsNode = assetsNode.children[0];
+    expect(commentsNode._joinNode!.immediateAssocName).toBe("comments");
+    expect(commentsNode.baseKlass).toBe(Comment);
+  });
+
   it("uses table alias when name collides", () => {
     Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
 

@@ -103,6 +103,23 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(throughTable.tableAlias).toBeNull();
   });
 
+  it("builds tree with through node as child of root and target as sibling", () => {
+    const jd = new JoinDependency(JdtAuthor);
+    const node = jd.addAssociation("jdtComments");
+    expect(node).not.toBeNull();
+
+    const root = jd.joinRoot;
+    expect(root.baseKlass).toBe(JdtAuthor);
+    // Through + target are both children of root (flat under root for has_many :through)
+    expect(root.children.length).toBe(2);
+    const throughChild = root.children[0];
+    expect(throughChild._joinNode!.immediateAssocName).toBe("_through_jdtPosts");
+    expect(throughChild._joinNode!.tableName).toBe("jdt_posts");
+    const targetChild = root.children[1];
+    expect(targetChild._joinNode!.immediateAssocName).toBe("jdtComments");
+    expect(targetChild._joinNode!.tableName).toBe("jdt_comments");
+  });
+
   it("falls back to tN alias when the through real name collides", () => {
     const jd = new JoinDependency(JdtAuthor);
     jd.addAssociation("jdtPosts");

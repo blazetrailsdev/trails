@@ -26,8 +26,8 @@ export class JoinAssociation extends JoinPart {
   private _readonly = false;
   private _strictLoading = false;
 
-  constructor(reflection: AbstractReflection) {
-    super(reflection.klass);
+  constructor(reflection: AbstractReflection, children?: JoinPart[]) {
+    super(reflection.klass, children);
     this.reflection = reflection;
   }
 
@@ -48,16 +48,13 @@ export class JoinAssociation extends JoinPart {
     return this._table ?? new Table(this.reflection.tableName);
   }
 
-  isMatch(other: JoinPart | typeof Base): boolean {
-    if (other instanceof JoinPart) {
-      if (this === other) return true;
-      return (
-        super.isMatch(other.baseKlass) &&
-        other instanceof JoinAssociation &&
-        this.reflection === other.reflection
-      );
-    }
-    return super.isMatch(other);
+  isMatch(other: JoinPart): boolean {
+    if (this === other) return true;
+    return (
+      super.isMatch(other) &&
+      other instanceof JoinAssociation &&
+      this.reflection === other.reflection
+    );
   }
 
   match(other: JoinPart): boolean {
