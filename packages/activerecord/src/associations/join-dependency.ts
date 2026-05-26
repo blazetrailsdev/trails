@@ -897,6 +897,14 @@ export class JoinDependency {
     }
   }
 
+  private _resolveTreeParent(parentPath: string): JoinPart {
+    const found = this._treeNodesByPath.get(parentPath);
+    if (!found) {
+      throw new Error(`JoinDependency tree: parent path "${parentPath}" not found`);
+    }
+    return found;
+  }
+
   private _addThroughViaJoinAssociation(
     assocDef: any,
     reflection: any,
@@ -1191,13 +1199,11 @@ export class JoinDependency {
           : recursiveNode.immediateAssocName;
         this._treeNodesByPath.set(newKey, treePart);
         if (oldParentPath !== recursiveNode.parentPath) {
-          const oldParent = oldParentPath
-            ? (this._treeNodesByPath.get(oldParentPath) ?? this._joinRoot)
-            : this._joinRoot;
+          const oldParent = oldParentPath ? this._resolveTreeParent(oldParentPath) : this._joinRoot;
           const idx = oldParent.children.indexOf(treePart);
           if (idx !== -1) oldParent.children.splice(idx, 1);
           const newParent = recursiveNode.parentPath
-            ? (this._treeNodesByPath.get(recursiveNode.parentPath) ?? this._joinRoot)
+            ? this._resolveTreeParent(recursiveNode.parentPath)
             : this._joinRoot;
           newParent.children.push(treePart);
         }
