@@ -470,8 +470,8 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     return abstractSanitizeAsSqlComment(value);
   }
 
-  get arelVisitor(): Visitors.ToSql | undefined {
-    return (this.inner as { arelVisitor?: Visitors.ToSql }).arelVisitor;
+  get visitor(): Visitors.ToSql | undefined {
+    return (this.inner as { visitor?: Visitors.ToSql }).visitor;
   }
 
   // --- DatabaseStatements ---

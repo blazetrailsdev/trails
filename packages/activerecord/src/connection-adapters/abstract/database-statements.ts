@@ -155,7 +155,7 @@ export function toSql(
   // Use compile() (inlines values) for display SQL, matching Rails'
   // to_sql under unprepared_statement. toSqlAndBinds uses
   // compileWithBinds for execution (placeholders + bind array).
-  const visitor = (this as any)?.arelVisitor as Visitors.ToSql | undefined;
+  const visitor = (this as any)?.visitor as Visitors.ToSql | undefined;
   if (visitor && node instanceof Nodes.Node) {
     return visitor.compile(node);
   }
@@ -203,7 +203,7 @@ export function toSqlAndBinds(
           "The values must be stored on the AST directly",
       );
     }
-    const visitor = (this as any)?.arelVisitor as Visitors.ToSql | undefined;
+    const visitor = (this as any)?.visitor as Visitors.ToSql | undefined;
     if (visitor && node instanceof Nodes.Node) {
       const [sql, extractedBinds] = visitor.compileWithBinds(node);
       // Type-cast bind objects (QueryAttribute) to primitive values
@@ -236,7 +236,7 @@ export function cacheableQuery(
   arel: unknown,
 ): [unknown, unknown[]] {
   const host = this as DatabaseStatementsHost;
-  const visitor = (host as any)?.arelVisitor as Visitors.ToSql | undefined;
+  const visitor = (host as any)?.visitor as Visitors.ToSql | undefined;
 
   // Unwrap TreeManager → Node
   let node = arel;
@@ -1752,7 +1752,7 @@ export function buildFixtureSql(
   // SchemaAdapter/TestAdapter), construct one from this adapter so identifier
   // quoting is dialect-correct rather than using the global default quoter.
   const visitor =
-    ((this as any)?.arelVisitor as Visitors.ToSql | undefined) ??
+    ((this as any)?.visitor as Visitors.ToSql | undefined) ??
     new Visitors.ToSql(this as unknown as Visitors.ArelQuoter);
   return visitor.compile(manager.ast);
 }

@@ -2377,7 +2377,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /** @internal */
-  get arelVisitor(): Visitors.ToSql {
+  override arelVisitor(): Visitors.ToSql {
     return new Visitors.PostgreSQLWithBinds(this);
   }
 
@@ -2611,7 +2611,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   columnsForDistinct(columns: string | string[], orders?: (string | Nodes.Node)[]): string {
     const base = Array.isArray(columns) ? columns.join(", ") : columns;
-    const visitor = this.arelVisitor;
+    const visitor = this.visitor;
     // Mirrors Rails two-pass compact_blank: filter blanks before AND after stripping
     // so an order that becomes empty after stripping (e.g. bare "DESC") doesn't
     // consume an alias index slot and shift subsequent aliases.

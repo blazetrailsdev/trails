@@ -686,11 +686,8 @@ class TestAdapterFixtures implements DatabaseAdapter {
     return abstractSanitizeAsSqlComment(value);
   }
 
-  get arelVisitor(): Visitors.ToSql | undefined {
-    // Phase 9b-2b: all three adapters now delegate. The dormant
-    // `new Visitors.ToSql` fallback in `Relation#_arelVisitor` is dead
-    // code; Phase 9b-3+4 will delete the fallback and this wrapper class.
-    return (this.inner as { arelVisitor?: Visitors.ToSql }).arelVisitor;
+  get visitor(): Visitors.ToSql | undefined {
+    return (this.inner as { visitor?: Visitors.ToSql }).visitor;
   }
 
   lookupCastTypeFromColumn(column: unknown): unknown {

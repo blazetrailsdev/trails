@@ -305,7 +305,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   override unquotedFalse = mysqlUnquotedFalse;
 
   /** @internal */
-  override get arelVisitor(): Visitors.ToSql {
+  override arelVisitor(): Visitors.ToSql {
     return new Visitors.MySQL(this);
   }
 
