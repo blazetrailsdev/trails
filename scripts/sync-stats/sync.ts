@@ -12,22 +12,99 @@ const DB_PATH = join(homedir(), "github", "blazetrailsdev", "stats.db");
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
 // Throttle gh calls to stay under GitHub's secondary rate limit (~80 req/min
-// for bursty patterns). 250ms between calls = ~240/min, comfortably safe for
-// read-only traffic.
-const GH_MIN_INTERVAL_MS = 250;
+// for bursty patterns). Compute requests/minute from the interval so the
+// comment can't drift.
+const GH_MIN_INTERVAL_MS = 500;
+const GH_REQ_PER_MIN = Math.floor(60_000 / GH_MIN_INTERVAL_MS); // 120/min at 500ms
+const RATE_LIMIT_RESERVE = 1000;
+const BUDGET_CHECK_EVERY = 100;
 const sleepBuf = new Int32Array(new SharedArrayBuffer(4));
 let lastGhCallAt = 0;
+let rateLimitCooldownUntil = 0;
+let ghCallCount = 0;
+let lastBudgetCheckAt = 0; // ghCallCount value at last probe — prevents re-probing on the same call boundary
 
-function gh(args: string): string {
+void GH_REQ_PER_MIN; // documented for future reference; intentionally unused
+
+class RateLimitExhaustedError extends Error {
+  constructor(remaining: number) {
+    super(`Stopping: only ${remaining} API calls remaining (reserve: ${RATE_LIMIT_RESERVE})`);
+  }
+}
+
+function waitForCooldownAndInterval() {
+  const cooldownRemaining = rateLimitCooldownUntil - Date.now();
+  if (cooldownRemaining > 0) {
+    Atomics.wait(sleepBuf, 0, 0, cooldownRemaining);
+  }
   const elapsed = Date.now() - lastGhCallAt;
   if (elapsed < GH_MIN_INTERVAL_MS) {
     Atomics.wait(sleepBuf, 0, 0, GH_MIN_INTERVAL_MS - elapsed);
   }
-  try {
-    return execSync(`gh ${args}`, { encoding: "utf-8", maxBuffer: 50_000_000 });
-  } finally {
-    lastGhCallAt = Date.now();
+}
+
+function checkRateLimitBudget() {
+  if (
+    ghCallCount > 0 &&
+    ghCallCount % BUDGET_CHECK_EVERY === 0 &&
+    ghCallCount !== lastBudgetCheckAt
+  ) {
+    lastBudgetCheckAt = ghCallCount;
+    // Route the probe through the same throttle path so it doesn't burst
+    // alongside the real call that triggered it.
+    waitForCooldownAndInterval();
+    let out: string;
+    try {
+      out = execSync("gh api rate_limit --jq '.rate.remaining'", {
+        encoding: "utf-8",
+        timeout: 10_000,
+      }).trim();
+    } catch (err) {
+      console.warn(`  [budget check] probe failed: ${err instanceof Error ? err.message : err}`);
+      return;
+    } finally {
+      lastGhCallAt = Date.now();
+    }
+    const remaining = parseInt(out, 10);
+    if (Number.isNaN(remaining)) {
+      console.warn(`  [budget check] unparseable response: ${JSON.stringify(out)}`);
+      return;
+    }
+    if (remaining <= RATE_LIMIT_RESERVE) {
+      throw new RateLimitExhaustedError(remaining);
+    }
+    console.log(`  [budget check] ${remaining} API calls remaining`);
   }
+}
+
+// Set when a rate-limit error fires; subsequent gh() calls block at the top
+// of the loop until this time passes. Outlives a single gh() invocation so
+// later calls inherit the cooldown without re-tripping the limit.
+function gh(args: string): string {
+  const MAX_RETRIES = 5;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    ghCallCount++;
+    checkRateLimitBudget();
+    waitForCooldownAndInterval();
+    try {
+      const result = execSync(`gh ${args}`, { encoding: "utf-8", maxBuffer: 50_000_000 });
+      lastGhCallAt = Date.now();
+      return result;
+    } catch (err) {
+      lastGhCallAt = Date.now();
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/rate limit|secondary rate|abuse detection/i.test(msg) && attempt < MAX_RETRIES) {
+        const backoffMs = Math.min(120_000, 5_000 * Math.pow(2, attempt));
+        rateLimitCooldownUntil = Date.now() + backoffMs;
+        console.warn(
+          `  Rate limited, cooling down ${backoffMs / 1000}s (retry ${attempt + 1}/${MAX_RETRIES})...`,
+        );
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("unreachable");
 }
 
 function ghJson<T>(args: string): T {
@@ -965,8 +1042,8 @@ async function syncPullRequestsByNumber(numbers: number[]): Promise<number> {
         console.log(`  ...${synced}/${numbers.length}`);
       }
     } catch (err) {
+      if (err instanceof RateLimitExhaustedError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
-      // gh exits non-zero for numbers that are issues, not PRs, or that don't exist.
       if (/no pull request|not found|could not resolve/i.test(msg)) {
         skipped++;
         continue;
@@ -1027,6 +1104,7 @@ async function syncPullRequests(mode: "latest" | "refresh"): Promise<number> {
         const pr = ghJson<GhPrData>(`pr view ${num} --repo ${REPO} --json ${fields}`);
         await PullRequest.upsertAll([mapPr(pr)], { uniqueBy: "number" });
       } catch (err) {
+        if (err instanceof RateLimitExhaustedError) throw err;
         console.warn(`  Failed to refresh PR #${num}: ${err instanceof Error ? err.message : err}`);
       }
     }
@@ -1066,6 +1144,7 @@ async function syncPrFiles() {
         );
       }
     } catch (err) {
+      if (err instanceof RateLimitExhaustedError) throw err;
       console.warn(
         `  Failed to fetch files for PR #${number}: ${err instanceof Error ? err.message : err}`,
       );
@@ -1101,6 +1180,7 @@ async function syncPrCommits() {
       }
       await PullRequest.where({ number }).updateAll({ commit_count: commits.length });
     } catch (err) {
+      if (err instanceof RateLimitExhaustedError) throw err;
       console.warn(
         `  Failed to fetch commits for PR #${number}: ${err instanceof Error ? err.message : err}`,
       );
@@ -1184,6 +1264,7 @@ async function syncPrComments() {
         review_count: reviews.length,
       });
     } catch (err) {
+      if (err instanceof RateLimitExhaustedError) throw err;
       console.warn(
         `  Failed to fetch comments for PR #${number}: ${err instanceof Error ? err.message : err}`,
       );
@@ -1219,6 +1300,7 @@ async function syncPrRequestedReviewers() {
       }
       await PullRequest.where({ number }).updateAll({ reviewers_synced: 1 });
     } catch (err) {
+      if (err instanceof RateLimitExhaustedError) throw err;
       console.warn(
         `  Failed to fetch requested reviewers for PR #${number}: ${err instanceof Error ? err.message : err}`,
       );
@@ -1275,6 +1357,7 @@ async function syncPrLinkedIssues() {
       }
       await PullRequest.where({ number }).updateAll({ linked_issues_synced: 1 });
     } catch (err) {
+      if (err instanceof RateLimitExhaustedError) throw err;
       console.warn(
         `  Failed to fetch linked issues for PR #${number}: ${err instanceof Error ? err.message : err}`,
       );
@@ -1314,6 +1397,7 @@ async function syncPrTimelineEvents() {
       }
       await PullRequest.where({ number }).updateAll({ timeline_synced: 1 });
     } catch (err) {
+      if (err instanceof RateLimitExhaustedError) throw err;
       console.warn(
         `  Failed to fetch timeline events for PR #${number}: ${err instanceof Error ? err.message : err}`,
       );
@@ -1322,40 +1406,9 @@ async function syncPrTimelineEvents() {
 }
 
 async function syncPrReactions() {
-  const prsToSync = await PullRequest.findBySql(
-    `SELECT number FROM pull_requests WHERE reactions_synced = 0 ORDER BY number`,
-  );
-
-  if (prsToSync.length === 0) return;
-  console.log(`Fetching reactions for ${prsToSync.length} PRs...`);
-
-  for (const pr of prsToSync) {
-    const number = pr.readAttribute("number") as number;
-    try {
-      const reactions = ghJson<GhReactionData[]>(
-        `api repos/${REPO}/issues/${number}/reactions --paginate`,
-      );
-      await PrReaction.adapter.executeMutation(`DELETE FROM pr_reactions WHERE pr_number = ?`, [
-        number,
-      ]);
-      if (reactions.length > 0) {
-        await PrReaction.insertAll(
-          reactions.map((r) => ({
-            reaction_id: r.id,
-            pr_number: number,
-            user: r.user?.login ?? null,
-            content: r.content,
-            created_at: r.created_at,
-          })),
-        );
-      }
-      await PullRequest.where({ number }).updateAll({ reactions_synced: 1 });
-    } catch (err) {
-      console.warn(
-        `  Failed to fetch reactions for PR #${number}: ${err instanceof Error ? err.message : err}`,
-      );
-    }
-  }
+  // Skipped — no reactions on this repo, not worth the API calls. If reactions
+  // become relevant, restore the prior implementation from git history
+  // (#2433 removed it) and let the `reactions_synced=0` rows backfill.
 }
 
 async function syncWorkflowRuns(mode: "latest" | "refresh" | "backfill"): Promise<number> {
@@ -1481,6 +1534,7 @@ async function syncWorkflowRuns(mode: "latest" | "refresh" | "backfill"): Promis
         synced++;
       }
     } catch (err) {
+      if (err instanceof RateLimitExhaustedError) throw err;
       console.warn(
         `  Failed to fetch workflow runs for PR #${number} (${sha}): ${err instanceof Error ? err.message : err}`,
       );
@@ -1686,6 +1740,7 @@ async function syncCheckAnnotations(mode: "latest" | "refresh" | "backfill") {
         );
       }
     } catch (err) {
+      if (err instanceof RateLimitExhaustedError) throw err;
       console.warn(
         `  Failed to fetch annotations for job ${jobId}: ${err instanceof Error ? err.message : err}`,
       );
@@ -1744,6 +1799,7 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
         console.log(`  Fetched ${fetched}/${jobsToFetch.length} job logs...`);
       }
     } catch (err) {
+      if (err instanceof RateLimitExhaustedError) throw err;
       console.warn(
         `  Failed to fetch logs for job ${jobId} "${jobName}" (PR #${prNumber}): ${err instanceof Error ? err.message : err}`,
       );
@@ -2161,20 +2217,19 @@ async function main() {
       await syncPrLinkedIssues();
       console.log("\n=== Syncing PR timeline events ===");
       await syncPrTimelineEvents();
-      console.log("\n=== Syncing PR reactions ===");
       await syncPrReactions();
 
       console.log("\n=== Backfilling workflow runs (uncapped) ===");
       const runsSynced = await syncWorkflowRuns("backfill");
-
-      console.log("\n=== Backfilling check annotations (uncapped) ===");
-      await syncCheckAnnotations("backfill");
 
       console.log("\n=== Backfilling job logs (uncapped) ===");
       const logsFetched = await syncJobLogs("backfill");
 
       console.log("\n=== Backfilling compare stats (uncapped) ===");
       const logsParsed = await syncCompareStats("backfill");
+
+      console.log("\n=== Backfilling check annotations (uncapped) ===");
+      await syncCheckAnnotations("backfill");
 
       await SyncLog.create({
         synced_at: new Date().toISOString(),
@@ -2211,21 +2266,20 @@ async function main() {
       console.log("\n=== Syncing PR timeline events ===");
       await syncPrTimelineEvents();
 
-      console.log("\n=== Syncing PR reactions ===");
       await syncPrReactions();
     }
 
     console.log("\n=== Syncing workflow runs ===");
     const runsSynced = await syncWorkflowRuns(fetchMode);
 
-    console.log("\n=== Syncing check annotations ===");
-    await syncCheckAnnotations(fetchMode);
-
     console.log("\n=== Syncing job logs ===");
     const logsFetched = await syncJobLogs(fetchMode);
 
     console.log("\n=== Syncing compare stats from CI logs ===");
     const logsParsed = await syncCompareStats(fetchMode);
+
+    console.log("\n=== Syncing check annotations ===");
+    await syncCheckAnnotations(fetchMode);
 
     await SyncLog.create({
       synced_at: new Date().toISOString(),
@@ -2235,6 +2289,14 @@ async function main() {
     });
 
     await printSummary();
+  } catch (err) {
+    if (err instanceof RateLimitExhaustedError) {
+      console.warn(`\n${err.message}`);
+      console.warn("Run again later to continue syncing remaining data.");
+      await printSummary();
+    } else {
+      throw err;
+    }
   } finally {
     adapter.close();
   }
