@@ -295,8 +295,7 @@ export interface MysqlAdapterOptions extends TrailsAdapterOptions {
   waitTimeout?: number | string;
   // Mirrors: database.yml `variables:` — SET SESSION key = value on each new connection.
   variables?: Record<string, string | number | boolean | null | ":default" | "default">;
-  // Test-only sentinel: skips pool creation so the adapter can be instantiated without a live DB.
-  // @internal
+  /** @internal */
   _fakeConnection?: boolean;
 }
 
