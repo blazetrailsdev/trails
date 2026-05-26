@@ -16,7 +16,7 @@ TSE architecture, API mapping tables), see git history.
 | 5.6   | RenderContext: capture / concat / raw + block-form helpers | #2367 |
 | 5.7   | Layouts and yield                                          | #2369 |
 | 5.8   | Partials: typed render overloads + collection/as/counter   | #2370 |
-| 5.9   | Artifact emission: .js.map, .d.ts, .d.ts.map              | #2382 |
+| 5.9   | Artifact emission: .js.map, .d.ts, .d.ts.map               | #2382 |
 | 5.10  | Ambient `declare module "*.tse"`                           | #2374 |
 | 5.11  | Emitter hygiene CI guard                                   | #2383 |
 | 5.12  | TemplateRegistry augmentation + typed render overload      | #2365 |
