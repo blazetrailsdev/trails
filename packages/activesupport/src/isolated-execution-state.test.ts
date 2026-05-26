@@ -60,4 +60,42 @@ describe("IsolatedExecutionStateTest", () => {
     expect(IsolatedExecutionState.get("outer")).toBe("A");
     expect(IsolatedExecutionState.get("inner")).toBeUndefined();
   });
+
+  it("scope overrides one key and inherits the rest", () => {
+    IsolatedExecutionState.set("a", 1);
+    IsolatedExecutionState.set("b", 2);
+    IsolatedExecutionState.scope("b", 99, () => {
+      expect(IsolatedExecutionState.get("a")).toBe(1);
+      expect(IsolatedExecutionState.get("b")).toBe(99);
+    });
+    expect(IsolatedExecutionState.get("b")).toBe(2);
+  });
+
+  it("scope mutations do not leak to the parent", () => {
+    IsolatedExecutionState.set("x", "original");
+    IsolatedExecutionState.scope("scoped", true, () => {
+      IsolatedExecutionState.set("x", "mutated");
+      expect(IsolatedExecutionState.get("x")).toBe("mutated");
+    });
+    expect(IsolatedExecutionState.get("x")).toBe("original");
+  });
+
+  it("scope preserves the scoped value across await boundaries", async () => {
+    const result = await IsolatedExecutionState.scope("tx", "txA", async () => {
+      await new Promise((r) => setTimeout(r, 1));
+      return IsolatedExecutionState.get("tx");
+    });
+    expect(result).toBe("txA");
+    expect(IsolatedExecutionState.get("tx")).toBeUndefined();
+  });
+
+  it("scope nests correctly", () => {
+    IsolatedExecutionState.scope("level", 1, () => {
+      expect(IsolatedExecutionState.get("level")).toBe(1);
+      IsolatedExecutionState.scope("level", 2, () => {
+        expect(IsolatedExecutionState.get("level")).toBe(2);
+      });
+      expect(IsolatedExecutionState.get("level")).toBe(1);
+    });
+  });
 });

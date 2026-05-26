@@ -10,8 +10,7 @@
 import { Temporal } from "./temporal.js";
 import { Event } from "./notifications/instrumenter.js";
 import type { EventPayload } from "./notifications/instrumenter.js";
-import { getAsyncContext } from "./async-context-adapter.js";
-import type { AsyncContext } from "./async-context-adapter.js";
+import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 export type NotificationSubscriber = {
   readonly pattern: string | RegExp | null;
@@ -31,41 +30,14 @@ type Subscriber = {
 export class Notifications {
   private static _subscribers: Set<Subscriber> = new Set();
 
-  /**
-   * Event-nesting stack, scoped per async context.
-   *
-   * Rails tracks the instrumenter stack per-fiber via
-   * `ActiveSupport::IsolatedExecutionState` — so concurrent events
-   * in different fibers (or in our case, different async chains) can
-   * never pop each other's entries. In Node we need the same guarantee
-   * because `instrumentAsync` awaits user code between push and pop; a
-   * shared process-global array corrupts under `Promise.all(...)` over
-   * instrumented calls (event A pushes → B pushes → A awaits → B
-   * awaits → A pops B's entry).
-   *
-   * Fallback stack is used when no AsyncContext scope is established
-   * (e.g. top-level code before any async hop). Once we're inside an
-   * async chain, `_eventStack()` returns the per-context slot.
-   */
-  private static _fallbackStack: Event[] = [];
-  private static _stackContext: AsyncContext<Event[]> | null = null;
-  private static _stackContextAdapter: ReturnType<typeof getAsyncContext> | null = null;
-
-  private static _getStackContext(): AsyncContext<Event[]> {
-    const adapter = getAsyncContext();
-    if (!this._stackContext || this._stackContextAdapter !== adapter) {
-      this._stackContextAdapter = adapter;
-      this._stackContext = adapter.create<Event[]>();
-    }
-    return this._stackContext;
-  }
+  private static readonly _STACK_KEY = Symbol.for("as_notification_instrumenter");
 
   private static _eventStack(): Event[] {
-    return this._getStackContext().getStore() ?? this._fallbackStack;
+    return IsolatedExecutionState.fetch<Event[]>(this._STACK_KEY, () => []);
   }
 
   private static _runWithStack<T>(stack: Event[], fn: () => T): T {
-    return this._getStackContext().run(stack, fn);
+    return IsolatedExecutionState.scope(this._STACK_KEY, stack, fn);
   }
 
   // -------------------------------------------------------------------------
