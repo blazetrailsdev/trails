@@ -16,40 +16,18 @@
  * scope has been opened so existing unit-level tests keep working.
  */
 
-import { IsolatedExecutionState, getAsyncContext } from "@blazetrails/activesupport";
-import type { AsyncContext } from "@blazetrails/activesupport";
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
 
 const REGISTRY_KEY = "active_record_explain_registry";
+const SLOT_KEY = Symbol.for("ar_explain_registry_slot");
 
 interface Slot {
   collect: boolean;
   queries: [string, unknown[]][];
 }
 
-function newSlot(): Slot {
-  return { collect: false, queries: [] };
-}
-
-// Process-global fallback: used when no AsyncContext scope is active.
-// Matches the RuntimeRegistry / connectedToStack pattern elsewhere in
-// the codebase — per-request isolation requires wrapping in
-// `collectingQueries(fn)`; outside that wrapper, state is shared.
-const _fallback: Slot = newSlot();
-
-let _context: AsyncContext<Slot> | null = null;
-let _contextAdapter: ReturnType<typeof getAsyncContext> | null = null;
-
-function ctx(): AsyncContext<Slot> {
-  const adapter = getAsyncContext();
-  if (!_context || _contextAdapter !== adapter) {
-    _contextAdapter = adapter;
-    _context = adapter.create<Slot>();
-  }
-  return _context;
-}
-
 function currentSlot(): Slot {
-  return ctx().getStore() ?? _fallback;
+  return IsolatedExecutionState.fetch<Slot>(SLOT_KEY, () => ({ collect: false, queries: [] }));
 }
 
 export class ExplainRegistry {
@@ -96,13 +74,11 @@ export class ExplainRegistry {
   ): Promise<{ value: T; queries: [string, unknown[]][] }> {
     const slot: Slot = { collect: true, queries: [] };
     try {
-      const value = await ctx().run(slot, fn);
+      const value = await IsolatedExecutionState.scope(SLOT_KEY, slot, fn);
       return { value, queries: [...slot.queries] };
     } finally {
-      // Tear the scope's state down even on throw / cancellation so any
-      // late subscriber notifications that still hold a reference to the
-      // slot via the AsyncContext don't keep accumulating into a logical
-      // explain block the caller has already abandoned.
+      // Clear the slot so late subscriber notifications holding a reference
+      // to it don't keep accumulating into an abandoned explain block.
       slot.collect = false;
       slot.queries = [];
     }

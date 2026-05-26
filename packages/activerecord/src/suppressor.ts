@@ -5,32 +5,10 @@
  * Mirrors: ActiveRecord::Suppressor
  */
 
-import { IsolatedExecutionState, getAsyncContext } from "@blazetrails/activesupport";
-import type { AsyncContext } from "@blazetrails/activesupport";
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
-const SUPPRESSOR_REGISTRY_KEY = "active_record_suppressor_registry";
-
-/**
- * Per-async-scope override layer used by `suppress()` so concurrent
- * `Promise.all` branches don't leak suppression state into each other.
- * `registry()` returns the override if a scope is active, otherwise the
- * per-context bag from `IsolatedExecutionState` (mirroring Rails'
- * `Suppressor.registry`).
- *
- * `Object.create(null)` avoids `__proto__`/`constructor` foot-guns.
- */
-let _scopeOverride: AsyncContext<Record<string, true | undefined>> | null = null;
-let _scopeAdapter: ReturnType<typeof getAsyncContext> | null = null;
-
-function scopeOverride(): AsyncContext<Record<string, true | undefined>> {
-  const adapter = getAsyncContext();
-  if (!_scopeOverride || _scopeAdapter !== adapter) {
-    _scopeAdapter = adapter;
-    _scopeOverride = adapter.create<Record<string, true | undefined>>();
-  }
-  return _scopeOverride;
-}
+const SUPPRESSOR_REGISTRY_KEY = Symbol.for("ar_suppressor_registry");
 
 /**
  * Get the suppressor registry for the current async scope. Returns the
@@ -41,12 +19,9 @@ function scopeOverride(): AsyncContext<Record<string, true | undefined>> {
  * Mirrors: ActiveRecord::Suppressor.registry
  */
 export function registry(): Record<string, true | undefined> {
-  return (
-    scopeOverride().getStore() ??
-    IsolatedExecutionState.fetch(
-      SUPPRESSOR_REGISTRY_KEY,
-      () => Object.create(null) as Record<string, true | undefined>,
-    )
+  return IsolatedExecutionState.fetch(
+    SUPPRESSOR_REGISTRY_KEY,
+    () => Object.create(null) as Record<string, true | undefined>,
   );
 }
 
@@ -71,7 +46,7 @@ export async function suppress<R>(modelClass: typeof Base, fn: () => R | Promise
   const child: Record<string, true | undefined> = Object.create(null);
   Object.assign(child, parent);
   child[name] = true;
-  return await scopeOverride().run(child, fn);
+  return await IsolatedExecutionState.scope(SUPPRESSOR_REGISTRY_KEY, child, fn);
 }
 
 /**

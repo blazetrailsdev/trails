@@ -1,8 +1,8 @@
-import { getAsyncContext, type AsyncContext } from "@blazetrails/activesupport";
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
 
 let _contextIdCounter = 0;
-let _contextStorage: AsyncContext<number> | null = null;
 
+const CONTEXT_ID_KEY = Symbol.for("ar_execution_context_id");
 const _exitHooks: ((contextId: string) => void)[] = [];
 
 /** @internal */
@@ -12,10 +12,7 @@ export function registerContextExitHook(hook: (contextId: string) => void): void
 
 /** @internal */
 export function executionContextId(): number {
-  if (!_contextStorage) {
-    _contextStorage = getAsyncContext().create<number>();
-  }
-  return _contextStorage.getStore() ?? 0;
+  return IsolatedExecutionState.get<number>(CONTEXT_ID_KEY) ?? 0;
 }
 
 /**
@@ -26,15 +23,12 @@ export function executionContextId(): number {
  * `IsolatedExecutionState.context`.
  */
 export function withExecutionContext<T>(fn: () => T): T {
-  if (!_contextStorage) {
-    _contextStorage = getAsyncContext().create<number>();
-  }
   const id = ++_contextIdCounter;
   const runHooks = () => {
     const key = String(id);
     for (const hook of _exitHooks) hook(key);
   };
-  return _contextStorage.run(id, () => {
+  return IsolatedExecutionState.scope(CONTEXT_ID_KEY, id, () => {
     let result: T;
     try {
       result = fn();
@@ -44,7 +38,7 @@ export function withExecutionContext<T>(fn: () => T): T {
     }
     if (result && typeof (result as unknown as PromiseLike<unknown>).then === "function") {
       // Wrap via Promise.resolve so bare PromiseLike thenables (which only
-      // need to implement `then`) still get a `.finally` to attach the hook.
+      // need `then`) still get `.finally` for the exit hook.
       return Promise.resolve(result as unknown as PromiseLike<unknown>).finally(
         runHooks,
       ) as unknown as T;
