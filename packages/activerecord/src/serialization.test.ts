@@ -8,84 +8,139 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
 
-let Contact: typeof Base;
-
 beforeAll(async () => {
   await defineSchema({
-    contacts: { name: "string", age: "integer", created_at: "string" },
+    contacts: {
+      name: "string",
+      age: "integer",
+      avatar: "string",
+      created_at: "string",
+      awesome: "boolean",
+      preferences: "string",
+      alternative_id: "integer",
+    },
+    books: { format: "string", name: "string" },
     authors: { name: "string" },
     serialized_posts: { author_id: "integer", title: "string" },
   });
-  Contact = class Contact extends Base {
-    static {
-      this._tableName = "contacts";
-      this.attribute("id", "integer");
-      this.attribute("name", "string");
-      this.attribute("age", "integer");
-      this.attribute("created_at", "string");
-    }
-  };
 });
 
+const contactAttributes = {
+  name: "aaron stack",
+  age: 25,
+  avatar: "binarydata",
+  created_at: "2006-08-01",
+  awesome: false,
+  preferences: '{"gem":"<strong>ruby</strong>"}',
+  alternative_id: null as number | null,
+};
+
 describe("SerializationTest", () => {
+  function makeContact() {
+    class Contact extends Base {
+      static {
+        this._tableName = "contacts";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.attribute("avatar", "string");
+        this.attribute("created_at", "string");
+        this.attribute("awesome", "boolean");
+        this.attribute("preferences", "string");
+        this.attribute("alternative_id", "integer");
+      }
+    }
+    return Contact;
+  }
+
   it("include root in json is false by default", () => {
-    expect((Contact as any).includeRootInJson).toBeFalsy();
+    expect((Base as any).includeRootInJson).toBe(false);
   });
 
-  it("serialize should be reversible", async () => {
-    const contact = await Contact.create({ name: "David", age: 30 });
-    const json = contact.toJson();
-    const parsed = JSON.parse(json);
-    expect(parsed.name).toBe("David");
-    expect(parsed.age).toBe(30);
+  it("serialize should be reversible", () => {
+    const Contact = makeContact();
+    const serialized = new Contact().toJson();
+    const contact = new Contact().fromJson(serialized);
+    const keys = Object.keys(contactAttributes).map(String).sort();
+    const attrs = Object.keys(contact.attributes).sort();
+    expect(attrs).toEqual(expect.arrayContaining(keys));
   });
 
-  it("serialize should allow attribute only filtering", async () => {
-    const contact = await Contact.create({ name: "David", age: 30 });
-    const hash = contact.serializableHash({ only: ["name"] });
-    expect(hash.name).toBe("David");
-    expect(hash.age).toBeUndefined();
+  it("serialize should allow attribute only filtering", () => {
+    const Contact = makeContact();
+    const serialized = new Contact(contactAttributes).toJson({ only: ["age", "name"] });
+    const contact = new Contact().fromJson(serialized);
+    expect(contact.name).toBe(contactAttributes.name);
+    expect(contact.avatar).toBeNull();
   });
 
-  it("serialize should allow attribute except filtering", async () => {
-    const contact = await Contact.create({ name: "David", age: 30 });
-    const hash = contact.serializableHash({ except: ["age"] });
-    expect(hash.name).toBe("David");
-    expect(hash.age).toBeUndefined();
+  it("serialize should allow attribute except filtering", () => {
+    const Contact = makeContact();
+    const serialized = new Contact(contactAttributes).toJson({ except: ["age", "name"] });
+    const contact = new Contact().fromJson(serialized);
+    expect(contact.name).toBeNull();
+    expect(contact.age).toBeNull();
+    expect(contact.awesome).toBe(contactAttributes.awesome);
   });
 
-  it("include root in json allows inheritance", async () => {
-    (Contact as any).includeRootInJson = true;
+  it("include root in json allows inheritance", () => {
+    const originalRootInJson = (Base as any).includeRootInJson;
     try {
-      const Sub = class extends Contact {};
-      Sub._tableName = "contacts";
-      const contact = await Sub.create({ name: "David", age: 30 });
-      const json = contact.asJson();
-      const keys = Object.keys(json);
-      expect(keys.length).toBe(1);
+      (Base as any).includeRootInJson = true;
+
+      const klazz = class extends Base {
+        static {
+          this._tableName = "contacts";
+        }
+      };
+      expect((klazz as any).includeRootInJson).toBe(true);
+
+      (klazz as any).includeRootInJson = false;
+      expect((Base as any).includeRootInJson).toBe(true);
+      expect((klazz as any).includeRootInJson).toBe(false);
     } finally {
-      (Contact as any).includeRootInJson = false;
+      (Base as any).includeRootInJson = originalRootInJson;
     }
   });
 
-  it("read attribute for serialization with format without method missing", async () => {
-    const contact = await Contact.create({ name: "David", age: 30 });
-    const hash = contact.serializableHash();
-    expect(hash.name).toBe("David");
+  it("read attribute for serialization with format without method missing", () => {
+    class Book extends Base {
+      static {
+        this._tableName = "books";
+        this.attribute("id", "integer");
+        this.attribute("format", "string");
+        this.attribute("name", "string");
+      }
+    }
+    const book = new Book();
+    expect(book.readAttribute("format")).toBeNull();
   });
 
   it("read attribute for serialization with format after init", () => {
-    const contact = new Contact({ name: "David", age: 30 });
-    const hash = contact.serializableHash();
-    expect(hash.name).toBe("David");
-    expect(hash.age).toBe(30);
+    class Book extends Base {
+      static {
+        this._tableName = "books";
+        this.attribute("id", "integer");
+        this.attribute("format", "string");
+        this.attribute("name", "string");
+      }
+    }
+    const book = new Book({ format: "paperback" });
+    expect(book.readAttribute("format")).toBe("paperback");
   });
 
   it("read attribute for serialization with format after find", async () => {
-    const created = await Contact.create({ name: "David", age: 30 });
-    const found = await Contact.find(created.id);
-    const hash = found.serializableHash();
-    expect(hash.name).toBe("David");
+    class Book extends Base {
+      static {
+        this._tableName = "books";
+        this.attribute("id", "integer");
+        this.attribute("format", "string");
+        this.attribute("name", "string");
+      }
+    }
+    const created = await Book.create({ format: "paperback" });
+    const book = await Book.find(created.id);
+    expect(book.readAttribute("format")).toBe("paperback");
   });
 
   it("find records by serialized attributes through join", async () => {
