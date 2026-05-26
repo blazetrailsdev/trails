@@ -140,6 +140,7 @@ export class IntegrationTest {
     this.session = {};
     this._persistentCookies = {};
     this._cookieJar = undefined;
+    this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
     this.controller = undefined!;
     this.request = undefined!;
@@ -382,9 +383,10 @@ export class IntegrationTest {
 
   /**
    * Lazy-cached parsed document for the last response body. Returns an
-   * `XML::Document` when the response content-type ends with `xml`, otherwise
-   * an HTML document (rails-dom-testing). Invalidated at the start of each
-   * new request. Mirrors `ActionDispatch::Assertions#html_document`.
+   * `XML::Document` when the response content-type ends with `xml`; throws
+   * for other mime types (HTML parsing via rails-dom-testing is not yet
+   * implemented). Invalidated at the start of each new request.
+   * Mirrors `ActionDispatch::Assertions#html_document`.
    */
   get htmlDocument(): XmlDocument {
     if (!this._htmlDocument) {
@@ -844,6 +846,7 @@ export class IntegrationTest {
     // including down the no-route 404 path.
     this._cookieJar = undefined;
     this._urlOptions = undefined;
+    this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
 
     // Split path into PATH_INFO + QUERY_STRING; Rack stores them separately.
