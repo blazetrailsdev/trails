@@ -244,3 +244,36 @@ export class PoolConfig {
     this._schemaCache = null;
   }
 }
+
+/**
+ * Adapter-level options that travel alongside driver connection
+ * params in a single config hash (Rails' database.yml shape).
+ *
+ * Mirrors: the adapter-level keys read in
+ * `ActiveRecord::ConnectionAdapters::AbstractAdapter#initialize`.
+ */
+export interface TrailsAdapterOptions {
+  statementLimit?: number;
+  preparedStatements?: boolean;
+  insertReturning?: boolean;
+}
+
+export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
+  readonly?: boolean;
+  driver?: string | import("@blazetrails/activesupport/sqlite-adapter").SqliteDriver;
+  pragmas?: Record<string, string | number | boolean>;
+  strict?: boolean;
+}
+
+export interface MysqlAdapterOptions extends TrailsAdapterOptions {
+  strict?: boolean | "default";
+  waitTimeout?: number | string;
+  variables?: Record<string, string | number | boolean | null | ":default" | "default">;
+  /** @internal */
+  _fakeConnection?: boolean;
+}
+
+export interface PostgreSQLAdapterOptions extends TrailsAdapterOptions {
+  minMessages?: string;
+  variables?: Record<string, string | number | boolean | null | "default">;
+}

@@ -8,7 +8,7 @@ import type pg from "pg";
 import { PreparedStatementCacheExpired } from "../../errors.js";
 import type { Type } from "@blazetrails/activemodel";
 import type { Nodes } from "@blazetrails/arel";
-import type { ExplainOption } from "../../adapter.js";
+import type { ExplainOption } from "../abstract/database-statements.js";
 import { Result } from "../../result.js";
 
 // Mirrors: PostgreSQL::DatabaseStatements::READ_QUERY (database_statements.rb:19-21)

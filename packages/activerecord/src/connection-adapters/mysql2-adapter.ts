@@ -1,7 +1,9 @@
 import mysql from "mysql2/promise";
 import { Notifications } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import type { DatabaseAdapter, ExplainOption, MysqlAdapterOptions } from "../adapter.js";
+import type { DatabaseAdapter } from "../adapter.js";
+import type { ExplainOption } from "./abstract/database-statements.js";
+import type { MysqlAdapterOptions } from "./pool-config.js";
 import {
   AbstractMysqlAdapter,
   StatementPool as MysqlStatementPool,
