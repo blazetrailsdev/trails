@@ -1,5 +1,14 @@
 # Fixtures adoption plan
 
+> **Status (2026-05-26):**
+>
+> - Canary conversions shipped: **PR #2318** (`boolean.test.ts`, PoC), **PR #2391** (`type/string.test.ts` + `coders/json.test.ts`, first batch).
+> - Phase B canary outcome: pattern works; the cleaner-than-Rails "import canonical model + local subclass for test-specific traits" shape emerged as the template.
+> - Empirical yield from #2391: of 25 currently D-1 migrated files, **only 2 (~8%) cleanly converted**. Remaining 23 hit bespoke models / test-specific class mods / non-fixture setup / schema incompatibility.
+> - **D-1 progress is the true gate.** Phase G can only target D-1'd files. With ~87 files still bypass-ridden after PR #2400, the convertible pool grows as D-1 codemod sweeps land.
+> - D-Y (#2372) absorbed most of what Phase E was supposed to enable for fixture seeding — the "blocks on Phase E" sequencing decision is obsolete.
+> - Phase B "Spike S1" worker-level seeding still relevant but lower urgency; per-test seed works fine in the canary PRs.
+
 Tracks migrating the existing AR test suite from inline `defineSchema()` +
 ad-hoc `Model.create({...})` seeding to `useFixtures([...])` against the
 122 ported fixtures under
@@ -11,15 +20,15 @@ a separate plan doc"). This is that doc.
 
 ## Decisions (locked in 2026-05-22)
 
-| #   | Decision                                                                                              | Rationale                                                                                                                                                                                                           |
-| --- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Scope:** every AR test whose Rails counterpart calls `fixtures(:foo)`                               | Mirrors Rails line-for-line where Rails has a counterpart; eliminates the inline-seed surface where TM Phase 6 hazards keep tripping                                                                                |
-| 2   | **Aggressiveness:** per file, rewrite BOTH setup AND test body to mirror the Rails counterpart        | Drives `test:compare` matches as a side effect; setup-only would leave assertions diverged                                                                                                                          |
-| 3   | **Sequencing:** Phase B canary blocks on pool epic Phase E                                            | Pinned-connection-per-test is the natural home for `setup_fixtures`-shaped load-once-per-worker; doing this before would either preserve the AsyncContext sidecar across the conversion or be reworked when E lands |
-| 4   | **Batching:** by loader-readiness tier, not by test-directory cluster                                 | A test-directory sweep would block on whichever file hits the worst loader gap; tiering ships clean files first and unblocks the rest with surgical loader PRs                                                      |
-| 5   | **DIFF / ERB-UNSUPPORTED fixtures don't block consumers**                                             | If a test only references the rows that ARE comparable in `fixtures:compare`, the file is adoptable now; fixtures-port PR 7b (strict-fail) is independent                                                           |
-| 6   | **Files whose Rails counterpart inlines `Model.create` (no fixtures)** stay out of scope for adoption | The Phase F lint rule keys on `test:compare` membership AND Rails fixture usage; non-fixture-using counterparts aren't penalized                                                                                    |
-| 7   | **`useFixtures` runs once per worker, not per test, post-pool E**                                     | Matches Rails `setup_fixtures` semantics; tests roll back their writes via `withTransactionalFixtures`, fixture data remains. Implementation hook lands as Spike S1 (Prerequisites, below).                         |
+| #   | Decision                                                                                              | Rationale                                                                                                                                                                                                                                                                                          |
+| --- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Scope:** every AR test whose Rails counterpart calls `fixtures(:foo)`                               | Mirrors Rails line-for-line where Rails has a counterpart; eliminates the inline-seed surface where TM Phase 6 hazards keep tripping                                                                                                                                                               |
+| 2   | **Aggressiveness:** per file, rewrite BOTH setup AND test body to mirror the Rails counterpart        | Drives `test:compare` matches as a side effect; setup-only would leave assertions diverged                                                                                                                                                                                                         |
+| 3   | ~~**Sequencing:** Phase B canary blocks on pool epic Phase E~~ **OBSOLETE 2026-05-26**                | D-Y (#2372) shipped canonical schema preload + additive `defineSchema`, absorbing most of what Phase E was supposed to enable. Canary shipped before E (#2318, #2391). Phase E remains required for the worker-level Spike S1 seeding optimization but is no longer a hard gate for adoption work. |
+| 4   | **Batching:** by loader-readiness tier, not by test-directory cluster                                 | A test-directory sweep would block on whichever file hits the worst loader gap; tiering ships clean files first and unblocks the rest with surgical loader PRs                                                                                                                                     |
+| 5   | **DIFF / ERB-UNSUPPORTED fixtures don't block consumers**                                             | If a test only references the rows that ARE comparable in `fixtures:compare`, the file is adoptable now; fixtures-port PR 7b (strict-fail) is independent                                                                                                                                          |
+| 6   | **Files whose Rails counterpart inlines `Model.create` (no fixtures)** stay out of scope for adoption | The Phase F lint rule keys on `test:compare` membership AND Rails fixture usage; non-fixture-using counterparts aren't penalized                                                                                                                                                                   |
+| 7   | **`useFixtures` runs once per worker, not per test, post-pool E**                                     | Matches Rails `setup_fixtures` semantics; tests roll back their writes via `withTransactionalFixtures`, fixture data remains. Implementation hook lands as Spike S1 (Prerequisites, below).                                                                                                        |
 
 ## Prerequisites (must land before Phase B)
 
@@ -80,33 +89,59 @@ inventory script under `scripts/fixtures-adoption/` + the generated
   classified; "unmapped Rails counterpart" appears as `tier=4-unmapped`
   not silently dropped
 
-## Phase B — Canary conversion (1 file, target ≤300 LOC)
+## Phase B — Canary conversion — **SHIPPED**
 
-**File selection rule** (mechanical, not "pick the cleanest"):
-the Tier 1 file with the **smallest LOC delta** between TS and Rails
-counterpart, AND that consumes ≥3 distinct fixture tables (so the
-accessor pattern is exercised across multiple fixtures, not trivially).
-Top candidate from manual look: a small file under `relation/` or
-`finder-respond-to.test.ts`; final pick comes from Phase A inventory.
+Shipped in two PRs:
 
-**Per-PR deliverables:**
+- **PR #2318** — `boolean.test.ts`. Single-file PoC, established the
+  base pattern: drop inline `defineSchema()`, import canonical model
+  (or use it as a parent for a local subclass when test-specific traits
+  are needed), call `useFixtures({...})` at top, convert assertions to
+  fixture-ref ids.
+- **PR #2391** — `type/string.test.ts` + `coders/json.test.ts`.
+  Validated the "canonical parent + local subclass" pattern for
+  tests that need extra attributes/serializers beyond canonical.
 
-- Spike S1 is already merged (separate PR per Prerequisites)
-- Inline `Model.create` / `defineSchema` setup deleted from the canary file
-- Top-of-file `const { authors, posts } = useFixtures({...})`
-- Test bodies rewritten to call `authors("david")`-style accessors and
-  assert literal Rails ids/counts where the Rails source does
-- **Test names unchanged** (CLAUDE.md: never rename tests)
-- A new section in this doc, "Canary pattern," capturing the worked
-  shape for batch PRs to reference
+### Canary pattern (worked shape)
 
-**Success criteria:**
+For a file currently inlining `class X extends Base {}`:
 
-- `test:compare` shows the canary file's match-rate increased; no
-  regressions elsewhere
-- Local `pnpm vitest run <canary-file>` green on sqlite3 + PG + MySQL
-  (PG/MySQL via CI legs; do not run full suite locally per CLAUDE.md)
-- Spike S1 hook is generic — no canary-file-specific code
+```ts
+// before
+class StringTestAuthor extends Base {
+  static {
+    this.adapter = adapter;
+    this.attribute("name", "string");
+  }
+}
+let author: StringTestAuthor;
+beforeEach(async () => {
+  author = await StringTestAuthor.create({ name: "Sean" });
+});
+
+// after — pattern from #2391
+import { Author } from "../test-helpers/models/author.js";
+class StringTestAuthor extends Author {
+  static {
+    this.attribute("name", "string");
+  } // explicit attr generates nameChanged()
+}
+const { authors } = useFixtures({ authors: [StringTestAuthor, { sean: { name: "Sean" } }] });
+// in test body: StringTestAuthor.find(authors("sean").id)
+```
+
+Key insights from the canary PRs:
+
+1. **Canonical-as-parent works well** when the test needs validations/
+   serializers the canonical doesn't have. Avoids fighting schema mismatch.
+2. **Schema-reflected attributes don't auto-generate dynamic dirty methods**
+   (e.g. `nameChanged()`) — declare via `this.attribute("name", "string")`
+   inside the local subclass when the test exercises them.
+3. **D-Y absorbs `defineSchema` calls** for canonical-compatible schemas;
+   converted files drop `defineSchema` entirely when their tables are all
+   in canonical.
+4. **`vi.stubEnv("AR_NO_AUTO_SCHEMA")`** patterns can be dropped — D-Y
+   handles the orchestration.
 
 ## Phase C — Tier 1 sweep (batches of ~250 LOC)
 
@@ -148,7 +183,7 @@ gate, cluster is just batch-packing.
 
 ## Phase D — Loader gap PRs + Tier 2 → 1 promotion
 
-Each open loader gap from the fixtures port becomes a pair of
+Each open loader gap from `fixtures-port-plan.md` becomes a pair of
 PRs: the loader fix + the Tier 2 → 1 batch it unlocks. Shipped in this
 order to keep diffs small:
 
@@ -217,27 +252,46 @@ pattern has been reused across 20+ batch PRs:
 - 0 `Model.create` inside `beforeAll`/`beforeEach` in non-allowlisted
   files
 
-## Sizing estimate (derivation, not magic numbers)
+## Sizing estimate (updated 2026-05-26 with empirical yield)
 
 Inputs (verified against the worktree):
 
-- 490 total AR test files (`find packages/activerecord/src -name '*.test.ts' | wc -l`)
-- 159 already on `withTransactionalFixtures` / `defineSchema`
-- 122 fixtures translated (fixtures port — complete)
-- 94 fixtures currently MATCH under `fixtures:compare`
+- 492 total AR test files
+- 195 with inline `class X extends Base` (Phase G candidates)
+- 215 canonical models ported (all clusters complete; see models-port project)
+- 122 fixtures translated; hard-fail gate live
+- D-1 backlog: **87 files still containing `this.adapter = adapter`** (was 200+ at pivot; 47 cleared by 5 codemod variants; 16 fully + 20 partial from #2400 most recent)
 
-Rough projection (refined in Phase A):
+### Empirical yield from canary PRs
 
-- **~120–150 files** have Rails counterparts using fixtures (estimate
-  from test:compare mapping density; Phase A makes this exact)
-- **~70–90 Tier 1** at start (clean fixtures + no loader gap) → ~12–18
-  batch PRs at the 250-LOC ceiling, plus 1 canary
-- **~20–30 Tier 2** at start → 4 loader PRs + 4 batch PRs as gaps close
-- **~10–20 Tier 3** → ~10–20 small bespoke PRs over a longer tail
+PR #2391 (the first multi-file batch) attempted 25 candidate files
+(those already D-1 migrated) and **converted 2 cleanly (~8%)**. The
+23 it couldn't convert hit one of: bespoke models not in canonical
+(Metric/Invoice/Event), test-specific class modifications (validations,
+serialize), no DB operations (only `new Model()`), or schema
+incompatibility with canonical.
 
-**Total PR count: ~30–45.** Wall-clock dominated by review cycles, not
-LOC. Assume 2–4 weeks for Phase C steady-state once pool E lands and
-the canary pattern is settled.
+### Revised projection
+
+- **D-1 is the true gate.** Phase G can only operate on D-1'd files.
+  As D-1 codemod sweeps land (2 in flight: partial-finisher, PG/MySQL
+  variant), the convertible pool grows.
+- **~8% yield** holds as a working estimate. If 87 → 50 remaining D-1
+  files after current sweeps, with ~150 files total addressed, the
+  Phase G convertible pool is **~12-15 files**, not 70-90.
+- **Most "inline-class" test files stay inline** because their classes
+  are test-local inventions (Widget/Gizmo/Holdable) with no canonical
+  counterpart. Those benefit from D-Y's `defineSchema` no-op fast-path
+  and D-Z's `dropAllTables` elimination but don't convert to fixtures.
+- Long-tail bespoke conversions (Tier 3 equivalents) likely 10-20 more
+  files where Phase G's pattern needs adaptation per-file.
+
+### Revised total
+
+**~15-25 Phase G PRs total**, not 30-45. Cycle-time wins come
+predominantly from D-Y + D-Z infra, not from Phase G adoption. The
+adoption work mostly serves Rails-parity (assertions mirror Rails)
+rather than performance.
 
 ## Risks
 
@@ -253,11 +307,9 @@ the canary pattern is settled.
    score _worse_ on `test:compare` than the pre-conversion version
    because TS-only assertions hide what's missing. Mitigate: Decision
    2 (no setup-only conversions); each file ships fully or not at all.
-3. **Pool E slippage blocks Phase B.** If pool epic Phase D drags
-   (currently 1 batch in flight, 4–8 more expected), this plan
-   stalls. Mitigate: Phase A (inventory) is fully unblocked and ships
-   while pool D runs. Doesn't reduce wall-clock but keeps the queue
-   warm.
+3. ~~**Pool E slippage blocks Phase B.**~~ **OBSOLETE 2026-05-26** —
+   D-Y (#2372) absorbed the relevant infra; Phase B canary shipped
+   (#2318, #2391) before E.
 4. **Loader-gap discovery during Phase C.** Phase A's static analysis
    may miss runtime-only loader gaps that only fail when a specific
    row inserts. Mitigate: each batch PR runs the affected files
@@ -269,31 +321,13 @@ the canary pattern is settled.
    toward the 300-LOC ceiling; consider paths-filter narrowing if
    minutes get noisy.
 
-## Post-merge follow-ups
-
-**From #2391 (Phase G batch 1 — first 2 D-1 migrated files)**
-
-Only 2 of the 25 D-1 migrated files in #2397 met fixture-adoption criteria
-(compatible schema + all fixtures MATCH + no loader gap). The other 23 are
-blocked on:
-
-- Schema-reflected attributes don't generate dirty-tracking methods (~20 LOC
-  in `model-schema.ts`; tracked in connection-pooled-test-adapter-plan.md).
-  This is the primary gate — it blocks ~23 candidate files from reaching Tier 1.
-- Remaining D-1 codemod variants (multi-describe, sidecar, adapter-specific
-  files) haven't been migrated yet; Phase G can't adopt those files until
-  their pool wiring is in place.
-
-Status note: Phase G is in flight but at ~8% of target scope until the
-schema-reflected dirty-tracking gap and remaining D-1 variants land.
-
 ## Cross-references
 
-- fixtures port (complete) — the data substrate;
+- `fixtures-port-plan.md` (completed, deleted) — the data substrate;
   Loader gaps section feeds Phase D's pairings
 - [`connection-pooled-test-adapter-plan.md`](connection-pooled-test-adapter-plan.md)
   — Phase E gates this plan's Phase B
-- [`tm-unification-plan.md`](tm-unification-plan.md) Phase 6 hazard
+- `tm-unification-plan.md` (completed, deleted) Phase 6 hazard
   catalogue — Tier 3 files inherit those hazards
 - `vendor/rails/activerecord/test/cases/` — the Rails counterparts
   whose test bodies and assertions this plan mirrors

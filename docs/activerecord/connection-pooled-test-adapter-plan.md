@@ -1,13 +1,18 @@
 # Connection-pooled test adapter — Rails-parity epic
 
-> **Status (2026-05-22):** Phase A0 spike resolved; Phase B/C shipped
-> (#2242/#2245). Phase D sweep in flight (batch 1: #2250/#2253; expect
-> 4–8 more batches). Phase E open (gated on D). Phase F open; bundles
-> with TM Phase 9b-4 per
-> [`activerecord-index.md`](activerecord-index.md).
+> **Status (2026-05-26):**
 >
-> Future-tense narratives below predate Phase B/C; treat them as design
-> reference. Live phase state lives in the index.
+> - A0 spike, B (#2242), C (#2245): shipped
+> - **D-X driver-pool collapse:** PG (#2279) + MySQL (#2278) — shipped. All three adapters now single-connection per adapter, Rails-shape.
+> - **D-Y central canonical schema:** #2372 shipped. Per-worker preload + additive `defineSchema` fast-path. ~18 sites annotated `D-Y-INCOMPATIBLE`.
+> - **D-1..N bypass elimination (Model.adapter = X):** in flight via 7 codemod variants + finisher (#2296, #2315, #2319, #2397, #2400, #2419, #2420). **70 files fully cleared cumulatively; 65 remaining.** Next bottleneck: 3 giant files (calculations 216 sites, finder 97, inheritance 87) need bespoke surgery PRs.
+> - Phase E (delete singleton/AsyncContext filter): gated on D-1..N reaching critical mass.
+> - Phase F (move DDL tracking onto AbstractAdapter): open; bundles with TM Phase 9b-4 absorption.
+> - Phase G (fixture adoption): batch 1 shipped (#2391, 2 files). Tracked separately in [`fixtures-adoption-plan.md`](fixtures-adoption-plan.md).
+>
+> Future-tense narratives below predate the pivot; treat as design
+> reference. Live D-1..N sizing has shifted from "10 batches" to "long
+> tail of bespoke surgery"; see Phase D section below.
 
 Epic to retire `_sharedAdapter` (the module-level singleton currently
 shared across every test in a worker) in favor of a connection-pool-
@@ -17,7 +22,7 @@ trails' `AsyncContext`-based TX visibility filter — Rails doesn't need
 that filter because each chain naturally owns its connection.
 
 This is a follow-up to the TM unification plan
-([`tm-unification-plan.md`](tm-unification-plan.md)). Phase 9b-4 +
+(`tm-unification-plan.md` (completed, deleted)). Phase 9b-4 +
 the post-Phase-9 path-2 cleanup carry chain-isolation in the
 `TestAdapterFixtures` / `SidecarFixtures` wrapper as a temporary
 trails-specific patch over the shared-adapter pattern. This epic
@@ -96,7 +101,7 @@ After this lands:
 
 ## Interaction with the fixtures port
 
-The fixtures port (complete) is
+The fixtures port (`fixtures-port-plan.md` (completed, deleted)) is
 running in parallel and reshapes the test-data substrate trails uses.
 Key intersections:
 
@@ -228,12 +233,97 @@ loses the `_txLockStorage`/`_manualTxDepth` mechanisms — they're no
 longer needed because chain isolation is implicit in the pinned
 connection. The fixtures handle keeps only DDL tracking.
 
-### Phase D — Migrate the rest of the test suite (~200-400 LOC)
+### Phase D — Eliminate `Model.adapter = X` bypass + cycle-time wins
 
-Sweep every test file that uses `createTestAdapter()` to use the
-pooled factory. Most files don't care — they just need a working
-adapter. Files that exercised singleton semantics (Phase A audit's
-inventory) need explicit migration.
+Pivoted 2026-05-22 from "swap createTestAdapter callers" to "tests
+resolve adapter via `Base.connectionHandler` matching Rails." Has
+split into sub-phases:
+
+#### D-X — collapse driver-side connection pools — **shipped**
+
+Per-adapter inner pool collapsed to a single persistent driver
+connection, matching Rails' `@raw_connection`. PG #2279, MySQL #2278.
+SQLite already single-connection. This unblocked all subsequent work
+by closing cross-file pollution (#2278 also fixed `truncateAllTables`'s
+silent `_driverPool` no-op).
+
+#### D-Y — central canonical schema — **shipped (#2372)**
+
+Canonical fixture schema preloads once per worker. `defineSchema(s)`
+becomes a no-op fast-path when `s` is a subset of canonical. Additive
+for new tables; conflict → file gets a `D-Y-INCOMPATIBLE` skip (18 sites
+across 8 files; resolution path is Phase G fixture adoption).
+
+#### D-1..N — drop `Model.adapter = X` per test file — **in flight**
+
+Each test file currently has `static { this.adapter = adapter }` blocks
+that bypass `Base.connectionHandler`. D-1..N migrates them to the
+Rails-shape pattern PR #2286 established (`setupHandlerSuite()` +
+`defineSchema(s)` single-arg + explicit `this.attribute(...)` per
+[[project_pool_epic_d_handler_sqlite_constraint]]).
+
+**Codemod fleet + finisher (7 PRs shipped):**
+
+| PR    | Variant                             | Files cleared     |
+| ----- | ----------------------------------- | ----------------- |
+| #2296 | standard shape                      | 6                 |
+| #2315 | + describe-level + imports          | 3                 |
+| #2319 | sidecar                             | 11                |
+| #2397 | bulk run across all codemods        | 11                |
+| #2400 | multi-describe (per-describe)       | 16 (+ 20 partial) |
+| #2419 | PG/MySQL adapter-factory            | 13                |
+| #2420 | partial-transform finisher (manual) | 10                |
+
+**Cumulative: ~70 files fully cleared. ~65 files remaining.**
+
+### Remaining buckets (post #2419 / #2420)
+
+**Three giants — bespoke surgery PRs (~400 bypass sites combined):**
+
+| File                   | Sites | LOC  | Notes                                                           |
+| ---------------------- | ----- | ---- | --------------------------------------------------------------- |
+| `calculations.test.ts` | 216   | 7500 | Largest. Needs its own dedicated PR with internal sub-batching. |
+| `finder.test.ts`       | 97    | 3800 | Dedicated PR. May split per-describe.                           |
+| `inheritance.test.ts`  | 87    | 2200 | Dedicated PR.                                                   |
+
+**Infrastructure-blocked (1 file, 15 sites):**
+
+- `signed-id.test.ts` — `findGlobalId`/`findSignedGlobalId` tests use
+  `this.adapter = adapter` as a side effect for model registry
+  resolution. Needs a `registerModel()` test-infra hook (~20 LOC).
+  Once that's in place, the 15 sites convert mechanically.
+
+**Permanent exceptions — DDL/query adapter affinity (2 files, 4 sites):**
+
+| File                 | Sites | Reason                                                                                          |
+| -------------------- | ----- | ----------------------------------------------------------------------------------------------- |
+| `insert-all.test.ts` | 2     | `InsertAll async uniqueIndexes regression` — `addIndex()` + model query must share adapter      |
+| `timestamp.test.ts`  | 2     | `t.timestamps() end-to-end` — `MigrationContext.createTable()` + model query must share adapter |
+
+These 4 sites cannot be migrated; they need an explicit carve-out in
+whatever final D-1 closure mechanism we use (e.g. ESLint allow-list).
+
+**Long-tail (~46 files):** bespoke or small shapes. Address case-by-case
+after the giants land. Don't author more codemod variants for buckets
+under ~10 files — write by hand.
+
+Original "200 files / 10 batches" estimate is dead. Realistic close-out:
+
+- 3 giant PRs (~3 weeks each due to LOC + review cycles)
+- 1 signed-id infra PR + the 15-site mechanical conversion
+- 1 carve-out PR for the 4 DDL-affinity sites
+- ~10-15 bespoke PRs for the long tail
+
+**Total: ~15-20 more PRs to fully close D-1**, then E and F become reachable.
+
+#### D-1..N gotchas
+
+- SQLite `:memory:` deadlocks `loadSchema` on pool size 1 — migrated
+  models must declare attributes explicitly via `this.attribute(...)`.
+  See [[project_pool_epic_d_handler_sqlite_constraint]].
+- Tests can't trivially consume ported test models because of
+  schema-mismatch — [[feedback_d1_cannot_consume_ported_models]].
+  That swap belongs in Phase G, not D-1.
 
 ### Phase E — Delete `_sharedAdapter`, `AsyncContext` filter, manual TX depth
 
@@ -510,34 +600,12 @@ This is byte-for-byte Rails parity at the wiring level. The
 singleton bypass that exists today (`_sharedAdapter`) literally
 short-circuits this entire chain.
 
-## Post-merge follow-ups
-
-**From #2397 (D-1 codemod bulk run)**
-
-The automated codemod handles the simple one-`static {}`-per-file shape.
-Remaining variants need manual or targeted scripts:
-
-- [ ] ~200 LOC: multi-`describe`-block files — each describe has its own `static {}` adapter setup; codemod skips these. ~25 files estimated.
-- [ ] ~100 LOC: sidecar-fixture files — use `SidecarFixtures` wrapper; need pool-aware sidecar variant.
-- [ ] ~50 LOC: adapter-specific files — branch on `adapterName()` to pick sqlite/pg/mysql adapter class directly; need driver-neutral pool equivalent.
-- [ ] 25 remaining manual files — codemod output flagged these as `TOO_COMPLEX`; each needs per-file inspection.
-
-**From #2372 (D-Y — always-on pool for PG/MySQL in CI)**
-
-- [ ] 18 `D-Y-INCOMPATIBLE` skips remain in the test suite — files that test singleton-specific behavior. Audit and either fix the test or mark permanent.
-- [ ] PG/MySQL CI: always-drop-and-recreate overhead per worker. Measure; may need a `--pool-size=1` override for CI to keep wall-clock acceptable.
-- [ ] SQLite canonical schema preload overhead — schema init per worker adds ~200ms; baseline against current `_sharedAdapter` path.
-
-**From #2391 (Phase G batch 1)**
-
-- [ ] ~20 LOC in `model-schema.ts`: schema-reflected attributes don't generate dirty-tracking methods (e.g. `nameChanged?`, `namePreviouslyChanged?`). Rails generates these via `attribute_method_suffix`. Blocks ~23 Tier 1 fixture-adoption files from going green.
-
 ## Cross-references
 
-- [`tm-unification-plan.md`](tm-unification-plan.md) — Phase 9b + post-
+- `tm-unification-plan.md` (completed, deleted) — Phase 9b + post-
   Phase-9 cleanup paths 1/2. The TX-visibility patch this epic
   retires is documented there.
-- fixtures port (complete) — the parallel
+- `fixtures-port-plan.md` (completed, deleted) — the parallel
   effort that moves schema and fixture data out of per-test setup
   into a canonical loader. See "Interaction with the fixtures port"
   above for sequencing and seam analysis.

@@ -760,7 +760,7 @@ Followup from #1893. Phase 5-wide: decide and apply uniform schema-seeding strat
 
 ## Phase 6 batches — hoist `defineSchema` from `beforeEach` to once-per-file
 
-Spec lives in [`tm-unification-plan.md`](tm-unification-plan.md#phase-6). Replaces per-test `dropAllTables` with transactional BEGIN/ROLLBACK; promotes `beforeEach(defineSchema)` to module-level. Unblocked items can ship now; mechanical sweep gated on the infra switch.
+Spec lived in `tm-unification-plan.md` (completed, deleted). Replaces per-test `dropAllTables` with transactional BEGIN/ROLLBACK; promotes `beforeEach(defineSchema)` to module-level. Unblocked items can ship now; mechanical sweep gated on the infra switch.
 
 ### Batch B6.4 — Promote `beforeEach(defineSchema)` to module-level (cluster sweep, mostly shipped)
 

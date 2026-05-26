@@ -17,17 +17,17 @@ pnpm run test:compare 2>&1 | grep -E "(actiondispatch|actioncontroller|abstractc
 > `pnpm api:compare` is a chained `&&` script and won't forward
 > `--package`; invoke `compare.ts` directly for scoped totals.
 
-## Status (2026-05-23)
+## Status (2026-05-24)
 
 | Package            | api:compare       | files at 100% | inheritance   | test:compare     |
 | ------------------ | ----------------- | ------------- | ------------- | ---------------- |
 | abstractcontroller | 82/82 (100%)      | 11/11         | 3/4 (75%)     | 42/52 (81%)      |
 | actiondispatch     | 1277/1350 (94.6%) | 75/83         | 58/66 (87.9%) | 577/1622 (35.6%) |
-| actioncontroller   | 463/578 (80.1%)   | 42/43         | 16/16 (100%)  | 552/1860 (29.7%) |
+| actioncontroller   | 496/578 (85.8%)   | 42/43         | 16/16 (100%)  | 552/1860 (29.7%) |
 
 **Two large bodies of work remain:**
 
-1. **api:compare** — 188 methods across 10 partial files (most upstream-blocked on ActionView). See [Stories — API surface](#stories--api-surface).
+1. **api:compare** — 82 methods across 5 partial files (most upstream-blocked on ActionView). See [Stories — API surface](#stories--api-surface).
 2. **test:compare** — ~2350 Rails test cases not yet ported. Heaviest on routing, test_case, integration, render. See [Stories — Test ports](#stories--test-ports).
 
 ### Start here (next ~3 PRs to pick up)
@@ -340,27 +340,27 @@ parallel unless they share a dependency.
 
 ### Independent ports (sorted by size; do these in any order, in parallel)
 
-| Story  | Ruby file                                                | Missing | Pkg | Depends-on | Notes                                                                                                                                                                     |
-| ------ | -------------------------------------------------------- | ------: | --- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T-AD5  | `dispatch/request_test.rb`                               |      44 | AD  | —          | 77/121. Touches `Request` API broadly.                                                                                                                                    |
-| T-AD7  | `dispatch/ssl_test.rb`                                   |      38 | AD  | —          | 1/39 — middleware-level.                                                                                                                                                  |
-| T-AC4  | `controller/mime/respond_to_test.rb`                     |      38 | AC  | S15        | 28/66. Pair with `metal/mime_responds` leaf.                                                                                                                              |
-| T-AD3  | `dispatch/url_generation_test.rb`                        |      37 | AD  | —          | 0/37.                                                                                                                                                                     |
-| T-AD4  | `dispatch/routing_assertions_test.rb`                    |      29 | AD  | S15        | Pair with `assertRecognizes` WHATWG fix.                                                                                                                                  |
-| T-AC3  | `controller/url_for_test.rb`                             |      28 | AC  | —          | 29/57.                                                                                                                                                                    |
-| T-AD6  | `dispatch/response_test.rb`                              |      26 | AD  | —          | 27/53.                                                                                                                                                                    |
-| T-AD1  | `dispatch/routing/inspector_test.rb`                     |      24 | AD  | —          | Golden-output assertions; surfaces formatter divergence.                                                                                                                  |
-| T-AD9  | `dispatch/test_request_test.rb` / `test_session_test.rb` |      23 | AD  | —          | Bundle; sized to one PR.                                                                                                                                                  |
-| T-AD2  | `dispatch/mapper_test.rb`                                |      17 | AD  | —          | 4/21. Scope/anchor/via/format (#2150).                                                                                                                                    |
-| T-AC1  | `controller/http_digest_authentication_test.rb`          |      17 | AC  | S6b        | Bundle with Digest port.                                                                                                                                                  |
-| T-AC2  | `controller/http_token_authentication_test.rb`           |      16 | AC  | S6b        | Bundle with Token port.                                                                                                                                                   |
-| T-AC5  | `controller/redirect_test.rb`                            |      14 | AC  | S10        | 39/53. Pair with redirect cleanup.                                                                                                                                        |
-| T-AC7  | `controller/base_test.rb`                                |      14 | AC  | —          | 7/21.                                                                                                                                                                     |
-| T-AC8  | `controller/content_type_test.rb`                        |      13 | AC  | —          | 0/13 — full port.                                                                                                                                                         |
-| T-AD8  | `dispatch/content_security_policy_test.rb`               |      12 | AD  | —          | 21/33.                                                                                                                                                                    |
-| T-AC6  | `controller/flash_test.rb`                               |      10 | AC  | —          | 14/24.                                                                                                                                                                    |
-| T-AD10 | `dispatch/mount_test.rb`                                 |      10 | AD  | S9         | Bundle with mount work.                                                                                                                                                   |
-| T-AC21 | small-leaves bundle (≥5 missing, ≤10)                    |     ~70 | AC  | mixed      | `parameter_encoding`, `show_exceptions`, `api/conditional_get`, `mime/accept_format`, `rate_limiting`, `localized_templates`, `request/test_request`. Bundle to ~250 LOC. |
+| Story  | Ruby file                                                |             Missing | Pkg | Depends-on | Notes                                                                                                                                                                                                                                               |
+| ------ | -------------------------------------------------------- | ------------------: | --- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T-AD5  | `dispatch/request_test.rb`                               | ~~44~~ done (#2424) | AD  | —          | 121/121 ported (#2424); 30 skipped pending Rack body parsing / RemoteIp middleware / Inflector. List in PR body.                                                                                                                                    |
+| T-AD7  | `dispatch/ssl_test.rb`                                   |                  38 | AD  | —          | 1/39 — middleware-level.                                                                                                                                                                                                                            |
+| T-AC4  | `controller/mime/respond_to_test.rb`                     |                  38 | AC  | S15        | 28/66. Pair with `metal/mime_responds` leaf.                                                                                                                                                                                                        |
+| T-AD3  | `dispatch/url_generation_test.rb`                        |   ~~37~~ 17 (#2423) | AD  | —          | 20 passing + 17 skipped via #2423. Remaining gaps: SCRIPT_NAME propagation, subdomain false/nil stripping, `port: false`, trailing-slash via controller dispatch + `URL.pathFor` formatting (needs `RouteSet.pathFor` to honor `format`).           |
+| T-AD4  | `dispatch/routing_assertions_test.rb`                    |                  29 | AD  | S15        | Pair with `assertRecognizes` WHATWG fix.                                                                                                                                                                                                            |
+| T-AC3  | `controller/url_for_test.rb`                             |                  28 | AC  | —          | 29/57.                                                                                                                                                                                                                                              |
+| T-AD6  | `dispatch/response_test.rb`                              |                  26 | AD  | —          | 27/53.                                                                                                                                                                                                                                              |
+| T-AD1  | `dispatch/routing/inspector_test.rb`                     |                  24 | AD  | —          | Golden-output assertions; surfaces formatter divergence.                                                                                                                                                                                            |
+| T-AD9  | `dispatch/test_request_test.rb` / `test_session_test.rb` |                  23 | AD  | —          | Bundle; sized to one PR.                                                                                                                                                                                                                            |
+| T-AD2  | `dispatch/mapper_test.rb`                                |                  17 | AD  | —          | 4/21. Scope/anchor/via/format (#2150).                                                                                                                                                                                                              |
+| T-AC1  | `controller/http_digest_authentication_test.rb`          |                  17 | AC  | S6b        | Bundle with Digest port.                                                                                                                                                                                                                            |
+| T-AC2  | `controller/http_token_authentication_test.rb`           |                  16 | AC  | S6b        | Bundle with Token port.                                                                                                                                                                                                                             |
+| T-AC5  | `controller/redirect_test.rb`                            |                  14 | AC  | S10        | 39/53. Pair with redirect cleanup.                                                                                                                                                                                                                  |
+| T-AC7  | `controller/base_test.rb`                                |                  14 | AC  | —          | 7/21.                                                                                                                                                                                                                                               |
+| T-AC8  | `controller/content_type_test.rb`                        |    ~~13~~ 7 (#2422) | AC  | —          | 7 passing + 7 skipped via #2422. Remaining 7 all blocked on ActionView (erb/builder rendering, respond_to + view). Fixed 3 implementation bugs along the way (Response `contentType=` parse/merge, `charset` default, `render body:` default mime). |
+| T-AD8  | `dispatch/content_security_policy_test.rb`               |                  12 | AD  | —          | 21/33.                                                                                                                                                                                                                                              |
+| T-AC6  | `controller/flash_test.rb`                               |                  10 | AC  | —          | 14/24.                                                                                                                                                                                                                                              |
+| T-AD10 | `dispatch/mount_test.rb`                                 |                  10 | AD  | S9         | Bundle with mount work.                                                                                                                                                                                                                             |
+| T-AC21 | small-leaves bundle (≥5 missing, ≤10)                    |                 ~70 | AC  | mixed      | `parameter_encoding`, `show_exceptions`, `api/conditional_get`, `mime/accept_format`, `rate_limiting`, `localized_templates`, `request/test_request`. Bundle to ~250 LOC.                                                                           |
 
 ### Large port stories (sorted by size; split each into ~2–3 PRs)
 
@@ -475,6 +475,50 @@ lives in **CLAUDE.md** — start there. actionpack-specific notes only:
 - [ ] `HostPermission` type only accepts `string | RegExp | IPAddr` —
       Rails also accepts callable predicates (lambdas). Extend union if
       needed.
+
+**From #2422 (T-AC8 content_type_test.rb)**
+
+- [ ] 7 ActionView-dependent tests skipped: erb/builder content-type defaults,
+      `respond_to` + view rendering. Un-skip once ActionView template rendering
+      lands.
+- Discovery: Rails' `Response#content_type=` parses input via
+  `parse_content_type` and merges with existing charset before rebuilding via
+  `set_content_type`. Our naive string-concat broke
+  `"text/html; fragment; charset=utf-16"`. Now mirrored in #2422.
+- Discovery: Rails' `Response#charset` falls back to
+  `self.class.default_charset` when no `charset=` directive is in the header.
+  Trails returned `undefined`. Fixed in #2422.
+- Discovery: Rails' `render body:` defaults to `Mime[:text]` (`text/plain`),
+  not `application/octet-stream`. Fixed in #2422.
+
+**From #2423 (T-AD3 url_generation_test.rb)**
+
+- [ ] ~30 LOC: `normalizeHost` should strip subdomain when given `nil`/`false`/
+      blank — currently defaults to `true`. 3 skipped tests in
+      `url-generation.test.ts`.
+- [ ] ~5 LOC: `UrlOptions.port` typed `number|string|null` — accept `false`
+      to suppress port. 1 skipped test.
+- [ ] ~50 LOC: `RouteSet.pathFor` ignores `format` param when computing
+      trailing-slash placement. 6 skipped path-helper tests.
+- [ ] ~80 LOC: controller dispatch with `url_for(trailing_slash: true)` /
+      route-level default. 5 skipped tests.
+- [ ] ~50 LOC: SCRIPT_NAME header propagation through controller dispatch and
+      mounted-app wrapping. 2 skipped tests.
+
+**From #2424 (T-AD5 request_test.rb remainder)**
+
+- [ ] ~30 LOC: wire RemoteIp middleware into the test helper so spoof-detection
+      and trusted-proxies tests can run (9 skips).
+- [ ] ~20 LOC: `checkMethod` not wired into the getter — drops `Request#method`
+      validation. 2 skips.
+- [ ] ~80 LOC: needs Rack body parsing for `RequestParameters` /
+      `RequestParamsParsing` / `RequestFormat` ParameterTypeError surface
+      (13 skips combined). Bundle if Rack body parsing lands.
+- [ ] ~10 LOC: TS `method` getter can't accept args like Rails'
+      `request.method(:get)` mutation form. Low-priority API divergence; skip
+      noted in test file.
+- [ ] CustomParamEncoder + encoding validation surface — referenced by 4 skips
+      in RequestParameters group.
 
 ## Indefinite defers (do not port)
 

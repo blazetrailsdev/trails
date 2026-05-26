@@ -17,10 +17,15 @@
 
 ## Post-merge follow-ups (audited 2026-05-26)
 
-Completed items from the original PR 1–7b sequence.
+Items surfaced during the original PR 1–7b sequence. Checked items are shipped; unchecked items are open follow-ups folded into the F-series PRs below.
 
 - [x] ~200 LOC: `walk()` deduplication — shipped in #2405.
-- [x] ~20 LOC: `JoinBase.table` should return an Arel `Table` node, not a string. — shipped in #2417.
+- [ ] ~100 LOC: eliminate `_nodes` array — replace flat array with tree traversal once PR 3 tree structure is fully in use.
+- [x] ~150 LOC: use real `JoinAssociation` nodes in tree — shipped in #2414 (F1).
+- [x] ~20 LOC: `JoinBase.table` returns Arel `Table` node — shipped in #2417.
+
+**From #2384 (PR 4 — joinSql / dead helpers)**
+
 - [x] ~5 LOC: delete `joinSql` from `JoinNode` — done in PR 7 (#2387).
 - [x] ~5 LOC: delete `buildJoinSql()` — done in PR 7 (#2387).
 - [x] ~40 LOC: delete dead helper functions — done in PR 7 (#2387).
@@ -29,24 +34,29 @@ Completed items from the original PR 1–7b sequence.
 - [x] ~100 LOC: SELECT projections as Arel nodes — completed in #2394 (PR 6).
 - [x] ~~\~150 LOC: `buildSelectSql`/`applyColumnAliases` `_qt`/`_qc` migration~~ — **stale**: `buildSelectSql`, `_qt`, `_qc` no longer exist. `applyColumnAliases` already uses Arel `As` nodes.
 
+- [x] ~50 LOC: `makeConstraints` ON-predicate rebinding — shipped in #2418. `walk()` now rebinds ON predicates to the merged parent's table alias.
+- [x] ~20 LOC: `joinType` propagated to emitted joins (rebuilt when not `OuterJoin`) — shipped in #2417.
+- Note: `JoinTreeNode.isMatch()` matches on `immediateAssocName + modelClass` instead of Rails' reflection identity. Correct proxy for now.
+
+- [ ] ~200 LOC: nested eager-load proxy wiring — flat-node iteration only wires children to root parent. Needs recursive tree walk (depends on tree refactor).
+- [x] ~50 LOC: readonly/strictLoading propagation tests — shipped in #2415.
+- [x] ~30 LOC: cross-parent model cache for belongsTo dedup — shipped in #2410.
+- [x] ~5 LOC: Relation-level `_isReadonly` propagation — non-issue per #2417 investigation (relation's post-instantiation loop already handles it, matching Rails' `exec_queries`).
+
+**From #2414 (F1 — addAssociation via JoinAssociation)**
+
+- Discovery: STI constraints handled naturally by `klass.all()` default scope — no separate `_injectStiConstraint` needed on the JoinAssociation path. Note for #2414 PR-2-remainder work.
+- Architectural divergence: our `makeConstraints` rebuilds pre-built joins when `joinType` differs; Rails builds joins fresh inside `make_constraints`. Lower-risk for now but flagged for full alignment when `_nodes` flat array is eliminated.
+
 ## Remaining work — PR sequence
 
 All PRs branch from `main` independently (no stacking).
 
-### PR F1 — Wire JoinAssociation into addAssociation (~250 LOC)
+### PR F1 closed (#2414) — Wire JoinAssociation into addAssociation
 
-Replace the inline predicate construction in `addAssociation()` (non-through
-path) with real `JoinAssociation` nodes:
-
-1. Create `JoinAssociation(reflection)` instead of building predicates inline
-2. Call `joinAssociation.joinConstraints(sourceTable, sourceKlass, joinType)`
-   to get the `OuterJoin`/`InnerJoin` node (fixes the hardcoded `OuterJoin`)
-3. Push `JoinAssociation` into the tree instead of `JoinTreeNode` wrapper
-
-Touches: `join-dependency.ts` (addAssociation, ~150 LOC rewrite),
-test updates (~80 LOC).
-
-Closes: Gap 1 (non-through path), `joinType` not applied.
+Direct-path `addAssociation()` now creates `JoinAssociation` instances and
+emits `Nodes.OuterJoin` via `joinConstraints()`. Quoting tests migrated to
+Arel node assertions.
 
 ### PR F2 — Wire JoinAssociation for through-associations (~250 LOC)
 
@@ -119,7 +129,7 @@ model's attributes (mirrors Rails' `column_names` extraction in
 
 Closes: Gap 9.
 
-## Total: ~1200 LOC across 5 core + 1 stretch PR
+## Total: ~700 LOC remaining across 3 core + 2 stretch PRs
 
 ## Ordering constraints
 
@@ -156,6 +166,13 @@ F6 (independent)
    chain is fully populated for nested `:through` associations. If gaps exist,
    that's a prerequisite reflection fix. Blocks F2.
 
+3. **`scope._whereClause.ast` availability** — already confirmed working in the
+   existing `JoinAssociation`. The plan uses this path (not
+   `scope.arel().constraints`).
+
+4. ~~**Backward compat during migration**~~ — resolved. PRs 6+7 removed all
+   `joinSql` references; callers use `arelJoin` exclusively.
+
 ## Relationship to activerecord-100-plan.md
 
 This plan **supersedes** the following batches in `activerecord-100-plan.md`:
@@ -163,11 +180,10 @@ This plan **supersedes** the following batches in `activerecord-100-plan.md`:
 - **Batch 28b** (JoinDependency AliasTracker port, ~280 LOC) — covered by F5.
 - **Batch B35** (schema-qualified HABTM table aliasing, ~50 LOC) — covered by
   F5 (`AliasTracker.aliasedTableFor()` + Arel `Table({ as })`).
-- **Batch B133** (polymorphic-source through-reflection, ~80 LOC) — covered by
-  F2 (`JoinAssociation#joinConstraints` handles polymorphic sources via
-  `reflection.chain`).
-
-Once this plan lands, mark those batches as "superseded by join-dependency-arel-plan".
+- **Batch B133** (polymorphic-source through-reflection, ~80 LOC) — covered
+  by PR 2 (#2381, merged). `_addThroughAssociation` replaced by
+  `JoinAssociation#joinConstraints` which handles polymorphic sources via
+  `reflection.chain`.
 
 ## Non-goals
 
