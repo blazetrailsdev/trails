@@ -1,6 +1,7 @@
 import type { Base } from "../../base.js";
 import type { Table } from "@blazetrails/arel";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
+import { ConnectionNotDefined } from "../../errors.js";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
@@ -380,8 +381,9 @@ export class LoaderQuery {
     let adapter: object;
     try {
       adapter = klass.adapter;
-    } catch {
-      return spec;
+    } catch (e) {
+      if (e instanceof ConnectionNotDefined) return spec;
+      throw e;
     }
     let id = LoaderQuery._adapterIds.get(adapter);
     if (id == null) {
