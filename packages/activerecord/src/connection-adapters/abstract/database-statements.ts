@@ -26,6 +26,50 @@ import { Result } from "../../result.js";
 import { isWriteQuerySql } from "../sql-classification.js";
 
 /**
+ * A single entry in `Relation#explain`'s options list. Either a bare
+ * flag name (`"analyze"`, `"verbose"`) or a keyword hash (`{ format:
+ * "json" }`) — mirrors Rails' `explain(*options)` where options can
+ * be a mix of Symbols and a single Hash. Each adapter decides which
+ * flags / keys it supports and throws on unknown ones.
+ *
+ * Mirrors: the `options` array shape used by Rails'
+ * `ActiveRecord::Relation#explain` and its adapter `build_explain_clause`.
+ */
+export type ExplainOption = string | { format: string };
+
+/**
+ * Stringify an arbitrary value for inclusion in an EXPLAIN validation
+ * error message.
+ */
+export function inspectExplainOption(o: unknown): string {
+  if (o === null) return "null";
+  if (o === undefined) return "undefined";
+  if (typeof o === "bigint") return `${o}n`;
+  if (typeof o === "symbol") return o.toString();
+  if (typeof o === "function") return `[Function: ${o.name || "anonymous"}]`;
+  if (typeof o !== "object") return String(o);
+  const seen = new WeakSet<object>();
+  try {
+    return JSON.stringify(o, (_k, v) => {
+      if (typeof v === "bigint") return `${v}n`;
+      if (typeof v === "symbol") return v.toString();
+      if (typeof v === "function") return `[Function: ${v.name || "anonymous"}]`;
+      if (v !== null && typeof v === "object") {
+        if (seen.has(v as object)) return "[Circular]";
+        seen.add(v as object);
+      }
+      return v;
+    });
+  } catch {
+    try {
+      return Object.prototype.toString.call(o);
+    } catch {
+      return "[object Object]";
+    }
+  }
+}
+
+/**
  * Host interface for DatabaseStatements mixin methods that need adapter context.
  */
 export interface DatabaseStatementsHost {

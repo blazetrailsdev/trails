@@ -8,8 +8,9 @@
  * transaction handling, and advisory lock support.
  */
 
-import { inspectExplainOption } from "../adapter.js";
-import type { AdapterName, ExplainOption } from "../adapter.js";
+import { inspectExplainOption } from "./abstract/database-statements.js";
+import type { ExplainOption } from "./abstract/database-statements.js";
+import type { AdapterName } from "./abstract-adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import type { Column } from "./column.js";
 import {

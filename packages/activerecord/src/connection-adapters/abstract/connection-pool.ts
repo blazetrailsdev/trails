@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool
  */
 
-import { adapterNameFromConfig } from "../../adapter.js";
+import { adapterNameFromConfig } from "../abstract-adapter.js";
 import type { DatabaseAdapter } from "../../adapter.js";
 import type { DatabaseConfig } from "../../database-configurations/database-config.js";
 import type { PoolConfig } from "../pool-config.js";
