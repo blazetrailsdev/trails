@@ -4,8 +4,8 @@
  * `arelJoin` (Nodes.OuterJoin) with the correct ON predicate structure
  * for polymorphic :as, STI subclass IN-list, and basic foreign-key joins.
  *
- * Through-associations still use raw SQL strings (joinSql); those are
- * covered by join-dependency-through-aliasing.test.ts.
+ * Through-association Arel construction is covered by
+ * join-dependency-through-aliasing.test.ts.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
