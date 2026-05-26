@@ -36,7 +36,11 @@ export interface InsertAllOptions {
 
 export class InsertAll {
   readonly model: ModelClass;
-  readonly connection: ModelClass["adapter"];
+  private _connectionOverride: ModelClass["adapter"] | null = null;
+
+  get connection(): ModelClass["adapter"] {
+    return this._connectionOverride ?? this.model.adapter;
+  }
   readonly inserts: Record<string, unknown>[];
   readonly keys: Set<string>;
   /**
@@ -63,19 +67,39 @@ export class InsertAll {
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
   ): Promise<number> {
-    const model = (relation as any)._modelClass as ModelClass;
-    const ia = new InsertAll(relation, model.adapter, inserts, options);
+    const ia = new InsertAll(relation, inserts, options);
     return ia.execute();
   }
 
   constructor(
     relation: Relation<any>,
+    inserts: Record<string, unknown>[],
+    options?: InsertAllOptions,
+  );
+  /** @deprecated Pass inserts as the second argument; connection is resolved from the model. */
+  constructor(
+    relation: Relation<any>,
     connection: ModelClass["adapter"],
     inserts: Record<string, unknown>[],
-    options: InsertAllOptions = {},
+    options?: InsertAllOptions,
+  );
+  constructor(
+    relation: Relation<any>,
+    insertsOrConnection: Record<string, unknown>[] | ModelClass["adapter"],
+    insertsOrOptions?: Record<string, unknown>[] | InsertAllOptions,
+    legacyOptions?: InsertAllOptions,
   ) {
+    let inserts: Record<string, unknown>[];
+    let options: InsertAllOptions;
+    if (Array.isArray(insertsOrConnection)) {
+      inserts = insertsOrConnection;
+      options = (insertsOrOptions as InsertAllOptions) ?? {};
+    } else {
+      this._connectionOverride = insertsOrConnection;
+      inserts = (insertsOrOptions as Record<string, unknown>[]) ?? [];
+      options = legacyOptions ?? {};
+    }
     this.model = (relation as any)._modelClass as ModelClass;
-    this.connection = connection;
     this.inserts = inserts.map((r) => ({ ...r }));
     this.updateOnly = options.updateOnly;
     this.uniqueBy = options.uniqueBy;
@@ -95,8 +119,8 @@ export class InsertAll {
           : options.returning;
     } else {
       const supportsReturning =
-        typeof (connection as any).supportsInsertReturning === "function"
-          ? (connection as any).supportsInsertReturning()
+        typeof (this.connection as any).supportsInsertReturning === "function"
+          ? (this.connection as any).supportsInsertReturning()
           : false;
       this.returning = supportsReturning ? this.primaryKeys() : false;
     }

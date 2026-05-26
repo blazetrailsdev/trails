@@ -6,7 +6,7 @@
 
 import { inspectExplainOption } from "../adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
-import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
+import { type Nodes, Visitors, Collectors, setToSqlVisitor } from "@blazetrails/arel";
 import {
   ReadOnlyError,
   ActiveRecordError,
@@ -362,6 +362,16 @@ export interface AbstractAdapter {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractAdapter implements Quoting {
   static readonly Version = Version;
+
+  constructor() {
+    // Mirrors Rails abstract_adapter.rb:155 — @visitor = arel_visitor
+    const visitor = this.arelVisitor;
+    if (visitor) {
+      setToSqlVisitor(
+        (visitor as object).constructor as new () => { compile(node: Nodes.Node): string },
+      );
+    }
+  }
 
   protected _connection: DatabaseAdapter | null = null;
   private _owner: string | null = null;
