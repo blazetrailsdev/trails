@@ -302,6 +302,17 @@ async function buildRelation(
     .predicateBuilder;
   const adapter = klass.connection ?? null;
   const hasCsKey = Object.prototype.hasOwnProperty.call(options, "caseSensitive");
+  const typeObj =
+    typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
+
+  // When the attribute supports unencrypted data alongside encrypted values, the
+  // patched Relation#where (ExtendedDeterministicQueries) must receive a hash-style
+  // arg so processArguments can expand the IN list to include the plain-text variant.
+  // The Arel node path below bypasses processArguments entirely and would miss rows
+  // stored without encryption.
+  if ((typeObj as any)?.supportUnencryptedData) {
+    return [base.where({ [attribute]: value })];
+  }
 
   // Rails routes the comparison through the adapter (defaultUniquenessComparison
   // / caseSensitiveComparison / caseInsensitiveComparison) so adapters with
@@ -319,8 +330,6 @@ async function buildRelation(
       // UUID columns are already canonical lowercase — skip LOWER() to match Rails,
       // which returns false from can_perform_case_insensitive_comparison_for? for uuid
       // (PG has no lower(uuid) function). Use plain equality instead.
-      const typeObj =
-        typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
       const colType =
         typeObj == null
           ? null

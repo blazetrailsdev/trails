@@ -95,9 +95,9 @@ export class EncryptedUniquenessValidator {
     if (!(encryptedType instanceof EncryptedAttributeType)) return;
 
     // When ExtendedDeterministicQueries is installed it already expands the
-    // WHERE clause to cover all previous-scheme ciphertexts, so the first
-    // originalValidateEach call above is sufficient. Only issue the extra
-    // query when the WHERE expansion is not active.
+    // WHERE clause to cover all previous-scheme ciphertexts, and buildRelation
+    // uses hash-style WHERE for supportUnencryptedData attributes so the plain-
+    // text variant is included in the IN list. No extra per-scheme query needed.
     if (!ExtendedDeterministicQueries.installed) {
       const prevCiphertexts = encryptedType.previousTypes.map((pt) => pt.serialize(value));
       if (prevCiphertexts.length > 0) {

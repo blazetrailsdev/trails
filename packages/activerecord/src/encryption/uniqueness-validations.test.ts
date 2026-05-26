@@ -3,12 +3,11 @@ import {
   configureEncryption,
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
-  makeEncryptedBookWithDowncaseName,
   makeKeyProvider,
-  makeEncryptedBook,
 } from "./test-helpers.js";
-import { createTestAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { Configurable } from "./configurable.js";
 import { installExtendedQueriesIfConfigured } from "./install.js";
 import { ExtendedDeterministicUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
@@ -17,28 +16,11 @@ import { UniquenessValidator } from "../validations.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Relation } from "../relation.js";
 import { Base } from "../index.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import type { TestDatabaseAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
 
-// Builds a fresh Base subclass bound to the shared `encrypted_books` table.
-// Each test gets its own class so `encrypts(...)` is called exactly once
-// (encrypts() is idempotent and would no-op on a reused class). DDL was
-// already executed in beforeAll, so no in-test ALTER TABLE — compatible
-// with transactional fixtures on MariaDB.
-function freshBook(adapter: DatabaseAdapter): any {
-  return class extends Base {
-    static {
-      this._tableName = "encrypted_books";
-      this.attribute("id", "integer");
-      this.attribute("name", "string");
-      this.adapter = adapter;
-    }
-  } as any;
-}
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 
 describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
-  let adapter: TestDatabaseAdapter;
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
   let savedExtendQueries: boolean;
   const savedMethods: {
@@ -50,14 +32,10 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   } = {};
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       encrypted_books: { name: { type: "string", limit: 1024, default: "<untitled>" } },
-      encrypted_book_with_downcase_names: { name: { type: "string", limit: 1024 } },
     });
   });
-
-  withTransactionalFixtures(() => adapter);
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
@@ -65,7 +43,6 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     Configurable.config.previousSchemes = [];
     configureEncryption();
 
-    // Snapshot prototype methods before installing query patches.
     savedMethods.where = Relation.prototype.where;
     savedMethods.exists = (Relation.prototype as any).exists;
     savedMethods.scopeForCreate = (Relation.prototype as any).scopeForCreate;
@@ -77,7 +54,6 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   });
 
   afterEach(() => {
-    // Restore prototype methods to avoid cross-test pollution.
     Relation.prototype.where = savedMethods.where as typeof Relation.prototype.where;
     (Relation.prototype as any).exists = savedMethods.exists;
     (Relation.prototype as any).scopeForCreate = savedMethods.scopeForCreate;
@@ -92,73 +68,96 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   });
 
   it("uniqueness validations work", async () => {
-    const Book = makeEncryptedBookWithDowncaseName(adapter);
-    Book.validatesUniqueness("name");
-    new Book();
+    class EncryptedBookWithDowncaseName extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+        this.validatesUniqueness("name");
+        this.encrypts("name", { deterministic: true, downcase: true });
+      }
+    }
 
-    await Book.create({ name: "dune" });
-    const dup = await Book.create({ name: "dune" });
+    await EncryptedBookWithDowncaseName.create({ name: "dune" });
+    const dup = await EncryptedBookWithDowncaseName.create({ name: "dune" });
     expect(dup.errors.count).toBe(1);
   });
 
   it("uniqueness validations work when mixing encrypted an unencrypted data", async () => {
-    // Global supportUnencryptedData = true → plain-text fallback scheme is appended to
-    // previousTypes, so the uniqueness query also searches for the unencrypted value.
     Configurable.config.supportUnencryptedData = true;
 
-    const Book = freshBook(adapter);
-    Book.validatesUniqueness("name");
-    Book.encrypts("name", { deterministic: true, downcase: true });
-    new Book();
+    class EncryptedBookWithDowncaseName extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+        this.validatesUniqueness("name");
+        this.encrypts("name", { deterministic: true, downcase: true });
+      }
+    }
 
-    // Insert unencrypted "dune" directly (simulates a row that leaked plain text).
-    const RawBook = freshBook(adapter);
-    new RawBook();
-    await RawBook.create({ name: "dune" });
+    class UnencryptedBook extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+      }
+    }
 
-    // Creating an encrypted duplicate should fail: the query expansion includes
-    // the plain-text "dune" and finds the existing raw row.
-    const dup = await Book.create({ name: "dune" });
+    await UnencryptedBook.create({ name: "dune" });
+    const dup = await EncryptedBookWithDowncaseName.create({ name: "DUNE" });
     expect(dup.errors.count).toBe(1);
   });
 
   it("uniqueness validations do not work when mixing encrypted an unencrypted data and unencrypted data is opted out per-attribute", async () => {
-    // Global supportUnencryptedData = true, but the attribute opts out via per-attribute
-    // supportUnencryptedData: false — so no plain-text fallback in previousTypes.
     Configurable.config.supportUnencryptedData = true;
 
-    const Book = freshBook(adapter);
-    Book.validatesUniqueness("name");
-    Book.encrypts("name", { deterministic: true, downcase: true, supportUnencryptedData: false });
-    new Book();
+    class EncryptedBookWithUnencryptedDataOptedOut extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+        this.validatesUniqueness("name");
+        this.encrypts("name", { deterministic: true, supportUnencryptedData: false });
+      }
+    }
 
-    const RawBook = freshBook(adapter);
-    new RawBook();
-    await RawBook.create({ name: "dune" });
+    class UnencryptedBook extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+      }
+    }
 
-    // Validation passes: the plain-text row is invisible to the query because
-    // the per-attribute opt-out disables the clean-text fallback scheme.
-    const book = await Book.create({ name: "dune" });
+    await UnencryptedBook.create({ name: "dune" });
+    const book = await EncryptedBookWithUnencryptedDataOptedOut.create({ name: "dune" });
     expect(book.errors.count).toBe(0);
   });
 
   it("uniqueness validations work when mixing encrypted an unencrypted data and unencrypted data is opted in per-attribute", async () => {
-    // Global supportUnencryptedData = false, but the attribute explicitly opts in via
-    // supportUnencryptedData: true — so the plain-text fallback IS included.
-    Configurable.config.supportUnencryptedData = false;
+    Configurable.config.supportUnencryptedData = true;
 
-    const Book = freshBook(adapter);
-    Book.validatesUniqueness("name");
-    Book.encrypts("name", { deterministic: true, downcase: true, supportUnencryptedData: true });
-    new Book();
+    class EncryptedBookWithUnencryptedDataOptedIn extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+        this.validatesUniqueness("name");
+        this.encrypts("name", { deterministic: true, supportUnencryptedData: true });
+      }
+    }
 
-    const RawBook = freshBook(adapter);
-    new RawBook();
-    await RawBook.create({ name: "dune" });
+    class UnencryptedBook extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+      }
+    }
 
-    // Validation fails: per-attribute opt-in adds the clean-text fallback scheme even
-    // though the global config has supportUnencryptedData = false.
-    const dup = await Book.create({ name: "dune" });
+    await UnencryptedBook.create({ name: "dune" });
+    const dup = await EncryptedBookWithUnencryptedDataOptedIn.create({ name: "dune" });
     expect(dup.errors.count).toBe(1);
   });
 
@@ -166,30 +165,37 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     Configurable.config.supportUnencryptedData = false;
     Configurable.config.previous = [{ downcase: true, deterministic: true }];
 
-    const OldBook = freshBook(adapter);
-    OldBook.validatesUniqueness("name");
-    OldBook.encrypts("name", { deterministic: true, downcase: false });
-    new OldBook();
+    class OldEncryptionBook extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+        this.validatesUniqueness("name");
+        this.encrypts("name", { deterministic: true, downcase: false });
+      }
+    }
 
-    await OldBook.create({ name: "dune" });
-    // The previous scheme has downcase:true, so "DUNE" should collide with "dune".
-    const dup = await OldBook.create({ name: "DUNE" });
+    await OldEncryptionBook.create({ name: "dune" });
+    const dup = await OldEncryptionBook.create({ name: "DUNE" });
     expect(dup.errors.count).toBe(1);
   });
 
   it("uniqueness validation does not revalidate the attribute with current encryption type", async () => {
-    // Configure a previous scheme so previousTypes is non-empty — this exercises
-    // the code path that would trigger multiple validateEach calls and verifies
-    // the error count stays at 1 (not duplicated per scheme).
     const prevKeyProvider = makeKeyProvider("prev-key-for-uniqueness-test-32b!!");
     Configurable.config.previous = [{ keyProvider: prevKeyProvider, deterministic: true }];
 
-    const Book = makeEncryptedBook(adapter); // deterministic encrypted name
-    Book.validatesUniqueness("name");
-    new Book();
+    class EncryptedBookWithUniquenessValidation extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+        this.validatesUniqueness("name");
+        this.encrypts("name", { deterministic: true });
+      }
+    }
 
-    await Book.create({ name: "Dune" });
-    const dup = await Book.create({ name: "Dune" });
+    await EncryptedBookWithUniquenessValidation.create({ name: "dune" });
+    const dup = await EncryptedBookWithUniquenessValidation.create({ name: "dune" });
     expect(dup.errors.count).toBe(1);
   });
 });
