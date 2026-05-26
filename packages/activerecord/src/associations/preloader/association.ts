@@ -1,6 +1,7 @@
 import type { Base } from "../../base.js";
 import type { Table } from "@blazetrails/arel";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
+import { ConnectionNotDefined } from "../../errors.js";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
@@ -370,20 +371,20 @@ export class LoaderQuery {
   }
 
   // Mirrors Rails' `scope.model.connection_specification_name` in
-  // Preloader::Association::LoaderQuery#hash/#eql?. Does not check out a DB
-  // connection — `connectionSpecificationName` is a plain string getter and
-  // the cached `_adapter` field is read without invoking the `.adapter`
-  // getter (which would call `pool.checkout()`). When the spec name resolves
-  // to a shared ancestor (e.g. "Base" for direct-adapter test setups) we
-  // append a stable per-process adapter id (lazily assigned in a WeakMap)
-  // so two models with the same spec but different adapter instances don't
-  // coalesce. The WeakMap allocation is intentional and not a DB side effect.
+  // Preloader::Association::LoaderQuery#hash/#eql?. The adapter getter may
+  // check out a connection on first call, but in practice the preloader runs
+  // after records are loaded so the adapter is already cached on the class.
   private _scopeAdapterId(): string {
     const klass = this.scope?._modelClass;
     if (klass == null) return "";
     const spec = klass.connectionSpecificationName ?? "";
-    const adapter = klass._adapter;
-    if (adapter == null) return spec;
+    let adapter: object;
+    try {
+      adapter = klass.adapter;
+    } catch (e) {
+      if (e instanceof ConnectionNotDefined) return spec;
+      throw e;
+    }
     let id = LoaderQuery._adapterIds.get(adapter);
     if (id == null) {
       id = ++LoaderQuery._idCounter;
