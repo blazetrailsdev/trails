@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
 import { Base } from "./index.js";
-import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "./encryption.js";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
@@ -44,25 +44,21 @@ class TestEncryptor implements EncryptorLike {
   }
 }
 
-// -- Helpers --
-
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 // -- Phase 2000: Core --
+
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+beforeAll(async () => {
+  await defineSchema(TEST_SCHEMA);
+});
 
 describe("encrypts()", () => {
   it("encrypts and decrypts attributes transparently", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("ssn", "string");
-        this.adapter = adapter;
         this.encrypts("ssn");
       }
     }
@@ -77,24 +73,21 @@ describe("encrypts()", () => {
   });
 
   it("persists encrypted value to database and decrypts on load", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("secret", "string");
-        this.adapter = adapter;
         this.encrypts("secret");
       }
     }
 
-    await User.create({ name: "Alice", secret: "my-secret-data" });
-    const loaded = await User.find(1);
+    const created = await User.create({ name: "Alice", secret: "my-secret-data" });
+    const loaded = await User.find(created.id);
     expect(loaded.secret).toBe("my-secret-data");
   });
 
   it("supports custom encryptor", async () => {
-    const adapter = await freshAdapter();
     const customEncryptor = {
       encrypt: (v: string) => `ENC:${v}`,
       decrypt: (v: string) => v.replace(/^ENC:/, ""),
@@ -103,7 +96,6 @@ describe("encrypts()", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("token", "string");
-        this.adapter = adapter;
         this.encrypts("token", { encryptor: customEncryptor });
       }
     }
@@ -116,12 +108,10 @@ describe("encrypts()", () => {
   });
 
   it("wires scheme options (deterministic, downcase) through to the attribute type", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("email", "string");
-        this.adapter = adapter;
         this.encrypts("email", { deterministic: true, downcase: true });
       }
     }
@@ -135,12 +125,10 @@ describe("encrypts()", () => {
   });
 
   it("registers encrypted attributes on the class", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("ssn", "string");
-        this.adapter = adapter;
         this.encrypts("ssn");
       }
     }
@@ -166,12 +154,10 @@ describe("Base.encrypts() — global previous schemes via config.previous", () =
       { encryptor: new TestEncryptor({ legacy: "legacy_cipher" }) } as any,
     ];
 
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("email", "string");
-        this.adapter = adapter;
         this.encrypts("email", { encryptor: new TestEncryptor({ current: "current_cipher" }) });
       }
     }
@@ -188,12 +174,10 @@ describe("Base.encrypts() — global previous schemes via config.previous", () =
       { encryptor: new TestEncryptor({ det: "det_cipher" }), deterministic: true } as any,
     ];
 
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("email", "string");
-        this.adapter = adapter;
         this.encrypts("email", { encryptor: new TestEncryptor({ current: "current_cipher" }) });
       }
     }
