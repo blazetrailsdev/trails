@@ -159,6 +159,31 @@ describe("compileJs", () => {
     });
   });
 
+  describe("source map", () => {
+    it("emits one mapping per output line for a multi-line code tag", () => {
+      // `<%` opens on src line 1; value spans lines 2-3; `%>` closes on line 4.
+      const src = "before\n<%\nconst a = 1;\nconst b = 2;\n%>after";
+      const { sourceMap } = compileJs(src, {
+        fileName: "t.tse.js",
+        sourceFileName: "t.tse",
+      });
+      expect(sourceMap).not.toBeNull();
+      const segs = sourceMap!.mappings.split(";");
+      const mappedGenLines = segs
+        .map((seg, i) => ({ genLine: i, mapped: seg !== "" }))
+        .filter((l) => l.mapped)
+        .map((l) => l.genLine);
+      // There must be at least two consecutive mapped output lines (one per code line).
+      const hasConsecutivePair = mappedGenLines.some(
+        (g, i) => i > 0 && g === mappedGenLines[i - 1]! + 1,
+      );
+      expect(hasConsecutivePair).toBe(true);
+      // Before the fix only 1 mapping was emitted for the whole multi-line tag;
+      // now each of the 4 output lines the tag expands to must be mapped.
+      expect(mappedGenLines.length).toBeGreaterThanOrEqual(4);
+    });
+  });
+
   describe("preamble / postamble", () => {
     it("emits preamble immediately after const _ob line", () => {
       const { code } = compileJs("<p>hi</p>", {
