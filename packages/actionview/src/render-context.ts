@@ -3,32 +3,33 @@ import { OutputBuffer } from "./buffers.js";
 import type { TemplateLocals, TemplateRegistry } from "./template-registry.js";
 
 /**
- * Options for `render()` with a statically-typed partial name.
- * Mirrors Rails' `render partial:, locals:, collection:, as:, spacer_template:`.
- * `locals` is required when the registered partial has required properties,
- * optional when all properties are optional (matching the `.tse` virtualized shim).
+ * Render options with a single conditional-generic signature. When `P` is a
+ * literal key in `TemplateRegistry`, locals are typed (and required when the
+ * registered shape has required properties). When `P` is a plain `string`,
+ * locals fall back to `Record<string, unknown>`.
  */
-export type PartialOptions<K extends keyof TemplateRegistry> = {
-  partial: K;
-  collection?: readonly unknown[];
-  as?: string;
-  spacerTemplate?: string;
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-} & ({} extends TemplateLocals<TemplateRegistry[K]>
-  ? { locals?: TemplateLocals<TemplateRegistry[K]> }
-  : { locals: TemplateLocals<TemplateRegistry[K]> });
+export type RenderOptions<P extends string> = RenderSingleOptions<P> | RenderCollectionOptions<P>;
 
-/**
- * Options for `render()` with a dynamic partial name (string, not a literal
- * registry key). Locals type degrades to `Record<string, unknown>`.
- */
-export type DynamicPartialOptions = {
-  partial: string;
-  locals?: Record<string, unknown>;
-  collection?: readonly unknown[];
+type RenderSingleOptions<P extends string> = {
+  partial: P;
+  collection?: undefined;
+  as?: string;
+  spacerTemplate?: undefined;
+} & (P extends keyof TemplateRegistry
+  ? // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+    {} extends TemplateLocals<TemplateRegistry[P]>
+    ? { locals?: TemplateLocals<TemplateRegistry[P]> }
+    : { locals: TemplateLocals<TemplateRegistry[P]> }
+  : { locals?: Record<string, unknown> });
+
+type RenderCollectionOptions<P extends string> = {
+  partial: P;
+  collection: readonly unknown[];
   as?: string;
   spacerTemplate?: string;
-};
+} & (P extends keyof TemplateRegistry
+  ? { locals?: Partial<TemplateLocals<TemplateRegistry[P]>> }
+  : { locals?: Record<string, unknown> });
 
 /**
  * Per-render execution context passed to compiled `.tse` templates.
@@ -76,19 +77,18 @@ export interface TseRenderContext {
   contentFor(name: string, callback: () => void): void;
 
   /**
-   * Render a partial with typed locals when `partial` is a literal key known
-   * to the `TemplateRegistry`. `rails partial_renderer.rb`.
+   * Render a partial. When `partial` is a literal key known to
+   * `TemplateRegistry`, locals are typed (and required when the registered
+   * shape has required properties). A plain `string` falls back to
+   * `Record<string, unknown>`. Collection renders (`collection:` present)
+   * make locals optional because Rails auto-injects the item, counter, and
+   * iteration locals; `spacerTemplate` is only accepted on collection
+   * renders. `rails partial_renderer.rb`.
    *
    * Static form: `render({ partial: "users/user", locals: { user } })`
    * Collection form: `render({ partial: "users/user", collection: users, as: "user" })`
    */
-  render<K extends keyof TemplateRegistry>(options: PartialOptions<K>): SafeBuffer;
-
-  /**
-   * Dynamic form: partial name is a runtime `string`. Locals fall back to
-   * `Record<string, unknown>`.
-   */
-  render(options: DynamicPartialOptions): SafeBuffer;
+  render<P extends string>(options: RenderOptions<P>): SafeBuffer;
 }
 
 /**
@@ -147,9 +147,7 @@ export class TseRenderContextImpl implements TseRenderContext {
     this._contentBuffers.set(name, existing ? existing.concat(captured) : captured);
   }
 
-  render<K extends keyof TemplateRegistry>(options: PartialOptions<K>): SafeBuffer;
-  render(options: DynamicPartialOptions): SafeBuffer;
-  render(options: DynamicPartialOptions): SafeBuffer {
+  render<P extends string>(options: RenderOptions<P>): SafeBuffer {
     const { partial, locals = {}, collection, as, spacerTemplate } = options;
     const localName = as ?? deriveLocalName(partial);
 
