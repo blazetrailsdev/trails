@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { IntegrationTest } from "./integration.js";
 import { Base } from "../../action-controller/base.js";
 
@@ -68,6 +68,18 @@ class PostsController extends Base {
     const cookie = this.request.env.HTTP_COOKIE ?? "none";
     this.render({ plain: String(cookie) });
   }
+
+  async renderXml() {
+    this.response.setHeader("content-type", "application/xml");
+    this.response.body = "<root><item>1</item></root>";
+    this.status = 200;
+  }
+
+  async renderXml2() {
+    this.response.setHeader("content-type", "application/xml");
+    this.response.body = "<response><data>2</data></response>";
+    this.status = 200;
+  }
 }
 
 class CommentsController extends Base {
@@ -116,6 +128,8 @@ describe("ActionDispatch::IntegrationTest", () => {
     app = new IntegrationTest();
     app.routes.draw((r) => {
       // Custom routes before resources so they match before :id
+      r.get("/posts/xml", { to: "posts#renderXml", as: "posts_xml" });
+      r.get("/posts/xml2", { to: "posts#renderXml2", as: "posts_xml2" });
       r.get("/posts/html", { to: "posts#renderHtml", as: "posts_html" });
       r.get("/posts/error", { to: "posts#serverError", as: "posts_error" });
       r.get("/posts/redirect", { to: "posts#redirectToIndex", as: "posts_redirect" });
@@ -508,6 +522,66 @@ describe("ActionDispatch::IntegrationTest", () => {
       // Delete
       await app.delete("/posts/1");
       app.assertResponse("no_content");
+    });
+  });
+
+  // =========================================================================
+  // html_document / document_root_element / _mock_session
+  // (ActionDispatch::Assertions#html_document, Integration::Runner)
+  // =========================================================================
+  describe("html_document", () => {
+    afterEach(() => {
+      app.reset();
+    });
+
+    it("html_document parses XML response as XML::Document", async () => {
+      await app.get("/posts/xml");
+      const doc = app.htmlDocument;
+      expect(doc).toBeDefined();
+      expect(doc.root).toBeDefined();
+      expect(doc.root.name).toBe("root");
+    });
+
+    it("html_document is lazily cached per request", async () => {
+      await app.get("/posts/xml");
+      const first = app.htmlDocument;
+      const second = app.htmlDocument;
+      expect(first).toBe(second);
+    });
+
+    it("test_redirect_reset_html_document", async () => {
+      await app.get("/posts/xml");
+      const previousHtmlDocument = app.htmlDocument;
+
+      await app.get("/posts/xml2");
+
+      app.assertResponse("success");
+      expect(app.htmlDocument).not.toBe(previousHtmlDocument);
+    });
+
+    it("html_document throws for text/html responses (HTML parsing not yet implemented)", async () => {
+      await app.get("/posts/html");
+      expect(() => app.htmlDocument).toThrow("not yet implemented");
+    });
+  });
+
+  describe("document_root_element", () => {
+    afterEach(() => {
+      app.reset();
+    });
+
+    it("document_root_element returns the root element", async () => {
+      await app.get("/posts/xml");
+      const root = app.documentRootElement;
+      expect(root).toBeDefined();
+      expect(root.name).toBe("root");
+      expect(root).toBe(app.htmlDocument.root);
+    });
+  });
+
+  describe("_mock_session", () => {
+    it("_mock_session returns the integration session", () => {
+      expect(app._mockSession).toBe(app);
     });
   });
 });

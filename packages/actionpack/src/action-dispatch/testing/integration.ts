@@ -49,6 +49,8 @@ import {
 } from "./test-process.js";
 import * as routingAssertions from "./assertions/routing.js";
 import * as responseAssertions from "./assertions/response.js";
+import { htmlDocument as parseHtmlDocument } from "./assertions.js";
+import type { XmlDocument } from "@blazetrails/nokogiri";
 import * as urlForMod from "../routing/url-for.js";
 import * as polymorphicRoutes from "../routing/polymorphic-routes.js";
 import type { UrlForRoutes } from "../routing/url-for.js";
@@ -138,6 +140,8 @@ export class IntegrationTest {
     this.session = {};
     this._persistentCookies = {};
     this._cookieJar = undefined;
+    this._htmlDocument?.dispose();
+    this._htmlDocument = undefined;
     this.controller = undefined!;
     this.request = undefined!;
     this.response = undefined!;
@@ -377,6 +381,42 @@ export class IntegrationTest {
     return testProcessRedirectToUrl.call(this as unknown as TestProcessHost);
   }
 
+  /**
+   * Lazy-cached parsed document for the last response body. Returns an
+   * `XML::Document` when the response content-type ends with `xml`; throws
+   * for other mime types (HTML parsing via rails-dom-testing is not yet
+   * implemented). The previous document is **disposed** (libxml2-wasm memory
+   * freed) at the start of each new request and on `resetBang()` — do not
+   * hold references to a prior `htmlDocument` across requests.
+   * Mirrors `ActionDispatch::Assertions#html_document`.
+   */
+  get htmlDocument(): XmlDocument {
+    if (!this._htmlDocument) {
+      const mimeType = this.response?.getHeader("content-type") ?? undefined;
+      this._htmlDocument = parseHtmlDocument(this.responseBody, mimeType);
+    }
+    return this._htmlDocument;
+  }
+
+  /**
+   * Root element of the last response document. Mirrors
+   * `Integration::Runner#document_root_element`.
+   */
+  get documentRootElement() {
+    return this.htmlDocument.root;
+  }
+
+  /**
+   * The underlying mock session used to dispatch requests. In Rails this is a
+   * `Rack::MockSession`; in Trails the `IntegrationTest` itself plays that
+   * role, so this returns `this`. Mirrors `Integration::Session#_mock_session`.
+   *
+   * @internal
+   */
+  get _mockSession(): this {
+    return this;
+  }
+
   /** Mirror of `ActionDispatch::TestProcess#session` (no-op delegation). */
   // `session` is kept as an instance field above so multi-request tests can
   // observe accumulated state directly. TestProcess#session reads the same
@@ -488,6 +528,9 @@ export class IntegrationTest {
     );
     // Routes/controllers are shared with the parent (Rails dup is shallow
     // for object refs); per-request state is cleared by resetBang below.
+    // Null out _htmlDocument before resetBang so the parent's cached document
+    // isn't disposed — the shallow copy shares the same XmlDocument reference.
+    sess._htmlDocument = undefined;
     sess.resetBang();
     sess.rootSession = this.rootSession ?? this;
     block?.(sess);
@@ -520,6 +563,14 @@ export class IntegrationTest {
 
   /** @internal */
   _assertions: number = 0;
+
+  /**
+   * Cached parsed HTML/XML document for the last response. Cleared at the
+   * start of each new request. Rails: `@html_document`.
+   *
+   * @internal
+   */
+  _htmlDocument?: XmlDocument;
 
   /**
    * Copies session-owned ivars onto the test. In Rails the Runner uses
@@ -800,6 +851,8 @@ export class IntegrationTest {
     // including down the no-route 404 path.
     this._cookieJar = undefined;
     this._urlOptions = undefined;
+    this._htmlDocument?.dispose();
+    this._htmlDocument = undefined;
 
     // Split path into PATH_INFO + QUERY_STRING; Rack stores them separately.
     const qIdx = path.indexOf("?");
