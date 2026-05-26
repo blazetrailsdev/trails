@@ -209,24 +209,27 @@ export class Response {
   }
 
   set contentType(value: string | undefined) {
-    if (value) {
-      const charset = this._charset ?? (this.constructor as typeof Response).defaultCharset;
-      if (value.startsWith("text/")) {
-        this._headers["content-type"] = `${value}; charset=${charset}`;
-      } else {
-        this._headers["content-type"] = value;
-      }
-    } else {
-      delete this._headers["content-type"];
-      delete this._headers["Content-Type"];
+    if (!value) {
+      this.deleteHeader(CONTENT_TYPE);
+      return;
     }
+    const newHeader = this.parseContentType(value);
+    const prevHeader = this.parsedContentTypeHeader();
+    let charset = newHeader.charset || prevHeader.charset || this._charset;
+    const mimeType = newHeader.mimeType ?? value;
+    if (!charset && mimeType.startsWith("text/")) {
+      charset = (this.constructor as typeof Response).defaultCharset;
+    }
+    this.setContentType(mimeType, charset);
   }
 
   get charset(): string | undefined {
     const ct = this._headers["content-type"] ?? this._headers["Content-Type"];
-    if (!ct) return this._charset;
+    if (!ct) return this._charset ?? (this.constructor as typeof Response).defaultCharset;
     const match = ct.match(/charset=([^\s;]+)/i);
-    return match ? match[1] : this._charset;
+    return match
+      ? match[1]
+      : (this._charset ?? (this.constructor as typeof Response).defaultCharset);
   }
 
   set charset(value: string | undefined) {

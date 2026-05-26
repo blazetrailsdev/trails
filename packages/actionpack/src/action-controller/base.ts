@@ -243,7 +243,11 @@ export class Base extends Metal {
       this.contentType = options.contentType ?? "text/html; charset=utf-8";
       this.body = options.html;
     } else if (options.body !== undefined) {
-      this.contentType = options.contentType ?? "application/octet-stream";
+      if (options.contentType != null) {
+        this.contentType = String(options.contentType);
+      } else if (!this._contentType && !this.response.contentType) {
+        this.contentType = "text/plain";
+      }
       this.body = options.body;
     } else if (options.text !== undefined) {
       this.contentType = options.contentType ?? "text/plain; charset=utf-8";

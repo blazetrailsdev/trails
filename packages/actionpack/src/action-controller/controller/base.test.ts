@@ -77,7 +77,7 @@ describe("ControllerInstanceTests", () => {
     const c = new BodyController();
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(c.body).toBe("raw body");
-    expect(c.contentType).toBe("application/octet-stream");
+    expect(c.contentType).toBe("text/plain");
   });
 
   it("render text", async () => {

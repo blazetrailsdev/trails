@@ -143,7 +143,7 @@ describe("ActionController rendering", () => {
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
       expect(c.body).toBe("raw");
-      expect(c.contentType).toBe("application/octet-stream");
+      expect(c.contentType).toBe("text/plain");
     });
   });
 
@@ -593,7 +593,7 @@ describe("ActionController render edge cases", () => {
     expect(c.contentType).toContain("text/plain");
   });
 
-  it("render body sets octet-stream content type", async () => {
+  it("render body sets text/plain content type", async () => {
     class C extends Base {
       async index() {
         this.render({ body: "raw" });
@@ -601,7 +601,7 @@ describe("ActionController render edge cases", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.contentType).toContain("application/octet-stream");
+    expect(c.contentType).toContain("text/plain");
   });
 
   it("head with status symbol", async () => {
