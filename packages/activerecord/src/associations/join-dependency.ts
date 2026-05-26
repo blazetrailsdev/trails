@@ -380,9 +380,58 @@ export class JoinDependency {
       if (part._joinNode?.arelJoin) joins.push(part._joinNode.arelJoin);
     });
     for (const oj of joinsToAdd) {
-      oj._joinRoot.eachChildren((_parent, part) => {
-        if (part._joinNode?.arelJoin) joins.push(part._joinNode.arelJoin);
-      });
+      joins.push(...this.walk(this._joinRoot, oj._joinRoot, Nodes.OuterJoin));
+    }
+    return joins;
+  }
+
+  /** @internal */
+  private walk(
+    left: JoinPart,
+    right: JoinPart,
+    joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
+  ): Nodes.Join[] {
+    const intersection: [JoinPart, JoinPart][] = [];
+    const missing: JoinPart[] = [];
+
+    for (const rc of right.children) {
+      const lc = left.children.find((l) => l.isMatch(rc));
+      if (lc) {
+        intersection.push([lc, rc]);
+      } else {
+        missing.push(rc);
+      }
+    }
+
+    const joins: Nodes.Join[] = [];
+
+    for (const [l, r] of intersection) {
+      if (r instanceof JoinTreeNode) {
+        (r as JoinTreeNode).table = l.table;
+      }
+      joins.push(...this.walk(l, r, joinType));
+    }
+
+    for (const n of missing) {
+      joins.push(...this.makeConstraints(left, n, joinType));
+    }
+
+    return joins;
+  }
+
+  /** @internal */
+  private makeConstraints(
+    _parent: JoinPart,
+    child: JoinPart,
+    joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
+  ): Nodes.Join[] {
+    const joins: Nodes.Join[] = [];
+    const arelJoin = child._joinNode?.arelJoin;
+    if (arelJoin) {
+      joins.push(arelJoin);
+    }
+    for (const grandchild of child.children) {
+      joins.push(...this.makeConstraints(child, grandchild, joinType));
     }
     return joins;
   }
@@ -1035,6 +1084,7 @@ function rebindTableReferences(
 
 class JoinTreeNode extends JoinPart {
   override readonly _joinNode: JoinNode;
+  private _tableOverride: string | null = null;
 
   constructor(baseKlass: typeof Base, joinNode: JoinNode) {
     super(baseKlass);
@@ -1042,6 +1092,23 @@ class JoinTreeNode extends JoinPart {
   }
 
   get table(): string {
-    return this._joinNode.effectiveSqlName;
+    return this._tableOverride ?? this._joinNode.effectiveSqlName;
+  }
+
+  set table(value: string) {
+    this._tableOverride = value;
+  }
+
+  override isMatch(other: JoinPart): boolean {
+    if (this === other) return true;
+    if (!(other instanceof JoinTreeNode)) return false;
+    return (
+      this._joinNode.immediateAssocName === other._joinNode.immediateAssocName &&
+      this._joinNode.modelClass === other._joinNode.modelClass
+    );
+  }
+
+  match(other: JoinPart): boolean {
+    return this.isMatch(other);
   }
 }
