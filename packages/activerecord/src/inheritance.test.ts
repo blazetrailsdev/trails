@@ -2,14 +2,14 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass, SubclassNotFound } from "./index.js";
 import { getStiBase, isStiSubclass, setBaseClass } from "./inheritance.js";
 
-import { createTestAdapter } from "./test-adapter.js";
 import { quoteTableName } from "./test-helpers/quote-regex.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   vehicles: {
@@ -48,17 +48,11 @@ const TEST_SCHEMA: Schema = {
   },
 };
 
-// -- Helpers --
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 describe("InheritanceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
   });
 
   function makeHierarchy() {
@@ -67,7 +61,6 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.inheritanceColumn = "type";
-        this.adapter = adapter;
       }
     }
     class Car extends Vehicle {}
@@ -268,7 +261,6 @@ describe("InheritanceTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("type", "string");
-        this.adapter = adapter;
         enableSti(Shape);
       }
     }
@@ -293,7 +285,6 @@ describe("InheritanceTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("type", "string");
-        this.adapter = adapter;
         enableSti(Animal);
       }
     }
@@ -335,7 +326,6 @@ describe("InheritanceTest", () => {
         this.attribute("id", "integer");
         this.attribute("type", "string");
         this._tableName = "posts";
-        this.adapter = adapter;
         enableSti(Post);
       }
     }
@@ -366,20 +356,17 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = adapter;
         enableSti(Company);
       }
     }
     class Firm extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Firm);
         registerSubclass(Firm);
       }
     }
     class Client extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Client);
         registerSubclass(Client);
       }
@@ -404,20 +391,17 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = adapter;
         enableSti(Company);
       }
     }
     class Firm extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Firm);
         registerSubclass(Firm);
       }
     }
     class Client extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Client);
         registerSubclass(Client);
       }
@@ -446,20 +430,17 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "vegetables";
-        this.adapter = adapter;
         enableSti(Vegetable);
       }
     }
     class Cucumber extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cucumber);
         registerSubclass(Cucumber);
       }
     }
     class Cabbage extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cabbage);
         registerSubclass(Cabbage);
       }
@@ -485,20 +466,17 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = adapter;
         enableSti(Company);
       }
     }
     class Firm extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Firm);
         registerSubclass(Firm);
       }
     }
     class Client extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Client);
         registerSubclass(Client);
       }
@@ -526,20 +504,17 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "vegetables";
-        this.adapter = adapter;
         enableSti(Vegetable);
       }
     }
     class Cucumber extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cucumber);
         registerSubclass(Cucumber);
       }
     }
     class Cabbage extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cabbage);
         registerSubclass(Cabbage);
       }
@@ -566,13 +541,11 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = adapter;
         enableSti(Company);
       }
     }
     class Firm extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Firm);
         registerSubclass(Firm);
       }
@@ -592,13 +565,11 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "vegetables";
-        this.adapter = adapter;
         enableSti(Vegetable);
       }
     }
     class Cabbage extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cabbage);
         registerSubclass(Cabbage);
       }
@@ -622,20 +593,17 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = adapter;
         enableSti(Company);
       }
     }
     class Firm extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Firm);
         registerSubclass(Firm);
       }
     }
     class Client extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Client);
         registerSubclass(Client);
       }
@@ -658,20 +626,17 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "vegetables";
-        this.adapter = adapter;
         enableSti(Vegetable);
       }
     }
     class Cucumber extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cucumber);
         registerSubclass(Cucumber);
       }
     }
     class Cabbage extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cabbage);
         registerSubclass(Cabbage);
       }
@@ -698,13 +663,11 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "vegetables";
-        this.adapter = adapter;
         enableSti(Vegetable);
       }
     }
     class Cabbage extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cabbage);
         registerSubclass(Cabbage);
       }
@@ -728,7 +691,6 @@ describe("InheritanceTest", () => {
         this.attribute("id", "integer");
         this.attribute("type", "string");
         this._tableName = "vehicles";
-        this.adapter = adapter;
         enableSti(Vehicle);
       }
     }
@@ -758,7 +720,6 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = adapter;
         enableSti(Company);
       }
     }
@@ -778,20 +739,17 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = adapter;
         enableSti(Company);
       }
     }
     class Firm extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Firm);
         registerSubclass(Firm);
       }
     }
     class Client extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Client);
         registerSubclass(Client);
       }
@@ -817,20 +775,17 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "vegetables";
-        this.adapter = adapter;
         enableSti(Vegetable);
       }
     }
     class Cucumber extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cucumber);
         registerSubclass(Cucumber);
       }
     }
     class Cabbage extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cabbage);
         registerSubclass(Cabbage);
       }
@@ -860,20 +815,17 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = adapter;
         enableSti(Company);
       }
     }
     class Firm extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Firm);
         registerSubclass(Firm);
       }
     }
     class Client extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Client);
         registerSubclass(Client);
       }
@@ -896,20 +848,17 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "vegetables";
-        this.adapter = adapter;
         enableSti(Vegetable);
       }
     }
     class Cucumber extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cucumber);
         registerSubclass(Cucumber);
       }
     }
     class Cabbage extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cabbage);
         registerSubclass(Cabbage);
       }
@@ -934,20 +883,17 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = adapter;
         enableSti(Company);
       }
     }
     class Firm extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Firm);
         registerSubclass(Firm);
       }
     }
     class Client extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Client);
         registerSubclass(Client);
       }
@@ -975,20 +921,17 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = adapter;
         enableSti(Company);
       }
     }
     class Client extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Client);
         registerSubclass(Client);
       }
     }
     class VerySpecialClient extends Client {
       static {
-        this.adapter = adapter;
         registerModel(VerySpecialClient);
         registerSubclass(VerySpecialClient);
       }
@@ -1018,7 +961,6 @@ describe("InheritanceTest", () => {
       static {
         this.attribute("id", "integer");
         this.abstractClass = true;
-        this.adapter = adapter;
       }
     }
     class LooseDescendant extends LoosePerson {
@@ -1043,7 +985,6 @@ describe("InheritanceTest", () => {
         this.attribute("type", "string");
         this.primaryKey = "nick";
         this._tableName = "subscribers";
-        this.adapter = adapter;
         enableSti(Subscriber);
       }
     }
@@ -1061,14 +1002,12 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("inheritance new with base class", async () => {
-    const innerAdapter = await freshAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = innerAdapter;
         enableSti(Company);
       }
     }
@@ -1083,20 +1022,17 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("inheritance new with subclass", async () => {
-    const adapter = await freshAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = adapter;
         enableSti(Company);
       }
     }
     class Firm extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Firm);
         registerSubclass(Firm);
       }
@@ -1125,14 +1061,12 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("a bad type column", async () => {
-    const adapter = await freshAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = adapter;
         enableSti(Company);
       }
     }
@@ -1150,20 +1084,17 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("becomes bang resets inheritance type column", async () => {
-    const adapter = await freshAdapter();
     class Vegetable extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("custom_type", "string");
         this._tableName = "vegetables";
-        this.adapter = adapter;
         enableSti(Vegetable, { column: "custom_type" });
       }
     }
     class Cabbage extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cabbage);
         registerSubclass(Cabbage);
       }
@@ -1192,27 +1123,23 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("update all within inheritance", async () => {
-    const adapter = await freshAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = adapter;
         enableSti(Company);
       }
     }
     class Firm extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Firm);
         registerSubclass(Firm);
       }
     }
     class Client extends Company {
       static {
-        this.adapter = adapter;
         registerModel(Client);
         registerSubclass(Client);
       }
@@ -1238,27 +1165,23 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("alt update all within inheritance", async () => {
-    const adapter = await freshAdapter();
     class Vegetable extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "vegetables";
-        this.adapter = adapter;
         enableSti(Vegetable);
       }
     }
     class Cucumber extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cucumber);
         registerSubclass(Cucumber);
       }
     }
     class Cabbage extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cabbage);
         registerSubclass(Cabbage);
       }
@@ -1282,27 +1205,23 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("alt destroy all within inheritance", async () => {
-    const adapter = await freshAdapter();
     class Vegetable extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "vegetables";
-        this.adapter = adapter;
         enableSti(Vegetable);
       }
     }
     class Cucumber extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cucumber);
         registerSubclass(Cucumber);
       }
     }
     class Cabbage extends Vegetable {
       static {
-        this.adapter = adapter;
         registerModel(Cabbage);
         registerSubclass(Cabbage);
       }
@@ -1324,13 +1243,11 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("descends from active record", async () => {
-    const adapter = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("type", "string");
         this._tableName = "posts";
-        this.adapter = adapter;
         enableSti(Post);
       }
     }
@@ -1358,13 +1275,11 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("base class predicate", async () => {
-    const adapter = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("type", "string");
         this._tableName = "posts";
-        this.adapter = adapter;
         enableSti(Post);
       }
     }
@@ -1403,7 +1318,6 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("inheritance without mapping", async () => {
-    const adapter = await freshAdapter();
     class Subscriber extends Base {
       static {
         this.attribute("nick", "string");
@@ -1411,13 +1325,11 @@ describe("InheritanceTest", () => {
         this.attribute("type", "string");
         this.primaryKey = "nick";
         this._tableName = "subscribers";
-        this.adapter = adapter;
         enableSti(Subscriber);
       }
     }
     class SpecialSubscriber extends Subscriber {
       static {
-        this.adapter = adapter;
         registerModel(SpecialSubscriber);
         registerSubclass(SpecialSubscriber);
       }
@@ -1438,7 +1350,6 @@ describe("InheritanceTest", () => {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.inheritanceColumn = "type";
-        this.adapter = adapter;
       }
     }
     class Firm extends Company {}
@@ -1468,7 +1379,6 @@ describe("InheritanceTest", () => {
     class Plain extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const p = new (Plain as any)({ name: "NoSTI" });
@@ -1496,7 +1406,6 @@ describe("InheritanceTest", () => {
     class AbstractBase extends Base {
       static {
         this.abstractClass = true;
-        this.adapter = adapter;
       }
     }
     class ConcreteClass extends AbstractBase {
@@ -1525,7 +1434,6 @@ describe("InheritanceTest", () => {
       static {
         this.abstractClass = true;
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class RealCompany extends AbstractCompany {}
@@ -1571,14 +1479,18 @@ describe("InheritanceComputeTypeTest", () => {
 });
 
 describe("InheritanceAttributeMappingTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   it("sti with custom type", async () => {
-    const adapter = await freshAdapter();
     class Vehicle extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("kind", "string");
         this.inheritanceColumn = "kind";
-        this.adapter = adapter;
       }
     }
     class Car extends Vehicle {}
@@ -1587,12 +1499,10 @@ describe("InheritanceAttributeMappingTest", () => {
   });
 
   it("polymorphic associations custom type", async () => {
-    const adapter = await freshAdapter();
     class Entry extends Base {
       static {
         this.attribute("entryable_type", "string");
         this.attribute("entryable_id", "integer");
-        this.adapter = adapter;
       }
     }
     const e = await Entry.create({ entryable_type: "Comment", entryable_id: 1 });
@@ -1601,14 +1511,18 @@ describe("InheritanceAttributeMappingTest", () => {
 });
 
 describe("InheritanceAttributeTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   it("inheritance new with subclass as default", async () => {
-    const adapter = await freshAdapter();
     class Vehicle extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.inheritanceColumn = "type";
-        this.adapter = adapter;
       }
     }
     class Car extends Vehicle {}
@@ -1847,9 +1761,6 @@ import {
   polymorphicClassFor,
   __resetPrimaryAbstractClass,
 } from "./inheritance.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-
 describe("InheritanceTest — new parity methods", () => {
   afterEach(() => __resetPrimaryAbstractClass());
 
@@ -1985,18 +1896,15 @@ describe("typeCondition", () => {
 
   it("discriminateClassForRecord casts the inheritance column value through its type", async () => {
     const { discriminateClassForRecord } = await import("./inheritance.js");
-    const adapter = await freshAdapter();
     class Vehicle extends Base {
       static {
         this._tableName = "vehicles";
         this.attribute("type", "string");
-        this.adapter = adapter;
         enableSti(Vehicle);
       }
     }
     class Car extends Vehicle {
       static {
-        this.adapter = adapter;
         registerModel(Car);
         registerSubclass(Car);
       }
@@ -2008,18 +1916,15 @@ describe("typeCondition", () => {
 
   it("subclassFromAttributes casts the inheritance column value through its type", async () => {
     const { subclassFromAttributes } = await import("./inheritance.js");
-    const adapter = await freshAdapter();
     class Vehicle extends Base {
       static {
         this._tableName = "vehicles";
         this.attribute("type", "string");
-        this.adapter = adapter;
         enableSti(Vehicle);
       }
     }
     class Car extends Vehicle {
       static {
-        this.adapter = adapter;
         registerModel(Car);
         registerSubclass(Car);
       }
@@ -2132,13 +2037,11 @@ describe("Base constructor wires initializeInternalsCallback", () => {
 
   it("_instantiate (DB hydration) does NOT fire initializeInternalsCallback", async () => {
     const { enableSti } = await import("./inheritance.js");
-    const adapter = await freshAdapter();
     class Vehicle extends Base {
       static {
         this._tableName = "vehicles";
         this.attribute("id", "integer");
         this.attribute("type", "string");
-        this.adapter = adapter;
       }
     }
     enableSti(Vehicle);
@@ -2153,13 +2056,11 @@ describe("Base constructor wires initializeInternalsCallback", () => {
 
 describe("base_class? / isBaseClass", () => {
   it("base_class? returns true for the STI root and false for subclasses", async () => {
-    const adapter2 = await freshAdapter();
     class User2 extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("type", "string");
         this._tableName = "user2s";
-        this.adapter = adapter2;
         enableSti(User2);
       }
     }
@@ -2176,21 +2077,24 @@ describe("base_class? / isBaseClass", () => {
 });
 
 describe("STI subclass routing via find", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   it("subclass from find returns the subclass instance", async () => {
-    const adapter3 = await freshAdapter();
     class User3 extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "user3s";
-        this.adapter = adapter3;
         enableSti(User3);
       }
     }
     class Manager3 extends User3 {
       static {
-        this.adapter = adapter3;
         registerModel(Manager3);
         registerSubclass(Manager3);
       }
@@ -2205,12 +2109,10 @@ describe("STI subclass routing via find", () => {
 
 describe("set_base_class / setBaseClass", () => {
   it("setBaseClass caches the base class using the Rails hierarchy logic", async () => {
-    const adapter4 = await freshAdapter();
     class Animal2 extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("type", "string");
-        this.adapter = adapter4;
         enableSti(Animal2);
       }
     }
