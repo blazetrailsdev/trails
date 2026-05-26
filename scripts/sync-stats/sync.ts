@@ -12,14 +12,19 @@ const DB_PATH = join(homedir(), "github", "blazetrailsdev", "stats.db");
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
 // Throttle gh calls to stay under GitHub's secondary rate limit (~80 req/min
-// for bursty patterns). 250ms between calls = ~240/min, comfortably safe for
-// read-only traffic.
+// for bursty patterns). Compute requests/minute from the interval so the
+// comment can't drift.
 const GH_MIN_INTERVAL_MS = 500;
+const GH_REQ_PER_MIN = Math.floor(60_000 / GH_MIN_INTERVAL_MS); // 120/min at 500ms
 const RATE_LIMIT_RESERVE = 1000;
+const BUDGET_CHECK_EVERY = 100;
 const sleepBuf = new Int32Array(new SharedArrayBuffer(4));
 let lastGhCallAt = 0;
 let rateLimitCooldownUntil = 0;
 let ghCallCount = 0;
+let lastBudgetCheckAt = 0; // ghCallCount value at last probe — prevents re-probing on the same call boundary
+
+void GH_REQ_PER_MIN; // documented for future reference; intentionally unused
 
 class RateLimitExhaustedError extends Error {
   constructor(remaining: number) {
@@ -27,8 +32,27 @@ class RateLimitExhaustedError extends Error {
   }
 }
 
+function waitForCooldownAndInterval() {
+  const cooldownRemaining = rateLimitCooldownUntil - Date.now();
+  if (cooldownRemaining > 0) {
+    Atomics.wait(sleepBuf, 0, 0, cooldownRemaining);
+  }
+  const elapsed = Date.now() - lastGhCallAt;
+  if (elapsed < GH_MIN_INTERVAL_MS) {
+    Atomics.wait(sleepBuf, 0, 0, GH_MIN_INTERVAL_MS - elapsed);
+  }
+}
+
 function checkRateLimitBudget() {
-  if (ghCallCount > 0 && ghCallCount % 100 === 0) {
+  if (
+    ghCallCount > 0 &&
+    ghCallCount % BUDGET_CHECK_EVERY === 0 &&
+    ghCallCount !== lastBudgetCheckAt
+  ) {
+    lastBudgetCheckAt = ghCallCount;
+    // Route the probe through the same throttle path so it doesn't burst
+    // alongside the real call that triggered it.
+    waitForCooldownAndInterval();
     let out: string;
     try {
       out = execSync("gh api rate_limit --jq '.rate.remaining'", {
@@ -37,7 +61,10 @@ function checkRateLimitBudget() {
       }).trim();
     } catch (err) {
       console.warn(`  [budget check] probe failed: ${err instanceof Error ? err.message : err}`);
+      lastGhCallAt = Date.now();
       return;
+    } finally {
+      lastGhCallAt = Date.now();
     }
     const remaining = parseInt(out, 10);
     if (Number.isNaN(remaining)) {
@@ -58,14 +85,7 @@ function gh(args: string): string {
   checkRateLimitBudget();
   const MAX_RETRIES = 5;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const cooldownRemaining = rateLimitCooldownUntil - Date.now();
-    if (cooldownRemaining > 0) {
-      Atomics.wait(sleepBuf, 0, 0, cooldownRemaining);
-    }
-    const elapsed = Date.now() - lastGhCallAt;
-    if (elapsed < GH_MIN_INTERVAL_MS) {
-      Atomics.wait(sleepBuf, 0, 0, GH_MIN_INTERVAL_MS - elapsed);
-    }
+    waitForCooldownAndInterval();
     try {
       const result = execSync(`gh ${args}`, { encoding: "utf-8", maxBuffer: 50_000_000 });
       lastGhCallAt = Date.now();
@@ -1085,6 +1105,7 @@ async function syncPullRequests(mode: "latest" | "refresh"): Promise<number> {
         const pr = ghJson<GhPrData>(`pr view ${num} --repo ${REPO} --json ${fields}`);
         await PullRequest.upsertAll([mapPr(pr)], { uniqueBy: "number" });
       } catch (err) {
+        if (err instanceof RateLimitExhaustedError) throw err;
         console.warn(`  Failed to refresh PR #${num}: ${err instanceof Error ? err.message : err}`);
       }
     }
