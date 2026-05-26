@@ -533,6 +533,7 @@ export class JoinDependency {
     const seenChildren = new Map<unknown, Map<string, Set<unknown>>>();
     const seenRawPks = new Set<unknown>();
     const rawToKey = new Map<unknown, unknown>();
+    const modelCache = new Map<JoinNode, Map<unknown, any>>();
 
     const baseColumns = getModelColumns(this._baseModel);
 
@@ -588,7 +589,17 @@ export class JoinDependency {
 
         if (!seenPks.has(rawChildPk)) {
           seenPks.add(rawChildPk);
-          const child = this.constructModel(childAttrs, node, strictLoadingValue);
+
+          let nodeCache = modelCache.get(node);
+          if (!nodeCache) {
+            nodeCache = new Map();
+            modelCache.set(node, nodeCache);
+          }
+          let child = nodeCache.get(rawChildPk);
+          if (!child) {
+            child = this.constructModel(childAttrs, node, strictLoadingValue);
+            if (rawChildPk != null) nodeCache.set(rawChildPk, child);
+          }
 
           this._wireAssociationProxy(parent, node, child);
 
