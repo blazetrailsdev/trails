@@ -200,6 +200,7 @@ export class JoinDependency {
       assocDef.type === "hasAndBelongsToMany"
     ) {
       if (assocDef.options.through) {
+        this._nextTableIndex--;
         if (reflection && reflection.isThroughReflection()) {
           return this._addThroughViaJoinAssociation(
             assocDef,
@@ -969,10 +970,10 @@ export class JoinDependency {
       sourceArelTable,
       modelClass,
       this._joinType,
-      (refl, _remaining) => {
-        const model = refl.klass;
-        const entry = chainTables.find((ct) => ct.model === model);
-        if (!entry) return [new Table((model as any).tableName), false];
+      (_refl, remaining) => {
+        const idx = chain.length - remaining.length;
+        const entry = chainTables[idx];
+        if (!entry) return [new Table((_refl.klass as any).tableName), false];
         return [entry.table, false];
       },
     );
@@ -1004,7 +1005,6 @@ export class JoinDependency {
     // After joinConstraints reversal: joins[0] corresponds to chain[last],
     // joins[last] corresponds to chain[0] (the target/ThroughReflection).
     // Register all tables and create JoinNodes.
-    const targetChainEntry = chainTables[0];
     let targetNode: JoinNode | null = null;
 
     // Map each join to its chain entry. joinConstraints reverses the chain,
