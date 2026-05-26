@@ -13,10 +13,6 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./lsp": {
-      "types": "./dist/lsp-plugin.d.ts",
-      "default": "./dist/lsp-plugin.js"
-    },
     "./ts-plugin": {
       "types": "./dist/lsp-plugin.d.ts",
       "default": "./dist/lsp-plugin.js"

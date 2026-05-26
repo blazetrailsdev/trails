@@ -61,7 +61,7 @@ export class AppGenerator extends AppBase {
           type: "module",
           exports: {
             "./*.tse": {
-              types: "./.trails/views/*.tse.ts",
+              types: "./.trails/views/*.tse.d.ts",
               default: "./.trails/views/*.tse.js",
             },
           },
