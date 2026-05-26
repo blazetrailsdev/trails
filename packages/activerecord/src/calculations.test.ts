@@ -5,7 +5,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
  */
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "./encryption.js";
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import {
   Base,
   association,
@@ -21,19 +21,12 @@ import { ReadonlyAttributeError } from "./readonly-attributes.js";
 
 import type { JoinDependency } from "./associations/join-dependency.js";
 import { lookupCastTypeFromJoinDependencies } from "./relation/calculations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { adapterType } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import type { DatabaseAdapter } from "./adapter.js";
 import { runBeforeCallbacksOnProto, runAfterCallbacksOnProto } from "@blazetrails/activemodel";
 import { setApp, _resetApp } from "@blazetrails/globalid";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-
-// -- Helpers --
-function freshAdapter(): TestDatabaseAdapter {
-  return createTestAdapter();
-}
 
 // ==========================================================================
 // CalculationsTest — targets calculations_test.rb
@@ -2668,11 +2661,10 @@ describe("CalculationsTest", () => {
 });
 
 describe("CalculationsTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       accounts: { balance: "integer" },
       authors: { name: "string" },
       conversations: {
@@ -2735,10 +2727,6 @@ describe("CalculationsTest", () => {
     });
   });
 
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
-
   // Rails: test "group count"
   it("group().count() returns counts keyed by group value", async () => {
     class Order extends Base {
@@ -2747,7 +2735,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.attribute("total", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -2770,7 +2757,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.attribute("total", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -2790,7 +2776,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.attribute("total", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -2810,7 +2795,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.attribute("total", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -2833,7 +2817,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2849,7 +2832,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2866,7 +2848,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2886,7 +2867,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2902,7 +2882,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2916,7 +2895,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2938,7 +2916,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2955,7 +2932,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2972,7 +2948,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "topics";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -2989,7 +2964,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "topics";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -3003,7 +2977,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "topics";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -3019,7 +2992,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3040,7 +3012,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3064,7 +3035,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
     Post.scope("published", (rel: any) => rel.where({ status: "published" }));
@@ -3085,7 +3055,6 @@ describe("CalculationsTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3107,7 +3076,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "topics";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -3123,7 +3091,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3145,7 +3112,6 @@ describe("CalculationsTest", () => {
         this._tableName = "sl_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("SlAuthor", Author);
@@ -3156,7 +3122,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("sl_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Book, "slAuthor", { className: "SlAuthor" });
@@ -3178,7 +3143,6 @@ describe("CalculationsTest", () => {
         this._tableName = "sl2_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Sl2Author", Author);
@@ -3188,7 +3152,6 @@ describe("CalculationsTest", () => {
         this._tableName = "sl2_books";
         this.attribute("id", "integer");
         this.attribute("sl2_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Book, "sl2Author", { className: "Sl2Author" });
@@ -3210,7 +3173,6 @@ describe("CalculationsTest", () => {
         this._tableName = "sl3_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Sl3Author", Author);
@@ -3220,7 +3182,6 @@ describe("CalculationsTest", () => {
         this._tableName = "sl3_books";
         this.attribute("id", "integer");
         this.attribute("sl3_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Book, "sl3Author", { className: "Sl3Author" });
@@ -3248,7 +3209,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3264,7 +3224,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3278,7 +3237,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3299,7 +3257,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3321,7 +3278,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3350,7 +3306,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3381,7 +3336,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3403,7 +3357,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3422,7 +3375,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3444,7 +3396,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3461,7 +3412,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3481,7 +3431,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3503,7 +3452,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3523,7 +3471,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3544,7 +3491,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validatesPresenceOf("title");
       }
     }
@@ -3562,7 +3508,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3586,7 +3531,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3604,7 +3548,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3618,7 +3561,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "topics";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -3644,7 +3586,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3662,7 +3603,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3685,7 +3625,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
-        this.adapter = adapter;
       }
     }
     class Car extends Base {
@@ -3694,7 +3633,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3717,7 +3655,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3735,7 +3672,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3753,7 +3689,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3769,7 +3704,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3790,7 +3724,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3812,7 +3745,6 @@ describe("CalculationsTest", () => {
         this._tableName = "orders";
         this.attribute("id", "integer");
         this.attribute("total", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -3838,7 +3770,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adapter;
       }
     }
 
@@ -3863,7 +3794,6 @@ describe("CalculationsTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3891,7 +3821,6 @@ describe("CalculationsTest", () => {
         this._tableName = "conversations";
         this.attribute("id", "integer");
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Conversation, "status", ["active", "archived"]);
@@ -3911,7 +3840,6 @@ describe("CalculationsTest", () => {
         this._tableName = "conversations";
         this.attribute("id", "integer");
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Conversation, "status", ["active", "archived"]);
@@ -3931,7 +3859,6 @@ describe("CalculationsTest", () => {
         this._tableName = "conversations";
         this.attribute("id", "integer");
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Conversation, "status", ["active", "archived"]);
@@ -3956,7 +3883,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3977,7 +3903,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3999,7 +3924,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4021,7 +3945,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4041,7 +3964,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4064,7 +3986,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4087,7 +4008,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
 
@@ -4106,7 +4026,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("updated_at", "datetime");
         this.attribute("checked_at", "datetime");
-        this.adapter = adapter;
       }
     }
 
@@ -4126,7 +4045,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4146,7 +4064,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4168,7 +4085,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "rg_wa_authors";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("RgWaAuthor", Author);
@@ -4178,7 +4094,6 @@ describe("CalculationsTest", () => {
         this._tableName = "rg_wa_posts";
         this.attribute("id", "integer");
         this.attribute("rg_wa_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "rgWaAuthor", { className: "RgWaAuthor" });
@@ -4197,7 +4112,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "rg_wm_authors";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("RgWmAuthor", Author);
@@ -4207,7 +4121,6 @@ describe("CalculationsTest", () => {
         this._tableName = "rg_wm_posts";
         this.attribute("id", "integer");
         this.attribute("rg_wm_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "rgWmAuthor", { className: "RgWmAuthor" });
@@ -4232,7 +4145,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4252,7 +4164,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4271,7 +4182,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4289,7 +4199,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4307,7 +4216,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4326,7 +4234,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4346,7 +4253,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4370,7 +4276,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("approved", "boolean");
-        this.adapter = adapter;
       }
     }
 
@@ -4394,7 +4299,6 @@ describe("CalculationsTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4416,7 +4320,6 @@ describe("CalculationsTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4443,7 +4346,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("category", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4470,7 +4372,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4490,7 +4391,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4514,7 +4414,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4534,7 +4433,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4550,7 +4448,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4566,7 +4463,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4582,7 +4478,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4599,7 +4494,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4617,7 +4511,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4643,7 +4536,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4665,7 +4557,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4688,7 +4579,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4712,7 +4602,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
 
@@ -4734,7 +4623,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4757,7 +4645,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4775,7 +4662,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4794,7 +4680,6 @@ describe("CalculationsTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("author_name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4821,7 +4706,6 @@ describe("CalculationsTest", () => {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -4830,7 +4714,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4855,7 +4738,6 @@ describe("CalculationsTest", () => {
         this._tableName = "conversations";
         this.attribute("id", "integer");
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Conversation, "status", ["active", "archived"], { prefix: true });
@@ -4872,7 +4754,6 @@ describe("CalculationsTest", () => {
         this._tableName = "conversations";
         this.attribute("id", "integer");
         this.attribute("comments_status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Conversation, "comments_status", ["open", "closed"], { prefix: "comments" });
@@ -4889,7 +4770,6 @@ describe("CalculationsTest", () => {
         this._tableName = "conversations";
         this.attribute("id", "integer");
         this.attribute("question_type", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Conversation, "question_type", ["multiple", "single"], { suffix: true });
@@ -4906,7 +4786,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
     User.scope("active", (rel: any) => rel.where({ status: "active" }));
@@ -4930,7 +4809,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("role", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4952,7 +4830,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4970,7 +4847,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -4993,7 +4869,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5013,7 +4888,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5029,7 +4903,6 @@ describe("CalculationsTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5047,7 +4920,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5064,7 +4936,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -5082,7 +4953,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5102,12 +4972,11 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
     const existing = await User.create({ name: "Claim" });
-    await adapter.executeMutation(`CREATE UNIQUE INDEX users_name_idx ON users (name)`);
+    await Base.adapter.executeMutation(`CREATE UNIQUE INDEX users_name_idx ON users (name)`);
 
     const retried = await User.createOrFindBy({ name: "Claim" });
     expect(retried.id).toBe(existing.id);
@@ -5115,18 +4984,18 @@ describe("CalculationsTest", () => {
   });
 
   // Rails: test "lock! reloads with FOR UPDATE"
-  it("lockBang reloads the record", async () => {
+  // SQLite does not support FOR UPDATE locking.
+  it.skipIf(adapterType === "sqlite")("lockBang reloads the record", async () => {
     class Account extends Base {
       static {
         this._tableName = "accounts";
         this.attribute("id", "integer");
         this.attribute("balance", "integer");
-        this.adapter = adapter;
       }
     }
 
     const account = await Account.create({ balance: 100 });
-    await adapter.executeMutation(
+    await Base.adapter.executeMutation(
       `UPDATE "accounts" SET "balance" = 200 WHERE "id" = ${account.id}`,
     );
 
@@ -5142,7 +5011,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -5159,7 +5027,6 @@ describe("CalculationsTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5174,7 +5041,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5198,7 +5064,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("role", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5214,7 +5079,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5234,7 +5098,6 @@ describe("CalculationsTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("comments_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
 
@@ -5251,7 +5114,6 @@ describe("CalculationsTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("comments_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
 
@@ -5269,7 +5131,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("likes_count", "integer", { default: 0 });
         this.attribute("views_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
 
@@ -5288,7 +5149,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
 
@@ -5308,7 +5168,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("sku", "string");
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.attrReadonly("sku");
       }
     }
@@ -5334,7 +5193,6 @@ describe("CalculationsTest", () => {
         this._tableName = "products";
         this.attribute("id", "integer");
         this.attribute("sku", "string");
-        this.adapter = adapter;
         this.attrReadonly("sku");
       }
     }
@@ -5348,7 +5206,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5368,7 +5225,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("email", "string");
-        this.adapter = adapter;
         this.validates("email", { presence: true });
       }
     }
@@ -5386,7 +5242,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5402,7 +5257,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5419,7 +5273,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -5436,7 +5289,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5459,7 +5311,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
     expect(User.columnNames()).toEqual(["id", "name", "email"]);
@@ -5479,7 +5330,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5497,14 +5347,12 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "users";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this._tableName = "posts";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -5519,7 +5367,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5540,7 +5387,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5560,7 +5406,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -5581,7 +5426,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5601,7 +5445,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
         this.cacheVersioning = true; // stable key without timestamp
       }
     }
@@ -5621,7 +5464,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
 
@@ -5638,7 +5480,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("role", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5653,7 +5494,6 @@ describe("CalculationsTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5669,7 +5509,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5690,7 +5529,6 @@ describe("CalculationsTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5709,7 +5547,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("role", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5725,7 +5562,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("role", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5748,7 +5584,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5767,7 +5602,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5787,7 +5621,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "users";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -5808,7 +5641,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "users";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -5822,7 +5654,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "users";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -5837,7 +5668,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5854,7 +5684,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5870,7 +5699,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -5893,7 +5721,6 @@ describe("CalculationsTest", () => {
         this.afterTouch((r: any) => {
           log.push("touched");
         });
-        this.adapter = adapter;
       }
     }
 
@@ -5909,7 +5736,6 @@ describe("CalculationsTest", () => {
         this._tableName = "rg_comments";
         this.attribute("id", "integer");
         this.attribute("rg_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class RGPost extends Base {
@@ -5917,7 +5743,6 @@ describe("CalculationsTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(RGComment);
@@ -5941,7 +5766,6 @@ describe("CalculationsTest", () => {
         this._tableName = "rg_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class RGBook extends Base {
@@ -5950,7 +5774,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("rg_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(RGAuthor);
@@ -5975,7 +5798,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -5994,7 +5816,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -6014,7 +5835,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -6034,7 +5854,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
     User.normalizes("email", (v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : v));
@@ -6050,7 +5869,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -6067,7 +5885,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -6086,7 +5903,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
 
@@ -6102,7 +5918,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -6119,7 +5934,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -6142,7 +5956,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -6172,7 +5985,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const sql = User.all().optimizerHints("MAX_EXECUTION_TIME(1000)").toSql();
@@ -6189,7 +6001,6 @@ describe("CalculationsTest", () => {
         this.attribute("email", "string");
         this.validates("name", { presence: true });
         this.validates("email", { presence: true });
-        this.adapter = adapter;
       }
     }
     const u = new User({});
@@ -6206,7 +6017,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     const u = new User({});
@@ -6223,7 +6033,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
     const u = new User({ name: "Alice", age: 25 });
@@ -6240,7 +6049,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
     const u = new User({ age: "42" });
@@ -6256,7 +6064,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("ssn", "string");
-        this.adapter = adapter;
         this.encrypts("ssn");
       }
     }
@@ -6284,7 +6091,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
         this.scope("published", (rel: any) => rel.where({ status: "published" }), {
           recentFirst: function (this: any) {
             return this.order("id", "desc");
@@ -6327,7 +6133,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "users";
         this.attribute("id", "integer");
-        this.adapter = createTestAdapter();
       }
     }
     expect(User.recordTimestamps).toBe(true);
@@ -6341,7 +6146,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "users";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     let suppressed = false;
@@ -6362,7 +6166,6 @@ describe("CalculationsTest", () => {
           this._tableName = "users";
           this.attribute("id", "integer");
           this.attribute("name", "string");
-          this.adapter = adapter;
         }
       }
       generatesTokenFor(User, "email_verify", {});
@@ -6382,7 +6185,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "users";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     expect(User.all().isReadonly).toBe(false);
@@ -6395,7 +6197,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "orders";
         this.attribute("id", "integer");
-        this.adapter = createTestAdapter();
         this.defineModelCallbacks("ship", "deliver");
       }
     }
@@ -6416,7 +6217,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("bio", "string");
-        this.adapter = adapter;
         this.nullifyBlanks("name");
       }
     }
@@ -6431,7 +6231,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "users";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     const order: string[] = [];
@@ -6456,7 +6255,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.suppress(async () => {
@@ -6474,7 +6272,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("email", "string");
-        this.adapter = createTestAdapter();
       }
     }
     User.withOptions({ on: "update" }, (m: any) => {
@@ -6494,7 +6291,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
     const u = new User({ name: "Alice", age: 30 });
@@ -6512,7 +6308,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = new User({});
@@ -6527,7 +6322,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = new User({});
@@ -6542,7 +6336,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = new User({ name: "Alice" });
@@ -6558,7 +6351,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const types = User.attributeTypes();
@@ -6572,7 +6364,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "users";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     expect(User.logger).toBe(null);
@@ -6590,7 +6381,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("role", "string");
-        this.adapter = adapter;
       }
     }
     const u = User.where({ role: "admin" }).build({ name: "Alice" });
@@ -6607,7 +6397,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("role", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.where({ role: "admin" }).create({ name: "Bob" });
@@ -6622,7 +6411,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const rel = User.where({ name: "Alice" });
@@ -6638,7 +6426,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice", active: true });
@@ -6657,7 +6444,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const str = User.where({ name: "Alice" }).limit(5).inspect();
@@ -6672,7 +6458,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "users";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     const u = new User({});
@@ -6686,7 +6471,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "users";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     expect(User.i18nScope).toBe("activerecord");
@@ -6699,7 +6483,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -6716,7 +6499,6 @@ describe("CalculationsTest", () => {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -6725,7 +6507,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -6745,7 +6526,6 @@ describe("CalculationsTest", () => {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -6754,7 +6534,6 @@ describe("CalculationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -6770,7 +6549,6 @@ describe("CalculationsTest", () => {
       static {
         this._tableName = "users";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     const rel = User.where({ id: 1 }).loadAsync();
@@ -6787,7 +6565,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -6803,7 +6580,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.createTable();
@@ -6827,7 +6603,6 @@ describe("CalculationsTest", () => {
           this._tableName = "users";
           this.attribute("id", "integer");
           this.attribute("name", "string");
-          this.adapter = adapter;
         }
       }
       const u = await User.create({ name: "Alice" });
@@ -6844,7 +6619,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("role", "string", { default: "user" });
-        this.adapter = adapter;
       }
     }
     expect(User.columnDefaults.role).toBe("user");
@@ -6857,7 +6631,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice" });
@@ -6873,7 +6646,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("email", "string");
-        this.adapter = adapter;
         this.validates("email", { confirmation: { caseSensitive: false } });
       }
     }
@@ -6889,7 +6661,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const rel = User.where({ name: "Alice" }).extending((r: any) => {
@@ -6905,7 +6676,6 @@ describe("CalculationsTest", () => {
         this._tableName = "users";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.attributeMethodPrefix("get_");
       }
     }
