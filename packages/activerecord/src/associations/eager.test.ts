@@ -1924,14 +1924,12 @@ describe("EagerAssociationTest", () => {
     class EjEmAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EjEmPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("ej_em_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EjEmAuthor, "ejEmPosts", {
