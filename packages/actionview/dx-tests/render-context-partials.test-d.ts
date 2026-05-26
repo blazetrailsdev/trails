@@ -10,6 +10,7 @@ declare module "@blazetrails/actionview" {
   interface TemplateRegistry {
     "users/user": { user: string; role?: string };
     "shared/banner": { title?: string };
+    "items/item": { item: unknown; item_counter: number; item_iteration: object; label: string };
   }
 }
 
@@ -73,5 +74,20 @@ describe("TseRenderContext#render — conditional generic (Story 5.8 + follow-up
 
     // @ts-expect-error — 'bogus' is not a key on the registered locals type
     ctx.render({ partial: "users/user", collection: ["a"], locals: { bogus: 1 } });
+  });
+
+  it("collection render omits auto-injected keys from locals requirement", () => {
+    // "items/item" has { item, item_counter, item_iteration, label } — the first
+    // three are auto-injected by the collection iterator, so only `label` should
+    // be required from the caller.
+    ctx.render({ partial: "items/item", collection: [1, 2], locals: { label: "x" } });
+
+    // @ts-expect-error — 'label' is required and not auto-injected
+    ctx.render({ partial: "items/item", collection: [1, 2] });
+  });
+
+  it("collection render of partial with only auto-injected keys allows omitting locals", () => {
+    const r = ctx.render({ partial: "users/user", collection: ["a", "b"] });
+    expectTypeOf(r).toMatchTypeOf<SafeBuffer>();
   });
 });

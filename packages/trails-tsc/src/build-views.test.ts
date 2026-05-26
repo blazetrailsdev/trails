@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { buildViews } from "./build-views.js";
 import { runCli } from "./cli.js";
+import { diagnose } from "./plugins/tse-diagnose.js";
 
 function mkScratch(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-build-"));
@@ -149,6 +150,48 @@ describe("buildViews", () => {
     );
     expect(aug).toContain('"users/user"');
     expect(aug).toMatch(/\(NoExtraKeys<\{[^}]+\}>\)\s*&\s*\(NoExtraKeys<\{[^}]+\}>\)/);
+  });
+
+  it("multi-format intersection augmentation satisfies tsc semantic check", () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/views/users/_user.html.tse",
+      "<%# locals: (name:, role: 'guest') %><%= name %>",
+    );
+    write(cwd, "app/views/users/_user.json.tse", "<%# locals: (name:, email:) %><%= name %>");
+
+    buildViews({ cwd });
+
+    const aug = fs.readFileSync(
+      path.join(cwd, ".trails/template-registry-augmentation.d.ts"),
+      "utf8",
+    );
+    const localsType = aug.match(/"users\/user":\s*(.+);/)?.[1];
+    expect(localsType).toBeDefined();
+    const registryStub = [
+      "export type NoExtraKeys<T> = T & { [K in Exclude<string, keyof T>]?: never };",
+      "export type TemplateLocals<T> = T;",
+      `export interface TemplateRegistry { "users/user": ${localsType}; }`,
+    ].join("\n");
+
+    const check = (code: string) =>
+      diagnose(
+        `import type { TemplateRegistry } from "@blazetrails/actionview";\n` +
+          `type R = TemplateRegistry["users/user"];\n` +
+          code,
+        { customStub: registryStub },
+      );
+
+    // intersection requires `name` (shared) and `email` (json-only required)
+    expect(check("const a: R extends { name: unknown } ? 1 : 2 = 1; void a;")).toEqual([]);
+    expect(check("const a: R extends { email: unknown } ? 1 : 2 = 1; void a;")).toEqual([]);
+    // `role` is optional in html format — intersection preserves optionality
+    expect(check("const a: R extends { role: unknown } ? 1 : 2 = 2; void a;")).toEqual([]);
+    // missing `email` (required by json format) is a type error
+    expect(
+      check("const a: R extends { name: unknown } ? 1 : 2 = 2; void a;").length,
+    ).toBeGreaterThan(0);
   });
 
   it("emits an empty augmentation when no partials have a locals directive", () => {

@@ -22,13 +22,29 @@ type RenderSingleOptions<P extends string> = {
     : { locals: TemplateLocals<TemplateRegistry[P]> }
   : { locals?: Record<string, unknown> });
 
+type LastSegment<P extends string> = P extends `${string}/${infer L}` ? L : P;
+type StripLeadingUnderscore<S extends string> = S extends `_${infer R}` ? R : S;
+type BeforeFirstDot<S extends string> = S extends `${infer B}.${string}` ? B : S;
+type DeriveLocalName<P extends string> = BeforeFirstDot<StripLeadingUnderscore<LastSegment<P>>>;
+type CollectionAutoKeys<P extends string> =
+  | DeriveLocalName<P>
+  | `${DeriveLocalName<P>}_counter`
+  | `${DeriveLocalName<P>}_iteration`;
+type CollectionLocals<P extends keyof TemplateRegistry> = Omit<
+  TemplateLocals<TemplateRegistry[P]>,
+  CollectionAutoKeys<P>
+>;
+
 type RenderCollectionOptions<P extends string> = {
   partial: P;
   collection: readonly unknown[];
   as?: string;
   spacerTemplate?: string;
 } & (P extends keyof TemplateRegistry
-  ? { locals?: Partial<TemplateLocals<TemplateRegistry[P]>> }
+  ? // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+    {} extends CollectionLocals<P>
+    ? { locals?: CollectionLocals<P> }
+    : { locals: CollectionLocals<P> }
   : { locals?: Record<string, unknown> });
 
 /**
@@ -81,9 +97,10 @@ export interface TseRenderContext {
    * `TemplateRegistry`, locals are typed (and required when the registered
    * shape has required properties). A plain `string` falls back to
    * `Record<string, unknown>`. Collection renders (`collection:` present)
-   * make locals optional because Rails auto-injects the item, counter, and
-   * iteration locals; `spacerTemplate` is only accepted on collection
-   * renders. `rails partial_renderer.rb`.
+   * omit auto-injected keys (item, counter, iteration) from the locals
+   * requirement; remaining required keys must still be provided.
+   * `spacerTemplate` is only accepted on collection renders.
+   * `rails partial_renderer.rb`.
    *
    * Static form: `render({ partial: "users/user", locals: { user } })`
    * Collection form: `render({ partial: "users/user", collection: users, as: "user" })`
