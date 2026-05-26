@@ -132,9 +132,7 @@ export class TseRenderContextImpl implements TseRenderContext {
   }
 
   raw(value: unknown): SafeBuffer {
-    // OutputBuffer.toString() returns a non-primitive SafeBuffer, breaking String() coercion.
     if (value instanceof OutputBuffer) return value.toString();
-    if (value instanceof SafeBuffer) return value;
     return htmlSafe(String(value ?? ""));
   }
 

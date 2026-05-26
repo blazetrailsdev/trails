@@ -83,9 +83,12 @@ describe("TseRenderContextImpl", () => {
       expect(ctx.raw(undefined).toString()).toBe("");
     });
 
-    it("passes SafeBuffer through unchanged", () => {
+    it("always re-wraps SafeBuffer (Rails raw() calls .to_s.html_safe)", () => {
       const safe = htmlSafe("<em>safe</em>");
-      expect(ctx.raw(safe)).toBe(safe);
+      const result = ctx.raw(safe);
+      expect(result.toString()).toBe("<em>safe</em>");
+      expect(isHtmlSafe(result)).toBe(true);
+      expect(result).not.toBe(safe);
     });
 
     it("handles OutputBuffer without coercion error (OutputBuffer.toString() is non-primitive)", () => {
