@@ -131,7 +131,7 @@ interface QueryMethodsHost {
   _ctes: Array<{ name: string; sql: string; recursive: boolean }>;
   _skipPreloading: boolean;
   _skipQueryCache: boolean;
-  _modelClass: any;
+  _modelClass: typeof import("../base.js").Base;
   predicateBuilder: import("./predicate-builder.js").PredicateBuilder;
   _castWhereValue(key: string, value: unknown): unknown;
 }
@@ -141,17 +141,12 @@ interface QueryMethodsHost {
 // ---------------------------------------------------------------------------
 
 function resolveOrderMatcher(host: QueryMethodsHost): RegExp {
-  // Use the public .adapter getter so establishConnection() models get their
-  // concrete adapter's matcher. Walk adapter → inner to handle SchemaAdapter.
-  // Also check the instance method in case the adapter exposes it directly.
   try {
-    let adapter = (host._modelClass as any)?.adapter ?? (host._modelClass as any)?._adapter;
+    let adapter: any = host._modelClass.adapter;
     while (adapter) {
-      const matcher =
-        (adapter as any)?.columnNameWithOrderMatcher?.() ??
-        (adapter.constructor as any)?.columnNameWithOrderMatcher?.();
+      const matcher = (adapter.constructor as any)?.columnNameWithOrderMatcher?.();
       if (matcher) return matcher;
-      adapter = (adapter as any).inner;
+      adapter = adapter.inner;
     }
   } catch {
     // No adapter configured — fall back to abstract pattern.
