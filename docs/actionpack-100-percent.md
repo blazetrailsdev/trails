@@ -445,6 +445,37 @@ lives in **CLAUDE.md** — start there. actionpack-specific notes only:
 - No open follow-ups; standard test-port closures. Count included in
   the test:compare totals in the Status table above.
 
+**From #2348 (FilterTest basic conditional/before/after)**
+
+- [ ] ~37 tests: T-AC14b follow-up — remaining `FilterTest` tests
+      (skipping/rendering/redirection/around filters) +
+      `YieldingAroundFiltersTest`. Target file:
+      `packages/actionpack/src/action-controller/controller/filters.test.ts`.
+- [ ] 4 skipped tests pending callbacks impl gaps: non-yielding around
+      halt, `beforeActions` reflection API (`addedActionToInheritanceGraph`,
+      `baseClassInIsolation`, `prependingAction`).
+
+**From #2325 (S8 routing leaf bundle)**
+
+- [ ] ~30–50 LOC: duplicate-name guard in `route-set.ts` — `addRoute()`
+      silently overwrites; needs mapper.ts to emit correct singular names
+      for non-inflecting words, then upgrade guard to throw.
+- [ ] `constraints` propagated to `new`/`create` routes — Rails only
+      passes to member/collection. Low risk but verify if constraint-on-new
+      tests appear.
+
+**From #2334 (routing_test.rb part 2)**
+
+- [ ] Optional segment fallback in journey router — skipped tests
+      (`optional scoped path`, `nested optional scoped path`) need the
+      no-segment recognition path to return a match instead of null.
+
+**From #2352 (host_authorization_test.rb)**
+
+- [ ] `HostPermission` type only accepts `string | RegExp | IPAddr` —
+      Rails also accepts callable predicates (lambdas). Extend union if
+      needed.
+
 ## Indefinite defers (do not port)
 
 - **system_testing/** (5 files), **system_test_case.rb**,
