@@ -4,13 +4,12 @@
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { Base, RecordNotFound, registerSubclass } from "./index.js";
+import { Base, RecordNotFound, registerModel, registerSubclass } from "./index.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setSignedIdVerifierSecret, setSignedIdVerifier, signedIdVerifier } from "./signed-id.js";
 import { UnknownPrimaryKey } from "./errors.js";
 import { SignedGlobalID, setApp, _resetApp } from "@blazetrails/globalid";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -30,12 +29,6 @@ const TEST_SCHEMA: Schema = {
   user_shorts: { name: "string" },
   mateys: { columns: { name: "string" }, primaryKey: false },
 };
-
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
 
 describe("SignedIdTest", () => {
   setupHandlerSuite();
@@ -366,16 +359,20 @@ describe("SignedIdTest", () => {
 });
 
 describe("toGid", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   afterEach(() => _resetApp());
 
   it("returns a GlobalID-like URI", async () => {
     setApp("MyApp");
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
+        registerModel(this);
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -383,11 +380,9 @@ describe("toGid", () => {
   });
 
   it("throws when no app is configured", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ id: 1 });
@@ -396,16 +391,20 @@ describe("toGid", () => {
 });
 
 describe("Base.findGlobalId", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   afterEach(() => _resetApp());
 
   it("locates a record by its toGid() URI via the AR model registry", async () => {
     setApp("MyApp");
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
+        registerModel(this);
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -423,17 +422,15 @@ describe("Base.findGlobalId", () => {
 
   it("resolves an inherited-adapter STI subclass via the descendants fallback", async () => {
     setApp("MyApp");
-    const adapter = await freshAdapter();
     class Animal extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
+        registerModel(this);
       }
     }
     class Dog extends Animal {
       static {
-        // STI subclass registers with its parent; does NOT set its own adapter.
         registerSubclass(this);
       }
     }
@@ -445,16 +442,20 @@ describe("Base.findGlobalId", () => {
 });
 
 describe("Base.toGlobalId / toGidParam", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   afterEach(() => _resetApp());
 
   it("toGlobalId returns a GlobalID instance; toGidParam round-trips through findGlobalId", async () => {
     setApp("MyApp");
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
+        registerModel(this);
       }
     }
     const u = await User.create({ name: "Pat" });
@@ -467,17 +468,21 @@ describe("Base.toGlobalId / toGidParam", () => {
 });
 
 describe("Base.findSignedGlobalId", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   beforeEach(() => setSignedIdVerifierSecret("blazetrails-test-secret"));
   afterEach(() => _resetApp());
 
   it("locates a record by SignedGlobalID token", async () => {
     setApp("MyApp");
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
+        registerModel(this);
       }
     }
     const u = await User.create({ name: "Bob" });
@@ -494,11 +499,10 @@ describe("Base.findSignedGlobalId", () => {
 
   it("findSignedGlobalId honors for: purpose scoping", async () => {
     setApp("MyApp");
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
+        registerModel(this);
       }
     }
     const u = await User.create({ id: 3 });
@@ -514,11 +518,10 @@ describe("Base.findSignedGlobalId", () => {
 
   it("toSignedGlobalId is an alias of toSgid (same URI + purpose)", async () => {
     setApp("MyApp");
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
+        registerModel(this);
       }
     }
     const u = await User.create({ id: 7 });
@@ -531,13 +534,17 @@ describe("Base.findSignedGlobalId", () => {
 });
 
 describe("signedId / findSigned / findSignedBang", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   it("generates a signed ID for a persisted record", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const user = await User.create({ name: "Alice" });
@@ -558,12 +565,10 @@ describe("signedId / findSigned / findSignedBang", () => {
   });
 
   it("findSigned recovers the record from its signed ID", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const user = await User.create({ name: "Bob" });
@@ -574,12 +579,10 @@ describe("signedId / findSigned / findSignedBang", () => {
   });
 
   it("findSigned returns null for invalid signed ID", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const found = await User.findSigned("not-valid-base64!!!");
@@ -587,12 +590,10 @@ describe("signedId / findSigned / findSignedBang", () => {
   });
 
   it("findSigned respects purpose option", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const user = await User.create({ name: "Carol" });
@@ -607,23 +608,19 @@ describe("signedId / findSigned / findSignedBang", () => {
   });
 
   it("findSignedBang throws when not found", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await expect(User.findSignedBang("invalid")).rejects.toThrow();
   });
 
   it("toSgid returns SignedGlobalID whose toParam round-trips to same instance", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Dave" });
@@ -640,11 +637,9 @@ describe("signedId / findSigned / findSignedBang", () => {
   });
 
   it("toSgidParam returns a string token identical to toSgid().toParam()", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Eve" });

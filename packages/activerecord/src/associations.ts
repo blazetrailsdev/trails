@@ -175,6 +175,7 @@ export function registerModel(nameOrModel: string | typeof Base, model?: typeof 
   if (typeof nameOrModel === "string") {
     if (!model) throw new Error("registerModel(name, model) requires a model class");
     modelRegistry.set(nameOrModel, model);
+    model._modelsByName?.set(nameOrModel, model);
     // Attach registry key so counter-cache pending-map lookup can match it.
     const keys: string[] = model._registryKeys ?? [];
     if (!keys.includes(nameOrModel)) keys.push(nameOrModel);
@@ -182,6 +183,7 @@ export function registerModel(nameOrModel: string | typeof Base, model?: typeof 
     flushPendingCounterCacheColumns(model);
   } else {
     modelRegistry.set(nameOrModel.name, nameOrModel);
+    nameOrModel._modelsByName?.set(nameOrModel.name, nameOrModel);
     flushPendingCounterCacheColumns(nameOrModel);
   }
 }
