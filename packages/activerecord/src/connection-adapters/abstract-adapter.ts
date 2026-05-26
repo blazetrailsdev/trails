@@ -73,6 +73,7 @@ import {
   bindParamsLength,
 } from "./abstract/database-limits.js";
 import type {
+  AlterTable,
   TableDefinition,
   Table,
   ForeignKeyDefinition,
@@ -358,6 +359,25 @@ export interface AbstractAdapter {
   ): Promise<unknown>;
   /** @internal */
   executeBatch(statements: string[], name?: string | null): Promise<void>;
+
+  // --- Members previously only on DatabaseAdapter interface ---
+  // Declaring them here makes AbstractAdapter a structural superset of
+  // DatabaseAdapter, prerequisite for collapsing the two types.
+  execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]>;
+  executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
+  beginTransaction(): Promise<void>;
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+  createSavepoint(name: string): Promise<void>;
+  releaseSavepoint(name: string): Promise<void>;
+  rollbackToSavepoint(name: string): Promise<void>;
+  readonly inTransaction: boolean;
+  changeTableComment?(
+    tableName: string,
+    comment: string | null | Record<string, string | null>,
+  ): Promise<void>;
+  currentDatabase(): Promise<string>;
+  createAlterTable?(name: string): AlterTable;
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractAdapter implements Quoting {
@@ -373,7 +393,7 @@ export class AbstractAdapter implements Quoting {
     }
   }
 
-  protected _connection: DatabaseAdapter | null = null;
+  protected _connection: AbstractAdapter | null = null;
   private _owner: string | null = null;
   private _inUse = false;
   private _preparedStatements = false;
@@ -647,7 +667,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   /**
-   * Returns `this` typed as `DatabaseAdapter & SchemaQuoter`. SchemaStatements
+   * Returns `this` typed as `AbstractAdapter & SchemaQuoter`. SchemaStatements
    * methods (mixed in via `include()` below) reference `this.adapter` to
    * call quoting and execution helpers on the adapter — when those methods
    * run with `this` bound to an adapter instance, `this.adapter` must
@@ -655,9 +675,9 @@ export class AbstractAdapter implements Quoting {
    * @internal
    */
   protected get adapter(): import("./abstract/assert-schema-adapter.js").SchemaQuoter &
-    DatabaseAdapter {
+    AbstractAdapter {
     return this as unknown as import("./abstract/assert-schema-adapter.js").SchemaQuoter &
-      DatabaseAdapter;
+      AbstractAdapter;
   }
 
   /** @internal */
@@ -1035,7 +1055,7 @@ export class AbstractAdapter implements Quoting {
     return true;
   }
 
-  get rawConnection(): DatabaseAdapter | null {
+  get rawConnection(): AbstractAdapter | null {
     return this._connection;
   }
 
@@ -1492,8 +1512,8 @@ export class AbstractAdapter implements Quoting {
   async withRawConnection<T>(
     optsOrCallback:
       | { allowRetry?: boolean; materializeTransactions?: boolean }
-      | ((raw: DatabaseAdapter | null) => Promise<T> | T),
-    callback?: (raw: DatabaseAdapter | null) => Promise<T> | T,
+      | ((raw: AbstractAdapter | null) => Promise<T> | T),
+    callback?: (raw: AbstractAdapter | null) => Promise<T> | T,
   ): Promise<T> {
     const isFn = typeof optsOrCallback === "function";
     const opts = (isFn ? {} : optsOrCallback) ?? {};
@@ -1589,12 +1609,12 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal Mirrors: AbstractAdapter#any_raw_connection */
-  anyRawConnection(): DatabaseAdapter | null | Promise<DatabaseAdapter | null> {
+  anyRawConnection(): AbstractAdapter | null | Promise<AbstractAdapter | null> {
     return this._connection ?? this.validRawConnection();
   }
 
   /** @internal Mirrors: AbstractAdapter#valid_raw_connection */
-  validRawConnection(): DatabaseAdapter | null | Promise<DatabaseAdapter | null> {
+  validRawConnection(): AbstractAdapter | null | Promise<AbstractAdapter | null> {
     if (this._verified && this._connection) return this._connection;
     return this.withRawConnection(
       { allowRetry: false, materializeTransactions: false },
