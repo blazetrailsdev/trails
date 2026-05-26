@@ -3431,14 +3431,10 @@ export class Relation<T extends Base> {
   private _buildEagerJoinManager(jd: JoinDependency, basePk: string): SelectManager {
     const table = this._modelClass.arelTable;
 
-    const manager = table.project(new Nodes.SqlLiteral(jd.buildSelectSql()));
+    const manager = table.project(...jd.buildSelectArel());
 
     for (const node of jd.nodes) {
-      if (node.arelJoin) {
-        manager.appendJoinNode(node.arelJoin);
-      } else {
-        manager.appendStringJoin(node.joinSql);
-      }
+      manager.appendJoinNode(node.arelJoin!);
     }
 
     this._applyJoinsToManager(manager);
@@ -3465,11 +3461,7 @@ export class Relation<T extends Base> {
         const idSubquery = table.project(pkAttr);
         idSubquery.distinct();
         for (const node of jd.nodes) {
-          if (node.arelJoin) {
-            idSubquery.appendJoinNode(node.arelJoin);
-          } else {
-            idSubquery.appendStringJoin(node.joinSql);
-          }
+          idSubquery.appendJoinNode(node.arelJoin!);
         }
         this._applyJoinsToManager(idSubquery);
         this._applyWheresToManager(idSubquery, table);

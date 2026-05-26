@@ -20,10 +20,6 @@ import { Table, sql as arelSql, Nodes } from "@blazetrails/arel";
 import { modelRegistry } from "../associations.js";
 import { reflectOnAssociation } from "../reflection.js";
 import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
-import {
-  quoteTableName as abstractQuoteTableName,
-  quoteColumnName as abstractQuoteColumnName,
-} from "../connection-adapters/abstract/quoting.js";
 
 export interface JoinNode {
   tableIndex: number;
@@ -128,11 +124,13 @@ export class JoinDependency {
   // When a joined table's real name is unique, we skip the tN alias in SQL
   // (matching Rails' AliasTracker which only aliases on collision).
   private _usedTableNames: Set<string>;
+  private _arelTablesByIndex: Map<number, Table> = new Map();
 
   constructor(baseModel: typeof Base) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
     this._usedTableNames = new Set([this._baseAlias]);
+    this._arelTablesByIndex.set(this._baseTableIndex, (baseModel as any).arelTable);
     this._buildBaseAliases();
   }
 
@@ -217,6 +215,7 @@ export class JoinDependency {
       effectiveName === targetTable!
         ? new Table(targetTable!)
         : new Table(targetTable!, { as: effectiveName });
+    this._arelTablesByIndex.set(tableIndex, targetArelTable);
     const sourceArelTable = new Table(sourceAlias);
 
     // Build ON predicate as Arel nodes (mirrors Rails join_dependency.rb build_constraint)
@@ -334,28 +333,15 @@ export class JoinDependency {
     return lastNode;
   }
 
-  private _buildSelectExpressions(): string[] {
-    const effectiveNameByIndex = new Map<number, string>();
-    effectiveNameByIndex.set(this._baseTableIndex, this._baseAlias);
-    for (const node of this._nodes) {
-      effectiveNameByIndex.set(node.tableIndex, node.effectiveSqlName);
-    }
-
+  private _buildSelectArelNodes(): Nodes.As[] {
     return this._aliases.map((a) => {
-      const effectiveName = effectiveNameByIndex.get(a.tableIndex)!;
-      return `${abstractQuoteTableName(effectiveName)}.${abstractQuoteColumnName(a.column)} AS ${a.alias}`;
+      const table = this._arelTablesByIndex.get(a.tableIndex)!;
+      return table.get(a.column).as(a.alias);
     });
   }
 
-  buildSelectSql(): string {
-    return this._buildSelectExpressions().join(", ");
-  }
-
-  buildJoinSql(): string {
-    return this._nodes
-      .filter((n) => n.joinSql)
-      .map((n) => n.joinSql)
-      .join(" ");
+  buildSelectArel(): Nodes.As[] {
+    return this._buildSelectArelNodes();
   }
 
   get baseKlass(): typeof Base {
@@ -388,11 +374,9 @@ export class JoinDependency {
     _aliasTracker?: any,
     _references?: string[],
   ): Nodes.Join[] {
-    const toJoinNode = (n: JoinNode): Nodes.Join =>
-      n.arelJoin ?? new Nodes.StringJoin(arelSql(n.joinSql));
-    const joins = this._nodes.map(toJoinNode);
+    const joins: Nodes.Join[] = this._nodes.map((n) => n.arelJoin!);
     for (const oj of joinsToAdd) {
-      joins.push(...oj._nodes.map(toJoinNode));
+      joins.push(...oj._nodes.map((n) => n.arelJoin!));
     }
     return joins;
   }
@@ -402,22 +386,12 @@ export class JoinDependency {
   }
 
   applyColumnAliases(relation: any): any {
-    const effectiveNameByIndex = new Map<number, string>();
-    effectiveNameByIndex.set(this._baseTableIndex, this._baseAlias);
-    for (const node of this._nodes) {
-      effectiveNameByIndex.set(node.tableIndex, node.effectiveSqlName);
-    }
-    const selectExprs = this.aliases()
-      .columns()
-      .map(
-        (a) =>
-          `${abstractQuoteTableName(effectiveNameByIndex.get(a.tableIndex)!)}.${abstractQuoteColumnName(a.column)} AS ${a.alias}`,
-      );
+    const arelNodes = this._buildSelectArelNodes();
     if (typeof relation.reselectBang === "function") {
-      relation.reselectBang(...selectExprs);
+      relation.reselectBang(...arelNodes);
       return relation;
     } else if (typeof relation.select === "function") {
-      return relation.select(...selectExprs);
+      return relation.select(...arelNodes);
     }
     return relation;
   }
@@ -626,6 +600,7 @@ export class JoinDependency {
       throughEffective === throughTable
         ? new Table(throughTable)
         : new Table(throughTable, { as: throughEffective });
+    this._arelTablesByIndex.set(throughTableIndex, throughArelTable);
     const sourceArelTable = new Table(sourceAlias);
 
     // Through ON predicate: throughTable.fk = sourceTable.pk
@@ -878,6 +853,7 @@ export class JoinDependency {
     const fullAssocName = parentAssocName ? `${parentAssocName}.${assocDef.name}` : assocDef.name;
 
     const targetArelJoin = new Nodes.OuterJoin(targetArelTable, new Nodes.On(predicate));
+    this._arelTablesByIndex.set(targetTableIndex, targetArelTable);
 
     // Push intermediate through node
     const throughNodeName = parentAssocName
