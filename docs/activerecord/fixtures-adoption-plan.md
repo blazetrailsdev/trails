@@ -323,11 +323,11 @@ rather than performance.
 
 ## Cross-references
 
-- [`fixtures-port-plan.md`](archive/fixtures-port-plan.md) — the data substrate;
+- `fixtures-port-plan.md` (completed, deleted) — the data substrate;
   Loader gaps section feeds Phase D's pairings
 - [`connection-pooled-test-adapter-plan.md`](connection-pooled-test-adapter-plan.md)
   — Phase E gates this plan's Phase B
-- [`tm-unification-plan.md`](archive/tm-unification-plan.md) Phase 6 hazard
+- `tm-unification-plan.md` (completed, deleted) Phase 6 hazard
   catalogue — Tier 3 files inherit those hazards
 - `vendor/rails/activerecord/test/cases/` — the Rails counterparts
   whose test bodies and assertions this plan mirrors

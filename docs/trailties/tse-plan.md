@@ -2,7 +2,7 @@
 
 Dedicated implementation plan for `.tse`, the trails analogue of Rails `.erb`.
 This is a deep-dive companion to the TSE sections of
-[actionview-100-percent.md](actionview-100-percent.md) (Phase 2a–2c). Where
+[actionview-100-percent.md](../actionview-100-percent.md) (Phase 2a–2c). Where
 that doc places TSE in the broader actionview port, this one focuses on:
 
 1. How Rails ERB actually works (so we have something concrete to mirror).
@@ -359,7 +359,7 @@ direct port of that boundary.
 | `<%! types: { name: string; count?: number } !%>` | _(none)_                           | TSE-only — optional TS types for tsc (coexists with `locals:` line) |
 
 **Locals declaration is hybrid** (matches the decision in
-[actionview-100-percent.md §3](actionview-100-percent.md)): the
+[actionview-100-percent.md §3](../actionview-100-percent.md)): the
 Rails-style names line is the canonical form — `<%# locals: (name:, count: 0) %>` —
 and **drives runtime binding** (the compiled function's parameter
 list, arity, and defaults). The `<%! types: { ... } !%>` block is
@@ -1121,7 +1121,7 @@ output anyway, so we get runtime output for free.
 
 ## 4. Phasing (cross-reference)
 
-Maps to [actionview-100-percent.md](actionview-100-percent.md):
+Maps to [actionview-100-percent.md](../actionview-100-percent.md):
 
 | TSE plan section                            | actionview-100 phase                       |
 | ------------------------------------------- | ------------------------------------------ |

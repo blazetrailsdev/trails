@@ -22,7 +22,7 @@ trails' `AsyncContext`-based TX visibility filter — Rails doesn't need
 that filter because each chain naturally owns its connection.
 
 This is a follow-up to the TM unification plan
-([`tm-unification-plan.md`](archive/tm-unification-plan.md)). Phase 9b-4 +
+(`tm-unification-plan.md` (completed, deleted)). Phase 9b-4 +
 the post-Phase-9 path-2 cleanup carry chain-isolation in the
 `TestAdapterFixtures` / `SidecarFixtures` wrapper as a temporary
 trails-specific patch over the shared-adapter pattern. This epic
@@ -101,7 +101,7 @@ After this lands:
 
 ## Interaction with the fixtures port
 
-The fixtures port ([`fixtures-port-plan.md`](archive/fixtures-port-plan.md)) is
+The fixtures port (`fixtures-port-plan.md` (completed, deleted)) is
 running in parallel and reshapes the test-data substrate trails uses.
 Key intersections:
 
@@ -602,10 +602,10 @@ short-circuits this entire chain.
 
 ## Cross-references
 
-- [`tm-unification-plan.md`](archive/tm-unification-plan.md) — Phase 9b + post-
+- `tm-unification-plan.md` (completed, deleted) — Phase 9b + post-
   Phase-9 cleanup paths 1/2. The TX-visibility patch this epic
   retires is documented there.
-- [`fixtures-port-plan.md`](archive/fixtures-port-plan.md) — the parallel
+- `fixtures-port-plan.md` (completed, deleted) — the parallel
   effort that moves schema and fixture data out of per-test setup
   into a canonical loader. See "Interaction with the fixtures port"
   above for sequencing and seam analysis.
