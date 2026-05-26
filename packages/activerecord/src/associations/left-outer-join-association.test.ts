@@ -1,14 +1,10 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   authors: { name: "string" },
@@ -18,38 +14,30 @@ const TEST_SCHEMA: Schema = {
   l_comments: { body: "string", type: "string", post_id: "integer" },
 };
 
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
+beforeAll(async () => {
+  await defineSchema(TEST_SCHEMA);
+});
 
 describe("LeftOuterJoinAssociationTest", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
-    adapter = await freshAdapter();
-  });
-  withTransactionalFixtures(() => adapter);
-
   function makeModels() {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "author", {});
@@ -175,13 +163,11 @@ describe("LeftOuterJoinAssociationTest", () => {
   });
 
   it("find with sti join", async () => {
-    const a = adapter;
     class LComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("type", "string");
         this.attribute("post_id", "integer");
-        this.adapter = a;
       }
     }
     enableSti(LComment);
@@ -190,7 +176,6 @@ describe("LeftOuterJoinAssociationTest", () => {
     class LPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = a;
       }
     }
     Associations.hasMany.call(LPost, "lSpecialComments", {
