@@ -1,99 +1,205 @@
-# Adapter Access Cleanup Plan
+# Adapter → Connection Collapse Plan
 
-Goal: eliminate raw `._adapter` field reads and construction-time adapter
-caching. Every site should resolve the adapter through the class getter
-(`Model.adapter` → pool checkout) at point-of-use, matching Rails'
-`klass.connection` semantics.
+Goal: eliminate the `adapter` concept entirely. Rails has no "adapter"
+property on models — models have `connection` (returns an
+`AbstractAdapter`). Our codebase has **two parallel checkout paths**:
 
-**Why now:** Raw field reads bypass the pool getter, which means they return
-`null` if the getter was never called (silent bug in lazy-init paths), and
-construction-time caching freezes a stale adapter reference across
-`connectedTo()` role switches. Both are latent correctness issues that will
-surface as pool/multi-DB support matures. Cleaning these up also removes
-`as any` casts that hide type errors.
+1. `Base.adapter` (getter in `base.ts`) — the old path. Caches a checkout
+   on `_adapter`, wires arel visitors, used by ~165 call sites across ~34
+   source files.
+2. `Base.connection` (from `connection-handling.ts`) — the newer pool-based
+   path. Returns the pool's active connection or leases a new one
+   (`pool.activeConnection ?? pool.leaseConnection()`, with a
+   permanent-lease fast path), used by ~6 source files.
 
-**Done-when:** `grep -rn '\._adapter\b' packages/activerecord/src/ | grep -v test | grep -v '__'`
-returns only `base.ts` (the backing field), `connection-handling.ts` (the
-teardown path), and adapter-internal files (migration, schema-migration,
-internal-metadata). No `as any` casts remain for adapter access.
+The `adapter` getter, `_adapter` field, `DatabaseAdapter` interface, and
+`adapter.ts` barrel are all trails-isms. They must go.
 
-Three PRs, each ~150–250 LOC.
+**Why now:** Phase D landed connection-handler resolution, but ~34 files
+still route through the old `adapter` getter instead of the pool-based
+`connection`. Two checkout paths = two caching strategies = subtle bugs
+when they disagree.
+
+**Done-when:**
+
+- `Base.adapter` getter and `_adapter` field are deleted.
+- `set adapter()` renamed to `set connection()` (deprecated, transitional —
+  full removal is a non-goal of this plan, see below).
+- All source call sites use `Base.connection` (the pool-based path).
+- Tests continue working via a `static get adapter()` compatibility alias
+  that forwards to `connection` (removed during Phase G fixture adoption).
+- `DatabaseAdapter` interface is deleted; all types use `AbstractAdapter`.
+- `adapter.ts` barrel is deleted; surviving exports relocate to
+  `connection-adapters/`.
+- No `as any` casts remain for connection access.
+
+**Scale:** ~165 `.adapter` call sites in ~34 source files, ~7000 references
+across ~182 test files, ~38 files import `DatabaseAdapter`.
+
+**Test strategy:** Tests reference `.adapter` extensively (~7000 sites
+across ~182 files). Rather than skipping tests during Phases 1–2, PR 1a
+adds a temporary `static get adapter()` compatibility alias that forwards
+to `connection`. This keeps CI green throughout. The alias is removed
+during Phase G (fixture adoption), which already touches these same files
+— no separate test sweep needed.
 
 ---
 
-## PR 1 — Leaf bypasses: raw field reads + fallback chains
+## Phase 1 — Collapse the two getters (2 PRs)
 
-Bundle of all sites that read `._adapter` directly or use fallback chains
-instead of the getter. No behavioral change — every site already has a
-working getter path; these just remove the bypass/fallback.
+### PR 1a — Delete `adapter` getter, relocate its side effects
+
+The `adapter` getter does two things `connection` doesn't. Neither belongs
+in `connection` — Rails' `connection` is a bare pool delegation
+(`connection_pool.lease_connection` / `.active_connection`, see
+`connection_handling.rb:274`).
+
+1. **Per-class caching on `_adapter`** — Rails doesn't cache on the model
+   class; `connection` delegates to the pool every time. Delete it.
+2. **Arel-visitor wiring (`_wireArelVisitor`)** — sets a global
+   `setToSqlVisitor` singleton. In Rails this happens in
+   `AbstractAdapter#initialize` (`@visitor = arel_visitor`,
+   `abstract_adapter.rb:155`). Move it there.
+
+The setter (`set adapter()`) does real work: schema invalidation,
+descendant cache cascade, model registration. It exists because ~6900
+test sites do `this.adapter = adapter` in `static {}` blocks — a
+trails-ism (Rails tests use `establish_connection`, never direct
+assignment). This plan renames it to `set connection()` as a transitional
+step; a future plan converts tests to `establishConnection` and deletes
+the setter entirely.
 
 **Scope:**
 
-| Site                         | File                                    | Pattern                                        | Fix                                                             |
-| ---------------------------- | --------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------- |
-| Relation arel-visitor        | `relation.ts`                           | `(this._modelClass as any)._adapter`           | `this._modelClass.adapter` — remove `as any` casts              |
-| Preloader cache key          | `associations/preloader/association.ts` | `klass._adapter`                               | `klass.adapter` — local variable for repeated access            |
-| QueryMethods column matcher  | `relation/query-methods.ts`             | `.adapter ?? ._adapter` double-fallback        | Single `host._modelClass.adapter`; fix host type constraint     |
-| Uniqueness validator         | `validations/uniqueness.ts`             | `klass.adapter ?? klass.connection ?? null`    | Single `klass.adapter` call; delete dead fallback               |
-| primary-key quotedPrimaryKey | `attribute-methods/primary-key.ts`      | `{ adapter?: DatabaseAdapter }` in `this` type | Remove from host type; resolve via `this.adapter` (Base getter) |
+- `base.ts`: delete `static get adapter()`, `_adapter` field,
+  `_wireArelVisitor` helper, and the inline descendant-invalidation loop
+  in `set adapter()`.
+- `base.ts`: rename `static set adapter()` → `static set connection()`,
+  keep schema-invalidation logic intact. Mark `@internal` + add a
+  `@deprecated Use establishConnection() instead` JSDoc.
+- `base.ts`: add `static get adapter()` compatibility alias that
+  forwards to `this.connection` (keeps ~7000 test sites working).
+- `connection-adapters/abstract-adapter.ts`: wire arel visitor in
+  constructor (matching Rails).
 
-**Type fixes:** Where `as any` casts exist because the type doesn't expose
-`.adapter`, widen the constraint to `typeof Base` (or the appropriate
-connection-owning interface). This may touch type declarations in
-`relation.ts` and `query-methods.ts`.
+**Verify:** `pnpm vitest run packages/activerecord/src/base.test.ts`
 
-**Verify:** `pnpm vitest run packages/activerecord/src/relation.test.ts packages/activerecord/src/associations/nested-through-preloader.test.ts packages/activerecord/src/validations.test.ts`
+**LOC estimate:** ~200
+
+### PR 1b — Source call-site migration: `.adapter` → `.connection`
+
+Mechanical rename across ~34 non-test source files (~165 call sites). No
+behavioral change — every site calls the same pool-checkout path.
+
+**Scope:**
+
+| Layer        | Files                                                                   | Pattern                                        |
+| ------------ | ----------------------------------------------------------------------- | ---------------------------------------------- |
+| Relation     | `relation.ts`, `query-methods.ts`, `calculations.ts`                    | `modelClass.adapter` → `modelClass.connection` |
+| Associations | `preloader/association.ts`, `association-scope.ts`, `collection-*.ts`   | `klass.adapter` → `klass.connection`           |
+| Persistence  | `persistence.ts`, `insert-all.ts`, `locking/pessimistic.ts`             | `ctor.adapter` → `ctor.connection`             |
+| Querying     | `querying.ts`, `sanitization.ts`, `explain.ts`                          | `.adapter` → `.connection`                     |
+| Validations  | `validations/uniqueness.ts`                                             | fallback chain → single `.connection`          |
+| Schema       | `schema.ts`, `schema-dumper.ts`, `model-schema.ts`, `migration.ts`      | `.adapter` → `.connection`                     |
+| Other        | `timestamp.ts`, `touch-later.ts`, `transactions.ts`, `suppressor.ts`, … | `.adapter` → `.connection`                     |
+
+Note: `InsertAll` has only 1 `.adapter` ref (already cleaned up).
+`JoinDependency` has 0 (cleaned up in #2387).
+
+**Verify:** `grep -rn '\.adapter\b' packages/activerecord/src/ --include='*.ts' | grep -v test | grep -v connection-adapters | grep -v adapter.ts` returns zero.
+
+**LOC estimate:** ~250
+
+---
+
+## Phase 2 — Delete `DatabaseAdapter` interface (2 PRs)
+
+### PR 2a — Type constraints: `DatabaseAdapter` → `AbstractAdapter`
+
+~38 files import `DatabaseAdapter`. Every type annotation, generic
+constraint, and parameter switches to `AbstractAdapter`.
+
+**Scope:**
+
+- Host interfaces on Relation, QueryMethods, etc.
+- Constructor params on `InsertAll`, `SchemaStatements`, etc.
+- `connection-handling.ts` return types.
+
+**Verify:** `pnpm test:types`
+
+**LOC estimate:** ~200
+
+### PR 2b — Delete `adapter.ts`, relocate survivors
+
+`adapter.ts` exports more than just `DatabaseAdapter`. Surviving exports
+move to their Rails-natural homes:
+
+- `AdapterName`, `adapterNameFromConfig` →
+  `connection-adapters/abstract-adapter.ts` (Rails' `adapter_name`).
+- `TrailsAdapterOptions`, `SQLite3AdapterOptions`,
+  `MysqlAdapterOptions`, `PostgreSQLAdapterOptions` →
+  `connection-adapters/pool-config.ts` (connection-establishment config).
+- `ExplainOption`, `inspectExplainOption` →
+  `connection-adapters/abstract/database-statements.ts`.
+- Delete `adapter.ts`.
+- Update `index.ts` re-exports.
+
+**Verify:** `pnpm test:types` + grep for dead imports.
 
 **LOC estimate:** ~150
 
 ---
 
-## PR 2 — InsertAll: lazy connection resolution
+## Phase G intersection — test files handled by fixture adoption
 
-`InsertAll` stores `model.adapter` at construction time and reuses it across
-all operations. If the connection swaps between construction and execution
-(e.g., `connected_to` role switching), the stored reference is stale.
+~7000 `.adapter` references across ~182 test files overlap almost
+entirely with the ~150-200 files Phase G (fixture adoption) already
+plans to rewrite. Phase G replaces inline `Model.create()` with
+`useFixtures()` and will rename `.adapter` → `.connection` in the same
+pass. No separate test sweep is needed here.
 
-**Fix:**
+The compatibility alias (`static get adapter()`) bridges the gap:
+Phases 1–2 ship with CI green, then Phase G batches remove the alias
+usage file-by-file. The alias itself is deleted when the last Phase G
+batch lands.
 
-- Store the model class ref (`this._model: typeof Base`) instead of the adapter.
-- Add `private get _connection() { return this._model.adapter; }`.
-- Replace all `this._connection` reads (~15 sites) with the getter.
-- Delete the `connection` constructor parameter.
-
-**Verify:** `pnpm vitest run packages/activerecord/src/insert-all.test.ts`
-
-**LOC estimate:** ~100
-
----
-
-## PR 3 — JoinDependency: lazy connection resolution
-
-Same pattern as PR 2. `JoinDependency` resolves and freezes an adapter at
-construction for quoting. Rails' `JoinDependency` calls `connection` at the
-point of use (within `make_constraints` / `build_join_tree`).
-
-**Fix:**
-
-- Store `this._baseModel: typeof Base` instead of `this._adapter`.
-- Add `private get _adapter() { return this._baseModel.adapter; }`.
-- Remove `_resolveAdapter` static helper.
-- All existing `this._adapter` usage sites (~8) continue working via the
-  getter with no call-site changes.
-
-**Verify:** `pnpm vitest run packages/activerecord/src/associations/join-dependency-quoting.test.ts packages/activerecord/src/associations/join-dependency-through-aliasing.test.ts`
-
-**LOC estimate:** ~80
+See: `docs/connection-pooled-test-adapter-plan.md` (Phase G sequencing),
+`docs/fixtures-port-plan.md` (fixture data source),
+memory `project-phase-g-fixture-adoption-epic` (sizing).
 
 ---
 
 ## Ordering
 
-PR 1 first (no structural change, just resolution-path cleanup). PRs 2–3 are
-independent of each other and can ship in parallel after PR 1.
+```
+              PR 1a (collapse getters + compat alias)
+             ╱                              ╲
+PR 1b (source call-site rename)    PR 2a (DatabaseAdapter → AbstractAdapter)
+             ╲                              ╱
+              PR 2b (delete adapter.ts)
+                        ↓
+              Phase G batches (fixture adoption + .adapter→.connection in tests)
+                        ↓
+              Final: delete compatibility alias
+```
+
+PR 1a is the only prerequisite — it creates `set connection()`,
+adds the `get adapter()` compatibility alias, and deletes the old
+getter/caching/wiring. After 1a lands, PRs 1b and 2a are independent
+(1b renames runtime call sites, 2a swaps type annotations) and can
+ship in parallel. PR 2b depends on both 1b and 2a (can't delete
+`adapter.ts` until nothing imports from it). Phase G depends on 2b
+and handles all test-file changes.
+
+All PRs branch from `main` (no stacking).
 
 ## Non-goals (this plan)
 
-- Renaming `adapter` → `connection` across the codebase (separate initiative)
-- Removing `Base.adapter = X` setter (Phase D epic scope)
-- Adding `withConnection { }` block semantics (future pool lifecycle work)
+- **Deleting `set connection()` and the `get adapter()` compat alias** —
+  requires converting ~6900 test sites to `establishConnection()`. The
+  compat alias is consumed by Phase G (fixture adoption); the setter
+  removal is a separate initiative after Phase G lands.
+- Renaming `connection-adapters/` directory or `AbstractAdapter` class
+  (those already match Rails).
+- `withConnection { }` block semantics (future pool lifecycle work).
+- `connectedTo()` role-switching API (separate initiative).
