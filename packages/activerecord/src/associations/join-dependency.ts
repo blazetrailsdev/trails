@@ -21,6 +21,7 @@ import { modelRegistry } from "../associations.js";
 import { reflectOnAssociation } from "../reflection.js";
 import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
 import { JoinBase } from "./join-dependency/join-base.js";
+import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
 import { AssociationNotFoundError } from "./errors.js";
 
@@ -232,41 +233,6 @@ export class JoinDependency {
     this._arelTablesByIndex.set(tableIndex, targetArelTable);
     const sourceArelTable = new Table(sourceAlias);
 
-    // Build ON predicate as Arel nodes (mirrors Rails join_dependency.rb build_constraint)
-    let predicate: Nodes.Node;
-    if (isBelongsTo) {
-      predicate = targetArelTable.get(primaryKey!).eq(sourceArelTable.get(foreignKey!));
-    } else {
-      predicate = targetArelTable.get(foreignKey!).eq(sourceArelTable.get(primaryKey!));
-    }
-
-    // Polymorphic :as type predicate
-    if (!isBelongsTo && assocDef.options.as) {
-      const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-      const typePred = targetArelTable.get(typeCol).eq(new Nodes.Quoted(modelClass.name));
-      predicate = new Nodes.And([predicate, typePred]);
-    }
-
-    // Association scope predicates
-    if (assocDef.options.scope && typeof assocDef.options.scope === "function") {
-      const scopeRel = assocDef.options.scope((targetModel as any)._allForPreload());
-      if (scopeRel?._whereClause && !scopeRel._whereClause.isEmpty()) {
-        let scopeAst: Nodes.Node = scopeRel._whereClause.ast;
-        // When the target table was aliased (collision), the scope's AST
-        // references the unaliased table. Rebind attributes to the aliased table.
-        if (effectiveName !== targetTable!) {
-          scopeAst = rebindTableReferences(scopeAst, targetTable!, targetArelTable);
-        }
-        predicate =
-          predicate instanceof Nodes.And
-            ? new Nodes.And([...predicate.children, scopeAst])
-            : new Nodes.And([predicate, scopeAst]);
-      }
-    }
-
-    // STI type constraint as Arel predicate
-    predicate = this._addStiConstraintArel(predicate, targetModel!, targetArelTable);
-
     const targetModelPk = (targetModel as any).primaryKey ?? "id";
     if (Array.isArray(targetModelPk)) return null;
 
@@ -275,7 +241,55 @@ export class JoinDependency {
 
     const columns = getModelColumns(targetModel);
 
-    const arelJoin = new Nodes.OuterJoin(targetArelTable, new Nodes.On(predicate));
+    // Build JOIN via JoinAssociation when reflection is available (mirrors Rails),
+    // falling back to inline predicate construction otherwise.
+    let arelJoin: Nodes.Join;
+    if (reflection) {
+      const joinAssoc = new JoinAssociation(reflection);
+      const joins = joinAssoc.joinConstraints(
+        sourceArelTable,
+        modelClass,
+        this._joinType,
+        (_refl, _remaining) => [targetArelTable, false],
+      );
+      arelJoin = joins[0] as Nodes.Join;
+      // When the target table was aliased (collision), scope/STI predicates from
+      // klass.all() reference the unaliased table. Rebind to the aliased table.
+      if (effectiveName !== targetTable!) {
+        const on = (arelJoin as any).right as Nodes.On;
+        const rebound = rebindTableReferences(on.expr as Nodes.Node, targetTable!, targetArelTable);
+        if (rebound !== on.expr) {
+          arelJoin = new this._joinType((arelJoin as any).left, new Nodes.On(rebound));
+        }
+      }
+    } else {
+      let predicate: Nodes.Node;
+      if (isBelongsTo) {
+        predicate = targetArelTable.get(primaryKey!).eq(sourceArelTable.get(foreignKey!));
+      } else {
+        predicate = targetArelTable.get(foreignKey!).eq(sourceArelTable.get(primaryKey!));
+      }
+      if (!isBelongsTo && assocDef.options.as) {
+        const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
+        const typePred = targetArelTable.get(typeCol).eq(new Nodes.Quoted(modelClass.name));
+        predicate = new Nodes.And([predicate, typePred]);
+      }
+      if (assocDef.options.scope && typeof assocDef.options.scope === "function") {
+        const scopeRel = assocDef.options.scope((targetModel as any)._allForPreload());
+        if (scopeRel?._whereClause && !scopeRel._whereClause.isEmpty()) {
+          let scopeAst: Nodes.Node = scopeRel._whereClause.ast;
+          if (effectiveName !== targetTable!) {
+            scopeAst = rebindTableReferences(scopeAst, targetTable!, targetArelTable);
+          }
+          predicate =
+            predicate instanceof Nodes.And
+              ? new Nodes.And([...predicate.children, scopeAst])
+              : new Nodes.And([predicate, scopeAst]);
+        }
+      }
+      predicate = this._addStiConstraintArel(predicate, targetModel!, targetArelTable);
+      arelJoin = new this._joinType(targetArelTable, new Nodes.On(predicate));
+    }
 
     const node: JoinNode = {
       tableIndex,
@@ -436,9 +450,9 @@ export class JoinDependency {
     }
 
     const joins = intersection.flatMap(([l, r]) => {
-      if (r instanceof JoinTreeNode) {
+      if (r instanceof JoinAssociation || r instanceof JoinTreeNode) {
         const lt = l.table;
-        (r as JoinTreeNode).table = typeof lt === "string" ? lt : (lt.tableAlias ?? lt.name);
+        r.table = typeof lt === "string" ? lt : (lt.tableAlias ?? lt.name);
       }
       return this.walk(l, r, joinType);
     });
@@ -790,7 +804,14 @@ export class JoinDependency {
     } else {
       parent = this._joinRoot;
     }
-    const treePart = new JoinTreeNode(node.modelClass, node);
+    let treePart: JoinPart;
+    if (node.reflection) {
+      const ja = new JoinAssociation(node.reflection);
+      (ja as any)._joinNode = node;
+      treePart = ja;
+    } else {
+      treePart = new JoinTreeNode(node.modelClass, node);
+    }
     parent.children.push(treePart);
     const fullPath = parentPath
       ? `${parentPath}.${node.immediateAssocName}`

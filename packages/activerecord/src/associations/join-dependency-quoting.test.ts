@@ -12,6 +12,7 @@ import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
+import { JoinAssociation } from "./join-dependency/join-association.js";
 import { Nodes } from "@blazetrails/arel";
 
 describe("JoinDependency Arel node construction", () => {
@@ -51,21 +52,23 @@ describe("JoinDependency Arel node construction", () => {
     const on = outerJoin.right as Nodes.On;
     expect(on).toBeInstanceOf(Nodes.On);
 
-    // ON predicate is And(fk=pk, type='Owner')
+    // ON predicate is And(type='Owner', fk=pk) — joinScope adds type first, FK second
     const and = on.expr as Nodes.And;
     expect(and).toBeInstanceOf(Nodes.And);
     expect(and.children).toHaveLength(2);
 
-    // First child: fk equality
-    const eq = and.children[0] as Nodes.Equality;
-    expect(eq).toBeInstanceOf(Nodes.Equality);
-    expect((eq.left as any).name).toBe("owner_id");
-
-    // Second child: type equality
-    const typeEq = and.children[1] as Nodes.Equality;
+    // First child: type equality (joinScope adds polymorphic type predicate first)
+    const typeEq = and.children[0] as Nodes.Equality;
     expect(typeEq).toBeInstanceOf(Nodes.Equality);
     expect((typeEq.left as any).name).toBe("owner_type");
-    expect((typeEq.right as any).value ?? (typeEq.right as any).val).toBe("Owner");
+    const typeVal = typeEq.right as any;
+    const resolvedType = typeVal?.value?._valueBeforeTypeCast ?? typeVal?.value ?? typeVal?.val;
+    expect(resolvedType).toBe("Owner");
+
+    // Second child: fk equality
+    const eq = and.children[1] as Nodes.Equality;
+    expect(eq).toBeInstanceOf(Nodes.Equality);
+    expect((eq.left as any).name).toBe("owner_id");
   });
 
   it("emits OuterJoin with STI subclass IN-list predicate", () => {
@@ -76,14 +79,19 @@ describe("JoinDependency Arel node construction", () => {
       }
     }
     class Car extends Vehicle {}
+    class ElectricCar extends Car {}
     enableSti(Vehicle);
     registerSubclass(Car);
+    registerSubclass(ElectricCar);
     Vehicle.adapter = adapter;
     Car.adapter = adapter;
+    ElectricCar.adapter = adapter;
     (Vehicle as any)._associations = [];
     (Car as any)._associations = [];
+    (ElectricCar as any)._associations = [];
     registerModel(Vehicle);
     registerModel(Car);
+    registerModel(ElectricCar);
 
     Associations.hasMany.call(Owner, "cars", { className: "Car", foreignKey: "owner_id" });
 
@@ -98,10 +106,15 @@ describe("JoinDependency Arel node construction", () => {
     expect(and).toBeInstanceOf(Nodes.And);
     expect(and.children).toHaveLength(2);
 
-    // Second child: STI IN predicate
-    const inNode = and.children[1] as Nodes.In;
+    // First child: STI IN-list (Car has descendant ElectricCar, so klass.all() produces IN)
+    const inNode = and.children[0] as Nodes.In;
     expect(inNode).toBeInstanceOf(Nodes.In);
     expect((inNode.left as any).name).toBe("type");
+
+    // Second child: FK equality
+    const eq = and.children[1] as Nodes.Equality;
+    expect(eq).toBeInstanceOf(Nodes.Equality);
+    expect((eq.left as any).name).toBe("owner_id");
   });
 
   it("emits simple OuterJoin for hasMany without polymorphic/STI", () => {
@@ -193,5 +206,27 @@ describe("JoinDependency Arel node construction", () => {
     expect(node2!.effectiveSqlName).toBe("t2");
     const table2 = (node2!.arelJoin as Nodes.OuterJoin).left;
     expect((table2 as any).tableAlias).toBe("t2");
+  });
+
+  it("respects joinType constructor arg (InnerJoin)", () => {
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
+
+    const jd = new JoinDependency(Owner, Nodes.InnerJoin);
+    const node = jd.addAssociation("assets");
+    expect(node).not.toBeNull();
+    expect(node!.arelJoin).toBeInstanceOf(Nodes.InnerJoin);
+  });
+
+  it("pushes JoinAssociation into tree when reflection is available", () => {
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
+
+    const jd = new JoinDependency(Owner);
+    jd.addAssociation("assets");
+
+    const child = jd.joinRoot.children[0];
+    expect(child).toBeInstanceOf(JoinAssociation);
+    expect((child as JoinAssociation).reflection).toBeDefined();
+    expect(child._joinNode).not.toBeNull();
+    expect(child._joinNode!.immediateAssocName).toBe("assets");
   });
 });
