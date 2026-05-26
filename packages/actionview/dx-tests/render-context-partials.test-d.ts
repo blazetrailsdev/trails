@@ -58,7 +58,7 @@ describe("TseRenderContext#render — conditional generic (Story 5.8 + follow-up
     const r1 = ctx.render({ partial: "users/user", collection: ["a", "b"] });
     expectTypeOf(r1).toMatchTypeOf<SafeBuffer>();
 
-    const r2 = ctx.render({ partial: "users/user", collection: ["a"], as: "person" });
+    const r2 = ctx.render({ partial: "users/user", collection: ["a"], as: "user" });
     expectTypeOf(r2).toMatchTypeOf<SafeBuffer>();
 
     const r3 = ctx.render({
@@ -67,6 +67,24 @@ describe("TseRenderContext#render — conditional generic (Story 5.8 + follow-up
       spacerTemplate: "shared/divider",
     });
     expectTypeOf(r3).toMatchTypeOf<SafeBuffer>();
+  });
+
+  it("as literal narrows auto-injected keys — matching name compiles", () => {
+    ctx.render({ partial: "users/user", collection: ["a"], as: "user" });
+  });
+
+  it("as literal narrows auto-injected keys — mismatched name errors", () => {
+    // @ts-expect-error — as: "wrong" does not strip "user" from auto-keys, so "user" is required
+    ctx.render({ partial: "users/user", collection: ["a"], as: "wrong" });
+  });
+
+  it("as literal narrows auto-injected keys — mismatched name with locals compiles", () => {
+    ctx.render({
+      partial: "users/user",
+      collection: ["a"],
+      as: "person",
+      locals: { user: "Alice" },
+    });
   });
 
   it("collection renders with typed locals accept valid keys and reject unknown keys", () => {

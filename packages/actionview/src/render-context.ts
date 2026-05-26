@@ -8,7 +8,9 @@ import type { TemplateLocals, TemplateRegistry } from "./template-registry.js";
  * registered shape has required properties). When `P` is a plain `string`,
  * locals fall back to `Record<string, unknown>`.
  */
-export type RenderOptions<P extends string> = RenderSingleOptions<P> | RenderCollectionOptions<P>;
+export type RenderOptions<P extends string, A extends string = DeriveLocalName<P>> =
+  | RenderSingleOptions<P>
+  | RenderCollectionOptions<P, A>;
 
 type RenderSingleOptions<P extends string> = {
   partial: P;
@@ -26,25 +28,24 @@ type LastSegment<P extends string> = P extends `${string}/${infer L}` ? L : P;
 type StripLeadingUnderscore<S extends string> = S extends `_${infer R}` ? R : S;
 type BeforeFirstDot<S extends string> = S extends `${infer B}.${string}` ? B : S;
 type DeriveLocalName<P extends string> = BeforeFirstDot<StripLeadingUnderscore<LastSegment<P>>>;
-type CollectionAutoKeys<P extends string> =
-  | DeriveLocalName<P>
-  | `${DeriveLocalName<P>}_counter`
-  | `${DeriveLocalName<P>}_iteration`;
-type CollectionLocals<P extends keyof TemplateRegistry> = Omit<
-  TemplateLocals<TemplateRegistry[P]>,
-  CollectionAutoKeys<P>
->;
+type CollectionAutoKeysFor<A extends string> = string extends A
+  ? never
+  : A | `${A}_counter` | `${A}_iteration`;
+type CollectionLocals<
+  P extends keyof TemplateRegistry,
+  A extends string = DeriveLocalName<P>,
+> = Omit<TemplateLocals<TemplateRegistry[P]>, CollectionAutoKeysFor<A>>;
 
-type RenderCollectionOptions<P extends string> = {
+type RenderCollectionOptions<P extends string, A extends string = DeriveLocalName<P>> = {
   partial: P;
   collection: readonly unknown[];
-  as?: string;
+  as?: A;
   spacerTemplate?: string;
 } & (P extends keyof TemplateRegistry
   ? // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-    {} extends CollectionLocals<P>
-    ? { locals?: CollectionLocals<P> }
-    : { locals: CollectionLocals<P> }
+    {} extends CollectionLocals<P, A>
+    ? { locals?: CollectionLocals<P, A> }
+    : { locals: CollectionLocals<P, A> }
   : { locals?: Record<string, unknown> });
 
 /**
@@ -98,14 +99,17 @@ export interface TseRenderContext {
    * shape has required properties). A plain `string` falls back to
    * `Record<string, unknown>`. Collection renders (`collection:` present)
    * omit auto-injected keys (item, counter, iteration) from the locals
-   * requirement; remaining required keys must still be provided.
+   * requirement when `as` is a literal type; a wide `string` preserves
+   * all locals requirements. Remaining required keys must still be provided.
    * `spacerTemplate` is only accepted on collection renders.
    * `rails partial_renderer.rb`.
    *
    * Static form: `render({ partial: "users/user", locals: { user } })`
    * Collection form: `render({ partial: "users/user", collection: users, as: "user" })`
    */
-  render<P extends string>(options: RenderOptions<P>): SafeBuffer;
+  render<P extends string, A extends string = DeriveLocalName<P>>(
+    options: RenderOptions<P, A>,
+  ): SafeBuffer;
 }
 
 /**
@@ -164,7 +168,9 @@ export class TseRenderContextImpl implements TseRenderContext {
     this._contentBuffers.set(name, existing ? existing.concat(captured) : captured);
   }
 
-  render<P extends string>(options: RenderOptions<P>): SafeBuffer {
+  render<P extends string, A extends string = DeriveLocalName<P>>(
+    options: RenderOptions<P, A>,
+  ): SafeBuffer {
     const { partial, locals = {}, collection, as, spacerTemplate } = options;
     const localName = as ?? deriveLocalName(partial);
 
