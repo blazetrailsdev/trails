@@ -5,7 +5,7 @@
  *   tsx scripts/parity/translate/arel.ts [--fixture arel-XX] [--dry-run] [--force]
  *
  * Reads the `-- Query:` comment from each arel fixture's schema.sql,
- * applies the rule-based translation map from docs/query-parity-verification.md,
+ * applies the rule-based translation map from docs/activerecord/parity-verification.md,
  * and writes query.rb + query.ts skeletons into the fixture directory.
  *
  * Run when adding new fixtures. Existing files are skipped unless --force.
@@ -83,7 +83,7 @@ function parseSchemaSql(dir: string): FixtureInfo {
 }
 
 /**
- * Apply the Ruby→TypeScript translation rules from docs/query-parity-verification.md.
+ * Apply the Ruby→TypeScript translation rules from docs/activerecord/parity-verification.md.
  * Returns [rbExpr, tsExpr] for the body of the query expression.
  * When the query is too complex for rule-based translation, returns a TODO comment.
  */

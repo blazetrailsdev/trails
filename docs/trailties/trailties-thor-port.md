@@ -4,7 +4,7 @@
 
 Early on, `packages/trailties` was wired up with [`commander`](https://www.npmjs.com/package/commander) so a `trails` binary could exist quickly. Rails uses [Thor](https://github.com/rails/thor) — `Rails::Command::Base` (in `railties/lib/rails/command/base.rb`) is a thin wrapper over `Thor::Group`, and every `bin/rails <command>` resolves to a Thor command class.
 
-Project ethos is Rails-source fidelity (see [CLAUDE.md](../CLAUDE.md)). `commander` diverges from Thor's surface — different option DSL, different help formatting, different subcommand routing — and `api:compare` will flag every Thor method that doesn't exist on our side. Since nothing depends on trailties' CLI today, there's no back-compat cost to switching.
+Project ethos is Rails-source fidelity (see [CLAUDE.md](../../CLAUDE.md)). `commander` diverges from Thor's surface — different option DSL, different help formatting, different subcommand routing — and `api:compare` will flag every Thor method that doesn't exist on our side. Since nothing depends on trailties' CLI today, there's no back-compat cost to switching.
 
 ## Scope
 

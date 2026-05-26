@@ -4,7 +4,7 @@ TypeScript packages that mirror the Ruby on Rails API.
 
 The goal is **100% API compatible with Rails**, with behavior matched **test for test** against the Rails source. If you can read the [Rails API docs](https://api.rubyonrails.org/), you already know how to use this — class names, method signatures, and behavior are designed to match Rails as closely as TypeScript allows, while adding the type safety that Ruby can't.
 
-> **Milestone — May 2026: ActiveRecord public API at 100%.** Every public method, class, and module from `activerecord/lib/active_record/**/*.rb` has a TypeScript counterpart (`api:compare` 4969/4969). Behavior parity (test-for-test) continues — see [`docs/activerecord-100-plan.md`](docs/activerecord-100-plan.md) for the post-100% Rails-fidelity work.
+> **Milestone — May 2026: ActiveRecord public API at 100%.** Every public method, class, and module from `activerecord/lib/active_record/**/*.rb` has a TypeScript counterpart (`api:compare` 4969/4969). Behavior parity (test-for-test) continues — see [`docs/activerecord/activerecord-100-plan.md`](docs/activerecord/activerecord-100-plan.md) for the post-100% Rails-fidelity work.
 
 ## Zero-declare models — `trails-tsc`
 
@@ -69,7 +69,7 @@ Re-run `trails-schema-dump` after each migration (or wire it into your
 migration script). Rails-bookkeeping tables (`schema_migrations`,
 `ar_internal_metadata`) are skipped by default.
 
-Attributes come from the schema. Associations, scopes, and enums come from the runtime calls in each class's static block. Override types as needed with `this.attribute("admin", "boolean")` — overrides always win over schema reflection. For editor support (autocomplete, hover, go-to-definition), the Phase-2 tsserver plugin is in flight; [docs/virtual-source-files-plan.md](docs/virtual-source-files-plan.md) tracks the rollout.
+Attributes come from the schema. Associations, scopes, and enums come from the runtime calls in each class's static block. Override types as needed with `this.attribute("admin", "boolean")` — overrides always win over schema reflection. For editor support (autocomplete, hover, go-to-definition), the Phase-2 tsserver plugin is in flight; [docs/infrastructure/virtual-source-files-plan.md](docs/infrastructure/virtual-source-files-plan.md) tracks the rollout.
 
 ## A bigger slice
 
@@ -181,11 +181,11 @@ Ruby-to-TypeScript translation table.
 
 | Package                     | Rails Equivalent                                                      | API       | Tests     | Description                                              |
 | --------------------------- | --------------------------------------------------------------------- | --------- | --------- | -------------------------------------------------------- |
-| `@blazetrails/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **99.8%** | **84.8%** | ORM — persistence, querying, associations, migrations    |
+| `@blazetrails/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **99.8%** | **84.7%** | ORM — persistence, querying, associations, migrations    |
 | `@blazetrails/arel`         | [Arel](https://api.rubyonrails.org/classes/Arel.html)                 | **100%**  | **99.4%** | SQL AST builder and query generation                     |
 | `@blazetrails/activemodel`  | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)   | **99.8%** | **99.6%** | Attributes, validations, callbacks, dirty tracking, i18n |
 
-**Data Layer Parity** (ActiveRecord + Arel + ActiveModel): **99.8% API** (4412/4419) | **87.4% Tests** (8326/9531 non-skipped, weighted across the three packages)
+**Data Layer Parity** (ActiveRecord + Arel + ActiveModel): **99.8% API** (4408/4417) | **87.3% Tests** (8315/9531 non-skipped, weighted across the three packages)
 
 Per-package deviation guides catalog the places where Trails diverges
 from Rails on purpose (and why): [ActiveRecord](packages/website/docs/guides/activerecord-rails-deviations.md)
@@ -196,16 +196,16 @@ from Rails on purpose (and why): [ActiveRecord](packages/website/docs/guides/act
 
 | Package                      | Rails Equivalent                                                              | API       | Tests     | Description                                                |
 | ---------------------------- | ----------------------------------------------------------------------------- | --------- | --------- | ---------------------------------------------------------- |
-| `@blazetrails/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html)       | **28.6%** | **78.5%** | Core utilities, inflection, caching, notifications         |
-| `@blazetrails/rack`          | [Rack](https://rack.github.io/)                                               | —         | **100%**  | Modular web server interface, request/response, middleware |
-| `@blazetrails/actionpack`    | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **73.2%** | **28.3%** | Controller layer, rendering, filters, parameters           |
-|                              | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **77.1%** | **35.8%** | Routing, middleware stack, cookies, sessions, security     |
-| `@blazetrails/actionview`    | [ActionView](https://api.rubyonrails.org/classes/ActionView.html)             | **8.5%**  | **8.3%**  | Templates, rendering, view helpers                         |
-| `@blazetrails/trailties`     | [Railties](https://api.rubyonrails.org/classes/Rails.html)                    | —         | **4.8%**  | CLI, generators, application bootstrap                     |
+| `@blazetrails/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html)       | **29.0%** | **79.0%** | Core utilities, inflection, caching, notifications         |
+| `@blazetrails/rack`          | [Rack](https://rack.github.io/)                                               | **97.6%** | **100%**  | Modular web server interface, request/response, middleware |
+| `@blazetrails/actionpack`    | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **86.9%** | **35.9%** | Controller layer, rendering, filters, parameters           |
+|                              | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **96.5%** | **41.4%** | Routing, middleware stack, cookies, sessions, security     |
+| `@blazetrails/actionview`    | [ActionView](https://api.rubyonrails.org/classes/ActionView.html)             | **9.6%**  | **9.3%**  | Templates, rendering, view helpers                         |
+| `@blazetrails/trailties`     | [Railties](https://api.rubyonrails.org/classes/Rails.html)                    | **35.3%** | **5.2%**  | CLI, generators, application bootstrap                     |
 
-**Tests** = `test:compare` — matches our test names against the Rails test suite. **API** = `pnpm api:compare -- --public-only` — matches individual public methods against Rails source (method-level, not class/module wrappers). The default `api:compare` mode also includes Rails-private/internal helpers; this README reports the public-surface filter so the headline percentages reflect contract coverage. Rack doesn't have API comparison yet (it's not a Rails gem). Trailties' API column is em-dashed because `api:compare` finds no public-method overlap between our `packages/trailties/src/` files and the bundled `railties/lib/rails` source yet, so the package summary is omitted from the report.
+**Tests** = `test:compare` — matches our test names against the Rails test suite. **API** = `pnpm api:compare -- --public-only` — matches individual public methods against Rails source (method-level, not class/module wrappers). The default `api:compare` mode also includes Rails-private/internal helpers; this README reports the public-surface filter so the headline percentages reflect contract coverage.
 
-**52.6%** overall public API coverage (4,977 / 9,465 methods). CI runs both comparisons on every push.
+**66.4%** overall public API coverage (7,264 / 10,936 methods). CI runs both comparisons on every push.
 
 ## Design Principles
 

@@ -12,8 +12,8 @@ Rails-mirroring file paths. It does **not** validate **structure within a file**
 data-driven ESLint rule (`blazetrails/rails-file-structure`) backed by a
 cached Ruby analysis of `vendor/rails/`.
 
-Style match: [activerecord-type-audit.md](activerecord-type-audit.md) +
-[actionpack-100-percent.md](actionpack-100-percent.md).
+Style match: [activerecord-type-audit.md](../activerecord/activerecord-type-audit.md) +
+[actionpack-100-percent.md](../actionpack-100-percent.md).
 This is the _within-file_ analog of the actionpack restructure audit.
 
 > **Note:** The vendor migration (waves tracked in `vendor/README.md`, starting with [PR #1559](https://github.com/blazetrailsdev/trails/pull/1559)) is complete. Rails source lives at
@@ -44,16 +44,16 @@ This is the _within-file_ analog of the actionpack restructure audit.
 Source TS files in Rails-mirroring packages (excluding `*.test.ts`,
 `*.test-d.ts`, `*.d.ts`):
 
-| package       |   files | notes                                                                                                                                                      |
-| ------------- | ------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| activerecord  |     430 | dominant; biggest files 1.7k–5.4k LOC                                                                                                                      |
-| activesupport |      97 |                                                                                                                                                            |
-| arel          |      89 |                                                                                                                                                            |
-| actionpack    |      89 | 50 actioncontroller + 37 actiondispatch + 1 abstractcontroller + index; restructure in progress ([`actionpack-100-percent.md`](actionpack-100-percent.md)) |
-| activemodel   |      72 |                                                                                                                                                            |
-| trailties     |      23 | Rails source: `railties/lib/rails/`                                                                                                                        |
-| actionview    |      13 |                                                                                                                                                            |
-| **total**     | **813** |                                                                                                                                                            |
+| package       |   files | notes                                                                                                                                                         |
+| ------------- | ------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| activerecord  |     430 | dominant; biggest files 1.7k–5.4k LOC                                                                                                                         |
+| activesupport |      97 |                                                                                                                                                               |
+| arel          |      89 |                                                                                                                                                               |
+| actionpack    |      89 | 50 actioncontroller + 37 actiondispatch + 1 abstractcontroller + index; restructure in progress ([`actionpack-100-percent.md`](../actionpack-100-percent.md)) |
+| activemodel   |      72 |                                                                                                                                                               |
+| trailties     |      23 | Rails source: `railties/lib/rails/`                                                                                                                           |
+| actionview    |      13 |                                                                                                                                                               |
+| **total**     | **813** |                                                                                                                                                               |
 
 The actionpack split matters for §3.1 path mapping — the package is itself a
 union of Rails directories, so `conventions.ts` already disambiguates by
@@ -360,7 +360,7 @@ type`, `export interface`.
 - `include(Base, …)` calls from `@blazetrails/activesupport` (recognized
   by callee identifier — they are the Ruby-`include` analog).
 - `this`-typed top-level `function` exports (the
-  [CLAUDE.md mixin pattern](../CLAUDE.md)) — these mirror Ruby instance
+  [CLAUDE.md mixin pattern](../../CLAUDE.md)) — these mirror Ruby instance
   methods, not file-scope functions.
 - JSDoc `@internal` markers (visibility analog).
 
@@ -550,7 +550,7 @@ need to swap, the fix is one range covering both.
 
 ## 6. Wave-based rollout
 
-Each PR sized to ≤300 LOC per [CLAUDE.md](../CLAUDE.md). Estimates are
+Each PR sized to ≤300 LOC per [CLAUDE.md](../../CLAUDE.md). Estimates are
 implementation LOC excluding generated JSON.
 
 | wave      | scope                                                                                                    |  est. LOC | notes                                                                                                                                                                                                                                                         |
@@ -627,16 +627,16 @@ reason="rails-source-is-itself-disordered"` is the escape hatch and
 - Files explicitly listed in
   [`scripts/api-compare/unported-files.ts`](../scripts/api-compare/unported-files.ts).
 - Restructuring across files — the
-  [actionpack restructure audit](actionpack-100-percent.md) covers
+  [actionpack restructure audit](../actionpack-100-percent.md) covers
   inter-file moves; this plan is strictly within-file.
 - Comment-content equality — only _positions_ of section comments are
   checked, never their text.
 
 ## 9. Cross-references
 
-- [docs/activerecord-type-audit.md](activerecord-type-audit.md) — audit →
+- [docs/activerecord-type-audit.md](../activerecord/activerecord-type-audit.md) — audit →
   wave-plan style precedent.
-- [docs/actionpack-100-percent.md](actionpack-100-percent.md) —
+- [docs/actionpack-100-percent.md](../actionpack-100-percent.md) —
   the directory-level analog to this within-file plan.
 - [scripts/api-compare/conventions.ts](../scripts/api-compare/conventions.ts) —
   TS↔Ruby naming/path mapping registry; reused by the new rule.
@@ -654,5 +654,5 @@ reason="rails-source-is-itself-disordered"` is the escape hatch and
 - [eslint/nie-requires-annotation.mjs](../eslint/nie-requires-annotation.mjs)
   and [eslint/rails-private-jsdoc.mjs](../eslint/rails-private-jsdoc.mjs) —
   data-driven rule precedents; same plugin object, same RuleTester pattern.
-- [CLAUDE.md](../CLAUDE.md) — `this`-typed mixin convention; PR-size limit
+- [CLAUDE.md](../../CLAUDE.md) — `this`-typed mixin convention; PR-size limit
   driving the wave plan.

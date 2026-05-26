@@ -148,7 +148,7 @@ gate, cluster is just batch-packing.
 
 ## Phase D — Loader gap PRs + Tier 2 → 1 promotion
 
-Each open loader gap from `fixtures-port-plan.md` becomes a pair of
+Each open loader gap from the fixtures port becomes a pair of
 PRs: the loader fix + the Tier 2 → 1 batch it unlocks. Shipped in this
 order to keep diffs small:
 
@@ -223,7 +223,7 @@ Inputs (verified against the worktree):
 
 - 490 total AR test files (`find packages/activerecord/src -name '*.test.ts' | wc -l`)
 - 159 already on `withTransactionalFixtures` / `defineSchema`
-- 122 fixtures translated (fixtures-port-plan)
+- 122 fixtures translated (fixtures port — complete)
 - 94 fixtures currently MATCH under `fixtures:compare`
 
 Rough projection (refined in Phase A):
@@ -269,9 +269,27 @@ the canary pattern is settled.
    toward the 300-LOC ceiling; consider paths-filter narrowing if
    minutes get noisy.
 
+## Post-merge follow-ups
+
+**From #2391 (Phase G batch 1 — first 2 D-1 migrated files)**
+
+Only 2 of the 25 D-1 migrated files in #2397 met fixture-adoption criteria
+(compatible schema + all fixtures MATCH + no loader gap). The other 23 are
+blocked on:
+
+- Schema-reflected attributes don't generate dirty-tracking methods (~20 LOC
+  in `model-schema.ts`; tracked in connection-pooled-test-adapter-plan.md).
+  This is the primary gate — it blocks ~23 candidate files from reaching Tier 1.
+- Remaining D-1 codemod variants (multi-describe, sidecar, adapter-specific
+  files) haven't been migrated yet; Phase G can't adopt those files until
+  their pool wiring is in place.
+
+Status note: Phase G is in flight but at ~8% of target scope until the
+schema-reflected dirty-tracking gap and remaining D-1 variants land.
+
 ## Cross-references
 
-- [`fixtures-port-plan.md`](fixtures-port-plan.md) — the data substrate;
+- fixtures port (complete) — the data substrate;
   Loader gaps section feeds Phase D's pairings
 - [`connection-pooled-test-adapter-plan.md`](connection-pooled-test-adapter-plan.md)
   — Phase E gates this plan's Phase B

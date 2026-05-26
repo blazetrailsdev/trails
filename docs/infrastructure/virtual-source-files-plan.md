@@ -17,7 +17,7 @@ docs + consumer cutover (~150 LOC). Follow-ups: association-option
 
 Related:
 
-- Current manual pattern: [CLAUDE.md § "The `declare` pattern for typed runtime-attached members"](../CLAUDE.md).
+- Current manual pattern: [CLAUDE.md § "The `declare` pattern for typed runtime-attached members"](../../CLAUDE.md).
 - Canonical compiled reference for the manual pattern:
   [`packages/activerecord/dx-tests/declare-patterns.test-d.ts`](../packages/activerecord/dx-tests/declare-patterns.test-d.ts).
 

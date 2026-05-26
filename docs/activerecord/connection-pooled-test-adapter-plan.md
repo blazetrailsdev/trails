@@ -96,7 +96,7 @@ After this lands:
 
 ## Interaction with the fixtures port
 
-The fixtures port ([`fixtures-port-plan.md`](fixtures-port-plan.md)) is
+The fixtures port (complete) is
 running in parallel and reshapes the test-data substrate trails uses.
 Key intersections:
 
@@ -510,12 +510,34 @@ This is byte-for-byte Rails parity at the wiring level. The
 singleton bypass that exists today (`_sharedAdapter`) literally
 short-circuits this entire chain.
 
+## Post-merge follow-ups
+
+**From #2397 (D-1 codemod bulk run)**
+
+The automated codemod handles the simple one-`static {}`-per-file shape.
+Remaining variants need manual or targeted scripts:
+
+- [ ] ~200 LOC: multi-`describe`-block files — each describe has its own `static {}` adapter setup; codemod skips these. ~25 files estimated.
+- [ ] ~100 LOC: sidecar-fixture files — use `SidecarFixtures` wrapper; need pool-aware sidecar variant.
+- [ ] ~50 LOC: adapter-specific files — branch on `adapterName()` to pick sqlite/pg/mysql adapter class directly; need driver-neutral pool equivalent.
+- [ ] 25 remaining manual files — codemod output flagged these as `TOO_COMPLEX`; each needs per-file inspection.
+
+**From #2372 (D-Y — always-on pool for PG/MySQL in CI)**
+
+- [ ] 18 `D-Y-INCOMPATIBLE` skips remain in the test suite — files that test singleton-specific behavior. Audit and either fix the test or mark permanent.
+- [ ] PG/MySQL CI: always-drop-and-recreate overhead per worker. Measure; may need a `--pool-size=1` override for CI to keep wall-clock acceptable.
+- [ ] SQLite canonical schema preload overhead — schema init per worker adds ~200ms; baseline against current `_sharedAdapter` path.
+
+**From #2391 (Phase G batch 1)**
+
+- [ ] ~20 LOC in `model-schema.ts`: schema-reflected attributes don't generate dirty-tracking methods (e.g. `nameChanged?`, `namePreviouslyChanged?`). Rails generates these via `attribute_method_suffix`. Blocks ~23 Tier 1 fixture-adoption files from going green.
+
 ## Cross-references
 
 - [`tm-unification-plan.md`](tm-unification-plan.md) — Phase 9b + post-
   Phase-9 cleanup paths 1/2. The TX-visibility patch this epic
   retires is documented there.
-- [`fixtures-port-plan.md`](fixtures-port-plan.md) — the parallel
+- fixtures port (complete) — the parallel
   effort that moves schema and fixture data out of per-test setup
   into a canonical loader. See "Interaction with the fixtures port"
   above for sequencing and seam analysis.

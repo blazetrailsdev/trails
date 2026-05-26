@@ -164,7 +164,7 @@ usage file-by-file. The alias itself is deleted when the last Phase G
 batch lands.
 
 See: `docs/connection-pooled-test-adapter-plan.md` (Phase G sequencing),
-`docs/fixtures-port-plan.md` (fixture data source),
+the fixtures port (complete),
 memory `project-phase-g-fixture-adoption-epic` (sizing).
 
 ---
@@ -192,6 +192,39 @@ ship in parallel. PR 2b depends on both 1b and 2a (can't delete
 and handles all test-file changes.
 
 All PRs branch from `main` (no stacking).
+
+## Post-merge follow-ups
+
+Items surfaced during PRs that land adjacent to this plan. Add to the
+appropriate Phase above once ready to schedule; listed here to avoid loss.
+
+**From #2402 (PG addIndex cleanup)**
+
+- [ ] ~5 LOC: `addIndex` return type inconsistency on PG adapter — fix return type annotation to match AbstractAdapter.
+
+**From #2401 (set connection() rename)**
+
+- [ ] ~16 LOC: rename `migration-runner.ts` to match Rails-natural file layout.
+- [ ] ~schema-ar-models.ts: `set connection()` setter in schema-ar-models.ts is blocked on the `set connection()` rename in Phase 1a landing first.
+- Discovery: `extend()` overwrites class getters — any future getter that must survive `extend()` needs a post-extend `Object.defineProperty` call. Document this in contributor notes if/when it re-surfaces.
+
+**From #2395 (InsertAll / visitor)**
+
+- [ ] ~20 LOC: remove `InsertAll` legacy constructor deprecation shim once Phase G test files are migrated.
+- [ ] Pre-existing: global visitor singleton (`setToSqlVisitor`) vs per-adapter visitor — Rails uses per-adapter. Low-risk now, but flagged for the Phase 2 cleanup window.
+
+**From #2386 (PR 1b first batch)**
+
+- Remaining PR 1b sites not yet migrated: `associations/preloader/association.ts`, `relation/query-methods.ts`, `validations/uniqueness.ts`, `attribute-methods/primary-key.ts`. These are the Phase 1b remainder; tracked here until Phase 1b lands.
+
+**From #2392 (QueryMethods double-fallback removal)**
+
+- No new follow-ups; confirms Phase 1b pattern is safe.
+
+**From #2404 (relocate adapter.ts survivors)**
+
+- [ ] Phase G: delete `adapter.ts` barrel — 134 import sites still re-export through it. Phase G fixture adoption rewrites all imports. No standalone PR needed.
+- [ ] ~150 LOC: delete `DatabaseAdapter` interface entirely once barrel is gone — `AbstractAdapter` is the superset per #2402. ~134 files.
 
 ## Non-goals (this plan)
 

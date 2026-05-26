@@ -47,7 +47,7 @@ TM Phase 9b-1 (PG visitor) and 9b-2a–e (MySQL visitor incl. Arel
 
 ### Phase 3 — Fixtures port strict-flip
 
-Owner: [`fixtures-port-plan.md`](fixtures-port-plan.md). Data substrate
+Owner: [`fixtures-adoption-plan.md`](fixtures-adoption-plan.md). Data substrate (port complete)
 is complete (94/8 DIFF MATCH); only the strict-fail flip remains. Can
 run in parallel with Phase 1/2.
 
@@ -137,8 +137,8 @@ Independent of test-infra work.
 
 ### Phase 7 — DX / packaging (independent)
 
-Owner: [`browser-compat-plan.md`](browser-compat-plan.md) +
-[`virtual-source-files-plan.md`](virtual-source-files-plan.md). No
+Owner: [`browser-compat-plan.md`](../infrastructure/browser-compat-plan.md) +
+[`virtual-source-files-plan.md`](../infrastructure/virtual-source-files-plan.md). No
 test-infra or AR-100 dependency.
 
 - **Browser-compat** (~65% complete):
@@ -176,7 +176,7 @@ test-infra or AR-100 dependency.
 
 ## Related (not AR-owned)
 
-- [`ci-improvement-plan.md`](ci-improvement-plan.md) — actionpack CI
+- actionpack CI (plan complete)
   split; touches AR-test isolation but driven by actionpack.
 
 ## Sequencing summary

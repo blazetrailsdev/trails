@@ -33,7 +33,7 @@ New packages must declare their status before merging.
 ### activesupport adapter pattern
 
 `packages/activesupport/src` already ships `fsAdapter`, `pathAdapter`,
-`cryptoAdapter` (and others — see [activesupport.md](activesupport.md) §Adapters).
+`cryptoAdapter` (and others — see [activesupport.md](../activesupport.md) §Adapters).
 Twenty files across activerecord use `getFs()` / `getPath()` / `getCrypto()`
 instead of importing `node:*` directly, and there are zero bare `node:*`
 imports in `packages/activerecord/src` (excluding `tsc-wrapper/`, a

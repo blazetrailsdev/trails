@@ -1,6 +1,6 @@
 // fixtures:compare — diff Rails activerecord/test/fixtures/*.yml against
 // packages/activerecord/src/test-helpers/fixtures/<kebab-name>.ts. Soft
-// failure only per docs/fixtures-port-plan.md (Decision 4); PR 7 flips
+// failure only per the fixtures port plan (Decision 4); PR 7 flips
 // to hard-fail. ERB stubs adapter_name to "SQLite"; other ERB → skipped.
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -25,7 +25,7 @@ type Status = "MATCH" | "MISSING" | "DIFF" | "ERB-UNSUPPORTED" | "ERB-ALLOWED" |
 
 // Fixtures whose Rails YAML uses ERB constructs we don't reduce (binary
 // helpers, 1000+ row loops). Listed here so the PR-7b strict flip treats
-// them as expected gaps rather than failures. Per docs/fixtures-port-plan.md
+// them as expected gaps rather than failures. Per the fixtures port plan (complete)
 // — the TS side is the source of truth for these tables (rows expanded
 // statically, with the original ERB intent preserved in a header comment).
 export const ERB_ALLOW_LIST: ReadonlySet<string> = new Set<string>([

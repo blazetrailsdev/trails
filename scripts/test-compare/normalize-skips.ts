@@ -6,7 +6,7 @@
  * structured skip annotation into every bare it.skip / xit / test.skip /
  * describe.skip call that does not already have a BLOCKED: comment.
  *
- * Annotation format (from docs/activerecord-100-plan.md § "Skip annotation format"):
+ * Annotation format (from docs/activerecord/activerecord-100-plan.md § "Skip annotation format"):
  *
  *   it.skip("rails-test-name", () => {
  *     // BLOCKED: <category> — <reason>
@@ -1108,7 +1108,7 @@ function annotateFile(src: string, relPath: string): string | null {
 
     // Skip if already annotated:
     //   BLOCKED:        — temporary gap to fix
-    //   PERMANENT-SKIP: — current ruby-only exclusion marker (see docs/activerecord-100-plan.md)
+    //   PERMANENT-SKIP: — current ruby-only exclusion marker (see docs/activerecord/activerecord-100-plan.md)
     //   PERMANENT:      — legacy form retained for backward compatibility
     if (/BLOCKED:|PERMANENT-SKIP:|PERMANENT:/.test(body)) continue;
 

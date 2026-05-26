@@ -55,7 +55,7 @@ a model, run migrations, start a server, hit JSON and HTML endpoints.
       scaffold generates (`resources`) to actually dispatch to controllers.
 - [ ] **CLI** (`packages/trailties`) — `trails new`, `trails generate`,
       `trails server`, `trails db:migrate`. Lives in trailties (mirroring Rails'
-      railties package). See [docs/trailties-thor-port.md](trailties-thor-port.md)
+      railties package). See [docs/trailties/trailties-thor-port.md](trailties/trailties-thor-port.md)
       for the commander → Thor-port plan.
 
 ### Nice to have

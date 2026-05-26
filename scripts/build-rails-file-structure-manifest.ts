@@ -1,6 +1,6 @@
 /**
  * Builds the manifest(s) consumed by the `rails-file-structure-*`
- * ESLint rule family (docs/rails-file-structure-mirror-plan.md) from
+ * ESLint rule family (docs/infrastructure/rails-file-structure-mirror-plan.md) from
  * scripts/api-compare/output/rails-api.json.
  *
  * Currently emits:
