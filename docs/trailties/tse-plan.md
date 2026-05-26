@@ -61,9 +61,9 @@ Collected from post-merge findings across all story PRs. Grouped by area.
 
 **Sync / maintenance**
 
-- [ ] Virtualizer inline `RenderContext` interface (in `tse.ts` `buildPreamble`) must stay in sync with `TseRenderContext` in `render-context.ts` manually. No automated check exists yet.
+- [x] Virtualizer inline `RenderContext` interface (in `tse.ts` `buildPreamble`) must stay in sync with `TseRenderContext` in `render-context.ts`. Sync-check test added in `tse.test.ts` (#2416).
 
 **Type safety / DX — additional items**
 
 - [ ] ~30 LOC (#2407): `as` option on collection partial render should be a generic literal type narrowed to `CollectionAutoKeys` so mismatches are caught at compile time. Currently typed as `string`.
-- [ ] ~4 LOC (#2367): `output-safety-helper.ts` `raw()` has an `OutputBuffer.toString()` coercion bug — when passed an `OutputBuffer`, it calls `.toString()` which discards HTML-safety tagging. Fix: propagate the buffer directly without coercion.
+- [x] ~4 LOC (#2367): `output-safety-helper.ts` `raw()` called `OutputBuffer.toString()` — functionally correct but obscured intent vs Rails' `stringish.to_s.html_safe`. Replaced with `htmlSafe(buf.toStr())` for clarity (#2416).

@@ -264,6 +264,37 @@ describe("virtualizeTse", () => {
     });
   });
 
+  describe("RenderContext ↔ TseRenderContext sync", () => {
+    it("virtualizer RenderContext has every TseRenderContext member", () => {
+      const ts = virtualizeTse("<h1>hi</h1>");
+      const ifaceMatch = ts.match(/interface RenderContext \{([\s\S]*?)\n\}/);
+      expect(ifaceMatch).not.toBeNull();
+      const body = ifaceMatch![1];
+      const memberNames = [...body.matchAll(/^\s+(?:readonly\s+)?(\w+)\s*[(<[:?]/gm)]
+        .map((m) => m[1])
+        .filter((n) => n !== undefined && n[0] === n[0].toLowerCase());
+      const canonical = [
+        "outputBuffer",
+        "capture",
+        "concat",
+        "raw",
+        "yield",
+        "contentFor",
+        "render",
+      ];
+      for (const name of canonical) {
+        expect(memberNames, `missing "${name}" in virtualizer RenderContext`).toContain(name);
+      }
+      const named = memberNames.filter((n) => n !== undefined);
+      for (const name of named) {
+        expect(
+          canonical,
+          `extra "${name}" in virtualizer RenderContext not in TseRenderContext`,
+        ).toContain(name);
+      }
+    });
+  });
+
   describe("TseRenderContext method signatures on context param", () => {
     it("accepts context.capture/raw/yield calls", () => {
       const out = virtualizeTse(

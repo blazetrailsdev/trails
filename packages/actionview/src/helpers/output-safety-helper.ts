@@ -37,7 +37,7 @@ export function jsonEscape(value: unknown): string | SafeBuffer {
  * raw — marks a string as HTML safe without escaping.
  */
 export function raw(stringish: unknown): SafeBuffer {
-  if (stringish instanceof OutputBuffer) return stringish.toString();
+  if (stringish instanceof OutputBuffer) return htmlSafe(stringish.toStr());
   return htmlSafe(String(stringish ?? ""));
 }
 
