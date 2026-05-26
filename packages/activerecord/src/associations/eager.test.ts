@@ -235,6 +235,8 @@ const TEST_SCHEMA: Schema = {
   eager_twice_owners: { name: "string" },
   eager_twice_targets: { label: "string" },
   eager_widgets: { name: "string" },
+  ej_em_authors: { name: "string" },
+  ej_em_posts: { title: "string", ej_em_author_id: "integer" },
   ej_authors: { name: "string" },
   ej_bt_authors: { name: "string" },
   ej_bt_posts: { title: "string", ej_bt_author_id: "integer" },
@@ -1946,6 +1948,13 @@ describe("EagerAssociationTest", () => {
     expect(posts).toHaveLength(2);
     const titles = posts.map((p: any) => p.title).sort();
     expect(titles).toEqual(["P1", "P2"]);
+
+    // Association proxy wired during hydration (not lazy-synced from _preloadedAssociations)
+    const proxyInstance = (authors[0] as any)._associationInstances.get("ejPosts");
+    expect(proxyInstance).toBeDefined();
+    expect(proxyInstance.loaded).toBe(true);
+    expect(Array.isArray(proxyInstance.target)).toBe(true);
+    expect(proxyInstance.target).toHaveLength(2);
   });
   it("eager association loading with explicit join belongs to", async () => {
     class EjBtAuthor extends Base {
@@ -1976,6 +1985,13 @@ describe("EagerAssociationTest", () => {
     const loaded = (posts2[0] as any)._preloadedAssociations?.get("ejBtAuthor");
     expect(loaded).not.toBeNull();
     expect(loaded.name).toBe("BtAuthor");
+
+    // Association proxy wired during hydration (not lazy-synced from _preloadedAssociations)
+    const btProxy = (posts2[0] as any)._associationInstances.get("ejBtAuthor");
+    expect(btProxy).toBeDefined();
+    expect(btProxy.loaded).toBe(true);
+    expect(btProxy.target).not.toBeNull();
+    expect(btProxy.target.name).toBe("BtAuthor");
   });
   it("eager association loading with explicit join has one", async () => {
     class EjHoUser extends Base {
@@ -2006,6 +2022,43 @@ describe("EagerAssociationTest", () => {
     const profile = (users[0] as any)._preloadedAssociations?.get("ejHoProfile");
     expect(profile).not.toBeNull();
     expect(profile.bio).toBe("HoBio");
+
+    // Association proxy wired during hydration (not lazy-synced from _preloadedAssociations)
+    const hoProxy = (users[0] as any)._associationInstances.get("ejHoProfile");
+    expect(hoProxy).toBeDefined();
+    expect(hoProxy.loaded).toBe(true);
+    expect(hoProxy.target).not.toBeNull();
+    expect(hoProxy.target.bio).toBe("HoBio");
+  });
+  it("eager association loading with explicit join marks empty association loaded", async () => {
+    class EjEmAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EjEmPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("ej_em_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(EjEmAuthor, "ejEmPosts", {
+      className: "EjEmPost",
+      foreignKey: "ej_em_author_id",
+    });
+    registerModel(EjEmAuthor);
+    registerModel(EjEmPost);
+
+    await EjEmAuthor.create({ name: "NoPostsAuthor" });
+
+    const authors = await EjEmAuthor.all().eagerLoad("ejEmPosts").toArray();
+    expect(authors).toHaveLength(1);
+    const proxy = (authors[0] as any)._associationInstances.get("ejEmPosts");
+    expect(proxy).toBeDefined();
+    expect(proxy.loaded).toBe(true);
+    expect(proxy.target).toEqual([]);
   });
   it("eager association loading with explicit join habtm", async () => {
     class EjHabtmPost extends Base {
