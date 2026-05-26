@@ -210,7 +210,7 @@ appropriate Phase above once ready to schedule; listed here to avoid loss.
 
 **From #2395 (InsertAll / visitor)**
 
-- [x] ~20 LOC: remove `InsertAll` legacy constructor deprecation shim (no callers remain).
+- [x] ~20 LOC: collapse `InsertAll` constructor overloads to single Rails-canonical `(relation, connection, inserts, options)` signature.
 - [ ] Pre-existing: global visitor singleton (`setToSqlVisitor`) vs per-adapter visitor — Rails uses per-adapter. Low-risk now, but flagged for the Phase 2 cleanup window.
 
 **From #2386 (PR 1b first batch)**

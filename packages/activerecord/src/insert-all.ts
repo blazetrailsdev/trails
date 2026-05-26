@@ -36,10 +36,7 @@ export interface InsertAllOptions {
 
 export class InsertAll {
   readonly model: ModelClass;
-
-  get connection(): ModelClass["connection"] {
-    return this.model.connection;
-  }
+  readonly connection: ModelClass["connection"];
   readonly inserts: Record<string, unknown>[];
   readonly keys: Set<string>;
   /**
@@ -66,16 +63,19 @@ export class InsertAll {
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
   ): Promise<number> {
-    const ia = new InsertAll(relation, inserts, options);
+    const model = (relation as any)._modelClass as ModelClass;
+    const ia = new InsertAll(relation, model.connection, inserts, options);
     return ia.execute();
   }
 
   constructor(
     relation: Relation<any>,
+    connection: ModelClass["connection"],
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
   ) {
     this.model = (relation as any)._modelClass as ModelClass;
+    this.connection = connection;
     this.inserts = inserts.map((r) => ({ ...r }));
     this.updateOnly = options.updateOnly;
     this.uniqueBy = options.uniqueBy;
