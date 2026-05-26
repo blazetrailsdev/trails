@@ -676,7 +676,7 @@ export function buildWhereClause(
     if (isNamedBinds) {
       sql = opts;
       const namedBinds = firstBind as Record<string, unknown>;
-      const adapter = adapterFor((this as any)._modelClass);
+      const adapter = connectionFor((this as any)._modelClass);
       for (const [name, value] of Object.entries(namedBinds)) {
         const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const replacement = Array.isArray(value)
@@ -1729,16 +1729,16 @@ function escapeRegex(s: string): string {
  * see the real cause rather than a `TypeError` on the next `.quote*`
  * access.
  */
-function adapterFor(modelClass: any): any {
+function connectionFor(modelClass: any): any {
   return modelClass?.connection;
 }
 
 function safeQuoteTableName(modelClass: any, name: string): string {
-  return adapterFor(modelClass).quoteTableName(name);
+  return connectionFor(modelClass).quoteTableName(name);
 }
 
 function safeQuoteColumnName(modelClass: any, name: string): string {
-  return adapterFor(modelClass).quoteColumnName(name);
+  return connectionFor(modelClass).quoteColumnName(name);
 }
 
 /** @internal */
