@@ -102,20 +102,20 @@ describe("ContentTypeTest", () => {
     expect(c.response.charset).toBe("utf-8");
   });
 
-  it.skip("pending: requires ERB template rendering (ActionView not yet ported)", () => {
-    // test nil default for erb
+  it.skip("test nil default for erb", () => {
+    // pending: requires ERB template rendering (ActionView not yet ported)
   });
 
-  it.skip("pending: requires ERB template rendering (ActionView not yet ported)", () => {
-    // test default for erb
+  it.skip("test default for erb", () => {
+    // pending: requires ERB template rendering (ActionView not yet ported)
   });
 
-  it.skip("pending: requires builder template rendering (ActionView not yet ported)", () => {
-    // test default for builder
+  it.skip("test default for builder", () => {
+    // pending: requires builder template rendering (ActionView not yet ported)
   });
 
-  it.skip("pending: requires builder template rendering + render action: (ActionView not yet ported)", () => {
-    // test change for builder
+  it.skip("test change for builder", () => {
+    // pending: requires builder template rendering + render action: (ActionView not yet ported)
   });
 
   it("test content type with charset", async () => {
@@ -136,15 +136,15 @@ describe("ContentTypeTest", () => {
 // controller/content_type_test.rb — AcceptBasedContentTypeTest
 // ==========================================================================
 describe("AcceptBasedContentTypeTest", () => {
-  it.skip("pending: requires respond_to block + template rendering (ActionView not yet ported)", () => {
-    // test render default content types for respond to
+  it.skip("test render default content types for respond to", () => {
+    // pending: requires respond_to block + template rendering (ActionView not yet ported)
   });
 
-  it.skip("pending: requires respond_to block + template rendering (ActionView not yet ported)", () => {
-    // test render default content types for respond to with template
+  it.skip("test render default content types for respond to with template", () => {
+    // pending: requires respond_to block + template rendering (ActionView not yet ported)
   });
 
-  it.skip("pending: requires respond_to block + template rendering (ActionView not yet ported)", () => {
-    // test render default content types for respond to with overwrite
+  it.skip("test render default content types for respond to with overwrite", () => {
+    // pending: requires respond_to block + template rendering (ActionView not yet ported)
   });
 });
