@@ -179,6 +179,30 @@ describe("compileJs", () => {
       expect(segs[genLineA]).not.toBe("");
       expect(segs[genLineB]).not.toBe("");
     });
+
+    it("maps each code-tag output line to its actual source line (not the opener line)", () => {
+      // Template with only a multi-line code tag — no preceding text node so
+      // srcLine deltas in the VLQ segments are predictable.
+      // src line 0: `<%`
+      // src line 1: `const x = 1;`
+      // src line 2: `const y = 2;`
+      // src line 3: `%>`
+      const src = "<%\nconst x = 1;\nconst y = 2;\n%>";
+      const { code, sourceMap } = compileJs(src, {
+        fileName: "t.tse.js",
+        sourceFileName: "t.tse",
+      });
+      expect(sourceMap).not.toBeNull();
+      const codeLines = code.split("\n");
+      const segs = sourceMap!.mappings.split(";");
+      const genLineX = codeLines.findIndex((l) => l.includes("const x = 1;"));
+      const genLineY = codeLines.findIndex((l) => l.includes("const y = 2;"));
+      // Segment format: genCol(0) + srcIdx(0) + srcLineDelta + srcCol(0) = "AA<delta>A"
+      // genLineX maps to srcLine 1 (delta from prevSrc=0 → +1 → VLQ "C") → "AACA"
+      // genLineY maps to srcLine 2 (delta from prevSrc=1 → +1 → VLQ "C") → "AACA"
+      expect(segs[genLineX]).toBe("AACA");
+      expect(segs[genLineY]).toBe("AACA");
+    });
   });
 
   describe("preamble / postamble", () => {
