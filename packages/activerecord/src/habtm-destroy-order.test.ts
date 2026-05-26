@@ -53,7 +53,6 @@ describe("HabtmDestroyOrderTest", () => {
     const student = await Student.create({ name: "Ben Bitdiddle" });
     const lesson = await Lesson.create({ name: "SICP" });
     await association(lesson, "students").push(student);
-    await lesson.save();
     await student.destroy();
   });
 
