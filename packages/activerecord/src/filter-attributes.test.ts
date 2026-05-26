@@ -1,34 +1,32 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from "vitest";
 import { Base } from "./index.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 });
+
+setupHandlerSuite();
 
 afterAll(() => {
   vi.unstubAllEnvs();
 });
 
 function makeUser() {
-  const adapter = createTestAdapter();
   class User extends Base {
     static {
       this.attribute("name", "string");
       this.attribute("token", "string");
       this.attribute("auth_token", "string");
-      this.adapter = adapter;
     }
   }
   return User;
 }
 
 function makeAccount() {
-  const adapter = createTestAdapter();
   class Account extends Base {
     static {
       this.attribute("name", "string");
-      this.adapter = adapter;
     }
   }
   return Account;
@@ -48,12 +46,9 @@ describe("FilterAttributesTest", () => {
 
   it("filter_attributes", () => {
     const Account = makeAccount();
-    const user1 = new Account({ name: "David" });
-    const user2 = new Account({ name: "Alice" });
-    expect(user1.inspect()).toContain("name: [FILTERED]");
-    expect(user1.inspect().match(/\[FILTERED\]/g)?.length).toBe(1);
-    expect(user2.inspect()).toContain("name: [FILTERED]");
-    expect(user2.inspect().match(/\[FILTERED\]/g)?.length).toBe(1);
+    const account = new Account({ name: "David" });
+    expect(account.inspect()).toContain("name: [FILTERED]");
+    expect(account.inspect().match(/\[FILTERED\]/g)?.length).toBe(1);
   });
 
   it("filter_attributes affects attribute_for_inspect", () => {
@@ -106,7 +101,6 @@ describe("FilterAttributesTest", () => {
     const Account = makeAccount();
     const account = new Account({ name: "37signals" });
     account.inspect();
-    // Verify record is still usable after inspect with proc filter
     expect(account.readAttribute("name")).toBe("37signals");
   });
 

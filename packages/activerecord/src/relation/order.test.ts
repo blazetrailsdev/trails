@@ -1,43 +1,23 @@
-/**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
- */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
-
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-let _adapter: SidecarAdapter;
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
 beforeAll(async () => {
-  ({ adapter: _adapter } = createSidecarTestAdapter());
-  await defineSchema(_adapter, {
-    posts: { title: "string", score: "integer" },
-    items: { name: "string", price: "integer" },
+  await defineSchema({
+    posts: { title: "string", score: "integer", name: "string", price: "integer" },
   });
 });
-withTransactionalFixtures(() => _adapter);
-function freshAdapter(): DatabaseAdapter {
-  return _adapter;
-}
 
-// ==========================================================================
-// OrderTest — targets relation/order_test.rb
-// ==========================================================================
 describe("OrderTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("order with string", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.order("title").toSql();
@@ -48,7 +28,6 @@ describe("OrderTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.order({ title: "desc" }).toSql();
@@ -59,7 +38,6 @@ describe("OrderTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.order("title").reorder({ title: "desc" }).toSql();
@@ -70,33 +48,19 @@ describe("OrderTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.order("title").reverseOrder().toSql();
     expect(sql).toContain("DESC");
   });
-});
 
-describe("OrderTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
-  function makeModel() {
+  it("order asc", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("score", "integer");
-        this.adapter = adapter;
       }
     }
-    return { Post };
-  }
-
-  it("order asc", async () => {
-    const { Post } = makeModel();
     await Post.create({ title: "b", score: 2 });
     await Post.create({ title: "a", score: 1 });
     const results = await Post.order("title").toArray();
@@ -105,7 +69,12 @@ describe("OrderTest", () => {
   });
 
   it("order desc", async () => {
-    const { Post } = makeModel();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("score", "integer");
+      }
+    }
     await Post.create({ title: "a", score: 1 });
     await Post.create({ title: "b", score: 2 });
     const results = await Post.order("title DESC").toArray();
@@ -113,7 +82,11 @@ describe("OrderTest", () => {
   });
 
   it("order with association", async () => {
-    const { Post } = makeModel();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
     await Post.create({ title: "c" });
     await Post.create({ title: "a" });
     const results = await Post.order("title").toArray();
@@ -121,62 +94,100 @@ describe("OrderTest", () => {
   });
 
   it("order with association alias", async () => {
-    const { Post } = makeModel();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("score", "integer");
+      }
+    }
     await Post.create({ title: "z", score: 1 });
     await Post.create({ title: "a", score: 2 });
     const results = await Post.order("title").toArray();
     expect(results[0].title).toBe("a");
   });
-});
 
-describe("Relation Order (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  describe("hash syntax", () => {
+    it("order asc", async () => {
+      class Post extends Base {
+        static {
+          this.attribute("name", "string");
+          this.attribute("price", "integer");
+        }
+      }
+      await Post.create({ name: "Charlie", price: 30 });
+      await Post.create({ name: "Alice", price: 10 });
+      await Post.create({ name: "Bob", price: 20 });
+      const result = await Post.all().order({ name: "asc" }).toArray();
+      expect(result[0].name).toBe("Alice");
+      expect(result[2].name).toBe("Charlie");
+    });
 
-  class Item extends Base {
-    static {
-      this.attribute("name", "string");
-      this.attribute("price", "integer");
-    }
-  }
+    it("order desc", async () => {
+      class Post extends Base {
+        static {
+          this.attribute("name", "string");
+          this.attribute("price", "integer");
+        }
+      }
+      await Post.create({ name: "Charlie", price: 30 });
+      await Post.create({ name: "Alice", price: 10 });
+      await Post.create({ name: "Bob", price: 20 });
+      const result = await Post.all().order({ name: "desc" }).toArray();
+      expect(result[0].name).toBe("Charlie");
+      expect(result[2].name).toBe("Alice");
+    });
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Item.adapter = adapter;
-    await Item.create({ name: "Charlie", price: 30 });
-    await Item.create({ name: "Alice", price: 10 });
-    await Item.create({ name: "Bob", price: 20 });
-  });
+    it("order by string column name", async () => {
+      class Post extends Base {
+        static {
+          this.attribute("name", "string");
+          this.attribute("price", "integer");
+        }
+      }
+      await Post.create({ name: "Charlie", price: 30 });
+      await Post.create({ name: "Alice", price: 10 });
+      const result = await Post.all().order("name").toArray();
+      expect(result[0].name).toBe("Alice");
+    });
 
-  it("order asc", async () => {
-    const result = await Item.all().order({ name: "asc" }).toArray();
-    expect(result[0].name).toBe("Alice");
-    expect(result[2].name).toBe("Charlie");
-  });
+    it("reorder replaces existing order", async () => {
+      class Post extends Base {
+        static {
+          this.attribute("name", "string");
+          this.attribute("price", "integer");
+        }
+      }
+      await Post.create({ name: "Charlie", price: 30 });
+      await Post.create({ name: "Alice", price: 10 });
+      await Post.create({ name: "Bob", price: 20 });
+      const result = await Post.all().order({ name: "asc" }).reorder({ name: "desc" }).toArray();
+      expect(result[0].name).toBe("Charlie");
+    });
 
-  it("order desc", async () => {
-    const result = await Item.all().order({ name: "desc" }).toArray();
-    expect(result[0].name).toBe("Charlie");
-    expect(result[2].name).toBe("Alice");
-  });
+    it("reverseOrder flips direction", async () => {
+      class Post extends Base {
+        static {
+          this.attribute("name", "string");
+          this.attribute("price", "integer");
+        }
+      }
+      await Post.create({ name: "Charlie", price: 30 });
+      await Post.create({ name: "Alice", price: 10 });
+      await Post.create({ name: "Bob", price: 20 });
+      const result = await Post.all().order({ price: "asc" }).reverseOrder().toArray();
+      expect(result[0].price).toBe(30);
+    });
 
-  it("order by string column name", async () => {
-    const result = await Item.all().order("name").toArray();
-    expect(result[0].name).toBe("Alice");
-  });
-
-  it("reorder replaces existing order", async () => {
-    const result = await Item.all().order({ name: "asc" }).reorder({ name: "desc" }).toArray();
-    expect(result[0].name).toBe("Charlie");
-  });
-
-  it("reverseOrder flips direction", async () => {
-    const result = await Item.all().order({ price: "asc" }).reverseOrder().toArray();
-    expect(result[0].price).toBe(30);
-  });
-
-  it("multiple order columns", async () => {
-    const sql = Item.all().order({ name: "asc" }, { price: "desc" }).toSql();
-    expect(sql).toContain("name");
-    expect(sql).toContain("price");
+    it("multiple order columns", () => {
+      class Post extends Base {
+        static {
+          this.attribute("name", "string");
+          this.attribute("price", "integer");
+        }
+      }
+      const sql = Post.all().order({ name: "asc" }, { price: "desc" }).toSql();
+      expect(sql).toContain("name");
+      expect(sql).toContain("price");
+    });
   });
 });
