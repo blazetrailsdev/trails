@@ -5301,15 +5301,19 @@ describe("CalculationsTest", () => {
       }
     }
 
+    const created: number[] = [];
     for (let i = 0; i < 10; i++) {
-      await User.create({ name: `User ${i}` });
+      const u = await User.create({ name: `User ${i}` });
+      created.push(u.id as number);
     }
 
+    const start = created[3];
+    const finish = created[7];
     const ids: number[] = [];
-    for await (const user of User.all().findEach({ start: 4, finish: 8 })) {
+    for await (const user of User.all().findEach({ start, finish })) {
       ids.push(user.id as number);
     }
-    expect(ids).toEqual([4, 5, 6, 7, 8]);
+    expect(ids).toEqual(created.slice(3, 8));
   });
 
   // Rails: test "column_names"
@@ -6082,7 +6086,7 @@ describe("CalculationsTest", () => {
     const dbValues = user._attributes.valuesForDatabase();
     expect(dbValues.ssn).not.toBe("123-45-6789");
     // Reload from DB still decrypts
-    const loaded = await User.find(1);
+    const loaded = await User.find(user.id);
     expect(loaded.ssn).toBe("123-45-6789");
   });
 
