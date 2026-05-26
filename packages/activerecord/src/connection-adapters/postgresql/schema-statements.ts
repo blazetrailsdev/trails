@@ -172,7 +172,7 @@ export interface SchemaStatements {
       nullsNotDistinct?: boolean;
       include?: string[];
     },
-  ): Promise<string>;
+  ): Promise<void>;
   buildCreateIndexDefinition(
     tableName: string,
     columnName: string | string[],

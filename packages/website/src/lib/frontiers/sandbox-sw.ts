@@ -20,7 +20,7 @@ import { resolveVfsPath } from "./vfs-resolve.js";
 import { Base } from "@blazetrails/activerecord/base";
 import { Migration, Migrator } from "@blazetrails/activerecord/migration";
 import type { MigrationProxy } from "@blazetrails/activerecord/migration";
-import { MigrationRunner } from "@blazetrails/activerecord/migration-runner";
+import { MigrationRunner } from "@blazetrails/activerecord/migrator";
 import { Schema } from "@blazetrails/activerecord/schema";
 import { ActionController } from "@blazetrails/actionpack";
 
