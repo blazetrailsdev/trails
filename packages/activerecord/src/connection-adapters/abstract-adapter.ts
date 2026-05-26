@@ -406,6 +406,7 @@ export interface AbstractAdapter {
     comment: string | null | Record<string, string | null>,
   ): Promise<void>;
   currentDatabase(): Promise<string>;
+  /** @internal */
   createAlterTable?(name: string): AlterTable;
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -1110,8 +1111,8 @@ export class AbstractAdapter implements Quoting {
     return (this.pool as any)?.connectionDescriptor ?? null;
   }
 
-  get visitor(): unknown {
-    return (this.pool as any)?.visitor ?? null;
+  get visitor(): Visitors.ToSql {
+    return this._visitor;
   }
 
   /**
