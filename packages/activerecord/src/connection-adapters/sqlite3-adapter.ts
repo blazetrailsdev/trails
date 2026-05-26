@@ -6,12 +6,10 @@ import type {
 } from "@blazetrails/activesupport/sqlite-adapter";
 import { getSqlite } from "@blazetrails/activesupport/sqlite-adapter";
 import { Visitors } from "@blazetrails/arel";
-import type {
-  AdapterName,
-  DatabaseAdapter,
-  ExplainOption,
-  SQLite3AdapterOptions,
-} from "../adapter.js";
+import type { DatabaseAdapter } from "../adapter.js";
+import type { AdapterName } from "./abstract-adapter.js";
+import type { ExplainOption } from "./abstract/database-statements.js";
+import type { SQLite3AdapterOptions } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {

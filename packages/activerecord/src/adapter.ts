@@ -1,168 +1,27 @@
+/**
+ * Re-export barrel — most exports have moved to their Rails-natural homes.
+ * The DatabaseAdapter interface remains here until Phase G rewrites all
+ * import sites; once that lands, this file is deleted.
+ */
+
 import type { Result } from "./result.js";
 import type { SchemaCache } from "./connection-adapters/schema-cache.js";
 import type { AlterTable } from "./connection-adapters/abstract/schema-definitions.js";
 import type { Visitors } from "@blazetrails/arel";
 
-/**
- * A single entry in `Relation#explain`'s options list. Either a bare
- * flag name (`"analyze"`, `"verbose"`) or a keyword hash (`{ format:
- * "json" }`) — mirrors Rails' `explain(*options)` where options can
- * be a mix of Symbols and a single Hash. Each adapter decides which
- * flags / keys it supports and throws on unknown ones.
- *
- * Mirrors: the `options` array shape used by Rails'
- * `ActiveRecord::Relation#explain` and its adapter `build_explain_clause`.
- */
-export type ExplainOption = string | { format: string };
+export type { AdapterName } from "./connection-adapters/abstract-adapter.js";
+export { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
+export type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
+export { inspectExplainOption } from "./connection-adapters/abstract/database-statements.js";
+export type {
+  TrailsAdapterOptions,
+  SQLite3AdapterOptions,
+  MysqlAdapterOptions,
+  PostgreSQLAdapterOptions,
+} from "./connection-adapters/pool-config.js";
 
-/**
- * Adapter-level options that travel alongside driver connection
- * params in a single config hash (Rails' database.yml shape).
- * Constructors strip these keys out before handing the rest to the
- * driver.
- *
- * Mirrors: the adapter-level keys read in
- * `ActiveRecord::ConnectionAdapters::AbstractAdapter#initialize`
- * (`:statement_limit`, `:prepared_statements`).
- */
-export interface TrailsAdapterOptions {
-  statementLimit?: number;
-  preparedStatements?: boolean;
-  // Mirrors: database.yml `insert_returning` — set false to disable RETURNING
-  insertReturning?: boolean;
-}
-
-/**
- * SQLite3-specific adapter options that extend the shared base.
- */
-export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
-  readonly?: boolean;
-  /**
-   * Selects a registered SQLite driver. Pass the registered name string
-   * (e.g. `"better-sqlite3"`, `"node-sqlite"`) or a SqliteDriver instance
-   * directly to bypass the registry. When omitted, resolution follows
-   * AR_SQLITE_DRIVER, then exactly-one-registered fallback.
-   * Mirrors database.yml `driver:`.
-   */
-  driver?: string | import("@blazetrails/activesupport/sqlite-adapter").SqliteDriver;
-  // Mirrors: database.yml `pragmas:` — applied via PRAGMA on each connection.
-  // Keys must be simple SQLite pragma identifiers (word characters only, e.g. "cache_size").
-  // String values must be identifier-like enum words (e.g. "WAL", "NORMAL") — arbitrary
-  // strings are warned and skipped. Numbers and booleans are always accepted (boolean → "1"/"0").
-  pragmas?: Record<string, string | number | boolean>;
-  // Mirrors: database.yml `strict:` — disables double-quoted string literal fallback
-  // (DQS) at the connection level. Defaults to SQLite3Adapter.strictStringsByDefault.
-  strict?: boolean;
-}
-
-/**
- * MySQL2-specific adapter options that extend the shared base.
- * Kept separate so PG/SQLite3 destructuring of `TrailsAdapterOptions`
- * never receives — and leaks — these keys into their driver configs.
- */
-export interface MysqlAdapterOptions extends TrailsAdapterOptions {
-  // Mirrors: database.yml `strict:` — controls sql_mode STRICT_ALL_TABLES wiring.
-  // true/undefined → add STRICT_ALL_TABLES; false → remove strict flags; "default" → leave global value.
-  strict?: boolean | "default";
-  // Mirrors: database.yml `wait_timeout:` — SET SESSION wait_timeout = N on each connection.
-  waitTimeout?: number | string;
-  // Mirrors: database.yml `variables:` — SET SESSION key = value on each new connection.
-  variables?: Record<string, string | number | boolean | null | ":default" | "default">;
-  // Test-only sentinel: skips pool creation so the adapter can be instantiated without a live DB.
-  // @internal
-  _fakeConnection?: boolean;
-}
-
-/**
- * PostgreSQL-specific adapter options that extend the shared base.
- * Kept separate so MySQL2/SQLite3 destructuring of `TrailsAdapterOptions`
- * never receives — and leaks — these keys into their driver configs.
- */
-export interface PostgreSQLAdapterOptions extends TrailsAdapterOptions {
-  // Mirrors: database.yml `min_messages` — SET client_min_messages on connect (default: "warning")
-  minMessages?: string;
-  // Mirrors: database.yml `variables:` — SET SESSION key = value on each new connection
-  variables?: Record<string, string | number | boolean | null | "default">;
-}
-
-/**
- * Stringify an arbitrary value for inclusion in an EXPLAIN validation
- * error message. `as any` callers can hand us arbitrary shapes —
- * circular objects, BigInts, Symbols, functions — and a raw
- * `JSON.stringify` either throws or silently drops non-JSON values,
- * masking the validation error the caller actually needs to see.
- *
- * Uses `JSON.stringify` with a custom replacer that:
- *   - replaces circular refs with `"[Circular]"` (WeakSet-tracked)
- *   - renders `BigInt` as `"123n"`, `Symbol` as `"Symbol(desc)"`, and
- *     `function` as `"[Function: name]"` so the shape is visible
- *
- * `util.inspect` would be the idiomatic choice but is forbidden by the
- * repo's `blazetrails/no-node-builtins` rule (browser compat).
- */
-export function inspectExplainOption(o: unknown): string {
-  if (o === null) return "null";
-  if (o === undefined) return "undefined";
-  if (typeof o === "bigint") return `${o}n`;
-  if (typeof o === "symbol") return o.toString();
-  if (typeof o === "function") return `[Function: ${o.name || "anonymous"}]`;
-  if (typeof o !== "object") return String(o);
-  const seen = new WeakSet<object>();
-  try {
-    return JSON.stringify(o, (_k, v) => {
-      if (typeof v === "bigint") return `${v}n`;
-      if (typeof v === "symbol") return v.toString();
-      if (typeof v === "function") return `[Function: ${v.name || "anonymous"}]`;
-      if (v !== null && typeof v === "object") {
-        if (seen.has(v as object)) return "[Circular]";
-        seen.add(v as object);
-      }
-      return v;
-    });
-  } catch {
-    // String(o) would invoke a user-defined toString/valueOf, which can
-    // itself throw — masking the validation error we're here to preserve.
-    // Object.prototype.toString.call(o) is spec-defined to produce
-    // `[object Type]` without consulting user code.
-    try {
-      return Object.prototype.toString.call(o);
-    } catch {
-      return "[object Object]";
-    }
-  }
-}
-
-/**
- * Normalized adapter family name used for dialect branching.
- *
- * Mirrors: the three families Rails branches on throughout
- * ActiveRecord (sqlite3, postgresql, mysql2).
- */
-export type AdapterName = "sqlite" | "postgres" | "mysql";
-
-/**
- * Map a database.yml `adapter:` config string (e.g. `"postgresql"`, `"mysql2"`,
- * `"sqlite3"`) to the normalized `AdapterName` family.
- *
- * Mirrors: the adapter-family branching Rails applies throughout ActiveRecord
- * when it checks `adapter_name` against known families.
- *
- * @internal
- */
-export function adapterNameFromConfig(configAdapter: string | undefined): AdapterName {
-  switch (configAdapter?.toLowerCase()) {
-    case "postgresql":
-    case "postgres":
-    case "pg":
-      return "postgres";
-    case "mysql":
-    case "mysql2":
-    case "mariadb":
-      return "mysql";
-    default:
-      return "sqlite";
-  }
-}
+import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
+import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 
 /**
  * Database adapter interface — pluggable backends.

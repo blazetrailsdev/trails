@@ -5,7 +5,7 @@
  */
 
 import { sql as arelSql } from "@blazetrails/arel";
-import type { ExplainOption } from "../../adapter.js";
+import type { ExplainOption } from "../abstract/database-statements.js";
 import type { Nodes } from "@blazetrails/arel";
 import { Result } from "../../result.js";
 import {

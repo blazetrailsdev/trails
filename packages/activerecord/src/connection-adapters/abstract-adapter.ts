@@ -4,8 +4,9 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter
  */
 
-import { inspectExplainOption } from "../adapter.js";
-import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
+import { inspectExplainOption } from "./abstract/database-statements.js";
+import type { ExplainOption } from "./abstract/database-statements.js";
+import type { DatabaseAdapter } from "../adapter.js";
 import { type Nodes, Visitors, Collectors, setToSqlVisitor } from "@blazetrails/arel";
 import {
   ReadOnlyError,
@@ -100,6 +101,34 @@ import { Time as TimeType } from "../type/time.js";
 import { DateTime as DateTimeType } from "../type/date-time.js";
 import { Json as JsonType } from "../type/json.js";
 import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
+
+/**
+ * Normalized adapter family name used for dialect branching.
+ *
+ * Mirrors: the three families Rails branches on throughout
+ * ActiveRecord (sqlite3, postgresql, mysql2).
+ */
+export type AdapterName = "sqlite" | "postgres" | "mysql";
+
+/**
+ * Map a database.yml `adapter:` config string to the normalized `AdapterName` family.
+ *
+ * @internal
+ */
+export function adapterNameFromConfig(configAdapter: string | undefined): AdapterName {
+  switch (configAdapter?.toLowerCase()) {
+    case "postgresql":
+    case "postgres":
+    case "pg":
+      return "postgres";
+    case "mysql":
+    case "mysql2":
+    case "mariadb":
+      return "mysql";
+    default:
+      return "sqlite";
+  }
+}
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter::Version
