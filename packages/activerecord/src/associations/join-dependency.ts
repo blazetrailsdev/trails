@@ -357,13 +357,10 @@ export class JoinDependency {
 
   get reflections(): any[] {
     const result: any[] = [];
-    this._joinRoot.eachChildren((_parent, part) => {
-      const node = part._joinNode;
+    this._joinRoot.eachChildren((parent, child) => {
+      const node = child._joinNode;
       if (!node) return;
-      const parentModel = node.parentPath
-        ? (this._treeNodesByPath.get(node.parentPath)?.baseKlass ?? (this._baseModel as any))
-        : (this._baseModel as any);
-      const reflection = reflectOnAssociation(parentModel, node.immediateAssocName);
+      const reflection = reflectOnAssociation(parent.baseKlass as any, node.immediateAssocName);
       if (reflection) result.push(reflection);
     });
     return result;
@@ -580,15 +577,54 @@ export class JoinDependency {
 
   private _pushTreeNode(node: JoinNode): void {
     const parentPath = node.parentPath;
-    const parent: JoinPart = parentPath
-      ? (this._treeNodesByPath.get(parentPath) ?? this._joinRoot)
-      : this._joinRoot;
+    let parent: JoinPart;
+    if (parentPath) {
+      const found = this._treeNodesByPath.get(parentPath);
+      if (!found) {
+        throw new Error(
+          `JoinDependency tree: parent path "${parentPath}" not found for "${node.immediateAssocName}"`,
+        );
+      }
+      parent = found;
+    } else {
+      parent = this._joinRoot;
+    }
     const treePart = new JoinTreeNode(node.modelClass, node);
     parent.children.push(treePart);
-    const fullPath = node.parentPath
-      ? `${node.parentPath}.${node.immediateAssocName}`
+    const fullPath = parentPath
+      ? `${parentPath}.${node.immediateAssocName}`
       : node.immediateAssocName;
     this._treeNodesByPath.set(fullPath, treePart);
+  }
+
+  private _rekeyTreeNode(
+    node: JoinNode,
+    oldImmediateName: string,
+    oldParentPath: string | null,
+  ): void {
+    const oldKey = oldParentPath ? `${oldParentPath}.${oldImmediateName}` : oldImmediateName;
+    const treePart = this._treeNodesByPath.get(oldKey);
+    if (!treePart) return;
+    this._treeNodesByPath.delete(oldKey);
+
+    const newKey = node.parentPath
+      ? `${node.parentPath}.${node.immediateAssocName}`
+      : node.immediateAssocName;
+    this._treeNodesByPath.set(newKey, treePart);
+
+    // Reparent if parentPath changed
+    if (oldParentPath !== node.parentPath) {
+      const oldParent = oldParentPath
+        ? (this._treeNodesByPath.get(oldParentPath) ?? this._joinRoot)
+        : this._joinRoot;
+      const idx = oldParent.children.indexOf(treePart);
+      if (idx !== -1) oldParent.children.splice(idx, 1);
+
+      const newParent = node.parentPath
+        ? (this._treeNodesByPath.get(node.parentPath) ?? this._joinRoot)
+        : this._joinRoot;
+      newParent.children.push(treePart);
+    }
   }
 
   private _rollbackTree(snapshotNodeCount: number): void {
@@ -722,12 +758,15 @@ export class JoinDependency {
         return null;
       }
 
+      const oldImmediateName = recursiveNode.immediateAssocName;
+      const oldParentPath = recursiveNode.parentPath;
       recursiveNode.assocName = parentAssocName
         ? `${parentAssocName}.${assocDef.name}`
         : assocDef.name;
       recursiveNode.immediateAssocName = assocDef.name;
       recursiveNode.parentPath = parentAssocName ?? null;
       recursiveNode.assocType = assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type;
+      this._rekeyTreeNode(recursiveNode, oldImmediateName, oldParentPath);
 
       return recursiveNode;
     }
