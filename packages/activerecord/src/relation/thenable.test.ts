@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, vi, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, Relation, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
@@ -27,10 +27,6 @@ describe("Thenable", () => {
         this.attribute("active", "integer");
       }
     };
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it("Relation is directly awaitable", async () => {
@@ -79,13 +75,11 @@ describe("Thenable", () => {
   it("does not eagerly evaluate on construction", async () => {
     await ThenableUser.create({ name: "Alice", active: 1 });
 
-    const spy = vi.spyOn(Base.adapter, "execute");
-
     const relation = ThenableUser.where({ active: 1 });
-    expect(spy).not.toHaveBeenCalled();
+    expect(relation.isLoaded).toBe(false);
 
     await relation;
-    expect(spy).toHaveBeenCalled();
+    expect(relation.isLoaded).toBe(true);
   });
 
   it("Relation is not instanceof Promise", () => {
