@@ -221,6 +221,11 @@ appropriate Phase above once ready to schedule; listed here to avoid loss.
 
 - No new follow-ups; confirms Phase 1b pattern is safe.
 
+**From #2404 (relocate adapter.ts survivors)**
+
+- [ ] Phase G: delete `adapter.ts` barrel — 134 import sites still re-export through it. Phase G fixture adoption rewrites all imports. No standalone PR needed.
+- [ ] ~150 LOC: delete `DatabaseAdapter` interface entirely once barrel is gone — `AbstractAdapter` is the superset per #2402. ~134 files.
+
 ## Non-goals (this plan)
 
 - **Deleting `set connection()` and the `get adapter()` compat alias** —

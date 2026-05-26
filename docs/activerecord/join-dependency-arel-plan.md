@@ -8,9 +8,10 @@
 | PR 2    | #2379      | merged  |
 | PR 3    | #2381      | merged  |
 | PR 4    | #2384      | merged  |
-| PR 5    | —          | open    |
+| PR 5    | #2405      | merged  |
 | PR 6    | #2394      | merged  |
 | PR 7    | #2387      | merged  |
+| PR 7b   | #2398      | merged  |
 | PR 8    | —          | stretch |
 | PR 9    | —          | stretch |
 
@@ -20,7 +21,7 @@ Items not captured in the existing PR slots above.
 
 **From #2394 (PR 6 — Arel select aliases)**
 
-- [ ] ~200 LOC: `walk()` deduplication — after PR 5 (tree structure) lands, implement the shared-prefix reuse pass so `comments.author` + `comments.likes` share one join node.
+- [x] ~200 LOC: `walk()` deduplication — shipped in #2405.
 - [ ] ~100 LOC: eliminate `_nodes` array — replace flat array with tree traversal once PR 3 tree structure is fully in use.
 - [ ] ~150 LOC: use real `JoinAssociation` nodes in tree (PR 3/5 follow-on).
 - [ ] ~20 LOC: `JoinBase.table` should return an Arel `Table` node, not a string.
@@ -43,6 +44,19 @@ Items not captured in the existing PR slots above.
 - [ ] ~250 LOC: full through-association path via Arel nodes (PR 2 partial; remainder in PR 5).
 - [ ] ~150 LOC: `buildSelectSql`/`applyColumnAliases` still use `_qt`/`_qc` internally — finish migration in PR 6 follow-on.
 - `rebindTableReferences` is a stopgap and should be removed once alias resolution is wired through `AliasTracker`.
+
+**From #2405 (PR 5 — walk() deduplication)**
+
+- [ ] ~50 LOC: `makeConstraints` ON-predicate rebinding — PR 8 (AliasTracker). Pre-built `arelJoin` nodes don't rebind ON predicates to the merged parent's table alias. `rebindTableReferences()` is applicable.
+- [ ] ~20 LOC: `joinType` not applied to emitted joins — pre-built joins are always `OuterJoin`. Fix when `makeConstraints` is upgraded to rebuild joins.
+- Note: `JoinTreeNode.isMatch()` matches on `immediateAssocName + modelClass` instead of Rails' reflection identity. Correct proxy for now.
+
+**From #2398 (PR 7b — eager-load hydration)**
+
+- [ ] ~200 LOC: nested eager-load proxy wiring — flat-node iteration only wires children to root parent. Needs recursive tree walk (depends on tree refactor).
+- [ ] ~50 LOC: readonly/strictLoading propagation tests.
+- [ ] ~30 LOC: cross-parent model cache for belongsTo dedup.
+- [ ] ~5 LOC: Relation-level `_isReadonly` not propagated to parent records in eager-load join path.
 
 ## Status quo
 
