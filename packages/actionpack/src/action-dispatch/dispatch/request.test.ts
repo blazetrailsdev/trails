@@ -29,6 +29,16 @@ describe("RequestIP", () => {
     const req = new Request({ REMOTE_ADDR: "::1" });
     expect(req.remoteIp).toBe("::1");
   });
+
+  it.skip("remote ip spoof detection", () => {}); // needs RemoteIp middleware
+  it.skip("remote ip with spoof detection disabled", () => {}); // needs RemoteIp middleware
+  it.skip("remote ip spoof protection ignores private addresses", () => {}); // needs RemoteIp middleware
+  it.skip("remote ip v6 spoof detection", () => {}); // needs RemoteIp middleware
+  it.skip("remote ip v6 spoof detection disabled", () => {}); // needs RemoteIp middleware
+  it.skip("remote ip with user specified trusted proxies String", () => {}); // needs RemoteIp middleware
+  it.skip("remote ip v6 with user specified trusted proxies String", () => {}); // needs RemoteIp middleware
+  it.skip("remote ip with user specified trusted proxies Regexp", () => {}); // needs RemoteIp middleware
+  it.skip("remote ip v6 with user specified trusted proxies Regexp", () => {}); // needs RemoteIp middleware
 });
 
 describe("RequestDomain", () => {
@@ -226,6 +236,12 @@ describe("RequestMethod", () => {
     expect(req.method).toBe("PUT");
     expect(req.isPut).toBe(true);
   });
+
+  it.skip("invalid http method raises exception", () => {}); // checkMethod not wired into requestMethod getter
+  it.skip("method raises exception on invalid HTTP method", () => {}); // checkMethod not wired into method getter
+  it.skip("exception on invalid HTTP method unaffected by I18n settings", () => {}); // no I18n
+  it.skip("post uneffected by local inflections", () => {}); // no Inflector integration
+  it.skip("delegates to Object#method if an argument is passed", () => {}); // TS getter cannot accept arguments
 });
 
 describe("RequestMimeType", () => {
@@ -312,6 +328,9 @@ describe("RequestParamsParsing", () => {
     const req = new Request({});
     expect(req.contentLength).toBeUndefined();
   });
+
+  it.skip("request_parameters raises BadRequest when content length lower than actual data length for a multipart request", () => {}); // needs Rack multipart parsing
+  it.skip("request_parameters raises BadRequest when content length is higher than actual data length", () => {}); // needs Rack multipart parsing
 });
 
 describe("RequestFormat", () => {
@@ -400,6 +419,24 @@ describe("RequestFormat", () => {
     expect(req.formats.map((m) => m.symbol)).toEqual(["json"]);
   });
 
+  it("can override format with parameter negative", () => {
+    const req = new Request({ QUERY_STRING: "format=txt" });
+    expect(req.format.symbol).not.toBe("xml");
+  });
+
+  it("formats format:text with accept header", () => {
+    const req = new Request({ QUERY_STRING: "format=txt" });
+    expect(req.formats.map((m) => m.symbol)).toEqual(["text"]);
+  });
+
+  it("formats format:unknown with accept header", () => {
+    const req = new Request({ QUERY_STRING: "format=unknown" });
+    expect(req.format.symbol).toBeNull();
+  });
+
+  it.skip("format does not throw exceptions when malformed GET parameters", () => {}); // ParameterTypeError not caught in formats path
+  it.skip("format does not throw exceptions when invalid POST parameters", () => {}); // needs Rack body parsing
+
   it("ignore_accept_header", () => {
     const prev = Request.ignoreAcceptHeader;
     Request.ignoreAcceptHeader = true;
@@ -446,6 +483,20 @@ describe("RequestProtocol", () => {
     const req = new Request({ SERVER_SOFTWARE: "Apache/2.4.41" });
     expect(req.serverSoftware).toBe("Apache");
   });
+
+  it("xml http request", () => {
+    const req1 = new Request({});
+    expect(req1.isXmlHttpRequest).toBe(false);
+    expect(req1.xhr).toBe(false);
+
+    const req2 = new Request({ HTTP_X_REQUESTED_WITH: "DefinitelyNotAjax1.0" });
+    expect(req2.isXmlHttpRequest).toBe(false);
+    expect(req2.xhr).toBe(false);
+
+    const req3 = new Request({ HTTP_X_REQUESTED_WITH: "XMLHttpRequest" });
+    expect(req3.isXmlHttpRequest).toBe(true);
+    expect(req3.xhr).toBe(true);
+  });
 });
 
 describe("RequestRewind", () => {
@@ -453,6 +504,8 @@ describe("RequestRewind", () => {
     const req = new Request({ "rack.input": "body content" });
     expect(req.rawPost).toBe("body content");
   });
+
+  it.skip("body should be rewound", () => {}); // Rack < 3 only
 });
 
 describe("RequestParameters", () => {
@@ -498,6 +551,18 @@ describe("RequestParameters", () => {
     req.pathParameters = { view: "edit" };
     expect(req.params).toEqual({ view: "edit" });
   });
+
+  it.skip("parameters", () => {}); // needs Rack body parsing (JSON POST + query merge)
+  it.skip("parameters not accessible after rack parse error", () => {}); // needs Rack parse error path
+  it.skip("path parameters with invalid UTF8 encoding", () => {}); // needs encoding validation
+  it.skip("path parameters don't re-encode frozen strings", () => {}); // needs CustomParamEncoder
+  it.skip("parameters containing an invalid UTF8 character", () => {}); // needs encoding validation
+  it.skip("parameters containing a deeply nested invalid UTF8 character", () => {}); // needs encoding validation
+  it.skip("POST parameters containing invalid UTF8 character", () => {}); // needs Rack body parsing
+  it.skip("query parameters specified as ASCII_8BIT encoded do not raise InvalidParameterError", () => {}); // needs CustomParamEncoder
+  it.skip("POST parameters specified as ASCII_8BIT encoded do not raise InvalidParameterError", () => {}); // needs CustomParamEncoder
+  it.skip("parameters not accessible after rack parse error 1", () => {}); // needs Rack body parsing
+  it.skip("we have access to the original exception", () => {}); // needs Rack parse error path
 });
 
 describe("LocalhostTest", () => {
@@ -529,6 +594,17 @@ describe("RequestEtag", () => {
     expect(req.etagMatches('"strong"')).toBe(true);
     expect(req.etagMatches('W/"weak"')).toBe(true);
     expect(req.etagMatches(undefined)).toBe(false);
+  });
+
+  it("matches opaque ETag validators without unquoting", () => {
+    const header = '"the-etag"';
+    const req = new Request({ HTTP_IF_NONE_MATCH: header });
+
+    expect(req.ifNoneMatch).toBe(header);
+    expect(req.ifNoneMatchEtags).toEqual(['"the-etag"']);
+
+    expect(req.etagMatches('"the-etag"')).toBe(true);
+    expect(req.etagMatches("the-etag")).toBe(false);
   });
 });
 
@@ -577,19 +653,22 @@ describe("RequestVariant", () => {
 
 describe("RequestFormData", () => {
   it("media_type is from the FORM_DATA_MEDIA_TYPES array", () => {
-    const req = new Request({ CONTENT_TYPE: "application/x-www-form-urlencoded" });
-    expect(req.mediaType).toBe("application/x-www-form-urlencoded");
+    expect(new Request({ CONTENT_TYPE: "application/x-www-form-urlencoded" }).isFormData).toBe(
+      true,
+    );
+    expect(new Request({ CONTENT_TYPE: "multipart/form-data" }).isFormData).toBe(true);
   });
 
   it("media_type is not from the FORM_DATA_MEDIA_TYPES array", () => {
-    const req = new Request({ CONTENT_TYPE: "application/json" });
-    expect(req.mediaType).toBe("application/json");
+    expect(new Request({ CONTENT_TYPE: "application/xml" }).isFormData).toBe(false);
+    expect(new Request({ CONTENT_TYPE: "multipart/related" }).isFormData).toBe(false);
   });
 
   it("no Content-Type header is provided and the request_method is POST", () => {
     const req = new Request({ REQUEST_METHOD: "POST" });
-    expect(req.contentType).toBeUndefined();
-    expect(req.isPost).toBe(true);
+    expect(req.mediaType).toBeUndefined();
+    expect(req.requestMethod).toBe("POST");
+    expect(req.isFormData).toBe(false);
   });
 });
 
@@ -615,10 +694,10 @@ describe("RequestSession", () => {
 describe("RequestCookie", () => {
   it("cookie syntax resilience", () => {
     const req = new Request({
-      HTTP_COOKIE: "foo=bar; baz=qux",
+      HTTP_COOKIE: "_session_id=c84ace84796670c052c6ceb2451fb0f2; is_admin=yes",
     });
-    // We just verify the env is stored correctly
-    expect(req.env["HTTP_COOKIE"]).toBe("foo=bar; baz=qux");
+    expect(req.cookies["_session_id"]).toBe("c84ace84796670c052c6ceb2451fb0f2");
+    expect(req.cookies["is_admin"]).toBe("yes");
   });
 });
 
@@ -788,23 +867,6 @@ describe("RequestPermissionsPolicy", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Tests below correspond to the remaining Rails dispatch/request_test.rb tests
-// that were not yet ported. Grouped by Rails describe class.
-// ---------------------------------------------------------------------------
-
-describe("RequestIP (remaining)", () => {
-  it.skip("remote ip spoof detection", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip with spoof detection disabled", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip spoof protection ignores private addresses", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip v6 spoof detection", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip v6 spoof detection disabled", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip with user specified trusted proxies String", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip v6 with user specified trusted proxies String", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip with user specified trusted proxies Regexp", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip v6 with user specified trusted proxies Regexp", () => {}); // needs RemoteIp middleware
-});
-
 describe("RequestCGI", () => {
   it("CGI environment variables", () => {
     const req = new Request({
@@ -861,82 +923,7 @@ describe("RequestCGI", () => {
   });
 });
 
-describe("RequestProtocol (remaining)", () => {
-  it("xml http request", () => {
-    const req1 = new Request({});
-    expect(req1.isXmlHttpRequest).toBe(false);
-    expect(req1.xhr).toBe(false);
-
-    const req2 = new Request({ HTTP_X_REQUESTED_WITH: "DefinitelyNotAjax1.0" });
-    expect(req2.isXmlHttpRequest).toBe(false);
-    expect(req2.xhr).toBe(false);
-
-    const req3 = new Request({ HTTP_X_REQUESTED_WITH: "XMLHttpRequest" });
-    expect(req3.isXmlHttpRequest).toBe(true);
-    expect(req3.xhr).toBe(true);
-  });
-});
-
-describe("RequestMethod (remaining)", () => {
-  it.skip("invalid http method raises exception", () => {}); // checkMethod not wired into requestMethod getter
-
-  it.skip("method raises exception on invalid HTTP method", () => {}); // checkMethod not wired into method getter
-
-  it.skip("exception on invalid HTTP method unaffected by I18n settings", () => {}); // no I18n
-
-  it.skip("post uneffected by local inflections", () => {}); // no Inflector integration
-
-  it("delegates to Object#method if an argument is passed", () => {
-    const req = new Request({});
-    // In Rails, `request.method(:POST)` delegates to Object#method.
-    // In TS, `method` is a getter so we verify the getter works without args.
-    // The real intent is that passing an argument doesn't break — TS doesn't
-    // support overloading a getter with a method, so we verify the getter form.
-    expect(typeof req.method).toBe("string");
-  });
-});
-
-describe("RequestFormat (remaining)", () => {
-  it("can override format with parameter negative", () => {
-    const req = new Request({
-      "action_dispatch.request.parameters": { format: "txt" },
-    });
-    expect(req.format.symbol).not.toBe("xml");
-  });
-
-  it("formats format:text with accept header", () => {
-    const req = new Request({
-      "action_dispatch.request.parameters": { format: "txt" },
-    });
-    expect(req.formats.map((m) => m.symbol)).toEqual(["text"]);
-  });
-
-  it("formats format:unknown with accept header", () => {
-    const req = new Request({
-      "action_dispatch.request.parameters": { format: "unknown" },
-    });
-    expect(req.format.symbol).toBeNull();
-  });
-
-  it.skip("format does not throw exceptions when malformed GET parameters", () => {}); // ParameterTypeError not caught in formats path
-
-  it.skip("format does not throw exceptions when invalid POST parameters", () => {}); // needs Rack body parsing
-});
-
-describe("RequestEtag (remaining)", () => {
-  it("matches opaque ETag validators without unquoting", () => {
-    const header = '"the-etag"';
-    const req = new Request({ HTTP_IF_NONE_MATCH: header });
-
-    expect(req.ifNoneMatch).toBe(header);
-    expect(req.ifNoneMatchEtags).toEqual(['"the-etag"']);
-
-    expect(req.etagMatches('"the-etag"')).toBe(true);
-    expect(req.etagMatches("the-etag")).toBe(false);
-  });
-});
-
-describe("RequestParameterFilter (remaining)", () => {
+describe("RequestParameterFilter", () => {
   it("filtered_parameters returns params filtered", () => {
     const req = new Request({
       "action_dispatch.request.parameters": {
@@ -971,7 +958,7 @@ describe("RequestParameterFilter (remaining)", () => {
   });
 
   it("filtered_path returns path with filtered query string", () => {
-    for (const sep of ["&"]) {
+    for (const sep of [";", "&"]) {
       const req = new Request({
         QUERY_STRING: ["username=sikachu", "secret=bd4f21f", "api_key=b1bc3b3cd352f68d79d7"].join(
           sep,
@@ -982,9 +969,7 @@ describe("RequestParameterFilter (remaining)", () => {
 
       const path = req.filteredPath();
       expect(path).toBe(
-        ["", "/authenticate?username=sikachu", "secret=[FILTERED]", "api_key=[FILTERED]"]
-          .join(sep)
-          .replace(/^&/, ""),
+        `/authenticate?username=sikachu${sep}secret=[FILTERED]${sep}api_key=[FILTERED]`,
       );
     }
   });
@@ -1039,27 +1024,6 @@ describe("RequestParameterFilter (remaining)", () => {
   });
 });
 
-describe("RequestFormData (remaining)", () => {
-  it("media_type is from the FORM_DATA_MEDIA_TYPES array", () => {
-    expect(new Request({ CONTENT_TYPE: "application/x-www-form-urlencoded" }).isFormData).toBe(
-      true,
-    );
-    expect(new Request({ CONTENT_TYPE: "multipart/form-data" }).isFormData).toBe(true);
-  });
-
-  it("media_type is not from the FORM_DATA_MEDIA_TYPES array", () => {
-    expect(new Request({ CONTENT_TYPE: "application/xml" }).isFormData).toBe(false);
-    expect(new Request({ CONTENT_TYPE: "multipart/related" }).isFormData).toBe(false);
-  });
-
-  it("no Content-Type header is provided and the request_method is POST", () => {
-    const req = new Request({ REQUEST_METHOD: "POST" });
-    expect(req.mediaType).toBeUndefined();
-    expect(req.requestMethod).toBe("POST");
-    expect(req.isFormData).toBe(false);
-  });
-});
-
 describe("EarlyHintsRequestTest", () => {
   it("when early hints is set in the env link headers are sent", () => {
     let received: Record<string, string> | undefined;
@@ -1076,23 +1040,4 @@ describe("EarlyHintsRequestTest", () => {
       link: "</style.css>; rel=preload; as=style,</script.js>; rel=preload",
     });
   });
-});
-
-// Remaining skipped clusters (not ported — see PR body):
-// - RequestParameters: 11 tests need Rack body parsing / encoding validation / CustomParamEncoder
-// - RequestRewind: 2 tests are Rack < 3 only (body should be rewound, raw_post rewinds)
-
-describe("RequestCookie (remaining)", () => {
-  it("cookie syntax resilience", () => {
-    const req = new Request({
-      HTTP_COOKIE: "_session_id=c84ace84796670c052c6ceb2451fb0f2; is_admin=yes",
-    });
-    expect(req.cookies["_session_id"]).toBe("c84ace84796670c052c6ceb2451fb0f2");
-    expect(req.cookies["is_admin"]).toBe("yes");
-  });
-});
-
-describe("RequestParamsParsing (remaining)", () => {
-  it.skip("request_parameters raises BadRequest when content length lower than actual data length for a multipart request", () => {}); // needs Rack body parsing
-  it.skip("request_parameters raises BadRequest when content length is higher than actual data length", () => {}); // needs Rack body parsing
 });
