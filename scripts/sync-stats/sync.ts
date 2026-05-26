@@ -85,10 +85,10 @@ function gh(args: string): string {
   const MAX_RETRIES = 5;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     waitForCooldownAndInterval();
+    ghCallCount++;
     try {
       const result = execSync(`gh ${args}`, { encoding: "utf-8", maxBuffer: 50_000_000 });
       lastGhCallAt = Date.now();
-      ghCallCount++;
       return result;
     } catch (err) {
       lastGhCallAt = Date.now();
