@@ -3611,10 +3611,17 @@ export class Relation<T extends Base> {
     }
   }
 
+  /** Resolve the adapter through the public getter, returning null for HABTM join models with no connection. */
+  private _resolveAdapter(): DatabaseAdapter | null {
+    try {
+      return this._modelClass.adapter;
+    } catch {
+      return null;
+    }
+  }
+
   private _arelVisitor(): Visitors.ToSql {
-    const adapter = (this._modelClass as any)._adapter as
-      | (Visitors.ArelQuoter & { arelVisitor?: Visitors.ToSql })
-      | null;
+    const adapter = this._resolveAdapter();
     return adapter?.arelVisitor ?? new Visitors.ToSql(adapter ?? undefined);
   }
 
@@ -3625,13 +3632,13 @@ export class Relation<T extends Base> {
    * get dialect-correct quoting. `TestAdapterFixtures` delegates
    * `arelVisitor` to its inner adapter, so wrapped real adapters resolve
    * through here the same as a bare adapter. Returns null when no
-   * adapter is set (e.g. HABTM join models whose `_adapter` is null) or
+   * adapter is set (e.g. HABTM join models whose adapter is null) or
    * when the adapter is a mock/partial that doesn't define `arelVisitor`;
    * callers then fall back to `manager.toSql()` / `node.toSql()` (global
    * registry visitor = ANSI double-quotes).
    */
   private _selectVisitor(): Visitors.ToSql | null {
-    return ((this._modelClass as any)._adapter?.arelVisitor as Visitors.ToSql | undefined) ?? null;
+    return this._resolveAdapter()?.arelVisitor ?? null;
   }
 
   /**
