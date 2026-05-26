@@ -673,7 +673,7 @@ async function establishWithConfig(
   // Tag2.establishConnection both resolve connectionClassForSelf() → Base and
   // register under the same "Base" pool key, defeating cross-connection
   // isolation tests.
-  (modelClass as any)._connectionClass = true;
+  modelClass.connectionClass = true;
 
   // Honor the active connected_to scope so callers like
   // `connected_to(role:, shard:) { establish_connection(db_config) }` register
