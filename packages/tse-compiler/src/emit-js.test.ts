@@ -159,6 +159,53 @@ describe("compileJs", () => {
     });
   });
 
+  describe("source map", () => {
+    it("emits one mapping per output line for a multi-line code tag", () => {
+      // `<%` opens on src line 1; value has two code lines on src lines 2-3.
+      const src = "before\n<%\nconst a = 1;\nconst b = 2;\n%>after";
+      const { code, sourceMap } = compileJs(src, {
+        fileName: "t.tse.js",
+        sourceFileName: "t.tse",
+      });
+      expect(sourceMap).not.toBeNull();
+      const codeLines = code.split("\n");
+      const segs = sourceMap!.mappings.split(";");
+      // Find the exact genLines where the code-tag body lands in the output.
+      const genLineA = codeLines.findIndex((l) => l.includes("const a = 1;"));
+      const genLineB = codeLines.findIndex((l) => l.includes("const b = 2;"));
+      expect(genLineA).toBeGreaterThan(-1);
+      expect(genLineB).toBe(genLineA + 1);
+      // Both output lines must have a defined, non-empty source-map segment.
+      expect(segs.length).toBeGreaterThan(genLineB);
+      expect(segs[genLineA]).toBeTruthy();
+      expect(segs[genLineB]).toBeTruthy();
+    });
+
+    it("maps each code-tag output line to its actual source line (not the opener line)", () => {
+      // Template with only a multi-line code tag — no preceding text node so
+      // srcLine deltas in the VLQ segments are predictable.
+      // src line 0: `<%`
+      // src line 1: `const x = 1;`
+      // src line 2: `const y = 2;`
+      // src line 3: `%>`
+      const src = "<%\nconst x = 1;\nconst y = 2;\n%>";
+      const { code, sourceMap } = compileJs(src, {
+        fileName: "t.tse.js",
+        sourceFileName: "t.tse",
+      });
+      expect(sourceMap).not.toBeNull();
+      const codeLines = code.split("\n");
+      const segs = sourceMap!.mappings.split(";");
+      const genLineX = codeLines.findIndex((l) => l.includes("const x = 1;"));
+      const genLineY = codeLines.findIndex((l) => l.includes("const y = 2;"));
+      // Segment format: genCol(0) + srcIdx(0) + srcLineDelta + srcCol(0) = "AA<delta>A"
+      // genLineX maps to srcLine 1 (delta from prevSrc=0 → +1 → VLQ "C") → "AACA"
+      // genLineY maps to srcLine 2 (delta from prevSrc=1 → +1 → VLQ "C") → "AACA"
+      expect(segs[genLineX]).toBe("AACA");
+      expect(segs[genLineY]).toBe("AACA");
+    });
+  });
+
   describe("preamble / postamble", () => {
     it("emits preamble immediately after const _ob line", () => {
       const { code } = compileJs("<p>hi</p>", {

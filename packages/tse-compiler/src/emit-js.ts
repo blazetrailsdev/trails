@@ -117,8 +117,13 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
   const lineMappings: LineMapping[] = [];
   let nextGenLine = 0;
   const push = (line: string, srcLine?: number): void => {
-    if (srcLine !== undefined) lineMappings.push({ genLine: nextGenLine, srcLine });
-    nextGenLine += 1 + (line.match(/\n/g)?.length ?? 0);
+    const newlines = line.match(/\n/g)?.length ?? 0;
+    if (srcLine !== undefined) {
+      for (let i = 0; i <= newlines; i++) {
+        lineMappings.push({ genLine: nextGenLine + i, srcLine: srcLine + i });
+      }
+    }
+    nextGenLine += 1 + newlines;
     lines.push(line);
   };
 
