@@ -539,6 +539,30 @@ export async function defineSchema(
   return _defineSchemaImpl(adapter, schema, resolvedOpts);
 }
 
+async function _resetAutoIncrement(
+  adapter: DatabaseAdapter,
+  ss: SchemaStatements,
+  table: string,
+): Promise<void> {
+  try {
+    switch (adapter.adapterName) {
+      case "postgres":
+        await adapter.executeMutation(
+          `SELECT setval(pg_get_serial_sequence('"${table}"', 'id'), 1, false)`,
+        );
+        break;
+      case "mysql":
+        await adapter.executeMutation(`ALTER TABLE \`${table}\` AUTO_INCREMENT = 1`);
+        break;
+      case "sqlite":
+        await adapter.executeMutation(`DELETE FROM sqlite_sequence WHERE name = '${table}'`);
+        break;
+    }
+  } catch {
+    // Table may lack an auto-increment column (e.g. composite PK).
+  }
+}
+
 async function _defineSchemaImpl(
   adapter: DatabaseAdapter,
   schema: Schema,
@@ -575,6 +599,9 @@ async function _defineSchemaImpl(
     const cachedSig = cache.get(table);
     const stillExists = known ? known.has(table) : cachedSig !== undefined;
     if (cachedSig === newSig && stillExists) {
+      // D-Z: table persists across files. Reset auto-increment so tests
+      // that depend on id=1 (e.g. toParam, findEach start/finish) work.
+      await _resetAutoIncrement(adapter, ss, table);
       continue;
     }
     // D-Z: always drop the specific table before recreating. Together with
