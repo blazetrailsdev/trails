@@ -612,17 +612,12 @@ export class JoinDependency {
       : node.immediateAssocName;
     this._treeNodesByPath.set(newKey, treePart);
 
-    // Reparent if parentPath changed
     if (oldParentPath !== node.parentPath) {
-      const oldParent = oldParentPath
-        ? (this._treeNodesByPath.get(oldParentPath) ?? this._joinRoot)
-        : this._joinRoot;
+      const oldParent = this._resolveTreeParent(oldParentPath, "rekeyTreeNode(old)");
       const idx = oldParent.children.indexOf(treePart);
       if (idx !== -1) oldParent.children.splice(idx, 1);
 
-      const newParent = node.parentPath
-        ? (this._treeNodesByPath.get(node.parentPath) ?? this._joinRoot)
-        : this._joinRoot;
+      const newParent = this._resolveTreeParent(node.parentPath, "rekeyTreeNode(new)");
       newParent.children.push(treePart);
     }
   }
@@ -638,13 +633,19 @@ export class JoinDependency {
       if (mapped && mapped._joinNode === node) {
         this._treeNodesByPath.delete(fullPath);
       }
-      const parentPath = node.parentPath;
-      const parent: JoinPart = parentPath
-        ? (this._treeNodesByPath.get(parentPath) ?? this._joinRoot)
-        : this._joinRoot;
+      const parent = this._resolveTreeParent(node.parentPath, "rollbackTree");
       const idx = parent.children.findIndex((c) => c._joinNode === node);
       if (idx !== -1) parent.children.splice(idx, 1);
     }
+  }
+
+  private _resolveTreeParent(parentPath: string | null, caller: string): JoinPart {
+    if (!parentPath) return this._joinRoot;
+    const found = this._treeNodesByPath.get(parentPath);
+    if (!found) {
+      throw new Error(`JoinDependency tree (${caller}): parent path "${parentPath}" not found`);
+    }
+    return found;
   }
 
   private _addThroughAssociation(
