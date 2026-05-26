@@ -1567,10 +1567,16 @@ function createHabtmJoinModel(
   JoinModel.attribute(ownerFk, "integer");
   JoinModel.attribute(targetFk, "integer");
 
-  // Delegate adapter to the left (declaring) model
+  // Delegate connection to the left (declaring) model
+  Object.defineProperty(JoinModel, "connection", {
+    get() {
+      return lhsModel.connection;
+    },
+    configurable: true,
+  });
   Object.defineProperty(JoinModel, "adapter", {
     get() {
-      return lhsModel.adapter;
+      return lhsModel.connection;
     },
     set(_v: unknown) {
       /* no-op: always delegates to lhs */

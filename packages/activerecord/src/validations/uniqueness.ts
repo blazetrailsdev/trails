@@ -300,7 +300,7 @@ async function buildRelation(
   const arel = klass.arelTable as { get?: (n: string) => any } | null;
   const pb = (base as { predicateBuilder?: { buildBindAttribute(c: string, v: unknown): unknown } })
     .predicateBuilder;
-  const adapter = klass.adapter ?? null;
+  const adapter = klass.connection ?? null;
   const hasCsKey = Object.prototype.hasOwnProperty.call(options, "caseSensitive");
 
   // Rails routes the comparison through the adapter (defaultUniquenessComparison

@@ -1026,25 +1026,9 @@ export class Base extends Model {
     }
   }
 
-  /**
-   * Get the database connection for this model.
-   *
-   * Returns the adapter from either:
-   * 1. Directly assigned adapter (via `Model.adapter = ...`)
-   * 2. Connection checked out from ConnectionHandler pool
-   *    (set up by `await establishConnection()`)
-   *
-   * Throws if no connection has been established.
-   *
-   * Mirrors: ActiveRecord::Base.connection
-   */
+  /** @deprecated Use {@link connection} instead. Compatibility alias. */
   static get adapter(): DatabaseAdapter {
-    // Fast path: directly assigned adapter (used by tests and simple setups)
-    if (this._adapter) return this._adapter;
-
-    // Pool path — delegate to ConnectionHandling.connection which uses the
-    // pool's lease mechanism instead of caching on the model class.
-    return ConnectionHandling.connection.call(this);
+    return this.connection;
   }
 
   static get connectionHandler(): ConnectionHandler {
@@ -1106,7 +1090,7 @@ export class Base extends Model {
   }
   declare static isConnectedQ: typeof ConnectionHandling.isConnectedQ;
   declare static isConnected: typeof ConnectionHandling.isConnected;
-  declare static connection: typeof ConnectionHandling.connection;
+  declare static readonly connection: DatabaseAdapter;
   declare static isPrimaryClass: typeof ConnectionHandling.isPrimaryClass;
   declare static adapterClass: typeof ConnectionHandling.adapterClass;
   declare static removeConnection: typeof ConnectionHandling.removeConnection;
@@ -2565,8 +2549,8 @@ export class Base extends Model {
 
     let sql: string;
     if (columns.length === 0) {
-      const emptyValue = ctor.adapter.emptyInsertStatementValue();
-      sql = `INSERT INTO ${ctor.adapter.quoteTableName(table.name)} ${emptyValue}`;
+      const emptyValue = ctor.connection.emptyInsertStatementValue();
+      sql = `INSERT INTO ${ctor.connection.quoteTableName(table.name)} ${emptyValue}`;
     } else {
       const im = new InsertManager(table);
       const insertValues: [InstanceType<typeof Nodes.Node>, unknown][] = columns.map((c, i) => {
@@ -2577,44 +2561,46 @@ export class Base extends Model {
         return [table.get(c), val];
       });
       im.insert(insertValues);
-      const imVisitor = ctor.adapter.arelVisitor;
+      const imVisitor = ctor.connection.arelVisitor;
       sql = imVisitor ? imVisitor.compile(im.ast) : im.toSql();
     }
-    this._pendingOperation = ctor.adapter.execInsert(sql, `${ctor.name} Create`).then((rawId) => {
-      // Adapters with RETURNING support (PG) may return a Result-like object
-      // instead of the bare id — extract via adapter.lastInsertedId when available.
-      const insertedId =
-        rawId !== null &&
-        typeof rawId === "object" &&
-        "rows" in rawId &&
-        typeof (ctor.adapter as any).lastInsertedId === "function"
-          ? (ctor.adapter as any).lastInsertedId(rawId)
-          : rawId;
-      if (!Array.isArray(ctor.primaryKey) && this.id === null) {
-        this._attributes.set(ctor.primaryKey, insertedId);
-      } else if (
-        Array.isArray(ctor.primaryKey) &&
-        insertedId != null &&
-        (ctor.adapter as any).supportsInsertReturning?.()
-      ) {
-        // For composite-PK models with IDENTITY columns on adapters that use
-        // RETURNING (PG with use_insert_returning? = true), write back the
-        // DB-generated value to the first null PK column.
-        //
-        // Rails does this via _returning_columns_for_insert + _create_record
-        // write-back using named RETURNING columns. Our executeMutation
-        // always appends `RETURNING id`, so this only works when the IDENTITY
-        // column in the composite PK is named "id". A proper follow-up should
-        // implement _returningColumnsForInsert and pass explicit returning:
-        // column names to execInsert so the result can be mapped by name.
-        for (const pkCol of ctor.primaryKey) {
-          if (this._readAttribute(pkCol) == null) {
-            this._attributes.set(pkCol, insertedId);
-            break;
+    this._pendingOperation = ctor.connection
+      .execInsert(sql, `${ctor.name} Create`)
+      .then((rawId) => {
+        // Adapters with RETURNING support (PG) may return a Result-like object
+        // instead of the bare id — extract via adapter.lastInsertedId when available.
+        const insertedId =
+          rawId !== null &&
+          typeof rawId === "object" &&
+          "rows" in rawId &&
+          typeof (ctor.connection as any).lastInsertedId === "function"
+            ? (ctor.connection as any).lastInsertedId(rawId)
+            : rawId;
+        if (!Array.isArray(ctor.primaryKey) && this.id === null) {
+          this._attributes.set(ctor.primaryKey, insertedId);
+        } else if (
+          Array.isArray(ctor.primaryKey) &&
+          insertedId != null &&
+          (ctor.connection as any).supportsInsertReturning?.()
+        ) {
+          // For composite-PK models with IDENTITY columns on adapters that use
+          // RETURNING (PG with use_insert_returning? = true), write back the
+          // DB-generated value to the first null PK column.
+          //
+          // Rails does this via _returning_columns_for_insert + _create_record
+          // write-back using named RETURNING columns. Our executeMutation
+          // always appends `RETURNING id`, so this only works when the IDENTITY
+          // column in the composite PK is named "id". A proper follow-up should
+          // implement _returningColumnsForInsert and pass explicit returning:
+          // column names to execInsert so the result can be mapped by name.
+          for (const pkCol of ctor.primaryKey) {
+            if (this._readAttribute(pkCol) == null) {
+              this._attributes.set(pkCol, insertedId);
+              break;
+            }
           }
         }
-      }
-    });
+      });
   }
 
   private _performUpdate(): void {
@@ -2689,8 +2675,8 @@ export class Base extends Model {
     }
     _Persistence.applyDefaultAndGlobalConstraints(um as any, ctor);
 
-    const umVisitor = ctor.adapter.arelVisitor;
-    this._pendingOperation = ctor.adapter
+    const umVisitor = ctor.connection.arelVisitor;
+    this._pendingOperation = ctor.connection
       .execUpdate(umVisitor ? umVisitor.compile(um.ast) : um.toSql(), `${ctor.name} Update`)
       .then((affected) => {
         if (ctor.lockingEnabled && affected === 0) {
@@ -2730,7 +2716,7 @@ export class Base extends Model {
         }
         _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
 
-        const affected = await ctor.adapter.execDelete(dm.toSql(), `${ctor.name} Destroy`);
+        const affected = await ctor.connection.execDelete(dm.toSql(), `${ctor.name} Destroy`);
         if (ctor.lockingEnabled && affected === 0) {
           throw new StaleObjectError(this, "destroy");
         }
@@ -3278,6 +3264,18 @@ export interface Base extends Included<typeof AutosaveAssociation> {
 // ---------------------------------------------------------------------------
 
 extend(Base, ConnectionHandling.ClassMethods);
+
+// Re-define `connection` as a getter (accessor) after extend() overwrites it
+// with a data property. The getter delegates to ConnectionHandling.connection
+// with the correct `this` binding and includes the _adapter fast-path.
+Object.defineProperty(Base, "connection", {
+  get() {
+    return ConnectionHandling.connection.call(this);
+  },
+  configurable: true,
+  enumerable: false,
+});
+
 extend(Base, { collectionCacheKey: _collectionCacheKey });
 extend(Base, { find: _Core.find, findBy: _Core.findBy, findByBang: _Core.findByBang });
 extend(Base, Querying);

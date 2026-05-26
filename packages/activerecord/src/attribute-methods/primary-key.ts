@@ -196,9 +196,9 @@ export function isDangerousAttributeMethod(_this: PrimaryKeyHost, name: string):
 /**
  * Rails: adapter_class.quote_column_name(primary_key)
  */
-export function quotedPrimaryKey(this: PrimaryKeyHost & { adapter?: DatabaseAdapter }): string {
+export function quotedPrimaryKey(this: PrimaryKeyHost & { connection?: DatabaseAdapter }): string {
   const pk = this.primaryKey;
-  const quoter = this.adapter;
+  const quoter = this.connection;
   const fallback = (k: string) => `"${k.replace(/"/g, '""')}"`;
   if (Array.isArray(pk))
     return pk.map((k) => (quoter ? quoter.quoteColumnName(k) : fallback(k))).join(", ");

@@ -36,10 +36,10 @@ export interface InsertAllOptions {
 
 export class InsertAll {
   readonly model: ModelClass;
-  private _connectionOverride: ModelClass["adapter"] | null = null;
+  private _connectionOverride: ModelClass["connection"] | null = null;
 
-  get connection(): ModelClass["adapter"] {
-    return this._connectionOverride ?? this.model.adapter;
+  get connection(): ModelClass["connection"] {
+    return this._connectionOverride ?? this.model.connection;
   }
   readonly inserts: Record<string, unknown>[];
   readonly keys: Set<string>;
@@ -79,13 +79,13 @@ export class InsertAll {
   /** @deprecated Pass inserts as the second argument; connection is resolved from the model. */
   constructor(
     relation: Relation<any>,
-    connection: ModelClass["adapter"],
+    connection: ModelClass["connection"],
     inserts: Record<string, unknown>[],
     options?: InsertAllOptions,
   );
   constructor(
     relation: Relation<any>,
-    insertsOrConnection: Record<string, unknown>[] | ModelClass["adapter"],
+    insertsOrConnection: Record<string, unknown>[] | ModelClass["connection"],
     insertsOrOptions?: Record<string, unknown>[] | InsertAllOptions,
     legacyOptions?: InsertAllOptions,
   ) {

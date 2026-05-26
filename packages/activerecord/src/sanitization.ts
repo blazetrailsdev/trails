@@ -226,36 +226,19 @@ function sanitizeSqlClassMethod(
 
 /** @internal */
 interface QuoterHost {
-  connection?(): unknown;
-  adapter?: unknown;
+  connection?: unknown;
 }
 
 /**
- * Resolves quoting via `adapter` first, then `connection()` as a fallback.
- * `adapter` is checked first because a direct adapter assignment
- * (`this.adapter = x`) short-circuits the pool entirely. When no direct
- * assignment exists, `Base.adapter` checks out a connection from the pool
- * and caches it on the class (`_adapter`); it remains checked out until
- * explicitly checked in or the pool is disconnected.
- * `connection()` is tried second for callers that have no adapter path but do
- * have an active pool lease (rare). Only `ConnectionNotDefined` triggers
- * fallback; other errors propagate. @internal
+ * Resolves quoting via `connection`. Only `ConnectionNotDefined` triggers
+ * fallback to the abstract quoter; other errors propagate. @internal
  */
 function quoterFor(host: QuoterHost): Quoter {
   let conn: Quoter | null | undefined;
   try {
-    conn = host.adapter as Quoter | null | undefined;
+    conn = host.connection as Quoter | null | undefined;
   } catch (err) {
     if (!(err instanceof ConnectionNotDefined)) throw err;
-  }
-  if (!conn) {
-    if (typeof host.connection === "function") {
-      try {
-        conn = host.connection() as Quoter | null | undefined;
-      } catch (err) {
-        if (!(err instanceof ConnectionNotDefined)) throw err;
-      }
-    }
   }
   if (!conn || typeof conn.quote !== "function") return ABSTRACT_QUOTER;
   return conn;

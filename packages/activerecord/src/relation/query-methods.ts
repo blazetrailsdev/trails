@@ -142,7 +142,7 @@ interface QueryMethodsHost {
 
 function resolveOrderMatcher(host: QueryMethodsHost): RegExp {
   try {
-    let adapter: any = host._modelClass.adapter;
+    let adapter: any = host._modelClass.connection;
     while (adapter) {
       const matcher = (adapter.constructor as any)?.columnNameWithOrderMatcher?.();
       if (matcher) return matcher;
@@ -676,7 +676,7 @@ export function buildWhereClause(
     if (isNamedBinds) {
       sql = opts;
       const namedBinds = firstBind as Record<string, unknown>;
-      const adapter = adapterFor((this as any)._modelClass);
+      const adapter = connectionFor((this as any)._modelClass);
       for (const [name, value] of Object.entries(namedBinds)) {
         const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const replacement = Array.isArray(value)
@@ -1724,21 +1724,21 @@ function escapeRegex(s: string): string {
 }
 
 /**
- * Resolve the active adapter for a model. Lets `Base.adapter` propagate
+ * Resolve the active connection for a model. Lets `Base.connection` propagate
  * its `ConnectionNotDefined` (or other connection errors) so callers
  * see the real cause rather than a `TypeError` on the next `.quote*`
  * access.
  */
-function adapterFor(modelClass: any): any {
-  return modelClass?.adapter;
+function connectionFor(modelClass: any): any {
+  return modelClass?.connection;
 }
 
 function safeQuoteTableName(modelClass: any, name: string): string {
-  return adapterFor(modelClass).quoteTableName(name);
+  return connectionFor(modelClass).quoteTableName(name);
 }
 
 function safeQuoteColumnName(modelClass: any, name: string): string {
-  return adapterFor(modelClass).quoteColumnName(name);
+  return connectionFor(modelClass).quoteColumnName(name);
 }
 
 /** @internal */

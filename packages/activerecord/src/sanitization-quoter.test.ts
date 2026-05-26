@@ -61,17 +61,17 @@ describe("sanitization quoter threading (module-level)", () => {
   });
 });
 
-describe("sanitization class-method dispatch threads `this.connection()`", () => {
-  const mysqlHost = { connection: () => mysqlQuoter };
-  const pgHost = { connection: () => pgQuoter };
+describe("sanitization class-method dispatch threads `this.connection`", () => {
+  const mysqlHost = { connection: mysqlQuoter };
+  const pgHost = { connection: pgQuoter };
 
-  it("sanitizeSqlHashForAssignment uses MySQL adapter from this.connection()", () => {
+  it("sanitizeSqlHashForAssignment uses MySQL adapter from this.connection", () => {
     expect(ClassMethods.sanitizeSqlHashForAssignment.call(mysqlHost, { name: "x" }, "users")).toBe(
       "`users`.`name` = 'x'",
     );
   });
 
-  it("sanitizeSqlHashForAssignment uses PG adapter from this.connection()", () => {
+  it("sanitizeSqlHashForAssignment uses PG adapter from this.connection", () => {
     expect(ClassMethods.sanitizeSqlHashForAssignment.call(pgHost, { name: "x" }, "users")).toBe(
       `"name" = 'x'`,
     );
@@ -81,9 +81,9 @@ describe("sanitization class-method dispatch threads `this.connection()`", () =>
     expect(ClassMethods.sanitizeSqlArray.call(mysqlHost, "name = ?", "x")).toBe("name = 'x'");
   });
 
-  it("falls back to abstract quoter when host.connection() throws ConnectionNotDefined", () => {
+  it("falls back to abstract quoter when host.connection throws ConnectionNotDefined", () => {
     const host = {
-      connection: () => {
+      get connection(): never {
         throw new ConnectionNotDefined("No database connection defined.");
       },
     };
@@ -92,9 +92,9 @@ describe("sanitization class-method dispatch threads `this.connection()`", () =>
     );
   });
 
-  it("propagates non-ConnectionNotDefined errors from host.connection()", () => {
+  it("propagates non-ConnectionNotDefined errors from host.connection", () => {
     const host = {
-      connection: () => {
+      get connection(): never {
         throw new ConnectionTimeoutError("connection timed out");
       },
     };

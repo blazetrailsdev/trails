@@ -247,7 +247,7 @@ export async function _updateRecord(
 
   applyDefaultAndGlobalConstraints(um as any, this as any);
 
-  const adapter = (this as any).adapter;
+  const adapter = (this as any).connection;
   if (typeof adapter.update === "function") {
     return adapter.update(um);
   }
@@ -274,7 +274,7 @@ export async function _deleteRecord(
 
   applyDefaultAndGlobalConstraints(dm as any, this as any);
 
-  const adapter = (this as any).adapter;
+  const adapter = (this as any).connection;
   if (typeof adapter.delete === "function") {
     return adapter.delete(dm);
   }
@@ -539,7 +539,7 @@ interface DeleteRecord {
   constructor: {
     arelTable: InstanceType<typeof ArelTable>;
     _buildPkWhereNode(id: unknown): Parameters<DeleteManager["where"]>[0];
-    adapter: { execDelete(sql: string, name: string): Promise<number> };
+    connection: { execDelete(sql: string, name: string): Promise<number> };
   };
 }
 
@@ -554,7 +554,7 @@ export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
   const ctor = this.constructor;
   if (this.isPersisted()) {
     const dm = new DeleteManager().from(ctor.arelTable).where(ctor._buildPkWhereNode(this.id));
-    await ctor.adapter.execDelete(dm.toSql(), "Delete");
+    await ctor.connection.execDelete(dm.toSql(), "Delete");
   }
   this._destroyed = true;
   this._previouslyNewRecord = false;
@@ -831,7 +831,7 @@ interface UpdateColumnsRecord {
       }
     >;
     _buildPkWhereNode(id: unknown): Parameters<UpdateManager["where"]>[0];
-    adapter: {
+    connection: {
       execUpdate(sql: string, name?: string, binds?: unknown[]): Promise<number>;
       update?(arel: InstanceType<typeof UpdateManager>): Promise<number>;
       quote?(value: unknown): string;
@@ -940,7 +940,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   um.set(setPairs as Parameters<UpdateManager["set"]>[0]);
   um.where(ctor._buildPkWhereNode(originalId));
 
-  const adapter = ctor.adapter;
+  const adapter = ctor.connection;
   if (typeof adapter.update === "function") {
     await adapter.update(um);
   } else {
@@ -971,7 +971,7 @@ interface ReloadRecord {
     primaryKey: string | string[];
     arelTable: { project(...cols: unknown[]): { where(node: unknown): { toSql(): string } } };
     _buildPkWhereNode(id: unknown): unknown;
-    adapter: {
+    connection: {
       selectAll(
         sql: string,
         name: string,
@@ -989,7 +989,7 @@ interface ReloadRecord {
 export async function reload<T extends ReloadRecord>(this: T): Promise<T> {
   const ctor = this.constructor;
   const sm = ctor.arelTable.project(arelStar).where(ctor._buildPkWhereNode(this.id));
-  const result = await ctor.adapter.selectAll(sm.toSql(), "Reload");
+  const result = await ctor.connection.selectAll(sm.toSql(), "Reload");
   const row = result.first();
 
   if (row === undefined) {
@@ -1155,7 +1155,7 @@ interface PersistencePrivateHost {
     defaultScoped(): { whereClause: { isEmpty(): boolean; ast: unknown } };
     readonlyAttributeQ?(name: string): boolean;
     withConnection?(fn: (conn: unknown) => Promise<void>): Promise<void>;
-    adapter: { execDelete(sql: string, name: string): Promise<number> };
+    connection: { execDelete(sql: string, name: string): Promise<number> };
   };
 }
 
@@ -1352,7 +1352,7 @@ async function _createRecord(this: PersistenceInternalHost): Promise<unknown> {
   if (ctor.withConnection) {
     await ctor.withConnection(doInsert);
   } else {
-    await doInsert(ctor.adapter);
+    await doInsert(ctor.connection);
   }
 
   this._newRecord = false;

@@ -353,7 +353,7 @@ describe("ConnectionHandlingTest", () => {
   it("#connection leases a connection when none is active", () => {
     const pool = Base.connectionPool();
     expect(pool.activeConnection).toBeNull();
-    const conn = Base.connection();
+    const conn = Base.connection;
     expect(conn).toBeTruthy();
     expect(pool.activeConnection).toBeTruthy();
     Base.releaseConnection();
@@ -361,7 +361,7 @@ describe("ConnectionHandlingTest", () => {
 
   it("#connection returns the active connection inside withConnection", async () => {
     await Base.withConnection((leased) => {
-      const conn = Base.connection();
+      const conn = Base.connection;
       expect(conn).toBe(leased);
     });
   });

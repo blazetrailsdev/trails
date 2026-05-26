@@ -1958,7 +1958,10 @@ export class Relation<T extends Base> {
       this.loadRecords(loadedRecords);
     } else {
       const sql = this._toSql();
-      const result = await this._modelClass.adapter.selectAll(sql, `${this._modelClass.name} Load`);
+      const result = await this._modelClass.connection.selectAll(
+        sql,
+        `${this._modelClass.name} Load`,
+      );
       if (token !== this._loadToken) return [];
       const rows = result.toArray();
       loadedRecords = this._instrumentInstantiation(rows);
@@ -2091,7 +2094,7 @@ export class Relation<T extends Base> {
       !this._fromClause.isEmpty()
     ) {
       const sql = this._toSql();
-      const result = await this._modelClass.adapter.selectAll(sql, "Eager Load");
+      const result = await this._modelClass.connection.selectAll(sql, "Eager Load");
       this._records = this._instrumentInstantiation(result.toArray());
       await this._preloadAssociationsForRecords(this._records, eagerAssociations);
       return;
@@ -2118,7 +2121,7 @@ export class Relation<T extends Base> {
     // If no associations could be JOINed, fall back entirely to preload
     if (jd.nodes.length === 0) {
       const sql = this._toSql();
-      const rows = await this._modelClass.adapter.execute(sql);
+      const rows = await this._modelClass.connection.execute(sql);
       this._records = this._instrumentInstantiation(rows);
       if (fallbackAssocs.length > 0) {
         await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
@@ -2134,7 +2137,7 @@ export class Relation<T extends Base> {
       sql = `${sql} ${comments}`;
     }
 
-    const rows = await this._modelClass.adapter.execute(sql);
+    const rows = await this._modelClass.connection.execute(sql);
 
     const { parents, associations } = jd.instantiateFromRows(rows);
 
@@ -2256,7 +2259,7 @@ export class Relation<T extends Base> {
     queries: [string, unknown[]][],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    const adapter = this._modelClass.adapter;
+    const adapter = this._modelClass.connection;
     if (typeof adapter?.explain !== "function") {
       return "EXPLAIN not supported by this adapter";
     }
@@ -2321,7 +2324,7 @@ export class Relation<T extends Base> {
         // happens to implement `typeCast`, and nothing we ship does
         // without it.
         throw new Error(
-          `Relation#explain: adapter ${this._modelClass.adapter.adapterName} does not implement typeCast()`,
+          `Relation#explain: adapter ${this._modelClass.connection.adapterName} does not implement typeCast()`,
         );
       }
       return this._normalizeExplainBindValue(adapter.typeCast(b));
@@ -2539,7 +2542,7 @@ export class Relation<T extends Base> {
     for (const col of rel._groupColumns) manager.group(groupColumnToArel(col, table));
     if (!rel._havingClause.isEmpty()) manager.having(rel._havingClause.ast);
     manager.take(1);
-    const rows = await rel._modelClass.adapter.execute(manager.toSql());
+    const rows = await rel._modelClass.connection.execute(manager.toSql());
     return rows.length > 0;
   }
 
@@ -2649,7 +2652,7 @@ export class Relation<T extends Base> {
     // rather than column_name_with_order_matcher (which is stricter, for order).
     const stringColumns = columns.filter((c): c is string => typeof c === "string");
     if (stringColumns.length > 0) {
-      disallowRawSqlBang(stringColumns, resolveColumnNameMatcher(this._modelClass.adapter));
+      disallowRawSqlBang(stringColumns, resolveColumnNameMatcher(this._modelClass.connection));
     }
 
     const table = this._modelClass.arelTable;
@@ -2702,7 +2705,10 @@ export class Relation<T extends Base> {
     if (this._offsetValue !== null) manager.skip(this._offsetValue);
 
     const sql = manager.toSql();
-    const result = await this._modelClass.adapter.selectAll(sql, `${this._modelClass.name} Pluck`);
+    const result = await this._modelClass.connection.selectAll(
+      sql,
+      `${this._modelClass.name} Pluck`,
+    );
 
     const rows = result.toArray();
     if (columns.length === 1) {
@@ -2757,7 +2763,7 @@ export class Relation<T extends Base> {
       um.where(node);
     }
 
-    const count = await this._modelClass.adapter.execUpdate(
+    const count = await this._modelClass.connection.execUpdate(
       this._arelVisitor().compile(um.ast),
       `${this._modelClass.name} Update All`,
     );
@@ -2793,7 +2799,7 @@ export class Relation<T extends Base> {
       dm.where(node);
     }
 
-    const count = await this._modelClass.adapter.execDelete(
+    const count = await this._modelClass.connection.execDelete(
       this._arelVisitor().compile(dm.ast),
       `${this._modelClass.name} Delete All`,
     );
@@ -2831,7 +2837,7 @@ export class Relation<T extends Base> {
       um.where(node);
     }
 
-    return this._modelClass.adapter.executeMutation(this._arelVisitor().compile(um.ast));
+    return this._modelClass.connection.executeMutation(this._arelVisitor().compile(um.ast));
   }
 
   /**
@@ -3407,7 +3413,7 @@ export class Relation<T extends Base> {
         intersect: "INTERSECT",
         except: "EXCEPT",
       }[this._setOperation.type];
-      const isSqlite = this._modelClass.adapter?.adapterName === "sqlite";
+      const isSqlite = this._modelClass.connection?.adapterName === "sqlite";
       return isSqlite ? `${leftSql} ${op} ${rightSql}` : `(${leftSql}) ${op} (${rightSql})`;
     }
     return this._toSqlWithoutSetOp();
@@ -3611,10 +3617,10 @@ export class Relation<T extends Base> {
     }
   }
 
-  /** Resolve the adapter through the public getter, returning null for HABTM join models with no established connection. */
+  /** Resolve the connection through the public getter, returning null for HABTM join models with no established connection. */
   private _resolveAdapter(): DatabaseAdapter | null {
     try {
-      return this._modelClass.adapter;
+      return this._modelClass.connection;
     } catch (e) {
       if (e instanceof ConnectionNotEstablished) return null;
       throw e;
@@ -3764,7 +3770,7 @@ export class Relation<T extends Base> {
    */
   private _quoteBareColumn(name: string): string {
     if (this._selectVisitor() !== null) {
-      return this._modelClass.adapter.quoteColumnName(name);
+      return this._modelClass.connection.quoteColumnName(name);
     }
     return `"${name.replace(/"/g, '""')}"`;
   }
@@ -4487,7 +4493,7 @@ export class Relation<T extends Base> {
             new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]).as("size"),
             subColumn.maximum().as("timestamp"),
           );
-          const rows = await this._modelClass.adapter.execute(outerManager.toSql());
+          const rows = await this._modelClass.connection.execute(outerManager.toSql());
           size = Number(rows[0]?.size ?? 0);
           timestamp = rows[0]?.timestamp;
         } else {
@@ -4498,7 +4504,7 @@ export class Relation<T extends Base> {
             this._compileArelNode(countStar.as("size")),
             this._compileArelNode(maxNode.as("timestamp")),
           ];
-          const rows = await this._modelClass.adapter.execute(query.toSql());
+          const rows = await this._modelClass.connection.execute(query.toSql());
           size = Number(rows[0]?.size ?? 0);
           timestamp = rows[0]?.timestamp;
         }
@@ -4509,7 +4515,7 @@ export class Relation<T extends Base> {
           query._orderClauses = [];
           query._rawOrderClauses = [];
           query._selectColumns = [this._compileArelNode(countFallback.as("size"))];
-          const rows = await this._modelClass.adapter.execute(query.toSql());
+          const rows = await this._modelClass.connection.execute(query.toSql());
           size = Number(rows[0]?.size ?? 0);
         } catch {
           // Fall through with size = 0
@@ -4693,7 +4699,7 @@ export class Relation<T extends Base> {
   private async execMainQuery(): Promise<Record<string, unknown>[]> {
     if (this._isNone) return [];
     const sql = this.toSql();
-    const result = await this._modelClass.adapter.execute(sql);
+    const result = await this._modelClass.connection.execute(sql);
     return result;
   }
 
