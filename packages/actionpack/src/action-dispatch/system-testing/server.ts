@@ -35,6 +35,7 @@ export class Server {
     return new Promise((resolve, reject) => {
       this._server!.close((err) => {
         this._server = undefined;
+        this._port = 0;
         if (err) reject(err);
         else resolve();
       });

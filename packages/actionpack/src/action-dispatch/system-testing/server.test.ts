@@ -6,6 +6,8 @@ describe("ActionDispatch::SystemTesting::Server", () => {
   let server: Server | undefined;
   afterEach(async () => {
     await server?.stop();
+    server = undefined;
+    Server.silencePuma = false;
   });
 
   it("boots an app on a random port", async () => {
@@ -19,7 +21,7 @@ describe("ActionDispatch::SystemTesting::Server", () => {
     expect(server.host).toBe("127.0.0.1");
   });
 
-  it("stops the server", async () => {
+  it("stops the server and resets port", async () => {
     const app = http.createServer((_req, res) => {
       res.writeHead(200);
       res.end("ok");
@@ -27,6 +29,7 @@ describe("ActionDispatch::SystemTesting::Server", () => {
     server = new Server();
     await server.run(app);
     await server.stop();
+    expect(server.port).toBe(0);
     server = undefined;
   });
 
@@ -34,6 +37,5 @@ describe("ActionDispatch::SystemTesting::Server", () => {
     expect(Server.silencePuma).toBe(false);
     Server.silencePuma = true;
     expect(Server.silencePuma).toBe(true);
-    Server.silencePuma = false;
   });
 });
