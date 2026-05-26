@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/hstore_test.rb
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import {
   Hstore,
   parseHstore,
@@ -10,7 +10,9 @@ import {
 } from "../../connection-adapters/postgresql/oid/hstore.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
+import { Base } from "../../index.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -22,14 +24,17 @@ afterAll(() => {
 
 // The `hstores` table uses the PG-specific `hstore` type, which isn't
 // expressible via defineSchema. The table is created via raw DDL below;
-// defineSchema(adapter, {}) marks the file as TM-Phase-5 compliant.
+// defineSchema({}) marks the file as TM-Phase-5 compliant.
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   let HstoreModel: any;
 
   beforeAll(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await defineSchema(adapter, {});
+    adapter = Base.connection as PostgreSQLAdapter;
+    await defineSchema({});
     await adapter.exec(`CREATE EXTENSION IF NOT EXISTS hstore`);
     await adapter.exec(`DROP TABLE IF EXISTS hstores`);
     await adapter.exec(`
@@ -41,12 +46,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       )
     `);
     await adapter.loadAdditionalTypes();
-    const { Base } = await import("../../index.js");
     class HstoreModelCls extends Base {
       static tableName = "hstores";
-      static {
-        this.adapter = adapter;
-      }
     }
     await HstoreModelCls.loadSchema();
     HstoreModel = HstoreModelCls;
@@ -54,13 +55,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   afterAll(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS hstores`);
-    await adapter.close();
   });
-
-  withTransactionalFixtures(() => adapter);
-
   async function freshStoreAccessorModel(a: PostgreSQLAdapter): Promise<any> {
-    const { Base } = await import("../../index.js");
     class HstoreWithAccessors extends Base {
       static tableName = "hstores";
       static {

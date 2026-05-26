@@ -2,9 +2,11 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/explain_test.rb
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
+import { Base } from "../../index.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -15,20 +17,18 @@ afterAll(() => {
 });
 
 // EXPLAIN tests build their own ad-hoc `ex_*` tables; nothing is
-// expressible as a static defineSchema spec. defineSchema(adapter, {})
+// expressible as a static defineSchema spec. defineSchema({})
 // marks the file as TM-Phase-5 compliant. The outer transaction wrapping
 // each test rolls back those tables (PG DDL is transactional).
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await defineSchema(adapter, {});
+    adapter = Base.connection as PostgreSQLAdapter;
+    await defineSchema({});
   });
-  afterAll(async () => {
-    await adapter.close();
-  });
-  withTransactionalFixtures(() => adapter);
-
   describe("PostgresqlExplainTest", () => {
     it("explain for one query", async () => {
       const result = await adapter.explain("SELECT 1");
@@ -41,11 +41,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       // emits `sql.active_record`. Without that, `Relation#explain`
       // silently falls back to `toSql()` and reports zero collected
       // queries.
-      const { Base } = await import("../../index.js");
       class ExRelation extends Base {
         static {
           this.attribute("name", "string");
-          this.adapter = adapter;
         }
       }
       await adapter.exec(`CREATE TABLE "ex_relations" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
@@ -59,18 +57,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("Relation#explain on PG captures preload queries", async () => {
-      const { Base, registerModel } = await import("../../index.js");
+      const { registerModel } = await import("../../index.js");
       class ExAuthor extends Base {
         static {
           this.attribute("name", "string");
-          this.adapter = adapter;
         }
       }
       class ExBook extends Base {
         static {
           this.attribute("title", "string");
           this.attribute("ex_author_id", "integer");
-          this.adapter = adapter;
         }
       }
       ExAuthor.hasMany("exBooks", { className: "ExBook" });

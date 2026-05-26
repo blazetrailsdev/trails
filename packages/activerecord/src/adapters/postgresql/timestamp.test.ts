@@ -7,17 +7,20 @@ import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import {
   describeIfPg,
   PostgreSQLAdapter,
-  PG_TEST_URL,
   withPostgresqlDatetimeType,
   withNativeDatabaseTypeOverrides,
 } from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { DateTime as OidDateTime } from "../../connection-adapters/postgresql/oid/date-time.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { Base } from "../../index.js";
+
+setupHandlerSuite();
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = Base.connection as PostgreSQLAdapter;
     await adapter.exec(`DROP TABLE IF EXISTS "postgresql_timestamps"`);
     await adapter.exec(`
       CREATE TABLE "postgresql_timestamps" (
@@ -31,7 +34,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS "postgresql_timestamps"`);
-    await adapter.close();
   });
 
   describe("PostgreSQLTimestampTest", () => {
@@ -189,12 +191,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       // SCOPE: fixture loading is a separate multi-PR effort.
     });
     it("load infinity and beyond", async () => {
-      const { Base } = await import("../../index.js");
       class Dev extends Base {
         static tableName = "ts_infinity_dev";
-        static {
-          this.adapter = adapter;
-        }
       }
       await adapter.exec(`DROP TABLE IF EXISTS ts_infinity_dev`);
       await adapter.exec(

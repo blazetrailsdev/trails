@@ -200,6 +200,7 @@ export default defineConfig({
             "scripts/d1-migrate.test.ts",
             "scripts/d1-migrate-sidecar.test.ts",
             "scripts/d1-migrate-multi-describe.test.ts",
+            "scripts/d1-migrate-pg-mysql.test.ts",
             "scripts/test-deps/*.test.ts",
             "eslint/*.test.mjs",
             "vendor/*.test.ts",

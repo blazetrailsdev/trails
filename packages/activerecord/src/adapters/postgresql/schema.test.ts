@@ -2,15 +2,12 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/schema_test.rb
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
-import {
-  describeIfPg,
-  pgSupportsNativePartitioning,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "./test-helper.js";
+import { describeIfPg, pgSupportsNativePartitioning, PostgreSQLAdapter } from "./test-helper.js";
 import { StatementInvalid } from "../../errors.js";
 import { makeThingModels, makeThing5Model, makeSongAlbumModels } from "./schema-ar-models.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { Base } from "../../index.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -22,13 +19,8 @@ afterAll(() => {
 
 // Tables here are PG-schema-qualified (test_schema.things, music.songs, …),
 // which defineSchema can't express — they're provisioned via raw DDL in
-// setupSchemas. The empty defineSchema(adapter, {}) call only flips the
+// setupSchemas. The empty defineSchema({}) call only flips the
 // Phase-5 marker so the file satisfies the AR_NO_AUTO_SCHEMA=1 audit.
-async function freshAdapter(): Promise<PostgreSQLAdapter> {
-  const adapter = new PostgreSQLAdapter(PG_TEST_URL);
-  await defineSchema(adapter, {});
-  return adapter;
-}
 
 const SCHEMA_NAME = "test_schema";
 const SCHEMA2_NAME = "test_schema2";
@@ -123,13 +115,16 @@ async function teardownSchemas(adapter: PostgreSQLAdapter) {
   await adapter.dropSchema("music", { ifExists: true, cascade: true });
 }
 
+setupHandlerSuite();
+
+beforeAll(async () => {
+  await defineSchema({});
+});
+
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = await freshAdapter();
-  });
-  afterEach(async () => {
-    await adapter.close();
+    adapter = Base.connection as PostgreSQLAdapter;
   });
 
   describe("SchemaTest", () => {
@@ -843,11 +838,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.createTable("articles", async (t) => {
         t.string("title");
       });
-      const { Base } = await import("../../index.js");
       class Article extends Base {
         static {
           this.tableName = '"my.schema".articles';
-          this.adapter = adapter as any;
         }
       }
       await Article.loadSchema();

@@ -2,10 +2,12 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/virtual_column_test.rb
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { FixtureSet } from "../../test-helpers/fixture-set.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
+import { Base } from "../../index.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -17,14 +19,17 @@ afterAll(() => {
 
 // The `virtual_columns` table uses PG generated/virtual columns, which
 // aren't expressible via defineSchema. The table is built inline below;
-// defineSchema(adapter, {}) marks the file as TM-Phase-5 compliant.
+// defineSchema({}) marks the file as TM-Phase-5 compliant.
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   let VirtualColumn: any;
 
   beforeAll(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await defineSchema(adapter, {});
+    adapter = Base.connection as PostgreSQLAdapter;
+    await defineSchema({});
     await adapter.exec(`DROP TABLE IF EXISTS virtual_columns`);
     await adapter.createTable("virtual_columns", (t) => {
       t.string("name");
@@ -34,12 +39,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       t.integer("column1");
       t.virtual("column2", { type: "integer", as: "column1 + 1", stored: true });
     });
-    const { Base } = await import("../../index.js");
     class VirtualColumnCls extends Base {
       static tableName = "virtual_columns";
-      static {
-        this.adapter = adapter;
-      }
     }
     await VirtualColumnCls.loadSchema();
     VirtualColumn = VirtualColumnCls;
@@ -48,10 +49,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   afterAll(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS virtual_columns`).catch(() => {});
-    await adapter.close();
   });
-  withTransactionalFixtures(() => adapter);
-
   describe("PostgresqlVirtualColumnTest", () => {
     it("virtual column with full inserts", async () => {
       const partialInsertsWas = VirtualColumn.partialInserts;

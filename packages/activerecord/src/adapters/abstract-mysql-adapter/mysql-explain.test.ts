@@ -1,17 +1,18 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/mysql_explain_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { describe, it, expect, beforeAll } from "vitest";
+import { describeIfMysql, Mysql2Adapter } from "./test-helper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { Base } from "../../index.js";
+
+setupHandlerSuite();
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
-  beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.close();
+  beforeAll(() => {
+    adapter = Base.connection as Mysql2Adapter;
   });
 
   describe("MysqlExplainTest", () => {
@@ -68,14 +69,12 @@ describeIfMysql("Mysql2Adapter", () => {
       // Asserting backticks is the thing that discriminates the two
       // paths — plain "contains the table name" would pass either
       // way.
-      const { Base } = await import("../../index.js");
-      await defineSchema(adapter, {
+      await defineSchema({
         ex_rel_mysqls: { name: "string" },
       });
       class ExRelMysql extends Base {
         static {
           this.attribute("name", "string");
-          this.adapter = adapter;
         }
       }
       await ExRelMysql.create({ name: "r" });
@@ -92,22 +91,20 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("Relation#explain on MySQL captures preload queries", async () => {
-      const { Base, registerModel } = await import("../../index.js");
-      await defineSchema(adapter, {
+      const { registerModel } = await import("../../index.js");
+      await defineSchema({
         ex_mysql_authors: { name: "string" },
         ex_mysql_books: { title: "string", ex_mysql_author_id: "integer" },
       });
       class ExMysqlAuthor extends Base {
         static {
           this.attribute("name", "string");
-          this.adapter = adapter;
         }
       }
       class ExMysqlBook extends Base {
         static {
           this.attribute("title", "string");
           this.attribute("ex_mysql_author_id", "integer");
-          this.adapter = adapter;
         }
       }
       ExMysqlAuthor.hasMany("exMysqlBooks", { className: "ExMysqlBook" });

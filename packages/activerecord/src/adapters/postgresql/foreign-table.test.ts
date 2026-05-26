@@ -9,6 +9,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { Base } from "../../index.js";
 
 const url = new URL(PG_TEST_URL);
 const fdwHost = url.hostname || "localhost";
@@ -20,11 +22,13 @@ function quoteLit(s: string): string {
   return `'${s.replace(/'/g, "''")}'`;
 }
 
+setupHandlerSuite();
+
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
   beforeEach(async (ctx) => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = Base.connection as PostgreSQLAdapter;
 
     await adapter.exec("DROP FOREIGN TABLE IF EXISTS foreign_professors");
     await adapter.exec("DROP SERVER IF EXISTS foreign_server CASCADE");
@@ -37,7 +41,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       ctx.skip();
       return;
     }
-    await defineSchema(adapter, {
+    await defineSchema({
       professors: { name: { type: "string", null: false } },
     });
     await adapter.exec(
@@ -65,7 +69,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.exec("DROP SERVER IF EXISTS foreign_server CASCADE").catch(() => {});
     await adapter.exec("DROP TABLE IF EXISTS professors").catch(() => {});
     await adapter.disableExtension("postgres_fdw", { force: "cascade" }).catch(() => {});
-    await adapter.close();
   });
 
   describe("ForeignTableTest", () => {
@@ -89,12 +92,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("attribute names", async () => {
-      const { Base } = await import("../../index.js");
       class ForeignProfessor extends Base {
         static tableName = "foreign_professors";
-        static {
-          this.adapter = adapter;
-        }
       }
       await ForeignProfessor.loadSchema();
       expect(ForeignProfessor.attributeNames()).toEqual(["id", "name"]);
@@ -111,19 +110,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("attributes", async () => {
-      const { Base } = await import("../../index.js");
       class Professor extends Base {
         static tableName = "professors";
-        static {
-          this.adapter = adapter;
-        }
       }
       class ForeignProfessorWithPk extends Base {
         static tableName = "foreign_professors";
         static primaryKey = "id";
-        static {
-          this.adapter = adapter;
-        }
       }
       await Professor.loadSchema();
       await ForeignProfessorWithPk.loadSchema();
@@ -134,13 +126,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("insert record", async () => {
-      const { Base } = await import("../../index.js");
       class ForeignProfessorWithPk extends Base {
         static tableName = "foreign_professors";
         static primaryKey = "id";
-        static {
-          this.adapter = adapter;
-        }
       }
       await ForeignProfessorWithPk.loadSchema();
       await ForeignProfessorWithPk.createBang({ id: 100, name: "Leonardo" });
@@ -149,19 +137,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("update record", async () => {
-      const { Base } = await import("../../index.js");
       class Professor extends Base {
         static tableName = "professors";
-        static {
-          this.adapter = adapter;
-        }
       }
       class ForeignProfessorWithPk extends Base {
         static tableName = "foreign_professors";
         static primaryKey = "id";
-        static {
-          this.adapter = adapter;
-        }
       }
       await Professor.loadSchema();
       await ForeignProfessorWithPk.loadSchema();
@@ -174,19 +155,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("delete record", async () => {
-      const { Base } = await import("../../index.js");
       class Professor extends Base {
         static tableName = "professors";
-        static {
-          this.adapter = adapter;
-        }
       }
       class ForeignProfessorWithPk extends Base {
         static tableName = "foreign_professors";
         static primaryKey = "id";
-        static {
-          this.adapter = adapter;
-        }
       }
       await Professor.loadSchema();
       await ForeignProfessorWithPk.loadSchema();

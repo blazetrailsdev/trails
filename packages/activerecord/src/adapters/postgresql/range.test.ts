@@ -2,14 +2,15 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/range_test.rb
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { parseRange } from "./pg-range.js";
 import { Range } from "../../relation.js";
-import { MultiRange } from "../../index.js";
+import { MultiRange, Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TimeWithZone, TimeZone, setZone, resetZone } from "@blazetrails/activesupport";
 import { defineSchema } from "../../test-helpers/define-schema.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -24,15 +25,16 @@ afterAll(() => {
 // plus user-defined floatrange/stringrange), which aren't expressible via
 // defineSchema. The table is created via raw DDL below; defineSchema(
 // adapter, {}) marks the file as TM-Phase-5 compliant.
-async function freshAdapter(): Promise<PostgreSQLAdapter> {
-  const adapter = new PostgreSQLAdapter(PG_TEST_URL);
-  await defineSchema(adapter, {});
-  return adapter;
-}
 
 const toInt = (s: string) => parseInt(s, 10);
 const toFloat = (s: string) => parseFloat(s);
 const toBigInt = (s: string) => BigInt(s);
+
+setupHandlerSuite();
+
+beforeAll(async () => {
+  await defineSchema({});
+});
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -40,7 +42,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let PostgresqlRangesTz: any;
 
   beforeEach(async () => {
-    adapter = await freshAdapter();
+    adapter = Base.connection as PostgreSQLAdapter;
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
     await adapter.dropRange("floatrange", { ifExists: true });
     await adapter.dropRange("stringrange", { ifExists: true });
@@ -63,12 +65,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       )
     `);
     await adapter.loadAdditionalTypes();
-    const { Base } = await import("../../index.js");
     class PostgresqlRangesCls extends Base {
       static tableName = "postgresql_ranges";
-      static {
-        this.adapter = adapter;
-      }
     }
     await PostgresqlRangesCls.loadSchema();
     PostgresqlRanges = PostgresqlRangesCls;
@@ -77,9 +75,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       static tableName = "postgresql_ranges";
       static timeZoneAwareAttributes = true;
       static timeZoneAwareTypes = [...Base.timeZoneAwareTypes, "tsrange", "tstzrange"];
-      static {
-        this.adapter = adapter;
-      }
     }
     await PostgresqlRangesTzCls.loadSchema();
     PostgresqlRangesTz = PostgresqlRangesTzCls;
@@ -91,7 +86,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
     await adapter.dropRange("floatrange", { ifExists: true });
     await adapter.dropRange("stringrange", { ifExists: true });
-    await adapter.close();
   });
 
   describe("PostgresqlRangeTest", () => {

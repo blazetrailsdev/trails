@@ -3,10 +3,12 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Duration } from "@blazetrails/activesupport";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
+import { Base } from "../../index.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -19,14 +21,17 @@ afterAll(() => {
 // The `interval_data_types` table uses the PG-specific `interval` type
 // (including `interval(3)` precision and `interval[]`), which isn't
 // expressible via defineSchema. The table is created via raw DDL below;
-// defineSchema(adapter, {}) marks the file as TM-Phase-5 compliant.
+// defineSchema({}) marks the file as TM-Phase-5 compliant.
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   let IntervalDataType: any;
 
   beforeAll(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await defineSchema(adapter, {});
+    adapter = Base.connection as PostgreSQLAdapter;
+    await defineSchema({});
     await adapter.exec(`DROP TABLE IF EXISTS interval_data_types`);
     await adapter.exec(`
       CREATE TABLE interval_data_types (
@@ -39,11 +44,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       )
     `);
     await adapter.loadAdditionalTypes();
-    const { Base } = await import("../../index.js");
     class IntervalDataTypeCls extends Base {
       static tableName = "interval_data_types";
       static {
-        this.adapter = adapter;
         this.attribute("legacy_term", "string");
       }
     }
@@ -53,10 +56,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   afterAll(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS interval_data_types`);
-    await adapter.close();
   });
-  withTransactionalFixtures(() => adapter);
-
   describe("PostgresqlIntervalTest", () => {
     it("column", async () => {
       const columns = await adapter.columns("interval_data_types");

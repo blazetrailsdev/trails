@@ -2,11 +2,13 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/citext_test.rb
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Table as ArelTable } from "@blazetrails/arel";
 import { defineSchema } from "../../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
+import { Base } from "../../index.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -18,13 +20,16 @@ afterAll(() => {
 
 // The `citexts` table uses the PG-specific `citext` type, which isn't
 // expressible via defineSchema. The table is created via raw DDL below;
-// defineSchema(adapter, {}) marks the file as TM-Phase-5 compliant.
+// defineSchema({}) marks the file as TM-Phase-5 compliant.
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
   beforeAll(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await defineSchema(adapter, {});
+    adapter = Base.connection as PostgreSQLAdapter;
+    await defineSchema({});
     await adapter.exec(`CREATE EXTENSION IF NOT EXISTS citext`);
     await adapter.exec(`DROP TABLE IF EXISTS citexts`);
     await adapter.exec(`CREATE TABLE citexts (id serial primary key, cival citext)`);
@@ -34,10 +39,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterAll(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS citexts`);
     await adapter.exec(`DROP EXTENSION IF EXISTS citext CASCADE`);
-    await adapter.close();
   });
-  withTransactionalFixtures(() => adapter);
-
   describe("PostgresqlCitextTest", () => {
     it("citext enabled", async () => {
       expect(await adapter.extensionEnabled("citext")).toBe(true);
@@ -64,12 +66,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write", async () => {
-      const { Base } = await import("../../index.js");
       class Citext extends Base {
         static tableName = "citexts";
-        static {
-          this.adapter = adapter;
-        }
       }
       await Citext.loadSchema();
 
@@ -85,12 +83,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("select case insensitive", async () => {
       await adapter.exec(`INSERT INTO citexts (cival) VALUES ('Cased Text')`);
-      const { Base } = await import("../../index.js");
       class Citext extends Base {
         static tableName = "citexts";
-        static {
-          this.adapter = adapter;
-        }
       }
       await Citext.loadSchema();
 

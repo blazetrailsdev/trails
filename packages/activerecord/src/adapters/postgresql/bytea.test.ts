@@ -2,11 +2,13 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/bytea_test.rb
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { Bytea } from "../../connection-adapters/postgresql/oid/bytea.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
+import { Base } from "../../index.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -16,29 +18,25 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = Base.connection as PostgreSQLAdapter;
     await adapter.exec(`DROP TABLE IF EXISTS bytea_data_type`);
-    await defineSchema(adapter, {
+    await defineSchema({
       bytea_data_type: { payload: "binary", serialized: "binary" },
     });
   });
   afterAll(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS bytea_data_type`);
-    await adapter.close();
   });
-  withTransactionalFixtures(() => adapter);
-
   describe("PostgresqlByteaTest", () => {
     it("column", async () => {
-      const { Base } = await import("../../index.js");
       class ByteaDataType extends Base {
         static tableName = "bytea_data_type";
-        static {
-          this.adapter = adapter;
-        }
       }
       await ByteaDataType.loadSchema();
       const col = ByteaDataType.columnsHash()["payload"];
@@ -49,12 +47,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("default", async () => {
-      const { Base } = await import("../../index.js");
       class ByteaDataType extends Base {
         static tableName = "bytea_data_type";
-        static {
-          this.adapter = adapter;
-        }
       }
       await ByteaDataType.loadSchema();
       const col = ByteaDataType.columnsHash()["payload"];
@@ -91,12 +85,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write and read", async () => {
-      const { Base } = await import("../../index.js");
       class ByteaDataType extends Base {
         static tableName = "bytea_data_type";
-        static {
-          this.adapter = adapter;
-        }
       }
       await ByteaDataType.loadSchema();
       const data = Buffer.from([0x1f, 0x8b]);
@@ -122,12 +112,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write nothing", async () => {
-      const { Base } = await import("../../index.js");
       class ByteaDataType extends Base {
         static tableName = "bytea_data_type";
-        static {
-          this.adapter = adapter;
-        }
       }
       await ByteaDataType.loadSchema();
       const record = await (ByteaDataType as any).create({});
@@ -136,12 +122,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write nil", async () => {
-      const { Base } = await import("../../index.js");
       class ByteaDataType extends Base {
         static tableName = "bytea_data_type";
-        static {
-          this.adapter = adapter;
-        }
       }
       await ByteaDataType.loadSchema();
       const record = await (ByteaDataType as any).create({ payload: null });
@@ -152,12 +134,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write empty string", async () => {
-      const { Base } = await import("../../index.js");
       class ByteaDataType extends Base {
         static tableName = "bytea_data_type";
-        static {
-          this.adapter = adapter;
-        }
       }
       await ByteaDataType.loadSchema();
       const record = await (ByteaDataType as any).create({ payload: Buffer.alloc(0) });
@@ -222,12 +200,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("read value", async () => {
-      const { Base } = await import("../../index.js");
       class ByteaDataType extends Base {
         static tableName = "bytea_data_type";
-        static {
-          this.adapter = adapter;
-        }
       }
       await ByteaDataType.loadSchema();
       const data = Buffer.from([0x1f]);
@@ -238,12 +212,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("read nil value", async () => {
-      const { Base } = await import("../../index.js");
       class ByteaDataType extends Base {
         static tableName = "bytea_data_type";
-        static {
-          this.adapter = adapter;
-        }
       }
       await ByteaDataType.loadSchema();
       await adapter.execute(`INSERT INTO bytea_data_type (payload) VALUES (null)`);
@@ -252,12 +222,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write value", async () => {
-      const { Base } = await import("../../index.js");
       class ByteaDataType extends Base {
         static tableName = "bytea_data_type";
-        static {
-          this.adapter = adapter;
-        }
       }
       await ByteaDataType.loadSchema();
       const data = Buffer.from([0x1f]);
@@ -283,12 +249,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write binary", async () => {
-      const { Base } = await import("../../index.js");
       class ByteaDataType extends Base {
         static tableName = "bytea_data_type";
-        static {
-          this.adapter = adapter;
-        }
       }
       await ByteaDataType.loadSchema();
       // Round-trip all byte values 0x00–0xFF — none should be corrupted.

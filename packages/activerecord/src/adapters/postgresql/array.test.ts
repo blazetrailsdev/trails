@@ -2,10 +2,12 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/array_test.rb
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
+import { Base } from "../../index.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -17,14 +19,17 @@ afterAll(() => {
 
 // The pg_arrays table uses PG array columns (e.g. integer[],
 // numeric(10,2)[]) which are not expressible via defineSchema. The table
-// is created via raw DDL below; defineSchema(adapter, {}) marks the file
+// is created via raw DDL below; defineSchema({}) marks the file
 // as TM-Phase-5 compliant. The outer per-test transaction rolls back
 // inserts and any addColumn DDL done inside it() bodies.
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await defineSchema(adapter, {});
+    adapter = Base.connection as PostgreSQLAdapter;
+    await defineSchema({});
     await adapter.exec(`DROP TABLE IF EXISTS pg_arrays`);
     await adapter.exec(`
       CREATE TABLE pg_arrays (
@@ -39,10 +44,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterAll(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS pg_arrays`).catch(() => {});
-    await adapter.close();
   });
-  withTransactionalFixtures(() => adapter);
-
   describe("PostgresqlArrayTest", () => {
     it("column", async () => {
       const columns = await adapter.columns("pg_arrays");
@@ -74,12 +76,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("default", async () => {
       await adapter.addColumn("pg_arrays", "score", "integer", { array: true, default: [4, 4, 2] });
-      const { Base } = await import("../../index.js");
       class PgArrays extends Base {
         static tableName = "pg_arrays";
-        static {
-          this.adapter = adapter;
-        }
       }
       await PgArrays.loadSchema();
       // Rails: assert_equal([4, 4, 2], PgArray.column_defaults["score"])
@@ -92,12 +90,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         array: true,
         default: ["foo", "bar"],
       });
-      const { Base } = await import("../../index.js");
       class PgArrays extends Base {
         static tableName = "pg_arrays";
-        static {
-          this.adapter = adapter;
-        }
       }
       await PgArrays.loadSchema();
       // Rails: assert_equal(["foo", "bar"], PgArray.column_defaults["names"])
@@ -225,12 +219,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("with multi dimensional empty strings", async () => {
-      const { Base } = await import("../../index.js");
       class PgArrays extends Base {
         static tableName = "pg_arrays";
-        static {
-          this.adapter = adapter;
-        }
       }
       await PgArrays.loadSchema();
       const arr = [
@@ -246,12 +236,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("with arbitrary whitespace", async () => {
-      const { Base } = await import("../../index.js");
       class PgArrays extends Base {
         static tableName = "pg_arrays";
-        static {
-          this.adapter = adapter;
-        }
       }
       await PgArrays.loadSchema();
       const arr = [
@@ -310,12 +296,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       // SCOPE: ~20 LOC in postgresql-adapter.ts + abstract-adapter insertFixture
     });
     it("attribute for inspect for array field", async () => {
-      const { Base } = await import("../../index.js");
       class PgArrays extends Base {
         static tableName = "pg_arrays";
-        static {
-          this.adapter = adapter;
-        }
       }
       await PgArrays.loadSchema();
       const record = new PgArrays();
@@ -325,12 +307,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
     });
     it("attribute for inspect for array field for large array", async () => {
-      const { Base } = await import("../../index.js");
       class PgArrays extends Base {
         static tableName = "pg_arrays";
-        static {
-          this.adapter = adapter;
-        }
       }
       await PgArrays.loadSchema();
       const record = new PgArrays();
@@ -409,12 +387,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       // SCOPE: large — requires TimeZone registry port; defer to a dedicated timezone PR
     });
     it("assigning non array value", async () => {
-      const { Base } = await import("../../index.js");
       class PgArrays extends Base {
         static tableName = "pg_arrays";
-        static {
-          this.adapter = adapter;
-        }
       }
       await PgArrays.loadSchema();
       const record = new PgArrays({ tags: "not-an-array" } as any);
@@ -426,12 +400,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((reloaded as any).tags).toEqual([]);
     });
     it("assigning empty string", async () => {
-      const { Base } = await import("../../index.js");
       class PgArrays extends Base {
         static tableName = "pg_arrays";
-        static {
-          this.adapter = adapter;
-        }
       }
       await PgArrays.loadSchema();
       const record = new PgArrays({ tags: "" } as any);
@@ -443,12 +413,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((reloaded as any).tags).toEqual([]);
     });
     it("assigning valid pg array literal", async () => {
-      const { Base } = await import("../../index.js");
       class PgArrays extends Base {
         static tableName = "pg_arrays";
-        static {
-          this.adapter = adapter;
-        }
       }
       await PgArrays.loadSchema();
       const record = new PgArrays({ tags: "{1,2,3}" } as any);
@@ -469,11 +435,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("uniqueness validation", async () => {
-      const { Base } = await import("../../index.js");
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
-          this.adapter = adapter;
           this.validatesUniqueness("tags");
         }
       }
