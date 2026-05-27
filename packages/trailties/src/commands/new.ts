@@ -1,4 +1,4 @@
-import { cwd as getCwd } from "@blazetrails/activesupport/process-adapter";
+import { cwd as getCwd, exit } from "@blazetrails/activesupport/process-adapter";
 import { Command } from "commander";
 import path from "node:path";
 import { execSync } from "node:child_process";
@@ -8,6 +8,9 @@ import {
   type SqliteDriver,
 } from "../generators/app-generator.js";
 import { getPackageManager, packageManagerInstall } from "../package-manager.js";
+
+const VALID_PACKAGE_MANAGERS: PackageManager[] = ["pnpm", "npm", "yarn"];
+const VALID_SQLITE_DRIVERS: SqliteDriver[] = ["better-sqlite3", "node-sqlite", "expo-sqlite"];
 
 export function newCommand(): Command {
   const cmd = new Command("new");
@@ -26,14 +29,30 @@ export function newCommand(): Command {
     .option("--skip-install", "Skip dependency installation")
     .option("--skip-docker", "Skip Dockerfile creation")
     .action(async (name: string, options) => {
+      const pm = options.packageManager as PackageManager;
+      const driver = options.sqliteDriver as SqliteDriver;
+
+      if (!VALID_PACKAGE_MANAGERS.includes(pm)) {
+        console.error(
+          `Unknown package manager: '${pm}'. Valid options: ${VALID_PACKAGE_MANAGERS.join(", ")}`,
+        );
+        exit(1);
+      }
+      if (!VALID_SQLITE_DRIVERS.includes(driver)) {
+        console.error(
+          `Unknown SQLite driver: '${driver}'. Valid options: ${VALID_SQLITE_DRIVERS.join(", ")}`,
+        );
+        exit(1);
+      }
+
       const cwd = getCwd();
       const gen = new AppGenerator({
         cwd,
         output: console.log,
         appPath: name,
         database: options.database,
-        packageManager: options.packageManager as PackageManager,
-        sqliteDriver: options.sqliteDriver as SqliteDriver,
+        packageManager: pm,
+        sqliteDriver: driver,
         skipDocker: options.skipDocker,
       });
       await gen.run();
@@ -50,18 +69,13 @@ export function newCommand(): Command {
       }
 
       if (!options.skipInstall) {
-        // Detect from the *caller* cwd, not appDir: a freshly generated app
-        // has no lockfile, so detecting in appDir always falls back to npm
-        // and silently downgrades anyone who invoked `trails new` from a
-        // pnpm/yarn/bun workspace. Falls back to pnpm (the historical
-        // trails default) when caller cwd has no lockfile either.
-        const pm = getPackageManager(cwd, { fallback: "pnpm" });
-        console.log(`  Installing dependencies with ${pm.name}...`);
-        const result = packageManagerInstall(appDir, pm);
+        console.log(`  Installing dependencies with ${pm}...`);
+        const pmAdapter = getPackageManager(appDir, { fallback: pm });
+        const result = packageManagerInstall(appDir, pmAdapter);
         if (result.status === 0) {
           console.log("  Dependencies installed");
         } else {
-          console.log(`  Could not install dependencies — run '${pm.name} install' manually`);
+          console.log(`  Could not install dependencies — run '${pm} install' manually`);
         }
       }
 

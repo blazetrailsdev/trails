@@ -923,7 +923,7 @@ FROM base AS build
 RUN apt-get update -qq && apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3
 
 COPY package.json ${this.pmLockFile()}* ./
-RUN ${this.packageManager === "pnpm" ? "corepack enable pnpm && pnpm install" : this.pmInstall()}
+RUN ${this.packageManager === "pnpm" ? "corepack enable pnpm && pnpm install" : this.packageManager === "yarn" ? "corepack enable yarn && yarn" : this.pmInstall()}
 
 COPY . .
 RUN ${this.packageManager === "pnpm" ? "pnpm" : this.packageManager} run build
