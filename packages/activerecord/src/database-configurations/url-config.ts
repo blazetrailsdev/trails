@@ -17,7 +17,9 @@ export class UrlConfig extends HashConfig {
     url: string,
     configuration: DatabaseConfigOptions = {},
   ) {
-    super(envName, name, { ...configuration, ...buildUrlHash(url) });
+    const urlHash = buildUrlHash(url);
+    normalizeUrlHash(urlHash);
+    super(envName, name, { ...configuration, ...urlHash });
     this.url = url;
   }
 
@@ -52,6 +54,31 @@ function databaseFromUrl(url: string): string | undefined {
     // Bare filesystem paths and `:memory:` aren't parseable URLs but are
     // the database name themselves.
     return url;
+  }
+}
+
+// Mirrors: UrlConfig#initialize coercions — rename snake_case URL params to
+// camelCase and coerce string booleans, matching Rails' post-merge fixups.
+function normalizeUrlHash(hash: Record<string, unknown>): void {
+  if ("schema_dump" in hash) {
+    hash.schemaDump = hash.schema_dump === "false" ? false : hash.schema_dump;
+    delete hash.schema_dump;
+  } else if (hash.schemaDump === "false") {
+    hash.schemaDump = false;
+  }
+  if ("query_cache" in hash) {
+    hash.queryCache = hash.query_cache === "false" ? false : hash.query_cache;
+    delete hash.query_cache;
+  } else if (hash.queryCache === "false") {
+    hash.queryCache = false;
+  }
+  if ("database_tasks" in hash) {
+    const raw = hash.database_tasks;
+    hash.databaseTasks = typeof raw === "string" ? raw !== "false" : raw;
+    delete hash.database_tasks;
+  }
+  if (typeof hash.replica === "string") {
+    hash.replica = hash.replica !== "false";
   }
 }
 

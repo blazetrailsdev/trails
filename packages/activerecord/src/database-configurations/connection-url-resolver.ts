@@ -27,6 +27,7 @@ export class ConnectionUrlResolver {
   private readonly _parsed: URL | null;
   private readonly _opaque: string | null;
   private readonly _query: string | null;
+  private readonly _emptyAuthority: boolean;
 
   constructor(url: string) {
     if (!url || url.trim() === "") {
@@ -52,17 +53,22 @@ export class ConnectionUrlResolver {
 
     if (hasAuthority) {
       // Standard URL: scheme://user:pass@host:port/path?query
-      // Swap to http:// for URL parser (it only supports certain schemes),
-      // then extract the parts.
-      const normalized = `http://${rest}`;
+      // Swap to http:// for URL parser (it only supports certain schemes).
+      // WHATWG URL misparses `http:///path` (empty authority) by treating the
+      // first path segment as hostname. Detect the empty-authority case and
+      // prepend a placeholder host so parsing is correct, then discard it.
+      const emptyAuthority = rest.startsWith("/");
+      const normalized = emptyAuthority ? `http://placeholder${rest}` : `http://${rest}`;
       try {
         this._parsed = new URL(normalized);
+        this._emptyAuthority = emptyAuthority;
         this._opaque = null;
         this._query = this._parsed.search ? this._parsed.search.slice(1) : null;
       } catch {
         throw new Error(`Invalid database URL: ${redactUrl(url)}`);
       }
     } else {
+      this._emptyAuthority = false;
       // Opaque URI: scheme:path[?query]
       const queryIdx = rest.indexOf("?");
       if (queryIdx >= 0) {
@@ -80,7 +86,9 @@ export class ConnectionUrlResolver {
    * Mirrors: ConnectionUrlResolver#to_hash
    */
   toHash(): DatabaseConfigOptions {
-    const config: Record<string, unknown> = { ...this.queryHash(), ...this.rawConfig() };
+    // Mirrors Rails: query_hash.reverse_merge(...) — query params take precedence
+    // over structural fields (adapter, host, etc.) from the URL authority.
+    const config: Record<string, unknown> = { ...this.rawConfig(), ...this.queryHash() };
 
     // Remove null/undefined/empty values (Rails: compact_blank)
     for (const key of Object.keys(config)) {
@@ -148,6 +156,9 @@ export class ConnectionUrlResolver {
     }
 
     const parsed = this._parsed!;
+    // When we used a placeholder host to work around WHATWG's empty-authority
+    // misparse (http:///path), the hostname is "placeholder" — discard it.
+    const hostname = this._emptyAuthority ? "" : parsed.hostname;
     return {
       adapter: this._adapter,
       username: parsed.username || undefined,
@@ -155,7 +166,7 @@ export class ConnectionUrlResolver {
       port: parsed.port ? Number(parsed.port) : undefined,
       database: this.databaseFromPath(parsed.pathname),
       // URL API wraps IPv6 addresses in brackets; strip them to match Rails behavior
-      host: parsed.hostname ? parsed.hostname.replace(/^\[(.+)\]$/, "$1") : undefined,
+      host: hostname ? hostname.replace(/^\[(.+)\]$/, "$1") : undefined,
     };
   }
 

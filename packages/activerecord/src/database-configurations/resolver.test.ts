@@ -1,86 +1,149 @@
-import { describe, it } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { DatabaseConfigurations } from "../database-configurations.js";
+import type { RawConfigurations } from "../database-configurations.js";
+
+function resolveDbConfig(poolConfig: string, config: RawConfigurations = {}) {
+  const configs = new DatabaseConfigurations(config);
+  return configs.resolve(poolConfig);
+}
 
 describe("PoolConfig", () => {
   describe("ResolverTest", () => {
+    beforeEach(() => {
+      DatabaseConfigurations.defaultEnv = "development";
+    });
+
+    afterEach(() => {
+      DatabaseConfigurations.defaultEnv = "development";
+    });
+
     it.skip("url invalid adapter", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+      // BLOCKED: connection-pool — requires Base.connection_handler.establish_connection
     });
-    it.skip("url from environment", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+
+    it("url from environment", () => {
+      const poolConfig = resolveDbConfig("production", {
+        production: "abstract://foo?encoding=utf8",
+      });
+      expect(poolConfig.configurationHash).toMatchObject({
+        adapter: "abstract",
+        host: "foo",
+        encoding: "utf8",
+      });
     });
-    it.skip("url sub key", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+
+    it("url sub key", () => {
+      const poolConfig = resolveDbConfig("production", {
+        production: { url: "abstract://foo?encoding=utf8" },
+      });
+      expect(poolConfig.configurationHash).toMatchObject({
+        adapter: "abstract",
+        host: "foo",
+        encoding: "utf8",
+      });
     });
-    it.skip("url sub key merges correctly", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+
+    it("url sub key merges correctly", () => {
+      const hash = {
+        url: "abstract://foo?encoding=utf8&",
+        adapter: "sqlite3",
+        host: "bar",
+        pool: "3",
+      };
+      const poolConfig = resolveDbConfig("production", { production: hash });
+      expect(poolConfig.configurationHash).toMatchObject({
+        adapter: "abstract",
+        host: "foo",
+        encoding: "utf8",
+        pool: "3",
+      });
     });
-    it.skip("url sub key merges correctly when query param", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+
+    it("url sub key merges correctly when query param", () => {
+      const hash = { url: "abstract:///?user=user&password=passwd&dbname=app" };
+      const poolConfig = resolveDbConfig("production", { production: hash });
+      expect(poolConfig.configurationHash).toMatchObject({
+        adapter: "abstract",
+        user: "user",
+        password: "passwd",
+        dbname: "app",
+      });
     });
-    it.skip("url host no db", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+
+    it("url host no db", () => {
+      const poolConfig = resolveDbConfig("abstract://foo?encoding=utf8");
+      expect(poolConfig.configurationHash).toMatchObject({
+        adapter: "abstract",
+        host: "foo",
+        encoding: "utf8",
+      });
     });
+
     it.skip("url missing scheme", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+      // DIVERGES: we treat non-URL strings as env name lookups (like Ruby symbols);
+      // Rails always parses string args as URLs and raises InvalidConfigurationError.
     });
-    it.skip("url host db", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+
+    it("url host db", () => {
+      const poolConfig = resolveDbConfig("abstract://foo/bar?encoding=utf8");
+      expect(poolConfig.configurationHash).toMatchObject({
+        adapter: "abstract",
+        database: "bar",
+        host: "foo",
+        encoding: "utf8",
+      });
     });
-    it.skip("url port", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+
+    it("url port", () => {
+      const poolConfig = resolveDbConfig("abstract://foo:123?encoding=utf8");
+      expect(poolConfig.configurationHash).toMatchObject({
+        adapter: "abstract",
+        port: 123,
+        host: "foo",
+        encoding: "utf8",
+      });
     });
-    it.skip("encoded password", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+
+    it("encoded password", () => {
+      const password = "am@z1ng_p@ssw0rd#!";
+      const encoded = encodeURIComponent(password);
+      const poolConfig = resolveDbConfig(`abstract://foo:${encoded}@localhost/bar`);
+      expect(poolConfig.configurationHash.password).toBe(password);
     });
-    it.skip("url with authority for sqlite3", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+
+    it("url with authority for sqlite3", () => {
+      const poolConfig = resolveDbConfig("sqlite3:///foo_test");
+      expect(poolConfig.database).toBe("/foo_test");
     });
-    it.skip("url absolute path for sqlite3", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+
+    it("url absolute path for sqlite3", () => {
+      const poolConfig = resolveDbConfig("sqlite3:/foo_test");
+      expect(poolConfig.database).toBe("/foo_test");
     });
-    it.skip("url relative path for sqlite3", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+
+    it("url relative path for sqlite3", () => {
+      const poolConfig = resolveDbConfig("sqlite3:foo_test");
+      expect(poolConfig.database).toBe("foo_test");
     });
-    it.skip("url memory db for sqlite3", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+
+    it("url memory db for sqlite3", () => {
+      const poolConfig = resolveDbConfig("sqlite3::memory:");
+      expect(poolConfig.database).toBe(":memory:");
     });
-    it.skip("url sub key for sqlite3", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+
+    it("url sub key for sqlite3", () => {
+      const poolConfig = resolveDbConfig("production", {
+        production: { url: "sqlite3:foo?encoding=utf8" },
+      });
+      expect(poolConfig.configurationHash).toMatchObject({
+        adapter: "sqlite3",
+        database: "foo",
+        encoding: "utf8",
+      });
     });
+
     it.skip("pool config with invalid type", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in resolver
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in resolver.test.ts
+      // BLOCKED: connection-pool — requires Base.connection_handler.establish_connection
     });
   });
 });
