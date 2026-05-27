@@ -4451,69 +4451,52 @@ export class Relation<T extends Base> {
           }, null);
       }
     } else {
-      try {
-        const collection: Relation<T> = this;
-        const tsColumn = this.table.get(timestampColumn);
-        // Build COUNT(*) and MAX(col) projections via Arel nodes.
-        const countStar = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
-        const maxNode = tsColumn.maximum();
+      const collection: Relation<T> = this;
+      const tsColumn = this.table.get(timestampColumn);
+      // Build COUNT(*) and MAX(col) projections via Arel nodes.
+      const countStar = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
+      const maxNode = tsColumn.maximum();
 
-        if (this._limitValue !== null || (this._offsetValue ?? 0) > 0) {
-          // Has LIMIT/OFFSET — wrap in a subquery (mirrors Rails' build_subquery).
-          const subqueryAlias = "subquery_for_cache_key";
-          const inner = collection._clone();
-          inner._selectColumns = [
-            this._compileArelNode(tsColumn.as("collection_cache_key_timestamp")),
-          ];
-          if (this._isDistinct && (!this._selectColumns || this._selectColumns.length === 0)) {
-            inner._selectColumns = [
-              this._compileArelNode(this.table.star),
-              ...inner._selectColumns!,
-            ];
-          }
-          // Build a proper Arel SelectManager for the outer COUNT/MAX query so
-          // quoting and adapter differences are handled by the AST visitor.
-          // Grouping(SqlLiteral) renders as "(inner sql)" and TableAlias appends
-          // the bare alias name (same pattern SelectManager#as uses in Rails).
-          const subAlias = new Nodes.TableAlias(
-            new Nodes.Grouping(new Nodes.SqlLiteral(inner.toSql())),
-            subqueryAlias,
-          );
-          const subTable = new Table(subqueryAlias);
-          const subColumn = subTable.get("collection_cache_key_timestamp");
-          const outerManager = new SelectManager();
-          outerManager.from(subAlias);
-          outerManager.project(
-            new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]).as("size"),
-            subColumn.maximum().as("timestamp"),
-          );
-          const rows = await this._modelClass.connection.execute(outerManager.toSql());
-          size = Number(rows[0]?.size ?? 0);
-          timestamp = rows[0]?.timestamp;
-        } else {
-          const query = collection._clone();
-          query._orderClauses = [];
-          query._rawOrderClauses = [];
-          query._selectColumns = [
-            this._compileArelNode(countStar.as("size")),
-            this._compileArelNode(maxNode.as("timestamp")),
-          ];
-          const rows = await this._modelClass.connection.execute(query.toSql());
-          size = Number(rows[0]?.size ?? 0);
-          timestamp = rows[0]?.timestamp;
+      if (this._limitValue !== null || (this._offsetValue ?? 0) > 0) {
+        // Has LIMIT/OFFSET — wrap in a subquery (mirrors Rails' build_subquery).
+        const subqueryAlias = "subquery_for_cache_key";
+        const inner = collection._clone();
+        inner._selectColumns = [
+          this._compileArelNode(tsColumn.as("collection_cache_key_timestamp")),
+        ];
+        if (this._isDistinct && (!this._selectColumns || this._selectColumns.length === 0)) {
+          inner._selectColumns = [this._compileArelNode(this.table.star), ...inner._selectColumns!];
         }
-      } catch {
-        try {
-          const countFallback = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
-          const query = this._clone();
-          query._orderClauses = [];
-          query._rawOrderClauses = [];
-          query._selectColumns = [this._compileArelNode(countFallback.as("size"))];
-          const rows = await this._modelClass.connection.execute(query.toSql());
-          size = Number(rows[0]?.size ?? 0);
-        } catch {
-          // Fall through with size = 0
-        }
+        // Build a proper Arel SelectManager for the outer COUNT/MAX query so
+        // quoting and adapter differences are handled by the AST visitor.
+        // Grouping(SqlLiteral) renders as "(inner sql)" and TableAlias appends
+        // the bare alias name (same pattern SelectManager#as uses in Rails).
+        const subAlias = new Nodes.TableAlias(
+          new Nodes.Grouping(new Nodes.SqlLiteral(inner.toSql())),
+          subqueryAlias,
+        );
+        const subTable = new Table(subqueryAlias);
+        const subColumn = subTable.get("collection_cache_key_timestamp");
+        const outerManager = new SelectManager();
+        outerManager.from(subAlias);
+        outerManager.project(
+          new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]).as("size"),
+          subColumn.maximum().as("timestamp"),
+        );
+        const rows = await this._modelClass.connection.execute(outerManager.toSql());
+        size = Number(rows[0]?.size ?? 0);
+        timestamp = rows[0]?.timestamp;
+      } else {
+        const query = collection._clone();
+        query._orderClauses = [];
+        query._rawOrderClauses = [];
+        query._selectColumns = [
+          this._compileArelNode(countStar.as("size")),
+          this._compileArelNode(maxNode.as("timestamp")),
+        ];
+        const rows = await this._modelClass.connection.execute(query.toSql());
+        size = Number(rows[0]?.size ?? 0);
+        timestamp = rows[0]?.timestamp;
       }
     }
 

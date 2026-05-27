@@ -2,35 +2,24 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "./index.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 
 describe("ExplainTest", () => {
-  let adapter: TestDatabaseAdapter;
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+    await defineSchema({
       posts: { title: "string", score: "integer" },
       blogs: { name: "string" },
       articles: { title: "string", blog_id: "integer" },
     });
-  });
-  withTransactionalFixtures(() => adapter);
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   function makeModel() {
@@ -38,7 +27,6 @@ describe("ExplainTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("score", "integer");
-        this.adapter = adapter;
       }
     }
     return { Post };
@@ -187,14 +175,12 @@ describe("ExplainTest", () => {
     class Blog extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Article extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("blog_id", "integer");
-        this.adapter = adapter;
       }
     }
     Blog.hasMany("articles", { className: "Article" });
@@ -244,7 +230,14 @@ describe("ExplainTest", () => {
     // Booleans go through the adapter's typeCast: SQLite collapses
     // them to 1/0, PG/MySQL keep them as true/false. So the rendered
     // form differs by backend; assert both halves independently.
-    const rendered = rel._renderExplainBinds(adapter, [BigInt(42), "str", 7, null, true, false]);
+    const rendered = rel._renderExplainBinds(Base.adapter, [
+      BigInt(42),
+      "str",
+      7,
+      null,
+      true,
+      false,
+    ]);
     expect(rendered.startsWith('[42, "str", 7, nil, ')).toBe(true);
     expect(rendered).toMatch(/\b(1, 0|true, false)\]$/);
     // End-to-end on sqlite: where-literals are interpolated into the
@@ -282,7 +275,7 @@ describe("ExplainTest", () => {
     };
     const buf = Buffer.from("hello world"); // 11 bytes
     const u8 = new Uint8Array([1, 2, 3, 4, 5]); // 5 bytes
-    const rendered = rel._renderExplainBinds(adapter, [buf, u8]);
+    const rendered = rel._renderExplainBinds(Base.adapter, [buf, u8]);
     expect(rendered).toBe('["<11 bytes of binary data>", "<5 bytes of binary data>"]');
   });
 

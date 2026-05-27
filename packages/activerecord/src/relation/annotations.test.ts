@@ -2,39 +2,29 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-let _adapter: SidecarAdapter;
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
 beforeAll(async () => {
-  ({ adapter: _adapter } = createSidecarTestAdapter());
-  await defineSchema(_adapter, {
+  await defineSchema({
     posts: { title: "string" },
     items: {},
     users: { name: "string" },
   });
 });
-withTransactionalFixtures(() => _adapter);
-function freshAdapter(): DatabaseAdapter {
-  return _adapter;
-}
 
 describe("WithAnnotationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   function makeModel() {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     return { Post };
@@ -264,10 +254,11 @@ describe("WithAnnotationsTest", () => {
 describe("annotate()", () => {
   it("adds SQL comments to the query", () => {
     class Item extends Base {
-      static _tableName = "items";
+      static {
+        this._tableName = "items";
+        this.attribute("id", "integer");
+      }
     }
-    Item.attribute("id", "integer");
-    Item.adapter = freshAdapter();
 
     const sql = Item.all().annotate("loading items for user page").toSql();
     expect(sql).toContain("/* loading items for user page */");
@@ -275,10 +266,11 @@ describe("annotate()", () => {
 
   it("supports multiple annotations", () => {
     class Item extends Base {
-      static _tableName = "items";
+      static {
+        this._tableName = "items";
+        this.attribute("id", "integer");
+      }
     }
-    Item.attribute("id", "integer");
-    Item.adapter = freshAdapter();
 
     const sql = Item.all().annotate("controller: items", "action: index").toSql();
     expect(sql).toContain("/* controller: items */");
@@ -292,7 +284,6 @@ describe("optimizerHints()", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = freshAdapter();
       }
     }
     const sql = User.all().optimizerHints("MAX_EXECUTION_TIME(1000)").toSql();
@@ -304,7 +295,6 @@ describe("optimizerHints()", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = freshAdapter();
       }
     }
     const sql = User.all().optimizerHints("NO_INDEX_MERGE(users)", "BKA(users)").toSql();
