@@ -1,7 +1,19 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { RouteSet } from "../routing/route-set.js";
 
+// ==========================================================================
 // dispatch/prefix_generation_test.rb
+//
+// Rails-design rationale: PrefixGenerationTest verifies that SCRIPT_NAME
+// propagation works correctly when engines are mounted inside applications.
+// The central rule: relative redirects prepend SCRIPT_NAME so the browser
+// stays inside the engine's mount point, while absolute redirects ignore
+// SCRIPT_NAME entirely (the caller already supplied a full path). Tests
+// covering URL-helper generation from within controller actions and plain
+// Ruby objects require Rails::Engine dispatch and mounted_helpers wiring
+// (EngineObject/AppObject with url_helpers include) — those are skipped
+// pending Rails::Engine integration test infrastructure.
+// ==========================================================================
 
 function makeEnv(
   pathInfo: string,

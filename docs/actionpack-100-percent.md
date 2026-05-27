@@ -346,7 +346,7 @@ parallel unless they share a dependency.
 | T-AC13 | `controller/request_forgery_protection_test.rb`        |      59 | AC  | —                                     | 41/100. Bundle.                                           |
 | T-AC14 | `controller/filters_test.rb`                           |      54 | AC  | —                                     | 0/54.                                                     |
 | T-AbC1 | `abstract/callbacks_test.rb` + `translation_test.rb`   |      47 | AbC | —                                     | Pair; both abstractcontroller.                            |
-| T-AD13 | `dispatch/prefix_generation_test.rb`                   |      45 | AD  | —                                     | 0/45 — one PR.                                            |
+| T-AD13 | `dispatch/prefix_generation_test.rb`                   |      45 | AD  | —                                     | 24/45 passing; 21 skipped pending Rails::Engine dispatch. |
 | T-AC15 | `controller/action_pack_assertions_test.rb`            |      44 | AC  | —                                     | 0/44.                                                     |
 | T-AD14 | `dispatch/host_authorization_test.rb`                  |      41 | AD  | —                                     | 0/41. Trails has 23 hand-written XHR/detailed-body cases. |
 | T-AC16 | `controller/live_stream_test.rb`                       |      36 | AC  | AS::Executor (partial)                | 0/36. Some cases ship now.                                |
