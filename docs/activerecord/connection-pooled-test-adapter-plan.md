@@ -5,7 +5,7 @@
 > - A0 spike, B (#2242), C (#2245): shipped
 > - **D-X driver-pool collapse:** PG (#2279) + MySQL (#2278) — shipped. All three adapters now single-connection per adapter, Rails-shape.
 > - **D-Y central canonical schema:** #2372 shipped. Per-worker preload + additive `defineSchema` fast-path. ~18 sites annotated `D-Y-INCOMPATIBLE`.
-> - **D-1..N bypass elimination (Model.adapter = X):** 7 codemod variants + 18 bespoke/bundle PRs shipped. **~97 files fully cleared; 38 remaining** (verified grep). Three giants (calculations, finder, inheritance) all shipped. Remaining is long-tail bundles.
+> - **D-1..N bypass elimination (Model.adapter = X):** **8 files remaining** (verified grep 2026-05-27 21:00 UTC). 4 giants merged today: base (#2512), locking (#2500), transactions partial (#2508 — 9 sites left), persistence (#2513). Pending: 3 singles (dirty/migration/tx-instr 1 site each), relations (234, in flight), 3 large association files (associations 407, has-many-associations 443, has-many-through-associations 485), plus the 9-site tail in transactions.
 > - Phase E (delete singleton/AsyncContext filter): gated on D-1..N reaching critical mass.
 > - Phase F (move DDL tracking onto AbstractAdapter): open; bundles with TM Phase 9b-4 absorption.
 > - Phase G (fixture adoption): batch 1 shipped (#2391, 2 files). Tracked separately in [`fixtures-adoption-plan.md`](fixtures-adoption-plan.md).
@@ -350,6 +350,12 @@ bundle PRs (the current pattern). Each bundle clears 1–4 files at ~250 LOC.
 - Finder tests use `seedUsers()` helpers instead of fixtures — Phase G scope (#2436).
 - Collection-cache-key test doesn't use real Arel table alias (#2453).
 - `select.test.ts` still needs D-1 conversion (7 bypass sites) (#2456).
+- **#2480 (sanitize):** 6 skips remain; `castBoundValue` only via cast → missing from `DatabaseAdapter` interface.
+- **#2506 (relation/where):** polymorphic/association/composite-PK WHERE clause gap in `relation/where-clause.ts` — dedicated implementation PR after D-1 closes.
+- **#2508 (transactions partial):** shipped `RealTransaction.restart()` `databaseVersion` guard as defensive fix. **Follow-up (S):** call `getDatabaseVersion()` during PG adapter init (`_ensureInitialized` or `establishConnection`) so `supportsRestartDbTransaction()` always sees a loaded version. 9 bypass sites still in transactions.test.ts (deferred describes); MariaDB savepoint-invalidation moved 12 tests to a no-fixture describe with `beforeEach DELETE` cleanup.
+- **#2513 (persistence):** "create many" test serialized from `Promise.all` to sequential awaits due to PG pinned-connection 25P02 race under transactional fixtures. `incrementBang` (line 1594) still uses `Promise.all` and is untested on PG — same race likely. `cm_items` was added to inline schema (non-canonical table; flag if `dropAllTables` runs against persistence.test.ts).
+- **#2512 (base):** clean; lock-generates-for-update SQLite skip is correct (visitor suppresses FOR UPDATE).
+- **#2500 (locking):** clean; 18 pessimistic-locking skips (FOR UPDATE/FOR SHARE/NOWAIT/SKIP LOCKED not ported yet).
 
 ### Phase E — Delete `_sharedAdapter`, `AsyncContext` filter, manual TX depth
 
@@ -364,13 +370,31 @@ Final cleanup. After all tests are on the pool:
 - Update the TM unification plan to retract the "trails patch over
   shared adapter" framing
 
-### Phase F (optional) — Move DDL tracking onto `AbstractAdapter`
+### Phase F — Delete `recordDdlTracking` (Rails parity)
 
-`recordDdlTracking` currently lives in the sidecar's
-`executeMutation`/`exec`. With the pool in place, the right home is
-an `onDdl?` hook on `AbstractAdapter` that `defineSchema` registers.
-The sidecar can then be deleted entirely, and `createTestAdapter()`
-returns the real adapter directly — full Rails parity.
+Rails has neither `onDdl` nor `recordDdlTracking`. DDL side-effects are
+handled inline at each schema-mutating method via
+`schema_cache.clear_data_source_cache!` (see
+`vendor/rails/.../abstract_mysql_adapter.rb:333-355`). No generic hook.
+
+Phase F instead:
+
+- Delete `recordDdlTracking` + `_createdTables` / `_createdColumns` in
+  `test-helpers/ddl-tracker.ts`.
+- Inline schema-cache invalidations at each DDL site (`defineSchema`,
+  `createTable`, `addColumn`, `dropTable`, etc.). Where `defineSchema`
+  currently uses `adapterKnownTables` to short-circuit, switch to
+  `adapter.schemaCache.dataSourceExists()` (needs to be added to the
+  adapter API — that's Phase F's first PR).
+- Once trackers are gone, both `TestAdapterFixtures` and
+  `SidecarFixtures` have nothing left to do (E removed TX overrides, F
+  removed DDL tracking). Delete both wrappers; `createTestAdapter()`
+  returns the real adapter — full Rails parity.
+
+Scoping doc not yet written. First PRs: (1) add
+`schemaCache.dataSourceExists()` to adapter API; (2) inline
+invalidations per DDL method; (3) delete trackers + snapshot/restore;
+(4) delete wrappers.
 
 ## Sequencing
 

@@ -373,3 +373,80 @@ describe("withTransactionalFixtures (pooled adapter)", () => {
     expect(rows).toHaveLength(0);
   });
 });
+
+// Concurrency safety-net: two Base.transaction() calls running concurrently
+// from unrelated async chains must NOT observe each other's transaction state.
+// Base.transaction() routes through withinNewTransaction()/TransactionManager,
+// so the test targets that mechanism directly — the invariant boundary is the
+// same whether callers go via Base.transaction() or withinNewTransaction().
+//
+// Today this passes because SidecarFixtures._txVisible() gates
+// currentTransaction()/inTransaction/openTransactions behind the AsyncContext
+// flag set by withinNewTransaction(). E2/E3 delete that filter; E5 rewires
+// createSidecarTestAdapter() through the pool so each chain's checkout
+// provides natural isolation. This test must remain green through E2–E5 in
+// sequence: E2/E3 without E5 would break it (shared adapter, no filter).
+//
+// The test documents the invariant so regressions are caught immediately.
+describe("concurrency isolation: two concurrent transaction chains stay independent", () => {
+  it("chain B sees openTransactions=0 while chain A is mid-transaction", async () => {
+    const { fixtures: sidecarA } = createSidecarTestAdapter();
+    const { fixtures: sidecarB } = createSidecarTestAdapter();
+
+    // Coordinate so chain B reads state WHILE chain A holds an open transaction.
+    // Without coordination, chain B would read before chain A's async TM open,
+    // passing vacuously regardless of whether the filter is in place.
+    let signalBReady!: () => void;
+    let signalADone!: () => void;
+    const bReady = new Promise<void>((r) => {
+      signalBReady = r;
+    });
+    const aDone = new Promise<void>((r) => {
+      signalADone = r;
+    });
+
+    let bObservedOpen = -1;
+    let bObservedInTransaction = true;
+    let bObservedCurrentTxJoinable = true;
+
+    await Promise.all([
+      sidecarA.withinNewTransaction({ joinable: false }, async () => {
+        // Verify chain A genuinely has an open transaction before signalling B,
+        // so a vacuous pass (e.g. lazy open) is caught immediately.
+        expect(sidecarA.adapter.openTransactions).toBeGreaterThan(0);
+        // Transaction is open. Signal chain B to read.
+        signalBReady!();
+        // Hold the transaction open until chain B has read.
+        await aDone;
+      }),
+      (async () => {
+        // Wait until chain A is inside a live transaction before reading.
+        await bReady;
+        try {
+          bObservedOpen = sidecarB.openTransactions;
+          bObservedInTransaction = sidecarB.inTransaction;
+          // currentTransaction() returns null (current filter) or NullTransaction
+          // (pool isolation, post-E2/E3). Both have joinable===false. Asserting on
+          // joinable rather than identity keeps this green through E2–E5.
+          const ct = sidecarB.currentTransaction() as { joinable?: boolean } | null;
+          bObservedCurrentTxJoinable = ct?.joinable ?? false;
+        } finally {
+          // Always unblock chain A so the test fails rather than hangs.
+          signalADone!();
+        }
+      })(),
+    ]);
+
+    // Chain B must not have observed chain A's transaction state.
+    // currentTransaction() is the most critical: Base.transaction() consults
+    // it first to decide whether to join a foreign frame.
+    expect(bObservedOpen).toBe(0);
+    expect(bObservedInTransaction).toBe(false);
+    expect(bObservedCurrentTxJoinable).toBe(false);
+  });
+
+  it("currentTransaction() returns null for a chain outside any withinNewTransaction", () => {
+    const { fixtures } = createSidecarTestAdapter();
+    expect(fixtures.currentTransaction()).toBeNull();
+  });
+});
