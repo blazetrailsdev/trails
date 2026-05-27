@@ -4,8 +4,9 @@
 // `package.json` instead, so `editDatabaseConfig` rewrites the TS module and
 // `editPackageJson` swaps the database dependency. Dockerfile rewriting
 // mirrors Rails when the Dockerfile carries db-specific apt packages.
-// Devcontainer file rewriting is deferred until trailties' devcontainer
-// generator (#2221) lands.
+// `editDevcontainerFiles` mirrors Rails' edit_devcontainer_json / edit_compose_yaml;
+// compose.yaml is read/written as JSON because DevcontainerGenerator serialises it
+// with JSON.stringify (JSON is valid YAML, so Docker Compose accepts it).
 
 import { GeneratorBase, type GeneratorOptions } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
@@ -133,10 +134,104 @@ export class ChangeGenerator extends GeneratorBase {
   }
 
   editDevcontainerFiles(): void {
-    // Deferred: trailties' devcontainer generator (#2221) is in flight.
-    // Once its emission shape is known, this method will edit
-    // `.devcontainer/devcontainer.json` and `.devcontainer/compose.yaml`
-    // analogous to Rails' edit_devcontainer_json / edit_compose_yaml.
+    if (!this.fileExists(".devcontainer")) return;
+    this.editDevcontainerJson();
+    this.editComposeYaml();
+  }
+
+  private editDevcontainerJson(): void {
+    const rel = ".devcontainer/devcontainer.json";
+    if (!this.fileExists(rel)) return;
+    const full = this.path.join(this.cwd, rel);
+    let json: Record<string, unknown>;
+    try {
+      json = JSON.parse(this.fs.readFileSync(full, "utf-8")) as Record<string, unknown>;
+    } catch (e) {
+      throw new Error(
+        `Could not parse ${full}: ${(e as Error).message}. Fix the file and re-run.`,
+        {
+          cause: e,
+        },
+      );
+    }
+
+    // Mirrors edit_devcontainer_json: update DB_HOST and db feature entry.
+    const env = (json.containerEnv ?? {}) as Record<string, string>;
+    if (this.database.service) {
+      env.DB_HOST = this.database.name;
+    } else {
+      delete env.DB_HOST;
+    }
+    if (Object.keys(env).length > 0) {
+      json.containerEnv = env;
+    } else {
+      delete json.containerEnv;
+    }
+
+    const features = (json.features ?? {}) as Record<string, unknown>;
+    for (const d of Database.all()) {
+      if (d.featureName) delete features[d.featureName];
+    }
+    if (this.database.feature) Object.assign(features, this.database.feature);
+    if (Object.keys(features).length > 0) {
+      json.features = features;
+    } else {
+      delete json.features;
+    }
+
+    this.writeOrUpdate(rel, JSON.stringify(json, null, 2) + "\n");
+  }
+
+  private editComposeYaml(): void {
+    const rel = ".devcontainer/compose.yaml";
+    if (!this.fileExists(rel)) return;
+    const full = this.path.join(this.cwd, rel);
+    let compose: {
+      services: Record<string, Record<string, unknown>>;
+      volumes?: Record<string, unknown>;
+      [k: string]: unknown;
+    };
+    try {
+      compose = JSON.parse(this.fs.readFileSync(full, "utf-8"));
+    } catch (e) {
+      throw new Error(
+        `Could not parse ${full}: ${(e as Error).message}. Fix the file and re-run.`,
+        {
+          cause: e,
+        },
+      );
+    }
+    const { services } = compose;
+    const volumes = compose.volumes ?? {};
+    const railsApp = services["rails-app"] as
+      | { depends_on?: string[]; [k: string]: unknown }
+      | undefined;
+
+    for (const d of Database.all()) {
+      delete services[d.name];
+      if (d.volume) delete volumes[d.volume];
+      if (railsApp?.depends_on) {
+        railsApp.depends_on = railsApp.depends_on.filter((dep) => dep !== d.name);
+      }
+    }
+
+    if (this.database.service) {
+      services[this.database.name] = this.database.service as unknown as Record<string, unknown>;
+      if (this.database.volume) volumes[this.database.volume] = null;
+      if (railsApp) {
+        railsApp.depends_on = [this.database.name, ...(railsApp.depends_on ?? [])];
+      }
+    }
+
+    if (Object.keys(volumes).length > 0) {
+      compose.volumes = volumes;
+    } else {
+      delete compose.volumes;
+    }
+
+    if (railsApp?.depends_on?.length === 0) delete railsApp.depends_on;
+
+    this.writeOrUpdate(rel, JSON.stringify(compose, null, 2) + "\n");
   }
 }
 
