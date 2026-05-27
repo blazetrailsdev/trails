@@ -3,8 +3,8 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import {
   Associations,
   loadHasOne,
@@ -16,7 +16,7 @@ import { HasOneThroughCantAssociateThroughCollection } from "./errors.js";
 import { assertQueriesMatch } from "../testing/query-assertions.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 
-const TEST_SCHEMA: Schema = {
+const TEST_SCHEMA = {
   clubs: { name: "string" },
   memberships: { member_id: "integer", club_id: "integer", type: "string" },
   members: { name: "string" },
@@ -69,16 +69,11 @@ const TEST_SCHEMA: Schema = {
     cpk_club2_region_id: "integer",
     cpk_club2_id: "integer",
   },
-};
-
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
+} satisfies Schema;
 
 describe("HasOneThroughAssociationsTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Club extends Base {
     static {
@@ -101,10 +96,7 @@ describe("HasOneThroughAssociationsTest", () => {
   }
 
   beforeAll(async () => {
-    adapter = await freshAdapter();
-    Club.adapter = adapter;
-    Membership.adapter = adapter;
-    Member.adapter = adapter;
+    await defineSchema(TEST_SCHEMA);
     registerModel(Club);
     registerModel(Membership);
     registerModel(Member);
@@ -129,7 +121,6 @@ describe("HasOneThroughAssociationsTest", () => {
 
     Associations.belongsTo.call(Membership, "club", { className: "Club", foreignKey: "club_id" });
   });
-  withTransactionalFixtures(() => adapter);
 
   it("has one through with has one", async () => {
     // member -> membership -> club
@@ -286,7 +277,6 @@ describe("HasOneThroughAssociationsTest", () => {
     class HotpClub extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HotpSponsor extends Base {
@@ -294,13 +284,11 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
         this.attribute("club_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HotpMember extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(HotpClub);
@@ -363,7 +351,6 @@ describe("HasOneThroughAssociationsTest", () => {
     class HotepClub extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HotepSponsor extends Base {
@@ -371,13 +358,11 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
         this.attribute("club_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HotepMember extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(HotepClub);
@@ -419,7 +404,6 @@ describe("HasOneThroughAssociationsTest", () => {
     class StClub extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class StSponsor extends Base {
@@ -427,19 +411,16 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("club_id", "integer");
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
-        this.adapter = adapter;
       }
     }
     class StMember extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class StOrg extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(StClub);
@@ -484,7 +465,6 @@ describe("HasOneThroughAssociationsTest", () => {
     class EsClub extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EsSponsor extends Base {
@@ -492,19 +472,16 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("club_id", "integer");
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
-        this.adapter = adapter;
       }
     }
     class EsMember extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EsOrg extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(EsClub);
@@ -568,7 +545,6 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("uninitialized has one through should return nil for unsaved record", async () => {
     const member = new Member({ name: "Unsaved" });
-    (member.constructor as any).adapter = adapter;
     expect(member.isNewRecord()).toBe(true);
     // New record has no id, so has_one through should be null
     const membership =
@@ -707,7 +683,6 @@ describe("HasOneThroughAssociationsTest", () => {
     class ManyMember extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ManyMember);
@@ -798,11 +773,7 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("has one through relationship cannot have a counter cache", () => {
     expect(() => {
-      class Thing extends Base {
-        static {
-          this.adapter = adapter;
-        }
-      }
+      class Thing extends Base {}
       registerModel(Thing);
       Associations.hasOne.call(Thing, "club_thing", {
         className: "Club",
@@ -825,7 +796,6 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkMembership3 extends Base {
@@ -834,7 +804,6 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("cpk_club_region_id", "integer");
         this.attribute("cpk_club_id", "integer");
         this.attribute("member_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkClub, "cpkMembership3s", {
@@ -860,7 +829,6 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkMembership2 extends Base {
@@ -868,7 +836,6 @@ describe("HasOneThroughAssociationsTest", () => {
         this._tableName = "cpk_memberships2";
         this.attribute("cpk_club2_region_id", "integer");
         this.attribute("cpk_club2_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(CpkClub2, "cpkMembership2", {
