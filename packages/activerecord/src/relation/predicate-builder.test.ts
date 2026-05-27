@@ -1,14 +1,13 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Table, Visitors, Nodes } from "@blazetrails/arel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { Substitute } from "../statement-cache.js";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { TableMetadata } from "../table-metadata.js";
 import { Base, registerModel, modelRegistry } from "../index.js";
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import { dropAllTables } from "../test-helpers/drop-all-tables.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
 
 describe("PredicateBuilderTest", () => {
@@ -16,11 +15,11 @@ describe("PredicateBuilderTest", () => {
   // Teardown: Topic.class_eval { @predicate_builder = nil }
   // We use a local custom class instead of Regexp to keep the test self-contained.
 
-  let adapter: SidecarAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    ({ adapter: adapter } = createSidecarTestAdapter());
-    await defineSchema(adapter, {
+    await defineSchema({
       topics: { title: "string" },
       replies: { parent_id: "integer" },
       products: { metadata: "string" },
@@ -28,18 +27,12 @@ describe("PredicateBuilderTest", () => {
       posts: { author_id: "integer", title: "string" },
     });
   });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
 
   it("registering new handlers", () => {
     class PbTopic extends Base {
       static {
         this.tableName = "topics";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class RegexFilter {
@@ -60,40 +53,39 @@ describe("PredicateBuilderTest", () => {
   });
 
   it("registering new handlers for association", () => {
-    class PbTopic2 extends Base {
+    // Mirror Rails: Topic (tableName "topics") + Reply (belongsTo "topic"),
+    // handler on Topic, where key is the table name "topics".
+    class Topic extends Base {
       static {
         this.tableName = "topics";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    class PbReply2 extends Base {
+    class Reply extends Base {
       static {
         this.tableName = "replies";
         this.attribute("parent_id", "integer");
-        this.belongsTo("pbTopic2");
-        this.adapter = adapter;
+        this.belongsTo("topic");
       }
     }
-    registerModel("PbTopic2", PbTopic2);
-    registerModel("PbReply2", PbReply2);
+    registerModel("Topic", Topic);
+    registerModel("Reply", Reply);
     class RegexFilter2 {
       constructor(public source: string) {}
     }
-    PbTopic2.predicateBuilder.registerHandler(RegexFilter2, {
+    Topic.predicateBuilder.registerHandler(RegexFilter2, {
       call: (attr, val: RegexFilter2) =>
         new Nodes.InfixOperation("~", attr, new Nodes.Quoted(val.source)),
     });
     try {
-      const sql = PbReply2.where({ pbTopic2: { title: new RegexFilter2("rails") } }).toSql();
-      // Handler propagates to associated table — column uses association-resolved table name.
+      const sql = Reply.where({ topics: { title: new RegexFilter2("rails") } }).toSql();
       expect(sql).toMatch(
-        new RegExp(`${escapeRegExp(quoteTableName("pbTopic2.title"))} ~ 'rails'`, "i"),
+        new RegExp(`${escapeRegExp(quoteTableName("topics.title"))} ~ 'rails'`, "i"),
       );
     } finally {
-      modelRegistry.delete("PbTopic2");
-      modelRegistry.delete("PbReply2");
-      (PbTopic2 as any)._predicateBuilder = null;
+      modelRegistry.delete("Topic");
+      modelRegistry.delete("Reply");
+      (Topic as any)._predicateBuilder = null;
     }
   });
 
@@ -119,7 +111,6 @@ describe("PredicateBuilderTest", () => {
       static {
         this.tableName = "topics";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // Use TableMetadata-backed PB to enable associated_table fallback expansion,
@@ -141,11 +132,13 @@ describe("PredicateBuilderTest", () => {
         this.tableName = "topics";
         this.attribute("title", "string");
         this.attribute("approved", "boolean");
-        this.adapter = adapter;
       }
     }
-    const defaults: Record<string, unknown> = { title: "rails", approved: true };
-    const original = { ...defaults };
+    const defaults: Record<string, unknown> = {
+      topics: { title: "rails" },
+      "topics.approved": true,
+    };
+    const original = { topics: { title: "rails" }, "topics.approved": true };
     PbTopic3.where(defaults).toSql();
     expect(defaults).toEqual(original);
   });
@@ -290,9 +283,7 @@ describe("PredicateBuilderTest", () => {
       }
     }
 
-    beforeEach(() => {
-      PbTestAuthor.adapter = adapter;
-      PbTestPost.adapter = adapter;
+    beforeAll(() => {
       registerModel("Author", PbTestAuthor);
       registerModel("Post", PbTestPost);
     });
@@ -328,7 +319,6 @@ describe("PredicateBuilderTest", () => {
         static {
           this.tableName = "products";
           this.attribute("metadata", "string");
-          this.adapter = adapter;
           registerModel("PbTestProduct", this);
         }
       }
