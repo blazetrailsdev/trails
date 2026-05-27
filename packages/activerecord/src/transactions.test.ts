@@ -1551,6 +1551,143 @@ describe("TransactionTest", () => {
   it.skip("deprecation on ruby timeout outside inner transaction", () => {
     // Requires Ruby catch/throw non-local exit — not available in JS.
   });
+  it("transaction state is cleared when record is persisted", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    const p = await Post.create({ title: "txn-state" });
+    expect((p as any).isPersisted()).toBe(true);
+  });
+  it.skip("invalid keys for transaction", () => {
+    // transaction() does not validate option keys — feature gap vs Rails.
+  });
+  it.skip("using named savepoints", () => {
+    // Direct connection savepoint manipulation interferes with transactional
+    // fixture SAVEPOINT; currentSavepointName counter offset differs.
+  });
+  it.skip("releasing named savepoints", () => {
+    // Same as "using named savepoints" — direct connection savepoint API.
+  });
+  it.skip("savepoints name", () => {
+    // currentSavepointName counter starts at a different offset inside the
+    // fixture SAVEPOINT wrapper.
+  });
+  it.skip("rollback when thread killed", () => {
+    // Requires Ruby Thread.kill semantics — not available in JS.
+  });
+  it("assign custom primary key after rollback", async () => {
+    const { Movie } = makeSQLiteMovie();
+    const movie = (await Movie.create({ name: "foo" })) as any;
+
+    await Movie.transaction(async () => {
+      await movie.save();
+      throw new Rollback();
+    });
+
+    movie.movieid = null;
+    expect(movie.movieid).toBeNull();
+  });
+  it("read attribute with custom primary key after rollback", async () => {
+    const { Movie } = makeSQLiteMovie();
+    const movie = Movie.new({ name: "foo" }) as any;
+
+    await Movie.transaction(async () => {
+      await movie.save();
+      throw new Rollback();
+    });
+
+    expect(movie.readAttribute("movieid")).toBeNull();
+  });
+  it("write attribute after rollback", async () => {
+    const { Topic } = makeSQLiteTopic();
+    const topic = (await Topic.create({})) as any;
+
+    await Topic.transaction(async () => {
+      await topic.save();
+      throw new Rollback();
+    });
+
+    topic.writeAttribute("id", null);
+    expect(topic.id).toBeNull();
+  });
+  it("write attribute with custom primary key after rollback", async () => {
+    const { Movie } = makeSQLiteMovie();
+    const movie = (await Movie.create({ name: "foo" })) as any;
+
+    await Movie.transaction(async () => {
+      await movie.save();
+      throw new Rollback();
+    });
+
+    movie.writeAttribute("movieid", null);
+    expect(movie.movieid).toBeNull();
+  });
+  it.skip("sqlite add column in transaction", () => {
+    // DDL API (add_column) not exposed at the test layer.
+  });
+  it.skip("sqlite default transaction mode is immediate", () => {
+    // Requires assert_queries_match SQL monitoring — not available.
+  });
+  it("mark transaction state as committed", async () => {
+    const { TransactionState } = await import("./connection-adapters/abstract/transaction.js");
+    const state = new TransactionState();
+    state.rollbackBang();
+    state.commitBang();
+    expect(state.committed).toBe(true);
+  });
+  it("mark transaction state as rolledback", async () => {
+    const { TransactionState } = await import("./connection-adapters/abstract/transaction.js");
+    const state = new TransactionState();
+    state.commitBang();
+    state.rollbackBang();
+    expect(state.rolledBack).toBe(true);
+  });
+  it.skip("mark transaction state as nil", () => {
+    // nullifyBang() returns void; Rails' nullify! returns nil. No boolean
+    // getter to assert against — nullified state is indistinguishable here.
+  });
+  it.skip("transaction rollback with primarykeyless tables", () => {
+    // defineSchema does not support id: false / primarykeyless tables.
+  });
+  it.skip("unprepared statement materializes transaction", () => {
+    // Requires assert_queries_match SQL monitoring — not available.
+  });
+  it.skip("nested transactions skip excess savepoints", () => {
+    // Requires capture_sql SQL monitoring — not available.
+  });
+  it.skip("prepared statement materializes transaction", () => {
+    // Requires assert_queries_match SQL monitoring — not available.
+  });
+  it.skip("savepoint does not materialize transaction", () => {
+    // Requires assert_no_queries / SQL monitoring — not available.
+  });
+  it.skip("raising does not materialize transaction", () => {
+    // Requires assert_no_queries / SQL monitoring — not available.
+  });
+  it.skip("accessing raw connection materializes transaction", () => {
+    // No rawConnection API exposed.
+  });
+  it.skip("accessing raw connection disables lazy transactions", () => {
+    // No rawConnection API exposed.
+  });
+  it.skip("checking in connection reenables lazy transactions", () => {
+    // No rawConnection / check-in API exposed at this level.
+  });
+});
+
+// ==========================================================================
+// TransactionTest (no fixture SAVEPOINT) — tests that manage their own
+// transactions or throw inside callbacks; the per-test fixture SAVEPOINT
+// conflicts with MariaDB SAVEPOINT invalidation on callback-driven rollbacks.
+// ==========================================================================
+describe("TransactionTest", () => {
+  setupHandlerSuite();
+  beforeAll(async () => {
+    await defineSchema({ posts: { title: "string", approved: "boolean", content: "string" } });
+  });
+
   it("rolling back in a callback rollbacks before save", async () => {
     class Post extends Base {
       static {
@@ -1589,15 +1726,6 @@ describe("TransactionTest", () => {
     ).rejects.toThrow("Make the transaction rollback");
 
     expect(post.isNewRecord()).toBe(true);
-  });
-  it("transaction state is cleared when record is persisted", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = await Post.create({ title: "txn-state" });
-    expect((p as any).isPersisted()).toBe(true);
   });
   it("cancellation from before destroy rollbacks in destroy", async () => {
     class Post extends Base {
@@ -1714,9 +1842,6 @@ describe("TransactionTest", () => {
     expect(topicTwo.isPersisted()).toBe(false);
     expect(topicThree.isPersisted()).toBe(false);
   });
-  it.skip("invalid keys for transaction", () => {
-    // transaction() does not validate option keys — feature gap vs Rails.
-  });
   it("no savepoint in nested transaction without force", async () => {
     class Post extends Base {
       static {
@@ -1810,20 +1935,6 @@ describe("TransactionTest", () => {
     expect(two!).toBe("Two");
     expect(three!).toBe("Three");
   });
-  it.skip("using named savepoints", () => {
-    // Direct connection savepoint manipulation interferes with transactional
-    // fixture SAVEPOINT; currentSavepointName counter offset differs.
-  });
-  it.skip("releasing named savepoints", () => {
-    // Same as "using named savepoints" — direct connection savepoint API.
-  });
-  it.skip("savepoints name", () => {
-    // currentSavepointName counter starts at a different offset inside the
-    // fixture SAVEPOINT wrapper.
-  });
-  it.skip("rollback when thread killed", () => {
-    // Requires Ruby Thread.kill semantics — not available in JS.
-  });
   it("dont restore new record in subsequent transaction", async () => {
     class Post extends Base {
       static {
@@ -1844,104 +1955,6 @@ describe("TransactionTest", () => {
 
     expect(topic.isPersisted()).toBe(true);
     expect(topic.isNewRecord()).toBe(false);
-  });
-  it("assign custom primary key after rollback", async () => {
-    const { Movie } = makeSQLiteMovie();
-    const movie = (await Movie.create({ name: "foo" })) as any;
-
-    await Movie.transaction(async () => {
-      await movie.save();
-      throw new Rollback();
-    });
-
-    movie.movieid = null;
-    expect(movie.movieid).toBeNull();
-  });
-  it("read attribute with custom primary key after rollback", async () => {
-    const { Movie } = makeSQLiteMovie();
-    const movie = Movie.new({ name: "foo" }) as any;
-
-    await Movie.transaction(async () => {
-      await movie.save();
-      throw new Rollback();
-    });
-
-    expect(movie.readAttribute("movieid")).toBeNull();
-  });
-  it("write attribute after rollback", async () => {
-    const { Topic } = makeSQLiteTopic();
-    const topic = (await Topic.create({})) as any;
-
-    await Topic.transaction(async () => {
-      await topic.save();
-      throw new Rollback();
-    });
-
-    topic.writeAttribute("id", null);
-    expect(topic.id).toBeNull();
-  });
-  it("write attribute with custom primary key after rollback", async () => {
-    const { Movie } = makeSQLiteMovie();
-    const movie = (await Movie.create({ name: "foo" })) as any;
-
-    await Movie.transaction(async () => {
-      await movie.save();
-      throw new Rollback();
-    });
-
-    movie.writeAttribute("movieid", null);
-    expect(movie.movieid).toBeNull();
-  });
-  it.skip("sqlite add column in transaction", () => {
-    // DDL API (add_column) not exposed at the test layer.
-  });
-  it.skip("sqlite default transaction mode is immediate", () => {
-    // Requires assert_queries_match SQL monitoring — not available.
-  });
-  it("mark transaction state as committed", async () => {
-    const { TransactionState } = await import("./connection-adapters/abstract/transaction.js");
-    const state = new TransactionState();
-    state.rollbackBang();
-    state.commitBang();
-    expect(state.committed).toBe(true);
-  });
-  it("mark transaction state as rolledback", async () => {
-    const { TransactionState } = await import("./connection-adapters/abstract/transaction.js");
-    const state = new TransactionState();
-    state.commitBang();
-    state.rollbackBang();
-    expect(state.rolledBack).toBe(true);
-  });
-  it.skip("mark transaction state as nil", () => {
-    // nullifyBang() returns void; Rails' nullify! returns nil. No boolean
-    // getter to assert against — nullified state is indistinguishable here.
-  });
-  it.skip("transaction rollback with primarykeyless tables", () => {
-    // defineSchema does not support id: false / primarykeyless tables.
-  });
-  it.skip("unprepared statement materializes transaction", () => {
-    // Requires assert_queries_match SQL monitoring — not available.
-  });
-  it.skip("nested transactions skip excess savepoints", () => {
-    // Requires capture_sql SQL monitoring — not available.
-  });
-  it.skip("prepared statement materializes transaction", () => {
-    // Requires assert_queries_match SQL monitoring — not available.
-  });
-  it.skip("savepoint does not materialize transaction", () => {
-    // Requires assert_no_queries / SQL monitoring — not available.
-  });
-  it.skip("raising does not materialize transaction", () => {
-    // Requires assert_no_queries / SQL monitoring — not available.
-  });
-  it.skip("accessing raw connection materializes transaction", () => {
-    // No rawConnection API exposed.
-  });
-  it.skip("accessing raw connection disables lazy transactions", () => {
-    // No rawConnection API exposed.
-  });
-  it.skip("checking in connection reenables lazy transactions", () => {
-    // No rawConnection / check-in API exposed at this level.
   });
   it("transactions can be manually materialized", async () => {
     class Post extends Base {
@@ -2340,7 +2353,7 @@ describe("TransactionTest", () => {
     it("calls clearCacheBang and re-raises when the body throws the expired error", async () => {
       const { PreparedStatementCacheExpired } = await import("./errors.js");
       // After D-1 the TM's _connection is a pooled real adapter instance, not
-      // _sharedAdapter. Spy on the prototype to catch any SQLite3Adapter call.
+      // _sharedAdapter. Spy on AbstractAdapter.prototype to catch any adapter call.
       const spy = vi.spyOn(
         AbstractAdapter.prototype as unknown as Required<DatabaseAdapter>,
         "clearCacheBang",
@@ -2368,7 +2381,7 @@ describe("TransactionTest", () => {
 
     // The "after_failure_actions" tests above run on the handler adapter (D-1),
     // which takes the TM path. They cover SchemaAdapter→TM delegation by
-    // spying on SQLite3Adapter.prototype.clearCacheBang. The test below covers
+    // spying on AbstractAdapter.prototype.clearCacheBang. The test below covers
     // the pure-TM path directly, against a hand-rolled TransactionManager
     // with no SchemaAdapter wrapper — guards against TM-internal regressions
     // independently of the wrapper.

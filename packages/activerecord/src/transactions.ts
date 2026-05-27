@@ -451,7 +451,10 @@ export function restoreTransactionRecordState(
   // current in-memory attribute values. Mirrors Rails' attribute map that
   // rebuilds @attributes with snapshotted baseline + current values, so
   // changes() reflects the diff between pre-TX and in-memory state.
+  // clearChangesInformation() nullifies previousChanges/mutationsBeforeLastSave
+  // matching Rails' @mutations_before_last_save = nil after rollback.
   r._dirty.snapshot(snapshot.attributes);
+  r._dirty.clearChangesInformation();
   r._dirty.redetectChanges(r._attributes);
 
   // Re-apply the snapshot's frozen state *after* any internal restores.
