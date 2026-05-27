@@ -1,12 +1,11 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/join_model_test.rb
  */
-import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, association, enableSti, registerSubclass } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { dropAllTables } from "../test-helpers/drop-all-tables.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import {
   Associations,
   loadBelongsTo,
@@ -17,56 +16,126 @@ import {
   setHasMany,
 } from "../associations.js";
 
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
-
-/**
- * Declare each model's table via defineSchema (read from `_attributeDefinitions`)
- * and register it with the global model registry. One call replaces the
- * defineSchema + per-class registerModel boilerplate at every test site.
- */
-async function registerSchemaFor(adapter: DatabaseAdapter, ...models: any[]): Promise<void> {
-  const schema: Record<string, Record<string, string>> = {};
-  for (const M of models) {
-    const tableName = M.tableName as string;
-    if (!schema[tableName]) {
-      const cols: Record<string, string> = {};
-      for (const [name, def] of M._attributeDefinitions as Map<string, any>) {
-        if (name === "id") continue;
-        const inner = def?.type?.castType ?? def?.type;
-        cols[name] = (inner?.name as string) ?? "string";
-      }
-      schema[tableName] = cols;
-    }
-  }
-  await defineSchema(adapter, schema as any);
-  for (const M of models) registerModel(M);
-}
-
-// Disable the dynamic-adapter auto-schema path for this entire file.
-// Must be set before any describe/beforeEach runs so that createTestAdapter()
-// and all SchemaAdapter.setup() calls see the flag immediately.
-vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+const TEST_SCHEMA: Schema = {
+  authors: { name: "string" },
+  posts: { author_id: "integer", title: "string", body: "string", type: "string" },
+  tags: { name: "string" },
+  taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  inh_authors: { name: "string" },
+  inh_posts: { author_id: "integer", title: "string", type: "string" },
+  cphm_tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+  cphm_posts: { title: "string" },
+  sphm_tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+  sphm_posts: { title: "string" },
+  spho_tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+  spho_posts: { title: "string" },
+  sphn_tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+  sphn_posts: { title: "string" },
+  cps_posts: { title: "string" },
+  cps_tags: { name: "string" },
+  cps_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  cbps_posts: { title: "string" },
+  cbps_tags: { name: "string" },
+  cbps_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  cpho_posts: { title: "string" },
+  cpho_tags: { name: "string" },
+  cpho_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  dphm_tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+  dphm_posts: { title: "string" },
+  dphmd_tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+  dphmd_posts: { title: "string" },
+  dphmn_tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+  dphmn_posts: { title: "string" },
+  dphod_tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+  dphod_posts: { title: "string" },
+  dphon_tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+  dphon_posts: { title: "string" },
+  ihmt_posts: { title: "string", body: "string" },
+  ihmt_tags: { name: "string" },
+  ihmt_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  ipho_tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+  ipho_posts: { title: "string" },
+  iphm_tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+  iphm_posts: { title: "string" },
+  st_tags: { name: "string" },
+  st_taggings: { st_tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  st_posts: { title: "string" },
+  st_comments: { body: "string" },
+  est_tags: { name: "string" },
+  est_taggings: { est_tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  est_posts: { title: "string" },
+  est_comments: { body: "string" },
+  cfk_authors: { name: "string" },
+  cfk_posts: { writer_id: "integer", title: "string" },
+  cpk_jm_authors: { name: "string", author_code: "string" },
+  cpk_jm_posts: { author_code: "string", title: "string" },
+  utr_authors: { name: "string" },
+  ehs_authors: { name: "string" },
+  ehs_taggings: { author_id: "integer" },
+  cond_posts: { title: "string", published: "boolean" },
+  cond_taggings: { tag_id: "integer", post_id: "integer" },
+  cond_tags: { name: "string" },
+  cc_authors: { name: "string" },
+  cc_articles: { author_id: "integer", title: "string" },
+  cc_comments: { article_id: "integer", body: "string" },
+  tpho_authors: { name: "string" },
+  tpho_posts: { author_id: "integer", title: "string" },
+  tpho_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  tphm_authors: { name: "string" },
+  tphm_posts: { author_id: "integer", title: "string" },
+  tphm_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  iphmt_authors: { name: "string" },
+  iphmt_posts: { author_id: "integer", title: "string" },
+  iphmt_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  el_authors: { name: "string" },
+  el_posts: { author_id: "integer", title: "string", body: "string" },
+  el_tags: { name: "string" },
+  el_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  sr_people: { name: "string" },
+  sr_friendships: { person_id: "integer", friend_id: "integer" },
+  cond_hmt_posts: { title: "string" },
+  cond_hmt_taggings: { tag_id: "integer", post_id: "integer", active: "boolean" },
+  cond_hmt_tags: { name: "string" },
+  sti_posts: { title: "string", type: "string", author_id: "integer" },
+  sti_authors: { name: "string" },
+  sti_comments: { body: "string", sti_post_id: "integer" },
+  sti_posts2: { title: "string", type: "string", author_id: "integer" },
+  sti_author2s: { name: "string" },
+  sti_comment2s: { body: "string", sti_post2_id: "integer" },
+  ord_posts: { title: "string" },
+  ord_taggings: { tag_id: "integer", post_id: "integer" },
+  ord_tags: { name: "string" },
+  ca_posts: { title: "string", body: "string" },
+  ca_tags: { name: "string" },
+  ca_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  dt_posts: { title: "string", body: "string" },
+  dt_tags: { name: "string" },
+  dt_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  md_posts: { title: "string", body: "string" },
+  md_tags: { name: "string" },
+  md_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  shared_authors: { name: "string" },
+  shared_posts: { author_id: "integer", title: "string" },
+  shared_comments: { author_id: "integer", body: "string" },
+  hmi_parents: { name: "string" },
+  hmi_children: { parent_id: "integer", title: "string", type: "string" },
+  phm_posts: { title: "string" },
+  phm_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+  phm_tags: { name: "string" },
+};
 
 // ==========================================================================
 // AssociationsJoinModelTest — mirrors join_model_test.rb
 // ==========================================================================
 
 describe("AssociationsJoinModelTest", () => {
-  let adapter: DatabaseAdapter;
-
-  afterAll(async () => {
-    try {
-      await dropAllTables(adapter);
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Author extends Base {
     static {
       this.attribute("name", "string");
+      registerModel(Author);
     }
   }
 
@@ -76,12 +145,14 @@ describe("AssociationsJoinModelTest", () => {
       this.attribute("title", "string");
       this.attribute("body", "string");
       this.attribute("type", "string");
+      registerModel(Post);
     }
   }
 
   class Tag extends Base {
     static {
       this.attribute("name", "string");
+      registerModel(Tag);
     }
   }
 
@@ -90,19 +161,12 @@ describe("AssociationsJoinModelTest", () => {
       this.attribute("tag_id", "integer");
       this.attribute("taggable_id", "integer");
       this.attribute("taggable_type", "string");
+      registerModel(Tagging);
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Author.adapter = adapter;
-    Post.adapter = adapter;
-    Tag.adapter = adapter;
-    Tagging.adapter = adapter;
-    // AR_NO_AUTO_SCHEMA=1 (stubbed in beforeAll) disables the dynamic
-    // adapter path; tests declare their schema explicitly via
-    // registerSchemaFor instead.
-    await registerSchemaFor(adapter, Author, Post, Tag, Tagging);
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
   });
 
   it("has many", async () => {
@@ -137,11 +201,9 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("inherited has many", async () => {
-    const ad = freshAdapter();
     class InhAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class InhPost extends Base {
@@ -149,11 +211,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
         this.attribute("type", "string");
-        this.adapter = ad;
       }
     }
     class InhSpecialPost extends InhPost {}
-    await registerSchemaFor(ad, InhAuthor, InhPost);
+    registerModel(InhAuthor);
+    registerModel(InhPost);
     registerModel("InhSpecialPost", InhSpecialPost);
     Associations.hasMany.call(InhAuthor, "inh_posts", {
       className: "InhPost",
@@ -238,22 +300,20 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("count polymorphic has many", async () => {
-    const adapter = freshAdapter();
     class CphmTag extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class CphmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    await registerSchemaFor(adapter, CphmTag, CphmPost);
+    registerModel(CphmTag);
+    registerModel(CphmPost);
     Associations.hasMany.call(CphmPost, "cphmTags", { as: "taggable", className: "CphmTag" });
     const post = await CphmPost.create({ title: "Hello" });
     await CphmTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "CphmPost" });
@@ -335,22 +395,20 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("set polymorphic has many", async () => {
-    const adapter = freshAdapter();
     class SphmTag extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class SphmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    await registerSchemaFor(adapter, SphmTag, SphmPost);
+    registerModel(SphmTag);
+    registerModel(SphmPost);
     Associations.hasMany.call(SphmPost, "sphmTags", { as: "taggable", className: "SphmTag" });
     const post = await SphmPost.create({ title: "Hello" });
     const tag1 = await SphmTag.create({ name: "ruby" });
@@ -366,22 +424,20 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("set polymorphic has one", async () => {
-    const adapter = freshAdapter();
     class SphoTag extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class SphoPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    await registerSchemaFor(adapter, SphoTag, SphoPost);
+    registerModel(SphoTag);
+    registerModel(SphoPost);
     Associations.hasOne.call(SphoPost, "sphoTag", { as: "taggable", className: "SphoTag" });
     const post = await SphoPost.create({ title: "Hello" });
     const tag = await SphoTag.create({ name: "ruby" });
@@ -392,22 +448,20 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("set polymorphic has one on new record", async () => {
-    const adapter = freshAdapter();
     class SphnTag extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class SphnPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    await registerSchemaFor(adapter, SphnTag, SphnPost);
+    registerModel(SphnTag);
+    registerModel(SphnPost);
     Associations.hasOne.call(SphnPost, "sphnTag", { as: "taggable", className: "SphnTag" });
     const post = new SphnPost({ title: "Hello" });
     await post.save();
@@ -418,17 +472,14 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("create polymorphic has many with scope", async () => {
-    const ad = freshAdapter();
     class CpsPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = ad;
       }
     }
     class CpsTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class CpsTagging extends Base {
@@ -436,10 +487,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, CpsPost, CpsTag, CpsTagging);
+    registerModel(CpsPost);
+    registerModel(CpsTag);
+    registerModel(CpsTagging);
     Associations.hasMany.call(CpsPost, "taggings", { className: "CpsTagging", as: "taggable" });
     const post = await CpsPost.create({ title: "Hello" });
     const tag = await CpsTag.create({ name: "misc" });
@@ -451,17 +503,14 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("create bang polymorphic with has many scope", async () => {
-    const ad = freshAdapter();
     class CbpsPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = ad;
       }
     }
     class CbpsTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class CbpsTagging extends Base {
@@ -469,10 +518,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, CbpsPost, CbpsTag, CbpsTagging);
+    registerModel(CbpsPost);
+    registerModel(CbpsTag);
+    registerModel(CbpsTagging);
     Associations.hasMany.call(CbpsPost, "taggings", { className: "CbpsTagging", as: "taggable" });
     const post = await CbpsPost.create({ title: "Hello" });
     const tag = await CbpsTag.create({ name: "misc" });
@@ -483,17 +533,14 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("create polymorphic has one with scope", async () => {
-    const ad = freshAdapter();
     class CphoPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = ad;
       }
     }
     class CphoTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class CphoTagging extends Base {
@@ -501,10 +548,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, CphoPost, CphoTag, CphoTagging);
+    registerModel(CphoPost);
+    registerModel(CphoTag);
+    registerModel(CphoTagging);
     Associations.hasOne.call(CphoPost, "tagging", { className: "CphoTagging", as: "taggable" });
     const post = await CphoPost.create({ title: "Hello" });
     const tag = await CphoTag.create({ name: "misc" });
@@ -521,22 +569,20 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("delete polymorphic has many with delete all", async () => {
-    const adapter = freshAdapter();
     class DphmTag extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class DphmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    await registerSchemaFor(adapter, DphmTag, DphmPost);
+    registerModel(DphmTag);
+    registerModel(DphmPost);
     Associations.hasMany.call(DphmPost, "dphmTags", { as: "taggable", className: "DphmTag" });
     const post = await DphmPost.create({ title: "Hello" });
     await DphmTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "DphmPost" });
@@ -550,22 +596,20 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("delete polymorphic has many with destroy", async () => {
-    const adapter = freshAdapter();
     class DphmdTag extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class DphmdPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    await registerSchemaFor(adapter, DphmdTag, DphmdPost);
+    registerModel(DphmdTag);
+    registerModel(DphmdPost);
     Associations.hasMany.call(DphmdPost, "dphmdTags", { as: "taggable", className: "DphmdTag" });
     const post = await DphmdPost.create({ title: "Hello" });
     const tag = await DphmdTag.create({
@@ -582,22 +626,20 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("delete polymorphic has many with nullify", async () => {
-    const adapter = freshAdapter();
     class DphmnTag extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class DphmnPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    await registerSchemaFor(adapter, DphmnTag, DphmnPost);
+    registerModel(DphmnTag);
+    registerModel(DphmnPost);
     Associations.hasMany.call(DphmnPost, "dphmnTags", { as: "taggable", className: "DphmnTag" });
     const post = await DphmnPost.create({ title: "Hello" });
     const tag = await DphmnTag.create({
@@ -617,22 +659,20 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("delete polymorphic has one with destroy", async () => {
-    const adapter = freshAdapter();
     class DphodTag extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class DphodPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    await registerSchemaFor(adapter, DphodTag, DphodPost);
+    registerModel(DphodTag);
+    registerModel(DphodPost);
     Associations.hasOne.call(DphodPost, "dphodTag", { as: "taggable", className: "DphodTag" });
     const post = await DphodPost.create({ title: "Hello" });
     const tag = await DphodTag.create({
@@ -646,22 +686,20 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("delete polymorphic has one with nullify", async () => {
-    const adapter = freshAdapter();
     class DphonTag extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class DphonPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    await registerSchemaFor(adapter, DphonTag, DphonPost);
+    registerModel(DphonTag);
+    registerModel(DphonPost);
     Associations.hasOne.call(DphonPost, "dphonTag", { as: "taggable", className: "DphonTag" });
     const post = await DphonPost.create({ title: "Hello" });
     await DphonTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "DphonPost" });
@@ -685,18 +723,15 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("include has many through", async () => {
-    const ad = freshAdapter();
     class IhmtPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = ad;
       }
     }
     class IhmtTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class IhmtTagging extends Base {
@@ -704,10 +739,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, IhmtPost, IhmtTag, IhmtTagging);
+    registerModel(IhmtPost);
+    registerModel(IhmtTag);
+    registerModel(IhmtTagging);
     Associations.hasMany.call(IhmtPost, "taggings", {
       className: "IhmtTagging",
       foreignKey: "taggable_id",
@@ -730,22 +766,20 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("include polymorphic has one", async () => {
-    const adapter = freshAdapter();
     class IphoTag extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class IphoPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    await registerSchemaFor(adapter, IphoTag, IphoPost);
+    registerModel(IphoTag);
+    registerModel(IphoPost);
     Associations.hasOne.call(IphoPost, "iphoTag", { as: "taggable", className: "IphoTag" });
     const post = await IphoPost.create({ title: "Hello" });
     await IphoTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "IphoPost" });
@@ -771,22 +805,20 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("include polymorphic has many", async () => {
-    const adapter = freshAdapter();
     class IphmTag extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class IphmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    await registerSchemaFor(adapter, IphmTag, IphmPost);
+    registerModel(IphmTag);
+    registerModel(IphmPost);
     Associations.hasMany.call(IphmPost, "iphmTags", { as: "taggable", className: "IphmTag" });
     const post = await IphmPost.create({ title: "Hello" });
     await IphmTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "IphmPost" });
@@ -870,21 +902,19 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("has many going through join model with custom foreign key", async () => {
-    const ad = freshAdapter();
     class CfkAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class CfkPost extends Base {
       static {
         this.attribute("writer_id", "integer");
         this.attribute("title", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, CfkAuthor, CfkPost);
+    registerModel(CfkAuthor);
+    registerModel(CfkPost);
     Associations.hasMany.call(CfkAuthor, "cfk_posts", {
       className: "CfkPost",
       foreignKey: "writer_id",
@@ -900,22 +930,20 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("has many going through join model with custom primary key", async () => {
-    const ad = freshAdapter();
     class CpkJmAuthor extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("author_code", "string");
-        this.adapter = ad;
       }
     }
     class CpkJmPost extends Base {
       static {
         this.attribute("author_code", "string");
         this.attribute("title", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, CpkJmAuthor, CpkJmPost);
+    registerModel(CpkJmAuthor);
+    registerModel(CpkJmPost);
     Associations.hasMany.call(CpkJmAuthor, "cpk_jm_posts", {
       className: "CpkJmPost",
       foreignKey: "author_code",
@@ -960,14 +988,12 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("unavailable through reflection", async () => {
-    const ad = freshAdapter();
     class UtrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, UtrAuthor);
+    registerModel(UtrAuthor);
     Associations.hasMany.call(UtrAuthor, "tags", { through: "nonexistent", className: "Tag" });
     const author = await UtrAuthor.create({ name: "Bad" });
     // Error comes from ThroughReflection#checkValidityBang first-
@@ -979,20 +1005,18 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("exceptions have suggestions for fix", async () => {
-    const ad = freshAdapter();
     class EhsAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class EhsTagging extends Base {
       static {
         this.attribute("author_id", "integer");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, EhsAuthor, EhsTagging);
+    registerModel(EhsAuthor);
+    registerModel(EhsTagging);
     // Real reflection: taggings. Misspelled :through → "taggng" (lev 2).
     Associations.hasMany.call(EhsAuthor, "taggings", {
       className: "EhsTagging",
@@ -1009,28 +1033,26 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("has many through join model with conditions", async () => {
-    const ad = freshAdapter();
     class CondPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = ad;
       }
     }
     class CondTagging extends Base {
       static {
         this.attribute("tag_id", "integer");
         this.attribute("post_id", "integer");
-        this.adapter = ad;
       }
     }
     class CondTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, CondPost, CondTagging, CondTag);
+    registerModel(CondPost);
+    registerModel(CondTagging);
+    registerModel(CondTag);
     Associations.hasMany.call(CondPost, "cond_taggings", {
       className: "CondTagging",
       foreignKey: "post_id",
@@ -1070,7 +1092,6 @@ describe("AssociationsJoinModelTest", () => {
     class StTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class StTagging extends Base {
@@ -1078,21 +1099,22 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("st_tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class StPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class StComment extends Base {
       static {
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
+    registerModel(StTag);
+    registerModel(StTagging);
+    registerModel(StPost);
+    registerModel(StComment);
     Associations.hasMany.call(StTag, "stTaggings", {
       className: "StTagging",
       foreignKey: "st_tag_id",
@@ -1108,7 +1130,6 @@ describe("AssociationsJoinModelTest", () => {
       polymorphic: true,
       foreignKey: "taggable_id",
     });
-    await registerSchemaFor(adapter, StTag, StTagging, StPost, StComment);
 
     const tag = await StTag.create({ name: "ruby" });
     const post = await StPost.create({ title: "Tagged Post" });
@@ -1142,7 +1163,6 @@ describe("AssociationsJoinModelTest", () => {
     class EstTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EstTagging extends Base {
@@ -1150,21 +1170,22 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("est_tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class EstPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EstComment extends Base {
       static {
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
+    registerModel(EstTag);
+    registerModel(EstTagging);
+    registerModel(EstPost);
+    registerModel(EstComment);
     Associations.hasMany.call(EstTag, "estTaggings", {
       className: "EstTagging",
       foreignKey: "est_tag_id",
@@ -1180,7 +1201,6 @@ describe("AssociationsJoinModelTest", () => {
       polymorphic: true,
       foreignKey: "taggable_id",
     });
-    await registerSchemaFor(adapter, EstTag, EstTagging, EstPost, EstComment);
 
     const tag = await EstTag.create({ name: "ruby" });
     const post = await EstPost.create({ title: "Eager Post" });
@@ -1228,28 +1248,26 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("has many through has many find all with custom class", async () => {
-    const ad = freshAdapter();
     class CcAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class CcArticle extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = ad;
       }
     }
     class CcComment extends Base {
       static {
         this.attribute("article_id", "integer");
         this.attribute("body", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, CcAuthor, CcArticle, CcComment);
+    registerModel(CcAuthor);
+    registerModel(CcArticle);
+    registerModel(CcComment);
     Associations.hasMany.call(CcAuthor, "cc_articles", {
       className: "CcArticle",
       foreignKey: "author_id",
@@ -1347,18 +1365,15 @@ describe("AssociationsJoinModelTest", () => {
   it("has many through polymorphic has one", async () => {
     // Author has_one :post; Post has_one :tagging (polymorphic as: taggable)
     // Author has_many :taggings_2, through: :post (singular), source: :tagging
-    const ad = freshAdapter();
     class TphoAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class TphoPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = ad;
       }
     }
     class TphoTagging extends Base {
@@ -1366,10 +1381,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, TphoAuthor, TphoPost, TphoTagging);
+    registerModel(TphoAuthor);
+    registerModel(TphoPost);
+    registerModel(TphoTagging);
     Associations.hasOne.call(TphoAuthor, "post", {
       className: "TphoPost",
       foreignKey: "author_id",
@@ -1394,18 +1410,15 @@ describe("AssociationsJoinModelTest", () => {
   it("has many through polymorphic has many", async () => {
     // Author has_many :posts; Post has_many :taggings (as: :taggable)
     // Author has_many :taggings, through: :posts
-    const ad = freshAdapter();
     class TphmAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class TphmPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = ad;
       }
     }
     class TphmTagging extends Base {
@@ -1413,10 +1426,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, TphmAuthor, TphmPost, TphmTagging);
+    registerModel(TphmAuthor);
+    registerModel(TphmPost);
+    registerModel(TphmTagging);
     Associations.hasMany.call(TphmAuthor, "posts", {
       className: "TphmPost",
       foreignKey: "author_id",
@@ -1441,18 +1455,15 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("include has many through polymorphic has many", async () => {
-    const ad = freshAdapter();
     class IphmtAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class IphmtPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = ad;
       }
     }
     class IphmtTagging extends Base {
@@ -1460,10 +1471,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, IphmtAuthor, IphmtPost, IphmtTagging);
+    registerModel(IphmtAuthor);
+    registerModel(IphmtPost);
+    registerModel(IphmtTagging);
     Associations.hasMany.call(IphmtAuthor, "posts", {
       className: "IphmtPost",
       foreignKey: "author_id",
@@ -1484,11 +1496,9 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("eager load has many through has many", async () => {
-    const ad = freshAdapter();
     class ElAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class ElPost extends Base {
@@ -1496,13 +1506,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = ad;
       }
     }
     class ElTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class ElTagging extends Base {
@@ -1510,10 +1518,12 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, ElAuthor, ElPost, ElTag, ElTagging);
+    registerModel(ElAuthor);
+    registerModel(ElPost);
+    registerModel(ElTag);
+    registerModel(ElTagging);
     Associations.hasMany.call(ElAuthor, "posts", { className: "ElPost", foreignKey: "author_id" });
     Associations.hasMany.call(ElPost, "taggings", {
       className: "ElTagging",
@@ -1545,21 +1555,19 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("self referential has many through", async () => {
-    const ad = freshAdapter();
     class SrPerson extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class SrFriendship extends Base {
       static {
         this.attribute("person_id", "integer");
         this.attribute("friend_id", "integer");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, SrPerson, SrFriendship);
+    registerModel(SrPerson);
+    registerModel(SrFriendship);
     Associations.hasMany.call(SrPerson, "sr_friendships", {
       className: "SrFriendship",
       foreignKey: "person_id",
@@ -1596,11 +1604,9 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("has many through uses conditions specified on the has many association", async () => {
-    const ad = freshAdapter();
     class CondHmtPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = ad;
       }
     }
     class CondHmtTagging extends Base {
@@ -1608,16 +1614,16 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("tag_id", "integer");
         this.attribute("post_id", "integer");
         this.attribute("active", "boolean");
-        this.adapter = ad;
       }
     }
     class CondHmtTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, CondHmtPost, CondHmtTagging, CondHmtTag);
+    registerModel(CondHmtPost);
+    registerModel(CondHmtTagging);
+    registerModel(CondHmtTag);
     Associations.hasMany.call(CondHmtPost, "cond_hmt_taggings", {
       className: "CondHmtTagging",
       foreignKey: "post_id",
@@ -1682,18 +1688,15 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("create associate when adding to has many through", async () => {
-    const ad = freshAdapter();
     class CaPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = ad;
       }
     }
     class CaTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class CaTagging extends Base {
@@ -1701,10 +1704,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, CaPost, CaTag, CaTagging);
+    registerModel(CaPost);
+    registerModel(CaTag);
+    registerModel(CaTagging);
     Associations.hasMany.call(CaPost, "taggings", {
       className: "CaTagging",
       foreignKey: "taggable_id",
@@ -1776,18 +1780,15 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("delete associate when deleting from has many through", async () => {
-    const ad = freshAdapter();
     class DtPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = ad;
       }
     }
     class DtTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class DtTagging extends Base {
@@ -1795,10 +1796,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, DtPost, DtTag, DtTagging);
+    registerModel(DtPost);
+    registerModel(DtTag);
+    registerModel(DtTagging);
     Associations.hasMany.call(DtPost, "taggings", {
       className: "DtTagging",
       foreignKey: "taggable_id",
@@ -1829,18 +1831,15 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("delete associate when deleting from has many through with multiple tags", async () => {
-    const ad = freshAdapter();
     class MdPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = ad;
       }
     }
     class MdTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class MdTagging extends Base {
@@ -1848,10 +1847,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, MdPost, MdTag, MdTagging);
+    registerModel(MdPost);
+    registerModel(MdTag);
+    registerModel(MdTagging);
     Associations.hasMany.call(MdPost, "taggings", {
       className: "MdTagging",
       foreignKey: "taggable_id",
@@ -1930,13 +1930,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("type", "string");
         this.attribute("author_id", "integer");
         this._tableName = "sti_posts";
-        this.adapter = adapter;
         enableSti(StiPost);
       }
     }
     class SpecialStiPost extends StiPost {
       static {
-        this.adapter = adapter;
         registerModel(SpecialStiPost);
         registerSubclass(SpecialStiPost);
       }
@@ -1944,17 +1942,17 @@ describe("AssociationsJoinModelTest", () => {
     class StiAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class StiComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("sti_post_id", "integer");
-        this.adapter = adapter;
       }
     }
-    await registerSchemaFor(adapter, StiPost, StiAuthor, StiComment);
+    registerModel(StiPost);
+    registerModel(StiAuthor);
+    registerModel(StiComment);
 
     Associations.hasMany.call(StiAuthor, "specialStiPosts", {
       className: "SpecialStiPost",
@@ -1989,27 +1987,25 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("distinct has many through should retain order", async () => {
-    const ad = freshAdapter();
     class OrdPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = ad;
       }
     }
     class OrdTagging extends Base {
       static {
         this.attribute("tag_id", "integer");
         this.attribute("post_id", "integer");
-        this.adapter = ad;
       }
     }
     class OrdTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, OrdPost, OrdTagging, OrdTag);
+    registerModel(OrdPost);
+    registerModel(OrdTagging);
+    registerModel(OrdTag);
     Associations.hasMany.call(OrdPost, "ord_taggings", {
       className: "OrdTagging",
       foreignKey: "post_id",
@@ -2123,28 +2119,26 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("belongs to shared parent", async () => {
-    const ad = freshAdapter();
     class SharedAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class SharedPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = ad;
       }
     }
     class SharedComment extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("body", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, SharedAuthor, SharedPost, SharedComment);
+    registerModel(SharedAuthor);
+    registerModel(SharedPost);
+    registerModel(SharedComment);
     Associations.belongsTo.call(SharedPost, "shared_author", {
       className: "SharedAuthor",
       foreignKey: "author_id",
@@ -2228,13 +2222,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("type", "string");
         this.attribute("author_id", "integer");
         this._tableName = "sti_posts2";
-        this.adapter = adapter;
         enableSti(StiPost2);
       }
     }
     class SubStiPost2 extends StiPost2 {
       static {
-        this.adapter = adapter;
         registerModel(SubStiPost2);
         registerSubclass(SubStiPost2);
       }
@@ -2242,17 +2234,17 @@ describe("AssociationsJoinModelTest", () => {
     class StiAuthor2 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class StiComment2 extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("sti_post2_id", "integer");
-        this.adapter = adapter;
       }
     }
-    await registerSchemaFor(adapter, StiPost2, StiAuthor2, StiComment2);
+    registerModel(StiPost2);
+    registerModel(StiAuthor2);
+    registerModel(StiComment2);
 
     Associations.hasMany.call(StiAuthor2, "stiPosts2", {
       className: "StiPost2",
@@ -2304,11 +2296,9 @@ describe("AssociationsJoinModelTest", () => {
     // Requires string joins in scope
   });
   it("has many inherited", async () => {
-    const ad = freshAdapter();
     class HmiParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class HmiChild extends Base {
@@ -2316,11 +2306,11 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("parent_id", "integer");
         this.attribute("title", "string");
         this.attribute("type", "string");
-        this.adapter = ad;
       }
     }
     class HmiSpecialChild extends HmiChild {}
-    await registerSchemaFor(ad, HmiParent, HmiChild);
+    registerModel(HmiParent);
+    registerModel(HmiChild);
     registerModel("HmiSpecialChild", HmiSpecialChild);
     Associations.hasMany.call(HmiParent, "hmi_children", {
       className: "HmiChild",
@@ -2337,11 +2327,9 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it("polymorphic has many going through join model", async () => {
-    const ad = freshAdapter();
     class PhmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = ad;
       }
     }
     class PhmTagging extends Base {
@@ -2349,16 +2337,16 @@ describe("AssociationsJoinModelTest", () => {
         this.attribute("tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = ad;
       }
     }
     class PhmTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
-    await registerSchemaFor(ad, PhmPost, PhmTagging, PhmTag);
+    registerModel(PhmPost);
+    registerModel(PhmTagging);
+    registerModel(PhmTag);
     Associations.hasMany.call(PhmPost, "phm_taggings", {
       as: "taggable",
       className: "PhmTagging",
