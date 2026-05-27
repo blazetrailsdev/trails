@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import {
   SubclassNotFound,
@@ -24,24 +24,9 @@ import {
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
-import {
-  createTestAdapter,
-  resetTestAdapterState,
-  type TestDatabaseAdapter,
-} from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-
-// -- Helpers --
-
-async function freshAdapterWithSchema(schema: Schema): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, schema);
-  return adapter;
-}
 
 const UNIVERSAL_HM_SCHEMA: Schema = {
   cpk_authors: { name: "string", author_code: "string" },
@@ -448,12 +433,6 @@ const UNIVERSAL_HM_SCHEMA: Schema = {
   r_containers: { name: "string" },
 } as const;
 
-async function setupHmAdapter(): Promise<TestDatabaseAdapter> {
-  const a = createTestAdapter();
-  await defineSchema(a, UNIVERSAL_HM_SCHEMA);
-  return a;
-}
-
 // Schema for the small head-of-file describes migrated to defineSchema
 // under TM Phase 5. The main `HasManyAssociationsTest` block further down
 // in this file still relies on auto-derived schema and is a follow-up.
@@ -479,25 +458,29 @@ const HEAD_SCHEMA: Schema = {
 };
 
 describe("HasManyAssociationsTestPrimaryKeys", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  beforeAll(async () => {
+    await defineSchema(HEAD_SCHEMA);
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
   it("custom primary key on new record should fetch with query", async () => {
-    const adapter = await freshAdapterWithSchema(HEAD_SCHEMA);
     class CpkAuthor extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("author_code", "string");
         this.primaryKey = "author_code";
-        this.adapter = adapter;
       }
     }
     class CpkPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_code", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CpkAuthor", CpkAuthor);
@@ -518,19 +501,16 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   });
 
   it("association primary key on new record should fetch with query", async () => {
-    const adapter = await freshAdapterWithSchema(HEAD_SCHEMA);
     class ApkAuthor extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("author_code", "string");
-        this.adapter = adapter;
       }
     }
     class ApkPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_code", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("ApkAuthor", ApkAuthor);
@@ -551,20 +531,17 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   });
 
   it("ids on unloaded association with custom primary key", async () => {
-    const adapter = await freshAdapterWithSchema(HEAD_SCHEMA);
     class IdsAuthor extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("author_code", "string");
         this.primaryKey = "author_code";
-        this.adapter = adapter;
       }
     }
     class IdsPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_code", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("IdsAuthor", IdsAuthor);
@@ -594,20 +571,17 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   });
 
   it("blank custom primary key on new record should not run queries", async () => {
-    const adapter = await freshAdapterWithSchema(HEAD_SCHEMA);
     class BlankPkAuthor extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("author_code", "string");
         this.primaryKey = "author_code";
-        this.adapter = adapter;
       }
     }
     class BlankPkPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_code", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("BlankPkAuthor", BlankPkAuthor);
@@ -619,7 +593,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     });
     const author = new BlankPkAuthor({ name: "Eve" });
     expect(author.author_code).toBeNull();
-    const executeSpy = vi.spyOn(adapter, "execute");
+    const executeSpy = vi.spyOn(Base.adapter, "execute");
     const posts = await loadHasMany(author, "blank_pk_posts", {
       className: "BlankPkPost",
       foreignKey: "author_code",
@@ -631,12 +605,17 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  beforeAll(async () => {
+    await defineSchema(HEAD_SCHEMA);
+  });
+
   it("transaction when deleting persisted", async () => {
-    const adapter = await freshAdapterWithSchema(HEAD_SCHEMA);
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "to delete" });
@@ -646,11 +625,9 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("transaction when deleting new record", async () => {
-    const adapter = await freshAdapterWithSchema(HEAD_SCHEMA);
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = new Post({ title: "new" });
@@ -661,12 +638,13 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
   it("should generate valid sql", () => {
-    const adapter = createTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.order("title").reorder("title DESC").toSql();
@@ -2180,12 +2158,12 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    adapter = await setupHmAdapter();
+    await defineSchema(UNIVERSAL_HM_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter, { invalidateSchemaCache: false });
 
   // -- Scoped queries --
 
@@ -2193,14 +2171,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2215,14 +2191,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2237,14 +2211,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2260,14 +2232,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2300,14 +2270,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2323,14 +2291,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2348,14 +2314,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2377,14 +2341,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2398,14 +2360,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2425,14 +2385,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2451,14 +2409,12 @@ describe("HasManyAssociationsTest", () => {
     class AnonAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AnonPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(AnonAuthor);
@@ -2479,14 +2435,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2509,7 +2463,6 @@ describe("HasManyAssociationsTest", () => {
     class UpdAtAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class UpdAtPost extends Base {
@@ -2517,7 +2470,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     registerModel(UpdAtAuthor);
@@ -2539,14 +2491,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class ClrUpdPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ClrUpdAuthor);
@@ -2567,14 +2517,12 @@ describe("HasManyAssociationsTest", () => {
     class DefScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DefScopePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DefScopeAuthor);
@@ -2588,14 +2536,12 @@ describe("HasManyAssociationsTest", () => {
     class AttrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AttrPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(AttrAuthor);
@@ -2608,14 +2554,12 @@ describe("HasManyAssociationsTest", () => {
     class UnscopeAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class UnscopePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(UnscopeAuthor);
@@ -2629,14 +2573,12 @@ describe("HasManyAssociationsTest", () => {
     class ScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ScopePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ScopeAuthor);
@@ -2650,14 +2592,12 @@ describe("HasManyAssociationsTest", () => {
     class InvAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class InvPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(InvAuthor);
@@ -2672,14 +2612,12 @@ describe("HasManyAssociationsTest", () => {
     class DelAllAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DelAllPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DelAllAuthor);
@@ -2704,14 +2642,12 @@ describe("HasManyAssociationsTest", () => {
     class NilDepAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NilDepPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(NilDepAuthor);
@@ -2730,13 +2666,11 @@ describe("HasManyAssociationsTest", () => {
 
   it("building the associated object with implicit sti base class", () => {
     // DependentFirm has_many :companies; Company has STI with type column
-    const a = createTestAdapter();
     class StiCompany extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = a;
       }
     }
     enableSti(StiCompany);
@@ -2747,7 +2681,6 @@ describe("HasManyAssociationsTest", () => {
     class StiAccount extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     registerModel(StiCompany);
@@ -2758,7 +2691,6 @@ describe("HasManyAssociationsTest", () => {
     class DepFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     registerModel(DepFirm);
@@ -2774,13 +2706,11 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("building the associated object with explicit sti base class", () => {
-    const a = createTestAdapter();
     class StiCompany2 extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = a;
       }
     }
     enableSti(StiCompany2);
@@ -2792,7 +2722,6 @@ describe("HasManyAssociationsTest", () => {
     class DepFirm2 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     registerModel(DepFirm2);
@@ -2808,13 +2737,11 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("building the associated object with sti subclass", () => {
-    const a = createTestAdapter();
     class StiCompany3 extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = a;
       }
     }
     enableSti(StiCompany3);
@@ -2826,7 +2753,6 @@ describe("HasManyAssociationsTest", () => {
     class DepFirm3 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     registerModel(DepFirm3);
@@ -2842,13 +2768,11 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("building the associated object with an invalid type", () => {
-    const a = createTestAdapter();
     class StiCompany4 extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = a;
       }
     }
     enableSti(StiCompany4);
@@ -2857,7 +2781,6 @@ describe("HasManyAssociationsTest", () => {
     class DepFirm4 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     registerModel(DepFirm4);
@@ -2872,20 +2795,17 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("building the associated object with an unrelated type", () => {
-    const a = createTestAdapter();
     class StiCompany5 extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = a;
       }
     }
     enableSti(StiCompany5);
     class UnrelatedModel extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     registerModel(StiCompany5);
@@ -2894,7 +2814,6 @@ describe("HasManyAssociationsTest", () => {
     class DepFirm5 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     registerModel(DepFirm5);
@@ -2911,14 +2830,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2936,14 +2853,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2961,14 +2876,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -2986,14 +2899,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3010,14 +2921,12 @@ describe("HasManyAssociationsTest", () => {
     class ProtAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ProtPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ProtAuthor);
@@ -3031,7 +2940,6 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -3039,7 +2947,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3058,14 +2965,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3079,14 +2984,12 @@ describe("HasManyAssociationsTest", () => {
     class FinderDirtyAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FinderDirtyPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FinderDirtyAuthor);
@@ -3105,14 +3008,12 @@ describe("HasManyAssociationsTest", () => {
     class FinderBangAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FinderBangPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FinderBangAuthor);
@@ -3128,14 +3029,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcResetPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcResetAuthor);
@@ -3157,14 +3056,12 @@ describe("HasManyAssociationsTest", () => {
     class CcSqlAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CcSqlPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcSqlAuthor);
@@ -3179,14 +3076,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3205,14 +3100,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3232,14 +3125,12 @@ describe("HasManyAssociationsTest", () => {
     class MergedAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class MergedPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(MergedAuthor);
@@ -3260,14 +3151,12 @@ describe("HasManyAssociationsTest", () => {
     class AppOrdAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AppOrdPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(AppOrdAuthor);
@@ -3285,14 +3174,12 @@ describe("HasManyAssociationsTest", () => {
     class DynOrdAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DynOrdPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DynOrdAuthor);
@@ -3310,14 +3197,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3333,7 +3218,6 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(TakeNotFoundPost);
@@ -3345,14 +3229,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3369,14 +3251,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3394,14 +3274,12 @@ describe("HasManyAssociationsTest", () => {
     class RoAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class RoPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(RoAuthor);
@@ -3425,14 +3303,12 @@ describe("HasManyAssociationsTest", () => {
     class DefOrdAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DefOrdPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DefOrdAuthor);
@@ -3450,14 +3326,12 @@ describe("HasManyAssociationsTest", () => {
     class DiffNameAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DiffNameArticle extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DiffNameAuthor);
@@ -3479,14 +3353,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3506,14 +3378,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3532,14 +3402,12 @@ describe("HasManyAssociationsTest", () => {
     class PkAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PkPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(PkAuthor);
@@ -3554,14 +3422,12 @@ describe("HasManyAssociationsTest", () => {
     class UpdAllAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class UpdAllPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(UpdAllAuthor);
@@ -3577,14 +3443,12 @@ describe("HasManyAssociationsTest", () => {
     class UpdAllFkAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class UpdAllFkPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(UpdAllFkAuthor);
@@ -3604,14 +3468,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3625,14 +3487,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3647,14 +3507,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3674,14 +3532,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3703,14 +3559,12 @@ describe("HasManyAssociationsTest", () => {
     class FibAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FibPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FibAuthor);
@@ -3726,14 +3580,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3751,14 +3603,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3775,14 +3625,12 @@ describe("HasManyAssociationsTest", () => {
     class ResetAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ResetPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ResetAuthor);
@@ -3800,14 +3648,12 @@ describe("HasManyAssociationsTest", () => {
     class ReloadAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ReloadPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ReloadAuthor);
@@ -3832,14 +3678,12 @@ describe("HasManyAssociationsTest", () => {
     class ReloadQcAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ReloadQcPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(ReloadQcAuthor, "reloadQcPosts", {
@@ -3865,14 +3709,12 @@ describe("HasManyAssociationsTest", () => {
     class ReloadUlAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ReloadUlPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(ReloadUlAuthor, "reloadUlPosts", {
@@ -3895,14 +3737,12 @@ describe("HasManyAssociationsTest", () => {
     class FICAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FICPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("fic_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(FICAuthor, "ficPosts", {
@@ -3925,14 +3765,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3960,14 +3798,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -3987,14 +3823,12 @@ describe("HasManyAssociationsTest", () => {
     class GrpAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class GrpPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(GrpAuthor);
@@ -4020,14 +3854,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -4045,14 +3877,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -4071,14 +3901,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -4096,14 +3924,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -4119,14 +3945,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -4141,7 +3965,6 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -4153,14 +3976,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -4174,14 +3995,12 @@ describe("HasManyAssociationsTest", () => {
     class TxAddAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TxAddPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(TxAddAuthor);
@@ -4195,14 +4014,12 @@ describe("HasManyAssociationsTest", () => {
     class TxNewAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TxNewPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(TxNewAuthor);
@@ -4217,14 +4034,12 @@ describe("HasManyAssociationsTest", () => {
     class InvValAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class InvValPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(InvValAuthor);
@@ -4252,14 +4067,12 @@ describe("HasManyAssociationsTest", () => {
     class SizeDirtyAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SizeDirtyPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(SizeDirtyAuthor);
@@ -4277,14 +4090,12 @@ describe("HasManyAssociationsTest", () => {
     class EmptyDirtyAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EmptyDirtyPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(EmptyDirtyAuthor);
@@ -4301,14 +4112,12 @@ describe("HasManyAssociationsTest", () => {
     class SizeTwiceAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SizeTwicePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(SizeTwiceAuthor);
@@ -4332,14 +4141,12 @@ describe("HasManyAssociationsTest", () => {
     class BuildSaveAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BuildSavePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(BuildSaveAuthor);
@@ -4359,14 +4166,12 @@ describe("HasManyAssociationsTest", () => {
     class BuildNoLoadAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BuildNoLoadPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(BuildNoLoadAuthor);
@@ -4381,14 +4186,12 @@ describe("HasManyAssociationsTest", () => {
     class BuildManyBlockAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BuildManyBlockPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(BuildManyBlockAuthor);
@@ -4408,14 +4211,12 @@ describe("HasManyAssociationsTest", () => {
     class CreateNoLoadAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CreateNoLoadPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CreateNoLoadAuthor);
@@ -4434,14 +4235,12 @@ describe("HasManyAssociationsTest", () => {
     class CreateSaveAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CreateSavePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CreateSaveAuthor);
@@ -4461,14 +4260,12 @@ describe("HasManyAssociationsTest", () => {
     class CompKeyAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CompKeyPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CompKeyAuthor);
@@ -4486,14 +4283,12 @@ describe("HasManyAssociationsTest", () => {
     class ShardAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ShardPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ShardAuthor);
@@ -4512,14 +4307,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcConcatPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcConcatAuthor);
@@ -4540,14 +4333,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcArrPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcArrAuthor);
@@ -4568,14 +4359,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcUpdDisPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcUpdDisAuthor);
@@ -4595,14 +4384,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcOverlapPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcOverlapAuthor);
@@ -4622,14 +4409,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcUpdEnPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcUpdEnAuthor);
@@ -4649,14 +4434,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcDelNdPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcDelNdAuthor);
@@ -4677,14 +4460,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcDelDaPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcDelDaAuthor);
@@ -4710,14 +4491,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcDelDsPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcDelDsAuthor);
@@ -4743,14 +4522,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcUpdIdPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcUpdIdAuthor);
@@ -4776,14 +4553,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcChgPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcChgAuthor);
@@ -4808,14 +4583,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcInvPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcInvAuthor);
@@ -4838,14 +4611,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcClrPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcClrAuthor);
@@ -4874,14 +4645,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcClrSymPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcClrSymAuthor);
@@ -4906,14 +4675,12 @@ describe("HasManyAssociationsTest", () => {
     class ExclDepAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ExclDepPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ExclDepAuthor);
@@ -4936,14 +4703,12 @@ describe("HasManyAssociationsTest", () => {
     class DcFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DcClient extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DcFirm);
@@ -4972,14 +4737,12 @@ describe("HasManyAssociationsTest", () => {
     class DsFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DsClient extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DsFirm);
@@ -5000,14 +4763,12 @@ describe("HasManyAssociationsTest", () => {
     class DhFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DhClient extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DhFirm);
@@ -5028,14 +4789,12 @@ describe("HasManyAssociationsTest", () => {
     class DelPkAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DelPkPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DelPkAuthor);
@@ -5065,14 +4824,12 @@ describe("HasManyAssociationsTest", () => {
     class ClearNoAccessAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ClearNoAccessPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ClearNoAccessAuthor);
@@ -5097,14 +4854,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -5125,14 +4880,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -5151,14 +4904,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -5174,14 +4925,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -5199,14 +4948,12 @@ describe("HasManyAssociationsTest", () => {
     class DestroyAllScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DestroyAllScopePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DestroyAllScopeAuthor);
@@ -5232,14 +4979,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class DccPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DccAuthor);
@@ -5265,14 +5010,12 @@ describe("HasManyAssociationsTest", () => {
     class DestroyScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DestroyScopePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DestroyScopeAuthor);
@@ -5291,14 +5034,12 @@ describe("HasManyAssociationsTest", () => {
     class DeleteScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DeleteScopePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DeleteScopeAuthor);
@@ -5316,14 +5057,12 @@ describe("HasManyAssociationsTest", () => {
     class HashCondAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HashCondPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(HashCondAuthor);
@@ -5343,21 +5082,18 @@ describe("HasManyAssociationsTest", () => {
     class Grandparent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Parent extends Base {
       static {
         this.attribute("grandparent_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Child extends Base {
       static {
         this.attribute("parent_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Grandparent);
@@ -5395,14 +5131,12 @@ describe("HasManyAssociationsTest", () => {
     class DepTxAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DepTxPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DepTxAuthor);
@@ -5427,14 +5161,12 @@ describe("HasManyAssociationsTest", () => {
     class ReLocaleAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ReLocalePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ReLocaleAuthor);
@@ -5459,14 +5191,12 @@ describe("HasManyAssociationsTest", () => {
     class InclAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class InclPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(InclAuthor);
@@ -5483,24 +5213,20 @@ describe("HasManyAssociationsTest", () => {
     class ArrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ArrPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ArrAuthor);
     registerModel(ArrPost);
     const author = await ArrAuthor.create({ name: "Alice" });
-    const posts = await Promise.all([
-      ArrPost.create({ author_id: author.id, title: "A" }),
-      ArrPost.create({ author_id: author.id, title: "B" }),
-      ArrPost.create({ author_id: author.id, title: "C" }),
-    ]);
+    await ArrPost.create({ author_id: author.id, title: "A" });
+    await ArrPost.create({ author_id: author.id, title: "B" });
+    await ArrPost.create({ author_id: author.id, title: "C" });
     const loaded = await loadHasMany(author, "arr_posts", {
       className: "ArrPost",
       foreignKey: "author_id",
@@ -5511,14 +5237,12 @@ describe("HasManyAssociationsTest", () => {
     class ReplFailAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ReplFailPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ReplFailAuthor);
@@ -5538,14 +5262,12 @@ describe("HasManyAssociationsTest", () => {
     class TxReplAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TxReplPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(TxReplAuthor);
@@ -5570,14 +5292,12 @@ describe("HasManyAssociationsTest", () => {
     class TxReplNewAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TxReplNewPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(TxReplNewAuthor);
@@ -5591,14 +5311,12 @@ describe("HasManyAssociationsTest", () => {
     class UnloadedAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class UnloadedPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(UnloadedAuthor);
@@ -5621,14 +5339,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcUlPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcUlAuthor);
@@ -5644,14 +5360,12 @@ describe("HasManyAssociationsTest", () => {
     class DirtyIdAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DirtyIdPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DirtyIdAuthor);
@@ -5675,14 +5389,12 @@ describe("HasManyAssociationsTest", () => {
     class ClrIdAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ClrIdPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ClrIdAuthor);
@@ -5705,14 +5417,12 @@ describe("HasManyAssociationsTest", () => {
     class GiiAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class GiiPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(GiiAuthor);
@@ -5730,14 +5440,12 @@ describe("HasManyAssociationsTest", () => {
     class OrdIdAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class OrdIdPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(OrdIdAuthor);
@@ -5757,14 +5465,12 @@ describe("HasManyAssociationsTest", () => {
     class SetIdAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SetIdPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(SetIdAuthor);
@@ -5783,14 +5489,12 @@ describe("HasManyAssociationsTest", () => {
     class BlankIdAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BlankIdPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(BlankIdAuthor);
@@ -5810,21 +5514,18 @@ describe("HasManyAssociationsTest", () => {
     class ThrIdAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ThrIdPost extends Base {
       static {
         this.attribute("thr_id_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class ThrIdComment extends Base {
       static {
         this.attribute("thr_id_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ThrIdAuthor);
@@ -5859,14 +5560,12 @@ describe("HasManyAssociationsTest", () => {
     class ThrModAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ThrModPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ThrModAuthor);
@@ -5883,14 +5582,12 @@ describe("HasManyAssociationsTest", () => {
     class OrdThrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class OrdThrPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(OrdThrAuthor);
@@ -5908,14 +5605,12 @@ describe("HasManyAssociationsTest", () => {
     class DynThrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DynThrPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DynThrAuthor);
@@ -5933,21 +5628,18 @@ describe("HasManyAssociationsTest", () => {
     class HcAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HcPost extends Base {
       static {
         this.attribute("hc_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class HcComment extends Base {
       static {
         this.attribute("hc_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(HcAuthor);
@@ -5987,14 +5679,12 @@ describe("HasManyAssociationsTest", () => {
     class InclAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class InclPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(InclAuthor, "inclPosts", {
@@ -6016,14 +5706,12 @@ describe("HasManyAssociationsTest", () => {
     class InclScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class InclScopePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(InclScopeAuthor, "inclScopePosts", {
@@ -6043,14 +5731,12 @@ describe("HasManyAssociationsTest", () => {
     class FnlAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FnlPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FnlAuthor);
@@ -6069,14 +5755,12 @@ describe("HasManyAssociationsTest", () => {
     class FlLoadAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FlLoadPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FlLoadAuthor);
@@ -6096,14 +5780,12 @@ describe("HasManyAssociationsTest", () => {
     class FnlBuildAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FnlBuildPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FnlBuildAuthor);
@@ -6124,14 +5806,12 @@ describe("HasManyAssociationsTest", () => {
     class FnlCreateAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FnlCreatePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FnlCreateAuthor);
@@ -6149,14 +5829,12 @@ describe("HasManyAssociationsTest", () => {
     class FnlNewAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FnlNewPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FnlNewAuthor);
@@ -6173,14 +5851,12 @@ describe("HasManyAssociationsTest", () => {
     class FlIntAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FlIntPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FlIntAuthor);
@@ -6201,14 +5877,12 @@ describe("HasManyAssociationsTest", () => {
     class ManyCountAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ManyCountPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(ManyCountAuthor, "manyCountPosts", {
@@ -6230,14 +5904,12 @@ describe("HasManyAssociationsTest", () => {
     class ManyLoadAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ManyLoadPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(ManyLoadAuthor, "manyLoadPosts", {
@@ -6269,14 +5941,12 @@ describe("HasManyAssociationsTest", () => {
     class ManySubAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ManySubPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(ManySubAuthor, "manySubPosts", {
@@ -6299,14 +5969,12 @@ describe("HasManyAssociationsTest", () => {
     class ManyBlkAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ManyBlkPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(ManyBlkAuthor, "manyBlkPosts", {
@@ -6330,14 +5998,12 @@ describe("HasManyAssociationsTest", () => {
     class NoneCountAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NoneCountPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NoneCountAuthor, "noneCountPosts", {
@@ -6357,14 +6023,12 @@ describe("HasManyAssociationsTest", () => {
     class NoneLoadAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NoneLoadPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NoneLoadAuthor, "noneLoadPosts", {
@@ -6394,14 +6058,12 @@ describe("HasManyAssociationsTest", () => {
     class NoneBlkAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NoneBlkPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NoneBlkAuthor, "noneBlkPosts", {
@@ -6423,14 +6085,12 @@ describe("HasManyAssociationsTest", () => {
     class OneCountAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class OneCountPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(OneCountAuthor);
@@ -6447,14 +6107,12 @@ describe("HasManyAssociationsTest", () => {
     class OneLoadAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class OneLoadPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(OneLoadAuthor);
@@ -6471,14 +6129,12 @@ describe("HasManyAssociationsTest", () => {
     class OneSubAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class OneSubPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(OneSubAuthor);
@@ -6501,14 +6157,12 @@ describe("HasManyAssociationsTest", () => {
     class OneBlkAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class OneBlkPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(OneBlkAuthor);
@@ -6527,14 +6181,12 @@ describe("HasManyAssociationsTest", () => {
     class OneZeroAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class OneZeroPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(OneZeroAuthor);
@@ -6552,14 +6204,12 @@ describe("HasManyAssociationsTest", () => {
     class OneMultiAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class OneMultiPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(OneMultiAuthor);
@@ -6579,14 +6229,12 @@ describe("HasManyAssociationsTest", () => {
     class NsAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NsPost extends Base {
       static {
         this.attribute("ns_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(NsAuthor);
@@ -6603,14 +6251,12 @@ describe("HasManyAssociationsTest", () => {
     class TxProxyAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TxProxyPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(TxProxyAuthor);
@@ -6627,14 +6273,12 @@ describe("HasManyAssociationsTest", () => {
     class PkAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PkPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(PkAuthor);
@@ -6653,14 +6297,12 @@ describe("HasManyAssociationsTest", () => {
     class LazyDelAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class LazyDelPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // Define association before registering the target model
@@ -6684,14 +6326,12 @@ describe("HasManyAssociationsTest", () => {
     class LazyNullAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class LazyNullPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(LazyNullAuthor, "lazy_null_posts", {
@@ -6711,14 +6351,12 @@ describe("HasManyAssociationsTest", () => {
     class WhereInitAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class WhereInitPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(WhereInitAuthor);
@@ -6732,7 +6370,6 @@ describe("HasManyAssociationsTest", () => {
     class MultiWhereAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class MultiWherePost extends Base {
@@ -6740,7 +6377,6 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(MultiWhereAuthor);
@@ -6755,14 +6391,12 @@ describe("HasManyAssociationsTest", () => {
     class ProtAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ProtPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ProtAuthor);
@@ -6780,14 +6414,12 @@ describe("HasManyAssociationsTest", () => {
     class MergeAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class MergePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(MergeAuthor);
@@ -6802,14 +6434,12 @@ describe("HasManyAssociationsTest", () => {
     class NoDblAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NoDblPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(NoDblAuthor);
@@ -6825,14 +6455,12 @@ describe("HasManyAssociationsTest", () => {
     class InitAttrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class InitAttrPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(InitAttrAuthor);
@@ -6847,14 +6475,12 @@ describe("HasManyAssociationsTest", () => {
     class NullRelAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NullRelPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(NullRelAuthor);
@@ -6868,14 +6494,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -6890,14 +6514,12 @@ describe("HasManyAssociationsTest", () => {
     class KernelAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class KernelPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(KernelAuthor);
@@ -6914,14 +6536,12 @@ describe("HasManyAssociationsTest", () => {
     class OrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class OrPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(OrAuthor);
@@ -6938,14 +6558,12 @@ describe("HasManyAssociationsTest", () => {
     class RewhereAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class RewherePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(RewhereAuthor);
@@ -6962,14 +6580,12 @@ describe("HasManyAssociationsTest", () => {
     class FoiAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FoiPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FoiAuthor);
@@ -6989,14 +6605,12 @@ describe("HasManyAssociationsTest", () => {
     class FocAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FocPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FocAuthor);
@@ -7020,14 +6634,12 @@ describe("HasManyAssociationsTest", () => {
     class FocBangAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FocBangPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FocBangAuthor);
@@ -7050,14 +6662,12 @@ describe("HasManyAssociationsTest", () => {
     class NoLoadDelAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NoLoadDelPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(NoLoadDelAuthor);
@@ -7082,14 +6692,12 @@ describe("HasManyAssociationsTest", () => {
     class ExtAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ExtPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ExtAuthor);
@@ -7110,14 +6718,12 @@ describe("HasManyAssociationsTest", () => {
     class ExtPerAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ExtPerPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ExtPerAuthor);
@@ -7138,14 +6744,12 @@ describe("HasManyAssociationsTest", () => {
     class CjAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CjPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CjAuthor);
@@ -7163,14 +6767,12 @@ describe("HasManyAssociationsTest", () => {
     class UsInclAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class UsInclPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(UsInclAuthor);
@@ -7187,14 +6789,12 @@ describe("HasManyAssociationsTest", () => {
     class RndAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class RndPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(RndAuthor);
@@ -7211,14 +6811,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CcDsPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CcDsAuthor);
@@ -7237,14 +6835,12 @@ describe("HasManyAssociationsTest", () => {
     class CtxValAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CtxValPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CtxValAuthor);
@@ -7257,14 +6853,12 @@ describe("HasManyAssociationsTest", () => {
     class InstScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class InstScopePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(InstScopeAuthor);
@@ -7281,14 +6875,12 @@ describe("HasManyAssociationsTest", () => {
     class ReplMemAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ReplMemPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ReplMemAuthor);
@@ -7317,14 +6909,12 @@ describe("HasManyAssociationsTest", () => {
     class InMemAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class InMemPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(InMemAuthor);
@@ -7339,14 +6929,12 @@ describe("HasManyAssociationsTest", () => {
     class InMemCbAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class InMemCbPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(InMemCbAuthor);
@@ -7361,14 +6949,12 @@ describe("HasManyAssociationsTest", () => {
     class InMemInvAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class InMemInvPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(InMemInvAuthor);
@@ -7381,14 +6967,12 @@ describe("HasManyAssociationsTest", () => {
     class ReattachAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ReattachPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ReattachAuthor);
@@ -7415,14 +6999,12 @@ describe("HasManyAssociationsTest", () => {
     class SizeCalcAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SizeCalcPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(SizeCalcAuthor);
@@ -7437,14 +7019,12 @@ describe("HasManyAssociationsTest", () => {
     class DblFireAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DblFirePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DblFireAuthor);
@@ -7466,14 +7046,12 @@ describe("HasManyAssociationsTest", () => {
     class DestroyBangAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DestroyBangPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DestroyBangAuthor);
@@ -7487,14 +7065,12 @@ describe("HasManyAssociationsTest", () => {
     class MemoAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class MemoPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(MemoAuthor);
@@ -7518,14 +7094,12 @@ describe("HasManyAssociationsTest", () => {
     class LoadValAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class LoadValPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(LoadValAuthor);
@@ -7544,14 +7118,12 @@ describe("HasManyAssociationsTest", () => {
     class RollbackAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class RollbackPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(RollbackAuthor);
@@ -7570,14 +7142,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -7594,14 +7164,12 @@ describe("HasManyAssociationsTest", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -7629,14 +7197,12 @@ describe("HasManyAssociationsTest", () => {
     class KeyValAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class KeyValPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(KeyValAuthor);
@@ -7658,7 +7224,6 @@ describe("HasManyAssociationsTest", () => {
     class InvKeyAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(InvKeyAuthor);
@@ -7674,14 +7239,12 @@ describe("HasManyAssociationsTest", () => {
     class AsyncDepAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AsyncDepPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(AsyncDepAuthor);
@@ -7704,7 +7267,6 @@ describe("HasManyAssociationsTest", () => {
     class CpkMalAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CpkMalAuthor);
@@ -7720,7 +7282,6 @@ describe("HasManyAssociationsTest", () => {
     class CpkMalOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CpkMalOwner);
@@ -7736,14 +7297,12 @@ describe("HasManyAssociationsTest", () => {
     class PreCpkAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PreCpkPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(PreCpkAuthor);
@@ -7763,14 +7322,12 @@ describe("HasManyAssociationsTest", () => {
     class DelAllOptAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DelAllOptPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DelAllOptAuthor);
@@ -7793,27 +7350,21 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  // This test creates its own adapter with inline DDL and must live outside the
-  // withTransactionalFixtures block above: on MariaDB, DDL auto-commits any open
-  // transaction, which would destroy the outer BEGIN and cause SAVEPOINT errors in afterEach.
-  // afterAll resets state so sti_posts doesn't leak into subsequent describes that
-  // push shouldSkipGlobalReset (withTransactionalFixtures), which would suppress the
-  // global beforeEach reset.
-  afterAll(async () => {
-    await resetTestAdapterState();
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  beforeAll(async () => {
+    await defineSchema({
+      sti_posts: { title: "string", type: "string", tag_id: "integer" },
+    });
   });
 
   it("sti subselect count", async () => {
-    const a = createTestAdapter();
-    await defineSchema(a, {
-      sti_posts: { title: "string", type: "string", tag_id: "integer" },
-    });
     class StiPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("type", "string");
         this.attribute("tag_id", "integer");
-        this.adapter = a;
       }
     }
     enableSti(StiPost);
@@ -8185,23 +7736,23 @@ const TAIL_PRIMARY_KEYS_SCHEMA: Schema = {
 };
 
 describe("HasManyAssociationsTestPrimaryKeys", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapterWithSchema(TAIL_PRIMARY_KEYS_SCHEMA);
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  beforeAll(async () => {
+    await defineSchema(TAIL_PRIMARY_KEYS_SCHEMA);
   });
 
   it("has many custom primary key", async () => {
     class CpkAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CpkPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CpkAuthor);
@@ -8218,14 +7769,12 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     class CpkAsgAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CpkAsgPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CpkAsgAuthor);
@@ -8260,23 +7809,23 @@ const TAIL_HMT_SCHEMA: Schema = {
 };
 
 describe("HasManyAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapterWithSchema(TAIL_HMT_SCHEMA);
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  beforeAll(async () => {
+    await defineSchema(TAIL_HMT_SCHEMA);
   });
 
   it("do not call callbacks for delete all", async () => {
     class NoCbAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NoCbPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(NoCbAuthor);
@@ -8300,14 +7849,12 @@ describe("HasManyAssociationsTest", () => {
     class ResetAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ResetPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ResetAuthor);
@@ -8332,14 +7879,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = adapter;
       }
     }
     class DelCcPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DelCcAuthor);
@@ -8362,14 +7907,12 @@ describe("HasManyAssociationsTest", () => {
     class DepDelAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DepDelPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DepDelAuthor);
@@ -8392,14 +7935,12 @@ describe("HasManyAssociationsTest", () => {
     class NullAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NullPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(NullAuthor);
@@ -8419,14 +7960,12 @@ describe("HasManyAssociationsTest", () => {
     class OneAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class OnePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(OneAuthor);
@@ -8445,13 +7984,11 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("body", "string");
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     class AbsPolyPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(AbsPolyComment);
@@ -8472,13 +8009,11 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("body", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class CustPolyPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CustPolyComment);
@@ -8497,14 +8032,12 @@ describe("HasManyAssociationsTest", () => {
     class NoRaiseAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NoRaisePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(NoRaiseAuthor);
@@ -8519,14 +8052,12 @@ describe("HasManyAssociationsTest", () => {
     class PreloadAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PreloadPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(PreloadAuthor);
@@ -8554,23 +8085,23 @@ const TAIL_ASYNC_SCHEMA: Schema = {
 };
 
 describe("AsyncHasManyAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapterWithSchema(TAIL_ASYNC_SCHEMA);
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  beforeAll(async () => {
+    await defineSchema(TAIL_ASYNC_SCHEMA);
   });
 
   it("async load has many", async () => {
     class AsyncAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AsyncPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(AsyncAuthor);
@@ -8594,9 +8125,11 @@ const TAIL_HMT2_SCHEMA: Schema = {
 };
 
 describe("HasManyAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapterWithSchema(TAIL_HMT2_SCHEMA);
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  beforeAll(async () => {
+    await defineSchema(TAIL_HMT2_SCHEMA);
   });
 
   it("custom named counter cache", async () => {
@@ -8605,14 +8138,12 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("my_comment_count", "integer");
-        this.adapter = adapter;
       }
     }
     class CnComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(CnComment, "cnPost", {
@@ -8635,13 +8166,11 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("container_id", "integer");
-        this.adapter = adapter;
       }
     }
     class RContainer extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(RContainer, "rWidgets", {
@@ -8676,13 +8205,12 @@ const COUNTER_CACHE_HEAD_SCHEMA: Schema = {
 };
 
 describe("HasManyAssociationsTestCounterCacheHead", () => {
-  let cchAdapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    cchAdapter = createTestAdapter();
-    await defineSchema(cchAdapter, COUNTER_CACHE_HEAD_SCHEMA);
+    await defineSchema(COUNTER_CACHE_HEAD_SCHEMA);
   });
-  withTransactionalFixtures(() => cchAdapter as any);
 
   it("has many without counter cache option", () => {
     class Author extends Base {
@@ -8702,14 +8230,12 @@ describe("HasManyAssociationsTestCounterCacheHead", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = cchAdapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = cchAdapter;
       }
     }
     Associations.belongsTo.call(Post, "author", {
@@ -8730,14 +8256,12 @@ describe("HasManyAssociationsTestCounterCacheHead", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = cchAdapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = cchAdapter;
       }
     }
     Associations.belongsTo.call(Post, "author", {
@@ -8758,14 +8282,12 @@ describe("HasManyAssociationsTestCounterCacheHead", () => {
       static {
         this.attribute("name", "string");
         this.attribute("posts_count", "integer");
-        this.adapter = cchAdapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = cchAdapter;
       }
     }
     registerModel(Author);
