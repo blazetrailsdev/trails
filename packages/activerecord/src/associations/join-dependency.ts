@@ -23,7 +23,7 @@ import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
-import { AssociationNotFoundError } from "./errors.js";
+import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js";
 import { AliasTracker } from "./alias-tracker.js";
 
 export interface AliasMap {
@@ -829,7 +829,7 @@ export class JoinDependency {
       (reflection as any).checkEagerLoadableBang?.();
 
       if (reflection.polymorphic?.()) {
-        throw new Error(`Cannot eagerly load the polymorphic association '${String(name)}'`);
+        throw new EagerLoadPolymorphicError(String(name));
       }
 
       return new JoinAssociation(reflection, this.build(right, reflection.klass));
