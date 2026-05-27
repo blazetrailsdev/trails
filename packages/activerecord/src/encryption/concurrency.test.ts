@@ -7,7 +7,6 @@ import {
   installEncryptionSchema,
 } from "./test-helpers.js";
 import { createPooledTestAdapter, type SidecarAdapter } from "../test-adapter.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("ActiveRecord::Encryption::ConcurrencyTest", () => {
   let adapter: SidecarAdapter;
@@ -18,8 +17,6 @@ describe("ActiveRecord::Encryption::ConcurrencyTest", () => {
     adapter = pooled.adapter;
     await installEncryptionSchema(adapter);
   });
-
-  withTransactionalFixtures(() => adapter);
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
