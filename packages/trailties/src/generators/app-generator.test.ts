@@ -179,6 +179,68 @@ describe("AppGenerator", () => {
     expect(dbConfig).toContain("sqlite3");
   });
 
+  it("sqlite database config includes driver import", async () => {
+    await makeGen("sqlite").run();
+    const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
+    expect(dbConfig).toContain("@blazetrails/activesupport/sqlite/better-sqlite3");
+  });
+
+  it("--package-manager npm uses npm install in bin/setup", async () => {
+    const gen = new AppGenerator({
+      cwd: tmpDir,
+      output: (m) => lines.push(m),
+      appPath: "my-app",
+      packageManager: "npm",
+    });
+    await gen.run();
+    const setup = fs.readFileSync(appPath("bin/setup"), "utf-8");
+    expect(setup).toContain("npm install");
+    expect(setup).not.toContain("pnpm");
+  });
+
+  it("--package-manager yarn uses yarn in bin/setup and Dockerfile", async () => {
+    const gen = new AppGenerator({
+      cwd: tmpDir,
+      output: (m) => lines.push(m),
+      appPath: "my-app",
+      packageManager: "yarn",
+    });
+    await gen.run();
+    const setup = fs.readFileSync(appPath("bin/setup"), "utf-8");
+    expect(setup).toContain('system("yarn")');
+    const dockerfile = fs.readFileSync(appPath("Dockerfile"), "utf-8");
+    expect(dockerfile).toContain("yarn.lock");
+    expect(dockerfile).not.toContain("pnpm");
+  });
+
+  it("--sqlite-driver node-sqlite omits better-sqlite3 dep", async () => {
+    const gen = new AppGenerator({
+      cwd: tmpDir,
+      output: (m) => lines.push(m),
+      appPath: "my-app",
+      sqliteDriver: "node-sqlite",
+    });
+    await gen.run();
+    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
+    expect(pkg.dependencies["better-sqlite3"]).toBeUndefined();
+    const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
+    expect(dbConfig).toContain("@blazetrails/activesupport/sqlite/node-sqlite");
+  });
+
+  it("--sqlite-driver expo-sqlite omits driver dep", async () => {
+    const gen = new AppGenerator({
+      cwd: tmpDir,
+      output: (m) => lines.push(m),
+      appPath: "my-app",
+      sqliteDriver: "expo-sqlite",
+    });
+    await gen.run();
+    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
+    expect(pkg.dependencies["better-sqlite3"]).toBeUndefined();
+    const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
+    expect(dbConfig).toContain("@blazetrails/activesupport/sqlite/expo-sqlite");
+  });
+
   it("skips docker files when --skip-docker", async () => {
     await makeGen("sqlite", { skipDocker: true }).run();
     expect(exists("Dockerfile")).toBe(false);

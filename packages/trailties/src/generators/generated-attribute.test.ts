@@ -66,6 +66,60 @@ describe("GeneratedAttribute", () => {
     expect(GeneratedAttribute.parse("post:references{polymorphic}").polymorphic()).toBe(true);
   });
 
+  it("test_default_value_is_integer", () => {
+    expect(GeneratedAttribute.parse("count:integer").default()).toBe(1);
+  });
+
+  it("test_default_value_is_float", () => {
+    expect(GeneratedAttribute.parse("rate:float").default()).toBe(1.5);
+  });
+
+  it("test_default_value_is_decimal", () => {
+    expect(GeneratedAttribute.parse("price:decimal").default()).toBe("9.99");
+  });
+
+  it("test_default_value_is_datetime", () => {
+    for (const t of ["datetime", "timestamp", "time"]) {
+      const val = GeneratedAttribute.parse(`at:${t}`).default();
+      expect(typeof val).toBe("string");
+      expect(val).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    }
+  });
+
+  it("test_default_value_is_date", () => {
+    const val = GeneratedAttribute.parse("born:date").default();
+    expect(typeof val).toBe("string");
+    expect(val).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("test_default_value_is_string", () => {
+    expect(GeneratedAttribute.parse("title:string").default()).toBe("MyString");
+  });
+
+  it("test_default_value_for_type", () => {
+    expect(new GeneratedAttribute("type", "string").default()).toBe("");
+  });
+
+  it("test_default_value_is_text", () => {
+    expect(GeneratedAttribute.parse("body:text").default()).toBe("MyText");
+  });
+
+  it("test_default_value_is_boolean", () => {
+    expect(GeneratedAttribute.parse("admin:boolean").default()).toBe(false);
+  });
+
+  it("test_default_value_is_nil", () => {
+    for (const t of ["references", "belongs_to", "rich_text", "attachment", "attachments"]) {
+      expect(GeneratedAttribute.parse(`ref:${t}`).default()).toBeNull();
+    }
+  });
+
+  it("test_default_value_is_empty_string", () => {
+    for (const t of ["digest", "token"]) {
+      expect(GeneratedAttribute.parse(`tok:${t}`).default()).toBe("");
+    }
+  });
+
   it("test_handles_index_names_for_references", () => {
     const p = GeneratedAttribute.parse("post:references");
     expect([p.indexName(), p.columnName()]).toEqual(["post_id", "post_id"]);

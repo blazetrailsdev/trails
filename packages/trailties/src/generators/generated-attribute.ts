@@ -1,4 +1,5 @@
 import { humanize, pluralize, singularize } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export class GeneratorError extends Error {}
 
@@ -19,12 +20,25 @@ const FIELD_TYPES = Object.fromEntries(
     .map((p) => p.split(":")),
 );
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function dbTimeString(dt: Temporal.PlainDateTime): string {
+  return `${dt.year}-${pad2(dt.month)}-${pad2(dt.day)} ${pad2(dt.hour)}:${pad2(dt.minute)}:${pad2(dt.second)}`;
+}
+
+function dbDateString(d: Temporal.PlainDate): string {
+  return `${d.year}-${pad2(d.month)}-${pad2(d.day)}`;
+}
+
 export class GeneratedAttribute {
   name: string;
   type: string;
   attrOptions: AttrOptions;
   private _hasIndex: boolean;
   private _hasUniqIndex: boolean;
+  private _default: string | number | boolean | null | undefined = undefined;
 
   static parse(columnDefinition: string): GeneratedAttribute {
     const [name, rawType, rawIndex] = columnDefinition.split(":");
@@ -67,6 +81,38 @@ export class GeneratedAttribute {
     this._hasIndex = INDEX_OPTIONS.includes(indexType ?? "");
     this._hasUniqIndex = UNIQ_INDEX_OPTIONS.includes(indexType ?? "");
     this.attrOptions = attrOptions;
+  }
+
+  default(): string | number | boolean | null {
+    if (this._default !== undefined) return this._default;
+    switch (this.type) {
+      case "integer":
+        return (this._default = 1);
+      case "float":
+        return (this._default = 1.5);
+      case "decimal":
+        return (this._default = "9.99");
+      case "datetime":
+      case "timestamp":
+      case "time":
+        return (this._default = dbTimeString(Temporal.Now.plainDateTimeISO()));
+      case "date":
+        return (this._default = dbDateString(Temporal.Now.plainDateISO()));
+      case "string":
+        return (this._default = this.name === "type" ? "" : "MyString");
+      case "text":
+        return (this._default = "MyText");
+      case "boolean":
+        return (this._default = false);
+      case "references":
+      case "belongs_to":
+      case "attachment":
+      case "attachments":
+      case "rich_text":
+        return (this._default = null);
+      default:
+        return (this._default = "");
+    }
   }
 
   humanName = (): string => humanize(this.name);
