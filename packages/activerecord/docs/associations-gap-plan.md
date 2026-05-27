@@ -1,8 +1,9 @@
 # Associations gap plan
 
 339 skipped tests across 33 files. 20 PRs across 9 tracks, organized
-by unlock potential (tests unblocked per PR). ~310 actionable,
-~18 permanent-skip (marshal, Ruby-only), ~10 scattered single-test gaps.
+by unlock potential. Some tests are gated on multiple PRs (noted in
+dependency graph). ~18 permanent-skip (marshal, Ruby-only), ~10
+scattered single-test gaps (Track 9).
 
 ---
 
