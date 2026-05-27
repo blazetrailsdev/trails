@@ -457,4 +457,40 @@ describe("Resource routing", () => {
       expect(m!.route.action).toBe("show");
     });
   });
+
+  describe("non-inflecting words (test_singleton_resource_name_is_not_singularized / test_restful_routes_dont_generate_duplicates)", () => {
+    it("resources with non-inflecting name does not generate duplicate named routes", () => {
+      const routes = new RouteSet();
+      expect(() => {
+        routes.draw((map) => {
+          map.resources("sheep");
+        });
+      }).not.toThrow();
+      const named = routes.getNamedRoutes();
+      expect(named.has("sheep")).toBe(true);
+    });
+
+    it("resources generates no duplicate [verb, path] pairs", () => {
+      const routes = new RouteSet();
+      routes.draw((map) => {
+        map.resources("messages");
+      });
+      const all = routes.getRoutes();
+      const seen = new Set<string>();
+      for (const r of all) {
+        const key = `${r.verb} ${r.path}`;
+        expect(seen.has(key)).toBe(false);
+        seen.add(key);
+      }
+    });
+
+    it("duplicate named route uses last-write-wins (Rails parity)", () => {
+      const routes = new RouteSet();
+      routes.draw((map) => {
+        map.get("/foo", { to: "pages#foo", as: "foo" });
+        map.get("/bar", { to: "pages#bar", as: "foo" });
+      });
+      expect(routes.pathFor("foo", {})).toBe("/bar");
+    });
+  });
 });
