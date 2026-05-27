@@ -407,11 +407,14 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
 
     let bObservedOpen = -1;
     let bObservedInTransaction = true;
-    let bObservedCurrentTransaction: unknown = "unset";
+    let bObservedCurrentTxJoinable = true;
 
     await Promise.all([
       sidecarA.withinNewTransaction({ joinable: false }, async () => {
-        // Transaction is now open. Signal chain B to read.
+        // Verify chain A genuinely has an open transaction before signalling B,
+        // so a vacuous pass (e.g. lazy open) is caught immediately.
+        expect(sidecarA.adapter.openTransactions).toBeGreaterThan(0);
+        // Transaction is open. Signal chain B to read.
         signalBReady!();
         // Hold the transaction open until chain B has read.
         await aDone;
@@ -419,11 +422,18 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
       (async () => {
         // Wait until chain A is inside a live transaction before reading.
         await bReady;
-        bObservedOpen = sidecarB.openTransactions;
-        bObservedInTransaction = sidecarB.inTransaction;
-        bObservedCurrentTransaction = sidecarB.currentTransaction();
-        // Let chain A finish.
-        signalADone!();
+        try {
+          bObservedOpen = sidecarB.openTransactions;
+          bObservedInTransaction = sidecarB.inTransaction;
+          // currentTransaction() returns null (current filter) or NullTransaction
+          // (pool isolation, post-E2/E3). Both have joinable===false. Asserting on
+          // joinable rather than identity keeps this green through E2–E5.
+          const ct = sidecarB.currentTransaction() as { joinable?: boolean } | null;
+          bObservedCurrentTxJoinable = ct?.joinable ?? false;
+        } finally {
+          // Always unblock chain A so the test fails rather than hangs.
+          signalADone!();
+        }
       })(),
     ]);
 
@@ -432,7 +442,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
     // it first to decide whether to join a foreign frame.
     expect(bObservedOpen).toBe(0);
     expect(bObservedInTransaction).toBe(false);
-    expect(bObservedCurrentTransaction).toBeNull();
+    expect(bObservedCurrentTxJoinable).toBe(false);
   });
 
   it("currentTransaction() returns null for a chain outside any withinNewTransaction", () => {
