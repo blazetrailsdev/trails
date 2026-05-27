@@ -13,7 +13,6 @@ import {
 } from "./index.js";
 import { Associations } from "./associations.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -139,13 +138,6 @@ const TEST_SCHEMA = {
   uahm_articles: { title: "string" },
   uahm_tags: { name: "string", uahm_article_id: "integer" },
 } as const;
-
-// -- Helpers --
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
 
 // ==========================================================================
 // NestedAttributesTest — targets nested_attributes_test.rb
@@ -1576,14 +1568,17 @@ describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
 });
 
 describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("index in nested_attributes_order order", async () => {
-    const adapter = await freshAdapter();
     class IENTag extends Base {
       static {
         this._tableName = "ien_tags";
         this.attribute("name", "string");
         this.attribute("ien_article_id", "integer");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -1596,20 +1591,17 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
   });
 
   it("index unaffected by reject_if", async () => {
-    const adapter = await freshAdapter();
     class IERTag extends Base {
       static {
         this._tableName = "ier_tags";
         this.attribute("name", "string");
         this.attribute("ier_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class IERArticle extends Base {
       static {
         this._tableName = "ier_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(IERArticle, "ierTags", {
@@ -1630,21 +1622,23 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
 });
 
 describe("TestNestedAttributesWithExtend", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("extend affects nested attributes", async () => {
-    const adapter = await freshAdapter();
     class ExtTag extends Base {
       static {
         this._tableName = "ext_tags";
         this.attribute("name", "string");
         this.attribute("ext_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class ExtArticle extends Base {
       static {
         this._tableName = "ext_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(ExtArticle, "extTags", {
@@ -1655,11 +1649,7 @@ describe("TestNestedAttributesWithExtend", () => {
     registerModel(ExtTag);
     registerModel(ExtArticle);
     // Verify nested attributes still work with an extended/subclassed article
-    class ExtArticleSub extends ExtArticle {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class ExtArticleSub extends ExtArticle {}
     const article = await ExtArticleSub.create({ title: "extended" });
     assignNestedAttributes(article, "extTags", [{ name: "extended-tag" }]);
     await article.save();
@@ -1670,13 +1660,16 @@ describe("TestNestedAttributesWithExtend", () => {
 });
 
 describe("TestNestedAttributesForDelegatedType", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should build a new record based on the delegated type", async () => {
-    const adapter = await freshAdapter();
     class DTComment extends Base {
       static {
         this._tableName = "dt_comments";
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     class DTEntry extends Base {
@@ -1684,7 +1677,6 @@ describe("TestNestedAttributesForDelegatedType", () => {
         this._tableName = "dt_entries";
         this.attribute("entryable_type", "string");
         this.attribute("entryable_id", "integer");
-        this.adapter = adapter;
       }
     }
     // Set up a has_one association to simulate delegated type behavior
@@ -1701,14 +1693,12 @@ describe("TestNestedAttributesForDelegatedType", () => {
         this._tableName = "dt_comments2";
         this.attribute("body", "string");
         this.attribute("dt_entry2_id", "integer");
-        this.adapter = adapter;
       }
     }
     class DTEntry2 extends Base {
       static {
         this._tableName = "dt_entries2";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(DTEntry2, "dtComment2", {
@@ -1728,21 +1718,23 @@ describe("TestNestedAttributesForDelegatedType", () => {
 });
 
 describe("assigning nested attributes target", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("assigning nested attributes target", async () => {
-    const adapter = await freshAdapter();
     class ANTTag extends Base {
       static {
         this._tableName = "ant_tags";
         this.attribute("name", "string");
         this.attribute("ant_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class ANTArticle extends Base {
       static {
         this._tableName = "ant_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(ANTArticle, "antTags", {
@@ -1762,21 +1754,23 @@ describe("assigning nested attributes target", () => {
 });
 
 describe("assigning nested attributes target with nil placeholder for rejected item", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("assigning nested attributes target with nil placeholder for rejected item", async () => {
-    const adapter = await freshAdapter();
     class NilTag extends Base {
       static {
         this._tableName = "nil_tags";
         this.attribute("name", "string");
         this.attribute("nil_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NilArticle extends Base {
       static {
         this._tableName = "nil_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NilArticle, "nilTags", {
@@ -1798,23 +1792,25 @@ describe("assigning nested attributes target with nil placeholder for rejected i
 });
 
 describe("can use symbols as object identifier", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("can use symbols as object identifier", async () => {
     // In TypeScript there are no symbols-as-keys in the Ruby sense,
     // but string keys should work as identifiers for nested attributes
-    const adapter = await freshAdapter();
     class NSymTag extends Base {
       static {
         this._tableName = "nsym_tags";
         this.attribute("name", "string");
         this.attribute("nsym_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NSymArticle extends Base {
       static {
         this._tableName = "nsym_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NSymArticle, "nsymTags", {
@@ -1833,14 +1829,17 @@ describe("can use symbols as object identifier", () => {
 });
 
 describe("numeric column changes from zero to no empty string", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("numeric column changes from zero to no empty string", async () => {
-    const adapter = await freshAdapter();
     class NumPost extends Base {
       static {
         this._tableName = "num_posts";
         this.attribute("title", "string");
         this.attribute("score", "integer");
-        this.adapter = adapter;
       }
     }
     const post = await NumPost.create({ title: "test", score: 0 });
@@ -1854,21 +1853,23 @@ describe("numeric column changes from zero to no empty string", () => {
 });
 
 describe("should also work with a HashWithIndifferentAccess", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should also work with a HashWithIndifferentAccess", async () => {
-    const adapter = await freshAdapter();
     class HITag extends Base {
       static {
         this._tableName = "hi_tags";
         this.attribute("name", "string");
         this.attribute("hi_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HIArticle extends Base {
       static {
         this._tableName = "hi_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HIArticle, "hiTags", {
@@ -1889,21 +1890,23 @@ describe("should also work with a HashWithIndifferentAccess", () => {
 });
 
 describe("should automatically build new associated models for each entry in a hash where the id is missing", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should automatically build new associated models for each entry in a hash where the id is missing", async () => {
-    const adapter = await freshAdapter();
     class NBuildTag extends Base {
       static {
         this._tableName = "nbuild_tags";
         this.attribute("name", "string");
         this.attribute("nbuild_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NBuildArticle extends Base {
       static {
         this._tableName = "nbuild_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NBuildArticle, "nbuildTags", {
@@ -1925,21 +1928,23 @@ describe("should automatically build new associated models for each entry in a h
 });
 
 describe("should not assign destroy key to a record", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should not assign destroy key to a record", async () => {
-    const adapter = await freshAdapter();
     class NADTag extends Base {
       static {
         this._tableName = "nad_tags";
         this.attribute("name", "string");
         this.attribute("nad_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NADArticle extends Base {
       static {
         this._tableName = "nad_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NADArticle, "nadTags", {
@@ -1960,21 +1965,23 @@ describe("should not assign destroy key to a record", () => {
 });
 
 describe("should not destroy the associated model until the parent is saved", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should not destroy the associated model until the parent is saved", async () => {
-    const adapter = await freshAdapter();
     class NDTag extends Base {
       static {
         this._tableName = "nd_tags";
         this.attribute("name", "string");
         this.attribute("nd_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NDArticle extends Base {
       static {
         this._tableName = "nd_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NDArticle, "ndTags", {
@@ -1997,21 +2004,23 @@ describe("should not destroy the associated model until the parent is saved", ()
 });
 
 describe("should not load association when updating existing records", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should not load association when updating existing records", async () => {
-    const adapter = await freshAdapter();
     class NLUTag extends Base {
       static {
         this._tableName = "nlu_tags";
         this.attribute("name", "string");
         this.attribute("nlu_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NLUArticle extends Base {
       static {
         this._tableName = "nlu_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NLUArticle, "nluTags", {
@@ -2059,21 +2068,23 @@ describe("should preserve order when not overwriting unsaved updates", () => {
 });
 
 describe("should raise RecordNotFound if an id belonging to a different record is given", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should raise RecordNotFound if an id belonging to a different record is given", async () => {
-    const adapter = await freshAdapter();
     class RNFTag extends Base {
       static {
         this._tableName = "rnf_tags";
         this.attribute("name", "string");
         this.attribute("rnf_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class RNFArticle extends Base {
       static {
         this._tableName = "rnf_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(RNFArticle, "rnfTags", {
@@ -2091,21 +2102,23 @@ describe("should raise RecordNotFound if an id belonging to a different record i
 });
 
 describe("should raise an UnknownAttributeError for non existing nested attributes for has many", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should raise an UnknownAttributeError for non existing nested attributes for has many", async () => {
-    const adapter = await freshAdapter();
     class UAHMTag extends Base {
       static {
         this._tableName = "uahm_tags";
         this.attribute("name", "string");
         this.attribute("uahm_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class UAHMArticle extends Base {
       static {
         this._tableName = "uahm_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(UAHMArticle, "uahmTags", {
@@ -2122,21 +2135,23 @@ describe("should raise an UnknownAttributeError for non existing nested attribut
 });
 
 describe("should raise an argument error if something else than a hash is passed", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should raise an argument error if something else than a hash is passed", async () => {
-    const adapter = await freshAdapter();
     class RAETag extends Base {
       static {
         this._tableName = "rae_tags";
         this.attribute("name", "string");
         this.attribute("rae_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class RAEArticle extends Base {
       static {
         this._tableName = "rae_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(RAEArticle, "raeTags", {
@@ -2163,21 +2178,23 @@ describe("should refresh saved records when not overwriting unsaved updates", ()
 });
 
 describe("should save only one association on create", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should save only one association on create", async () => {
-    const adapter = await freshAdapter();
     class NSaveTag extends Base {
       static {
         this._tableName = "nsave_tags";
         this.attribute("name", "string");
         this.attribute("nsave_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NSaveArticle extends Base {
       static {
         this._tableName = "nsave_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NSaveArticle, "nsaveTags", {
@@ -2197,21 +2214,23 @@ describe("should save only one association on create", () => {
 });
 
 describe("should sort the hash by the keys before building new associated models", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should sort the hash by the keys before building new associated models", async () => {
-    const adapter = await freshAdapter();
     class NSHTag extends Base {
       static {
         this._tableName = "nsh_tags";
         this.attribute("name", "string");
         this.attribute("nsh_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NSHArticle extends Base {
       static {
         this._tableName = "nsh_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NSHArticle, "nshTags", {
@@ -2237,21 +2256,23 @@ describe("should sort the hash by the keys before building new associated models
 });
 
 describe("should take a hash and assign the attributes to the associated models", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should take a hash and assign the attributes to the associated models", async () => {
-    const adapter = await freshAdapter();
     class NHTag extends Base {
       static {
         this._tableName = "nh_tags";
         this.attribute("name", "string");
         this.attribute("nh_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NHArticle extends Base {
       static {
         this._tableName = "nh_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NHArticle, "nhTags", {
@@ -2280,21 +2301,23 @@ describe("should take a hash with composite id keys and assign the attributes to
 });
 
 describe("should take an array and assign the attributes to the associated models", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should take an array and assign the attributes to the associated models", async () => {
-    const adapter = await freshAdapter();
     class NArrTag extends Base {
       static {
         this._tableName = "narr_tags";
         this.attribute("name", "string");
         this.attribute("narr_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NArrArticle extends Base {
       static {
         this._tableName = "narr_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NArrArticle, "narrTags", {
@@ -2313,21 +2336,23 @@ describe("should take an array and assign the attributes to the associated model
 });
 
 describe("should work with update as well", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("should work with update as well", async () => {
-    const adapter = await freshAdapter();
     class NUpdTag extends Base {
       static {
         this._tableName = "nupd_tags";
         this.attribute("name", "string");
         this.attribute("nupd_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NUpdArticle extends Base {
       static {
         this._tableName = "nupd_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NUpdArticle, "nupdTags", {
@@ -2609,7 +2634,6 @@ describe("Nested Attributes (Rails-guided)", () => {
     expect(comments.length).toBe(2);
   });
   it("should automatically enable autosave on the association", async () => {
-    const adapter = await freshAdapter();
     class AE1Tag extends Base {
       static {
         this._tableName = "ae1_tags";
