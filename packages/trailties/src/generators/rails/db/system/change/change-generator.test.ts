@@ -180,4 +180,126 @@ describe("ChangeGeneratorTest", () => {
     expect(read("Dockerfile")).toBe("FROM node:22-slim\nRUN echo hello\n");
     expect(calls.some((m) => m.includes("Dockerfile"))).toBe(false);
   });
+
+  describe("editDevcontainerFiles", () => {
+    function seedDevcontainer(dbName: string, hasService: boolean): void {
+      const features: Record<string, unknown> = {
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+      };
+      if (dbName === "sqlite3") features["ghcr.io/rails/devcontainer/features/sqlite3"] = {};
+      else if (dbName === "postgres")
+        features["ghcr.io/rails/devcontainer/features/postgres-client"] = {};
+      else if (dbName === "mysql")
+        features["ghcr.io/rails/devcontainer/features/mysql-client"] = {};
+      const dc: Record<string, unknown> = {
+        name: "tmp",
+        features,
+        forwardPorts: [3000],
+      };
+      if (hasService) dc.containerEnv = { DB_HOST: dbName };
+      write(".devcontainer/devcontainer.json", JSON.stringify(dc, null, 2) + "\n");
+      const services: Record<string, unknown> = { "rails-app": { command: "sleep infinity" } };
+      if (hasService) {
+        (services["rails-app"] as Record<string, unknown>).depends_on = [dbName];
+        services[dbName] = { image: "fake:latest" };
+      }
+      const compose: Record<string, unknown> = { name: "tmp", services };
+      if (hasService) compose.volumes = { [`${dbName}-data`]: null };
+      write(".devcontainer/compose.yaml", JSON.stringify(compose, null, 2) + "\n");
+    }
+
+    it("editDevcontainerFiles skipped when no .devcontainer dir", () => {
+      run("postgresql");
+      expect(exists(".devcontainer/devcontainer.json")).toBe(false);
+    });
+
+    it("change to postgresql adds service, volume, DB_HOST, feature", () => {
+      seedDevcontainer("sqlite3", false);
+      run("postgresql");
+      const dc = JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;
+      expect((dc.containerEnv as Record<string, string>).DB_HOST).toBe("postgres");
+      expect(
+        (dc.features as Record<string, unknown>)[
+          "ghcr.io/rails/devcontainer/features/postgres-client"
+        ],
+      ).toEqual({});
+      expect(
+        (dc.features as Record<string, unknown>)["ghcr.io/rails/devcontainer/features/sqlite3"],
+      ).toBeUndefined();
+      const cm = JSON.parse(read(".devcontainer/compose.yaml")) as Record<string, unknown>;
+      expect((cm.services as Record<string, unknown>)["postgres"]).toBeDefined();
+      expect((cm.volumes as Record<string, unknown>)["postgres-data"]).toBeDefined();
+      const railsApp = (cm.services as Record<string, Record<string, unknown>>)["rails-app"];
+      expect(railsApp.depends_on).toContain("postgres");
+    });
+
+    it("change to sqlite3 removes service, volume, DB_HOST, swaps feature", () => {
+      seedDevcontainer("postgres", true);
+      run("sqlite3");
+      const dc = JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;
+      expect(dc.containerEnv).toBeUndefined();
+      expect(
+        (dc.features as Record<string, unknown>)["ghcr.io/rails/devcontainer/features/sqlite3"],
+      ).toEqual({});
+      expect(
+        (dc.features as Record<string, unknown>)[
+          "ghcr.io/rails/devcontainer/features/postgres-client"
+        ],
+      ).toBeUndefined();
+      const cm = JSON.parse(read(".devcontainer/compose.yaml")) as Record<string, unknown>;
+      expect((cm.services as Record<string, unknown>)["postgres"]).toBeUndefined();
+      expect(cm.volumes).toBeUndefined();
+      const railsApp = (cm.services as Record<string, Record<string, unknown>>)["rails-app"];
+      expect(railsApp.depends_on).toBeUndefined();
+    });
+
+    it("editDevcontainerJson throws on unparseable JSON", () => {
+      write(".devcontainer/devcontainer.json", "{ not json");
+      expect(() => run("postgresql")).toThrow(/Could not parse .*devcontainer\.json/);
+    });
+
+    it("editComposeYaml throws on unparseable JSON", () => {
+      seedDevcontainer("sqlite3", false);
+      write(".devcontainer/compose.yaml", "{ not json");
+      expect(() => run("postgresql")).toThrow(/Could not parse .*compose\.yaml/);
+    });
+
+    it("non-DB depends_on entries are preserved when swapping database", () => {
+      seedDevcontainer("postgres", true);
+      // Inject non-DB depends_on entries that the devcontainer generator may add.
+      const composePath = ".devcontainer/compose.yaml";
+      const compose = JSON.parse(read(composePath)) as {
+        services: Record<string, { depends_on?: string[]; [k: string]: unknown }>;
+        [k: string]: unknown;
+      };
+      (compose.services["rails-app"].depends_on ??= []).push("selenium", "redis");
+      write(composePath, JSON.stringify(compose, null, 2) + "\n");
+      run("mysql");
+      const cm = JSON.parse(read(composePath)) as Record<string, unknown>;
+      const railsApp = (cm.services as Record<string, Record<string, unknown>>)["rails-app"];
+      expect(railsApp.depends_on).toContain("mysql");
+      expect(railsApp.depends_on).toContain("selenium");
+      expect(railsApp.depends_on).toContain("redis");
+      expect(railsApp.depends_on).not.toContain("postgres");
+    });
+
+    it("change from mysql to postgresql swaps service and feature", () => {
+      seedDevcontainer("mysql", true);
+      run("postgresql");
+      const cm = JSON.parse(read(".devcontainer/compose.yaml")) as Record<string, unknown>;
+      expect((cm.services as Record<string, unknown>)["mysql"]).toBeUndefined();
+      expect((cm.services as Record<string, unknown>)["postgres"]).toBeDefined();
+      const dc = JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;
+      expect(
+        (dc.features as Record<string, unknown>)[
+          "ghcr.io/rails/devcontainer/features/mysql-client"
+        ],
+      ).toBeUndefined();
+      expect(
+        (dc.features as Record<string, unknown>)[
+          "ghcr.io/rails/devcontainer/features/postgres-client"
+        ],
+      ).toEqual({});
+    });
+  });
 });
