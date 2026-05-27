@@ -3,8 +3,8 @@
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass, RecordInvalid } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import {
   Associations,
   association,
@@ -540,19 +540,13 @@ const TEST_SCHEMA: Schema = {
   us_posts: { us_author_id: "integer" },
 };
 
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 describe("HasManyThroughAssociationsTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   }, 30000);
-  withTransactionalFixtures(() => adapter);
 
   it.skip("marshal dump", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
@@ -562,21 +556,18 @@ describe("HasManyThroughAssociationsTest", () => {
     class TajAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TajPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("taj_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class TajComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("taj_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(TajAuthor, "tajPosts", { foreignKey: "taj_author_id" });
@@ -608,21 +599,18 @@ describe("HasManyThroughAssociationsTest", () => {
     class TaljAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TaljPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("talj_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class TaljComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("talj_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(TaljAuthor, "taljPosts", { foreignKey: "talj_author_id" });
@@ -658,20 +646,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class TaCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TaContract extends Base {
       static {
         this.attribute("ta_company_id", "integer");
         this.attribute("ta_developer_id", "integer");
-        this.adapter = adapter;
       }
     }
     class TaDeveloper extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("TaCompany", TaCompany);
@@ -714,27 +699,23 @@ describe("HasManyThroughAssociationsTest", () => {
     class PnAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PnPost extends Base {
       static {
         this.attribute("pn_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class PnTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PnTagging extends Base {
       static {
         this.attribute("pn_post_id", "integer");
         this.attribute("pn_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PnAuthor, "pnPosts", {
@@ -783,20 +764,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class PsrCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PsrContract extends Base {
       static {
         this.attribute("psr_company_id", "integer");
         this.attribute("psr_developer_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PsrDeveloper extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PsrCompany, "psrContracts", {
@@ -834,13 +812,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class PsClub extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PsMember extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PsMembership extends Base {
@@ -849,20 +825,17 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("ps_member_id", "integer");
         this.attribute("type", "string");
         this._tableName = "ps_memberships";
-        this.adapter = adapter;
         enableSti(PsMembership);
       }
     }
     class PsSuperMembership extends PsMembership {
       static {
-        this.adapter = adapter;
         registerModel(PsSuperMembership);
         registerSubclass(PsSuperMembership);
       }
     }
     class PsCurrentMembership extends PsMembership {
       static {
-        this.adapter = adapter;
         registerModel(PsCurrentMembership);
         registerSubclass(PsCurrentMembership);
       }
@@ -902,14 +875,12 @@ describe("HasManyThroughAssociationsTest", () => {
     class PreloadMultiParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PreloadMultiChild extends Base {
       static {
         this.attribute("value", "string");
         this.attribute("preload_multi_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PreloadMultiParent, "preloadMultiChildren", {
@@ -945,20 +916,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtSingletonOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtSingletonJoin extends Base {
       static {
         this.attribute("hmt_singleton_owner_id", "integer");
         this.attribute("hmt_singleton_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtSingletonItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtSingletonOwner, "hmtSingletonJoins", {
@@ -998,20 +966,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtNoPkOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtNoPkJoin extends Base {
       static {
         this.attribute("hmt_no_pk_owner_id", "integer");
         this.attribute("hmt_no_pk_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtNoPkItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtNoPkOwner, "hmtNoPkJoins", {
@@ -1051,20 +1016,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtNoPkDelOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtNoPkDelJoin extends Base {
       static {
         this.attribute("hmt_no_pk_del_owner_id", "integer");
         this.attribute("hmt_no_pk_del_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtNoPkDelItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtNoPkDelOwner, "hmtNoPkDelJoins", {
@@ -1105,20 +1067,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtPkOptOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtPkOptJoin extends Base {
       static {
         this.attribute("hmt_pk_opt_owner_id", "integer");
         this.attribute("hmt_pk_opt_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtPkOptItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtPkOptOwner, "hmtPkOptJoins", {
@@ -1154,24 +1113,21 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(items).toHaveLength(1);
   });
 
-  it("include? - has many through", async () => {
+  it("include?", async () => {
     class HmtPerson extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtMembership extends Base {
       static {
         this.attribute("person_id", "integer");
         this.attribute("hmt_club_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtClub extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtPerson, "hmtMemberships", {
@@ -1211,20 +1167,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDepDestroyOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtDepDestroyJoin extends Base {
       static {
         this.attribute("hmt_dep_destroy_owner_id", "integer");
         this.attribute("hmt_dep_destroy_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtDepDestroyItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtDepDestroyOwner", HmtDepDestroyOwner);
@@ -1250,14 +1203,12 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDepNullOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtDepNullJoin extends Base {
       static {
         this.attribute("hmt_dep_null_owner_id", "integer");
         this.attribute("hmt_dep_null_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtDepNullOwner", HmtDepNullOwner);
@@ -1283,14 +1234,12 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDepDelAllOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtDepDelAllJoin extends Base {
       static {
         this.attribute("hmt_dep_del_all_owner_id", "integer");
         this.attribute("hmt_dep_del_all_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtDepDelAllOwner", HmtDepDelAllOwner);
@@ -1326,20 +1275,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtPostTag extends Base {
       static {
         this.attribute("post_id", "integer");
         this.attribute("hmt_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtPost, "hmtPostTags", {
@@ -1384,20 +1330,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDupPerson extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtDupMembership extends Base {
       static {
         this.attribute("hmt_dup_person_id", "integer");
         this.attribute("hmt_dup_club_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtDupClub extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtDupPerson, "hmtDupMemberships", {
@@ -1440,20 +1383,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDup2Person extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtDup2Join extends Base {
       static {
         this.attribute("hmt_dup2_person_id", "integer");
         this.attribute("hmt_dup2_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtDup2Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtDup2Person, "hmtDup2Joins", {
@@ -1483,20 +1423,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDelOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtDelJoin extends Base {
       static {
         this.attribute("hmt_del_owner_id", "integer");
         this.attribute("hmt_del_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtDelItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtDelOwner, "hmtDelJoins", {
@@ -1545,20 +1482,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtStudent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtEnrollment extends Base {
       static {
         this.attribute("student_id", "integer");
         this.attribute("course_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtCourse extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtStudent", HmtStudent);
@@ -1581,20 +1515,17 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     class AnbReader extends Base {
       static {
         this.attribute("anb_person_id", "integer");
         this.attribute("anb_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class AnbPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(AnbPost, "anbReaders", {
@@ -1625,20 +1556,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class BtsPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class BtsReader extends Base {
       static {
         this.attribute("bts_person_id", "integer");
         this.attribute("bts_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class BtsPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(BtsPost, "btsReaders", {
@@ -1670,20 +1598,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class BtshPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class BtshReader extends Base {
       static {
         this.attribute("btsh_person_id", "integer");
         this.attribute("btsh_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class BtshPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(BtshPost, "btshReaders", {
@@ -1714,20 +1639,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class BtrsPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class BtrsReader extends Base {
       static {
         this.attribute("btrs_person_id", "integer");
         this.attribute("btrs_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class BtrsPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(BtrsPost, "btrsReaders", {
@@ -1764,20 +1686,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtWriter extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtWriterBook extends Base {
       static {
         this.attribute("writer_id", "integer");
         this.attribute("book_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtWriterBookTitle extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtWriter", HmtWriter);
@@ -1799,20 +1718,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDelAssocOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtDelAssocJoin extends Base {
       static {
         this.attribute("hmt_del_assoc_owner_id", "integer");
         this.attribute("hmt_del_assoc_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtDelAssocItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtDelAssocOwner, "hmtDelAssocJoins", {
@@ -1853,20 +1769,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDestroyAssocOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtDestroyAssocJoin extends Base {
       static {
         this.attribute("hmt_destroy_assoc_owner_id", "integer");
         this.attribute("hmt_destroy_assoc_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtDestroyAssocItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtDestroyAssocOwner, "hmtDestroyAssocJoins", {
@@ -1913,20 +1826,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDestroyAllOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtDestroyAllJoin extends Base {
       static {
         this.attribute("hmt_destroy_all_owner_id", "integer");
         this.attribute("hmt_destroy_all_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtDestroyAllItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtDestroyAllOwner, "hmtDestroyAllJoins", {
@@ -1983,7 +1893,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     registerModel("CpkItem", CpkItem);
@@ -2005,7 +1914,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkJtJoin extends Base {
@@ -2014,14 +1922,12 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("cpk_jt_owner_region_id", "integer");
         this.attribute("cpk_jt_owner_id", "integer");
         this.attribute("cpk_jt_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CpkJtItem extends Base {
       static {
         this._tableName = "cpk_jt_items";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkJtOwner, "cpkJtJoins", {
@@ -2056,20 +1962,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDaClrOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtDaClrJoin extends Base {
       static {
         this.attribute("hmt_da_clr_owner_id", "integer");
         this.attribute("hmt_da_clr_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtDaClrItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtDaClrOwner, "hmtDaClrJoins", {
@@ -2121,20 +2024,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDstClrOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtDstClrJoin extends Base {
       static {
         this.attribute("hmt_dst_clr_owner_id", "integer");
         this.attribute("hmt_dst_clr_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtDstClrItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtDstClrOwner, "hmtDstClrJoins", {
@@ -2181,20 +2081,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDelClrOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtDelClrJoin extends Base {
       static {
         this.attribute("hmt_del_clr_owner_id", "integer");
         this.attribute("hmt_del_clr_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtDelClrItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtDelClrOwner, "hmtDelClrJoins", {
@@ -2235,20 +2132,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtMismatchOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtMismatchJoin extends Base {
       static {
         this.attribute("hmt_mismatch_owner_id", "integer");
         this.attribute("hmt_mismatch_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtMismatchItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtMismatchOwner, "hmtMismatchJoins", {
@@ -2289,20 +2183,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class DepNullOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DepNullJoin extends Base {
       static {
         this.attribute("dep_null_owner_id", "integer");
         this.attribute("dep_null_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class DepNullItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(DepNullOwner, "depNullJoins", {
@@ -2328,14 +2219,12 @@ describe("HasManyThroughAssociationsTest", () => {
     class DepDelOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DepDelJoin extends Base {
       static {
         this.attribute("dep_del_owner_id", "integer");
         this.attribute("dep_del_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(DepDelOwner, "depDelJoins", {
@@ -2355,14 +2244,12 @@ describe("HasManyThroughAssociationsTest", () => {
     class DepDesOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DepDesJoin extends Base {
       static {
         this.attribute("dep_des_owner_id", "integer");
         this.attribute("dep_des_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(DepDesOwner, "depDesJoins", {
@@ -2382,13 +2269,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class BtDesParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BtDesChild extends Base {
       static {
         this.attribute("bt_des_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(BtDesChild, "btDesParent", {
@@ -2412,13 +2297,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class BtDelParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BtDelChild extends Base {
       static {
         this.attribute("bt_del_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(BtDelParent, "btDelChildren", {
@@ -2438,13 +2321,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class BtNullParent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BtNullChild extends Base {
       static {
         this.attribute("bt_null_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(BtNullParent, "btNullChildren", {
@@ -2466,20 +2347,17 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("tags_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class CcTagging extends Base {
       static {
         this.attribute("cc_owner_id", "integer");
         this.attribute("cc_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CcTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CcOwner, "ccTaggings", {
@@ -2512,20 +2390,17 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("tags_with_destroy_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class CcDestrTagging extends Base {
       static {
         this.attribute("cc_destr_owner_id", "integer");
         this.attribute("cc_destr_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CcDestrTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CcDestrOwner, "ccDestrTaggings", {
@@ -2565,20 +2440,17 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("tags_with_nullify_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class CcNulTagging extends Base {
       static {
         this.attribute("cc_nul_owner_id", "integer");
         this.attribute("cc_nul_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CcNulTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CcNulOwner, "ccNulTaggings", {
@@ -2620,20 +2492,17 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("tags_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class CcRplTagging extends Base {
       static {
         this.attribute("cc_rpl_owner_id", "integer");
         this.attribute("cc_rpl_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CcRplTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CcRplOwner, "ccRplTaggings", {
@@ -2673,20 +2542,17 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("taggings_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class CcDTagging extends Base {
       static {
         this.attribute("cc_d_owner_id", "integer");
         this.attribute("cc_d_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CcDTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CcDOwner, "ccDTaggings", {
@@ -2719,14 +2585,12 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("indestructible_tags_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class IdestrTagging extends Base {
       static {
         this.attribute("idestr_owner_id", "integer");
         this.attribute("idestr_tag_id", "integer");
-        this.adapter = adapter;
         // before_destroy that prevents destruction
         this.beforeDestroy((r: any) => {
           return false;
@@ -2736,7 +2600,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class IdestrTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(IdestrOwner, "idestrTaggings", {
@@ -2775,20 +2638,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtReplOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtReplJoin extends Base {
       static {
         this.attribute("hmt_repl_owner_id", "integer");
         this.attribute("hmt_repl_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtReplItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtReplOwner, "hmtReplJoins", {
@@ -2842,20 +2702,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtReplDupOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtReplDupJoin extends Base {
       static {
         this.attribute("hmt_repl_dup_owner_id", "integer");
         this.attribute("hmt_repl_dup_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtReplDupItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtReplDupOwner, "hmtReplDupJoins", {
@@ -2900,20 +2757,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class RopPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class RopReader extends Base {
       static {
         this.attribute("rop_person_id", "integer");
         this.attribute("rop_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class RopPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(RopPost, "ropReaders", {
@@ -2954,20 +2808,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class RbiPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class RbiReader extends Base {
       static {
         this.attribute("rbi_person_id", "integer");
         this.attribute("rbi_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class RbiPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(RbiPost, "rbiReaders", {
@@ -3006,20 +2857,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtSponsor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtSponsorShip extends Base {
       static {
         this.attribute("sponsor_id", "integer");
         this.attribute("event_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtEvent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtSponsor", HmtSponsor);
@@ -3040,20 +2888,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class TrbTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TrbTagging extends Base {
       static {
         this.attribute("trb_post_id", "integer");
         this.attribute("trb_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class TrbPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(TrbPost, "trbTaggings", {
@@ -3090,20 +2935,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtSimpleOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtSimpleJoin extends Base {
       static {
         this.attribute("hmt_simple_owner_id", "integer");
         this.attribute("hmt_simple_target_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtSimpleTarget extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtSimpleOwner", HmtSimpleOwner);
@@ -3123,20 +2965,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class AccTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AccTagging extends Base {
       static {
         this.attribute("acc_post_id", "integer");
         this.attribute("acc_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class AccPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(AccPost, "accTaggings", {
@@ -3175,20 +3014,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtBangNoOptOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtBangNoOptJoin extends Base {
       static {
         this.attribute("hmt_bang_no_opt_owner_id", "integer");
         this.attribute("hmt_bang_no_opt_target_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtBangNoOptTarget extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtBangNoOptOwner", HmtBangNoOptOwner);
@@ -3208,20 +3044,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtNewRecOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtNewRecJoin extends Base {
       static {
         this.attribute("hmt_new_rec_owner_id", "integer");
         this.attribute("hmt_new_rec_thing_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtNewRecThing extends Base {
       static {
         this.attribute("value", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtNewRecOwner", HmtNewRecOwner);
@@ -3243,14 +3076,12 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtInvOptOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtInvOptJoin extends Base {
       static {
         this.attribute("hmt_inv_opt_owner_id", "integer");
         this.attribute("hmt_inv_opt_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtInvOptOwner", HmtInvOptOwner);
@@ -3268,20 +3099,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtValOptOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtValOptJoin extends Base {
       static {
         this.attribute("hmt_val_opt_owner_id", "integer");
         this.attribute("hmt_val_opt_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtValOptItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtValOptOwner", HmtValOptOwner);
@@ -3302,14 +3130,12 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtBangInvOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtBangInvJoin extends Base {
       static {
         this.attribute("hmt_bang_inv_owner_id", "integer");
         this.attribute("hmt_bang_inv_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtBangInvOwner", HmtBangInvOwner);
@@ -3326,20 +3152,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtBangValOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtBangValJoin extends Base {
       static {
         this.attribute("hmt_bang_val_owner_id", "integer");
         this.attribute("hmt_bang_val_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtBangValItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtBangValOwner", HmtBangValOwner);
@@ -3363,20 +3186,17 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("pwir_owner_id", "integer");
         this.attribute("pwir_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PwirItem extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.validates("name", { exclusion: { in: ["0"] } });
       }
     }
     class PwirOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("PwirJoin", PwirJoin);
@@ -3409,7 +3229,6 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("pij_owner_id", "integer");
         this.attribute("pij_item_id", "integer");
-        this.adapter = adapter;
         this.validate((r: any) => {
           r.errors.add("base", "Invalid Contract");
         });
@@ -3418,13 +3237,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class PijItem extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PijOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("PijJoin", PijJoin);
@@ -3453,20 +3270,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtClrOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtClrJoin extends Base {
       static {
         this.attribute("hmt_clr_owner_id", "integer");
         this.attribute("hmt_clr_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtClrItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtClrOwner, "hmtClrJoins", {
@@ -3521,20 +3335,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class AcoOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AcoJoin extends Base {
       static {
         this.attribute("aco_owner_id", "integer");
         this.attribute("aco_person_id", "integer");
-        this.adapter = adapter;
       }
     }
     class AcoPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(AcoOwner, "acoJoins", {
@@ -3597,20 +3408,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class DfPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class DfReader extends Base {
       static {
         this.attribute("df_person_id", "integer");
         this.attribute("df_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class DfPerson extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("DfPost", DfPost);
@@ -3644,20 +3452,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class CiPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class CiReader extends Base {
       static {
         this.attribute("ci_person_id", "integer");
         this.attribute("ci_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CiPerson extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CiPost", CiPost);
@@ -3693,20 +3498,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class IjqPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     class IjqReference extends Base {
       static {
         this.attribute("ijq_person_id", "integer");
         this.attribute("ijq_job_id", "integer");
-        this.adapter = adapter;
       }
     }
     class IjqJob extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(IjqPerson, "ijqReferences", { foreignKey: "ijq_person_id" });
@@ -3745,20 +3547,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtIdsCondOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtIdsCondJoin extends Base {
       static {
         this.attribute("hmt_ids_cond_owner_id", "integer");
         this.attribute("hmt_ids_cond_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtIdsCondItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtIdsCondOwner, "hmtIdsCondJoins", {
@@ -3806,14 +3605,12 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtGroup extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtMemberRecord extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("group_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtGroup", HmtGroup);
@@ -3836,14 +3633,12 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtUnloadGroup extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtUnloadMember extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("hmt_unload_group_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtUnloadGroup", HmtUnloadGroup);
@@ -3869,20 +3664,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class TxnOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TxnJoin extends Base {
       static {
         this.attribute("txn_owner_id", "integer");
         this.attribute("txn_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class TxnTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("TxnOwner", TxnOwner);
@@ -3928,20 +3720,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class TxnPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class TxnReader extends Base {
       static {
         this.attribute("txn_post_id", "integer");
         this.attribute("txn_person_id", "integer");
-        this.adapter = adapter;
       }
     }
     class TxnPerson extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("TxnPost", TxnPost);
@@ -3979,20 +3768,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtNoBtOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtNoBtJoin extends Base {
       static {
         this.attribute("hmt_no_bt_owner_id", "integer");
         this.attribute("hmt_no_bt_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtNoBtItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtNoBtOwner, "hmtNoBtJoins", {
@@ -4027,28 +3813,24 @@ describe("HasManyThroughAssociationsTest", () => {
     class MjAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class MjPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("mj_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class MjComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("mj_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class MjRating extends Base {
       static {
         this.attribute("score", "integer");
         this.attribute("mj_comment_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(MjAuthor, "mjPosts", { foreignKey: "mj_author_id" });
@@ -4078,20 +3860,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class NpkOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NpkJoin extends Base {
       static {
         this.attribute("npk_owner_id", "integer");
         this.attribute("npk_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NpkItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NpkOwner, "npkJoins", {
@@ -4128,20 +3907,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class FicOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FicJoin extends Base {
       static {
         this.attribute("fic_owner_id", "integer");
         this.attribute("fic_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class FicPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(FicOwner, "ficJoins", {
@@ -4181,20 +3957,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtHoReflOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtHoReflJoin extends Base {
       static {
         this.attribute("hmt_ho_refl_owner_id", "integer");
         this.attribute("hmt_ho_refl_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtHoReflItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtHoReflOwner, "hmtHoReflJoins", {
@@ -4234,21 +4007,18 @@ describe("HasManyThroughAssociationsTest", () => {
     class MhrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class MhrPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("mhr_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class MhrComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("mhr_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     // Through goes via has_one, so writes should be forbidden
@@ -4284,20 +4054,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class NskPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class NskTagging extends Base {
       static {
         this.attribute("nsk_post_id", "integer");
         this.attribute("nsk_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NskTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NskPost, "nskTaggings", {
@@ -4331,20 +4098,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class CbkPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class CbkTagging extends Base {
       static {
         this.attribute("cbk_post_id", "integer");
         this.attribute("cbk_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CbkTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CbkPost, "cbkTaggings", {
@@ -4375,20 +4139,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class CckPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class CckTagging extends Base {
       static {
         this.attribute("cck_post_id", "integer");
         this.attribute("cck_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CckTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CckPost, "cckTaggings", {
@@ -4420,14 +4181,12 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtProject extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtTask extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("project_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtProject", HmtProject);
@@ -4447,20 +4206,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class CdkPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class CdkTagging extends Base {
       static {
         this.attribute("cdk_post_id", "integer");
         this.attribute("cdk_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CdkTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CdkPost, "cdkTaggings", {
@@ -4497,20 +4253,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class SpkPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class SpkReader extends Base {
       static {
         this.attribute("spk_person_id", "integer");
         this.attribute("spk_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class SpkPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(SpkPerson, "spkReaders", {
@@ -4545,14 +4298,12 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtLibrary extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtBook extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("library_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtLibrary", HmtLibrary);
@@ -4573,20 +4324,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class TcPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class TcReader extends Base {
       static {
         this.attribute("tc_person_id", "integer");
         this.attribute("tc_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class TcPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(TcPerson, "tcReaders", {
@@ -4620,20 +4368,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class SpPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class SpReader extends Base {
       static {
         this.attribute("sp_person_id", "integer");
         this.attribute("sp_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class SpPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(SpPerson, "spReaders", {
@@ -4667,20 +4412,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class EiPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EiReader extends Base {
       static {
         this.attribute("ei_person_id", "integer");
         this.attribute("ei_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EiPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EiPerson, "eiReaders", {
@@ -4709,20 +4451,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class EitPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class EitReader extends Base {
       static {
         this.attribute("eit_person_id", "integer");
         this.attribute("eit_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EitPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EitPerson, "eitReaders", {
@@ -4751,7 +4490,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtBuildOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtBuildJoin extends Base {
@@ -4759,13 +4497,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("hmt_build_owner_id", "integer");
         this.attribute("hmt_build_item_id", "integer");
         this.attribute("role", "string");
-        this.adapter = adapter;
       }
     }
     class HmtBuildItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtBuildOwner", HmtBuildOwner);
@@ -4782,20 +4518,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtAttrOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtAttrJoin extends Base {
       static {
         this.attribute("hmt_attr_owner_id", "integer");
         this.attribute("hmt_attr_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtAttrItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtAttrOwner", HmtAttrOwner);
@@ -4808,21 +4541,18 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtMwOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtMwJoin extends Base {
       static {
         this.attribute("hmt_mw_owner_id", "integer");
         this.attribute("hmt_mw_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtMwItem extends Base {
       static {
         this.attribute("label", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtMwOwner", HmtMwOwner);
@@ -4836,20 +4566,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class IncBPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class IncBReader extends Base {
       static {
         this.attribute("inc_b_person_id", "integer");
         this.attribute("inc_b_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class IncBPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(IncBPerson, "incBReaders", {
@@ -4880,20 +4607,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class IncNPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class IncNReader extends Base {
       static {
         this.attribute("inc_n_person_id", "integer");
         this.attribute("inc_n_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class IncNPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(IncNPerson, "incNReaders", {
@@ -4924,20 +4648,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtRoOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtRoJoin extends Base {
       static {
         this.attribute("hmt_ro_owner_id", "integer");
         this.attribute("hmt_ro_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtRoItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtRoOwner, "hmtRoJoins", {
@@ -4981,20 +4702,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtUpdOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtUpdJoin extends Base {
       static {
         this.attribute("hmt_upd_owner_id", "integer");
         this.attribute("hmt_upd_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtUpdItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtUpdOwner, "hmtUpdJoins", {
@@ -5040,13 +4758,11 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("ss_author_id", "integer");
         this.attribute("skimmer", "boolean");
-        this.adapter = adapter;
       }
     }
     class SsAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("SsReader", SsReader);
@@ -5078,19 +4794,16 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("ssi_author_id", "integer");
         this.attribute("ssi_post_id", "integer");
         this.attribute("skimmer", "boolean");
-        this.adapter = adapter;
       }
     }
     class SsiPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class SsiAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("SsiJoin", SsiJoin);
@@ -5131,20 +4844,17 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("ssj_author_id", "integer");
         this.attribute("ssj_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class SsjPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adapter;
       }
     }
     class SsjAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("SsjJoin", SsjJoin);
@@ -5182,13 +4892,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class DupCat extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DupPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class DupCateg extends Base {
@@ -5196,13 +4904,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("dup_author_id", "integer");
         this.attribute("dup_post_id", "integer");
         this.attribute("dup_cat_id", "integer");
-        this.adapter = adapter;
       }
     }
     class DupAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("DupCat", DupCat);
@@ -5240,7 +4946,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class RwPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class RwTagging extends Base {
@@ -5248,13 +4953,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("rw_tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class RwTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(RwTag, "rwTaggings", {
@@ -5291,7 +4994,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class PpkPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class PpkTagging extends Base {
@@ -5299,13 +5001,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("ppk_tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class PpkTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PpkTag, "ppkTaggings", {
@@ -5342,20 +5042,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtPkOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtPkJoin extends Base {
       static {
         this.attribute("hmt_pk_owner_id", "integer");
         this.attribute("hmt_pk_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtPkItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtPkOwner, "hmtPkJoins", {
@@ -5392,20 +5089,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtDsOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtDsJoin extends Base {
       static {
         this.attribute("hmt_ds_owner_id", "integer");
         this.attribute("hmt_ds_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtDsItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtDsOwner, "hmtDsJoins", {
@@ -5442,20 +5136,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtCdOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtCdJoin extends Base {
       static {
         this.attribute("hmt_cd_owner_id", "integer");
         this.attribute("hmt_cd_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtCdItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtCdOwner", HmtCdOwner);
@@ -5477,20 +5168,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class JdAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class JdCategorization extends Base {
       static {
         this.attribute("jd_author_id", "integer");
         this.attribute("jd_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class JdPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(JdAuthor, "jdCategorizations", { foreignKey: "jd_author_id" });
@@ -5526,26 +5214,22 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("jbt_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class JbtAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class JbtCategorization extends Base {
       static {
         this.attribute("jbt_author_id", "integer");
         this.attribute("jbt_category_id", "integer");
-        this.adapter = adapter;
       }
     }
     class JbtCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(JbtPost, "jbtAuthor", { foreignKey: "jbt_author_id" });
@@ -5585,21 +5269,18 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtSelOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtSelJoin extends Base {
       static {
         this.attribute("hmt_sel_owner_id", "integer");
         this.attribute("hmt_sel_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtSelItem extends Base {
       static {
         this.attribute("label", "string");
         this.attribute("extra", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtSelOwner, "hmtSelJoins", {
@@ -5637,7 +5318,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class GidAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class GidCategorization extends Base {
@@ -5645,13 +5325,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("gid_author_id", "integer");
         this.attribute("gid_category_id", "integer");
         this.attribute("special", "boolean");
-        this.adapter = adapter;
       }
     }
     class GidCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GidAuthor, "gidCategorizations", {
@@ -5692,21 +5370,18 @@ describe("HasManyThroughAssociationsTest", () => {
     class GcsOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class GcsJoin extends Base {
       static {
         this.attribute("gcs_owner_id", "integer");
         this.attribute("gcs_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GcsPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("comments_count", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GcsOwner, "gcsJoins", {
@@ -5748,7 +5423,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class CntCat extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.scope("general", (rel: any) => rel.where({ name: "General" }));
       }
     }
@@ -5756,13 +5430,11 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("cnt_author_id", "integer");
         this.attribute("cnt_cat_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CntAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CntCat", CntCat);
@@ -5797,20 +5469,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtFkOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtFkJoin extends Base {
       static {
         this.attribute("hmt_fk_owner_id", "integer");
         this.attribute("hmt_fk_target_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtFkTarget extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtFkOwner, "hmtFkJoins", {
@@ -5855,20 +5524,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtNoCounterOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtNoCounterJoin extends Base {
       static {
         this.attribute("hmt_no_counter_owner_id", "integer");
         this.attribute("hmt_no_counter_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtNoCounterItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtNoCounterOwner, "hmtNoCounterJoins", {
@@ -5913,20 +5579,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class PkoOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PkoJoin extends Base {
       static {
         this.attribute("pko_owner_id", "integer");
         this.attribute("pko_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PkoItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PkoOwner, "pkoJoins", {
@@ -5962,14 +5625,12 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtNoErrOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtNoErrJoin extends Base {
       static {
         this.attribute("hmt_no_err_owner_id", "integer");
         this.attribute("hmt_no_err_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtNoErrOwner", HmtNoErrOwner);
@@ -5987,20 +5648,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtArrOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtArrJoin extends Base {
       static {
         this.attribute("hmt_arr_owner_id", "integer");
         this.attribute("hmt_arr_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtArrItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtArrOwner, "hmtArrJoins", {
@@ -6057,7 +5715,6 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("cbang_owner_id", "integer");
         this.attribute("cbang_item_id", "integer");
-        this.adapter = adapter;
         this.validate((r: any) => {
           r.errors.add("base", "Invalid Join");
         });
@@ -6066,13 +5723,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class CbangItem extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CbangOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CbangJoin", CbangJoin);
@@ -6104,7 +5759,6 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("sbang_owner_id", "integer");
         this.attribute("sbang_item_id", "integer");
-        this.adapter = adapter;
         this.validate((r: any) => {
           r.errors.add("base", "Invalid Join");
         });
@@ -6113,13 +5767,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class SbangItem extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SbangOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("SbangJoin", SbangJoin);
@@ -6153,7 +5805,6 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("fbang_owner_id", "integer");
         this.attribute("fbang_item_id", "integer");
-        this.adapter = adapter;
         this.validate((r: any) => {
           r.errors.add("base", "Invalid Join");
         });
@@ -6162,13 +5813,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class FbangItem extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FbangOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("FbangJoin", FbangJoin);
@@ -6208,20 +5857,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtEmptyThrOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtEmptyThrJoin extends Base {
       static {
         this.attribute("hmt_empty_thr_owner_id", "integer");
         this.attribute("hmt_empty_thr_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtEmptyThrItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtEmptyThrOwner, "hmtEmptyThrJoins", {
@@ -6256,7 +5902,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class PepOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PepTagging extends Base {
@@ -6264,13 +5909,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("pep_owner_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class PepItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PepOwner, "pepTaggings", {
@@ -6304,21 +5947,18 @@ describe("HasManyThroughAssociationsTest", () => {
     class EjjOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EjjPet extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("ejj_owner_id", "integer");
-        this.adapter = adapter;
       }
     }
     class EjjToy extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("ejj_pet_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(EjjOwner, "ejjPets", { foreignKey: "ejj_owner_id" });
@@ -6349,7 +5989,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class PsPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class PsTagging extends Base {
@@ -6357,13 +5996,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("ps_tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class PsTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PsTag, "psTaggings", {
@@ -6405,7 +6042,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class PjmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class PjmTagging extends Base {
@@ -6413,13 +6049,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("pjm_tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class PjmTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PjmPost, "pjmTaggings", {
@@ -6461,20 +6095,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class OrdPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class OrdReader extends Base {
       static {
         this.attribute("ord_person_id", "integer");
         this.attribute("ord_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class OrdPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(OrdPerson, "ordReaders", {
@@ -6512,21 +6143,18 @@ describe("HasManyThroughAssociationsTest", () => {
     class SumPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class SumPerson extends Base {
       static {
         this.attribute("first_name", "string");
         this.attribute("followers_count", "integer");
-        this.adapter = adapter;
       }
     }
     class SumReader extends Base {
       static {
         this.attribute("sum_post_id", "integer");
         this.attribute("sum_person_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(SumPost, "sumReaders", { foreignKey: "sum_post_id" });
@@ -6596,7 +6224,6 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("is_first", "boolean");
-        this.adapter = adapter;
         this.defaultScope((rel: any) => rel.where({ is_first: true }));
       }
     }
@@ -6604,13 +6231,11 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("ds_owner_id", "integer");
         this.attribute("ds_tgt_id", "integer");
-        this.adapter = adapter;
       }
     }
     class DsOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("DsTgt", DsTgt);
@@ -6644,20 +6269,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class IncScopeOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class IncScopeJoin extends Base {
       static {
         this.attribute("inc_scope_owner_id", "integer");
         this.attribute("inc_scope_tgt_id", "integer");
-        this.adapter = adapter;
       }
     }
     class IncScopeTgt extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("IncScopeOwner", IncScopeOwner);
@@ -6691,7 +6313,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class IrClub extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class IrMembership extends Base {
@@ -6699,13 +6320,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("ir_club_id", "integer");
         this.attribute("ir_member_id", "integer");
         this.attribute("favorite", "boolean");
-        this.adapter = adapter;
       }
     }
     class IrMember extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("IrClub", IrClub);
@@ -6749,7 +6368,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class IrClub2 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class IrMembership2 extends Base {
@@ -6757,13 +6375,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("ir_club2_id", "integer");
         this.attribute("ir_member2_id", "integer");
         this.attribute("favorite", "boolean");
-        this.adapter = adapter;
       }
     }
     class IrMember2 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("IrClub2", IrClub2);
@@ -6800,19 +6416,16 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("htu_post_id", "integer");
         this.attribute("htu_person_id", "integer");
         this.attribute("skimmer", "boolean");
-        this.adapter = adapter;
       }
     }
     class HtuPerson extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HtuPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HtuReader", HtuReader);
@@ -6858,13 +6471,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class StiAddClub extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class StiAddMember extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class StiAddMembership extends Base {
@@ -6873,13 +6484,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("sti_add_member_id", "integer");
         this.attribute("type", "string");
         this._tableName = "sti_add_memberships";
-        this.adapter = adapter;
         enableSti(StiAddMembership);
       }
     }
     class StiAddSuperMembership extends StiAddMembership {
       static {
-        this.adapter = adapter;
         registerModel(StiAddSuperMembership);
         registerSubclass(StiAddSuperMembership);
       }
@@ -6921,21 +6530,18 @@ describe("HasManyThroughAssociationsTest", () => {
     class BfAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BfPost extends Base {
       static {
         this.attribute("bf_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class BfOrg extends Base {
       static {
         this.attribute("bf_author_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(BfAuthor, "bfPosts", {
@@ -6975,20 +6581,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtMgClub extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtMgMembership extends Base {
       static {
         this.attribute("hmt_mg_club_id", "integer");
         this.attribute("hmt_mg_member_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtMgMember extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtMgClub", HmtMgClub);
@@ -7029,7 +6632,6 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("dc_owner_id", "integer");
         this.attribute("dc_tgt_id", "integer");
-        this.adapter = adapter;
         // Dynamic default scope: only join records for the current owner
         this.defaultScope((rel: any) =>
           currentOwnerId !== null ? rel.where({ dc_owner_id: currentOwnerId }) : rel,
@@ -7039,13 +6641,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class DcTgt extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DcOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("DcTgt", DcTgt);
@@ -7088,21 +6688,18 @@ describe("HasManyThroughAssociationsTest", () => {
     class JsAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class JsPost extends Base {
       static {
         this.attribute("js_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class JsComment extends Base {
       static {
         this.attribute("js_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("JsAuthor", JsAuthor);
@@ -7141,21 +6738,18 @@ describe("HasManyThroughAssociationsTest", () => {
     class LjAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class LjPost extends Base {
       static {
         this.attribute("lj_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class LjComment extends Base {
       static {
         this.attribute("lj_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("LjAuthor", LjAuthor);
@@ -7194,20 +6788,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class UsAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class UsPost extends Base {
       static {
         this.attribute("us_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class UsComment extends Base {
       static {
         this.attribute("us_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("UsAuthor", UsAuthor);
@@ -7251,21 +6842,18 @@ describe("HasManyThroughAssociationsTest", () => {
     class SjAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SjPost extends Base {
       static {
         this.attribute("sj_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class SjComment extends Base {
       static {
         this.attribute("sj_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("SjAuthor", SjAuthor);
@@ -7319,13 +6907,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class StFamily extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class StUser extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class StTree extends Base {
@@ -7333,7 +6919,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("st_family_id", "integer");
         this.attribute("st_member_id", "integer");
         this.attribute("token", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("StFamily", StFamily);
@@ -7373,7 +6958,6 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("tsu_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.defaultScope((rel: any) => rel.where({ title: "First Post" }));
       }
     }
@@ -7381,13 +6965,11 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("tsu_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     class TsuAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("TsuPost", TsuPost);
@@ -7442,7 +7024,6 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("tsi_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.defaultScope((rel: any) => rel.where({ title: "First Post" }));
       }
     }
@@ -7450,13 +7031,11 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("tsi_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     class TsiAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("TsiPost", TsiPost);
@@ -7494,7 +7073,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class IoOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     // Define through association BEFORE the through source
@@ -7522,7 +7100,6 @@ describe("HasManyThroughAssociationsTest", () => {
     class UidCat extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class UidCateg extends Base {
@@ -7530,13 +7107,11 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("uid_author_id", "integer");
         this.attribute("uid_cat_id", "integer");
         this.attribute("special", "boolean");
-        this.adapter = adapter;
       }
     }
     class UidAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("UidCat", UidCat);
@@ -7570,20 +7145,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtUnpOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtUnpJoin extends Base {
       static {
         this.attribute("hmt_unp_owner_id", "integer");
         this.attribute("hmt_unp_target_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtUnpTarget extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtUnpOwner, "hmtUnpJoins", {
@@ -7617,20 +7189,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtNestedUnpOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtNestedUnpJoin extends Base {
       static {
         this.attribute("hmt_nested_unp_owner_id", "integer");
         this.attribute("hmt_nested_unp_target_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtNestedUnpTarget extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtNestedUnpOwner, "hmtNestedUnpJoins", {
@@ -7663,20 +7232,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class CvOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CvPetTreasure extends Base {
       static {
         this.attribute("cv_owner_id", "integer");
         this.attribute("cv_pet_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CvPet extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     let callbackFired = false;
@@ -7725,13 +7291,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class CaSeminar extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CaSession extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CaSection extends Base {
@@ -7739,7 +7303,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("short_name", "string");
         this.attribute("ca_seminar_id", "integer");
         this.attribute("ca_session_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("CaSeminar", CaSeminar);
@@ -7785,14 +7348,12 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("blog_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class CqTag extends Base {
       static {
         this.attribute("blog_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CqBlogPostTag extends Base {
@@ -7800,7 +7361,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("blog_id", "integer");
         this.attribute("blog_post_id", "integer");
         this.attribute("tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("CqBlogPost", CqBlogPost);
@@ -7829,21 +7389,19 @@ describe("HasManyThroughAssociationsTest", () => {
     expect((tags[0] as any).name).toBe("Ruby");
   });
 
-  it("tags has many posts through association with composite query constraints", async () => {
+  it("tags has manu posts through association with composite query constraints", async () => {
     // Rails: tag.blog_posts.to_a uses JOIN with composite blog_id constraint
     // Core: reverse of above — tags to posts through composite FK
     class CqTag2 extends Base {
       static {
         this.attribute("blog_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CqBlogPost2 extends Base {
       static {
         this.attribute("blog_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class CqBlogPostTag2 extends Base {
@@ -7851,7 +7409,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("blog_id", "integer");
         this.attribute("blog_post_id", "integer");
         this.attribute("tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("CqTag2", CqTag2);
@@ -7888,7 +7445,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkHmtJoin extends Base {
@@ -7897,14 +7453,12 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("cpk_hmt_owner_region_id", "integer");
         this.attribute("cpk_hmt_owner_id", "integer");
         this.attribute("cpk_hmt_target_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CpkHmtTarget extends Base {
       static {
         this._tableName = "cpk_hmt_targets";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkHmtOwner, "cpkHmtJoins", {
@@ -7937,7 +7491,6 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkStJoin extends Base {
@@ -7946,14 +7499,12 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("cpk_st_owner_region_id", "integer");
         this.attribute("cpk_st_owner_id", "integer");
         this.attribute("cpk_st_target_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CpkStTarget extends Base {
       static {
         this._tableName = "cpk_st_targets";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkStOwner, "cpkStJoins", {
@@ -7995,20 +7546,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class CpkBOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CpkBJoin extends Base {
       static {
         this.attribute("cpk_b_owner_id", "integer");
         this.attribute("cpk_b_item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CpkBItem extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkBOwner, "cpkBJoins", {
@@ -8040,20 +7588,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtCrBook extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class HmtCrSubscription extends Base {
       static {
         this.attribute("hmt_cr_book_id", "integer");
         this.attribute("hmt_cr_subscriber_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtCrSubscriber extends Base {
       static {
         this.attribute("nick", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtCrBook, "hmtCrSubscriptions", {
@@ -8092,20 +7637,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class OhtPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class OhtReader extends Base {
       static {
         this.attribute("oht_person_id", "integer");
         this.attribute("oht_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class OhtPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(OhtPerson, "ohtReaders", {
@@ -8148,20 +7690,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class NpcLesson extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NpcLessonStudent extends Base {
       static {
         this.attribute("npc_lesson_id", "integer");
         this.attribute("npc_student_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NpcStudent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NpcLesson, "npcLessonStudents", {
@@ -8203,20 +7742,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class IncPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class IncReader extends Base {
       static {
         this.attribute("inc_person_id", "integer");
         this.attribute("inc_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class IncPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(IncPerson, "incReaders", {
@@ -8247,21 +7783,18 @@ describe("HasManyThroughAssociationsTest", () => {
     class HmtBtAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HmtBtFavorite extends Base {
       static {
         this.attribute("hmt_bt_author_id", "integer");
         this.attribute("favorite_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class HmtBtPost extends Base {
       static {
         this.attribute("hmt_bt_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(HmtBtAuthor, "hmtBtFavorites", {
@@ -8303,7 +7836,6 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("first_name", "string");
         this.attribute("primary_contact_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(SelfPerson, "agents", {
@@ -8341,20 +7873,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class CwcTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CwcTagging extends Base {
       static {
         this.attribute("cwc_post_id", "integer");
         this.attribute("cwc_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CwcPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CwcPost, "cwcTaggings", {
@@ -8387,20 +7916,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class NrPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class NrReader extends Base {
       static {
         this.attribute("nr_person_id", "integer");
         this.attribute("nr_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NrPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NrPerson, "nrReaders", {
@@ -8434,20 +7960,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class AePost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class AeReader extends Base {
       static {
         this.attribute("ae_person_id", "integer");
         this.attribute("ae_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class AePerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(AePost, "aeReaders", {
@@ -8482,20 +8005,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class SzPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class SzReader extends Base {
       static {
         this.attribute("sz_person_id", "integer");
         this.attribute("sz_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class SzPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(SzPost, "szReaders", {
@@ -8539,14 +8059,12 @@ describe("HasManyThroughAssociationsTest", () => {
     class ClearScopeAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ClearScopePost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(ClearScopeAuthor);
@@ -8570,20 +8088,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class GiPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class GiReader extends Base {
       static {
         this.attribute("gi_person_id", "integer");
         this.attribute("gi_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GiPerson extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GiPerson, "giReaders", {
@@ -8626,7 +8141,6 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this.attribute("irpv_owner_id", "integer");
         this.attribute("irpv_item_id", "integer");
-        this.adapter = adapter;
         this.validate((r: any) => {
           r.errors.add("base", "Join always invalid");
         });
@@ -8635,13 +8149,11 @@ describe("HasManyThroughAssociationsTest", () => {
     class IrpvItem extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class IrpvOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("IrpvJoin", IrpvJoin);
@@ -8677,20 +8189,17 @@ describe("HasManyThroughAssociationsTest", () => {
     class LtjmTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class LtjmTagging extends Base {
       static {
         this.attribute("post_id", "integer");
         this.attribute("tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class LtjmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(LtjmPost, "ltjmTaggings", {
