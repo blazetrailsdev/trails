@@ -108,7 +108,7 @@ export async function touch(
   if (typeof adapter.update === "function") {
     affected = await adapter.update(um);
   } else {
-    const sql = adapter.toSql ? adapter.toSql(um) : um.toSql();
+    const sql = adapter.visitor?.compile(um.ast) ?? um.toSql();
     affected = await ctor.connection.execUpdate(sql, `${ctor.name} Touch`);
   }
   if (ctor.lockingEnabled && affected === 0) {

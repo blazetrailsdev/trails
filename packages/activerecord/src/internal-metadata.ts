@@ -72,6 +72,11 @@ export class InternalMetadata {
     this._enabled = options.enabled ?? true;
   }
 
+  /** @internal */
+  private _compileSql(manager: { ast: unknown; toSql(): string }): string {
+    return this._connection.visitor?.compile(manager.ast as any) ?? manager.toSql();
+  }
+
   /**
    * Whether metadata storage is enabled for this configuration.
    *
@@ -163,7 +168,7 @@ export class InternalMetadata {
     if (!this._enabled) return;
     const dm = new DeleteManager();
     dm.from(this.arelTable);
-    await this._connection.executeMutation(dm.toSql());
+    await this._connection.executeMutation(this._compileSql(dm));
   }
 
   async count(): Promise<number> {
@@ -173,7 +178,7 @@ export class InternalMetadata {
     if (!this._enabled) return 0;
     const sm = new SelectManager(this.arelTable);
     sm.project(new Nodes.NamedFunction("COUNT", [star]).as("cnt"));
-    const rows = await this._connection.execute(sm.toSql());
+    const rows = await this._connection.execute(this._compileSql(sm));
     return Number(rows[0]?.cnt ?? 0);
   }
 
@@ -194,7 +199,7 @@ export class InternalMetadata {
       const sm = new SelectManager(this.arelTable);
       sm.project(new Nodes.Quoted(1));
       sm.take(1);
-      await this._connection.execute(sm.toSql());
+      await this._connection.execute(this._compileSql(sm));
       return true;
     } catch {
       return false;
@@ -221,7 +226,7 @@ export class InternalMetadata {
     sm.where(this.arelTable.get(this.primaryKey).eq(key));
     sm.order(this.arelTable.get(this.primaryKey).asc());
     sm.take(1);
-    const rows = await this._connection.execute(sm.toSql());
+    const rows = await this._connection.execute(this._compileSql(sm));
     return rows[0] ?? null;
   }
 
@@ -234,7 +239,7 @@ export class InternalMetadata {
       [this.arelTable.get("created_at"), now],
       [this.arelTable.get("updated_at"), now],
     ]);
-    await this._connection.executeMutation(im.toSql());
+    await this._connection.executeMutation(this._compileSql(im));
   }
 
   private async updateEntry(key: string, newValue: string): Promise<void> {
@@ -246,6 +251,6 @@ export class InternalMetadata {
       [this.arelTable.get("updated_at"), now],
     ]);
     um.where(this.arelTable.get(this.primaryKey).eq(key));
-    await this._connection.executeMutation(um.toSql());
+    await this._connection.executeMutation(this._compileSql(um));
   }
 }

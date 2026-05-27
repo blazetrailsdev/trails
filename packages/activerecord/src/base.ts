@@ -2756,7 +2756,8 @@ export class Base extends Model {
         }
         _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
 
-        const affected = await ctor.connection.execDelete(dm.toSql(), `${ctor.name} Destroy`);
+        const dmSql = ctor.connection.visitor?.compile(dm.ast) ?? dm.toSql();
+        const affected = await ctor.connection.execDelete(dmSql, `${ctor.name} Destroy`);
         if (ctor.lockingEnabled && affected === 0) {
           throw new StaleObjectError(this, "destroy");
         }

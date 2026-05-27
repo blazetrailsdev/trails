@@ -34,6 +34,11 @@ export class SchemaMigration {
     this.arelTable = new Table(this.tableName);
   }
 
+  /** @internal */
+  private _compileSql(manager: { ast: unknown; toSql(): string }): string {
+    return this._adapter.visitor?.compile(manager.ast as any) ?? manager.toSql();
+  }
+
   get primaryKey(): string {
     return "version";
   }
@@ -55,14 +60,14 @@ export class SchemaMigration {
   async createVersion(version: string): Promise<void> {
     const im = new InsertManager(this.arelTable);
     im.insert([[this.arelTable.get(this.primaryKey), version]]);
-    await this._adapter.executeMutation(im.toSql());
+    await this._adapter.executeMutation(this._compileSql(im));
   }
 
   async deleteVersion(version: string): Promise<void> {
     const dm = new DeleteManager();
     dm.from(this.arelTable);
     dm.where(this.arelTable.get(this.primaryKey).eq(version));
-    await this._adapter.executeMutation(dm.toSql());
+    await this._adapter.executeMutation(this._compileSql(dm));
   }
 
   async deleteAllVersions(): Promise<void> {
@@ -76,7 +81,7 @@ export class SchemaMigration {
     const sm = new SelectManager(this.arelTable);
     sm.project(this.arelTable.get(this.primaryKey));
     sm.order(this.arelTable.get(this.primaryKey).asc());
-    const rows = await this._adapter.execute(sm.toSql());
+    const rows = await this._adapter.execute(this._compileSql(sm));
     return rows.map((row) => String(row[this.primaryKey]).trim());
   }
 
@@ -87,7 +92,7 @@ export class SchemaMigration {
   async count(): Promise<number> {
     const sm = new SelectManager(this.arelTable);
     sm.project(new Nodes.NamedFunction("COUNT", [star]).as("cnt"));
-    const rows = await this._adapter.execute(sm.toSql());
+    const rows = await this._adapter.execute(this._compileSql(sm));
     return Number(rows[0]?.cnt ?? 0);
   }
 
@@ -96,7 +101,7 @@ export class SchemaMigration {
       const sm = new SelectManager(this.arelTable);
       sm.project(new Nodes.Quoted(1));
       sm.take(1);
-      await this._adapter.execute(sm.toSql());
+      await this._adapter.execute(this._compileSql(sm));
       return true;
     } catch {
       return false;
@@ -200,7 +205,7 @@ export class SchemaMigration {
       const rows = toInsert.map((v) => [new Nodes.Quoted(v)]);
       im.ast.columns = [col];
       im.values = im.createValuesList(rows);
-      await this._adapter.executeMutation(im.toSql());
+      await this._adapter.executeMutation(this._compileSql(im));
     }
   }
 }

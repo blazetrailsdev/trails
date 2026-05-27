@@ -245,7 +245,8 @@ async function processNestedAttributes(record: Base): Promise<void> {
             .table(arelTable)
             .set([[arelTable.get(foreignKey), created.id]])
             .where((ctor as any)._buildPkWhereNode(record.id));
-          await (ctor as any).connection.executeMutation(um.toSql());
+          const conn = (ctor as any).connection;
+          await conn.executeMutation(conn.visitor?.compile(um.ast) ?? um.toSql());
         }
       } else {
         // For hasMany/hasOne, set FK on the child record
