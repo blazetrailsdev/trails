@@ -149,4 +149,20 @@ describe("DevcontainerGeneratorTest", () => {
     expect(services().selenium).toBeUndefined();
     expect(env().CAPYBARA_SERVER_PORT).toBeUndefined();
   });
+  it("test_dockerfile_content", () => {
+    run({ nodeVersion: "20.0.0" });
+    const dockerfile = read(".devcontainer/Dockerfile");
+    expect(dockerfile).toContain("ARG NODE_VERSION=20.0.0");
+    expect(dockerfile).toContain(
+      "FROM mcr.microsoft.com/devcontainers/javascript-node:1-${NODE_VERSION}",
+    );
+  });
+  it("test_sqlite_driver_node_sqlite", () => {
+    run({ sqliteDriver: "node-sqlite" });
+    expect(features()).not.toHaveProperty("ghcr.io/rails/devcontainer/features/sqlite3");
+  });
+  it("test_sqlite_driver_expo_sqlite", () => {
+    run({ sqliteDriver: "expo-sqlite" });
+    expect(features()).not.toHaveProperty("ghcr.io/rails/devcontainer/features/sqlite3");
+  });
 });

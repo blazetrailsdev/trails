@@ -46,10 +46,7 @@ export class DevcontainerGenerator extends GeneratorBase {
 
   run(): string[] {
     this.createFile(".devcontainer/devcontainer.json", this.devcontainerJson());
-    this.createFile(
-      ".devcontainer/Dockerfile",
-      `ARG NODE_VERSION=${this.opts.nodeVersion}\nFROM mcr.microsoft.com/devcontainers/javascript-node:1-\${NODE_VERSION}\n`,
-    );
+    this.createFile(".devcontainer/Dockerfile", this.dockerfileContent());
     this.createFile(".devcontainer/compose.yaml", this.composeYaml());
     this.gsubFile(
       "test/application_system_test_case.ts",
@@ -71,6 +68,14 @@ export class DevcontainerGenerator extends GeneratorBase {
     const full = this.path.join(this.cwd, rel);
     this.fs.writeFileSync(full, this.fs.readFileSync(full, "utf-8").replace(re, replacement));
     this.output(`      update  ${rel}`);
+  }
+
+  private dockerfileContent(): string {
+    return [
+      `ARG NODE_VERSION=${this.opts.nodeVersion}`,
+      "FROM mcr.microsoft.com/devcontainers/javascript-node:1-${NODE_VERSION}",
+      "",
+    ].join("\n");
   }
 
   private devcontainerJson(): string {
