@@ -279,6 +279,14 @@ export class RequestForgeryProtection {
   }
 
   private normalizePath(path: string): string {
+    // Extract just the pathname from full or protocol-relative URLs
+    if (/^https?:\/\/|^\/\//i.test(path)) {
+      try {
+        path = new URL(/^\/\//.test(path) ? `https:${path}` : path).pathname;
+      } catch {
+        // fall through and treat as path
+      }
+    }
     // Remove query string and fragment
     let normalized = path.split("?")[0].split("#")[0];
     // Remove trailing slash (but keep root /)

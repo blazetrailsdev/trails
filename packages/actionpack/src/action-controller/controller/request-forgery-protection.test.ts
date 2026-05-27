@@ -676,20 +676,65 @@ describe("PerFormTokensControllerTest", () => {
   it.skip("Accepts proper token for patch method on button_to tag", () => {
     /* requires ActionView */
   });
-  it.skip("does not return old csrf token", () => {
-    /* requires controller dispatch */
+  it("does not return old csrf token", () => {
+    const csrf = new RequestForgeryProtection({ perFormTokens: true });
+    const session: Record<string, unknown> = {};
+    const realToken = csrf.getRealToken(session);
+    const perFormToken = csrf.generatePerFormToken(session, "/per_form_tokens/post_one", "POST");
+    const unmasked = csrf.unmaskToken(perFormToken);
+    expect(unmasked).not.toBe(realToken);
   });
-  it.skip("accepts old csrf token", () => {
-    /* requires controller dispatch */
+
+  it("accepts old csrf token", () => {
+    const csrf = new RequestForgeryProtection({ perFormTokens: true });
+    const session: Record<string, unknown> = {};
+    const realToken = csrf.getRealToken(session);
+    const nonHmacToken = csrf.maskToken(realToken);
+    expect(
+      csrf.verifyToken(session, nonHmacToken, {
+        actionPath: "/per_form_tokens/post_one",
+        method: "POST",
+      }),
+    ).toBe(true);
   });
+
   it.skip("handles relative paths", () => {
-    /* requires controller dispatch + PATH_INFO */
+    /* pending: requires controller PATH_INFO context for relative URL resolution */
   });
   it.skip("handles relative paths with dot", () => {
-    /* requires controller dispatch + PATH_INFO */
+    /* pending: requires controller PATH_INFO context for relative URL resolution */
   });
-  it.skip("ignores origin during generation", () => {
-    /* requires controller dispatch */
+
+  it("ignores origin during generation", () => {
+    const csrf = new RequestForgeryProtection({ perFormTokens: true });
+    const session: Record<string, unknown> = {};
+    const tokenWithOrigin = csrf.generatePerFormToken(
+      session,
+      "https://example.com/per_form_tokens/post_one/",
+      "POST",
+    );
+    expect(
+      csrf.verifyToken(session, tokenWithOrigin, {
+        actionPath: "/per_form_tokens/post_one",
+        method: "POST",
+      }),
+    ).toBe(true);
+  });
+
+  it("ignores origin during generation with protocol-relative url", () => {
+    const csrf = new RequestForgeryProtection({ perFormTokens: true });
+    const session: Record<string, unknown> = {};
+    const tokenWithOrigin = csrf.generatePerFormToken(
+      session,
+      "//example.com/per_form_tokens/post_one/",
+      "POST",
+    );
+    expect(
+      csrf.verifyToken(session, tokenWithOrigin, {
+        actionPath: "/per_form_tokens/post_one",
+        method: "POST",
+      }),
+    ).toBe(true);
   });
 });
 
