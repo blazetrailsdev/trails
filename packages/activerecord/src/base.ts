@@ -2741,10 +2741,13 @@ export class Base extends Model {
         const dm = new DeleteManager().from(table).where(ctor._buildPkWhereNode(pk));
         const lockCol = ctor.lockingColumn;
         if (ctor.lockingEnabled) {
-          // Mirrors Rails _lock_value_for_database: use original DB value so NULL → IS NULL.
-          // originalValueForDatabase() traces through originalAttribute chain, so
-          // a self-assign before destroy still yields the original null.
-          const lockWhereValue = this._attributes.getAttribute(lockCol).originalValueForDatabase();
+          // Mirrors Rails _lock_value_for_database: if user explicitly changed lock_version,
+          // use valueForDatabase (user-set value as expected DB version → stale if mismatch).
+          // Otherwise use originalValueForDatabase() so NULL-in-DB → IS NULL.
+          const lockAttr = this._attributes.getAttribute(lockCol);
+          const lockWhereValue = this.willSaveChangeToAttribute(lockCol)
+            ? lockAttr.valueForDatabase
+            : lockAttr.originalValueForDatabase();
           if (lockWhereValue == null) {
             dm.where(table.get(lockCol).isNull());
           } else {
