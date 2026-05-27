@@ -24,6 +24,7 @@ import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
 import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js";
+import { ConfigurationError } from "../errors.js";
 import { AliasTracker } from "./alias-tracker.js";
 
 export interface AliasMap {
@@ -812,7 +813,9 @@ export class JoinDependency {
   private findReflection(klass: typeof Base, name: string): any {
     const reflection = reflectOnAssociation(klass as any, name);
     if (!reflection) {
-      throw new AssociationNotFoundError(klass, name);
+      throw new ConfigurationError(
+        `Can't join '${(klass as any).name}' to association named '${name}'; perhaps you misspelled it?`,
+      );
     }
     return reflection;
   }
@@ -828,7 +831,7 @@ export class JoinDependency {
       (reflection as any).checkValidityBang?.();
       (reflection as any).checkEagerLoadableBang?.();
 
-      if (reflection.polymorphic?.()) {
+      if (reflection.isPolymorphic?.()) {
         throw new EagerLoadPolymorphicError(String(name));
       }
 

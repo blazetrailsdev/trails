@@ -16,8 +16,8 @@ All plan PRs (1–7b, F1–F6) have shipped.
 - [x] Add private `aliasTracker` getter
 - [x] Port `findReflection` helper
 - [x] Port `build` method
-- [ ] ~30 LOC: Implement `associationCached` shortcut in `_constructRecursive`
-- [ ] ~10 LOC: Wire `_references` param in `joinConstraints`
+- [x] Implement `associationCached` shortcut in `_constructRecursive`
+- [x] Wire `_references` param in `joinConstraints`
 - [ ] ~30 LOC: Pass `column_types` from result set for extra-column type-casting
 
 ### PR C — F2 dead code deletion (~220 LOC)
