@@ -5,7 +5,7 @@
  * polymorphic, dependent, counterCache, touch, CollectionProxy, reflection,
  * strict loading, inverse_of, and scoped associations.
  */
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
 import {
   loadHabtm,
   Base,
@@ -21,7 +21,8 @@ import {
 } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import {
   Associations,
   loadBelongsTo,
@@ -39,16 +40,13 @@ import { Preloader } from "./associations/preloader.js";
 import { Batch } from "./associations/preloader/batch.js";
 import { LoaderQuery } from "./associations/preloader/association.js";
 
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
-
 // ==========================================================================
 // belongs_to associations (Rails: belongs_to_associations_test.rb)
 // ==========================================================================
 
 describe("BelongsToAssociations", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Company extends Base {
     static {
@@ -63,13 +61,10 @@ describe("BelongsToAssociations", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Company.adapter = adapter;
-    Account.adapter = adapter;
+  beforeAll(async () => {
     registerModel(Company);
     registerModel(Account);
-    await defineSchema(adapter, {
+    await defineSchema({
       companies: { name: "string" },
       accounts: { company_id: "integer", credit_limit: "integer" },
       firms: { name: "string", uuid: "string" },
@@ -97,13 +92,11 @@ describe("BelongsToAssociations", () => {
       static {
         this.attribute("name", "string");
         this.attribute("uuid", "string");
-        this.adapter = adapter;
       }
     }
     class Client extends Base {
       static {
         this.attribute("firm_uuid", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Firm);
@@ -138,7 +131,6 @@ describe("BelongsToAssociations", () => {
     class Sponsor extends Base {
       static {
         this.attribute("sponsor_club_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Sponsor);
@@ -156,7 +148,6 @@ describe("BelongsToAssociations", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
@@ -164,7 +155,6 @@ describe("BelongsToAssociations", () => {
         this.attribute("body", "string");
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -187,7 +177,6 @@ describe("BelongsToAssociations", () => {
       static {
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     const comment = await Comment.create({ commentable_id: 1 });
@@ -196,7 +185,7 @@ describe("BelongsToAssociations", () => {
   });
 
   it("polymorphic belongs_to with foreignType reads overridden type column", async () => {
-    await defineSchema(adapter, {
+    await defineSchema({
       things: { name: "string" },
       ft_sponsors: { sponsorable_id: "integer", sponsorable_type: "string" },
     });
@@ -204,7 +193,6 @@ describe("BelongsToAssociations", () => {
       static {
         this._tableName = "things";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FtSponsor extends Base {
@@ -212,7 +200,6 @@ describe("BelongsToAssociations", () => {
         this._tableName = "ft_sponsors";
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(FtThing);
@@ -234,7 +221,7 @@ describe("BelongsToAssociations", () => {
   });
 
   it("polymorphic belongs_to with foreignType writes overridden type column on assignment", async () => {
-    await defineSchema(adapter, {
+    await defineSchema({
       ft_targets: { label: "string" },
       ft_owners: { sponsorable_id: "integer", sponsorable_type: "string" },
     });
@@ -242,7 +229,6 @@ describe("BelongsToAssociations", () => {
       static {
         this._tableName = "ft_targets";
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     class FtOwner extends Base {
@@ -250,7 +236,6 @@ describe("BelongsToAssociations", () => {
         this._tableName = "ft_owners";
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
-        this.adapter = adapter;
         this.belongsTo("thing", {
           polymorphic: true,
           foreignType: "sponsorable_type",
@@ -333,13 +318,11 @@ describe("BelongsToAssociations", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Book extends Base {
       static {
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -361,7 +344,8 @@ describe("BelongsToAssociations", () => {
 // ==========================================================================
 
 describe("HasOneAssociations", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Firm extends Base {
     static {
@@ -376,13 +360,10 @@ describe("HasOneAssociations", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Firm.adapter = adapter;
-    AccountDetail.adapter = adapter;
-    registerModel("Firm", Firm);
-    registerModel("AccountDetail", AccountDetail);
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    registerModel(Firm);
+    registerModel(AccountDetail);
+    await defineSchema({
       firms: { name: "string" },
       account_details: { firm_id: "integer", credit_limit: "integer" },
       profiles: { owner_id: "integer", firm_id: "integer", bio: "string" },
@@ -412,7 +393,6 @@ describe("HasOneAssociations", () => {
       static {
         this.attribute("owner_id", "integer");
         this.attribute("bio", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Profile);
@@ -429,7 +409,6 @@ describe("HasOneAssociations", () => {
         this.attribute("imageable_id", "integer");
         this.attribute("imageable_type", "string");
         this.attribute("url", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Image);
@@ -447,7 +426,6 @@ describe("HasOneAssociations", () => {
     class Profile extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Profile);
@@ -475,7 +453,8 @@ describe("HasOneAssociations", () => {
 // ==========================================================================
 
 describe("HasManyAssociations", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Author extends Base {
     static {
@@ -490,13 +469,8 @@ describe("HasManyAssociations", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Author.adapter = adapter;
-    Post.adapter = adapter;
-    registerModel(Author);
-    registerModel(Post);
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       authors: { name: "string" },
       posts: { title: "string", author_id: "integer" },
       articles: { writer_id: "integer", title: "string" },
@@ -527,7 +501,6 @@ describe("HasManyAssociations", () => {
       static {
         this.attribute("writer_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Article);
@@ -543,7 +516,6 @@ describe("HasManyAssociations", () => {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(BlogEntry);
@@ -563,7 +535,6 @@ describe("HasManyAssociations", () => {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
         this.attribute("tag", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Tagging);
@@ -621,7 +592,8 @@ describe("HasManyAssociations", () => {
 // ==========================================================================
 
 describe("HasManyThroughAssociations", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Doctor extends Base {
     static {
@@ -642,15 +614,11 @@ describe("HasManyThroughAssociations", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Doctor.adapter = adapter;
-    Appointment.adapter = adapter;
-    Patient.adapter = adapter;
+  beforeAll(async () => {
     registerModel(Doctor);
     registerModel(Appointment);
     registerModel(Patient);
-    await defineSchema(adapter, {
+    await defineSchema({
       doctors: { name: "string" },
       appointments: { doctor_id: "integer", patient_id: "integer" },
       patients: { name: "string" },
@@ -698,7 +666,6 @@ describe("HasManyThroughAssociations", () => {
     class Orphan extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     (Orphan as any)._associations = [];
@@ -734,7 +701,8 @@ describe("HasManyThroughAssociations", () => {
 // ==========================================================================
 
 describe("CollectionProxy", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Team extends Base {
     static {
@@ -749,13 +717,10 @@ describe("CollectionProxy", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Team.adapter = adapter;
-    Player.adapter = adapter;
+  beforeAll(async () => {
     registerModel(Team);
     registerModel(Player);
-    await defineSchema(adapter, {
+    await defineSchema({
       teams: { name: "string" },
       players: { name: "string", team_id: "integer" },
     });
@@ -973,11 +938,11 @@ describe("CollectionProxy", () => {
 // ==========================================================================
 
 describe("DependentAssociations", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       posts: { title: "string" },
       comments: { body: "string", post_id: "integer" },
       items: { name: "string" },
@@ -993,13 +958,11 @@ describe("DependentAssociations", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", {
@@ -1024,13 +987,11 @@ describe("DependentAssociations", () => {
       static {
         this.attribute("name", "string");
         this.attribute("item_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Item, "tags", {
@@ -1053,13 +1014,11 @@ describe("DependentAssociations", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", {
@@ -1084,13 +1043,11 @@ describe("DependentAssociations", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", {
@@ -1112,13 +1069,11 @@ describe("DependentAssociations", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", {
@@ -1139,13 +1094,11 @@ describe("DependentAssociations", () => {
       static {
         this.attribute("user_id", "integer");
         this.attribute("bio", "string");
-        this.adapter = adapter;
       }
     }
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(User, "profile", {
@@ -1168,13 +1121,11 @@ describe("DependentAssociations", () => {
       static {
         this.attribute("user_id", "integer");
         this.attribute("bio", "string");
-        this.adapter = adapter;
       }
     }
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(User, "profile", {
@@ -1197,13 +1148,11 @@ describe("DependentAssociations", () => {
     class Profile extends Base {
       static {
         this.attribute("user_id", "integer");
-        this.adapter = adapter;
       }
     }
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(User, "profile", {
@@ -1224,7 +1173,6 @@ describe("DependentAssociations", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment" });
@@ -1240,7 +1188,8 @@ describe("DependentAssociations", () => {
 // ==========================================================================
 
 describe("StrictLoading", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Author extends Base {
     static {
@@ -1262,15 +1211,8 @@ describe("StrictLoading", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Author.adapter = adapter;
-    Book.adapter = adapter;
-    Profile.adapter = adapter;
-    registerModel(Author);
-    registerModel(Book);
-    registerModel(Profile);
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       authors: { name: "string" },
       books: { title: "string", author_id: "integer" },
       profiles: { bio: "string", author_id: "integer" },
@@ -1332,6 +1274,8 @@ describe("StrictLoading", () => {
 // ==========================================================================
 
 describe("AssociationDefinitions", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   // Rails: test_belongs_to_macro_is_stored
   it("test_belongsTo_stores_definition", () => {
     class Post extends Base {
@@ -1403,18 +1347,14 @@ describe("AssociationDefinitions", () => {
 // ==========================================================================
 
 describe("AssociationReflection", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   // Rails: test_reflect_on_association
   it("test_reflect_on_association", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Author, "books", {});
@@ -1428,11 +1368,7 @@ describe("AssociationReflection", () => {
 
   // Rails: test_reflect_on_association_not_found
   it("test_reflect_on_association_returns_null_for_missing", () => {
-    class Author extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class Author extends Base {}
     (Author as any)._associations = [];
     const reflection = reflectOnAssociation(Author, "nonexistent");
     expect(reflection).toBeNull();
@@ -1440,11 +1376,7 @@ describe("AssociationReflection", () => {
 
   // Rails: test_reflect_on_all_associations
   it("test_reflect_on_all_associations", () => {
-    class Author extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class Author extends Base {}
     Associations.hasMany.call(Author, "books", {});
     Associations.belongsTo.call(Author, "publisher", {});
     Associations.hasOne.call(Author, "profile", {});
@@ -1458,11 +1390,7 @@ describe("AssociationReflection", () => {
   // Base-wired variants so `Model.reflectOnAssociation("name")` works
   // idiomatically.
   it("test_class_method_reflection_api_is_callable_on_base", () => {
-    class Author extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class Author extends Base {}
     Associations.hasMany.call(Author, "books", {});
     Associations.belongsTo.call(Author, "publisher", {});
 
@@ -1475,11 +1403,7 @@ describe("AssociationReflection", () => {
 
   // Rails: test_reflect_on_all_associations_with_macro_filter
   it("test_reflect_on_all_associations_filtered_by_macro", () => {
-    class Author extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class Author extends Base {}
     Associations.hasMany.call(Author, "books", {});
     Associations.belongsTo.call(Author, "publisher", {});
     Associations.hasOne.call(Author, "profile", {});
@@ -1495,11 +1419,7 @@ describe("AssociationReflection", () => {
 
   // Rails: test_association_reflection_foreign_key
   it("test_reflection_derives_foreign_key", () => {
-    class Author extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class Author extends Base {}
     Associations.hasMany.call(Author, "books", {});
     const reflection = reflectOnAssociation(Author, "books");
     expect(reflection!.foreignKey).toBe("author_id");
@@ -1507,11 +1427,7 @@ describe("AssociationReflection", () => {
 
   // Rails: test_belongs_to_reflection_foreign_key
   it("test_belongs_to_reflection_derives_foreign_key", () => {
-    class Book extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class Book extends Base {}
     Associations.belongsTo.call(Book, "author", {});
     const reflection = reflectOnAssociation(Book, "author");
     expect(reflection!.foreignKey).toBe("author_id");
@@ -1519,11 +1435,7 @@ describe("AssociationReflection", () => {
 
   // Rails: test_reflection_class_name
   it("test_reflection_derives_class_name", () => {
-    class Author extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class Author extends Base {}
     Associations.hasMany.call(Author, "books", {});
     const reflection = reflectOnAssociation(Author, "books");
     expect(reflection!.className).toBe("Book");
@@ -1531,11 +1443,7 @@ describe("AssociationReflection", () => {
 
   // Rails: test_reflection_custom_class_name
   it("test_reflection_uses_custom_class_name", async () => {
-    class Author extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class Author extends Base {}
     Associations.hasMany.call(Author, "writings", { className: "Article" });
     const reflection = reflectOnAssociation(Author, "writings");
     expect(reflection!.className).toBe("Article");
@@ -1543,11 +1451,7 @@ describe("AssociationReflection", () => {
 
   // Rails: test_reflection_is_belongs_to / is_has_many etc.
   it("test_reflection_type_predicates", async () => {
-    class Author extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class Author extends Base {}
     Associations.belongsTo.call(Author, "publisher", {});
     Associations.hasMany.call(Author, "books", {});
     Associations.hasOne.call(Author, "profile", {});
@@ -1570,11 +1474,11 @@ describe("AssociationReflection", () => {
 // ==========================================================================
 
 describe("HasAndBelongsToManyAssociations", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       developers: { name: "string" },
       projects: { name: "string" },
     });
@@ -1585,20 +1489,18 @@ describe("HasAndBelongsToManyAssociations", () => {
     class Developer extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Project extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Developer);
     registerModel(Project);
 
     // Create the join table
-    await adapter.executeMutation(
+    await Base.adapter.executeMutation(
       `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
     );
 
@@ -1606,10 +1508,10 @@ describe("HasAndBelongsToManyAssociations", () => {
     const p1 = await Project.create({ name: "Rails" });
     const p2 = await Project.create({ name: "Basecamp" });
 
-    await adapter.executeMutation(
+    await Base.adapter.executeMutation(
       `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p1.id})`,
     );
-    await adapter.executeMutation(
+    await Base.adapter.executeMutation(
       `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p2.id})`,
     );
 
@@ -1622,13 +1524,12 @@ describe("HasAndBelongsToManyAssociations", () => {
     class Developer extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Developer);
 
     // Create the join table
-    await adapter.executeMutation(
+    await Base.adapter.executeMutation(
       `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
     );
 
@@ -1642,7 +1543,6 @@ describe("HasAndBelongsToManyAssociations", () => {
     class Developer extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Developer);
@@ -1657,7 +1557,6 @@ describe("HasAndBelongsToManyAssociations", () => {
     class Developer extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Developer);
@@ -1675,11 +1574,11 @@ describe("HasAndBelongsToManyAssociations", () => {
 // ==========================================================================
 
 describe("CounterCache", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       topics: {
         title: "string",
         replies_count: { type: "integer", default: 0 },
@@ -1699,14 +1598,12 @@ describe("CounterCache", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1727,14 +1624,12 @@ describe("CounterCache", () => {
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1756,14 +1651,12 @@ describe("CounterCache", () => {
       static {
         this.attribute("name", "string");
         this.attribute("num_products", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Product extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("category_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Product, "category", { counterCache: "num_products" });
@@ -1783,13 +1676,11 @@ describe("CounterCache", () => {
     class Topic extends Base {
       static {
         this.attribute("replies_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class Reply extends Base {
       static {
         this.attribute("topic_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Reply, "topic", { counterCache: true });
@@ -1807,11 +1698,11 @@ describe("CounterCache", () => {
 // ==========================================================================
 
 describe("TouchBelongsToParents", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       owners: { name: "string", updated_at: "datetime" },
       pets: { name: "string", owner_id: "integer" },
     });
@@ -1823,14 +1714,12 @@ describe("TouchBelongsToParents", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class Pet extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("owner_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Pet, "owner", { touch: true });
@@ -1858,13 +1747,11 @@ describe("TouchBelongsToParents", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class Pet extends Base {
       static {
         this.attribute("owner_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Pet, "owner", { touch: true });
@@ -1877,10 +1764,10 @@ describe("TouchBelongsToParents", () => {
 });
 
 describe("Rails-guided: association features", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       articles: { title: "string" },
       comments: { body: "string", article_id: "integer" },
       categories: { name: "string" },
@@ -1906,13 +1793,11 @@ describe("Rails-guided: association features", () => {
       static {
         this.attribute("body", "string");
         this.attribute("article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Article extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Article, "comments", {
@@ -1936,13 +1821,11 @@ describe("Rails-guided: association features", () => {
       static {
         this.attribute("name", "string");
         this.attribute("category_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Category extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Category, "tags", {
@@ -1963,20 +1846,17 @@ describe("Rails-guided: association features", () => {
     class Skill extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Enrollment extends Base {
       static {
         this.attribute("student_id", "integer");
         this.attribute("skill_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Student extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Student, "enrollments", { className: "Enrollment" });
@@ -2009,13 +1889,11 @@ describe("Rails-guided: association features", () => {
       static {
         this.attribute("name", "string");
         this.attribute("machine_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Machine extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Machine, "parts", { className: "Part", foreignKey: "machine_id" });
@@ -2034,13 +1912,11 @@ describe("Rails-guided: association features", () => {
       static {
         this.attribute("content", "string");
         this.attribute("journal_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Journal extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Journal, "entries", { className: "Entry", foreignKey: "journal_id" });
@@ -2059,13 +1935,11 @@ describe("Rails-guided: association features", () => {
       static {
         this.attribute("label", "string");
         this.attribute("box_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Box extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const beforeAdds: Base[] = [];
@@ -2091,13 +1965,11 @@ describe("Rails-guided: association features", () => {
       static {
         this.attribute("subject", "string");
         this.attribute("event_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Event extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Event, "tickets", { className: "Ticket", foreignKey: "event_id" });
@@ -2117,13 +1989,11 @@ describe("Rails-guided: association features", () => {
       static {
         this.attribute("title", "string");
         this.attribute("album_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Album extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Album, "songs", { className: "Song", foreignKey: "album_id" });
@@ -2147,9 +2017,10 @@ describe("Rails-guided: association features", () => {
 });
 
 describe("AssociationsTest", () => {
-  async function setupATAdapter(): Promise<DatabaseAdapter> {
-    const a = freshAdapter();
-    await defineSchema(a, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       ships: {
         name: "string",
         pirate_id: "integer",
@@ -2344,16 +2215,13 @@ describe("AssociationsTest", () => {
         primaryKey: ["blog_id", "id"],
       },
     });
-    return a;
-  }
+  });
 
   it("eager loading should not change count of children", async () => {
-    const adapter = await setupATAdapter();
     class ELParent extends Base {
       static {
         this._tableName = "el_parents";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ELChild extends Base {
@@ -2361,7 +2229,6 @@ describe("AssociationsTest", () => {
         this._tableName = "el_children";
         this.attribute("value", "string");
         this.attribute("el_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(ELParent, "elChildren", {
@@ -2388,12 +2255,10 @@ describe("AssociationsTest", () => {
     /* needs author_favorites association */
   });
   it("loading the association target should keep child records marked for destruction", async () => {
-    const adapter = await setupATAdapter();
     class DPost extends Base {
       static {
         this._tableName = "d_posts";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class DComment extends Base {
@@ -2401,7 +2266,6 @@ describe("AssociationsTest", () => {
         this._tableName = "d_comments";
         this.attribute("body", "string");
         this.attribute("d_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(DPost, "dComments", {
@@ -2422,8 +2286,7 @@ describe("AssociationsTest", () => {
     expect(isMarkedForDestruction(comment)).toBe(true);
   });
   it("loading the association target should load most recent attributes for child records marked for destruction", async () => {
-    const fxAdapter = await setupATAdapter();
-    const f = createFixtures(fxAdapter);
+    const f = createFixtures(Base.adapter);
     const ship = await f.Ship.create({ name: "The good ship Dollypop" });
     const proxy = association(ship, "parts");
     const part = await proxy.create({ name: "Mast" });
@@ -2435,7 +2298,6 @@ describe("AssociationsTest", () => {
     expect(parts[0].name).toBe("Deck");
   });
   it("loading cpk association when persisted and in memory differ", async () => {
-    const adapter = await setupATAdapter();
     class CpkOrder extends Base {
       static {
         this._tableName = "cpk_orders";
@@ -2443,7 +2305,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkOrderItem extends Base {
@@ -2452,7 +2313,6 @@ describe("AssociationsTest", () => {
         this.attribute("cpk_order_shop_id", "integer");
         this.attribute("cpk_order_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkOrder, "cpkOrderItems", {
@@ -2473,13 +2333,11 @@ describe("AssociationsTest", () => {
     expect(items.length).toBe(1);
   });
   it("include with order works", async () => {
-    const adapter = await setupATAdapter();
     class IOPost extends Base {
       static {
         this._tableName = "io_posts";
         this.attribute("title", "string");
         this.attribute("score", "integer");
-        this.adapter = adapter;
       }
     }
     class IOComment extends Base {
@@ -2487,7 +2345,6 @@ describe("AssociationsTest", () => {
         this._tableName = "io_comments";
         this.attribute("body", "string");
         this.attribute("io_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(IOPost, "ioComments", {
@@ -2504,12 +2361,10 @@ describe("AssociationsTest", () => {
     expect(posts[1].title).toBe("B");
   });
   it("bad collection keys", async () => {
-    const adapter = await setupATAdapter();
     class APost extends Base {
       static {
         this._tableName = "a_posts";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class AComment extends Base {
@@ -2517,7 +2372,6 @@ describe("AssociationsTest", () => {
         this._tableName = "a_comments";
         this.attribute("body", "string");
         this.attribute("a_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(APost, "aComments", {
@@ -2535,12 +2389,10 @@ describe("AssociationsTest", () => {
   });
 
   it("should construct new finder sql after create", async () => {
-    const adapter = await setupATAdapter();
     class BPost extends Base {
       static {
         this._tableName = "b_posts";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class BComment extends Base {
@@ -2548,7 +2400,6 @@ describe("AssociationsTest", () => {
         this._tableName = "b_comments";
         this.attribute("body", "string");
         this.attribute("b_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(BPost, "bComments", {
@@ -2569,12 +2420,10 @@ describe("AssociationsTest", () => {
   });
 
   it("force reload", async () => {
-    const adapter = await setupATAdapter();
     class CPost extends Base {
       static {
         this._tableName = "c_posts";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class CComment extends Base {
@@ -2582,7 +2431,6 @@ describe("AssociationsTest", () => {
         this._tableName = "c_comments";
         this.attribute("body", "string");
         this.attribute("c_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CPost, "cComments", {
@@ -2614,7 +2462,6 @@ describe("AssociationsTest", () => {
     /* needs references/includes support */
   });
   it("belongs to a model with composite foreign key finds associated record", async () => {
-    const adapter = await setupATAdapter();
     class CpkOrder extends Base {
       static {
         this._tableName = "cpk_orders";
@@ -2622,7 +2469,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkOrderItem extends Base {
@@ -2631,7 +2477,6 @@ describe("AssociationsTest", () => {
         this.attribute("order_shop_id", "integer");
         this.attribute("order_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CpkOrder", CpkOrder);
@@ -2650,7 +2495,6 @@ describe("AssociationsTest", () => {
     expect(loaded!.status).toBe("pending");
   });
   it("belongs to a cpk model by id attribute", async () => {
-    const adapter = await setupATAdapter();
     class CpkBook extends Base {
       static {
         this._tableName = "cpk_books";
@@ -2658,7 +2502,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkChapter extends Base {
@@ -2667,7 +2510,6 @@ describe("AssociationsTest", () => {
         this.attribute("cpk_book_shop_id", "integer");
         this.attribute("cpk_book_id", "integer");
         this.attribute("number", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(CpkChapter, "cpkBook", {
@@ -2687,7 +2529,6 @@ describe("AssociationsTest", () => {
     expect(loaded!.id).toEqual([1, 10]);
   });
   it("belongs to a model with composite primary key uses composite pk in sql", async () => {
-    const adapter = await setupATAdapter();
     class CpkAuthor extends Base {
       static {
         this._tableName = "cpk_authors";
@@ -2695,7 +2536,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkPost extends Base {
@@ -2704,7 +2544,6 @@ describe("AssociationsTest", () => {
         this.attribute("cpk_author_region_id", "integer");
         this.attribute("cpk_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(CpkPost, "cpkAuthor", {
@@ -2727,7 +2566,6 @@ describe("AssociationsTest", () => {
     expect(loaded!.id).toEqual([1, 5]);
   });
   it("querying by whole associated records using query constraints", async () => {
-    const adapter = await setupATAdapter();
     class QwarBlogPost extends Base {
       static {
         this._tableName = "qwar_blog_posts";
@@ -2735,7 +2573,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.primaryKey = ["blog_id", "id"];
-        this.adapter = adapter;
       }
     }
     class QwarComment extends Base {
@@ -2746,7 +2583,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("body", "string");
         this.primaryKey = ["blog_id", "id"];
-        this.adapter = adapter;
       }
     }
     registerModel("QwarBlogPost", QwarBlogPost);
@@ -2765,7 +2601,6 @@ describe("AssociationsTest", () => {
     expect(posts.map((p: any) => p.title).sort()).toEqual(["Post 1", "Post 2"]);
   });
   it("querying by single associated record works using query constraints", async () => {
-    const adapter = await setupATAdapter();
     class QsarBlogPost extends Base {
       static {
         this._tableName = "qsar_blog_posts";
@@ -2773,7 +2608,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.primaryKey = ["blog_id", "id"];
-        this.adapter = adapter;
       }
     }
     class QsarComment extends Base {
@@ -2784,7 +2618,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("body", "string");
         this.primaryKey = ["blog_id", "id"];
-        this.adapter = adapter;
       }
     }
     registerModel("QsarBlogPost", QsarBlogPost);
@@ -2801,14 +2634,12 @@ describe("AssociationsTest", () => {
     expect(posts.map((p: any) => p.title)).toEqual(["Post 2"]);
   });
   it("querying by relation with composite key", async () => {
-    const adapter = await setupATAdapter();
     class QrkAuthor extends Base {
       static {
         this.attribute("region_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     registerModel("QrkAuthor", QrkAuthor);
@@ -2821,7 +2652,6 @@ describe("AssociationsTest", () => {
     expect(results.map((r: any) => r.name).sort()).toEqual(["Alice", "Bob"]);
   });
   it("has many association with composite foreign key loads records", async () => {
-    const adapter = await setupATAdapter();
     class CpkAuthor extends Base {
       static {
         this._tableName = "cpk_authors";
@@ -2829,7 +2659,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkPost extends Base {
@@ -2838,7 +2667,6 @@ describe("AssociationsTest", () => {
         this.attribute("author_region_id", "integer");
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CpkAuthor", CpkAuthor);
@@ -2859,14 +2687,12 @@ describe("AssociationsTest", () => {
     expect(posts.map((p) => p.title).sort()).toEqual(["Post1", "Post2"]);
   });
   it("has many association from a model with query constraints different from the association", async () => {
-    const adapter = await setupATAdapter();
     class DqcBlogPost extends Base {
       static {
         this._tableName = "dqc_blog_posts";
         this.attribute("blog_id", "integer");
         this.attribute("revision", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
         // 3-column query_constraints, but association provides explicit FK/PK
         (this as any)._queryConstraintsList = ["blog_id", "revision", "id"];
         (this as any)._hasQueryConstraints = true;
@@ -2878,7 +2704,6 @@ describe("AssociationsTest", () => {
         this.attribute("blog_id", "integer");
         this.attribute("blog_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("DqcBlogPost", DqcBlogPost);
@@ -2901,12 +2726,10 @@ describe("AssociationsTest", () => {
     expect(comments.map((c) => c.body).sort()).toEqual(["A", "B"]);
   });
   it("query constraints over three without defining explicit foreign key query constraints raises", async () => {
-    const adapter = await setupATAdapter();
     class QcThreeBlogPost extends Base {
       static {
         this.attribute("blog_id", "integer");
         this.attribute("revision", "integer");
-        this.adapter = adapter;
         (this as any)._queryConstraintsList = ["blog_id", "revision", "id"];
         (this as any)._hasQueryConstraints = true;
       }
@@ -2914,7 +2737,6 @@ describe("AssociationsTest", () => {
     class QcThreeComment extends Base {
       static {
         this.attribute("blog_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("QcThreeBlogPost", QcThreeBlogPost);
@@ -2925,14 +2747,12 @@ describe("AssociationsTest", () => {
     expect(() => refl.foreignKey).toThrow("more than 2 attributes");
   });
   it("model with composite query constraints has many association sql", async () => {
-    const adapter = await setupATAdapter();
     class CqcAuthor extends Base {
       static {
         this.attribute("region_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CqcPost extends Base {
@@ -2940,7 +2760,6 @@ describe("AssociationsTest", () => {
         this.attribute("author_region_id", "integer");
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CqcAuthor", CqcAuthor);
@@ -2960,12 +2779,10 @@ describe("AssociationsTest", () => {
   it("belongs to association does not use parent query constraints if not configured to", async () => {
     // Rails: test_belongs_to_association_does_not_use_parent_query_constraints_if_not_configured_to
     // When belongs_to has explicit single FK/PK, it bypasses query_constraints derivation.
-    const adapter = await setupATAdapter();
     class BtNqcBlogPost extends Base {
       static {
         this.attribute("blog_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class BtNqcComment extends Base {
@@ -2973,7 +2790,6 @@ describe("AssociationsTest", () => {
         this.attribute("blog_id", "integer");
         this.attribute("blog_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
         // Comment has query_constraints, but the belongs_to uses explicit single FK/PK
         (this as any)._queryConstraintsList = ["blog_id", "id"];
         (this as any)._hasQueryConstraints = true;
@@ -3009,7 +2825,6 @@ describe("AssociationsTest", () => {
     // Owner has query_constraints :blog_id, :id. Polymorphic belongs_to :parent must derive
     // the composite FK [blog_id, parent_id] and resolve against the target's
     // [blog_id, id] query-constraints key — not just scalar parent_id.
-    const adapter = await setupATAdapter();
     class PbtBlogPost extends Base {
       static {
         this._tableName = "pbt_blog_posts";
@@ -3023,7 +2838,6 @@ describe("AssociationsTest", () => {
         // only. derive_fk_query_constraints in Rails reflection.rb:865-868
         // depends on primary_key being a string for the first_key/last_key
         // comparison, so an array PK would break the FK derivation entirely.
-        this.adapter = adapter;
         (this as any)._queryConstraintsList = ["blog_id", "id"];
         (this as any)._hasQueryConstraints = true;
       }
@@ -3056,14 +2870,12 @@ describe("AssociationsTest", () => {
     expect(wrong).toBeNull();
   });
   it("preloads model with query constraints by explicitly configured fk and pk", async () => {
-    const adapter = await setupATAdapter();
     class PmqcBlogPost extends Base {
       static {
         this._tableName = "pmqc_blog_posts";
         this.attribute("blog_id", "integer");
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class PmqcComment extends Base {
@@ -3073,7 +2885,6 @@ describe("AssociationsTest", () => {
         this.attribute("blog_post_id", "integer");
         this.attribute("id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
         (this as any)._queryConstraintsList = ["blog_id", "id"];
         (this as any)._hasQueryConstraints = true;
       }
@@ -3095,14 +2906,12 @@ describe("AssociationsTest", () => {
     expect((cached as any).title).toBe("Great post");
   });
   it("append composite foreign key has many association", async () => {
-    const adapter = await setupATAdapter();
     class CpkOwner extends Base {
       static {
         this.attribute("region_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkItem extends Base {
@@ -3110,7 +2919,6 @@ describe("AssociationsTest", () => {
         this.attribute("owner_region_id", "integer");
         this.attribute("owner_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CpkOwner", CpkOwner);
@@ -3128,14 +2936,12 @@ describe("AssociationsTest", () => {
   });
 
   it("nullify composite foreign key has many association", async () => {
-    const adapter = await setupATAdapter();
     class CpkOwner2 extends Base {
       static {
         this.attribute("region_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkItem2 extends Base {
@@ -3143,7 +2949,6 @@ describe("AssociationsTest", () => {
         this.attribute("owner_region_id", "integer");
         this.attribute("owner_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CpkOwner2", CpkOwner2);
@@ -3160,14 +2965,12 @@ describe("AssociationsTest", () => {
     expect(item.owner_id).toBeNull();
   });
   it("assign persisted composite foreign key belongs to association", async () => {
-    const adapter = await setupATAdapter();
     class CpkParent extends Base {
       static {
         this.attribute("region_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkChild extends Base {
@@ -3175,7 +2978,6 @@ describe("AssociationsTest", () => {
         this.attribute("parent_region_id", "integer");
         this.attribute("parent_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CpkParent", CpkParent);
@@ -3195,14 +2997,12 @@ describe("AssociationsTest", () => {
   });
 
   it("nullify composite foreign key belongs to association", async () => {
-    const adapter = await setupATAdapter();
     class CpkParent2 extends Base {
       static {
         this.attribute("region_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkChild2 extends Base {
@@ -3210,7 +3010,6 @@ describe("AssociationsTest", () => {
         this.attribute("parent_region_id", "integer");
         this.attribute("parent_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CpkParent2", CpkParent2);
@@ -3229,14 +3028,12 @@ describe("AssociationsTest", () => {
   });
 
   it("assign composite foreign key belongs to association", async () => {
-    const adapter = await setupATAdapter();
     class CpkParent3 extends Base {
       static {
         this.attribute("region_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkChild3 extends Base {
@@ -3244,7 +3041,6 @@ describe("AssociationsTest", () => {
         this.attribute("parent_region_id", "integer");
         this.attribute("parent_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CpkParent3", CpkParent3);
@@ -3263,14 +3059,12 @@ describe("AssociationsTest", () => {
     expect(child.parent_id).toBe(30);
   });
   it("setBelongsTo infers composite foreign key from target primary key", async () => {
-    const adapter = await setupATAdapter();
     class InfParent extends Base {
       static {
         this.attribute("region_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class InfChild extends Base {
@@ -3278,7 +3072,6 @@ describe("AssociationsTest", () => {
         this.attribute("inf_parent_region_id", "integer");
         this.attribute("inf_parent_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("InfParent", InfParent);
@@ -3292,14 +3085,12 @@ describe("AssociationsTest", () => {
   });
 
   it("setBelongsTo nullifies inferred composite foreign key", async () => {
-    const adapter = await setupATAdapter();
     class InfParent2 extends Base {
       static {
         this.attribute("region_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class InfChild2 extends Base {
@@ -3307,7 +3098,6 @@ describe("AssociationsTest", () => {
         this.attribute("inf_parent2_region_id", "integer");
         this.attribute("inf_parent2_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("InfParent2", InfParent2);
@@ -3324,11 +3114,9 @@ describe("AssociationsTest", () => {
   });
 
   it("query constraints that dont include the primary key raise with a single column", async () => {
-    const adapter = await setupATAdapter();
     class QcSingleBlogPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         (this as any)._queryConstraintsList = ["title"];
         (this as any)._hasQueryConstraints = true;
       }
@@ -3336,7 +3124,6 @@ describe("AssociationsTest", () => {
     class QcSingleComment extends Base {
       static {
         this.attribute("blog_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("QcSingleBlogPost", QcSingleBlogPost);
@@ -3350,12 +3137,10 @@ describe("AssociationsTest", () => {
     expect(() => refl.foreignKey).toThrow("does not include the primary key");
   });
   it("query constraints that dont include the primary key raise with multiple columns", async () => {
-    const adapter = await setupATAdapter();
     class QcMultiBlogPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("revision", "integer");
-        this.adapter = adapter;
         (this as any)._queryConstraintsList = ["title", "revision"];
         (this as any)._hasQueryConstraints = true;
       }
@@ -3363,7 +3148,6 @@ describe("AssociationsTest", () => {
     class QcMultiComment extends Base {
       static {
         this.attribute("blog_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("QcMultiBlogPost", QcMultiBlogPost);
@@ -3377,7 +3161,6 @@ describe("AssociationsTest", () => {
     expect(() => refl.foreignKey).toThrow("does not include the primary key");
   });
   it("assign belongs to cpk model by id attribute", async () => {
-    const adapter = await setupATAdapter();
     class CpkTarget extends Base {
       static {
         this._tableName = "cpk_targets";
@@ -3385,7 +3168,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkRef extends Base {
@@ -3393,7 +3175,6 @@ describe("AssociationsTest", () => {
         this._tableName = "cpk_refs";
         this.attribute("cpk_target_shop_id", "integer");
         this.attribute("cpk_target_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(CpkRef, "cpkTarget", {
@@ -3412,14 +3193,12 @@ describe("AssociationsTest", () => {
     expect(loaded!.id).toEqual([2, 7]);
   });
   it("append composite foreign key has many association with autosave", async () => {
-    const adapter = await setupATAdapter();
     class AsCpkOwner extends Base {
       static {
         this.attribute("region_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class AsCpkItem extends Base {
@@ -3427,7 +3206,6 @@ describe("AssociationsTest", () => {
         this.attribute("owner_region_id", "integer");
         this.attribute("owner_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("AsCpkOwner", AsCpkOwner);
@@ -3446,14 +3224,12 @@ describe("AssociationsTest", () => {
     expect(item.owner_id).toBe(10);
   });
   it("assign composite foreign key belongs to association with autosave", async () => {
-    const adapter = await setupATAdapter();
     class AsCpkParent extends Base {
       static {
         this.attribute("region_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class AsCpkChild extends Base {
@@ -3461,7 +3237,6 @@ describe("AssociationsTest", () => {
         this.attribute("parent_region_id", "integer");
         this.attribute("parent_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("AsCpkParent", AsCpkParent);
@@ -3484,7 +3259,6 @@ describe("AssociationsTest", () => {
     expect(child.parent_id).toBe(30);
   });
   it("append composite has many through association", async () => {
-    const adapter = await setupATAdapter();
     class CpkThruDoc1 extends Base {
       static {
         this._tableName = "cpk_thru_doc1s";
@@ -3492,7 +3266,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkThruAppt1 extends Base {
@@ -3501,14 +3274,12 @@ describe("AssociationsTest", () => {
         this.attribute("doctor_region_id", "integer");
         this.attribute("doctor_id", "integer");
         this.attribute("patient_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CpkThruPat1 extends Base {
       static {
         this._tableName = "cpk_thru_pat1s";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkThruDoc1, "appts", {
@@ -3556,7 +3327,6 @@ describe("AssociationsTest", () => {
     expect(otherLoaded.map((p: any) => p.name)).toEqual(["Noise"]);
   });
   it("append composite has many through association with autosave", async () => {
-    const adapter = await setupATAdapter();
     class CpkThruDoc2 extends Base {
       static {
         this._tableName = "cpk_thru_doc2s";
@@ -3564,7 +3334,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkThruAppt2 extends Base {
@@ -3573,14 +3342,12 @@ describe("AssociationsTest", () => {
         this.attribute("doctor_region_id", "integer");
         this.attribute("doctor_id", "integer");
         this.attribute("patient_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CpkThruPat2 extends Base {
       static {
         this._tableName = "cpk_thru_pat2s";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkThruDoc2, "appts", {
@@ -3615,7 +3382,6 @@ describe("AssociationsTest", () => {
     expect(joins[0].patient_id).toBe(bob.id);
   });
   it("nullify composite has many through association", async () => {
-    const adapter = await setupATAdapter();
     class CpkThruDoc3 extends Base {
       static {
         this._tableName = "cpk_thru_doc3s";
@@ -3623,7 +3389,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkThruAppt3 extends Base {
@@ -3632,14 +3397,12 @@ describe("AssociationsTest", () => {
         this.attribute("doctor_region_id", "integer");
         this.attribute("doctor_id", "integer");
         this.attribute("patient_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CpkThruPat3 extends Base {
       static {
         this._tableName = "cpk_thru_pat3s";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkThruDoc3, "appts", {
@@ -3675,7 +3438,6 @@ describe("AssociationsTest", () => {
   it("delete single composite has many through join row", async () => {
     // Covers _deleteThrough composite-aware findBy. Another owner shares one
     // PK component to verify the join lookup ANDs across both columns.
-    const adapter = await setupATAdapter();
     class CpkThruDoc4 extends Base {
       static {
         this._tableName = "cpk_thru_doc4s";
@@ -3683,7 +3445,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkThruAppt4 extends Base {
@@ -3692,14 +3453,12 @@ describe("AssociationsTest", () => {
         this.attribute("doctor_region_id", "integer");
         this.attribute("doctor_id", "integer");
         this.attribute("patient_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CpkThruPat4 extends Base {
       static {
         this._tableName = "cpk_thru_pat4s";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkThruDoc4, "appts", {
@@ -3746,13 +3505,11 @@ describe("AssociationsTest", () => {
     // unrepresentable. Promoted from plain Error to ConfigurationError so
     // misconfiguration surfaces with the same error class as the rest of the
     // through-association validations (reflection.ts:556-588).
-    const adapter = await setupATAdapter();
     class CpkThruTgtDoc extends Base {
       static {
         this._tableName = "cpk_thru_tgt_docs";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CpkThruTgtAppt extends Base {
@@ -3760,7 +3517,6 @@ describe("AssociationsTest", () => {
         this._tableName = "cpk_thru_tgt_appts";
         this.attribute("doctor_id", "integer");
         this.attribute("patient_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CpkThruTgtPat extends Base {
@@ -3770,7 +3526,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkThruTgtDoc, "appts", {
@@ -3801,7 +3556,6 @@ describe("AssociationsTest", () => {
     // the two polymorphic columns. `_throughOwnerPolymorphic` now requires an
     // explicit single-column `primaryKey:` option on the polymorphic-through
     // when the owner has a composite PK, and rejects an array `primaryKey:`.
-    const adapter = await setupATAdapter();
     const makeOwner = (
       suffix: string,
     ): {
@@ -3819,7 +3573,6 @@ describe("AssociationsTest", () => {
           this.attribute("id", "integer");
           this.attribute("name", "string");
           this.primaryKey = ["region_id", "id"];
-          this.adapter = adapter;
         }
       };
       Object.defineProperty(Owner, "name", { value: ownerName });
@@ -3830,7 +3583,6 @@ describe("AssociationsTest", () => {
           this.attribute("taggable_id", "integer");
           this.attribute("taggable_type", "string");
           this.attribute("article_id", "integer");
-          this.adapter = adapter;
         }
       };
       Object.defineProperty(Tag, "name", { value: tagName });
@@ -3839,7 +3591,6 @@ describe("AssociationsTest", () => {
           this._tableName = `cpk_poly_articles_${suffix.toLowerCase()}`;
           this.attribute("id", "integer");
           this.attribute("title", "string");
-          this.adapter = adapter;
         }
       };
       Object.defineProperty(Article, "name", { value: articleName });
@@ -3900,14 +3651,12 @@ describe("AssociationsTest", () => {
     }
   });
   it("belongs to with explicit composite foreign key", async () => {
-    const adapter = await setupATAdapter();
     class CfkOrder extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CfkLineItem extends Base {
@@ -3915,7 +3664,6 @@ describe("AssociationsTest", () => {
         this.attribute("order_shop_id", "integer");
         this.attribute("order_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CfkOrder", CfkOrder);
@@ -3936,7 +3684,6 @@ describe("AssociationsTest", () => {
   });
 
   it("cpk model has many records by id attribute", async () => {
-    const adapter = await setupATAdapter();
     class CpkParent extends Base {
       static {
         this._tableName = "cpk_parents";
@@ -3944,7 +3691,6 @@ describe("AssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkChild extends Base {
@@ -3953,7 +3699,6 @@ describe("AssociationsTest", () => {
         this.attribute("cpk_parent_region_id", "integer");
         this.attribute("cpk_parent_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkParent, "cpkChildren", {
@@ -3976,7 +3721,8 @@ describe("AssociationsTest", () => {
 });
 
 describe("Associations", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Author extends Base {
     static {
@@ -3998,15 +3744,11 @@ describe("Associations", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Author.adapter = adapter;
-    Book.adapter = adapter;
-    Profile.adapter = adapter;
+  beforeAll(async () => {
     registerModel(Author);
     registerModel(Book);
     registerModel(Profile);
-    await defineSchema(adapter, {
+    await defineSchema({
       authors: { name: "string" },
       books: { title: "string", author_id: "integer" },
       profiles: { bio: "string", author_id: "integer" },
@@ -4056,7 +3798,6 @@ describe("Associations", () => {
       static {
         this.attribute("title", "string");
         this.attribute("writer_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Article);
@@ -4072,28 +3813,26 @@ describe("Associations", () => {
 });
 
 describe("Associations: dependent", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   it("dependent destroy destroys children", async () => {
-    const adapter = freshAdapter();
-
     class Comment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
 
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", { dependent: "destroy", className: "Comment" });
 
     registerModel(Post);
     registerModel(Comment);
-    await defineSchema(adapter, {
+    await defineSchema({
       posts: { title: "string" },
       comments: { body: "string", post_id: "integer" },
     });
@@ -4108,20 +3847,16 @@ describe("Associations: dependent", () => {
   });
 
   it("dependent nullify sets FK to null", async () => {
-    const adapter = freshAdapter();
-
     class Reply extends Base {
       static {
         this.attribute("content", "string");
         this.attribute("thread_id", "integer");
-        this.adapter = adapter;
       }
     }
 
     class Thread extends Base {
       static {
         this.attribute("subject", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Thread, "replies", {
@@ -4132,7 +3867,7 @@ describe("Associations: dependent", () => {
 
     registerModel(Thread);
     registerModel(Reply);
-    await defineSchema(adapter, {
+    await defineSchema({
       threads: { subject: "string" },
       replies: { content: "string", thread_id: "integer" },
     });
@@ -4149,10 +3884,10 @@ describe("Associations: dependent", () => {
 });
 
 describe("CollectionProxy", () => {
-  let cpAdapter: DatabaseAdapter;
-  beforeEach(async () => {
-    cpAdapter = freshAdapter();
-    await defineSchema(cpAdapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       orders: { number: "string" },
       items: { name: "string", order_id: "integer" },
       invoices: { number: "string" },
@@ -4165,20 +3900,16 @@ describe("CollectionProxy", () => {
   });
 
   it("toArray loads associated records", async () => {
-    const adapter = cpAdapter;
-
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("order_id", "integer");
-        this.adapter = adapter;
       }
     }
 
     class Order extends Base {
       static {
         this.attribute("number", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Order, "items", { className: "Item", foreignKey: "order_id" });
@@ -4196,20 +3927,16 @@ describe("CollectionProxy", () => {
   });
 
   it("build creates unsaved record with FK", async () => {
-    const adapter = cpAdapter;
-
     class LineItem extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("invoice_id", "integer");
-        this.adapter = adapter;
       }
     }
 
     class Invoice extends Base {
       static {
         this.attribute("number", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Invoice, "lineItems", {
@@ -4228,20 +3955,16 @@ describe("CollectionProxy", () => {
   });
 
   it("create saves a new associated record", async () => {
-    const adapter = cpAdapter;
-
     class Note extends Base {
       static {
         this.attribute("text", "string");
         this.attribute("doc_id", "integer");
-        this.adapter = adapter;
       }
     }
 
     class Doc extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Doc, "notes", { className: "Note", foreignKey: "doc_id" });
@@ -4257,20 +3980,16 @@ describe("CollectionProxy", () => {
   });
 
   it("count returns number of associated records", async () => {
-    const adapter = cpAdapter;
-
     class Task extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("project_id", "integer");
-        this.adapter = adapter;
       }
     }
 
     class Project extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Project, "tasks", { className: "Task", foreignKey: "project_id" });
@@ -4288,11 +4007,11 @@ describe("CollectionProxy", () => {
 });
 
 describe("Polymorphic Associations", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       articles: { title: "string" },
       photos: { url: "string" },
       comments: { body: "string", commentable_id: "integer", commentable_type: "string" },
@@ -4305,7 +4024,6 @@ describe("Polymorphic Associations", () => {
     }
     Article.attribute("id", "integer");
     Article.attribute("title", "string");
-    Article.adapter = adapter;
     registerModel(Article);
 
     class Photo extends Base {
@@ -4313,7 +4031,6 @@ describe("Polymorphic Associations", () => {
     }
     Photo.attribute("id", "integer");
     Photo.attribute("url", "string");
-    Photo.adapter = adapter;
     registerModel(Photo);
 
     class Comment extends Base {
@@ -4323,7 +4040,6 @@ describe("Polymorphic Associations", () => {
     Comment.attribute("body", "string");
     Comment.attribute("commentable_id", "integer");
     Comment.attribute("commentable_type", "string");
-    Comment.adapter = adapter;
     Associations.belongsTo.call(Comment, "commentable", { polymorphic: true });
 
     const article = await Article.create({ title: "Hello" });
@@ -4354,7 +4070,6 @@ describe("Polymorphic Associations", () => {
     }
     Article.attribute("id", "integer");
     Article.attribute("title", "string");
-    Article.adapter = adapter;
     registerModel(Article);
     Associations.hasMany.call(Article, "comments", { as: "commentable" });
 
@@ -4365,7 +4080,6 @@ describe("Polymorphic Associations", () => {
     Comment.attribute("body", "string");
     Comment.attribute("commentable_id", "integer");
     Comment.attribute("commentable_type", "string");
-    Comment.adapter = adapter;
     registerModel(Comment);
 
     const article = await Article.create({ title: "Hello" });
@@ -4388,10 +4102,10 @@ describe("Polymorphic Associations", () => {
 });
 
 describe("association scopes", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       posts: { title: "string" },
       comments: {
         body: "string",
@@ -4409,7 +4123,6 @@ describe("association scopes", () => {
     Comment.attribute("body", "string");
     Comment.attribute("approved", "boolean");
     Comment.attribute("post_id", "integer");
-    Comment.adapter = adapter;
     registerModel(Comment);
 
     class Post extends Base {
@@ -4417,7 +4130,6 @@ describe("association scopes", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
-    Post.adapter = adapter;
     Associations.hasMany.call(Post, "approvedComments", {
       className: "Comment",
       scope: (rel: any) => rel.where({ approved: true }),
@@ -4438,10 +4150,10 @@ describe("association scopes", () => {
 });
 
 describe("whereAssociated / whereMissing", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       wa_authors: {},
       wa_books: { wa_author_id: "integer" },
       wm_authors: {},
@@ -4454,7 +4166,6 @@ describe("whereAssociated / whereMissing", () => {
       static _tableName = "wa_authors";
     }
     Author.attribute("id", "integer");
-    Author.adapter = adapter;
     registerModel("WaAuthor", Author);
 
     class Book extends Base {
@@ -4462,7 +4173,6 @@ describe("whereAssociated / whereMissing", () => {
     }
     Book.attribute("id", "integer");
     Book.attribute("wa_author_id", "integer");
-    Book.adapter = adapter;
     Associations.belongsTo.call(Book, "waAuthor", { className: "WaAuthor" });
 
     const author = await Author.create({});
@@ -4478,7 +4188,6 @@ describe("whereAssociated / whereMissing", () => {
       static _tableName = "wm_authors";
     }
     Author.attribute("id", "integer");
-    Author.adapter = adapter;
     registerModel("WmAuthor", Author);
 
     class Book extends Base {
@@ -4486,7 +4195,6 @@ describe("whereAssociated / whereMissing", () => {
     }
     Book.attribute("id", "integer");
     Book.attribute("wm_author_id", "integer");
-    Book.adapter = adapter;
     Associations.belongsTo.call(Book, "wmAuthor", { className: "WmAuthor" });
 
     const author = await Author.create({});
@@ -4499,26 +4207,24 @@ describe("whereAssociated / whereMissing", () => {
 });
 
 describe("destroyedByAssociation", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   it("is null by default", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
     User.attribute("id", "integer");
-    User.adapter = adapter;
 
     const user = new User({});
     expect(user.destroyedByAssociation).toBeNull();
   });
 
   it("can be set and read", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
     User.attribute("id", "integer");
-    User.adapter = adapter;
-    await defineSchema(adapter, { users: {} });
+    await defineSchema({ users: {} });
 
     const user = await User.create({});
     user.destroyedByAssociation = { name: "posts", type: "hasMany" };
@@ -4527,23 +4233,21 @@ describe("destroyedByAssociation", () => {
 });
 
 describe("dependent: restrictWithException", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   it("prevents deletion when associated records exist", async () => {
-    const adapter = freshAdapter();
-
     class DComment extends Base {
       static _tableName = "d_comments";
     }
     DComment.attribute("id", "integer");
     DComment.attribute("d_post_id", "integer");
     DComment.attribute("body", "string");
-    DComment.adapter = adapter;
 
     class DPost extends Base {
       static _tableName = "d_posts";
     }
     DPost.attribute("id", "integer");
     DPost.attribute("title", "string");
-    DPost.adapter = adapter;
 
     registerModel(DComment);
     registerModel(DPost);
@@ -4552,7 +4256,7 @@ describe("dependent: restrictWithException", () => {
       className: "DComment",
       foreignKey: "d_post_id",
     });
-    await defineSchema(adapter, {
+    await defineSchema({
       d_posts: { title: "string" },
       d_comments: { d_post_id: "integer", body: "string" },
     });
@@ -4566,21 +4270,17 @@ describe("dependent: restrictWithException", () => {
   });
 
   it("allows deletion when no associated records exist", async () => {
-    const adapter = freshAdapter();
-
     class DReview extends Base {
       static _tableName = "d_reviews";
     }
     DReview.attribute("id", "integer");
     DReview.attribute("d_article_id", "integer");
-    DReview.adapter = adapter;
 
     class DArticle extends Base {
       static _tableName = "d_articles";
     }
     DArticle.attribute("id", "integer");
     DArticle.attribute("title", "string");
-    DArticle.adapter = adapter;
 
     registerModel(DReview);
     registerModel(DArticle);
@@ -4589,7 +4289,7 @@ describe("dependent: restrictWithException", () => {
       className: "DReview",
       foreignKey: "d_article_id",
     });
-    await defineSchema(adapter, {
+    await defineSchema({
       d_articles: { title: "string" },
       d_reviews: { d_article_id: "integer" },
     });
@@ -4601,22 +4301,20 @@ describe("dependent: restrictWithException", () => {
 });
 
 describe("CollectionProxy enhancements", () => {
-  let cpeAdapter: DatabaseAdapter;
-  beforeEach(async () => {
-    cpeAdapter = freshAdapter();
-    await defineSchema(cpeAdapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       authors: { name: "string" },
       posts: { title: "string", author_id: "integer" },
     });
   });
 
   it("push adds records to the collection", async () => {
-    const adapter = cpeAdapter;
     class Author extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -4624,7 +4322,6 @@ describe("CollectionProxy enhancements", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -4639,12 +4336,10 @@ describe("CollectionProxy enhancements", () => {
   });
 
   it("size returns count", async () => {
-    const adapter = cpeAdapter;
     class Author extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -4652,7 +4347,6 @@ describe("CollectionProxy enhancements", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -4666,12 +4360,10 @@ describe("CollectionProxy enhancements", () => {
   });
 
   it("isEmpty returns true/false", async () => {
-    const adapter = cpeAdapter;
     class Author extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -4679,7 +4371,6 @@ describe("CollectionProxy enhancements", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -4694,12 +4385,10 @@ describe("CollectionProxy enhancements", () => {
   });
 
   it("first and last return correct records", async () => {
-    const adapter = cpeAdapter;
     class Author extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -4707,7 +4396,6 @@ describe("CollectionProxy enhancements", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -4726,12 +4414,10 @@ describe("CollectionProxy enhancements", () => {
   });
 
   it("includes checks for record membership", async () => {
-    const adapter = cpeAdapter;
     class Author extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -4739,7 +4425,6 @@ describe("CollectionProxy enhancements", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -4756,7 +4441,8 @@ describe("CollectionProxy enhancements", () => {
 });
 
 describe("Associations (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Author extends Base {
     static {
@@ -4776,15 +4462,8 @@ describe("Associations (Rails-guided)", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Author.adapter = adapter;
-    Book.adapter = adapter;
-    Profile.adapter = adapter;
-    registerModel(Author);
-    registerModel(Book);
-    registerModel(Profile);
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       authors: { name: "string" },
       books: { title: "string", author_id: "integer" },
       profiles: { bio: "string", author_id: "integer" },
@@ -4828,7 +4507,6 @@ describe("Associations (Rails-guided)", () => {
       static {
         this.attribute("title", "string");
         this.attribute("writer_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Article);
@@ -4846,7 +4524,8 @@ describe("Associations (Rails-guided)", () => {
 });
 
 describe("Associations (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Author extends Base {
     static {
@@ -4868,15 +4547,8 @@ describe("Associations (Rails-guided)", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Author.adapter = adapter;
-    Book.adapter = adapter;
-    Profile.adapter = adapter;
-    registerModel(Author);
-    registerModel(Book);
-    registerModel(Profile);
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       authors: { name: "string" },
       books: { title: "string", author_id: "integer" },
       profiles: { bio: "string", author_id: "integer" },
@@ -4897,7 +4569,6 @@ describe("Associations (Rails-guided)", () => {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Article);
@@ -4966,7 +4637,6 @@ describe("Associations (Rails-guided)", () => {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Article);
@@ -4984,11 +4654,11 @@ describe("Associations (Rails-guided)", () => {
 });
 
 describe("Polymorphic Associations (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       posts: { title: "string" },
       images: { url: "string" },
       comments: { body: "string", commentable_id: "integer", commentable_type: "string" },
@@ -5002,7 +4672,6 @@ describe("Polymorphic Associations (Rails-guided)", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -5012,7 +4681,6 @@ describe("Polymorphic Associations (Rails-guided)", () => {
         this._tableName = "images";
         this.attribute("id", "integer");
         this.attribute("url", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Image);
@@ -5024,7 +4692,6 @@ describe("Polymorphic Associations (Rails-guided)", () => {
         this.attribute("body", "string");
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Comment, "commentable", { polymorphic: true });
@@ -5057,7 +4724,6 @@ describe("Polymorphic Associations (Rails-guided)", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(Post, "comments", { as: "commentable" });
@@ -5070,7 +4736,6 @@ describe("Polymorphic Associations (Rails-guided)", () => {
         this.attribute("body", "string");
         this.attribute("commentable_id", "integer");
         this.attribute("commentable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Comment);
@@ -5086,11 +4751,11 @@ describe("Polymorphic Associations (Rails-guided)", () => {
 });
 
 describe("HABTM (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       developers: { name: "string" },
       projects: { name: "string" },
     });
@@ -5103,7 +4768,6 @@ describe("HABTM (Rails-guided)", () => {
         this._tableName = "developers";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasAndBelongsToMany.call(Developer, "projects", {
@@ -5116,13 +4780,12 @@ describe("HABTM (Rails-guided)", () => {
         this._tableName = "projects";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Project);
 
     // Create the join table
-    await adapter.executeMutation(
+    await Base.adapter.executeMutation(
       `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
     );
 
@@ -5130,10 +4793,10 @@ describe("HABTM (Rails-guided)", () => {
     const p1 = await Project.create({ name: "Rails" });
     const p2 = await Project.create({ name: "Basecamp" });
 
-    await adapter.executeMutation(
+    await Base.adapter.executeMutation(
       `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p1.id})`,
     );
-    await adapter.executeMutation(
+    await Base.adapter.executeMutation(
       `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p2.id})`,
     );
 
@@ -5144,11 +4807,11 @@ describe("HABTM (Rails-guided)", () => {
 });
 
 describe("inverse_of (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       authors: { name: "string" },
       books: { author_id: "integer" },
       posts: { title: "string" },
@@ -5163,7 +4826,6 @@ describe("inverse_of (Rails-guided)", () => {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Author);
@@ -5173,7 +4835,6 @@ describe("inverse_of (Rails-guided)", () => {
         this._tableName = "books";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Book, "author", { inverseOf: "books" });
@@ -5194,7 +4855,6 @@ describe("inverse_of (Rails-guided)", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -5205,7 +4865,6 @@ describe("inverse_of (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Comment);
@@ -5223,11 +4882,11 @@ describe("inverse_of (Rails-guided)", () => {
 });
 
 describe("Association Scopes (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       posts: { title: "string" },
       comments: { body: "string", approved: "boolean", position: "integer", post_id: "integer" },
     });
@@ -5242,7 +4901,6 @@ describe("Association Scopes (Rails-guided)", () => {
         this.attribute("body", "string");
         this.attribute("approved", "boolean");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Comment);
@@ -5252,7 +4910,6 @@ describe("Association Scopes (Rails-guided)", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -5278,7 +4935,6 @@ describe("Association Scopes (Rails-guided)", () => {
         this.attribute("body", "string");
         this.attribute("position", "integer");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Comment);
@@ -5287,7 +4943,6 @@ describe("Association Scopes (Rails-guided)", () => {
       static {
         this._tableName = "posts";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Post);
@@ -5309,11 +4964,11 @@ describe("Association Scopes (Rails-guided)", () => {
 // ---------------------------------------------------------------------------
 
 describe("BelongsToAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       abs_clients: { firm_id: "integer", name: "string" },
       abs_firms: { name: "string" },
       bc_accounts: { firm_id: "integer", name: "string" },
@@ -5396,13 +5051,11 @@ describe("BelongsToAssociationsTest", () => {
     class NullFkCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NullFkAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("NullFkCompany", NullFkCompany);
@@ -5421,13 +5074,11 @@ describe("BelongsToAssociationsTest", () => {
     class MissingCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class MissingAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("MissingCompany", MissingCompany);
@@ -5450,14 +5101,12 @@ describe("BelongsToAssociationsTest", () => {
     class BuildFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BuildAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("BuildFirm", BuildFirm);
@@ -5483,14 +5132,12 @@ describe("BelongsToAssociationsTest", () => {
     class CreateFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CreateAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("CreateFirm", CreateFirm);
@@ -5519,14 +5166,12 @@ describe("BelongsToAssociationsTest", () => {
     class NatFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NatAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("NatFirm", NatFirm);
@@ -5545,14 +5190,12 @@ describe("BelongsToAssociationsTest", () => {
     class NilFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NilAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("NilFirm", NilFirm);
@@ -5584,13 +5227,11 @@ describe("BelongsToAssociationsTest", () => {
     class OptCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class OptAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(OptAccount, "optCompany", {
@@ -5612,13 +5253,11 @@ describe("BelongsToAssociationsTest", () => {
     class ReqCompany extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ReqAccount extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(ReqAccount, "reqCompany", {
@@ -5644,14 +5283,12 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "string");
-        this.adapter = adapter;
       }
     }
     class TouchComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(TouchComment, "touchPost", {
@@ -5686,14 +5323,12 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("cc_comments_count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class CcComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(CcComment, "ccPost", {
@@ -5724,13 +5359,11 @@ describe("BelongsToAssociationsTest", () => {
         this.attribute("url", "string");
         this.attribute("imageable_id", "integer");
         this.attribute("imageable_type", "string");
-        this.adapter = adapter;
       }
     }
     class PolyPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("PolyPost", PolyPost);
@@ -5759,13 +5392,11 @@ describe("BelongsToAssociationsTest", () => {
     class ReloadFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ReloadAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("ReloadFirm", ReloadFirm);
@@ -5803,14 +5434,12 @@ describe("BelongsToAssociationsTest", () => {
     class AbsFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AbsClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("AbsFirm", AbsFirm);
@@ -5835,14 +5464,12 @@ describe("BelongsToAssociationsTest", () => {
     class InvPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class InvComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(InvPost, "comments", {
@@ -5879,14 +5506,12 @@ describe("BelongsToAssociationsTest", () => {
     class StFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class StClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("StFirm", StFirm);
@@ -5919,14 +5544,12 @@ describe("BelongsToAssociationsTest", () => {
     class NrFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NrClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("NrFirm", NrFirm);
@@ -5948,14 +5571,12 @@ describe("BelongsToAssociationsTest", () => {
     class NoFkFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NoFkClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("NoFkFirm", NoFkFirm);
@@ -5979,14 +5600,12 @@ describe("BelongsToAssociationsTest", () => {
     class NilInvPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class NilInvComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("NilInvPost", NilInvPost);
@@ -6014,13 +5633,11 @@ describe("BelongsToAssociationsTest", () => {
     class IdFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class IdAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("IdFirm", IdFirm);
@@ -6042,13 +5659,11 @@ describe("BelongsToAssociationsTest", () => {
     class NilFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NilAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("NilFirm", NilFirm);
@@ -6074,13 +5689,11 @@ describe("BelongsToAssociationsTest", () => {
     class CrNrFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CrNrAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("CrNrFirm", CrNrFirm);
@@ -6115,13 +5728,11 @@ describe("BelongsToAssociationsTest", () => {
     class FkNilFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FkNilAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("FkNilFirm", FkNilFirm);
@@ -6153,13 +5764,11 @@ describe("BelongsToAssociationsTest", () => {
     class StkFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class StkAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("StkFirm", StkFirm);
@@ -6187,14 +5796,12 @@ describe("BelongsToAssociationsTest", () => {
     class PolyOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PolyItem extends Base {
       static {
         this.attribute("owner_id", "integer");
         this.attribute("owner_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("PolyOwner", PolyOwner);
@@ -6217,14 +5824,12 @@ describe("BelongsToAssociationsTest", () => {
     class PolyNilOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PolyNilItem extends Base {
       static {
         this.attribute("owner_id", "integer");
         this.attribute("owner_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("PolyNilOwner", PolyNilOwner);
@@ -6246,13 +5851,11 @@ describe("BelongsToAssociationsTest", () => {
     class SlFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SlAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("SlFirm", SlFirm);
@@ -6279,13 +5882,11 @@ describe("BelongsToAssociationsTest", () => {
     class FkCrFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FkCrAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("FkCrFirm", FkCrFirm);
@@ -6303,13 +5904,11 @@ describe("BelongsToAssociationsTest", () => {
     class FkSvFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FkSvAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("FkSvFirm", FkSvFirm);
@@ -6331,13 +5930,11 @@ describe("BelongsToAssociationsTest", () => {
     class TcFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TcAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("TcFirm", TcFirm);
@@ -6354,13 +5951,11 @@ describe("BelongsToAssociationsTest", () => {
     class Tc2Firm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Tc2Account extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Tc2Firm", Tc2Firm);
@@ -6377,13 +5972,11 @@ describe("BelongsToAssociationsTest", () => {
     class Tc3Firm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Tc3Account extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Tc3Firm", Tc3Firm);
@@ -6410,13 +6003,11 @@ describe("BelongsToAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     class WcAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("WcFirm", WcFirm);
@@ -6437,14 +6028,12 @@ describe("BelongsToAssociationsTest", () => {
     class BcFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BcAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("BcFirm", BcFirm);
@@ -6463,14 +6052,12 @@ describe("BelongsToAssociationsTest", () => {
     class CcFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CcAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CcFirm", CcFirm);
@@ -6487,18 +6074,16 @@ describe("BelongsToAssociationsTest", () => {
 // Shared setup helpers
 // ---------------------------------------------------------------------------
 
-function makePostComments(adapter: DatabaseAdapter) {
+function makePostComments() {
   class Comment extends Base {
     static {
       this.attribute("body", "string");
       this.attribute("post_id", "integer");
-      this.adapter = adapter;
     }
   }
   class Post extends Base {
     static {
       this.attribute("title", "string");
-      this.adapter = adapter;
     }
   }
   Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "post_id" });
@@ -6507,18 +6092,16 @@ function makePostComments(adapter: DatabaseAdapter) {
   return { Post, Comment };
 }
 
-function makeFirmClients(adapter: DatabaseAdapter) {
+function makeFirmClients() {
   class Client extends Base {
     static {
       this.attribute("name", "string");
       this.attribute("firm_id", "integer");
-      this.adapter = adapter;
     }
   }
   class Firm extends Base {
     static {
       this.attribute("name", "string");
-      this.adapter = adapter;
     }
   }
   Associations.hasMany.call(Firm, "clients", { className: "Client", foreignKey: "firm_id" });
@@ -6532,7 +6115,8 @@ function makeFirmClients(adapter: DatabaseAdapter) {
 // ---------------------------------------------------------------------------
 
 describe("HasManyAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   const HM_SCHEMA: Schema = {
     articles: { title: "string" },
@@ -6556,16 +6140,9 @@ describe("HasManyAssociationsTest", () => {
     widgets: { name: "string", shelf_id: "integer" },
   };
 
-  beforeEach(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, HM_SCHEMA);
+  beforeAll(async () => {
+    await defineSchema(HM_SCHEMA);
   });
-
-  async function setupHMAdapter2(): Promise<DatabaseAdapter> {
-    const a = createTestAdapter();
-    await defineSchema(a, HM_SCHEMA);
-    return a;
-  }
 
   // -------------------------------------------------------------------------
   // Basic has_many loading
@@ -6573,7 +6150,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("has many build with options", async () => {
     // Rails: test_has_many_build_with_options
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "UFMT" });
     await Client.create({ name: "Active Client", firm_id: firm.id });
 
@@ -6587,7 +6164,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("finding", async () => {
     // Rails: test_finding
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Signal37" });
     await Client.create({ name: "Client A", firm_id: firm.id });
     await Client.create({ name: "Client B", firm_id: firm.id });
@@ -6600,7 +6177,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("counting", async () => {
     // Rails: test_counting
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Signal37" });
     await Client.create({ name: "A", firm_id: firm.id });
     await Client.create({ name: "B", firm_id: firm.id });
@@ -6612,7 +6189,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("counting with single hash", async () => {
     // Rails: test_counting_with_single_hash
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Signal37" });
     await Client.create({ name: "Microsoft", firm_id: firm.id });
     await Client.create({ name: "Apple", firm_id: firm.id });
@@ -6629,7 +6206,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("build sets foreign key automatically", async () => {
     // Rails: test_association_keys_bypass_attribute_protection
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = await Firm.create({ name: "Honda Corp" });
 
     const proxy = association(firm, "clients");
@@ -6639,7 +6216,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("build overrides supplied foreign key with correct value", async () => {
     // Rails: test_association_protect_foreign_key
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = await Firm.create({ name: "Invoice Corp" });
 
     const proxy = association(firm, "clients");
@@ -6650,7 +6227,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("adding", async () => {
     // Rails: test_adding
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Signal37" });
     await Client.create({ name: "Existing A", firm_id: firm.id });
     await Client.create({ name: "Existing B", firm_id: firm.id });
@@ -6665,7 +6242,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("adding a collection", async () => {
     // Rails: test_adding_a_collection
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Signal37" });
     await Client.create({ name: "Existing", firm_id: firm.id });
 
@@ -6682,7 +6259,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("calling empty on an association that has not been loaded performs a query", async () => {
     // Rails: calling empty...
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Empty Corp" });
 
     const proxy = association(firm, "clients");
@@ -6694,7 +6271,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("calling size on an association performs a query", async () => {
     // Rails: calling size...
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Sized Corp" });
     await Client.create({ name: "A", firm_id: firm.id });
     await Client.create({ name: "B", firm_id: firm.id });
@@ -6709,7 +6286,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("deleting", async () => {
     // Rails: test_deleting
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Signal37" });
     const clientA = await Client.create({ name: "Microsoft", firm_id: firm.id });
     await Client.create({ name: "Apple", firm_id: firm.id });
@@ -6728,7 +6305,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("deleting a collection", async () => {
     // Rails: test_deleting_a_collection
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Signal37" });
     const a = await Client.create({ name: "A", firm_id: firm.id });
     const b = await Client.create({ name: "B", firm_id: firm.id });
@@ -6744,7 +6321,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("clearing an association collection", async () => {
     // Rails: test_clearing_an_association_collection
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Signal37" });
     await Client.create({ name: "A", firm_id: firm.id });
     await Client.create({ name: "B", firm_id: firm.id });
@@ -6759,7 +6336,7 @@ describe("HasManyAssociationsTest", () => {
   it("clear collection should not change updated at", async () => {
     // Rails: test_clear_collection_should_not_change_updated_at
     // We verify FK is nullified but record still exists
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Dauntless" });
     const client = await Client.create({ name: "Cockpit", firm_id: firm.id });
 
@@ -6776,7 +6353,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("get ids for association on new record does not try to find records", async () => {
     // Rails: test_get_ids_for_association_on_new_record_does_not_try_to_find_records
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = new Firm({ name: "New Firm" });
 
     // New unsaved record — FK value is undefined/null, should return []
@@ -6793,7 +6370,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("calling first or last on association", async () => {
     // Rails: test_calling_first_or_last_on_loaded_association_should_not_fetch_with_query
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "Alpha", firm_id: firm.id });
     await Client.create({ name: "Beta", firm_id: firm.id });
@@ -6811,18 +6388,15 @@ describe("HasManyAssociationsTest", () => {
 
   it("dependence", async () => {
     // Rails: test_dependence
-    const adapter2 = await setupHMAdapter2();
     class Tag extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter2;
       }
     }
     class Article extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter2;
       }
     }
     Associations.hasMany.call(Article, "tags", {
@@ -6853,18 +6427,15 @@ describe("HasManyAssociationsTest", () => {
 
   it("depends and nullify", async () => {
     // Rails: test_depends_and_nullify
-    const adapter2 = await setupHMAdapter2();
     class Child extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("parent_id", "integer");
-        this.adapter = adapter2;
       }
     }
     class Parent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter2;
       }
     }
     Associations.hasMany.call(Parent, "children", {
@@ -6894,18 +6465,15 @@ describe("HasManyAssociationsTest", () => {
 
   it("restrict with exception when empty allows destroy", async () => {
     // Rails: test_restrict_with_exception (empty case)
-    const adapter2 = await setupHMAdapter2();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("shelf_id", "integer");
-        this.adapter = adapter2;
       }
     }
     class Shelf extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter2;
       }
     }
     Associations.hasMany.call(Shelf, "widgets", {
@@ -6927,18 +6495,15 @@ describe("HasManyAssociationsTest", () => {
 
   it("restrict with error", async () => {
     // Rails: test_restrict_with_error
-    const adapter2 = await setupHMAdapter2();
     class Entry extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("log_id", "integer");
-        this.adapter = adapter2;
       }
     }
     class Log extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter2;
       }
     }
     Associations.hasMany.call(Log, "entries", {
@@ -6961,7 +6526,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("replace with less", async () => {
     // Rails: test_replace_with_less
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Firm" });
     await Client.create({ name: "A", firm_id: firm.id });
     const b = await Client.create({ name: "B", firm_id: firm.id });
@@ -6981,7 +6546,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("replace with new", async () => {
     // Rails: test_replace_with_new
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Firm" });
     await Client.create({ name: "Old", firm_id: firm.id });
 
@@ -7001,7 +6566,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("included in collection", async () => {
     // Rails: test_included_in_collection
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     const client = await Client.create({ name: "Included", firm_id: firm.id });
     await Client.create({ name: "Other", firm_id: 99999 });
@@ -7012,7 +6577,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("included in collection for new records", async () => {
     // Rails: test_included_in_collection_for_new_records
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     const unsaved = new Client({ name: "New" });
 
@@ -7026,7 +6591,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("destroying a collection", async () => {
     // Rails: test_destroying_a_collection
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Signal37" });
     const a = await Client.create({ name: "A", firm_id: firm.id });
     const b = await Client.create({ name: "B", firm_id: firm.id });
@@ -7045,7 +6610,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("has many associations on new records use null relations", async () => {
     // Rails: test has many associations on new records use null relations
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = new Firm({ name: "New" });
 
     const records = await loadHasMany(firm, "clients", {
@@ -7061,19 +6626,16 @@ describe("HasManyAssociationsTest", () => {
 
   it("association with scope applies conditions", async () => {
     // Rails: scoped association variant
-    const adapter2 = await setupHMAdapter2();
     class ScopedComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
         this.attribute("approved", "boolean");
-        this.adapter = adapter2;
       }
     }
     class ScopedPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter2;
       }
     }
     Associations.hasMany.call(ScopedPost, "approved_comments", {
@@ -7103,7 +6665,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("build from association sets inverse instance", async () => {
     // Rails: test_build_from_association_sets_inverse_instance
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = await Firm.create({ name: "Inverse Corp" });
     const proxy = association(firm, "clients");
     const built = proxy.build({ name: "Built Client" });
@@ -7116,19 +6678,16 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("has many with different foreign keys", async () => {
-    const adapter2 = await setupHMAdapter2();
     class Product extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("seller_id", "integer");
         this.attribute("buyer_id", "integer");
-        this.adapter = adapter2;
       }
     }
     class Person extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter2;
       }
     }
     Associations.hasMany.call(Person, "sold_products", {
@@ -7165,7 +6724,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("taking", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "A", firm_id: firm.id });
     await Client.create({ name: "B", firm_id: firm.id });
@@ -7176,7 +6735,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("taking not found", async () => {
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = await Firm.create({ name: "Empty Corp" });
 
     const proxy = association(firm, "clients");
@@ -7185,7 +6744,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("taking with a number", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "A", firm_id: firm.id });
     await Client.create({ name: "B", firm_id: firm.id });
@@ -7201,7 +6760,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("calling many should return true if more than one", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "A", firm_id: firm.id });
     await Client.create({ name: "B", firm_id: firm.id });
@@ -7210,7 +6769,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("calling many should return false if only one", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "A", firm_id: firm.id });
 
@@ -7218,14 +6777,14 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("calling none should return true if none", async () => {
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = await Firm.create({ name: "Empty" });
 
     expect(await association(firm, "clients").isNone()).toBe(true);
   });
 
   it("calling none should return false if any", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "A", firm_id: firm.id });
 
@@ -7233,14 +6792,14 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("calling one should return false if zero", async () => {
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = await Firm.create({ name: "Empty" });
 
     expect(await association(firm, "clients").one()).toBe(false);
   });
 
   it("calling one should return false if more than one", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "A", firm_id: firm.id });
     await Client.create({ name: "B", firm_id: firm.id });
@@ -7249,7 +6808,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("calling one should return true if exactly one", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "A", firm_id: firm.id });
 
@@ -7261,7 +6820,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("first_or_initialize adds the record to the association", async () => {
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
 
     const proxy = association(firm, "clients");
@@ -7273,7 +6832,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("first_or_initialize returns existing when found", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "Existing", firm_id: firm.id });
 
@@ -7284,7 +6843,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("first_or_create adds the record to the association", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
 
     const proxy = association(firm, "clients");
@@ -7299,7 +6858,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("first_or_create! adds the record to the association", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
 
     const proxy = association(firm, "clients");
@@ -7317,7 +6876,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("exists respects association scope", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     const other = await Firm.create({ name: "Other" });
     await Client.create({ name: "A", firm_id: firm.id });
@@ -7335,7 +6894,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("sending new to association proxy should have same effect as calling new", async () => {
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
 
     const proxy = association(firm, "clients");
@@ -7350,7 +6909,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("attributes are being set when initialized from has many association with where clause", async () => {
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
 
     const proxy = association(firm, "clients");
@@ -7365,7 +6924,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("include method in has many association should return true for instance added with build", async () => {
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
 
     const proxy = association(firm, "clients");
@@ -7380,7 +6939,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("replace returns target", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "Old", firm_id: firm.id });
 
@@ -7399,7 +6958,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("create from association with nil values should work", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
 
     const proxy = association(firm, "clients");
@@ -7415,7 +6974,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("finding with condition", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "Microsoft", firm_id: firm.id });
     await Client.create({ name: "Apple", firm_id: firm.id });
@@ -7427,7 +6986,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("finding with condition hash", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "Alpha", firm_id: firm.id });
     await Client.create({ name: "Beta", firm_id: firm.id });
@@ -7442,7 +7001,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("attributes are set when initialized from has many null relationship", async () => {
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = new Firm({ name: "New Firm" });
 
     // New record — collection is empty/null
@@ -7462,7 +7021,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("replace", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "Old A", firm_id: firm.id });
     await Client.create({ name: "Old B", firm_id: firm.id });
@@ -7479,7 +7038,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("replace with same content", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "A", firm_id: firm.id });
     await Client.create({ name: "B", firm_id: firm.id });
@@ -7501,7 +7060,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("clearing without initial access", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "A", firm_id: firm.id });
     await Client.create({ name: "B", firm_id: firm.id });
@@ -7519,7 +7078,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("deleting by integer id", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     const a = await Client.create({ name: "A", firm_id: firm.id });
     await Client.create({ name: "B", firm_id: firm.id });
@@ -7533,7 +7092,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("destroying by integer id", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     const a = await Client.create({ name: "A", firm_id: firm.id });
     await Client.create({ name: "B", firm_id: firm.id });
@@ -7552,7 +7111,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("find in collection", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     const a = await Client.create({ name: "A", firm_id: firm.id });
     await Client.create({ name: "B", firm_id: firm.id });
@@ -7567,7 +7126,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("set ids for association on new record applies association correctly", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     const a = await Client.create({ name: "A", firm_id: null });
     const b = await Client.create({ name: "B", firm_id: null });
@@ -7581,7 +7140,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("assign ids ignoring blanks", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     const a = await Client.create({ name: "A", firm_id: null });
 
@@ -7597,7 +7156,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("adding using create", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
 
     await association(firm, "clients").create({ name: "New Via Create" });
@@ -7612,7 +7171,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("creation respects hash condition", async () => {
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
 
     const client = await association(firm, "clients").create({ name: "Conditioned" });
@@ -7626,7 +7185,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("create with bang on has many when parent is new raises", async () => {
-    const { Firm } = makeFirmClients(adapter);
+    const { Firm } = makeFirmClients();
     const firm = new Firm({ name: "New Corp" });
 
     // build on unsaved parent: FK is null since parent has no id
@@ -7640,7 +7199,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("include uses array include after loaded", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     const a = await Client.create({ name: "A", firm_id: firm.id });
 
@@ -7650,7 +7209,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("include returns false for non matching record to verify scoping", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     const other = await Firm.create({ name: "Other" });
     await Client.create({ name: "A", firm_id: firm.id });
@@ -7664,7 +7223,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("calling many should return false if none or one", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
 
     expect(await association(firm, "clients").many()).toBe(false);
@@ -7678,7 +7237,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("find all", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "A", firm_id: firm.id });
     await Client.create({ name: "B", firm_id: firm.id });
@@ -7688,7 +7247,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("find first", async () => {
-    const { Firm, Client } = makeFirmClients(adapter);
+    const { Firm, Client } = makeFirmClients();
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "Alpha", firm_id: firm.id });
     await Client.create({ name: "Beta", firm_id: firm.id });
@@ -7703,25 +7262,21 @@ describe("HasManyAssociationsTest", () => {
 
   it("three levels of dependence", async () => {
     // Rails: test_three_levels_of_dependence
-    const adapter2 = await setupHMAdapter2();
     class Grandchild extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("child_id", "integer");
-        this.adapter = adapter2;
       }
     }
     class Child2 extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("root_id", "integer");
-        this.adapter = adapter2;
       }
     }
     class Root extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter2;
       }
     }
     Associations.hasMany.call(Child2, "grandchildren", {
@@ -7753,11 +7308,11 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("AssociationProxyTest", () => {
-  let apAdapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    apAdapter = freshAdapter();
-    await defineSchema(apAdapter, {
+  beforeAll(async () => {
+    await defineSchema({
       ap_categories: { name: "string" },
       ap_comments: { ap_post_id: "integer", body: "string" },
       ap_posts: { title: "string" },
@@ -7774,14 +7329,12 @@ describe("AssociationProxyTest", () => {
         this._tableName = "ap_comments";
         this.attribute("body", "string");
         this.attribute("ap_post_id", "integer");
-        this.adapter = apAdapter;
       }
     }
     class APPost extends Base {
       static {
         this._tableName = "ap_posts";
         this.attribute("title", "string");
-        this.adapter = apAdapter;
       }
     }
     Associations.hasMany.call(APPost, "apComments", {
@@ -7917,21 +7470,18 @@ describe("AssociationProxyTest", () => {
         this._tableName = "ap_taggings";
         this.attribute("ap_tagged_post_id", "integer");
         this.attribute("ap_category_id", "integer");
-        this.adapter = apAdapter;
       }
     }
     class APCategory extends Base {
       static {
         this._tableName = "ap_categories";
         this.attribute("name", "string");
-        this.adapter = apAdapter;
       }
     }
     class APTaggedPost extends Base {
       static {
         this._tableName = "ap_tagged_posts";
         this.attribute("title", "string");
-        this.adapter = apAdapter;
       }
     }
     Associations.hasMany.call(APTaggedPost, "apTaggings", {
@@ -8033,7 +7583,6 @@ describe("AssociationProxyTest", () => {
       static {
         this._tableName = "is_humans";
         this.attribute("name", "string");
-        this.adapter = apAdapter;
       }
     }
     class IsInterest extends Base {
@@ -8041,7 +7590,6 @@ describe("AssociationProxyTest", () => {
         this._tableName = "is_interests";
         this.attribute("topic", "string");
         this.attribute("is_human_id", "integer");
-        this.adapter = apAdapter;
       }
     }
     Associations.hasMany.call(IsHuman, "isInterests", { className: "IsInterest" });
@@ -8134,9 +7682,10 @@ describe("AssociationProxyTest", () => {
 });
 
 describe("PreloaderTest", () => {
-  async function setupPLAdapter(): Promise<DatabaseAdapter> {
-    const a = freshAdapter();
-    await defineSchema(a, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       cfk_bt_authors: {
         columns: { id: "integer", name: "string", region_id: "integer" },
         primaryKey: ["region_id", "id"],
@@ -8262,24 +7811,20 @@ describe("PreloaderTest", () => {
       tb_categories: { name: "string" },
       tb_essays: { tb_author_id: "integer", tb_category_id: "integer" },
     });
-    return a;
-  }
+  });
 
   afterEach(() => vi.restoreAllMocks());
 
   it("preload with scope", async () => {
-    const adapter = await setupPLAdapter();
     class PwsPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class PwsComment extends Base {
       static {
         this.attribute("pws_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("PwsPost", PwsPost);
@@ -8299,18 +7844,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload makes correct number of queries on array", async () => {
-    const adapter = await setupPLAdapter();
     class PAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("p_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(PPost, "pAuthor", {
@@ -8332,18 +7874,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload makes correct number of queries on relation", async () => {
-    const adapter = await setupPLAdapter();
     class PRAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PRPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pr_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(PRPost, "prAuthor", {
@@ -8364,18 +7903,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload does not concatenate duplicate records", async () => {
-    const adapter = await setupPLAdapter();
     class PDAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PDPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pd_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PDAuthor, "pdPosts", {
@@ -8396,25 +7932,21 @@ describe("PreloaderTest", () => {
   });
 
   it("preload for hmt with conditions", async () => {
-    const adapter = await setupPLAdapter();
     class HmtcPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class HmtcCategory extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("special", "boolean");
-        this.adapter = adapter;
       }
     }
     class HmtcCategorization extends Base {
       static {
         this.attribute("hmtc_post_id", "integer");
         this.attribute("hmtc_category_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("HmtcPost", HmtcPost);
@@ -8446,18 +7978,15 @@ describe("PreloaderTest", () => {
     expect(cats[0].name).toBe("Special");
   });
   it("preload groups queries with same scope", async () => {
-    const adapter = await setupPLAdapter();
     class GQSAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class GQSPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("gqs_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GQSAuthor, "gqsPosts", {
@@ -8480,18 +8009,15 @@ describe("PreloaderTest", () => {
     expect((a2 as any)._preloadedAssociations.get("gqsPosts")[0].title).toBe("P2");
   });
   it("preload grouped queries with already loaded records", async () => {
-    const adapter = await setupPLAdapter();
     class GQLAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class GQLPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("gql_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(GQLPost, "gqlAuthor", {
@@ -8517,24 +8043,20 @@ describe("PreloaderTest", () => {
     expect((p2Fresh as any)._preloadedAssociations.get("gqlAuthor").name).toBe("Auth2");
   });
   it("preload grouped queries of middle records", async () => {
-    const adapter = await setupPLAdapter();
     class GMMPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class GMMTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class GMMTagging extends Base {
       static {
         this.attribute("gmm_post_id", "integer");
         this.attribute("gmm_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GMMPost, "gmmTaggings", {
@@ -8575,24 +8097,20 @@ describe("PreloaderTest", () => {
     ]);
   });
   it("preload grouped queries of through records", async () => {
-    const adapter = await setupPLAdapter();
     class GGTPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class GGTTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class GGTTagging extends Base {
       static {
         this.attribute("ggt_post_id", "integer");
         this.attribute("ggt_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GGTPost, "ggtTaggings", {
@@ -8632,24 +8150,20 @@ describe("PreloaderTest", () => {
     expect(p2tags[0].name).toBe("rails");
   });
   it("preload through records with already loaded middle record", async () => {
-    const adapter = await setupPLAdapter();
     class GATPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class GATTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class GATTagging extends Base {
       static {
         this.attribute("gat_post_id", "integer");
         this.attribute("gat_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GATPost, "gatTaggings", {
@@ -8692,18 +8206,15 @@ describe("PreloaderTest", () => {
     ]);
   });
   it("preload with instance dependent scope", async () => {
-    const adapter = await setupPLAdapter();
     class PIDSAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PIDSPost extends Base {
       static {
         this.attribute("pids_author_id", "integer");
         this.attribute("mention", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("PIDSAuthor", PIDSAuthor);
@@ -8734,24 +8245,20 @@ describe("PreloaderTest", () => {
     expect(bobPosts).toEqual([]);
   });
   it("preload with instance dependent through scope", async () => {
-    const adapter = await setupPLAdapter();
     class PWITSAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PWITSPost extends Base {
       static {
         this.attribute("pwits_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PWITSComment extends Base {
       static {
         this.attribute("pwits_post_id", "integer");
         this.attribute("mention", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("PWITSAuthor", PWITSAuthor);
@@ -8798,24 +8305,20 @@ describe("PreloaderTest", () => {
     expect(bobComments).toEqual([]);
   });
   it("preload with through instance dependent scope", async () => {
-    const adapter = await setupPLAdapter();
     class PWTISSAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PWTISSPost extends Base {
       static {
         this.attribute("pwtiss_author_id", "integer");
         this.attribute("mention", "string");
-        this.adapter = adapter;
       }
     }
     class PWTISSComment extends Base {
       static {
         this.attribute("pwtiss_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("PWTISSAuthor", PWTISSAuthor);
@@ -8870,18 +8373,15 @@ describe("PreloaderTest", () => {
   });
 
   it("some already loaded associations", async () => {
-    const adapter = await setupPLAdapter();
     class SAAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SAPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("sa_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(SAPost, "saAuthor", {
@@ -8904,24 +8404,20 @@ describe("PreloaderTest", () => {
   });
 
   it("preload through", async () => {
-    const adapter = await setupPLAdapter();
     class PTTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PTTagging extends Base {
       static {
         this.attribute("pt_post_id", "integer");
         this.attribute("pt_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PTPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PTPost, "ptTaggings", {
@@ -8955,25 +8451,21 @@ describe("PreloaderTest", () => {
   });
 
   it("preload groups queries with same scope at second level", async () => {
-    const adapter = await setupPLAdapter();
     class GSLAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class GSLPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("gsl_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class GSLComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("gsl_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(GSLAuthor, "gslThinkingPosts", {
@@ -9010,18 +8502,15 @@ describe("PreloaderTest", () => {
     /* BLOCKED: needs `extending` association option to differentiate vs `same scope`. */
   });
   it("preload with grouping sets inverse association", async () => {
-    const adapter = await setupPLAdapter();
     class IAAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class IAFav extends Base {
       static {
         this.attribute("ia_author_id", "integer");
         this.attribute("ia_favorite_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(IAAuthor, "iaFavs", {
@@ -9062,25 +8551,21 @@ describe("PreloaderTest", () => {
     expect(loadedMary._cachedAssociations?.get("iaFavs")).toBe(fav);
   });
   it("preload can group separate levels", async () => {
-    const adapter = await setupPLAdapter();
     class SLAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class SLPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("sl_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class SLAuthorFavorite extends Base {
       static {
         this.attribute("sl_author_id", "integer");
         this.attribute("sl_favorite_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(SLAuthor, "slPosts", {
@@ -9119,18 +8604,15 @@ describe("PreloaderTest", () => {
     expect(spy).toHaveBeenCalledTimes(3);
   });
   it("preload does not group same class different scope", async () => {
-    const adapter = await setupPLAdapter();
     class DCAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DCPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("dc_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(DCPost, "dcAuthorWithLetterA", {
@@ -9157,24 +8639,20 @@ describe("PreloaderTest", () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
   it("preload does not group same scope different key name", async () => {
-    const adapter = await setupPLAdapter();
     class DKNAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DKNPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("dkn_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class DKNPostesque extends Base {
       static {
         this.attribute("dkn_author_name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(DKNPost, "dknAuthor", {
@@ -9202,8 +8680,8 @@ describe("PreloaderTest", () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
   it("multi database polymorphic preload with same table name", async () => {
-    const adapterA = freshAdapter();
-    const adapterB = freshAdapter();
+    const adapterA = createTestAdapter();
+    const adapterB = createTestAdapter();
     await defineSchema(adapterA, {
       mdd_dogs: { name: "string" },
       md_comments: { body: "string", origin_id: "integer", origin_type: "string" },
@@ -9250,18 +8728,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records", async () => {
-    const adapter = await setupPLAdapter();
     class PAAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PAPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pa_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(PAPost, "paAuthor", {
@@ -9282,11 +8757,9 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records sti", async () => {
-    const adapter = await setupPLAdapter();
     class StiBook extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class StiEssay extends Base {
@@ -9296,7 +8769,6 @@ describe("PreloaderTest", () => {
         this.attribute("type", "string");
         this.attribute("sti_book_id", "integer");
         this.inheritanceColumn = "type";
-        this.adapter = adapter;
       }
     }
     class StiEssaySpecial extends StiEssay {}
@@ -9324,18 +8796,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with only some records available", async () => {
-    const adapter = await setupPLAdapter();
     class PSAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PSPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("ps_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(PSPost, "psAuthor", {
@@ -9359,18 +8828,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with some records already loaded", async () => {
-    const adapter = await setupPLAdapter();
     class PLAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PLPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pl_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(PLPost, "plAuthor", {
@@ -9394,24 +8860,20 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records with through association", async () => {
-    const adapter = await setupPLAdapter();
     class TAAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TACategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TAEssay extends Base {
       static {
         this.attribute("ta_author_id", "integer");
         this.attribute("ta_category_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(TAAuthor, "essays", {
@@ -9450,24 +8912,20 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with only some records available with through associations", async () => {
-    const adapter = await setupPLAdapter();
     class TBAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TBCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class TBEssay extends Base {
       static {
         this.attribute("tb_author_id", "integer");
         this.attribute("tb_category_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(TBAuthor, "essays", {
@@ -9510,25 +8968,21 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records with multiple classes", async () => {
-    const adapter = await setupPLAdapter();
     class PMAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PMComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("pm_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PMPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pm_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(PMPost, "pmAuthor", {
@@ -9555,18 +9009,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records queries when scoped", async () => {
-    const adapter = await setupPLAdapter();
     class QSAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class QSPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("qs_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(QSPost, "author", {
@@ -9592,18 +9043,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records queries when collection", async () => {
-    const adapter = await setupPLAdapter();
     class QCPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class QCComment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("qc_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(QCPost, "comments", {
@@ -9629,18 +9077,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records queries when incomplete", async () => {
-    const adapter = await setupPLAdapter();
     class QIAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class QIPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("qi_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(QIPost, "author", {
@@ -9668,18 +9113,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with unpersisted records no ops", async () => {
-    const adapter = await setupPLAdapter();
     class PUAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PUPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pu_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(PUPost, "puAuthor", {
@@ -9701,18 +9143,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload wont set the wrong target", async () => {
-    const adapter = await setupPLAdapter();
     class PWAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PWPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pw_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(PWPost, "pwAuthor", {
@@ -9734,7 +9173,6 @@ describe("PreloaderTest", () => {
   });
 
   it("preload has many association with composite foreign key", async () => {
-    const adapter = await setupPLAdapter();
     class CfkHmAuthor extends Base {
       static {
         this._tableName = "cfk_hm_authors";
@@ -9742,7 +9180,6 @@ describe("PreloaderTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CfkHmPost extends Base {
@@ -9751,7 +9188,6 @@ describe("PreloaderTest", () => {
         this.attribute("author_region_id", "integer");
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CfkHmAuthor, "cfkHmPosts", {
@@ -9778,7 +9214,6 @@ describe("PreloaderTest", () => {
   });
 
   it("preload belongs to association with composite foreign key", async () => {
-    const adapter = await setupPLAdapter();
     class CfkBtAuthor extends Base {
       static {
         this._tableName = "cfk_bt_authors";
@@ -9786,7 +9221,6 @@ describe("PreloaderTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CfkBtPost extends Base {
@@ -9795,7 +9229,6 @@ describe("PreloaderTest", () => {
         this.attribute("author_region_id", "integer");
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(CfkBtPost, "cfkBtAuthor", {
@@ -9818,7 +9251,6 @@ describe("PreloaderTest", () => {
   });
 
   it("preload loaded belongs to association with composite foreign key", async () => {
-    const adapter = await setupPLAdapter();
     class CfkLBtAuthor extends Base {
       static {
         this._tableName = "cfk_lbt_authors";
@@ -9826,7 +9258,6 @@ describe("PreloaderTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CfkLBtPost extends Base {
@@ -9835,7 +9266,6 @@ describe("PreloaderTest", () => {
         this.attribute("author_region_id", "integer");
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(CfkLBtPost, "cfkLBtAuthor", {
@@ -9864,7 +9294,6 @@ describe("PreloaderTest", () => {
   });
 
   it("preload has many through association with composite query constraints", async () => {
-    const adapter = await setupPLAdapter();
     class CfkThruDoctor extends Base {
       static {
         this._tableName = "cfk_thru_doctors";
@@ -9872,7 +9301,6 @@ describe("PreloaderTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CfkThruAppt extends Base {
@@ -9881,14 +9309,12 @@ describe("PreloaderTest", () => {
         this.attribute("doctor_region_id", "integer");
         this.attribute("doctor_id", "integer");
         this.attribute("patient_id", "integer");
-        this.adapter = adapter;
       }
     }
     class CfkThruPatient extends Base {
       static {
         this._tableName = "cfk_thru_patients";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CfkThruDoctor, "cfkThruAppts", {
@@ -9920,7 +9346,6 @@ describe("PreloaderTest", () => {
     expect(preloaded.map((p: any) => p.name).sort()).toEqual(["Alice", "Bob"]);
   });
   it("preloads has many on model with a composite primary key through id attribute", async () => {
-    const adapter = await setupPLAdapter();
     class CpkPLOwner extends Base {
       static {
         this._tableName = "cpk_pl_owners";
@@ -9928,7 +9353,6 @@ describe("PreloaderTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkPLChild extends Base {
@@ -9937,7 +9361,6 @@ describe("PreloaderTest", () => {
         this.attribute("cpk_pl_owner_shop_id", "integer");
         this.attribute("cpk_pl_owner_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(CpkPLOwner, "cpkPLChildren", {
@@ -9956,7 +9379,6 @@ describe("PreloaderTest", () => {
     expect(children.length).toBe(2);
   });
   it("preloads belongs to a composite primary key model through id attribute", async () => {
-    const adapter = await setupPLAdapter();
     class CpkPLTarget extends Base {
       static {
         this._tableName = "cpk_pl_targets";
@@ -9964,7 +9386,6 @@ describe("PreloaderTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkPLRef extends Base {
@@ -9972,7 +9393,6 @@ describe("PreloaderTest", () => {
         this._tableName = "cpk_pl_refs";
         this.attribute("cpk_pl_target_region_id", "integer");
         this.attribute("cpk_pl_target_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(CpkPLRef, "cpkPLTarget", {
@@ -9992,18 +9412,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built has many records no ops", async () => {
-    const adapter = await setupPLAdapter();
     class PKAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PKPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pk_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PKAuthor, "pkPosts", {
@@ -10024,18 +9441,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built has many records after query", async () => {
-    const adapter = await setupPLAdapter();
     class PKQAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PKQPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pkq_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PKQAuthor, "pkqPosts", {
@@ -10056,18 +9470,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built belongs to records no ops", async () => {
-    const adapter = await setupPLAdapter();
     class PKBAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PKBPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pkb_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(PKBPost, "pkbAuthor", {
@@ -10088,18 +9499,15 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built belongs to records after query", async () => {
-    const adapter = await setupPLAdapter();
     class PKBAAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PKBAPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("pkba_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(PKBAPost, "pkbaAuthor", {
@@ -10123,13 +9531,13 @@ describe("PreloaderTest", () => {
 });
 
 describe("OverridingAssociationsTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   it("habtm association redefinition callbacks should differ and not inherited", () => {
-    const oaAdapter = freshAdapter();
     class OAParent extends Base {
       static {
         this._tableName = "oa_parents";
         this.attribute("name", "string");
-        this.adapter = oaAdapter;
       }
     }
     class OAChild extends OAParent {}
@@ -10147,12 +9555,10 @@ describe("OverridingAssociationsTest", () => {
   });
 
   it("has many association redefinition callbacks should differ and not inherited", () => {
-    const oaAdapter = freshAdapter();
     class OAParent extends Base {
       static {
         this._tableName = "oa_parents";
         this.attribute("name", "string");
-        this.adapter = oaAdapter;
       }
     }
     class OAChild extends Base {
@@ -10160,7 +9566,6 @@ describe("OverridingAssociationsTest", () => {
         this._tableName = "oa_children";
         this.attribute("name", "string");
         this.attribute("oa_parent_id", "integer");
-        this.adapter = oaAdapter;
       }
     }
     const log1: string[] = [];
@@ -10177,7 +9582,6 @@ describe("OverridingAssociationsTest", () => {
     class OASubParent extends OAParent {
       static {
         this._tableName = "oa_parents";
-        this.adapter = oaAdapter;
       }
     }
     const log2: string[] = [];
@@ -10195,12 +9599,10 @@ describe("OverridingAssociationsTest", () => {
   });
 
   it("habtm association redefinition reflections should differ and not inherited", () => {
-    const oaAdapter = freshAdapter();
     class OAParent extends Base {
       static {
         this._tableName = "oa_parents";
         this.attribute("name", "string");
-        this.adapter = oaAdapter;
       }
     }
     class OAChild extends OAParent {}
@@ -10227,12 +9629,10 @@ describe("OverridingAssociationsTest", () => {
   });
 
   it("has many association redefinition reflections should differ and not inherited", () => {
-    const oaAdapter = freshAdapter();
     class OAPost extends Base {
       static {
         this._tableName = "oa_posts";
         this.attribute("title", "string");
-        this.adapter = oaAdapter;
       }
     }
     class OATag extends Base {
@@ -10240,7 +9640,6 @@ describe("OverridingAssociationsTest", () => {
         this._tableName = "oa_tags";
         this.attribute("name", "string");
         this.attribute("oa_post_id", "integer");
-        this.adapter = oaAdapter;
       }
     }
     registerModel("OAPost", OAPost);
@@ -10253,12 +9652,10 @@ describe("OverridingAssociationsTest", () => {
   });
 
   it("belongs to association redefinition reflections should differ and not inherited", () => {
-    const oaAdapter = freshAdapter();
     class OAOwner extends Base {
       static {
         this._tableName = "oa_owners";
         this.attribute("name", "string");
-        this.adapter = oaAdapter;
       }
     }
     class OAPet extends Base {
@@ -10266,7 +9663,6 @@ describe("OverridingAssociationsTest", () => {
         this._tableName = "oa_pets";
         this.attribute("name", "string");
         this.attribute("oa_owner_id", "integer");
-        this.adapter = oaAdapter;
       }
     }
     registerModel("OAOwner", OAOwner);
@@ -10282,12 +9678,10 @@ describe("OverridingAssociationsTest", () => {
   });
 
   it("has one association redefinition reflections should differ and not inherited", () => {
-    const oaAdapter = freshAdapter();
     class OAUser extends Base {
       static {
         this._tableName = "oa_users";
         this.attribute("name", "string");
-        this.adapter = oaAdapter;
       }
     }
     class OAProfile extends Base {
@@ -10295,7 +9689,6 @@ describe("OverridingAssociationsTest", () => {
         this._tableName = "oa_profiles";
         this.attribute("bio", "string");
         this.attribute("oa_user_id", "integer");
-        this.adapter = oaAdapter;
       }
     }
     registerModel("OAUser", OAUser);
@@ -10314,11 +9707,9 @@ describe("OverridingAssociationsTest", () => {
     // In TypeScript, association names are strings (Ruby uses symbols).
     // This test verifies that passing a non-string would be caught at compile time.
     // Since TypeScript's type system handles this, we just verify string args work.
-    const oaAdapter = freshAdapter();
     class OaArgTest extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = oaAdapter;
       }
     }
     registerModel("OaArgTest", OaArgTest);
@@ -10328,18 +9719,16 @@ describe("OverridingAssociationsTest", () => {
   });
 
   it("associations raise with name error if associated to classes that do not exist", async () => {
-    const oaAdapter = freshAdapter();
     class OABroken extends Base {
       static {
         this._tableName = "oa_brokens";
         this.attribute("name", "string");
         this.attribute("nonexistent_id", "integer");
-        this.adapter = oaAdapter;
       }
     }
     Associations.belongsTo.call(OABroken, "nonexistent", { foreignKey: "nonexistent_id" });
     registerModel("OABroken", OABroken);
-    await defineSchema(oaAdapter, {
+    await defineSchema({
       oa_brokens: { name: "string", nonexistent_id: "integer" },
     });
     const record = await OABroken.create({ name: "test", nonexistent_id: 1 });
@@ -10350,13 +9739,13 @@ describe("OverridingAssociationsTest", () => {
 });
 
 describe("GeneratedMethodsTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   it("association methods override attribute methods of same name", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "author", {});
@@ -10366,11 +9755,9 @@ describe("GeneratedMethodsTest", () => {
   });
 
   it("model method overrides association method", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // Model has attribute "title", no association named "title" should conflict
@@ -10379,12 +9766,10 @@ describe("GeneratedMethodsTest", () => {
   });
 
   it("included module overwrites association methods", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "tag", {});
@@ -10395,12 +9780,12 @@ describe("GeneratedMethodsTest", () => {
 });
 
 describe("WithAnnotationsTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   it("belongs to with annotation includes a query comment", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.all().annotate("belongs-to-hint").toSql();
@@ -10408,11 +9793,9 @@ describe("WithAnnotationsTest", () => {
   });
 
   it("has and belongs to many with annotation includes a query comment", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.all().annotate("habtm-hint").toSql();
@@ -10420,11 +9803,9 @@ describe("WithAnnotationsTest", () => {
   });
 
   it("has one with annotation includes a query comment", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.all().annotate("has-one-hint").toSql();
@@ -10432,11 +9813,9 @@ describe("WithAnnotationsTest", () => {
   });
 
   it("has many with annotation includes a query comment", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.all().annotate("has-many-hint").toSql();
@@ -10444,11 +9823,9 @@ describe("WithAnnotationsTest", () => {
   });
 
   it("has many through with annotation includes a query comment", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.all().annotate("hmt-hint").toSql();
@@ -10456,11 +9833,9 @@ describe("WithAnnotationsTest", () => {
   });
 
   it("has many through with annotation includes a query comment when eager loading", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.all().annotate("eager-hmt-hint").toSql();
@@ -10473,11 +9848,11 @@ describe("WithAnnotationsTest", () => {
 // ==========================================================================
 
 describe("CollectionProxyDelegation", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       dlg_posts: { title: "string" },
       dlg_comments: { body: "string", active: "boolean", dlg_post_id: "integer" },
       bt_blogs: { title: "string" },
@@ -10493,14 +9868,12 @@ describe("CollectionProxyDelegation", () => {
         this.attribute("body", "string");
         this.attribute("active", "boolean");
         this.attribute("dlg_post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class DlgPost extends Base {
       static {
         this._tableName = "dlg_posts";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(DlgPost, "dlgComments", {
@@ -10654,11 +10027,9 @@ describe("CollectionProxyDelegation", () => {
   });
 
   it("associations mixed onto Base: this.belongsTo / hasOne / hasMany / hasAndBelongsToMany work", async () => {
-    const adapter = createTestAdapter();
     class BtBlog extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.hasMany("posts");
       }
     }
@@ -10666,14 +10037,12 @@ describe("CollectionProxyDelegation", () => {
       static {
         this.attribute("title", "string");
         this.attribute("bt_blog_id", "integer");
-        this.adapter = adapter;
         this.belongsTo("bt_blog");
       }
     }
     class BtAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.hasOne("bt_post");
         this.hasAndBelongsToMany("bt_tags");
       }
@@ -10690,6 +10059,8 @@ describe("CollectionProxyDelegation", () => {
 });
 
 describe("eagerLoadBang", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   it("resolves without error", async () => {
     const { eagerLoadBang } = await import("./associations.js");
     await expect(eagerLoadBang()).resolves.toBeUndefined();
