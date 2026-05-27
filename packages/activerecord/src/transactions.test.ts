@@ -1687,6 +1687,9 @@ describe("TransactionTest", () => {
   beforeAll(async () => {
     await defineSchema({ posts: { title: "string", approved: "boolean", content: "string" } });
   });
+  beforeEach(async () => {
+    await Base.adapter.executeMutation("DELETE FROM posts");
+  });
 
   it("rolling back in a callback rollbacks before save", async () => {
     class Post extends Base {
