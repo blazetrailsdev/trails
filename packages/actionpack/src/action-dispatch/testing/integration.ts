@@ -895,6 +895,11 @@ export class IntegrationTest {
         HTTP_ACCEPT: this.accept,
         ...(options.env ?? {}),
       };
+      if (Object.keys(this._persistentCookies).length > 0) {
+        noRouteEnv.HTTP_COOKIE = Object.entries(this._persistentCookies)
+          .map(([k, v]) => `${k}=${v}`)
+          .join("; ");
+      }
       if (options.headers) {
         for (const [name, value] of Object.entries(options.headers)) {
           const envKey = name.startsWith("HTTP_")
@@ -902,11 +907,6 @@ export class IntegrationTest {
             : "HTTP_" + name.toUpperCase().replace(/-/g, "_");
           noRouteEnv[envKey] = value;
         }
-      }
-      if (Object.keys(this._persistentCookies).length > 0) {
-        noRouteEnv.HTTP_COOKIE = Object.entries(this._persistentCookies)
-          .map(([k, v]) => `${k}=${v}`)
-          .join("; ");
       }
       if (options.body) {
         noRouteEnv["rack.input"] = options.body;

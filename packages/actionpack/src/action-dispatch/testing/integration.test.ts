@@ -635,6 +635,18 @@ describe("ActionDispatch::IntegrationTest", () => {
       expect(redirectApp.status).toBe(404);
       expect(redirectApp.request.env.HTTP_X_CUSTOM_HEADER).toBe("sentinel");
     });
+
+    it("merges options.env into 404 request env", async () => {
+      await app.get("/no-such-route", { env: { "X-CUSTOM-ENV": "env-value" } });
+      expect(app.status).toBe(404);
+      expect(app.request.env["X-CUSTOM-ENV"]).toBe("env-value");
+    });
+
+    it("sets rack.input on 404 request when body option is provided", async () => {
+      await app.get("/no-such-route", { body: "test-body" });
+      expect(app.status).toBe(404);
+      expect(app.request.env["rack.input"]).toBe("test-body");
+    });
   });
 
   describe("IPv6 host parsing", () => {
