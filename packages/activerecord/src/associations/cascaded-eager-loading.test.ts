@@ -2,22 +2,35 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createTestAdapter } from "../test-adapter.js";
-import { defineSchema, type TableSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
-
-// -- Helpers --
-async function freshAdapter(schema?: Record<string, TableSchema>): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  if (schema) await defineSchema(adapter, schema);
-  return adapter;
-}
+import { defineSchema } from "../test-helpers/define-schema.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 describe("CascadedEagerLoadingTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
+      en_parents: { name: "string" },
+      en_children: { value: "string", en_parent_id: "integer" },
+      sti_topics: { title: "string", type: "string", parent_id: "integer" },
+      sti_topics2: { title: "string", type: "string", parent_id: "integer" },
+      sti_topics3: { title: "string", type: "string", parent_id: "integer" },
+      ef_parents: { name: "string" },
+      ef_children: { value: "string", ef_parent_id: "integer" },
+      pm_authors: { name: "string" },
+      pm_posts: { title: "string", pm_author_id: "integer" },
+      em_authors: { name: "string" },
+      em_posts: { title: "string", em_author_id: "integer" },
+      pd_authors: { name: "string" },
+      pd_posts: { title: "string", pd_author_id: "integer" },
+    });
+  });
+
   it.skip("eager association loading with cascaded two levels", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
@@ -67,15 +80,10 @@ describe("CascadedEagerLoadingTest", () => {
     /* fixture-dependent */
   });
   it("eager association loading with nil associations", async () => {
-    const adapter = await freshAdapter({
-      en_parents: { name: "string" },
-      en_children: { value: "string", en_parent_id: "integer" },
-    });
     class ENParent extends Base {
       static {
         this._tableName = "en_parents";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ENChild extends Base {
@@ -83,7 +91,6 @@ describe("CascadedEagerLoadingTest", () => {
         this._tableName = "en_children";
         this.attribute("value", "string");
         this.attribute("en_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(ENParent, "enChildren", {
@@ -92,11 +99,10 @@ describe("CascadedEagerLoadingTest", () => {
     });
     registerModel("ENParent", ENParent);
     registerModel("ENChild", ENChild);
-    // Parent with no children
     await ENParent.create({ name: "lonely" });
-    const parents = await ENParent.all().includes("enChildren").toArray();
-    expect(parents.length).toBe(1);
-    const children = (parents[0] as any)._preloadedAssociations?.get("enChildren") ?? [];
+    const authors = await ENParent.all().includes("enChildren").toArray();
+    expect(authors.length).toBe(1);
+    const children = (authors[0] as any)._preloadedAssociations?.get("enChildren") ?? [];
     expect(children.length).toBe(0);
   });
   it.skip("eager association loading with cascaded two levels with two has many associations", () => {
@@ -124,22 +130,17 @@ describe("CascadedEagerLoadingTest", () => {
     /* fixture-dependent */
   });
   it("eager association loading with has many sti", async () => {
-    const adapter = await freshAdapter({
-      sti_topics: { title: "string", type: "string", parent_id: "integer" },
-    });
     class StiTopic extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("type", "string");
         this.attribute("parent_id", "integer");
         this._tableName = "sti_topics";
-        this.adapter = adapter;
         enableSti(StiTopic);
       }
     }
     class StiReply extends StiTopic {
       static {
-        this.adapter = adapter;
         registerModel(StiReply);
         registerSubclass(StiReply);
       }
@@ -167,29 +168,23 @@ describe("CascadedEagerLoadingTest", () => {
     expect(t2Replies).toHaveLength(0);
   });
   it("eager association loading with has many sti and subclasses", async () => {
-    const adapter = await freshAdapter({
-      sti_topics2: { title: "string", type: "string", parent_id: "integer" },
-    });
     class StiTopic2 extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("type", "string");
         this.attribute("parent_id", "integer");
         this._tableName = "sti_topics2";
-        this.adapter = adapter;
         enableSti(StiTopic2);
       }
     }
     class StiReply2 extends StiTopic2 {
       static {
-        this.adapter = adapter;
         registerModel(StiReply2);
         registerSubclass(StiReply2);
       }
     }
     class StiSillyReply2 extends StiReply2 {
       static {
-        this.adapter = adapter;
         registerModel(StiSillyReply2);
         registerSubclass(StiSillyReply2);
       }
@@ -207,26 +202,20 @@ describe("CascadedEagerLoadingTest", () => {
     const topics = await StiTopic2.all().where({ type: null }).includes("replies").toArray();
     expect(topics).toHaveLength(1);
     const replies = (topics[0] as any)._preloadedAssociations.get("replies");
-    // Should include both StiReply2 and StiSillyReply2
     expect(replies).toHaveLength(2);
   });
   it("eager association loading with belongs to sti", async () => {
-    const adapter = await freshAdapter({
-      sti_topics3: { title: "string", type: "string", parent_id: "integer" },
-    });
     class StiTopic3 extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("type", "string");
         this.attribute("parent_id", "integer");
         this._tableName = "sti_topics3";
-        this.adapter = adapter;
         enableSti(StiTopic3);
       }
     }
     class StiReply3 extends StiTopic3 {
       static {
-        this.adapter = adapter;
         registerModel(StiReply3);
         registerSubclass(StiReply3);
       }
@@ -253,15 +242,10 @@ describe("CascadedEagerLoadingTest", () => {
     /* fixture-dependent */
   });
   it("eager association loading where first level returns nil", async () => {
-    const adapter = await freshAdapter({
-      ef_parents: { name: "string" },
-      ef_children: { value: "string", ef_parent_id: "integer" },
-    });
     class EFParent extends Base {
       static {
         this._tableName = "ef_parents";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EFChild extends Base {
@@ -269,7 +253,6 @@ describe("CascadedEagerLoadingTest", () => {
         this._tableName = "ef_children";
         this.attribute("value", "string");
         this.attribute("ef_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(EFParent, "efChild", {
@@ -286,15 +269,10 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("preload through missing records", async () => {
-    const adapter = await freshAdapter({
-      pm_authors: { name: "string" },
-      pm_posts: { title: "string", pm_author_id: "integer" },
-    });
     class PMAuthor extends Base {
       static {
         this._tableName = "pm_authors";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PMPost extends Base {
@@ -302,7 +280,6 @@ describe("CascadedEagerLoadingTest", () => {
         this._tableName = "pm_posts";
         this.attribute("title", "string");
         this.attribute("pm_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(PMPost, "pmAuthor", {
@@ -311,7 +288,6 @@ describe("CascadedEagerLoadingTest", () => {
     });
     registerModel("PMAuthor", PMAuthor);
     registerModel("PMPost", PMPost);
-    // Post with non-existent author id
     await PMPost.create({ title: "orphan", pm_author_id: 9999 });
     const posts = await PMPost.all().includes("pmAuthor").toArray();
     expect(posts.length).toBe(1);
@@ -320,15 +296,10 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading with missing first record", async () => {
-    const adapter = await freshAdapter({
-      em_authors: { name: "string" },
-      em_posts: { title: "string", em_author_id: "integer" },
-    });
     class EMAuthor extends Base {
       static {
         this._tableName = "em_authors";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class EMPost extends Base {
@@ -336,7 +307,6 @@ describe("CascadedEagerLoadingTest", () => {
         this._tableName = "em_posts";
         this.attribute("title", "string");
         this.attribute("em_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(EMPost, "emAuthor", {
@@ -350,7 +320,6 @@ describe("CascadedEagerLoadingTest", () => {
     await EMPost.create({ title: "has-author", em_author_id: a.id });
     const posts = await EMPost.all().includes("emAuthor").toArray();
     expect(posts.length).toBe(2);
-    // One should have author, one should not
     const authors = posts.map((p: any) => (p as any)._preloadedAssociations?.get("emAuthor"));
     expect(authors.filter((a: any) => a != null).length).toBe(1);
     expect(authors.filter((a: any) => a == null).length).toBe(1);
@@ -374,15 +343,10 @@ describe("CascadedEagerLoadingTest", () => {
     /* fixture-dependent */
   });
   it("preloaded records are not duplicated", async () => {
-    const adapter = await freshAdapter({
-      pd_authors: { name: "string" },
-      pd_posts: { title: "string", pd_author_id: "integer" },
-    });
     class PDAuthor extends Base {
       static {
         this._tableName = "pd_authors";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PDPost extends Base {
@@ -390,7 +354,6 @@ describe("CascadedEagerLoadingTest", () => {
         this._tableName = "pd_posts";
         this.attribute("title", "string");
         this.attribute("pd_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PDAuthor, "pdPosts", {
@@ -406,7 +369,6 @@ describe("CascadedEagerLoadingTest", () => {
     expect(authors.length).toBe(1);
     const posts = (authors[0] as any)._preloadedAssociations?.get("pdPosts") ?? [];
     expect(posts.length).toBe(2);
-    // Check no duplicates - all unique ids
     const ids = posts.map((p: any) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
