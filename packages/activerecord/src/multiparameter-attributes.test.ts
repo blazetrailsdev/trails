@@ -1,32 +1,24 @@
 /**
  * Mirrors: activerecord/test/cases/multiparameter_attributes_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
 import { withTimezoneConfig } from "./test-helper.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const utc = (v: Temporal.Instant) => v.toZonedDateTimeISO("UTC");
 
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
-
 describe("MultiParameterAttributeTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   it("multiparameter attributes on date", () => {
     class Topic extends Base {
       static {
         this.attribute("last_read", "date");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -46,7 +38,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("last_read", "date");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -62,7 +53,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("last_read", "date");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -78,7 +68,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("last_read", "date");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -94,7 +83,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("last_read", "date");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -110,7 +98,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("last_read", "date");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -126,7 +113,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("last_read", "date");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -142,7 +128,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("last_read", "date");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -158,7 +143,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -184,7 +168,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -205,7 +188,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -223,7 +205,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -244,7 +225,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -259,7 +239,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -272,7 +251,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -291,7 +269,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -311,7 +288,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -329,7 +305,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -349,7 +324,6 @@ describe("MultiParameterAttributeTest", () => {
       class Topic extends Base {
         static {
           this.attribute("written_on", "datetime");
-          this.adapter = adapter;
         }
       }
       const topic = new Topic();
@@ -376,7 +350,6 @@ describe("MultiParameterAttributeTest", () => {
         class Topic extends Base {
           static {
             this.attribute("written_on", "datetime");
-            this.adapter = adapter;
           }
         }
         const topic = new Topic();
@@ -401,7 +374,6 @@ describe("MultiParameterAttributeTest", () => {
       class Topic extends Base {
         static {
           this.attribute("written_on", "datetime");
-          this.adapter = adapter;
         }
       }
       const topic = new Topic();
@@ -421,7 +393,6 @@ describe("MultiParameterAttributeTest", () => {
         class Topic extends Base {
           static {
             this.attribute("written_on", "datetime");
-            this.adapter = adapter;
           }
         }
         const topic = new Topic();
@@ -448,7 +419,6 @@ describe("MultiParameterAttributeTest", () => {
           static {
             this.skipTimeZoneConversionForAttributes = ["written_on"];
             this.attribute("written_on", "datetime");
-            this.adapter = adapter;
           }
         }
         const topic = new Topic();
@@ -476,7 +446,6 @@ describe("MultiParameterAttributeTest", () => {
           static {
             this.attribute("bonus_time", "time");
             this.attribute("written_on", "datetime");
-            this.adapter = adapter;
           }
         }
         const topic = new Topic();
@@ -507,7 +476,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -529,7 +497,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -551,7 +518,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("last_read", "date");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -571,7 +537,6 @@ describe("MultiParameterAttributeTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("last_read", "date");
-        this.adapter = adapter;
       }
     }
     // Rails: Topic.new(attrs) calls assign_attributes internally
@@ -592,7 +557,6 @@ describe("MultiParameterAttributeTest", () => {
       static {
         this.attribute("last_read", "date");
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -618,7 +582,6 @@ describe("MultiParameterAttributeTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("written_on", "datetime");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic({
@@ -639,7 +602,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("last_read", "date");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -666,7 +628,6 @@ describe("MultiParameterAttributeTest", () => {
     class Customer extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         composedOf(this, "address", {
           className: Address,
           mapping: [
@@ -701,7 +662,6 @@ describe("MultiParameterAttributeTest", () => {
     class Customer extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         composedOf(this, "address", {
           className: Address,
           mapping: [
@@ -735,7 +695,6 @@ describe("MultiParameterAttributeTest", () => {
     class Customer extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         composedOf(this, "address", {
           className: Address,
           mapping: [
@@ -768,7 +727,6 @@ describe("MultiParameterAttributeTest", () => {
     class Customer extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         composedOf(this, "address", {
           className: Address,
           mapping: [
@@ -799,7 +757,6 @@ describe("MultiParameterAttributeTest", () => {
     class Meeting extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         composedOf(this, "duration", {
           className: Timespan,
           mapping: [
@@ -823,7 +780,6 @@ describe("MultiParameterAttributeTest", () => {
     class Topic extends Base {
       static {
         this.attribute("last_read", "date");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();

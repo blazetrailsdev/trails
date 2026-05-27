@@ -3,8 +3,6 @@
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import {
   Associations,
   loadBelongsTo,
@@ -13,6 +11,8 @@ import {
   loadHasManyThrough,
 } from "../associations.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   authors: { name: "string" },
@@ -74,14 +74,9 @@ const TEST_SCHEMA: Schema = {
   phmt_drink_designer2s: { name: "string" },
 };
 
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 describe("NestedThroughAssociationsTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Author extends Base {
     static {
@@ -112,17 +107,12 @@ describe("NestedThroughAssociationsTest", () => {
   }
 
   beforeAll(async () => {
-    adapter = await freshAdapter();
-    Author.adapter = adapter;
-    Post.adapter = adapter;
-    Tag.adapter = adapter;
-    Tagging.adapter = adapter;
+    await defineSchema(TEST_SCHEMA);
     registerModel(Author);
     registerModel(Post);
     registerModel(Tag);
     registerModel(Tagging);
   });
-  withTransactionalFixtures(() => adapter);
 
   beforeEach(() => {
     // Reset associations to avoid cross-test coupling
@@ -1358,7 +1348,6 @@ describe("NestedThroughAssociationsTest", () => {
       static {
         this.tableName = "pst_tags";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PstTagging extends Base {
@@ -1367,14 +1356,12 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("pst_tag_id", "integer");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class PstPost extends Base {
       static {
         this.tableName = "pst_posts";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("PstTag", PstTag);
@@ -1412,21 +1399,18 @@ describe("NestedThroughAssociationsTest", () => {
     class FkThrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FkThrPost extends Base {
       static {
         this.attribute("writer_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class FkThrComment extends Base {
       static {
         this.attribute("fk_thr_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(FkThrAuthor, "fkThrPosts", {
@@ -1464,21 +1448,18 @@ describe("NestedThroughAssociationsTest", () => {
     class FkSrcAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class FkSrcPost extends Base {
       static {
         this.attribute("fk_src_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class FkSrcComment extends Base {
       static {
         this.attribute("article_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(FkSrcAuthor, "fkSrcPosts", {
@@ -1516,7 +1497,6 @@ describe("NestedThroughAssociationsTest", () => {
     class StiThrClub extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class StiThrMembership extends Base {
@@ -1525,13 +1505,11 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("sti_thr_member_id", "integer");
         this.attribute("type", "string");
         this._tableName = "sti_thr_memberships";
-        this.adapter = adapter;
         enableSti(StiThrMembership);
       }
     }
     class StiThrSuperMembership extends StiThrMembership {
       static {
-        this.adapter = adapter;
         registerModel(StiThrSuperMembership);
         registerSubclass(StiThrSuperMembership);
       }
@@ -1539,7 +1517,6 @@ describe("NestedThroughAssociationsTest", () => {
     class StiThrMember extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(StiThrClub, "stiThrMemberships", {
@@ -1588,27 +1565,23 @@ describe("NestedThroughAssociationsTest", () => {
     class NwrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NwrPost extends Base {
       static {
         this.attribute("nwr_author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class NwrTagging extends Base {
       static {
         this.attribute("nwr_post_id", "integer");
         this.attribute("nwr_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NwrTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NwrAuthor, "nwrPosts", {
@@ -1658,20 +1631,17 @@ describe("NestedThroughAssociationsTest", () => {
     class NhoAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NhoPost extends Base {
       static {
         this.attribute("nho_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NhoComment extends Base {
       static {
         this.attribute("nho_post_id", "integer");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(NhoAuthor, "nhoPost", {
@@ -1885,27 +1855,23 @@ describe("NestedThroughAssociationsTest", () => {
     class NfkOrganization extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NfkAuthor extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("organization_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NfkEssay extends Base {
       static {
         this.attribute("writer_id", "integer");
         this.attribute("nfk_category_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NfkCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NfkOrganization, "nfkAuthors", {
@@ -1960,13 +1926,11 @@ describe("NestedThroughAssociationsTest", () => {
     class PhmtHotel extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PhmtDepartment extends Base {
       static {
         this.attribute("phmt_hotel_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PhmtChef extends Base {
@@ -1974,19 +1938,16 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("phmt_department_id", "integer");
         this.attribute("employable_id", "integer");
         this.attribute("employable_type", "string");
-        this.adapter = adapter;
       }
     }
     class PhmtCakeDesigner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PhmtDrinkDesigner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PhmtHotel, "phmtDepartments", {
@@ -2058,13 +2019,11 @@ describe("NestedThroughAssociationsTest", () => {
     class PhmtHotel2 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PhmtDepartment2 extends Base {
       static {
         this.attribute("phmt_hotel2_id", "integer");
-        this.adapter = adapter;
       }
     }
     class PhmtChef2 extends Base {
@@ -2072,19 +2031,16 @@ describe("NestedThroughAssociationsTest", () => {
         this.attribute("phmt_department2_id", "integer");
         this.attribute("employable_id", "integer");
         this.attribute("employable_type", "string");
-        this.adapter = adapter;
       }
     }
     class PhmtCakeDesigner2 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PhmtDrinkDesigner2 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(PhmtHotel2, "phmtDepartment2s", {
