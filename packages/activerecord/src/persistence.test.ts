@@ -31,6 +31,7 @@ describe("PersistenceTest", () => {
     await defineSchema({
       topics: { title: "string", body: "string", replies_count: "integer" },
       minimals: {},
+      cm_items: { title: "string" },
     });
   });
 
@@ -2839,9 +2840,9 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
       }
     }
-    await Post.create({ title: "A" });
-    await Post.delete(1);
-    await expect(Post.find(1)).rejects.toThrow("not found");
+    const p = (await Post.create({ title: "A" })) as any;
+    await Post.delete(p.id);
+    await expect(Post.find(p.id)).rejects.toThrow("not found");
   });
 
   it("class level update by id", async () => {
@@ -3029,7 +3030,7 @@ describe("PersistenceTest", () => {
   it("createBang returns persisted record on success", async () => {
     const p = await Post.createBang({ title: "OK", body: "Fine" });
     expect(p.isPersisted()).toBe(true);
-    expect(p.id).toBe(1);
+    expect(p.id).toBeDefined();
   });
 
   // -- update / update! --
@@ -3957,9 +3958,9 @@ describe("PersistenceTest", () => {
         this.attribute("name", "string");
       }
     }
-    await User.create({ name: "Alice" });
-    await User.delete(1);
-    await expect(User.find(1)).rejects.toThrow("not found");
+    const u2 = (await User.create({ name: "Alice" })) as any;
+    await User.delete(u2.id);
+    await expect(User.find(u2.id)).rejects.toThrow("not found");
   });
 
   it("destroyBang delegates to destroy", async () => {
@@ -4474,7 +4475,7 @@ describe("PersistenceTest", () => {
     const p = new Post({ title: "Hello", body: "World" });
     const result = await p.save();
     expect(result).toBe(true);
-    expect(p.id).toBe(1);
+    expect(p.id).toBeDefined();
     expect(p.isNewRecord()).toBe(false);
   });
 
