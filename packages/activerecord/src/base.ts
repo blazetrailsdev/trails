@@ -2653,12 +2653,17 @@ export class Base extends Model {
       },
     );
 
-    // Optimistic locking: include lock column in WHERE and increment it
+    // Optimistic locking: include lock column in WHERE and increment it.
+    // Remove any user-supplied lock column entry from the SET list first —
+    // it will be replaced with the auto-incremented value to avoid a
+    // "multiple assignments to same column" error on PostgreSQL.
     const lockCol = ctor.lockingColumn;
     let rawVersion: unknown;
     if (ctor.lockingEnabled) {
       rawVersion = this.readAttribute(lockCol);
       const currentVersion = rawVersion == null ? 0 : Number(rawVersion) || 0;
+      const lockIdx = declaredChanges.indexOf(lockCol);
+      if (lockIdx !== -1) updateValues.splice(lockIdx, 1);
       this._attributes.set(lockCol, currentVersion + 1);
       updateValues.push([table.get(lockCol), currentVersion + 1]);
     }

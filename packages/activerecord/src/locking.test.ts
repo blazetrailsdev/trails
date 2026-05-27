@@ -370,7 +370,9 @@ describe("OptimisticLockingTest", () => {
         this.attribute("updated_at", "datetime");
       }
     }
-    const t1 = await LockWithoutDefault.create({ title: "title1" });
+    // Mirrors Rails: raw INSERT so lock_version and updated_at start as NULL in DB
+    await Base.connection.execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
+    const t1 = (await LockWithoutDefault.last())!;
     expect(t1.lock_version).toBe(0);
     await t1.touch();
     expect(t1.lock_version).toBe(1);
