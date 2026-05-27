@@ -768,9 +768,7 @@ export class Mapper {
       path?: string;
     },
   ): void {
-    if (options.on !== undefined && !VALID_ON_OPTIONS.has(options.on)) {
-      throw new Error(`Unknown scope ${options.on} given to :on`);
-    }
+    if (options.on !== undefined) assertValidOnOption(options.on);
 
     const scopeTo = this._scope.get("to") as string | undefined;
     if (scopeTo) options.to ??= scopeTo;
@@ -942,6 +940,9 @@ export class Mapper {
   // --- internals ---
 
   private addRoute(verb: string, path: string, options: RouteOptions): void {
+    // TODO: valid on: values (member/collection/new) should dispatch through the corresponding
+    // scope helper as Rails does (mapper.rb:2024-2025). Currently accepted but not applied.
+    if (options.on !== undefined) assertValidOnOption(options.on);
     const fullPath = this.currentPrefix() + "/" + path.replace(/^\/+/, "");
     // Apply _scope controller/action/to defaults set via controller(...)/defaults(...)/scope(...).
     // Mirrors mapper.rb:1972-1980: scope[:to] and scope[:controller]+scope[:action] feed options[:to].
@@ -1509,6 +1510,11 @@ const CANONICAL_ACTIONS = ["index", "create", "new", "show", "update", "destroy"
 
 /** Rails `VALID_ON_OPTIONS = [:new, :collection, :member]` (mapper.rb:1160). */
 const VALID_ON_OPTIONS: ReadonlySet<string> = new Set(["new", "collection", "member"]);
+
+/** @internal */
+function assertValidOnOption(on: string): void {
+  if (!VALID_ON_OPTIONS.has(on)) throw new Error(`Unknown scope :${on} given to :on`);
+}
 
 interface ScopeFrame {
   path: string;
