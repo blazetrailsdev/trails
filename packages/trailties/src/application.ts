@@ -67,8 +67,11 @@ export class Application extends Engine {
   }
 
   override get config(): Configuration {
-    if (!(this._config instanceof Configuration)) this._config = new Configuration(null);
-    return this._config as Configuration;
+    const cfg = this._config;
+    if (cfg instanceof Configuration) return cfg;
+    const newCfg = new Configuration(null);
+    this._config = newCfg;
+    return newCfg;
   }
 
   /** Returns true once {@link Application#initialize} has completed. */

@@ -84,9 +84,11 @@ export class Engine extends Trailtie {
    * an `EngineConfiguration` so `middleware`, `paths`, `tableNamePrefix`,
    * etc. are reachable through the single `config` surface. */
   override get config(): EngineConfiguration {
-    if (!(this._config instanceof EngineConfiguration))
-      this._config = new EngineConfiguration(null);
-    return this._config as EngineConfiguration;
+    const cfg = this._config;
+    if (cfg instanceof EngineConfiguration) return cfg;
+    const newCfg = new EngineConfiguration(null);
+    this._config = newCfg;
+    return newCfg;
   }
 
   tableNamePrefix(): string | null {
