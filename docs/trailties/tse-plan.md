@@ -1202,7 +1202,7 @@ Collected from post-merge findings across all §5 PRs. Grouped by area.
 
 **Build tooling**
 
-- [ ] ~30 LOC (#2382): multi-line `<% %>` code tags only map the first generated line in `.tse.js.map`. Fix: emit one mapping per output line. Requires column-level spans in lexer tokens first.
+- [x] ~30 LOC (#2439): multi-line `<% %>` code tags now emit one source-map mapping per output line in `.tse.js.map`.
 - [x] ~15 LOC (#2382): `emitDeclarations()` in `build-views.ts` ignores `program.emit()` return value — `throw` on `emitSkipped` for fail-fast.
 - [x] ~10 LOC (#2382): `lineAt()` in lexer is O(n) per call (O(n²) total). Replace with precomputed line-start index + binary search if templates grow large.
 - [x] ~30 LOC (#2377): `trails-tsc-views build` should emit `.tse.d.ts` alongside `.tse.js` so exports `types` condition points at declaration files instead of `.tse.ts` source shims.

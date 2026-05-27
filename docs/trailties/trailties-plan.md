@@ -17,27 +17,22 @@ current state.
 0. **All TS-source generator output flows through `@blazetrails/trailties/template-builder`.**
    No raw-string `createFile` for `.ts` files; no `.rb`/`.erb` strings
    anywhere. See `docs/trailties-template-builder.md` for the locked
-   Option B design and PR T1 below for the builder PR. Per-generator
-   tests must include (a) snapshot, (b) `parseTs` (the
-   parse-without-diagnostics helper exported from T1), (c)
-   `assertNoRubySource`.
+   Option B design. Per-generator tests must include (a) snapshot, (b)
+   `parseTs`, (c) `assertNoRubySource`.
 1. **No `node:*` imports** in `packages/trailties/src/` except `bin.ts`.
-   Repository rule; enforce locally with
-   `! grep -r 'from "node:' packages/trailties/src/ | grep -v bin.ts`.
+   Known exceptions pending cleanup: `commands/destroy.ts`,
+   `generators/base.ts`, `source-annotation-extractor.ts` — scheduled
+   for the async-fs rollout (see "Code quality" section).
 2. **No `process.*` references** in `packages/trailties/src/` after PR 0.3.
    Enforced by ESLint via `blazetrails/no-process-bypass`. Use the
    `processAdapter` snapshot for `env` / `cwd` / `stdout`.
-3. **Trailties code uses async fs only.** `fsAdapter` exposes both
-   sync and async surfaces; trailties imports only the async ones
-   (`exists`, `mkdtemp`, `readdir`, `readFile`, `writeFile`, …) and
-   `await`s every call. The pre-existing sync helpers in
-   `generators/base.ts` (`createFile`, `appendToFile`, `insertIntoFile`,
-   `fileExists`, `removeFile`) and a handful of command files still
-   violate this — scheduled for the 1.12c refactor.
-4. **No new third-party runtime deps in trailties.** `commander` and
-   `vite` (behind `./vite` export only) are the only non-workspace deps.
-5. **PR size ceiling: 300 LOC** (CLAUDE.md). Splits are pre-planned per PR
-   below using the `<base>` / `<base>b` pattern.
+3. **Trailties code uses async fs only** (target state). Known sync
+   callers: `generators/base.ts` (`createFile`, `appendToFile`,
+   `insertIntoFile`, `fileExists`, `removeFile`), `commands/destroy.ts`,
+   `commands/console.ts`, `source-annotation-extractor.ts`. Cleanup
+   tracked under "Async-fs rollout" in the code quality section.
+4. **No new third-party runtime deps in trailties.**
+5. **PR size ceiling: 300 LOC** (CLAUDE.md). Splits use the `<base>` / `<base>b` pattern.
 6. **Test names match Rails verbatim** where Rails has tests (CLAUDE.md).
 7. **Every PR description** lists Rails source files referenced and which
    methods/initializers were intentionally skipped.
@@ -51,12 +46,8 @@ think one is wrong.
 
 - Package: `trailties`. Base class: `Trailtie`. Per-framework files:
   `<package>/src/trailtie.ts`. Engine collection: `engine/trailties.ts`.
-- Rails source paths in this doc keep upstream Ruby names — they point at
-  real files in the Rails repo.
-- `api:compare` rename map (added in PR 2.1) handles `Railtie` → `Trailtie`
-  and the `railties/` → `trailties/` path-segment alias is global; any
-  future framework that ships a real `railties/` subdir MUST rename its
-  TS dir to `trailties/`.
+- `api:compare` rename map handles `Railtie` → `Trailtie` and the
+  `railties/` → `trailties/` path-segment alias is global.
 
 ### What we are NOT building
 
@@ -79,405 +70,371 @@ think one is wrong.
 
 ### Architectural answers
 
-| Question                                                 | Answer                                                                                                                                                            |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Templates: EJS or `.tse`?                                | `.tse` (codebase convention). `api:compare`'s `.erb` → `.tse` mapping handles paths.                                                                              |
-| `Trailtie` subclass registration                         | Explicit: `Trailtie.register(MyTrailtie)`. No `inherited` hook. Same for `Application.register(klass)`.                                                           |
-| `config_for` config format                               | TS/JS modules via dynamic `import()`. No YAML.                                                                                                                    |
-| Glob pattern dialect                                     | Node/picomatch-style: `**`, `*`, `?`, `[...]`, `{a,b}`, `!`. Not Ruby parity.                                                                                     |
-| `processAdapter` `env` mutation                          | Snapshot values are read-only by convention (typed `Readonly`, null-prototype object). `setEnv` is the only supported mutation path; rare.                        |
-| `processAdapter` exports use `Proxy`?                    | No. Plain copied snapshot objects on `registerProcessAdapter`; no runtime `Object.freeze`.                                                                        |
-| `WriteStream` `isTTY`/`columns`/`rows`                   | Snapshot at register time. No resize event.                                                                                                                       |
-| Test runner integration                                  | Out of scope — Vitest, separate plan.                                                                                                                             |
-| User code STI subclass / `Concern.included` registration | User app maintains a central index file (e.g. `app/models/index.ts`). Future tooling in `trails-tsc` will auto-manage these.                                      |
-| `Engine` namespacing replacement                         | Explicit `tableNamePrefix` config option. Module/helper namespacing handled by where the user imports from.                                                       |
-| `Rails.logger` before init                               | `NullLogger` in activesupport (shipped). Wiring into a `Trails` global is PR 2.6.                                                                                 |
-| `Trails.version` source                                  | Trailties `package.json` (via `packages/trailties/src/version.ts`). Trails versions independently from upstream Rails. Resolved in PR 2.6.                        |
-| Activesupport `Trailtie` file location                   | Likely **inside trailties** (`packages/trailties/src/trailties/active-support.ts`) to avoid inverting the trailties → activesupport dependency. PR 2.7a confirms. |
-| Application root-flag file                               | `config.ts` (trails analog of Rails' `config.ru`). `Application.findRoot` walks parents looking for it. See `app-generator.ts:177`.                               |
-
-### Per-PR universal acceptance
-
-Every PR must pass:
-
-- `pnpm -r build`, `pnpm -r typecheck`, `pnpm -r test`, `pnpm lint` clean
-  (lint includes `blazetrails/no-process-bypass` for rule 2).
-- Rails-mirrored tests added where Rails has tests; verbatim names.
-- PR description lists Rails sources kept/skipped per rule 7.
+| Question                         | Answer                                                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Templates: EJS or `.tse`?        | `.tse` (codebase convention). `api:compare`'s `.erb` → `.tse` mapping handles paths.                    |
+| `Trailtie` subclass registration | Explicit: `Trailtie.register(MyTrailtie)`. No `inherited` hook. Same for `Application.register(klass)`. |
+| `config_for` config format       | TS/JS modules via dynamic `import()`. No YAML.                                                          |
+| `processAdapter` `env` mutation  | Snapshot values are read-only by convention. `setEnv` is the only supported mutation path.              |
+| Application root-flag file       | `config.ts`. `Application.findRoot` walks parents looking for it.                                       |
+| `Engine` namespacing replacement | Explicit `tableNamePrefix` config option.                                                               |
 
 ### Decisions still open
 
 | #   | Question                                                                                                                                   | Decide before |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
-| 2   | Where does the activesupport `Trailtie` live (in trailties subdir vs activesupport itself)?                                                | PR 2.7a       |
 | 5   | Convert remaining sync `readdir`/`readFile`/`writeFile` callers to async; promote optional `FsAdapter` async surface to required?          | PR 1.12c      |
 | 6   | Should `Engine#paths()` THROW (Rails-faithful) when `calledFrom` is unset? (Currently returns `Root(null)` per 2.2a/b deviation.)          | PR 2.5c       |
-| 7   | Migration filename separator: align `MigrationGenerator` to Rails `_` (preferred) or broaden helper regexes to accept `_` and `-`?         | PR 1.12c      |
 | 8   | Generated apps' package-manager: `--package-manager <pm>` flag on `trails new` vs runtime detection in generated `bin/setup`?              | PR 1.14d      |
 | 9   | Generated apps' SQLite driver: `--sqlite-driver` flag; default stays `better-sqlite3` until `node-sqlite` is in Node LTS. Confirm default. | PR 1.14d      |
 
 ---
 
-## Phase 1 — Leaves (open items)
+## Boot chain completeness — current state
 
-> **Generator output is governed by `docs/trailties-template-builder.md`
-> (Option B: typed tagged-template emitters).** Every PR that produces app
-> source code must build it through `@blazetrails/trailties/template-builder`'s
-> `tsModule` / `tsClass` / `tsImport` / `tsField` / `tsMethod` / `tsBody`
-> builder — never raw string templates, never `.rb`/`.erb` content. PR T1
-> (below) lands the builder; PRs that emit code are gated on it.
+`api:compare` scores for the files that make up the app boot sequence.
+**Target: 100% on every row before calling the boot chain "done".**
 
-### PR T1 — Typed template emitter infra (~250 LOC) — gate for all generator work
-
-**Blocked by:** none. Lands first.
-
-**Source:** new. See `docs/trailties-template-builder.md` for the full API.
-
-**Node/TS fit:** pure TS. No new runtime deps (hard rule 4).
-
-**Scope:**
-
-- `packages/trailties/src/template-builder/{index,types,refs,emit-module,emit-class,emit-interface,emit-import,emit-method,ts-body}.ts`.
-- `Ref` (branded `{ kind: "ref"; name: string; from?: string }`), `type` tagged template, `tsImport` family (named / default / type-only), `tsField`, `tsMethod`, `tsBody` (dedent + ref-carrying tagged template), `tsClass`, `tsInterface`, `tsModule`.
-- `tsModule` is the sole record→source resolver. It walks every `Ref` in declarations, dedupes imports, and emits the final file as one string.
-- Unit tests cover: import dedup, default+named in same import, type-only, ref propagation through `type` / `tsBody`, dedent behavior, snapshot golden for a hand-built module, **`extends: "ApplicationRecord"` fails to typecheck** (compile-error assertion via `// @ts-expect-error` in a `*.test-d.ts` file, executed by the existing `test:types` pass).
-
-**Acceptance:**
-
-- `ts.createSourceFile` parse + diagnostic helper exported for downstream snapshot tests.
-- `assertNoRubySource(text)` helper exported (regex on `/^\s*(class|module|def)\s+\w+($|\s+<)/m`).
-
-### PR T2 — migrate model / migration / resource-route generators (~150 LOC)
-
-**Blocked by:** PR T1.
-
-Smallest existing generators first. Each becomes a thin function over the
-builder; snapshot tests capture the canonical emit.
-
-- `packages/trailties/src/generators/rails/model/model-generator.ts`
-- `packages/trailties/src/generators/rails/migration/migration-generator.ts`
-- `packages/trailties/src/generators/rails/resource-route/resource-route-generator.ts`
-- Per-generator `__snapshots__/` covering the matrix of attribute types.
-- Per-generator `assertNoRubySource` + `parseTs` checks.
-
-### PR T3 — migrate controller / scaffold generators (~200 LOC)
-
-**Blocked by:** PR T1.
-
-Bigger flat-layout generators. Done together because they share the
-controller-template prose. Same snapshot + parse + no-Ruby tests as T2.
-
-- `packages/trailties/src/generators/controller-generator.ts`
-- `packages/trailties/src/generators/scaffold-generator.ts`
-- Relocate both into `packages/trailties/src/generators/rails/` Rails layout
-  in the same PR; the migration to the builder is the natural moment.
-- **Factor out** `emitControllerClass(...)` and a `controllerPathHelpers`
-  module — consumed by T4 (authentication) and PR 1.14b-cont (helper /
-  controller / scaffold_controller). Either factor-out lands here or the
-  consumers fall back to T1 primitives.
-
-### PR T4 — AuthenticationGenerator on the builder (~200 LOC)
-
-**Blocked by:** PR T1 (builder). Soft-blocked by PR T3 for the
-`emitControllerClass` helper; if T3 ships without factoring, T4 inlines
-the controller emit via T1 primitives.
-
-**Source:** `vendor/rails/railties/lib/rails/generators/rails/authentication/`.
-
-- `packages/trailties/src/generators/rails/authentication/authentication-generator.ts`
-- Snapshots for all 7 generated files.
-- Mandatory `assertNoRubySource` over the full emit set (`app/models/{user,session,current}`, `app/controllers/{sessions,passwords,concerns/authentication}`, `app/mailers/passwords_mailer`, etc.).
-- Mailer pieces gated on actionmailer existence — emit a `--skip-mailer` flag honoring the existing pattern.
-- Skipped from Rails: `enable_bcrypt` (Ruby Bundler), `add_migrations` (needs `MigrationGenerator.generate` shell-out — open question #8 territory), `hook_for :test_framework`, `hook_for :template_engine, as: :authentication`.
-
-### PR T5 — DevcontainerGenerator (~250 LOC) — supersedes prior PR 1.14c-3 scope
-
-**Blocked by:** PR T1 (builder).
-
-Resolves the YAML carve-out from open question pre-existing in
-`trailties-plan.md` PR 1.14c-3 entry: emit a fresh `compose.yaml` per
-database config — file extension stays `.yaml` (Compose looks for it),
-but the contents are JSON syntax (YAML 1.2 is a strict superset of
-JSON; Docker Compose parses it fine). No YAML emitter, no new infra.
-
-- `packages/trailties/src/generators/rails/devcontainer/devcontainer-generator.ts`
-- `update_devcontainer_db_host` / `update_devcontainer_db_feature` /
-  `edit_compose_yaml` ports emit both `compose.yaml` and
-  `devcontainer.json` via `JSON.stringify(..., null, 2)`.
-- `update_application_system_test_case` stays a plain string replace.
-- **SQLite driver awareness**: when the app was created with
-  `--sqlite-driver=node-sqlite`, omit `better-sqlite3` native-build
-  features (`libsqlite3-dev`, build-essential) from the devcontainer
-  base image. `--sqlite-driver=expo-sqlite` skips devcontainer SQLite
-  setup entirely. Default `better-sqlite3` keeps current behavior.
-
-### PR 1.10c — Trails-native template DSL (~150–250 LOC, optional)
-
-**Blocked by:** PR T1 (`assertNoRubySource` helper used by `initializer()`).
-
-**Node/TS fit:** clean — all four operations are file edits via the existing `FsAdapter` async surface and the established marker-insert pattern (`// routes` marker is already wired in `controller-generator.ts:148`, `scaffold-generator.ts:80`, and the new `generators/rails/resource-route/`).
-
-**Dependencies:**
-
-- `FsAdapter` async surface (shipped).
-- `AppGenerator` template at `packages/trailties/src/generators/app-generator.ts` already emits a `// config` marker for `application.ts`? No — must be added in this PR before `environment()` can hook in.
-- `// initializers` directory convention — `src/config/initializers/` is generated by `AppGenerator`; confirm before shipping.
-
-**Scope:**
-
-- `pkg(name, version?, opts?)` → mutate `package.json` deps (replaces Ruby `gem`). JSON via `JSON.stringify(..., null, 2)`.
-- `route(tsCode)` → insert into `src/config/routes.ts` at existing `// routes` marker. Caller-supplied; documented contract: must be valid TS.
-- `environment(tsCode, { env })` → insert into `src/config/application.ts` (add `// config` marker to `AppGenerator` template first; this marker addition lands in PR 1.14d-a's `app-generator.ts` builder migration).
-- `initializer(filename, content)` → writes to `src/config/initializers/`. Content **must** be produced via the T1 `tsModule` builder; raw-string content fails the `assertNoRubySource` check that ships in T1.
-
-**Open:** call file `trails-actions.ts` (new) or keep on `GeneratorBase` alongside the existing `generate` queue. Recommend a separate file to keep `actions.ts` as the Rails-shape mirror, so `api:compare` stays clean.
-
-### PR 1.12b-2 closed (#2185 — CreateMigration action + migrationTemplate dispatch)
-
-### PR 1.12c closed (#2176 — AppBase + Database + migration filename underscore)
-
-### PR 1.14b-cont — helper / controller / scaffold_controller generators (~250 LOC)
-
-**Blocked by:** PR T1 (builder). Soft-blocked by PR T3 for the
-`emitControllerClass` factor-out — if T3 ships it, 1.14b-cont consumes
-it; if not, this PR inlines via T1 primitives.
-
-**Source:** `vendor/rails/railties/lib/rails/generators/rails/{helper,controller,scaffold_controller}/`. PR 1.14b deferred these because the trailties side had no canonical "controller template surface."
-
-**Node/TS fit:** straightforward — compose the builder helpers landed in T1 (and reuse T3's if available).
-
-**Dependencies:**
-
-- `paths.controllers` / `paths.helpers` resolution from `Engine#paths()` (shipped in 2.2b).
-- Builder primitives `tsClass`/`tsMethod`/`tsBody` (T1).
-
-> **PR 1.14c-2 (authentication) is replaced by PR T4 above.**
-
-> **PR 1.14c-3 (devcontainer) is superseded by PR T5 above.** YAML carve-out
-> resolved: `compose.yaml` contents are JSON syntax (Compose accepts it),
-> emitted fresh per config. No YAML emitter.
-
-### PR 1.14c-4 — db/system/change generator (~200 LOC)
-
-**Blocked by:** PR T5 (shares devcontainer's `Database` registry usage patterns and compose-emit conventions).
-
-**Source:** `vendor/rails/railties/lib/rails/generators/rails/db/system/change/change_generator.rb`.
-
-**Node/TS fit:** clean — config-file rewriting via builder; database adapter swap in app skeletons.
-
-**Dependencies:** Database registry (shipped); the devcontainer prose helpers factored out in T5.
-
-### PR 1.14d — `AppGenerator` extends `AppBase` (~250–350 LOC, may split)
-
-**Blocked by:** PR 1.12c (`AppBase`). Soft-blocked by PR T3 for shared prose helpers (falls back to T1 primitives if T3 ships without factoring).
-
-**Node/TS fit:** mechanical refactor of existing `packages/trailties/src/generators/app-generator.ts` (~900 LOC of raw-string emit) onto the builder. The bulk of the diff is the raw-string-to-builder migration; size may force a split into:
-
-- **1.14d-a** (~250 LOC): file-by-file migration of `app-generator.ts` to the builder. Snapshot every emitted file. No behavior change.
-- **1.14d-b** (~150 LOC): extend `AppBase`; bundle the items below.
-
-**Bundle (in 1.14d-b):**
-
-- `default()` view-template helper on `GeneratedAttribute` + Rails-verbatim `test_default_value_*` tests (~50 LOC).
-- **Package-manager parameterization** (open question #8, ~30 LOC): replace hardcoded `pnpm install` / `corepack enable pnpm` in `app-generator.ts:153,237,883-887` and `bin/setup` template strings. Add `--package-manager <pnpm|npm|yarn>` to `trails new`; thread through. These move from inline literals into typed builder slots, which makes the parameterization a one-line change instead of three.
-- **SQLite driver parameterization** (open question #9, ~40 LOC). Today `app-generator.ts:919` hardcodes `"better-sqlite3": "^12.6.0"` into the generated `package.json`, and the generated `config/database.ts` never imports a driver explicitly — `trailties/src/database.ts:439` auto-imports `better-sqlite3` at runtime. Add `--sqlite-driver <better-sqlite3|node-sqlite|expo-sqlite>` to `trails new`; thread through:
-  - `package.json` builder slot conditionally emits the runtime dep (`better-sqlite3` only; `node-sqlite` is Node-built-in; `expo-sqlite` is the app's responsibility).
-  - Generated `src/config/database.ts` emits an explicit `import "@blazetrails/activesupport/sqlite/<driver>"` (or `registerSqliteDriver(...)` for custom paths) so the choice is visible at the call site rather than relying on the runtime auto-import.
-  - Default stays `better-sqlite3`. Revisit when `node-sqlite` ships in Node LTS.
-
-**Deferred:** `required?` predicate gated on `belongs_to_required_by_default` (~10 LOC) — wait for AR config port.
+| File                                      | Score   | Key gaps                                                                                                                                                                                                                                                                        |
+| ----------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `trailtie.ts`                             | **84%** | 4 methods (see PR B1)                                                                                                                                                                                                                                                           |
+| `trailtie/configurable.ts`                | **0%**  | `configure`, instance delegation (see PR B1)                                                                                                                                                                                                                                    |
+| `trailtie/configuration.ts`               | **86%** | 2 methods (bundle into B1)                                                                                                                                                                                                                                                      |
+| `engine/trailties.ts`                     | **33%** | `_all` public accessor, Engine subclass instantiation (see PR B1)                                                                                                                                                                                                               |
+| `paths.ts`                                | **43%** | 16 missing: `first`/`last`/`<<`/`concat`/`unshift`/`toAry`/`extensions`/`existentDirectories`/`filesIn`/`autoloadOnce`/`eagerLoad`/`autoloadPaths`/`filterBy`/`absoluteCurrent` (see PR B2)                                                                                     |
+| `engine.ts`                               | **39%** | `app`, `call`, `endpoint`, `envConfig`, `helpers`, `loadSeed`, `loadConsole`/`Runner`/`Tasks`/`Generators`/`Server`, `loadConfigInitializer`, `hasMigrations?`, `buildRequest`, `buildMiddleware` (PR B3)                                                                       |
+| `application/configuration.ts`            | **73%** | `loadDefaults(version)`, `secretKeyBase`, `sessionStore`, `contentSecurityPolicy`, `permissionsPolicy`, `databaseConfiguration`, `annotations`, `colorizeLogging`, `defaultLogFile` (PR B4)                                                                                     |
+| `application/finisher.ts`                 | **40%** | `FinisherHost` interface gaps; `add_generator_templates`, `define_main_app_helper`, `add_to_prepare_blocks`, `run_prepare_callbacks` (PR B5)                                                                                                                                    |
+| `application/routes-reloader.ts`          | **59%** | `executeIfUpdated`, `updatedAt?`, `clear!`, `loadPaths`, `finalize!`, `revert`, `updater` (PR B5)                                                                                                                                                                               |
+| `application/default-middleware-stack.ts` | **71%** | 2 methods (bundle into B5)                                                                                                                                                                                                                                                      |
+| `application.ts`                          | **46%** | `envConfig` (30-key action_dispatch merge), `orderedRailties`, `railtiesInitializers`, `reloadRoutes!`/`reloadRoutesUnlessLoaded`, `messageVerifiers`, `deprecators`, `migrationRailties`, `toApp`, `buildRequest`, `buildMiddleware`, `runTasksBlocks`/etc. (PR B6, may split) |
+| `engine/lazy-route-set.ts`                | **87%** | 2 methods (bundle into B3 or B5)                                                                                                                                                                                                                                                |
+| `application/bootstrap.ts`                | ✅ 100% |                                                                                                                                                                                                                                                                                 |
+| `engine/configuration.ts`                 | ✅ 100% |                                                                                                                                                                                                                                                                                 |
+| `engine/updater.ts`                       | ✅ 100% |                                                                                                                                                                                                                                                                                 |
+| `initializable.ts`                        | ✅ 100% |                                                                                                                                                                                                                                                                                 |
 
 ---
 
-## Phase 2 — Core composition (open items)
+## Boot chain PRs
 
-### PR 2.1b closed (#2238 — Trailtie configurable + framework block runners)
+### PR B1 — Trailtie surface gaps (~150 LOC)
 
-### PR 2.5c closed (#2184 — Application routes-reloader + config_for + credentials wiring)
+**Blocked by:** none.
 
-### PR 2.6 closed (#2195 — Trails global + Rails→Trails api-compare rename)
+**Source:** `vendor/rails/railties/lib/rails/railtie.rb`,
+`vendor/rails/railties/lib/rails/railtie/configurable.rb`.
 
-**Wiring followups** (not done in #2195; each ~5 LOC unless noted):
+**Scope:**
 
-- `BacktraceCleaner.setRoot()` → lazy `Trails.root` read
-- `Rack::Logger` / `SilenceRequest` constructor logger default → `Trails.logger`
-- Welcome template locals (`railsVersion` / `rackVersion` / `runtimeVersion`) → globals
-- `Info.property("Environment")` reads `Trails.env`, not `env.TRAILS_ENV ?? env.NODE_ENV`
-- `LazyRouteSet.setReloadRoutesHook(() => Trails.application?.reloadRoutesUnlessLoaded())` (per #2175 findings)
-- `Application._appClass` write-side: confirm `Trails.application` tracks `Application.appClass` reassignment (per #2173 findings)
-- `editEncryptedFile` constructed directly from CLI flags in 2.5c; wire through `Trails.application.encrypted(...)` (2.5c followup)
+- `trailtie.ts` — 4 missing methods. Read `api:compare` output to confirm names before implementing.
+- `trailtie/configurable.ts` — `configure(block)` class method (Rails class-level DSL entry), instance delegation for `config` (the `Configurable` module exposes `config` via `method_missing` delegating to `instance.config`). Current file has `sealAgainstInheritance`/`assertNotSealed` (our sealed-subclass guard) but no matching of Rails' `configure` / instance surface — hence 0/2.
+- `trailtie/configuration.ts` — 2 missing methods; bundle here.
+- `engine/trailties.ts` — `_all` as public accessor; ensure `Trailties` constructor walks both `Trailtie.subclasses()` **and** `Engine.subclasses()` separately (Rails `Railties` includes both); add matching `initialize` semantics. Currently 1/3.
 
-### PR 2.7a closed (#2187 — Activesupport Trailtie at `packages/trailties/src/trailties/active-support.ts`)
+**Rails source methods to read first:**
+`Railtie::Configurable#configure`, `Railtie#instance`, `Railties#initialize`.
 
-### PR 2.7-followups — Activerecord + Actionpack railtie full wiring
+### PR B2 — `Paths` completion (~150 LOC)
 
-**Blocked by:** various.
+**Blocked by:** none.
 
-PRs 2.7b/2.7c/2.7d/2.7e shipped only the config namespaces + minimal initializer surface. The full Rails `railtie.rb` initializer chains for activerecord and action-controller are followups, each blocked on the named infrastructure:
+**Source:** `vendor/rails/railties/lib/rails/paths.rb`.
 
-**activerecord/trailtie.ts followups (per #2181):**
+**Current:** 12/28 matched. The Rails `Root` and `Path` classes together have
+28 public methods; the TS port has the core path resolution but is missing the
+collection/array-protocol surface.
 
-- `active_record.postgresql_time_zone_aware_types`, `active_record.logger`, `active_record.backtrace_cleaner` — wire via existing `activesupport.onLoad` registry (`packages/activesupport/src/lazy-load-hooks.ts` is shipped; just consume it).
-- `active_record.set_filter_attributes` — `Base.filterAttributes` exists; needs `Application.config.filterParameters` slot first.
-- `active_record.set_signed_id_verifier_secret` — helper exists in `signed-id.ts`; blocked on `Application.secretKeyBase` (PR 2.5c).
-- `active_record.clear_active_connections` (after_initialize), `active_record.log_runtime`.
-- `active_record.copy_schema_cache_config`, `active_record.sqlite3_adapter_strict_strings_by_default`, `active_record.postgresql_adapter_decode_dates`.
+**Missing (implement all):**
+
+- `Path#first`, `Path#last` — delegate to the underlying glob-expanded array.
+- `Path#<<(path)` — append to `@paths`; return `self`.
+- `Path#concat(paths)` — batch append.
+- `Path#unshift(path)` — prepend to `@paths`.
+- `Path#toAry` / `Path#to_a` — expand to real filesystem paths (call `existent`).
+- `Path#extensions` — unique extensions across globbed files.
+- `Path#existentDirectories` — filter globbed results to dirs that exist on fs.
+- `Path#filesIn(...)` — glob within this path for the given pattern.
+- `Path#autoloadOnce` / `Path#eagerLoad` — flag methods (set the boolean,
+  push `self` into the root's `autoloadOncePaths` / `eagerLoadPaths` sets).
+- `Path#autoloadPaths` — alias/delegation to root's autoload set filtered to this path.
+- `Root#filterBy(constraint)` — yield or return paths matching a condition.
+- `Root#absoluteCurrent` — resolve relative path entries against cwd.
+
+**Skip:** `eager_load!` (per "What we are NOT building" table).
+
+### PR B3 — `Engine` completion (~200–250 LOC, may need B3b split)
+
+**Blocked by:** PR B2 (`Paths` surface needed for `envConfig`/`helpers` method bodies).
+
+**Source:** `vendor/rails/railties/lib/rails/engine.rb`.
+
+**Current:** 14/36 matched.
+
+**Scope:**
+
+- `engine/lazy-route-set.ts` — 2 missing methods; bundle here.
+- `Engine#app` — builds and memoizes the middleware stack:
+  `defaultMiddlewareStack.buildStack; config.middleware.mergeInto(stack); stack.build`.
+- `Engine#call(env)` — `buildRequest(env)` then `app.call(request.env)`.
+  The `call` surface is what makes an Engine rack-mountable.
+- `Engine#endpoint` — returns `config.middleware.isEmpty? ? routes : app`.
+  (Class-level `endpoint` already exists for `config.action_controller.perform_caching`
+  wiring; this is the instance-level one.)
+- `Engine#envConfig` — merges `paths["public"].first` into the env hash;
+  Rails adds `action_dispatch.asset_path`, `action_dispatch.routes` and a
+  handful more from engine-level config. Read the Rails method carefully —
+  it is simpler than `Application#envConfig`.
+- `Engine#helpers` — aggregates `ActionController::Base.helpers` +
+  `helperModulesFrom(helpersPaths)`. Skip the module-eval parts; return
+  the module list.
+- `Engine#loadSeed` — reads `db/seeds` path and evals/imports it.
+- `Engine#loadConsole(binding?)`, `#loadRunner(runner)`, `#loadTasks`,
+  `#loadGenerators`, `#loadServer(server)` — each calls the corresponding
+  railtie method. Implement as no-op stubs with `@internal` JSDoc unless
+  a real consumer exists in the package.
+- `Engine#loadConfigInitializer(initializer)` — loads a single initializer
+  from the initializers path. Reads the file and calls `eval`/`import`.
+- `Engine#hasMigrations?` — checks `paths["db/migrate"].existentDirectories`.
+- `Engine#buildRequest(env)` — `ActionDispatch::Request.new(env)`.
+- `Engine#buildMiddleware` — wrapper over `ActionDispatch::MiddlewareStack.new`.
+- `Engine#eagerLoad!` — skip (per table), add `@internal` placeholder.
+
+**Split trigger:** if B3 > 280 LOC after writing stubs, move `loadConsole`/
+`loadRunner`/`loadTasks`/`loadGenerators`/`loadServer`/`loadSeed` into PR B3b.
+
+### PR B4 — `Application::Configuration` completion (~200–250 LOC, likely needs B4b split)
+
+**Blocked by:** none (can parallel with B3).
+
+**Source:** `vendor/rails/railties/lib/rails/application/configuration.rb`.
+
+**Current:** 87/120 matched (73%).
+
+**Key missing pieces:**
+
+- `loadDefaults(version)` — the large `case target_version` dispatch from
+  5.0 → 8.0+. Each case sets per-framework defaults by writing onto
+  `config.activeRecord.*`, `config.actionController.*`, etc. Implement the
+  8.0 case fully; stub older versions with a comment pointing at the Rails
+  source. This is the most LOC-heavy item; may need to be B4b on its own.
+- `secretKeyBase` getter — reads `ENV["SECRET_KEY_BASE"]` via `processAdapter.env`,
+  falls back to `credentials.secretKeyBase`. Setter stores on the instance.
+- `sessionStore` / `sessionStore?` — getter/setter pair; `sessionStore?` returns
+  whether a non-default store is configured.
+- `contentSecurityPolicy` — DSL block setter analogous to `config.action_dispatch.content_security_policy`.
+- `permissionsPolicy` — same pattern as CSP.
+- `databaseConfiguration` — reads the database config module (`config_for(:database)`).
+- `annotations` — `SourceAnnotationExtractor::Annotations` config block.
+- `colorizeLogging` / `colorizeLogging=` — flag for `ActiveSupport::LogSubscriber`.
+- `defaultLogFile` — path to `log/<env>.log`.
+- `paths()` override — Rails `Application::Configuration#paths` adds
+  `app/mailers`, `app/javascript`, `public`, `public/javascripts`,
+  `public/stylesheets`, `tmp`, `log/<env>.log` beyond what Engine adds.
+  The TS port only adds `public`; add the rest.
+
+**Split:** if `loadDefaults` alone hits ~150 LOC, move it into B4b.
+
+### PR B5 — `Application::Finisher` + `RoutesReloader` gaps (~200 LOC)
+
+**Blocked by:** B3 (`RoutesReloader` depends on `Engine#routes` surface,
+`Finisher` depends on middleware stack being buildable).
+
+**Source:** `vendor/rails/railties/lib/rails/application/finisher.rb`,
+`vendor/rails/railties/lib/rails/application/routes_reloader.rb`.
+
+**Finisher current:** 2/5 matched. Missing:
+
+- `FinisherHost` interface — `add_generator_templates`, `define_main_app_helper`,
+  `add_to_prepare_blocks`, `run_prepare_callbacks` initializers. The api:compare
+  gap is likely that these initializers exist in the TS file but the host
+  interface type exported from the module doesn't declare them, so they
+  don't match the Ruby public surface.
+
+**RoutesReloader current:** 10/17 matched. Missing:
+
+- `executeIfUpdated` — calls `updater.execute_if_updated`.
+- `updatedAt?` — delegates to `updater.updated?`.
+- `clear!` — calls `routeSets.each(&:clear!)`.
+- `loadPaths` — returns the concatenated path entries.
+- `finalize!` — freezes route sets.
+- `revert` — rolls back to the snapshot route state.
+- `updater` — constructs a `FileUpdateChecker` over `paths`. Because
+  `FileUpdateChecker` is not ported (Zeitwerk-territory), stub `updater`
+  as a no-op object that always reports `updated? = true` and note it as
+  a known deviation in the PR description.
+
+**DefaultMiddlewareStack current:** 5/7 matched — 2 methods. Bundle here.
+
+### PR B6 — `Application` completion (~250 LOC, may need B6b)
+
+**Blocked by:** B3 (engine middleware), B4 (`secretKeyBase`, `sessionStore`,
+`databaseConfiguration`), B5 (finisher + routes-reloader hooks).
+
+**Source:** `vendor/rails/railties/lib/rails/application.rb`.
+
+**Current:** 28/61 matched (46%).
+
+**Key missing pieces:**
+
+- `envConfig` — the large method that merges ~30 `action_dispatch.*` Rack
+  env keys: `parameter_filter`, `secret_key_base`, `key_generator`,
+  `http_auth_salt`, `signed_cookie_salt`, `encrypted_cookie_salt`,
+  `encrypted_signed_cookie_salt`, `authenticated_encrypted_cookie_salt`,
+  `action_dispatch.show_exceptions`, CSP config, cookie config, etc.
+  Read `vendor/rails/railties/lib/rails/application.rb#env_config` in full.
+- `orderedRailties` — respects `config.railtiesOrder`; partitions the
+  registered railtie list around the `Trails::Application` sentinel.
+- `railtiesInitializers` — calls `orderedRailties.flatMap(&:initializers)`.
+- `reloadRoutes!` — calls `routesReloader.reload!`.
+- `reloadRoutesUnlessLoaded` — calls `routesReloader.reloadUnlessLoaded`.
+- `messageVerifiers` — `ActiveSupport::MessageVerifiers` instance memoized
+  on the application; keyed by purpose string.
+- `deprecators` — `ActiveSupport::Deprecation::Deprecators` proxy over
+  all registered framework deprecators. Read `vendor/rails/activesupport/lib/active_support/deprecation/deprecators.rb`.
+- `migrationRailties` — railtie list filtered to those with migrations.
+- `toApp` — builds and returns the rack app (`endpoint`). Called by Rack.
+- `buildRequest(env)`, `buildMiddleware` — same shape as Engine, but
+  Application-scoped.
+- `runTasksBlocks(app)`, `runConsoleBlocks(app)`, `runRunnerBlocks(app)`,
+  `runGeneratorBlocks(app)` — iterate registered `toRun` blocks. Stub if
+  no real consumer yet.
+- `create(initializer?)` — class method; instantiates and `register`s the
+  app instance, optionally calls the block.
+
+**Split trigger:** if `envConfig` + `orderedRailties` + `deprecators` > 200 LOC,
+move `runTasksBlocks`/`runConsoleBlocks`/etc. and `create` into B6b.
+
+---
+
+## Framework railtie wiring followups
+
+These are NOT boot-chain blockers but are required for full initializer
+fidelity. Do after B1–B6.
+
+### Activerecord trailtie followups
+
+- `active_record.postgresql_time_zone_aware_types`, `active_record.logger`,
+  `active_record.backtrace_cleaner` — wire via `activesupport.onLoad`.
+- `active_record.set_filter_attributes` — needs `Application.config.filterParameters` slot (B4).
+- `active_record.set_signed_id_verifier_secret` — blocked on `Application.secretKeyBase` (B4).
+- `active_record.clear_active_connections`, `active_record.log_runtime`.
+- `active_record.copy_schema_cache_config`, `active_record.sqlite3_adapter_strict_strings_by_default`.
 - `active_record_encryption.configuration`, `active_record.query_log_tags_config`.
-- `active_record.set_configs` setter-dispatch loop (catch-all copying `config.activeRecord.*` onto `ActiveRecord.*`).
-- Convert `initialize_timezone` from direct `Base.timeZoneAwareAttributes = true` to `onLoad("active_record", ...)` once the on_load consumers are wired.
+- `active_record.set_configs` setter-dispatch loop.
 
-**action-controller/trailtie.ts followups (per #2181):**
+### Action-controller trailtie followups
 
-- `action_controller.assets_config` — needs `paths["public"]`.
-- `action_controller.set_helpers_path` — needs `helpers_paths` (Engine#helpersPaths is shipped at 2.2b but unwired here).
-- `action_controller.parameters_config` — blocked on `ActionController::Parameters` port + on_load.
-- `action_controller.set_configs`, `compile_config_methods`, `request_forgery_protection`, `query_log_tags`, `test_case`.
+- `action_controller.assets_config` — needs `paths["public"]` (B2/B3).
+- `action_controller.set_helpers_path` — needs `helpers_paths` (B3).
+- `action_controller.parameters_config` — blocked on `ActionController::Parameters` port.
+- `action_controller.set_configs`, `compile_config_methods`, `request_forgery_protection`.
 
-**actionview/trailtie.ts followups (per #2165, ~30–60 LOC bundle):**
+### Actionview trailtie followups
 
-Wire `action_view.logger`, `action_view.caching`, `action_view.setup_action_pack`, `action_view.collection_caching` + 9 `config.after_initialize` blocks (AssetTagHelper / FormHelper / FormTagHelper / SanitizeHelper / UrlHelper / Template / ContentExfiltrationPreventionHelper) + `rake_tasks { cache_digests.rake }`. Bundle when 3–4 of those helpers gain the required setter surface.
+Wire `action_view.logger`, `action_view.caching`, `action_view.setup_action_pack`,
+`action_view.collection_caching` + 9 `config.after_initialize` blocks. Bundle
+when 3–4 target helpers gain the required setter surface.
 
-**Cross-package cleanup:**
+### Cross-package trailtie migration
 
-- Migrate AR + actionpack `trailtie.ts` files from `extends BaseRailtie from "@blazetrails/activesupport"` to `@blazetrails/trailties` `Trailtie`; delete `packages/activesupport/src/railtie.ts`. Blocked on PR 2.7a (~150 LOC).
-- Remove activemodel `TrailtieConfig.i18nCustomizeFullMessage` flat slot (`@deprecated`) once internal callers migrate.
-
----
-
-## Cross-cutting followups from merged PRs
-
-Sized work that doesn't belong to a single open PR. Bundle into the most relevant upcoming PR or open standalone when ceiling allows.
-
-### Activesupport infrastructure
-
-- **GCM in `MessageEncryptor`** (~150 LOC, real). `crypto-adapter.ts` already exposes optional `getAuthTag()` / `setAuthTag()`; `message-encryptor.ts` has a partial `nonceLen` branch (`name.includes("gcm")`). Needs envelope extension to `encrypted--iv--tag`. Then flip `EncryptedFile.CIPHER` to `aes-128-gcm` to match Rails.
-- **`ActiveSupport::Messages::Codec` port** (~250 LOC): `Codec.with(default_serializer:)` global flip. Lets "can read encrypted file after changing default_serializer" test exercise real Rails semantics. Some infrastructure (`messages/rotation-configuration`, `serializer-with-fallback`) already exists at `packages/activesupport/src/messages/`.
-- **Eager symlink resolution via async factory** (~50 LOC): optional `EncryptedFile.create(opts)` resolves `realpath` before returning — matches Rails' eager semantics.
-- **`EncryptedFile.isKey()` cache** memoizes a miss. Worked around in trailties by reading fs directly in `ensureKeyFile`; add `resetKeyCache()` or auto-invalidate on `change`.
-- **`EncryptedConfiguration` port** (~150 LOC): 12 `it.skip` stubs in `packages/activesupport/src/encrypted-configuration.test.ts`. Real blocker for PR 2.5c — see that entry.
-- **Tighten `nodeFs` typing in fs-adapter** (~30 LOC): extract a shared `NodeFsPromises` type instead of inline ad-hoc shapes in both `tryAutoRegisterNode` branches. Promote optional async methods to required once browser-fs and virtual-fs adapters add them (open question #5).
-- **Async `mkdir` on FsAdapter** (~30 LOC): add `mkdir(path, {recursive})` + Node impl; call before `ensureKeyFile` / `file.change` so `credentials edit --environment <env>` doesn't ENOENT on a fresh app. (`mkdirSync` exists; async surface absent.)
-- **`stdio: "inherit"` on child-process-adapter** (~20 LOC): extend `SpawnSyncOptions` so vim/nano get a TTY when called via `editEncryptedFile`.
-- **`silenceAsync<T>(level, fn)` on Logger / TaggedLogger** (~30 LOC, real — sync `silence()` exists, async variant does not). Required so `SilenceRequest` middleware silences across `await` points.
-- **Shellwords-style arg parsing for `git`/`rake`** (deferred per #2170): current `splitArgs()` in `actions.ts` splits on whitespace only. Acceptable for `git :init` / `git add: "."` cases; quoted args (`git('commit -m "msg with spaces"')`) mis-split. Add a `string[]` argv overload or vendor a shellwords parser into activesupport (~40 LOC).
-- **ESM-safe sync auto-register** (audit, codebase-wide): Copilot flagged that activesupport's sync `getFs()` / `getPath()` / `getChildProcess()` auto-register only works under CJS via `createRequire`. `generators/base.ts` and several commands use sync getters. Either eager-init in `bin.ts` or convert all callers to the async getter pattern. Pre-existing; same as open question #5.
-
-### Actionpack prerequisites surfaced
-
-- **`ActionController.Base.render` honor `template:` option** (~30–50 LOC). PWA/Welcome call `render({ template: "...", layout: false })` verbatim per Rails source, but current `abstract-controller/rendering.ts` falls through to implicit-render and returns empty 200. Also fix `renderAsync` path. Unblocks PWA/Welcome runtime + any future Rails port using `render template:`.
-- **`metal.ts` `controllerPath()`** override semantics: current implementation ignores `_controllerPath`; subclasses must override the static method, not the field. Surprising and undocumented; tighten.
-- **`verifyAuthenticityToken` auto-registration as before_action** on `ActionController.Base`: `skipBeforeAction("verifyAuthenticityToken")` calls in PWA/Welcome currently no-op (no entry to remove). The forgery-protection module exists at `packages/actionpack/src/action-controller/metal/request-forgery-protection.ts` but its `skipBeforeAction` call assumes a registered entry — verify the class-eval-time registration on `ActionController.Base`.
-- **`request.local?` + `before_action :require_local!`** + `consider_all_requests_local` config (~50 LOC): unlocks unmirrored Rails-verbatim "remote requests forbidden" / "renders an error message when forbidden" / "allows local requests" `InfoController` tests.
-- **Wire existing `RoutesInspector`** into `InfoController#matchingRoutes` (`packages/actionpack/src/action-dispatch/routing/inspector.ts` is shipped at 407 LOC). `info-controller.ts` currently no-ops the body. ~30 LOC wire + render-template-on-`query` branch.
-- **`ActionDispatch::Request`** is shipped — swap `request.action_dispatch` notification payload from raw env to a Request wrapper (~20 LOC); update `Rack::Logger` tests.
-- **Routing camelCase action keys:** Rails route `pwa#service_worker` won't dispatch — needs `pwa#serviceWorker` (per `feedback_camelcase_only`). Document in actionpack routing docs.
-- **`define_generate_prefix` should use `name_for_action`-equivalent** (~20 LOC): apply `currentNamePrefix` + normalization so registered helper key matches Rails for nested-scope mounts.
-- **`mount({ app, at, ... })` overload** (~40 LOC): support the Rails hash form so plan docs and engine-mounting code can write the idiomatic shape.
-- **Port remaining 17 Rails `mapper_test.rb` tests** (~30 LOC): `dispatch/mapper_test.rb` is at 4/21 matched. Cover scope/anchor/via/format behavior tangential to `mount`.
-- **Default middleware stack actionpack ctor alignment** (~150–250 LOC, per #2177): audit + fix `HostAuthorization(app, hosts, **kw)`, `Static(app, path, index:, headers:)`, `DebugExceptions(app, format)`, `ShowExceptions(app, exceptionsApp)` to accept Rails-shape positional + kwargs OR `.call`-able exceptions apps. Also drop the `_showExceptionsApp` wrapper in `default-middleware-stack.ts` once `ShowExceptions` accepts `.call`-ables.
-- **Deferred middlewares (no actionpack equivalent yet, per #2177):** `Rack::{Sendfile,Cache,Lock,Runtime,Head,ConditionalGet,ETag,TempfileReaper,MethodOverride}`, `ActionDispatch::{Executor,Reloader}` (need `app.executor`/`app.reloader` from 2.5c), `Rails::Rack::{Logger,SilenceRequest}` wire-up, `ActiveRecord::Middleware::{DatabaseSelector,ShardSelector}`, `Flash` middleware class (only `FlashHash` exported), `PermissionsPolicy::Middleware`.
-
-### Actionview / actionmailer / actioncable
-
-- **`Application::Bootstrap`-style `:initialize_logger` upgrade** (~40 LOC): wrap logger in `TaggedLogging` + `BroadcastLogger`. Both already shipped at `packages/activesupport/src/{tagged-logging,broadcast-logger}.ts` — this is wiring only, not infrastructure. Blocked on `Application::Configuration` having `logFormatter` / `broadcastLogLevel`.
-- **`config.cacheFormatVersion` in `:initialize_cache`** (~20 LOC): set `ActiveSupport.cacheFormatVersion`. Requires that field on activesupport's cache module.
-- **`:initialize_error_reporter` initializer** (~30 LOC): once `ActiveSupport.error` / `Trails.error` exists.
-- **`Notifications.instrumenter.buildHandle(name, payload)`** is already shipped (`packages/activesupport/src/notifications/fanout.ts`); `Rack::Logger` can emit Rails-shaped start/finish pairs now (~30 LOC wire-up only).
-
-### Trailties code quality / fidelity
-
-- **Async-fs rollout** — scoped into PR 1.12c (or its 1.12c-b split). Tracked there, not here. Note for the implementer: callers to convert are `migration-loader.ts`, `commands/destroy.ts`, `commands/console.ts`, `source-annotation-extractor.ts`, all of `generators/base.ts`.
-- **Port 8 verbatim `Rails::Command::NotesTest` cases** (~120–150 LOC, test-only PR): into `source-annotation-extractor.test.ts`. Dropped from PR 1.4 to fit ceiling. Test names from `vendor/rails/railties/test/commands/notes_test.rb`.
-- **`ParserExtractor` port** (unscheduled): AST-based extractor that skips notes inside string literals. Current trails port is regex-only. Likely a `typescript` compiler API pass over `.ts`/`.tsx`.
-- **CodeStatistics polish** (small): ~15 LOC golden test of `toString()` exact column widths + alignment; ~10 LOC extend TS method regex to count bare class-method shorthand (with safe exclude list); ~5 LOC render `NaN` ratio like Rails when `code === 0`.
-- **`BACKTRACE=1` bypass** (~30 LOC): once a trailties env adapter wrapper exists, restore the `ENV["BACKTRACE"]` bypass in `BacktraceCleaner.clean` / `cleanFrame` (hard rule 2 forbids `process.*`).
-- **`.gitignore` append on key generation** (~15 LOC): Rails' `EncryptionKeyFileGenerator#ignore_key_file` appends the key path; `ensureKeyFile` currently writes the key without touching `.gitignore`.
-- **`credentials:diff` subcommand** (~80 LOC): Rails enrolls/disenrolls the project in git diff filter and decrypts on `git diff`. Heavy git-plumbing; defer.
-- **`Info` properties needing ported deps:** "Rack version", "JavaScript Runtime", "Middleware", "Database adapter", "Database schema version". User code can register via `Info.property(...)` today; pure parity gap.
-- **`generate()` typing nit** (~5 LOC): `pendingGenerators ??= []` against an always-present field — drop the `??=` or mark field optional.
-- **PathAdapter optional-method sweep:** other CLI commands using `getPath()` may have the same fallback bug `app.ts` fixed; audit.
-- **`.ts` template files** for `app:template`: first-class support requires registering a `ts-node`/`tsx` ESM hook at launch.
-- **`MigrationGenerator.generate` shell-out** (optional): needed to wire `add_migrations` into PR 1.14c-2 (authentication).
-- **`Engine#allLoadPaths(addAutoloadPathsToLoadPath)` single-flag memoization** (per #2174): documented Rails-mirrored quirk — if both `true` and `false` are called in one process, cache returns wrong shape. Worth a JSDoc `@internal` flagging.
-- **`Engine#config` cast smell** (per #2174): fixed — `Engine#config` and `Application#config` now use a local variable to avoid `as` casts.
+- Migrate AR + actionpack `trailtie.ts` files from `extends BaseRailtie from
+"@blazetrails/activesupport"` to `@blazetrails/trailties` `Trailtie`;
+  delete `packages/activesupport/src/railtie.ts`. Blocked on B1.
 
 ---
 
-## Phase 3 — Deferred (not blocking)
+## Activesupport wiring followups (needed for full boot)
 
-### PR 3.5 — Browser adapters
+- **Bootstrap `:initialize_logger` upgrade** — wrap logger in `TaggedLogging`
+  \+ `BroadcastLogger`. Both shipped; wiring only. Blocked on B4
+  (`logFormatter` / `broadcastLogLevel` in `Application::Configuration`).
+- **`:initialize_cache` `cacheFormatVersion`** — set `ActiveSupport.cacheFormatVersion`.
+  Requires the field on activesupport's cache module (~20 LOC).
+- **`:initialize_error_reporter` initializer** — once `ActiveSupport.error` /
+  `Trails.error` exists (~30 LOC).
+- **GCM in `MessageEncryptor`** (~150 LOC): flip `EncryptedFile.CIPHER` to
+  `aes-128-gcm`. `crypto-adapter.ts` already exposes optional `getAuthTag()`.
+- **`ActiveSupport::Messages::Codec` port** (~250 LOC): `Codec.with(default_serializer:)`
+  global flip. Some infrastructure already exists at `packages/activesupport/src/messages/`.
 
-**Node/TS fit:** straightforward — both adapters implement the same interfaces as the Node ones (`ProcessAdapter` / `FsAdapter`), bound to browser surfaces. Virtual-fs needs a per-session in-memory store (Map).
+---
 
-**Dependencies:** decide whether `crypto` / `child_process` adapters need browser variants too; `encryption-key-file-generator` calls `EncryptedFile.generateKey()` → `getCrypto()` sync — browser builds must pre-register webcrypto.
+## Actionpack prerequisites
 
-Browser `processAdapter` + virtual-fs `fsAdapter`, packaged as `@blazetrails/activesupport/browser` subpath export. Demo harness in `packages/website/`.
+These block the middleware stack from functioning correctly (needed for B3/B6).
 
-**New files:**
+- **`ActionController.Base.render` honor `template:` option** (~30–50 LOC):
+  PWA/Welcome use `render({ template: "...", layout: false })` but current
+  `abstract-controller/rendering.ts` returns empty 200.
+- **Default middleware stack ctor alignment** (~150–250 LOC, per #2177):
+  `HostAuthorization`, `Static`, `DebugExceptions`, `ShowExceptions` need
+  Rails-shape positional + kwargs. Required for `Application#app` to return
+  a callable stack.
+- **Deferred middlewares** (no actionpack equivalent yet): `Rack::{Sendfile,
+Cache,Lock,Runtime,Head,ConditionalGet,ETag,TempfileReaper,MethodOverride}`,
+  `ActionDispatch::{Executor,Reloader}`, `Flash` middleware,
+  `PermissionsPolicy::Middleware`.
 
-- `packages/activesupport/src/browser-process-adapter.ts`
-- `packages/activesupport/src/browser-fs-adapter.ts`
-- `packages/website/src/demo/`
+---
 
-**Files changed:** `packages/activesupport/package.json` — add `./browser` subpath export.
+## Generators (deprioritized)
 
-### PR 3.5b — Browser SQLite driver (~150 LOC)
+Template-builder infra and all generator migrations are lower priority than
+the boot chain. Do not open generator PRs while B1–B6 are in flight.
 
-**Blocked by:** none structurally — the `sqlite-adapter.ts` driver registry already exists and accepts plug-in drivers (`better-sqlite3`, `node-sqlite`, `expo-sqlite` ship today). Ships alongside or after PR 3.5 since both target the browser surface.
+### Still open
 
-**Source:** new.
+- **PR 1.10c** — Trails-native template DSL: `pkg`, `route`, `environment`, `initializer` DSL actions on `GeneratorBase` (~150–250 LOC). Blocked by T1.
+- **PR 1.14c-4** — db/system/change generator (~200 LOC). Blocked by T5.
+- **PR 1.14d** — `AppGenerator` extends `AppBase`; migrate raw-string emit to builder; `--package-manager` and `--sqlite-driver` flags. Likely splits into 1.14d-a (migration) + 1.14d-b (extend + flags). Blocked by 1.12c.
 
-**Scope:**
+### Completed (reference only)
 
-- `packages/activesupport/src/sqlite-drivers/wa-sqlite.ts` (preferred — OPFS-backed, WASM) **or** `sql-js.ts` (simpler, in-memory only). Recommend `wa-sqlite` to match the OPFS persistence story Expo and Node drivers already provide.
-- Register the new driver under the `./browser` subpath export added in PR 3.5 so `import "@blazetrails/activesupport/sqlite/wa-sqlite"` works in a browser bundle.
-- Mirror the test surface in `sqlite-drivers/better-sqlite3.test.ts` — `run`/`get`/`all`/`iterate`/`columns`/`setReadBigInts`/`prepare`/`close`.
+T1 (typed template emitter, #2191), T2 (model/migration/resource-route, #2202),
+T3 (controller/scaffold, #2212), T4 (AuthenticationGenerator, #2225),
+T5 (DevcontainerGenerator, #2461),
+1.14b-cont (helper/controller/scaffold_controller, #2224), 1.12b-2
+(CreateMigration, #2185), 1.12c (AppBase + Database, #2176).
 
-**Dependencies (runtime):** the chosen WASM lib is a peer dep of the consumer app, not of trails. Same pattern as `better-sqlite3`.
+---
 
-**Extends PR 1.14d-b's `--sqlite-driver` flag** to accept `wa-sqlite` as a fourth value (gated on browser-target detection — probably easiest as a separate `trails new --browser` mode rather than free composition).
+## Code quality / fidelity followups
 
-### PR 3.6 — Relocate dev binaries to trailties
+Non-blocking; bundle into boot-chain PRs when ceiling permits.
 
-`trails-tsc` stays a standalone bin (tooling expects the executable name). The two dump bins fold into `trails` subcommands.
-
-**Node/TS fit:** mechanical move + command registration. Verify CI workflow paths.
-
-**Files moved:**
-
-- `packages/activerecord/bin/trails-tsc.js` → `packages/trailties/bin/trails-tsc.js`
-- `packages/activerecord/bin/trails-schema-dump.js` → `packages/trailties/src/commands/schema.ts` (`trails schema:dump`)
-- `packages/activerecord/bin/trails-models-dump.js` → `packages/trailties/src/commands/models.ts` (`trails models:dump`)
-- TS sources backing each `bin/*.js`
-
-**Files changed:**
-
-- `packages/activerecord/package.json` — drop the three `bin` entries
-- `packages/trailties/package.json` — add `trails-tsc` bin
-- `packages/trailties/src/cli.ts` — register `schema:dump`, `models:dump`
-- CI workflow invoking `Virtualized DX Type Tests` — update `trails-tsc` invocation path
-- Workspace `package.json` `scripts:` calling any of the three bins
-
-### Blocked
-
-- **`MailersController`** — needs `actionmailer` package.
-
-### Skipped indefinitely
-
-- `Rails::Command` framework (`commander` is sufficient).
-- `Rails::Plugin` builder.
-- `Rails::Secrets`.
+- **Port 8 verbatim `Rails::Command::NotesTest` cases** (~120–150 LOC, test-only):
+  into `source-annotation-extractor.test.ts`.
+- **`BACKTRACE=1` bypass** (~30 LOC): once a trailties env adapter wrapper
+  exists, restore `BacktraceCleaner.clean` / `cleanFrame`.
+- **`.gitignore` append on key generation** (~15 LOC): `ensureKeyFile` should
+  append the key path.
+- **Async-fs rollout** (~50 LOC): callers to convert: `migration-loader.ts`,
+  `commands/destroy.ts`, `commands/console.ts`, `source-annotation-extractor.ts`,
+  all of `generators/base.ts`.
+- **CodeStatistics polish** (~30 LOC): golden test of `toString()` column widths;
+  extend TS method regex for bare class-method shorthand.
+- **`Info` properties needing ported deps:** "Rack version", "JavaScript Runtime",
+  "Middleware", "Database adapter", "Database schema version".
+- **`Engine#allLoadPaths(addAutoloadPathsToLoadPath)` single-flag memoization**:
+  documented Rails-mirrored quirk — add `@internal` JSDoc.
 
 ---
 
 ## Tracking
 
-- **Primary signal:** `pnpm tsx scripts/api-compare/compare.ts --package trailties` (after `pnpm tsx scripts/api-compare/extract-ts-api.ts`). Tracks Ruby↔TS surface coverage; "misplaced" means tests exist but in the wrong file per Rails layout.
-- **Generator regression signal:** `pnpm vitest run packages/trailties/src/generators` — every generator must pass its snapshot + `parseTs` + `assertNoRubySource` triple (per Hard rule 0).
-- **Final acceptance:** PR 2.6's integration test passes — hello-world fixture imports `Trails`, calls `await Trails.application.initialize()`, serves a route through `actionpack`.
+- **Primary signal:** `bash scripts/api-compare/run.sh --package trailties`.
+  Target: all boot-chain files at 100%.
+- **Final acceptance:** integration test passes — hello-world fixture imports
+  `Trails`, calls `await Trails.application.initialize()`, serves a route
+  through `actionpack`.
 
 ## Conventions for amending this doc
 
-- When a PR ships, replace its "open" entry with a one-line "shipped (#NNNN)" header and fold any deferred work into the relevant followup section or into the next open PR's scope. Don't accumulate gravestones.
-- New cross-cutting work that doesn't belong to a single PR goes under "Cross-cutting followups from merged PRs" with the smallest practical sizing estimate.
-- Open questions get added to the table with a "Decide before" target PR; remove rows when the answer locks into "Decisions already made."
+- When a PR ships, replace its "open" entry with a one-line "shipped (#NNNN)"
+  header and fold any deferred work into the relevant followup section.
+  Don't accumulate gravestones.
+- New cross-cutting work goes under the relevant followup section with the
+  smallest practical sizing estimate.
+- Open questions get added to the table with a "Decide before" target PR;
+  remove rows when the answer locks into "Decisions already made."

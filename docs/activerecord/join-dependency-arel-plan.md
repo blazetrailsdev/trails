@@ -14,13 +14,18 @@
 | PR 7b   | #2398      | merged         |
 | PR 8    | —          | replaced by F5 |
 | PR 9    | —          | replaced by F6 |
+| PR F2   | #2429      | merged         |
+| PR F3   | #2435      | merged         |
+| PR F4   | #2448      | merged         |
+| PR F5   | #2447      | merged         |
+| PR F6   | #2430      | merged         |
 
 ## Post-merge follow-ups (audited 2026-05-26)
 
-Items surfaced during the original PR 1–7b sequence. Checked items are shipped; unchecked items are open follow-ups folded into the F-series PRs below.
+Items surfaced during the original PR 1–7b sequence. Checked items are shipped. Remaining open items from the F-series are tracked under "Post-merge follow-ups from F-series" below.
 
 - [x] ~200 LOC: `walk()` deduplication — shipped in #2405.
-- [ ] ~100 LOC: eliminate `_nodes` array — replace flat array with tree traversal once PR 3 tree structure is fully in use.
+- [x] ~100 LOC: eliminate `_nodes` array — shipped in #2435 (F3).
 - [x] ~150 LOC: use real `JoinAssociation` nodes in tree — shipped in #2414 (F1).
 - [x] ~20 LOC: `JoinBase.table` returns Arel `Table` node — shipped in #2417.
 
@@ -38,7 +43,7 @@ Items surfaced during the original PR 1–7b sequence. Checked items are shipped
 - [x] ~20 LOC: `joinType` propagated to emitted joins (rebuilt when not `OuterJoin`) — shipped in #2417.
 - Note: `JoinTreeNode.isMatch()` matches on `immediateAssocName + modelClass` instead of Rails' reflection identity. Correct proxy for now.
 
-- [ ] ~200 LOC: nested eager-load proxy wiring — flat-node iteration only wires children to root parent. Needs recursive tree walk (depends on tree refactor).
+- [x] ~200 LOC: nested eager-load proxy wiring — shipped in #2448 (F4, recursive nested hydration).
 - [x] ~50 LOC: readonly/strictLoading propagation tests — shipped in #2415.
 - [x] ~30 LOC: cross-parent model cache for belongsTo dedup — shipped in #2410.
 - [x] ~5 LOC: Relation-level `_isReadonly` propagation — non-issue per #2417 investigation (relation's post-instantiation loop already handles it, matching Rails' `exec_queries`).
@@ -58,95 +63,38 @@ Direct-path `addAssociation()` now creates `JoinAssociation` instances and
 emits `Nodes.OuterJoin` via `joinConstraints()`. Quoting tests migrated to
 Arel node assertions.
 
-### PR F2 — Wire JoinAssociation for through-associations (~250 LOC)
+### PR F2 closed (#2429) — Wire JoinAssociation for through-associations
 
-Replace `_addThroughAssociation` + `_finishThroughTarget` (~220 lines of inline
-predicate building) with `JoinAssociation#joinConstraints` which already handles
-`reflection.chain` for multi-hop throughs.
+Through-associations now route through `JoinAssociation#joinConstraints` via
+`reflection.chain`. `_addThroughAssociation` + `_finishThroughTarget` retained
+as fallback only when no reflection exists.
 
-Touches: `join-dependency.ts` (\_addThroughAssociation, \_finishThroughTarget →
-delegate to JoinAssociation), test updates.
+### PR F3 closed (#2435) — Eliminate `_nodes` array + tree traversal
 
-Closes: Gap 1 (through path), through-association scope predicates.
+Flat `_nodes: JoinNode[]` replaced with tree traversal via `_joinRoot`.
+`instantiateFromRows` and `_buildSelectArelNodes` walk the tree. `_rollbackTree`
+uses path-set diffing (trails-specific; Rails has no rollback mechanism).
 
-### PR F3 — Eliminate `_nodes` array + tree traversal (~250 LOC)
+### PR F4 closed (#2448) — Nested hydration + belongsTo dedup
 
-Replace flat `_nodes: JoinNode[]` (14 references) with tree traversal via
-`_joinRoot`. After F1/F2, tree nodes are real `JoinAssociation` instances, so
-`_nodes` becomes redundant.
+`instantiateFromRows` rewritten to recursive tree walk matching Rails'
+`construct`. Cross-parent belongsTo dedup cache shipped.
 
-1. `instantiateFromRows` walks `_joinRoot` tree instead of iterating `_nodes`
-2. `_buildSelectArelNodes` walks tree for column aliases
-3. `_aliases` array → computed from tree walk
-4. Delete `JoinNode` interface (folded into `JoinAssociation`/`JoinTreeNode`)
-5. Delete `_pushTreeNode`, `_rekeyTreeNode`, `_rollbackTree` helpers
+### PR F5 closed (#2447) — AliasTracker wiring + joinConstraints sig
 
-Touches: `join-dependency.ts` (~200 LOC rewrite), `relation.ts` caller (~20
-LOC), test updates (~30 LOC).
+`AliasTracker` wired into `JoinDependency`. `JoinAssociation#joinConstraints`
+accepts `aliasTracker` as 4th param (Rails sig).
 
-Closes: Gap 2 (flat array → tree).
+### PR F6 closed (#2430) — Extra columns in instantiate
 
-### PR F4 — Nested hydration + belongsTo dedup (~250 LOC)
+Non-`tN_rN` columns in result rows merged into parent model's attributes.
+Gap 9 closed.
 
-`instantiateFromRows` currently iterates nodes flat — it wires children only
-to the root parent. Rewrite to recursive tree walk matching Rails' `construct`:
-
-1. Recursive walk: parent→children, wire each child via `association(name)`
-   proxy on the correct intermediate parent (not just root)
-2. Cross-parent belongsTo dedup cache: same target record loaded via two
-   parents gets instantiated once (~30 LOC)
-3. Relation-level `_isReadonly` propagated to parent records (~5 LOC)
-4. readonly/strictLoading propagation tests (~50 LOC)
-
-Touches: `join-dependency.ts` (instantiateFromRows rewrite ~150 LOC),
-new/updated test file (~100 LOC).
-
-Closes: Gap 3 (nested proxy wiring), Gap 5 (readonly/strictLoading tests),
-belongsTo dedup, `_isReadonly` propagation.
-
-### PR F5 — AliasTracker wiring + ON-predicate rebinding (~200 LOC)
-
-Wire the existing `AliasTracker` (`associations/alias-tracker.ts`) into
-`JoinDependency`:
-
-1. Replace `_usedTableNames: Set<string>` with `AliasTracker` instance
-2. Pass tracker to `JoinAssociation#joinConstraints` as 4th arg (Rails sig)
-3. Use `aliasedTableFor()` for table collision resolution
-4. `makeConstraints` rebinds ON predicates via `rebindTableReferences()` when
-   `walk()` merges trees and the parent table alias changes (~50 LOC)
-
-Touches: `join-dependency.ts` (~150 LOC), `join-association.ts` signature
-(~20 LOC), test updates (~30 LOC).
-
-Closes: Gap 8 (AliasTracker), `makeConstraints` rebinding. Enables removal of
-`rebindTableReferences` stopgap once fully wired.
-
-### PR F6 (stretch) — Extra columns in instantiate (~100 LOC)
-
-Handle non-`tN_rN` columns in result rows, merging them into the parent
-model's attributes (mirrors Rails' `column_names` extraction in
-`JoinDependency#instantiate`).
-
-Closes: Gap 9.
-
-## Total: ~700 LOC remaining across 3 core + 2 stretch PRs
+## Total: all F-series PRs shipped
 
 ## Ordering constraints
 
-- F1 and F2 are independent (non-overlapping code paths) and can be developed
-  in parallel, but must both merge before F3.
-- F3 must merge before F4 (F4 rewrites `instantiateFromRows` assuming tree
-  structure).
-- F5 can proceed after F1+F2 (needs JoinAssociation nodes to pass tracker to).
-- F6 is independent of everything.
-
-```
-F1 ──┐
-     ├── F3 ── F4
-F2 ──┘
-F1+F2 ── F5
-F6 (independent)
-```
+All F-series PRs have shipped. Ordering was: F1+F2 → F3 → F4; F1+F2 → F5; F6 independent.
 
 ## Notes
 
@@ -184,6 +132,39 @@ This plan **supersedes** the following batches in `activerecord-100-plan.md`:
   by PR 2 (#2381, merged). `_addThroughAssociation` replaced by
   `JoinAssociation#joinConstraints` which handles polymorphic sources via
   `reflection.chain`.
+
+## Post-merge follow-ups from F-series
+
+**From #2429 (F2 — through-associations)**
+
+- [ ] ~220 LOC: Delete dead `_addThroughAssociation` + `_finishThroughTarget` — retained as fallback when no reflection exists. Deletion blocked on a cleanup pass over the same area.
+- [ ] ~10 LOC: Add `isCollection()` delegation to `PolymorphicReflection` — workaround reaches into `_reflection.macro`.
+- [ ] `PolymorphicReflection#joinScopes` `buildScope(table)` ignores the `table` parameter. Works because the relation's default table matches, but diverges from Rails.
+
+**From #2435 (F3 — eliminate \_nodes)**
+
+- [ ] ~150 LOC: Delete `JoinNode` interface, fold properties onto `JoinPart` subclasses — `JoinNode` still exported and used by relation.ts (~6 call sites).
+- [ ] ~30 LOC: Delete `_pushTreeNode`, build tree nodes directly in `addAssociation` — blocked on JoinNode deletion.
+- [ ] ~20 LOC: Delete `JoinTreeNode` class — used as fallback when reflection is null.
+- `_rollbackTree` uses path-set diffing — Rails has no rollback mechanism (structural difference, not fidelity gap).
+
+**From #2447 (F5 — AliasTracker wiring)**
+
+- [ ] `JoinAssociation#joinConstraints` accepts `aliasTracker` as 4th param but does not use it in the body — wired for signature parity only. Will matter when `make_constraints`/`@joined_tables` dedup is ported.
+- [ ] `_references` param on `JoinDependency#joinConstraints` is unused — Rails uses it for eager-load reference tracking.
+
+**From #2448 (F4 — nested hydration)**
+
+- [ ] ~20–30 LOC: add `aliasTracker` getter + `findReflection` helper to `join-dependency.ts` (brings api:compare to 19/21).
+- [ ] ~50 LOC: port `build` — depends on `reflection.checkValidity!` / `checkEagerLoadable!`.
+- [ ] ~30 LOC: implement `association_cached?` shortcut in `_constructRecursive` for singular already-cached associations.
+- [ ] ~20 LOC: move `setInverseInstance` call into `constructModel` before proxy wiring to match Rails ordering.
+- [ ] ~40 LOC: implement readonly/strictLoading propagation in `_constructRecursive`.
+- `join_dependency.rb` api:compare at 86% (18/21): `aliasTracker`, `findReflection`, `build` remain.
+
+**From #2430 (F6 — extra columns)**
+
+- [ ] ~30 LOC: Pass `column_types` from result set for proper type-casting of extra columns. Low priority — only matters if adapter returns uncast DB types for computed columns.
 
 ## Non-goals
 

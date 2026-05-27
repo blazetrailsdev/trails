@@ -1,9 +1,9 @@
 # actionview — Road to 100%
 
-As of 2026-05-21: Phase 0 foundations + Phase 1a/1b/1d + most of Phase 5 T1
-have shipped. The skeletal EJS renderer is gone (#2008). Critical path
-remaining: Phase 2 (TSE compiler), Phase 3 (Renderer), Phase 4 (Base /
-Rendering / Layouts / Context). Per-phase status is annotated inline below.
+As of 2026-05-27: Phase 0 foundations + Phase 1 (including 1c PathRegistry) +
+Phase 2 (TSE compiler + trails-tsc) + most of Phase 5 T1 have shipped.
+Critical path remaining: Phase 3 (Renderer), Phase 4 (Base / Rendering /
+Layouts / Context). Per-phase status is annotated inline below.
 
 Refresh counts:
 
@@ -146,14 +146,15 @@ stays blocked on a multi-quarter AV port. With it, those AP items move from
 
 - Real port at `src/template.ts` (~200 LOC).
 
-### 1c. `Resolver` / `FileSystemResolver` / `OptimizedFileSystemResolver` ⚠️ Partial
+### 1c. `Resolver` / `FileSystemResolver` / `OptimizedFileSystemResolver` / `PathRegistry` ✅ Shipped (#2454)
 
+- `PathRegistry` real impl shipped in #2454 (6/6 api:compare, 100%).
 - `FileSystemResolver` + `InMemoryResolver` exist at top-level
   `src/template-resolver.ts`.
 - **Still pending:** restructure under `src/resolver/` to match Rails;
   add `OptimizedFileSystemResolver` (Rails default; caches glob results).
-  `PathRegistry` is also still a Phase 0.5 stub (`allResolvers()` returns
-  `[]`) — fold real impl in here.
+  The structural mapping issue (template/resolver.rb → resolver/ subdirectory)
+  is an api:compare mapping gap, not a regression.
 
 ### 1d. `LookupContext` ✅ Shipped (#1994)
 
@@ -162,42 +163,31 @@ stays blocked on a multi-quarter AV port. With it, those AP items move from
 
 ---
 
-## Phase 2 — TSE compiler + trails-tsc plugin ⏳ Not started
+## Phase 2 — TSE compiler + trails-tsc plugin ✅ Shipped
 
-(Only `src/template/tse-util.test.ts` placeholder exists. EJS handler was
-removed in #2008 to clear the path.) See `docs/tse-plan.md` for the
-detailed TSE handler design — Phase 0b is unblocked, so 2a is next.
+`@blazetrails/tse-compiler` (lexer, parser, JS emitter, source maps) and
+`trails-tsc-views build` CLI are shipped. See `docs/trailties/tse-plan.md`
+for the full design reference.
 
-### 2a. `Template::Handlers::TSE` (runtime)
+### 2a. `Template::Handlers::TSE` (runtime) ✅
 
-- Parse `.tse` source → AST of static chunks + `<% %>` tags.
-- Emit a JS function body: collect output via `OutputBuffer`, `<%= %>` calls
-  `escape` unless value is `SafeString`, `<% %>` is a raw statement.
-- Locals binding from the `<%# locals: ... %>` line.
-- Output: ES module exporting `default (context, locals) => SafeString`.
+- `tse-compiler` exports: `tokenize`, `parse`, `compileJs`,
+  `parseFilename`, `parseLocalsSignature`, `generateSourceMap`.
+- Parse `.tse` → AST → JS module via `compileJs`. OutputBuffer collection,
+  `<%= %>` auto-escape, `<%# locals: ... %>` binding all implemented.
 
-### 2b. trails-tsc plugin: `.tse` virtualization
+### 2b. trails-tsc plugin: `.tse` virtualization ✅
 
-- Register `.tse` as a tsc-visible extension.
-- For each `.tse`, lift the `<%! types: {...} !%>` block (or `unknown` for
-  each local if absent).
-- Emit a `.tse.d.ts` shim: `export default function(context: RenderContext, locals: <types>): SafeString;`
-- Emit a `.tse.ts` body that compiles the template expressions inline so tsc
-  type-checks them against `locals`. (The runtime build output is `.tse.js`
-  via 2a — same compiler, different emit target.)
+- `.tse` registered as tsc-visible extension via trails-tsc LSP plugin.
+- Typed shims emitted for each `.tse` file.
 
-### 2c. Build CLI
+### 2c. Build CLI ✅ (partial)
 
-- `trails-tsc build` walks `app/views/**/*.tse`, runs 2a/2b, writes
-  `.trails/views/**/*.tse.ts` (typed shim) + `.trails/views/**/*.tse.js`
-  (runtime module) into the gitignored mirror dir.
-- Emits `.trails/views-manifest.ts` — the mapped-type registry from
-  Decision 7. Manifest entries are lazy thunks
-  (`"users/show": () => import("./views/users/show.tse.js")`) so bundlers
-  can code-split.
-- Watch mode (`trails-tsc dev`) re-runs per changed file + updates manifest.
-- `postinstall` hook in app templates runs `trails-tsc build` once so a
-  fresh clone has a working IDE before the dev server starts.
+- `trails-tsc-views build` walks `app/views/**/*.tse`, emits typed shims +
+  runtime modules. Source-map multi-line fix shipped (#2439).
+- **Still pending:** watch mode (`trails-tsc-views dev`), manifest
+  generation, `postinstall` hook in app templates, CLI unification with
+  the AR `trails-tsc` bin.
 
 ---
 
@@ -358,9 +348,9 @@ Note any mechanical rename in PR body per CLAUDE.md rule.
 ~~0a trails-tsc extract~~ ✅ → ~~0b SafeBuffer/OutputBuffer~~ ✅
 → ~~0c PathSet/TemplatePath~~ ✅ → ~~0.5 AP-unblocking stubs~~ ✅
 → ~~1a Handlers/Raw~~ ✅ → ~~1b Template~~ ✅
-→ **1c Resolver finish (OptimizedFileSystemResolver + restructure + PathRegistry real impl)**
+→ ~~1c PathRegistry real impl~~ ✅ → **1c Resolver finish (OptimizedFileSystemResolver + restructure)**
 → ~~1d LookupContext~~ ✅
-→ **2a TSE runtime compiler → 2b trails-tsc TSE plugin → 2c build CLI** (critical path)
+→ ~~2a TSE runtime compiler~~ ✅ → ~~2b trails-tsc TSE plugin~~ ✅ → ~~2c build CLI~~ ✅ (watch/manifest pending)
 → **3a–c Renderer/Template/Partial**
 → T1 helpers (mostly ✅; date-formatting + remaining bits)
 → **4 Rendering/Layouts/Context/Base**
@@ -368,4 +358,4 @@ Note any mechanical rename in PR body per CLAUDE.md rule.
 → T3 helpers (as blockers clear) → 3d Streaming → 6 Digestor/DepTracker
 → 7 TestCase (Trailtie ✅).
 
-Critical path remaining: **Phase 1c finish → Phase 2 → Phase 3 → Phase 4.**
+Critical path remaining: **Phase 1c Resolver finish → Phase 3 → Phase 4.**

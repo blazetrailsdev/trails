@@ -5,7 +5,7 @@
 > - A0 spike, B (#2242), C (#2245): shipped
 > - **D-X driver-pool collapse:** PG (#2279) + MySQL (#2278) — shipped. All three adapters now single-connection per adapter, Rails-shape.
 > - **D-Y central canonical schema:** #2372 shipped. Per-worker preload + additive `defineSchema` fast-path. ~18 sites annotated `D-Y-INCOMPATIBLE`.
-> - **D-1..N bypass elimination (Model.adapter = X):** in flight via 7 codemod variants + finisher (#2296, #2315, #2319, #2397, #2400, #2419, #2420). **70 files fully cleared cumulatively; 65 remaining.** Next bottleneck: 3 giant files (calculations 216 sites, finder 97, inheritance 87) need bespoke surgery PRs.
+> - **D-1..N bypass elimination (Model.adapter = X):** 7 codemod variants + 18 bespoke/bundle PRs shipped. **~97 files fully cleared; 38 remaining** (verified grep). Three giants (calculations, finder, inheritance) all shipped. Remaining is long-tail bundles.
 > - Phase E (delete singleton/AsyncContext filter): gated on D-1..N reaching critical mass.
 > - Phase F (move DDL tracking onto AbstractAdapter): open; bundles with TM Phase 9b-4 absorption.
 > - Phase G (fixture adoption): batch 1 shipped (#2391, 2 files). Tracked separately in [`fixtures-adoption-plan.md`](fixtures-adoption-plan.md).
@@ -262,7 +262,7 @@ Rails-shape pattern PR #2286 established (`setupHandlerSuite()` +
 `defineSchema(s)` single-arg + explicit `this.attribute(...)` per
 [[project_pool_epic_d_handler_sqlite_constraint]]).
 
-**Codemod fleet + finisher (7 PRs shipped):**
+**Codemod fleet + finisher + bespoke surgery (shipped):**
 
 | PR    | Variant                             | Files cleared     |
 | ----- | ----------------------------------- | ----------------- |
@@ -273,48 +273,54 @@ Rails-shape pattern PR #2286 established (`setupHandlerSuite()` +
 | #2400 | multi-describe (per-describe)       | 16 (+ 20 partial) |
 | #2419 | PG/MySQL adapter-factory            | 13                |
 | #2420 | partial-transform finisher (manual) | 10                |
+| #2426 | calculations.test.ts (219 sites)    | 1                 |
+| #2427 | signed-id.test.ts (15 sites)        | 1                 |
+| #2434 | inheritance.test.ts (88 sites)      | 1                 |
+| #2436 | finder.test.ts (97 sites)           | 1                 |
+| #2437 | long-tail bundle 1 (4 files)        | 4                 |
+| #2438 | long-tail bundle 2 (2 files)        | 2                 |
+| #2440 | long-tail bundle 3 (3 files)        | 3                 |
+| #2441 | long-tail bundle 5 (3 files)        | 3                 |
+| #2442 | insert-all.test.ts                  | 1                 |
+| #2443 | long-tail bundle 4 (2 files)        | 2                 |
+| #2444 | timestamp.test.ts                   | 1                 |
+| #2445 | transaction-isolation.test.ts       | 1                 |
+| #2449 | encryption/uniqueness-validations   | 1                 |
+| #2450 | encryption.test.ts                  | 1                 |
+| #2452 | relation/update-all.test.ts         | 1                 |
+| #2453 | bundle (collection-cache-key, etc.) | 3                 |
+| #2456 | relation/predicate-builder.test.ts  | 1                 |
+| #2457 | associations/required.test.ts       | 1                 |
+| #2458 | bundle (inner-join-assoc, tx-instr) | 1                 |
 
-**Cumulative: ~70 files fully cleared. ~65 files remaining.**
+**Cumulative: ~97 files fully cleared.**
 
-### Remaining buckets (post #2419 / #2420)
+### Remaining buckets (post long-tail cleanup wave)
 
-**Three giants — bespoke surgery PRs (~400 bypass sites combined):**
+**Three giants — all shipped:**
 
-| File                   | Sites | LOC  | Notes                                                           |
-| ---------------------- | ----- | ---- | --------------------------------------------------------------- |
-| `calculations.test.ts` | 216   | 7500 | Largest. Needs its own dedicated PR with internal sub-batching. |
-| `finder.test.ts`       | 97    | 3800 | Dedicated PR. May split per-describe.                           |
-| `inheritance.test.ts`  | 87    | 2200 | Dedicated PR.                                                   |
+| File                   | Sites | Shipped as |
+| ---------------------- | ----- | ---------- |
+| `calculations.test.ts` | 219   | #2426      |
+| `finder.test.ts`       | 97    | #2436      |
+| `inheritance.test.ts`  | 88    | #2434      |
 
-**Infrastructure-blocked (1 file, 15 sites):**
+**Infrastructure-blocked — resolved:**
 
-- `signed-id.test.ts` — `findGlobalId`/`findSignedGlobalId` tests use
-  `this.adapter = adapter` as a side effect for model registry
-  resolution. Needs a `registerModel()` test-infra hook (~20 LOC).
-  Once that's in place, the 15 sites convert mechanically.
+- `signed-id.test.ts` — `registerModel()` fix shipped in #2427.
+  All 15 sites converted.
 
-**Permanent exceptions — DDL/query adapter affinity (2 files, 4 sites):**
+**Permanent exceptions — DDL/query adapter affinity (2 files):**
 
-| File                 | Sites | Reason                                                                                          |
-| -------------------- | ----- | ----------------------------------------------------------------------------------------------- |
-| `insert-all.test.ts` | 2     | `InsertAll async uniqueIndexes regression` — `addIndex()` + model query must share adapter      |
-| `timestamp.test.ts`  | 2     | `t.timestamps() end-to-end` — `MigrationContext.createTable()` + model query must share adapter |
+- `transaction-instrumentation.test.ts` — 1 bypass in `makeTopic()`;
+  per-test fresh SQLite3Adapter structurally required. Not a D-1
+  candidate.
+- Insert-all and timestamp DDL-affinity bypasses shipped as-is in
+  #2442 / #2444; remaining DDL sites need explicit carve-out.
 
-These 4 sites cannot be migrated; they need an explicit carve-out in
-whatever final D-1 closure mechanism we use (e.g. ESLint allow-list).
-
-**Long-tail (~46 files):** bespoke or small shapes. Address case-by-case
-after the giants land. Don't author more codemod variants for buckets
-under ~10 files — write by hand.
-
-Original "200 files / 10 batches" estimate is dead. Realistic close-out:
-
-- 3 giant PRs (~3 weeks each due to LOC + review cycles)
-- 1 signed-id infra PR + the 15-site mechanical conversion
-- 1 carve-out PR for the 4 DDL-affinity sites
-- ~10-15 bespoke PRs for the long tail
-
-**Total: ~15-20 more PRs to fully close D-1**, then E and F become reachable.
+**Remaining long-tail:** 38 files with `this.adapter = adapter` bypass
+(verified `grep -rl`). Address case-by-case via D-1 + Rails-fidelity
+bundle PRs (the current pattern). Each bundle clears 1–4 files at ~250 LOC.
 
 #### D-1..N gotchas
 
@@ -324,6 +330,26 @@ Original "200 files / 10 batches" estimate is dead. Realistic close-out:
 - Tests can't trivially consume ported test models because of
   schema-mismatch — [[feedback_d1_cannot_consume_ported_models]].
   That swap belongs in Phase G, not D-1.
+
+#### D-1 post-merge findings (from bundle PRs #2426–#2458)
+
+**Implementation gaps surfaced:**
+
+- [ ] `partialUpdates` not defaulted to `true` on `Base` — `shouldRecordTimestamps()` always updates on save (#2444).
+- [ ] Instance-level `recordTimestamps` not supported — only class-level check (#2444).
+- [ ] `noTouching()` not implemented — 4 tests skipped (#2444).
+- [ ] `belongs-to touch: true` not implemented — 10 tests skipped (#2444).
+- [ ] `Base.belongsToRequiredByDefault` global config not implemented — 1 test skipped (#2457).
+- [ ] `_buildProjections` in relation.ts doesn't honor `enumerateColumnsInSelectStatements` flag (#2456).
+- [ ] Annotate sanitization: `annotate("*/foo/*")` doesn't escape comment delimiters (#2437).
+- [ ] Transaction `_beginTransactionInner` eagerly materializes isolated transactions — diverges from Rails' per-query materialization pattern (#2445).
+
+**Deviations noted (not blocking):**
+
+- Inheritance tests use inline classes instead of ported models — Phase G scope (#2434).
+- Finder tests use `seedUsers()` helpers instead of fixtures — Phase G scope (#2436).
+- Collection-cache-key test doesn't use real Arel table alias (#2453).
+- `select.test.ts` still needs D-1 conversion (7 bypass sites) (#2456).
 
 ### Phase E — Delete `_sharedAdapter`, `AsyncContext` filter, manual TX depth
 

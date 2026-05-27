@@ -39,16 +39,14 @@ Cross-reference: `docs/activerecord/fixtures-adoption-plan.md` for Phase G seque
 - Update to `set connection()` if any callers remain.
 - If audit shows zero references, close this item as moot.
 
-### PR C — Per-adapter Arel visitor (pre-existing, ~Phase 2 window)
+### PR C — Per-adapter Arel visitor — partially shipped (#2432)
 
-**Status:** flagged in the PR 1a follow-ups; not currently scheduled.
+**Status:** #2432 shipped per-adapter cached visitor on `AbstractAdapter`. The global `setToSqlVisitor` sync mechanism remains as backwards compat for ~35 `Node#toSql()` / `TreeManager#toSql()` call sites that lack adapter context.
 
-**Scope:**
+**Remaining (~150-200 LOC):**
 
-- `setToSqlVisitor` is currently a global singleton. Rails uses a per-adapter `@visitor` set in `AbstractAdapter#initialize`.
-- Already partially addressed in #2395 (wiring moved to `AbstractAdapter` constructor), but the singleton itself remains.
-- Replace global singleton with per-adapter visitor instance; update all `setToSqlVisitor`/`toSqlVisitor` consumers.
-- Low-risk now (only matters under multi-adapter cross-talk scenarios) but mandatory for full Rails fidelity.
+- Migrate ~35 `toSql()` call sites to `connection.visitor.compile(ast)`. Largest clusters: `relation.ts` (~15 sites), `schema-migration.ts` (6), `internal-metadata.ts` (6), `persistence.ts` (5), `locking/pessimistic.ts` (1).
+- Once all call sites are migrated, delete the global `setToSqlVisitor` mechanism.
 
 ### Long-tail (separate initiative) — Delete `set connection()` + `get adapter()` compat alias
 

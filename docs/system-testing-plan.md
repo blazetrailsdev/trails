@@ -71,9 +71,11 @@ packages/actionpack/src/action-dispatch/
 
 ## PR sequence
 
-### PR 1 — Driver + Server + SystemTestCase shell (~250 LOC)
+### PR 1 — shipped (#2428) — Driver + Server + SystemTestCase shell
 
-**Scope:**
+### PR 2 — shipped (#2446) — ScreenshotHelper + SetupAndTeardown + PageDumpHelper
+
+**Original PR 1 scope (reference):**
 
 - `driver.ts`: `Driver` class wrapping Playwright browser launch.
   - Constructor: `(driverType, { using, screenSize, options })`.
@@ -100,9 +102,7 @@ packages/actionpack/src/action-dispatch/
 **Test:** Unit test for Driver launch/close lifecycle using a minimal
 HTTP server. Verify `page.goto()` works against it.
 
-### PR 2 — ScreenshotHelper + SetupAndTeardown + PageDumpHelper (~250 LOC)
-
-**Scope:**
+**Original PR 2 scope (reference):**
 
 - `screenshot-helper.ts`:
   - `takeScreenshot({ html, screenshot })`: saves PNG via
@@ -242,6 +242,26 @@ imports from PR 1's types but doesn't modify the same files.
    (a) Proxy-based delegation, (b) explicit `urlHelpers` object the test
    destructures, (c) mixin that copies helpers onto the test class.
    Decision deferred to PR 1 implementation.
+
+## Post-merge follow-ups
+
+**From #2428 (PR 1 — Driver + Server + SystemTestCase)**
+
+- [ ] ~30 LOC: Browser api:compare stubs (9 methods, 0%). No real Browser abstraction (see "No `Browser` class" above) — thin `@internal` delegation to `Driver`, or mark all 9 as `@internal` skip in api:compare.
+- [ ] `servedBy()` stores `_serverHost`/`_serverPort` but `startApplication()` doesn't consume them. Wire when needed.
+- [ ] `urlHelpers()` returns undefined — needs routing infrastructure wired.
+- [ ] `Driver.use()` is async (Rails is sync via Capybara lazy registration). Idempotency guard added.
+
+**From #2446 (PR 2 — ScreenshotHelper + SetupAndTeardown + PageDumpHelper)**
+
+- `displayImage` encodes buffer directly as base64 (Rails re-reads from disk). Functionally equivalent.
+- `htmlDumpDefaultPath` uses `Date.now()` (ms) vs Rails' `DateTime.current.to_i` (seconds). Cosmetic.
+- `openFile` dispatches on `process.platform` — Rails uses Launchy gem. Works but adds platform branch.
+- `takeFailedScreenshot` guard checks `failed? && supportsScreenshot()` (no session-created check like Rails). Structurally equivalent.
+
+**From #2451 (actionpack: \_mockSession, htmlDocument, documentRootElement)**
+
+- [ ] HTML parsing in `htmlDocument` not yet implemented — throws for `text/html`. Blocked on rails-dom-testing port.
 
 ## Relationship to actionpack-100-percent.md
 

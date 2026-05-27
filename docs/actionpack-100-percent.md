@@ -347,7 +347,7 @@ parallel unless they share a dependency.
 | T-AC4  | `controller/mime/respond_to_test.rb`                     |                  38 | AC  | S15        | 28/66. Pair with `metal/mime_responds` leaf.                                                                                                                                                                                                        |
 | T-AD3  | `dispatch/url_generation_test.rb`                        |   ~~37~~ 17 (#2423) | AD  | —          | 20 passing + 17 skipped via #2423. Remaining gaps: SCRIPT_NAME propagation, subdomain false/nil stripping, `port: false`, trailing-slash via controller dispatch + `URL.pathFor` formatting (needs `RouteSet.pathFor` to honor `format`).           |
 | T-AD4  | `dispatch/routing_assertions_test.rb`                    |                  29 | AD  | S15        | Pair with `assertRecognizes` WHATWG fix.                                                                                                                                                                                                            |
-| T-AC3  | `controller/url_for_test.rb`                             |                  28 | AC  | —          | 29/57.                                                                                                                                                                                                                                              |
+| T-AC3  | `controller/url_for_test.rb`                             |   ~~28~~ 15 (#2460) | AC  | —          | 42/57 via #2460. 15 remaining need RouteSet-backed URL generation (~200-300 LOC).                                                                                                                                                                   |
 | T-AD6  | `dispatch/response_test.rb`                              |                  26 | AD  | —          | 27/53.                                                                                                                                                                                                                                              |
 | T-AD1  | `dispatch/routing/inspector_test.rb`                     |                  24 | AD  | —          | Golden-output assertions; surfaces formatter divergence.                                                                                                                                                                                            |
 | T-AD9  | `dispatch/test_request_test.rb` / `test_session_test.rb` |                  23 | AD  | —          | Bundle; sized to one PR.                                                                                                                                                                                                                            |
@@ -520,11 +520,30 @@ lives in **CLAUDE.md** — start there. actionpack-specific notes only:
 - [ ] CustomParamEncoder + encoding validation surface — referenced by 4 skips
       in RequestParameters group.
 
+**From #2428 (SystemTestCase + Driver + Server shell)**
+
+- [ ] ~30 LOC: Browser class stubs (9 methods, 0% in api:compare). `:nodoc:` in Rails but tracked.
+- [ ] `servedBy()` wiring into `startApplication()`.
+- [ ] `urlHelpers()` returns undefined — needs routing infra.
+- [ ] 3 missing `testing/integration.rb` methods — identify and bundle.
+
+**From #2446 (ScreenshotHelper + SetupAndTeardown + PageDumpHelper)**
+
+- All deviations are cosmetic/structural (buffer vs file-read for base64, Date.now vs seconds, platform dispatch vs Launchy). No action needed.
+
+**From #2451 (\_mockSession, htmlDocument, documentRootElement)**
+
+- [ ] HTML parsing in `htmlDocument` not implemented — throws for `text/html`. Blocked on rails-dom-testing port.
+
+**From #2460 (T-AC3 url_for_test.rb remainder)**
+
+- [ ] ~200-300 LOC: implement RouteSet-backed URL generation to unlock 15 pending tests (needs `with_routing` helper + named route helpers).
+- Deviation: `relative_url_root` uses `script_name` directly instead of `RouteSet::Config.new("/subdir")`. Acceptable approximation.
+- Deviation: `original_script_name` concatenation in `urlFor` directly instead of RouteSet URL helper layer. Works for direct callers but won't fire for generated route helpers.
+
 ## Indefinite defers (do not port)
 
-- **system_testing/** (5 files), **system_test_case.rb**,
-  **testing/test_helpers/page_dump_helper.rb** — trails uses Playwright /
-  Vitest browser mode, not Capybara/Selenium.
+- **system_testing/** — now ported via Playwright. See `docs/system-testing-plan.md`.
 - **http/rack_cache.rb** — Rack-specific.
 
 ---
