@@ -2291,6 +2291,18 @@ describe("TestUrlGenerationErrors", () => {
     const routes = new RouteSet();
     expect(() => routes.pathFor("nonexistent")).toThrow(/No route matches name/);
   });
+
+  it.skip("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", () => {
+    // pending: requires url_helpers optimized helper (product_path(nil) positional form) not ported
+  });
+
+  it.skip("URL helpers raise a 'constraint failure' error for a nil param with non-optimized helpers", () => {
+    // pending: requires url_helpers non-optimized helper (product_path(id: nil) keyword form) not ported
+  });
+
+  it.skip("exceptions have suggestions for fix", () => {
+    // pending: error.detailed_message (Ruby DidYouMean hook) not yet wired for UrlGenerationError
+  });
 });
 
 describe("TestAltApp", () => {
@@ -2472,4 +2484,81 @@ describe("TestRelativeUrlRootGeneration", () => {
   // Both tests require url_helpers with SCRIPT_NAME/relative_url_root not ported
   it.skip("url helpers", () => {});
   it.skip("optimized url helpers", () => {});
+});
+
+describe("TestHttpMethods", () => {
+  // Rails generates ~30 tests dynamically: "request method #{method.underscore} can be matched"
+  // for every RFC HTTP method. test:compare cannot statically resolve Ruby interpolation, so
+  // none of these will appear in test:compare counts regardless of stub name.
+  // Requires RoutedRackApp HTTP dispatch — not ported.
+  it.skip("request method get can be matched", () => {});
+});
+
+describe("TestUriPathEscaping", () => {
+  it("escapes slash in generated path segment", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/:segment", { to: "test#show", as: "segment" });
+    });
+    expect(routes.pathFor("segment", { segment: "a b/c+d" })).toBe("/a%20b%2Fc+d");
+  });
+
+  it("unescapes recognized path segment", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/:segment", { to: "test#show", as: "segment" });
+    });
+    const m = routes.recognize("GET", "/a%20b%2Fc+d");
+    expect(m?.params.segment).toBe("a b/c+d");
+  });
+
+  it("does not escape slash in generated path splat", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/*splat", { to: "test#show", as: "splat" });
+    });
+    expect(routes.pathFor("splat", { splat: "a b/c+d" })).toBe("/a%20b/c+d");
+  });
+
+  it("unescapes recognized path splat", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/*splat", { to: "test#show", as: "splat" });
+    });
+    const m = routes.recognize("GET", "/a%20b/c+d");
+    expect(m?.params.splat).toBe("a b/c+d");
+  });
+});
+
+describe("TestMultipleNestedController", () => {
+  it.skip("controller option which starts with '/' from multiple nested controller", () => {
+    // pending: url_for with '/' absolute controller prefix in nested namespace not ported
+  });
+});
+
+describe("TestRedirectInterpolation", () => {
+  // Tests require HTTP dispatch with redirect middleware and %{param} interpolation
+  it.skip("redirect escapes interpolated parameters with redirect proc", () => {
+    // pending: redirect() string interpolation escaping not ported
+  });
+  it.skip("redirect escapes interpolated parameters with option proc", () => {
+    // pending: redirect(path:) option interpolation escaping not ported
+  });
+  it.skip("path redirect escapes interpolated parameters correctly", () => {
+    // pending: redirect() path + query string interpolation escaping not ported
+  });
+});
+
+describe("TestConstraintsAccessingParameters", () => {
+  it.skip("parameters are reset between constraint checks", () => {
+    // pending: request.params isolation between successive constraint evaluations
+    // requires HTTP dispatch layer not ported
+  });
+});
+
+describe("TestDefaultUrlOptions", () => {
+  it.skip("positional args with format false", () => {
+    // pending: positional argument form of url_helpers (archived_posts_path(2014, 12, 13))
+    // and default_url_options scoping not ported
+  });
 });
