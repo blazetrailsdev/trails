@@ -90,17 +90,23 @@
     "dist"
   ],
   "license": "MIT",
+  "devDependencies": {
+    "@blazetrails/nokogiri": "workspace:*"
+  },
   "dependencies": {
-    "@blazetrails/nokogiri": "workspace:*",
     "@js-temporal/polyfill": "^0.5.1",
     "tinyglobby": "^0.2.16",
     "yaml": "^2.8.3"
   },
   "peerDependencies": {
+    "@blazetrails/nokogiri": "workspace:*",
     "better-sqlite3": "^12.0.0",
     "expo-sqlite": "^15.0.0"
   },
   "peerDependenciesMeta": {
+    "@blazetrails/nokogiri": {
+      "optional": true
+    },
     "better-sqlite3": {
       "optional": true
     },
