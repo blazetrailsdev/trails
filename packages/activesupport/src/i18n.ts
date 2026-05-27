@@ -1,6 +1,6 @@
 import { deepMergeInPlace } from "./hash-utils.js";
 
-type TranslationValue = string | (string | null)[] | null | TranslationHash;
+type TranslationValue = string | number | boolean | (string | null)[] | null | TranslationHash;
 interface TranslationHash {
   [key: string]: TranslationValue;
 }
@@ -46,6 +46,10 @@ class SimpleBackend {
     if (!store) return undefined;
     const parts = key.split(".");
     return dig(store, parts);
+  }
+
+  reload(): void {
+    this.translations = {};
   }
 }
 
@@ -219,6 +223,8 @@ interface LocalizeOptions {
 interface TranslateOptions {
   locale?: string;
   default?: TranslationValue;
+  scope?: string;
+  count?: number;
   /** When true, raise `MissingTranslationData` instead of returning a
    * "Translation missing: …" string for unknown keys. Mirrors Rails
    * `I18n.t(key, raise: true)`. A supplied `default` still wins. */
@@ -286,10 +292,12 @@ class I18nModule {
 
   translate(key: string | symbol, options: TranslateOptions = {}): TranslationValue {
     const locale = options.locale ?? this.locale;
-    const keyStr = symbolToString(key);
+    let keyStr = symbolToString(key);
+    if (options.scope) keyStr = `${options.scope}.${keyStr}`;
     const result = this.backend.lookup(locale, keyStr);
-    if (result !== undefined) return interpolate(result, options);
-    if (options.default !== undefined) return interpolate(options.default, options);
+    if (result !== undefined) return interpolate(this._pluralize(result, options.count), options);
+    if (options.default !== undefined)
+      return interpolate(this._pluralize(options.default, options.count), options);
     if (options.raise) throw new MissingTranslationData(locale, keyStr);
     return `Translation missing: ${locale}.${keyStr}`;
   }
@@ -329,6 +337,20 @@ class I18nModule {
 
   l(object: DateLike, options: LocalizeOptions = {}): string {
     return this.localize(object, options);
+  }
+
+  private _pluralize(value: TranslationValue, count: number | undefined): TranslationValue {
+    if (
+      count !== undefined &&
+      value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    ) {
+      const pluralKey = count === 1 ? "one" : "other";
+      const pluralized = (value as TranslationHash)[pluralKey];
+      if (pluralized !== undefined) return pluralized;
+    }
+    return value;
   }
 
   private _lookupArray(locale: string, key: string): string[] | null {

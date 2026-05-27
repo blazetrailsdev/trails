@@ -3,15 +3,24 @@ import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import type { NumberToCurrencyOptions } from "../number-helper.js";
 
 export class NumberToCurrencyConverter extends NumberConverter<NumberToCurrencyOptions> {
+  static override namespace = "currency";
+
+  protected override formatOptions(): Record<string, unknown> {
+    const defaults = this.defaultFormatOptions();
+    const i18n = this.i18nFormatOptions();
+    if (i18n.format && !i18n.negativeFormat) {
+      i18n.negativeFormat = `-${i18n.format}`;
+    }
+    const merged = { ...defaults, ...i18n };
+    if (this.opts.format) {
+      merged.negativeFormat = `-${this.opts.format}`;
+    }
+    return { ...merged, ...this.opts };
+  }
+
   protected convert(): string {
-    const {
-      precision = 2,
-      unit = "$",
-      separator = ".",
-      delimiter = ",",
-      negativeFormat = "(%u%n)",
-    } = this.opts;
-    const userFormat = this.opts.format;
+    const opts = this.options;
+    const unit = (opts.unit ?? "$") as string;
 
     const num = Number(this.number);
     if (!Number.isFinite(num)) return String(this.number);
@@ -19,18 +28,15 @@ export class NumberToCurrencyConverter extends NumberConverter<NumberToCurrencyO
     const isNegative = num < 0;
     const abs = Math.abs(num);
 
-    const numberStr = NumberToRoundedConverter.convert(abs, {
-      precision,
-      separator,
-      delimiter,
-    });
+    const numberStr = NumberToRoundedConverter.convert(abs, opts);
 
-    if (userFormat !== undefined) {
-      const numStr = isNegative ? `-${numberStr}` : numberStr;
-      return userFormat.replaceAll("%u", unit).replaceAll("%n", numStr);
+    let format: string;
+    if (isNegative) {
+      format = (opts.negativeFormat ?? `-%u%n`) as string;
+    } else {
+      format = (opts.format ?? "%u%n") as string;
     }
 
-    const format = isNegative ? negativeFormat : "%u%n";
     return format.replaceAll("%u", unit).replaceAll("%n", numberStr);
   }
 }
