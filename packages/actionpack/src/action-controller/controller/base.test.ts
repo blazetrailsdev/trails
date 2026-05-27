@@ -731,27 +731,49 @@ describe("EmptyUrlOptionsTest", () => {
 // controller/base_test.rb — BaseTest
 // ==========================================================================
 describe("BaseTest", () => {
-  // Verify that MODULES lists every module that is wired into Base, in the
-  // same order Rails includes them. This acts as a regression guard: if a
-  // module is added to base.ts without updating MODULES, or vice-versa, the
-  // api:compare parity score will drift.
+  // Rails reads action_controller/base.rb, scans every `include X` line,
+  // and asserts MODULES matches exactly (order included). We can't scan
+  // the TS source at runtime, so we assert the full expected array directly —
+  // equivalent coverage: any addition/removal/reorder in MODULES will fail.
   it("included modules are tracked", () => {
-    expect(MODULES.length).toBeGreaterThan(0);
-    // Every entry must be a non-empty string (no accidental undefined slots).
-    for (const mod of MODULES) {
-      expect(typeof mod).toBe("string");
-      expect(mod.length).toBeGreaterThan(0);
-    }
-    // Spot-check a handful of canonical entries that Rails base.rb includes.
-    const modSet = new Set(MODULES);
-    expect(modSet.has("Helpers")).toBe(true);
-    expect(modSet.has("Redirecting")).toBe(true);
-    expect(modSet.has("Flash")).toBe(true);
-    expect(modSet.has("Rescue")).toBe(true);
-    expect(modSet.has("ParamsWrapper")).toBe(true);
-    expect(modSet.has("DefaultHeaders")).toBe(true);
-    expect(modSet.has("StrongParameters")).toBe(true);
-    expect(modSet.has("ConditionalGet")).toBe(true);
+    expect(MODULES).toEqual([
+      "AbstractController::Rendering",
+      "AbstractController::Translation",
+      "AbstractController::AssetPaths",
+      "Helpers",
+      "UrlFor",
+      "Redirecting",
+      "ActionView::Layouts",
+      "Rendering",
+      "Renderers::All",
+      "ConditionalGet",
+      "EtagWithTemplateDigest",
+      "EtagWithFlash",
+      "Caching",
+      "MimeResponds",
+      "ImplicitRender",
+      "StrongParameters",
+      "ParameterEncoding",
+      "Cookies",
+      "Flash",
+      "FormBuilder",
+      "RequestForgeryProtection",
+      "ContentSecurityPolicy",
+      "PermissionsPolicy",
+      "RateLimiting",
+      "AllowBrowser",
+      "Streaming",
+      "DataStreaming",
+      "HttpAuthentication::Basic::ControllerMethods",
+      "HttpAuthentication::Digest::ControllerMethods",
+      "HttpAuthentication::Token::ControllerMethods",
+      "DefaultHeaders",
+      "Logging",
+      "AbstractController::Callbacks",
+      "Rescue",
+      "Instrumentation",
+      "ParamsWrapper",
+    ]);
   });
 });
 
