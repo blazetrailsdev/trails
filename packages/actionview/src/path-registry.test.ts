@@ -1,7 +1,12 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
+import { getPathAsync } from "@blazetrails/activesupport";
 import { FileSystemResolver } from "./resolver/file-system-resolver.js";
 import { InMemoryResolver } from "./resolver/in-memory-resolver.js";
 import { PathRegistry } from "./path-registry.js";
+
+beforeAll(async () => {
+  await getPathAsync();
+});
 
 afterEach(() => {
   PathRegistry.reset();
