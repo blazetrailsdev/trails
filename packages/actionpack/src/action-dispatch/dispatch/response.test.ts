@@ -403,6 +403,73 @@ describe("ResponseTest", () => {
       Response.defaultCharset = prior;
     }
   });
+
+  it("set header after read body during action", () => {
+    const res = new Response();
+    void res.body;
+    res.setHeader("x-header", "Best of all possible worlds.");
+    const [status, headers] = res.toRack();
+    expect(status).toBe(200);
+    expect(headers["x-header"]).toBe("Best of all possible worlds.");
+  });
+
+  it.skip("read body during action", () => {
+    // pending: toRack() does not call commitBang(); content-type is not
+    // auto-assigned without an explicit commit. Rails' to_a commits first.
+  });
+
+  it.skip("code", () => {
+    // pending: Rails response.code returns the string "200"; our implementation
+    // returns a number. Fixing this requires a breaking change to the existing
+    // "response code" test which already asserts res.code === 200 (number).
+  });
+
+  it("read content type with default charset utf-8", () => {
+    const res = new Response(200, { "Content-Type": "text/xml" });
+    expect(res.charset).toBe("utf-8");
+  });
+
+  it("read content type with charset utf-16", () => {
+    const original = Response.defaultCharset;
+    try {
+      Response.defaultCharset = "utf-16";
+      const res = new Response(200, { "Content-Type": "text/xml" });
+      expect(res.charset).toBe("utf-16");
+    } finally {
+      Response.defaultCharset = original;
+    }
+  });
+
+  it.skip("read x_frame_options, x_content_type_options, x_xss_protection, x_permitted_cross_domain_policies and referrer_policy", () => {
+    // pending: Response.create() does not merge defaultHeaders into new
+    // instances. Rails merges them in create via merge_default_headers.
+  });
+
+  it.skip("read custom default_header", () => {
+    // pending: same as above — defaultHeaders not applied in create().
+  });
+
+  it.skip("respond_to? accepts include_private", () => {
+    // pending: Ruby-only introspection (respond_to? with include_private).
+    // No TypeScript equivalent.
+  });
+
+  it("can be explicitly destructured into status, headers and an enumerable body", () => {
+    const res = new Response(404, { "Content-Type": "text/plain" }, ["Not Found"]);
+    const [status, headers, body] = res.toRack() as [number, Record<string, string>, string[]];
+    expect(status).toBe(404);
+    expect(headers["Content-Type"]).toBe("text/plain");
+    expect(body).toEqual(["Not Found"]);
+  });
+
+  it.skip("[response.to_a].flatten does not recurse infinitely", () => {
+    // pending: requires Timeout equivalent; no TS parallel. The fix is a
+    // Ruby-specific infinite-recursion guard in to_a / flatten.
+  });
+
+  it.skip("compatibility with Rack::ContentLength", () => {
+    // pending: requires Rack::ContentLength middleware, not available in TS.
+  });
 });
 
 describe("ResponseFilterRedirect", () => {
@@ -603,5 +670,82 @@ describe("Response Cache::Response wiring", () => {
       const res = new Response(200, {}, ["a", "b"]);
       expect(res.bodyParts()).toEqual(["a", "b"]);
     });
+  });
+});
+
+describe("ResponseHeadersTest", () => {
+  it("has_header?", () => {
+    const res = Response.create();
+    res.setHeader("Foo", "1");
+    expect(res.hasHeader("Foo")).toBe(true);
+    expect(res.hasHeader("foo")).toBe(true);
+  });
+
+  it("get_header", () => {
+    const res = Response.create();
+    res.setHeader("Foo", "1");
+    expect(res.getHeader("Foo")).toBe("1");
+    expect(res.getHeader("foo")).toBe("1");
+  });
+
+  it("set_header", () => {
+    const res = Response.create();
+    res.setHeader("Foo", "1");
+    res.setHeader("Foo", "2");
+    expect(res.hasHeader("Foo")).toBe(true);
+    expect(res.getHeader("Foo")).toBe("2");
+  });
+
+  it("delete_header", () => {
+    const res = Response.create();
+    res.setHeader("Foo", "1");
+    res.deleteHeader("Foo");
+    expect(res.hasHeader("Foo")).toBe(false);
+  });
+
+  it.skip("add_header", () => {
+    // pending: addHeader (Rails add_header) is not yet implemented.
+  });
+});
+
+describe("ResponseIntegrationTest", () => {
+  it.skip("response cache control from railsish app", () => {
+    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
+  });
+
+  it.skip("response cache control from rackish app", () => {
+    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
+  });
+
+  it.skip("response charset and content type from railsish app", () => {
+    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
+  });
+
+  it.skip("response charset and content type from rackish app", () => {
+    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
+  });
+
+  it.skip("strong ETag validator", () => {
+    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
+  });
+
+  it.skip("response Content-Type with optional parameters", () => {
+    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
+  });
+
+  it.skip("response Content-Type with optional parameters that set before charset", () => {
+    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
+  });
+
+  it.skip("response Content-Type with quoted-string", () => {
+    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
+  });
+
+  it.skip("response body with enumerator", () => {
+    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
+  });
+
+  it.skip("response body with lazy enumerator", () => {
+    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
   });
 });
