@@ -13,7 +13,7 @@ function isTemporalDatetime(v: unknown): boolean {
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_one_associations_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import {
   Base,
   registerModel,
@@ -22,8 +22,6 @@ import {
   registerSubclass,
   SubclassNotFound,
 } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
 import {
   Associations,
   loadBelongsTo,
@@ -33,6 +31,8 @@ import {
   buildHasOne,
 } from "../associations.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   firms: { name: "string" },
@@ -84,18 +84,13 @@ const TEST_SCHEMA: Schema = {
   ah_accounts: { credit_limit: "integer", ah_firm_id: "integer" },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 // ==========================================================================
 // HasOneAssociationsTest — mirrors has_one_associations_test.rb
 // ==========================================================================
 
 describe("HasOneAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Firm extends Base {
     static {
@@ -110,10 +105,8 @@ describe("HasOneAssociationsTest", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
-    Firm.adapter = adapter;
-    Account.adapter = adapter;
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
     registerModel(Firm);
     registerModel(Account);
   });
@@ -242,19 +235,16 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("nullify on polymorphic association", async () => {
-    const adapter = await freshAdapter();
     class PolyTag extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
-        this.adapter = adapter;
       }
     }
     class PolyPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(PolyTag);
@@ -292,7 +282,6 @@ describe("HasOneAssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkAccount extends Base {
@@ -301,7 +290,6 @@ describe("HasOneAssociationsTest", () => {
         this.attribute("cpk_firm_region_id", "integer");
         this.attribute("cpk_firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(CpkFirm, "cpkAccount", {
@@ -333,18 +321,15 @@ describe("HasOneAssociationsTest", () => {
 
   it("association change calls delete", async () => {
     // When a has_one dependent: delete is set and FK changes, the old record gets deleted
-    const a2 = await freshAdapter();
     class DelFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a2;
       }
     }
     class DelAcct extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = a2;
       }
     }
     Associations.hasOne.call(DelFirm, "delAcct", {
@@ -362,18 +347,15 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("association change calls destroy", async () => {
-    const a2 = await freshAdapter();
     class DestFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a2;
       }
     }
     class DestAcct extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = a2;
       }
     }
     Associations.hasOne.call(DestFirm, "destAcct", {
@@ -420,18 +402,15 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("exclusive dependence", async () => {
-    const a2 = await freshAdapter();
     class ExclFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a2;
       }
     }
     class ExclAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = a2;
       }
     }
     Associations.hasOne.call(ExclFirm, "exclAccount", {
@@ -449,17 +428,14 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("dependence with nil associate", async () => {
-    const a2 = await freshAdapter();
     class NilFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a2;
       }
     }
     class NilAcct extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = a2;
       }
     }
     Associations.hasOne.call(NilFirm, "nilAcct", {
@@ -474,17 +450,14 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("restrict with error", async () => {
-    const a2 = await freshAdapter();
     class RsFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a2;
       }
     }
     class RsAcct extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = a2;
       }
     }
     Associations.hasOne.call(RsFirm, "rsAcct", {
@@ -509,7 +482,6 @@ describe("HasOneAssociationsTest", () => {
   it("successful build association", async () => {
     const firm = await Firm.create({ name: "Build Corp" });
     const account = new Account({ firm_id: firm.id as number, credit_limit: 200 });
-    (account.constructor as any).adapter = adapter;
     expect(account.isNewRecord()).toBe(true);
     await account.save();
     expect(account.isNewRecord()).toBe(false);
@@ -530,13 +502,11 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("building the associated object with implicit sti base class", async () => {
-    const a = await freshAdapter();
     class HoCompany extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = a;
       }
     }
     enableSti(HoCompany);
@@ -548,7 +518,6 @@ describe("HasOneAssociationsTest", () => {
     class HoFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     registerModel(HoFirm);
@@ -566,13 +535,11 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("building the associated object with explicit sti base class", async () => {
-    const a = await freshAdapter();
     class HoCompany2 extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = a;
       }
     }
     enableSti(HoCompany2);
@@ -581,7 +548,6 @@ describe("HasOneAssociationsTest", () => {
     class HoFirm2 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     registerModel(HoFirm2);
@@ -597,13 +563,11 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("building the associated object with sti subclass", async () => {
-    const a = await freshAdapter();
     class HoCompany3 extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = a;
       }
     }
     enableSti(HoCompany3);
@@ -615,7 +579,6 @@ describe("HasOneAssociationsTest", () => {
     class HoFirm3 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     registerModel(HoFirm3);
@@ -631,13 +594,11 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("building the associated object with an invalid type", async () => {
-    const a = await freshAdapter();
     class HoCompany4 extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = a;
       }
     }
     enableSti(HoCompany4);
@@ -646,7 +607,6 @@ describe("HasOneAssociationsTest", () => {
     class HoFirm4 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     registerModel(HoFirm4);
@@ -663,20 +623,17 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("building the associated object with an unrelated type", async () => {
-    const a = await freshAdapter();
     class HoCompany5 extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = a;
       }
     }
     enableSti(HoCompany5);
     class HoUnrelated extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     registerModel(HoCompany5);
@@ -685,7 +642,6 @@ describe("HasOneAssociationsTest", () => {
     class HoFirm5 extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     registerModel(HoFirm5);
@@ -752,7 +708,6 @@ describe("HasOneAssociationsTest", () => {
     // In our in-memory adapter, we simulate this by creating an account without saving
     const firm = await Firm.create({ name: "BangFail Corp" });
     const account = new Account({ firm_id: firm.id, credit_limit: 0 });
-    (account.constructor as any).adapter = adapter;
     // Before saving, it's still a new record
     expect(account.isNewRecord()).toBe(true);
   });
@@ -815,14 +770,12 @@ describe("HasOneAssociationsTest", () => {
   it("build", async () => {
     const firm = await Firm.create({ name: "Build2 Corp" });
     const account = new Account({ firm_id: firm.id as number, credit_limit: 50 });
-    (account.constructor as any).adapter = adapter;
     expect(account.firm_id).toBe(firm.id);
   });
 
   it("create", async () => {
     const firm = await Firm.create({ name: "Create2 Corp" });
     const account = new Account({ firm_id: firm.id as number, credit_limit: 50 });
-    (account.constructor as any).adapter = adapter;
     await account.save();
     expect(account.isNewRecord()).toBe(false);
   });
@@ -842,17 +795,14 @@ describe("HasOneAssociationsTest", () => {
 
   it("dependence with missing association", async () => {
     // When dependent association record doesn't exist, processDependentAssociations should not error
-    const a2 = await freshAdapter();
     class MissFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a2;
       }
     }
     class MissAcct extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = a2;
       }
     }
     Associations.hasOne.call(MissFirm, "missAcct", {
@@ -868,17 +818,14 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("dependence with missing association and nullify", async () => {
-    const a2 = await freshAdapter();
     class MissNFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a2;
       }
     }
     class MissNAcct extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = a2;
       }
     }
     Associations.hasOne.call(MissNFirm, "missNAcct", {
@@ -1033,7 +980,6 @@ describe("HasOneAssociationsTest", () => {
     // In TS we simulate block-form build by passing attrs to constructor
     const firm = await Firm.create({ name: "Block Build Corp" });
     const account = new Account({ firm_id: firm.id, credit_limit: 123 });
-    (account.constructor as any).adapter = adapter;
     expect(account.credit_limit).toBe(123);
     expect(account.firm_id).toBe(firm.id);
     expect(account.isNewRecord()).toBe(true);
@@ -1116,7 +1062,6 @@ describe("HasOneAssociationsTest", () => {
 
   it("has one loading for new record", async () => {
     const firm = new Firm({ name: "New Firm" });
-    (firm.constructor as any).adapter = adapter;
     // New records should return null for has_one associations
     const result = firm.isNewRecord()
       ? null
@@ -1125,17 +1070,14 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("has one relationship cannot have a counter cache", async () => {
-    const ad = await freshAdapter();
     class CcFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class CcAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = ad;
       }
     }
     registerModel("CcFirm", CcFirm);
@@ -1168,14 +1110,12 @@ describe("HasOneAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class TouchAccount extends Base {
       static {
         this.attribute("touch_firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(TouchAccount, "touchFirm", {
@@ -1213,14 +1153,12 @@ describe("HasOneAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class TouchUpdAccount extends Base {
       static {
         this.attribute("touch_upd_firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(TouchUpdAccount, "touchUpdFirm", {
@@ -1262,14 +1200,12 @@ describe("HasOneAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     class TouchDesAccount extends Base {
       static {
         this.attribute("touch_des_firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(TouchDesAccount, "touchDesFirm", {
@@ -1347,18 +1283,15 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("dependency should halt parent destruction", async () => {
-    const ad = await freshAdapter();
     class DepHaltFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class DepHaltAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = ad;
       }
     }
     Associations.hasOne.call(DepHaltFirm, "dep_halt_account", {
@@ -1386,7 +1319,6 @@ describe("HasOneAssociationsTest", () => {
     class CpkOwner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CpkWidget extends Base {
@@ -1395,7 +1327,6 @@ describe("HasOneAssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("cpk_owner_id", "integer");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     registerModel("CpkOwner", CpkOwner);
@@ -1414,14 +1345,12 @@ describe("HasOneAssociationsTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.primaryKey = ["region_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkTarget2 extends Base {
       static {
         this.attribute("cpk_owner2_region_id", "integer");
         this.attribute("cpk_owner2_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("CpkOwner2", CpkOwner2);
@@ -1437,13 +1366,11 @@ describe("HasOneAssociationsTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("city", "string");
-        this.adapter = adapter;
       }
     }
     class Account extends Base {
       static {
         this.attribute("company_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel(Company);
@@ -1459,13 +1386,17 @@ describe("HasOneAssociationsTest", () => {
 });
 
 describe("AsyncHasOneAssociationsTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   it("async load has one", async () => {
-    const adapter = await freshAdapter();
     class AHFirm extends Base {
       static {
         this._tableName = "ah_firms";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AHAccount extends Base {
@@ -1473,7 +1404,6 @@ describe("AsyncHasOneAssociationsTest", () => {
         this._tableName = "ah_accounts";
         this.attribute("credit_limit", "integer");
         this.attribute("ah_firm_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasOne.call(AHFirm, "ahAccount", {
