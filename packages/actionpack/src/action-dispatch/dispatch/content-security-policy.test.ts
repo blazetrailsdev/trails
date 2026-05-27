@@ -467,7 +467,7 @@ CspIntegrationController.contentSecurityPolicy({ only: ["api"] }, (p) => {
   p.frameAncestors(":none");
 });
 
-function buildCspApp(globalPolicy: ContentSecurityPolicy | null) {
+function buildCspApp() {
   const app = new IntegrationTest();
   app.routes.draw((r) => {
     r.get("/", { to: "csp#index" });
@@ -481,7 +481,7 @@ function buildCspApp(globalPolicy: ContentSecurityPolicy | null) {
     r.get("/not-modified", { to: "csp#notModified" });
   });
   app.registerController("csp", CspIntegrationController);
-  return { app, globalPolicy };
+  return app;
 }
 
 function cspEnv(policy: ContentSecurityPolicy | null, extra: Record<string, unknown> = {}) {
@@ -497,7 +497,7 @@ describe("ContentSecurityPolicyIntegrationTest", () => {
   let app: IntegrationTest;
 
   beforeAll(() => {
-    ({ app } = buildCspApp(GLOBAL_CSP_POLICY));
+    app = buildCspApp();
   });
 
   beforeEach(() => app.resetBang());
@@ -567,7 +567,7 @@ describe("DisabledContentSecurityPolicyIntegrationTest", () => {
   let app: IntegrationTest;
 
   beforeAll(() => {
-    ({ app } = buildCspApp(null));
+    app = buildCspApp();
   });
 
   beforeEach(() => app.resetBang());
@@ -590,7 +590,7 @@ describe("DefaultContentSecurityPolicyIntegrationTest", () => {
       p.defaultSrc(() => ":self");
       p.scriptSrc(() => ":https");
     });
-    const { app } = buildCspApp(dynamicPolicy);
+    const app = buildCspApp();
     await app.get("/", { env: cspEnv(dynamicPolicy) });
     await app.get("/", { env: cspEnv(dynamicPolicy) });
     expect(app.response.status).toBe(200);
@@ -653,11 +653,7 @@ describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
       }),
     });
 
-    const req = app.request as unknown as CspRequestHost;
-    const builtPolicy = cspFromRequest.call(req)!;
-    const nonce = cspNonceFromRequest.call(req) ?? undefined;
-    const dirs = cspNonceDirectivesFromRequest.call(req) ?? undefined;
-    const header = builtPolicy.build(app.controller ?? app.request, nonce, dirs);
+    const header = resolvedCspHeader(app);
     expect(header).toMatch(/script-src https: 'nonce-/);
     expect(header).not.toMatch(/style-src https: 'nonce-/);
   });
