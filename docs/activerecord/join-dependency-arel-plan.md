@@ -5,20 +5,24 @@ All plan PRs (1–7b, F1–F6) have shipped.
 
 ## Post-merge follow-ups
 
-### PR A — F3: JoinNode elimination (~200 LOC) — in progress
+### PR A — F3: JoinNode elimination — merged (#2511)
 
 - [x] Delete `JoinNode` interface, fold properties onto `JoinPart` subclasses
 - [x] Delete `_pushTreeNode`, build tree nodes directly via `_insertTreeNode`
 - [x] Delete `JoinTreeNode` class, replaced by `JoinLeaf`
 
-### PR B — F2 cleanup + F4 helpers + F5/F6 wiring (~270 LOC)
+### PR B — api:compare 21/21 + hydration helpers — in progress
 
-- [ ] ~220 LOC: Delete dead `_addThroughAssociation` + `_finishThroughTarget`
-- [ ] ~20–30 LOC: Add public `aliasTracker` getter + `findReflection` helper
-- [ ] ~50 LOC: Port `build` (depends on `checkValidity!` / `checkEagerLoadable!`)
-- [ ] ~30 LOC: Implement `associationCached` shortcut in `_constructRecursive`
-- [ ] ~10 LOC: Wire `_references` param in `joinConstraints`
+- [x] Add private `aliasTracker` getter
+- [x] Port `findReflection` helper
+- [x] Port `build` method
+- [x] Implement `associationCached` shortcut in `_constructRecursive`
+- [x] Wire `_references` param in `joinConstraints`
 - [ ] ~30 LOC: Pass `column_types` from result set for extra-column type-casting
+
+### PR C — F2 dead code deletion (~220 LOC)
+
+- [ ] Delete dead `_addThroughAssociation` + `_finishThroughTarget` fallback path
 
 ### Already shipped (verified 2026-05-27)
 
