@@ -790,7 +790,14 @@ export class RealTransaction extends Transaction {
 
     this._instrumenter.finish("restart");
 
-    if (this.connection.supportsRestartDbTransaction?.()) {
+    let supportsRestart = false;
+    try {
+      supportsRestart = !!this.connection.supportsRestartDbTransaction?.();
+    } catch {
+      // databaseVersion may not be loaded yet; fall back to rollback+begin
+    }
+
+    if (supportsRestart) {
       this._instrumenter.start();
       await this.connection.restartDbTransaction?.();
     } else {
