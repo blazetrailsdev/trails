@@ -81,12 +81,12 @@ think one is wrong.
 
 ### Decisions still open
 
-| #   | Question                                                                                                                                   | Decide before |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
-| 5   | Convert remaining sync `readdir`/`readFile`/`writeFile` callers to async; promote optional `FsAdapter` async surface to required?          | PR 1.12c      |
-| 6   | Should `Engine#paths()` THROW (Rails-faithful) when `calledFrom` is unset? (Currently returns `Root(null)` per 2.2a/b deviation.)          | PR 2.5c       |
-| 8   | Generated apps' package-manager: `--package-manager <pm>` flag on `trails new` vs runtime detection in generated `bin/setup`?              | PR 1.14d      |
-| 9   | Generated apps' SQLite driver: `--sqlite-driver` flag; default stays `better-sqlite3` until `node-sqlite` is in Node LTS. Confirm default. | PR 1.14d      |
+| #   | Question                                                                                                                          | Decide before |
+| --- | --------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| 5   | Convert remaining sync `readdir`/`readFile`/`writeFile` callers to async; promote optional `FsAdapter` async surface to required? | PR 1.12c      |
+| 6   | Should `Engine#paths()` THROW (Rails-faithful) when `calledFrom` is unset? (Currently returns `Root(null)` per 2.2a/b deviation.) | PR 2.5c       |
+
+**Resolved:** #8 (`--package-manager` flag, #2483), #9 (`--sqlite-driver` flag with `better-sqlite3` default, #2483).
 
 ---
 
@@ -109,10 +109,9 @@ think one is wrong.
 | `application/default-middleware-stack.ts` | **71%** | 2 methods (bundle into B5)                                                                                                                                                                                                                                                      |
 | `application.ts`                          | **46%** | `envConfig` (30-key action_dispatch merge), `orderedRailties`, `railtiesInitializers`, `reloadRoutes!`/`reloadRoutesUnlessLoaded`, `messageVerifiers`, `deprecators`, `migrationRailties`, `toApp`, `buildRequest`, `buildMiddleware`, `runTasksBlocks`/etc. (PR B6, may split) |
 | `engine/lazy-route-set.ts`                | **87%** | 2 methods (bundle into B3 or B5)                                                                                                                                                                                                                                                |
-| `application/bootstrap.ts`                | ✅ 100% |                                                                                                                                                                                                                                                                                 |
-| `engine/configuration.ts`                 | ✅ 100% |                                                                                                                                                                                                                                                                                 |
-| `engine/updater.ts`                       | ✅ 100% |                                                                                                                                                                                                                                                                                 |
-| `initializable.ts`                        | ✅ 100% |                                                                                                                                                                                                                                                                                 |
+
+4 files at 100% omitted (`application/bootstrap.ts`, `engine/configuration.ts`,
+`engine/updater.ts`, `initializable.ts`).
 
 ---
 
@@ -386,16 +385,6 @@ the boot chain. Do not open generator PRs while B1–B6 are in flight.
 ### Still open
 
 - **PR 1.10c** — Trails-native template DSL: `pkg`, `route`, `environment`, `initializer` DSL actions on `GeneratorBase` (~150–250 LOC). Blocked by T1.
-- **PR 1.14c-4** — db/system/change generator (~200 LOC). Blocked by T5.
-- **PR 1.14d** — `AppGenerator` extends `AppBase`; migrate raw-string emit to builder; `--package-manager` and `--sqlite-driver` flags. Likely splits into 1.14d-a (migration) + 1.14d-b (extend + flags). Blocked by 1.12c.
-
-### Completed (reference only)
-
-T1 (typed template emitter, #2191), T2 (model/migration/resource-route, #2202),
-T3 (controller/scaffold, #2212), T4 (AuthenticationGenerator, #2225),
-T5 (DevcontainerGenerator, #2461),
-1.14b-cont (helper/controller/scaffold_controller, #2224), 1.12b-2
-(CreateMigration, #2185), 1.12c (AppBase + Database, #2176).
 
 ---
 
