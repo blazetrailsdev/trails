@@ -102,8 +102,8 @@ export class RenderedCollection {
     return this.renderedTemplates.map((t) => t.body).join(this.spacer.body);
   }
 
-  get format(): string {
-    return this.renderedTemplates[0]!.format!;
+  get format(): string | null {
+    return this.renderedTemplates[0]!.format;
   }
 }
 
