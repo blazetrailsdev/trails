@@ -202,7 +202,7 @@ export function disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], permi
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_like
  */
 export function sanitizeSqlLike(value: string, escapeChar: string = "\\"): string {
-  // Empty escape character is a no-op in Rails (gsub("", ...) is a no-op).
+  // Empty escape character: Rails inserts "" before each wildcard — net no-op.
   if (escapeChar === "") return value;
   // Rails inserts the escape character before each % and _ in a single pass.
   // When escapeChar is not itself a wildcard, it also escapes occurrences of
