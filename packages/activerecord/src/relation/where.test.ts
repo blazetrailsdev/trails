@@ -6,11 +6,10 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, Range, defineEnum, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { quoteTableName, quoteColumnName } from "../test-helpers/quote-regex.js";
-import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
 const woaCols = {
@@ -117,32 +116,20 @@ const SCHEMA: Schema = {
   },
 };
 
-let _adapter: SidecarAdapter;
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  ({ adapter: _adapter } = createSidecarTestAdapter());
-  await defineSchema(_adapter, SCHEMA);
+  await defineSchema(SCHEMA);
 });
-withTransactionalFixtures(() => _adapter);
-
-function freshAdapter(): DatabaseAdapter {
-  return _adapter;
-}
 
 // ==========================================================================
 // WhereTest — targets relation/where_test.rb
 // ==========================================================================
 describe("WhereTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(async () => {
-    adapter = freshAdapter();
-  });
-
   it("where with string generates sql", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where("title = 'hello'").toSql();
@@ -153,7 +140,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ title: "hello" }).toSql();
@@ -164,7 +150,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.all().whereNot({ title: "hello" }).toSql();
@@ -175,7 +160,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ title: "old" }).rewhere({ title: "new" }).toSql();
@@ -186,7 +170,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ age: new Range(18, 30) }).toSql();
@@ -197,7 +180,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ title: ["a", "b", "c"] }).toSql();
@@ -208,7 +190,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ title: null }).toSql();
@@ -219,7 +200,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const rel = Post.where({ title: "a" }).invertWhere();
@@ -229,17 +209,10 @@ describe("WhereTest", () => {
 });
 
 describe("WhereTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(async () => {
-    adapter = freshAdapter();
-  });
-
   it("where copies bind params", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const rel1 = Post.where("title = ?", "hello");
@@ -257,7 +230,6 @@ describe("WhereTest", () => {
       static {
         this._tableName = "posts";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ title: "hello" }).toSql();
@@ -274,7 +246,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where("title = ?", "hello").toSql();
@@ -285,7 +256,6 @@ describe("WhereTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where("title = ? AND status = ?", "hello", "active").toSql();
@@ -296,7 +266,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where("title = 'hello'").toSql();
@@ -306,7 +275,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // where with empty string should produce no additional conditions
@@ -317,7 +285,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({}).toSql();
@@ -328,7 +295,6 @@ describe("WhereTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
     // Nested conditions via chaining
@@ -342,7 +308,6 @@ describe("WhereTest", () => {
         this._tableName = "authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -350,7 +315,6 @@ describe("WhereTest", () => {
         this._tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     const aliceIds = Author.where({ name: "Alice" }).select("id") as any;
@@ -361,7 +325,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({}).toSql();
@@ -373,7 +336,6 @@ describe("WhereTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
     // Prehash: conditions defined as a variable before passing to where
@@ -386,7 +348,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ title: null }).toSql();
@@ -396,7 +357,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ title: ["a", "b"] }).toSql();
@@ -436,7 +396,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // Blank condition (empty string) should not add where clause
@@ -447,7 +406,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // where(null) returns a clone (chainable), matching Rails where(nil)
@@ -458,7 +416,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("views", "integer");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ views: new Range(1, 10) }).toSql();
@@ -468,7 +425,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("views", "integer");
-        this.adapter = adapter;
       }
     }
     await Post.create({ views: 1 });
@@ -488,7 +444,6 @@ describe("WhereTest", () => {
         this._tableName = "woa_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class WoaEssay extends Base {
@@ -496,7 +451,6 @@ describe("WhereTest", () => {
         this._tableName = "woa_essays";
         this.attribute("id", "integer");
         this.attribute("writer_id", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("WoaAuthor", WoaAuthor);
@@ -535,7 +489,6 @@ describe("WhereTest", () => {
         this._tableName = "woar_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class WoarPost extends Base {
@@ -543,7 +496,6 @@ describe("WhereTest", () => {
         this._tableName = "woar_posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("WoarAuthor", WoarAuthor);
@@ -562,7 +514,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("views", "integer");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ views: 5 }).toSql();
@@ -574,7 +525,6 @@ describe("WhereTest", () => {
       static {
         this.attribute("views", "integer");
         this.attribute("likes", "integer");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ views: 5, likes: 10 }).toSql();
@@ -585,7 +535,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.whereNot({ title: null }).toSql();
@@ -595,7 +544,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("views", "integer");
-        this.adapter = adapter;
       }
     }
     await Post.create({ views: 5 });
@@ -612,7 +560,6 @@ describe("WhereTest", () => {
         this._tableName = "wm_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -621,7 +568,6 @@ describe("WhereTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "author", { className: "Author", foreignKey: "author_id" });
@@ -636,14 +582,12 @@ describe("WhereTest", () => {
       static {
         this._tableName = "wm_editors";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Author extends Base {
       static {
         this._tableName = "wm_authors2";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -652,7 +596,6 @@ describe("WhereTest", () => {
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
         this.attribute("editor_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "author", { className: "Author", foreignKey: "author_id" });
@@ -668,7 +611,6 @@ describe("WhereTest", () => {
       static {
         this._tableName = "wa_authors";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -677,7 +619,6 @@ describe("WhereTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "author", { className: "Author", foreignKey: "author_id" });
@@ -693,7 +634,6 @@ describe("WhereTest", () => {
         this._tableName = "wahm_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class WahmPost extends Base {
@@ -702,7 +642,6 @@ describe("WhereTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("wahm_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(WahmAuthor, "wahmPosts", {
@@ -723,14 +662,12 @@ describe("WhereTest", () => {
       static {
         this._tableName = "wa_authors2";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Editor extends Base {
       static {
         this._tableName = "wa_editors2";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
@@ -739,7 +676,6 @@ describe("WhereTest", () => {
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
         this.attribute("editor_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "author", { className: "Author", foreignKey: "author_id" });
@@ -757,7 +693,6 @@ describe("WhereTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(WnaPost, "author", { foreignKey: "author_id" });
@@ -775,7 +710,6 @@ describe("WhereTest", () => {
         this._tableName = "wnahm_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class WnahmPost extends Base {
@@ -784,7 +718,6 @@ describe("WhereTest", () => {
         this.attribute("id", "integer");
         this.attribute("title", "string");
         this.attribute("wnahm_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(WnahmAuthor, "wnahmPosts", {
@@ -807,7 +740,6 @@ describe("WhereTest", () => {
         this._tableName = "wnamm_authors";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class WnammPost extends Base {
@@ -815,7 +747,6 @@ describe("WhereTest", () => {
         this._tableName = "wnamm_posts";
         this.attribute("id", "integer");
         this.attribute("wnamm_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class WnammComment extends Base {
@@ -823,7 +754,6 @@ describe("WhereTest", () => {
         this._tableName = "wnamm_comments";
         this.attribute("id", "integer");
         this.attribute("wnamm_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(WnammAuthor, "wnamm_posts", {
@@ -851,7 +781,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
@@ -867,7 +796,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
@@ -881,7 +809,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // Building a relation should not execute any query
@@ -894,7 +821,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // Ensure where creates a new relation (immutability)
@@ -909,7 +835,6 @@ describe("WhereTest", () => {
         this.attribute("number", "integer");
         this.attribute("title", "string");
         this.primaryKey = ["author_id", "number"];
-        this.adapter = adapter;
       }
     }
     await CpkBook.create({ author_id: 1, number: 100, title: "First" });
@@ -928,7 +853,6 @@ describe("WhereTest", () => {
         this.attribute("number", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "number"];
-        this.adapter = adapter;
       }
     }
     await CpkOrder.create({ shop_id: 1, number: 10, status: "pending" });
@@ -949,7 +873,6 @@ describe("WhereTest", () => {
         this.attribute("shop_id", "integer");
         this.attribute("number", "integer");
         this.primaryKey = ["shop_id", "number"];
-        this.adapter = adapter;
       }
     }
     // Tuple inner length (1) doesn't match column count (2) — must raise with the specific mismatch details
@@ -965,7 +888,6 @@ describe("WhereTest", () => {
         this.attribute("number", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "number"];
-        this.adapter = adapter;
       }
     }
     await CpkItem.create({ shop_id: 1, number: 1, status: "active" });
@@ -993,7 +915,6 @@ describe("WhereTest", () => {
         this.attribute("number", "integer");
         this.attribute("title", "string");
         this.primaryKey = ["shop_id", "number"];
-        this.adapter = adapter;
       }
     }
     const tuples: [number, number][] = [];
@@ -1016,7 +937,6 @@ describe("WhereTest", () => {
       static {
         this._tableName = "bts_authors";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class BtsPost extends Base {
@@ -1024,7 +944,6 @@ describe("WhereTest", () => {
         this._tableName = "bts_posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("BtsAuthor", BtsAuthor);
@@ -1043,7 +962,6 @@ describe("WhereTest", () => {
       static {
         this._tableName = "btn_authors";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class BtnPost extends Base {
@@ -1051,7 +969,6 @@ describe("WhereTest", () => {
         this._tableName = "btn_posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("BtnAuthor", BtnAuthor);
@@ -1068,7 +985,6 @@ describe("WhereTest", () => {
       static {
         this._tableName = "btav_authors";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class BtavPost extends Base {
@@ -1076,7 +992,6 @@ describe("WhereTest", () => {
         this._tableName = "btav_posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("BtavAuthor", BtavAuthor);
@@ -1093,7 +1008,6 @@ describe("WhereTest", () => {
       static {
         this._tableName = "btnr_authors";
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class BtnrPost extends Base {
@@ -1101,7 +1015,6 @@ describe("WhereTest", () => {
         this._tableName = "btnr_posts";
         this.attribute("id", "integer");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("BtnrAuthor", BtnrAuthor);
@@ -1171,7 +1084,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({}).toSql();
@@ -1181,7 +1093,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // Float value should be converted to string representation
@@ -1192,7 +1103,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ title: 123.456 }).toSql();
@@ -1214,7 +1124,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("data", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ data: 42 }).toSql();
@@ -1224,19 +1133,17 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("data", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ data: "hello" }).toSql();
     expect(sql).toContain("hello");
   });
-  function makeWoaModels(ad: DatabaseAdapter, suffix: string) {
+  function makeWoaModels(suffix: string) {
     class Author extends Base {
       static {
         this._tableName = `woa_${suffix}_authors`;
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = ad;
       }
     }
     class Essay extends Base {
@@ -1244,7 +1151,6 @@ describe("WhereTest", () => {
         this._tableName = `woa_${suffix}_essays`;
         this.attribute("id", "integer");
         this.attribute("writer_id", "string");
-        this.adapter = ad;
       }
     }
     const aName = `Woa${suffix}Author`;
@@ -1257,7 +1163,7 @@ describe("WhereTest", () => {
     return { Author, Essay };
   }
   it("where on association with custom primary key with relation", async () => {
-    const { Author, Essay } = makeWoaModels(adapter, "cr");
+    const { Author, Essay } = makeWoaModels("cr");
     const author = await Author.create({ name: "David" });
     await Essay.create({ writer_id: "David" });
     const essay = await Essay.where({ writer: Author.where({ id: author.id }) }).first();
@@ -1265,7 +1171,7 @@ describe("WhereTest", () => {
     expect(essay!.writer_id).toBe("David");
   });
   it("where on association with relation performs subselect not two queries", async () => {
-    const { Author, Essay } = makeWoaModels(adapter, "sp");
+    const { Author, Essay } = makeWoaModels("sp");
     const author = await Author.create({ name: "Alice" });
     await Essay.create({ writer_id: "Alice" });
     const sql = Essay.where({ writer: Author.where({ name: "Alice" }) }).toSql();
@@ -1275,13 +1181,13 @@ describe("WhereTest", () => {
     expect(result).toHaveLength(1);
   });
   it("where on association with custom primary key with array of base", async () => {
-    const { Author, Essay } = makeWoaModels(adapter, "ab");
+    const { Author, Essay } = makeWoaModels("ab");
     const author = await Author.create({ name: "David" });
     await Essay.create({ writer_id: "David" });
     expect(await Essay.where({ writer: [author] }).first()).not.toBeNull();
   });
   it("where on association with custom primary key with array of ids", async () => {
-    const { Author, Essay } = makeWoaModels(adapter, "ai");
+    const { Author, Essay } = makeWoaModels("ai");
     await Author.create({ name: "David" });
     await Essay.create({ writer_id: "David" });
     const essay = await Essay.where({ writer: ["David"] }).first();
@@ -1315,7 +1221,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(() => Post.where(42 as any)).toThrow(/Unsupported argument type/);
@@ -1324,7 +1229,6 @@ describe("WhereTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "hello" });
@@ -1341,7 +1245,6 @@ describe("WhereTest", () => {
         this.attribute("id", "integer");
         this.attribute("status", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
@@ -1370,13 +1273,10 @@ describe("where with Range", () => {
   });
 
   it("filters records with BETWEEN", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -1390,12 +1290,9 @@ describe("where with Range", () => {
   });
 
   it("BETWEEN is inclusive on both ends", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -1410,12 +1307,9 @@ describe("where with Range", () => {
 
 describe("Range edge cases", () => {
   it("count with Range condition", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -1427,13 +1321,10 @@ describe("Range edge cases", () => {
   });
 
   it("Range combined with IN array in same where", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -1449,11 +1340,6 @@ describe("Range edge cases", () => {
 });
 
 describe("where with raw SQL", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-  });
-
   it("supports raw SQL string with bind params", async () => {
     class User extends Base {
       static _tableName = "users";
@@ -1461,16 +1347,15 @@ describe("where with raw SQL", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("age", "integer");
-    User.adapter = adapter;
 
     await User.create({ name: "Alice", age: 25 });
     await User.create({ name: "Bob", age: 17 });
     await User.create({ name: "Charlie", age: 30 });
 
     const sql = User.where('"users"."age" > ?', 18).toSql();
-    const a = User.adapter as unknown as { castBoundValue?(v: unknown): unknown };
+    const a = Base.adapter as unknown as { castBoundValue?(v: unknown): unknown };
     const cast18 = typeof a.castBoundValue === "function" ? a.castBoundValue(18) : 18;
-    expect(sql).toContain(`"users"."age" > ${User.adapter.quote(cast18)}`);
+    expect(sql).toContain(`"users"."age" > ${Base.adapter.quote(cast18)}`);
   });
 
   it("rewhere replaces specific where conditions", async () => {
@@ -1480,7 +1365,6 @@ describe("where with raw SQL", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("status", "string");
-    User.adapter = adapter;
 
     await User.create({ name: "Alice", status: "active" });
     await User.create({ name: "Bob", status: "inactive" });
@@ -1494,18 +1378,12 @@ describe("where with raw SQL", () => {
 });
 
 describe("where with subquery", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-  });
-
   it("supports Relation as value for IN subquery", async () => {
     class Author extends Base {
       static _tableName = "authors";
     }
     Author.attribute("id", "integer");
     Author.attribute("name", "string");
-    Author.adapter = adapter;
 
     class Post extends Base {
       static _tableName = "posts";
@@ -1513,7 +1391,6 @@ describe("where with subquery", () => {
     Post.attribute("id", "integer");
     Post.attribute("author_id", "integer");
     Post.attribute("title", "string");
-    Post.adapter = adapter;
 
     const alice = await Author.create({ name: "Alice" });
     const bob = await Author.create({ name: "Bob" });
@@ -1530,14 +1407,12 @@ describe("where with subquery", () => {
 
 describe("rewhere clears NOT clauses", () => {
   it("replaces whereNot clauses for the same key", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("role", "string");
-    User.adapter = adapter;
 
     await User.create({ name: "Alice", role: "admin" });
     await User.create({ name: "Bob", role: "viewer" });
@@ -1552,14 +1427,12 @@ describe("rewhere clears NOT clauses", () => {
 
 describe("where with named binds", () => {
   it("replaces :name placeholders with values", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("age", "integer");
-    User.adapter = adapter;
 
     await User.create({ name: "Alice", age: 25 });
     await User.create({ name: "Bob", age: 15 });
@@ -1573,13 +1446,11 @@ describe("where with named binds", () => {
   });
 
   it("handles string named binds with quoting", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
 
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -1592,13 +1463,11 @@ describe("where with named binds", () => {
 
 describe("whereAny", () => {
   it("matches records where ANY condition is true (OR)", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("role", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -1611,13 +1480,11 @@ describe("whereAny", () => {
   });
 
   it("filters correctly with strict conditions", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("role", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -1634,13 +1501,11 @@ describe("whereAny", () => {
 
 describe("whereAll", () => {
   it("matches records where ALL conditions are true (AND)", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("role", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -1656,8 +1521,6 @@ describe("whereAll", () => {
 });
 
 describe("Relation Where (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-
   class User extends Base {
     static {
       this.attribute("name", "string");
@@ -1668,8 +1531,6 @@ describe("Relation Where (Rails-guided)", () => {
   }
 
   beforeEach(async () => {
-    adapter = freshAdapter();
-    User.adapter = adapter;
     await User.create({ name: "Alice", email: "alice@test.com", age: 25, active: true });
     await User.create({ name: "Bob", email: "bob@test.com", age: 30, active: false });
     await User.create({ name: "Charlie", email: null, age: 35, active: true });
@@ -1756,8 +1617,6 @@ describe("Relation Where (Rails-guided)", () => {
 });
 
 describe("where with Range (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-
   class Person extends Base {
     static {
       this.attribute("name", "string");
@@ -1766,8 +1625,6 @@ describe("where with Range (Rails-guided)", () => {
   }
 
   beforeEach(async () => {
-    adapter = freshAdapter();
-    Person.adapter = adapter;
     await Person.create({ name: "Child", age: 10 });
     await Person.create({ name: "Teen", age: 16 });
     await Person.create({ name: "Adult", age: 25 });
@@ -1804,19 +1661,12 @@ describe("where with Range (Rails-guided)", () => {
 });
 
 describe("Range / BETWEEN (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-
   class Product extends Base {
     static {
       this.attribute("name", "string");
       this.attribute("price", "integer");
     }
   }
-
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Product.adapter = adapter;
-  });
 
   // Rails: test_where_with_range
   it("Range generates BETWEEN", async () => {
@@ -1852,12 +1702,6 @@ describe("Range / BETWEEN (Rails-guided)", () => {
 });
 
 describe("Raw SQL Where (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(async () => {
-    adapter = freshAdapter();
-  });
-
   // Rails: test "where with SQL string and bind values"
   it("where accepts raw SQL string with ? placeholders", async () => {
     class Person extends Base {
@@ -1866,7 +1710,6 @@ describe("Raw SQL Where (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
 
@@ -1875,9 +1718,9 @@ describe("Raw SQL Where (Rails-guided)", () => {
     await Person.create({ name: "Charlie", age: 30 });
 
     const sql = Person.where('"people"."age" > ?', 18).toSql();
-    const a = Person.adapter as unknown as { castBoundValue?(v: unknown): unknown };
+    const a = Base.adapter as unknown as { castBoundValue?(v: unknown): unknown };
     const cast18 = typeof a.castBoundValue === "function" ? a.castBoundValue(18) : 18;
-    expect(sql).toContain(`"people"."age" > ${Person.adapter.quote(cast18)}`);
+    expect(sql).toContain(`"people"."age" > ${Base.adapter.quote(cast18)}`);
   });
 
   // Rails: test "where with string bind for LIKE"
@@ -1887,7 +1730,6 @@ describe("Raw SQL Where (Rails-guided)", () => {
         this._tableName = "people";
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -1903,7 +1745,6 @@ describe("Raw SQL Where (Rails-guided)", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -1927,7 +1768,6 @@ describe("Raw SQL Where (Rails-guided)", () => {
         this.attribute("name", "string");
         this.attribute("status", "string");
         this.attribute("role", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -1945,17 +1785,11 @@ describe("Raw SQL Where (Rails-guided)", () => {
 });
 
 describe("WhereTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-  });
-
   function makeAuthor() {
     class Author extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
     return Author;
@@ -2104,18 +1938,12 @@ describe("WhereTest", () => {
 // Arel node support in Relation#where
 // ==========================================================================
 describe("WhereTest Arel nodes", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-  });
-
   it("where accepts an Arel node", async () => {
     const { Table } = await import("@blazetrails/arel");
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "yes", published: true });
@@ -2132,14 +1960,12 @@ describe("WhereTest Arel nodes", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     const alice = await Author.create({ name: "Alice" });
@@ -2164,12 +1990,10 @@ describe("WhereTest Arel nodes", () => {
 // ==========================================================================
 describe("WhereTest", () => {
   it("aliased attribute", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
         (this as any).aliasAttribute("heading", "title");
       }
     }
