@@ -2,27 +2,26 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
 
 import { Notifications } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
-import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
-  books: { name: "string", type: "string" },
+  books: { name: "string", type: "string", format: "string", status: "string" },
   authors: { name: "string" },
 } as const;
 
-// -- Helpers --
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 describe("InstrumentationTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   afterEach(() => {
     Notifications.unsubscribeAll();
   });
@@ -62,7 +61,7 @@ describe("InstrumentationTest", () => {
       expect(event.children.length).toBe(1);
       expect(event.children[0].name).toBe("inner");
     });
-    Notifications.subscribe("inner", (event) => {
+    Notifications.subscribe("inner", () => {
       events.push("inner");
     });
     Notifications.instrument("outer", {}, () => {
@@ -95,13 +94,12 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on load", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
+    await Book.create({ name: "test book" });
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.sql?.includes("SELECT")) capturedName = event.payload.name;
@@ -111,64 +109,57 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on create", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.sql?.includes("INSERT")) capturedName = event.payload.name;
     });
-    await Book.create({ name: "test" });
+    await Book.create({ name: "test book" });
     expect(capturedName).toBe("Book Create");
   });
 
   it("payload name on update", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
+        this.attribute("format", "string");
       }
     }
-    const book = await Book.create({ name: "test" });
+    const book = await Book.create({ name: "test book", format: "paperback" });
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.sql?.includes("UPDATE")) capturedName = event.payload.name;
     });
-    await book.updateAttribute("name", "updated");
+    await book.updateAttribute("format", "ebook");
     expect(capturedName).toBe("Book Update");
   });
 
   it("payload name on update all", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
+        this.attribute("format", "string");
       }
     }
-    await Book.create({ name: "test" });
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.sql?.includes("UPDATE")) capturedName = event.payload.name;
     });
-    await Book.updateAll({ name: "bulk" });
+    await Book.updateAll({ format: "ebook" });
     expect(capturedName).toBe("Book Update All");
   });
 
   it("payload name on destroy", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
-    const book = await Book.create({ name: "test" });
+    const book = await Book.create({ name: "test book" });
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.sql?.includes("DELETE")) capturedName = event.payload.name;
@@ -178,14 +169,11 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on delete all", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
-    await Book.create({ name: "test" });
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.sql?.includes("DELETE")) capturedName = event.payload.name;
@@ -195,14 +183,11 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on pluck", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
-    await Book.create({ name: "test" });
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.sql?.includes("SELECT")) capturedName = event.payload.name;
@@ -212,81 +197,66 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on count", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
-    await Book.create({ name: "test" });
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
-      if (event.payload?.sql?.includes("COUNT")) capturedName = event.payload.name;
+      if (event.payload?.name === "Book Count") capturedName = event.payload.name;
     });
     await Book.count();
     expect(capturedName).toBe("Book Count");
   });
 
   it("payload name on grouped count", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.attribute("type", "string");
-        this.adapter = adapter;
+        this.attribute("status", "string");
       }
     }
-    await Book.create({ name: "a", type: "fiction" });
-    await Book.create({ name: "b", type: "fiction" });
     let capturedName: string | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
-      if (event.payload?.sql?.includes("COUNT")) capturedName = event.payload.name;
+      if (event.payload?.name === "Book Count") capturedName = event.payload.name;
     });
-    await Book.group("type").count();
+    await Book.group("status").count();
     expect(capturedName).toBe("Book Count");
   });
 
   it("payload row count on select all", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
-    await Book.create({ name: "a" });
-    await Book.create({ name: "b" });
-    await Book.create({ name: "c" });
+    for (let i = 0; i < 10; i++) await Book.create({ name: "row count book 1" });
     let capturedRowCount: number | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.sql?.includes("SELECT") && !event.payload?.sql?.includes("COUNT")) {
         capturedRowCount = event.payload.row_count;
       }
     });
-    await Book.where({}).toArray();
-    expect(capturedRowCount).toBe(3);
+    await Book.where({ name: "row count book 1" }).toArray();
+    expect(capturedRowCount).toBe(10);
   });
 
   it("payload row count on pluck", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
-    await Book.create({ name: "a" });
-    await Book.create({ name: "b" });
-    await Book.create({ name: "c" });
+    for (let i = 0; i < 10; i++) await Book.create({ name: "row count book 2" });
     let capturedRowCount: number | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.name === "Book Pluck") {
         capturedRowCount = event.payload.row_count;
       }
     });
-    await Book.pluck("name");
-    expect(capturedRowCount).toBe(3);
+    await Book.where({ name: "row count book 2" }).pluck("name");
+    expect(capturedRowCount).toBe(10);
   });
 
   it.skip("payload row count on raw sql", () => {
@@ -304,21 +274,18 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload connection with query cache disabled", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
+    const connection = Base.adapter;
     let capturedConnection: unknown;
     Notifications.subscribe("sql.active_record", (event: any) => {
       capturedConnection = event.payload.connection;
     });
-    await Book.create({ name: "test" });
-    // In the test environment the notification fires from the inner SQLite3Adapter
-    // (the actual database connection), not from the SchemaAdapter wrapper.
-    expect(capturedConnection).toBe((adapter as any).inner ?? adapter);
+    await Book.first();
+    expect(capturedConnection).toBe((connection as any).inner ?? connection);
   });
 
   it.skip("payload connection with query cache enabled", () => {
@@ -329,11 +296,9 @@ describe("InstrumentationTest", () => {
   });
 
   it("no instantiation notification when no records", async () => {
-    const adapter = await freshAdapter();
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await Author.create({ name: "David" });
@@ -347,23 +312,32 @@ describe("InstrumentationTest", () => {
 });
 
 describe("TransactionInSqlActiveRecordPayloadTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   afterEach(() => {
     Notifications.unsubscribeAll();
   });
 
   it("payload without an open transaction", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
-    let capturedTransaction: unknown;
+    let asserted = false;
+    let capturedTransaction: unknown = "unset";
     Notifications.subscribe("sql.active_record", (event: any) => {
-      capturedTransaction = event.payload.transaction;
+      if (event.payload?.name === "Book Count") {
+        capturedTransaction = event.payload.transaction;
+        asserted = true;
+      }
     });
-    await Book.create({ name: "test" });
+    await Book.count();
+    expect(asserted).toBe(true);
     expect(capturedTransaction ?? null).toBeNull();
   });
 
@@ -376,23 +350,31 @@ describe("TransactionInSqlActiveRecordPayloadTest", () => {
 });
 
 describe("TransactionInSqlActiveRecordPayloadNonTransactionalTest", () => {
+  setupHandlerSuite();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   afterEach(() => {
     Notifications.unsubscribeAll();
   });
 
   it("payload without an open transaction", async () => {
-    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
+    let asserted = false;
     let capturedTransaction: unknown = "unset";
     Notifications.subscribe("sql.active_record", (event: any) => {
-      capturedTransaction = event.payload.transaction;
+      if (event.payload?.name === "Book Count") {
+        capturedTransaction = event.payload.transaction;
+        asserted = true;
+      }
     });
-    await Book.create({ name: "test" });
+    await Book.count();
+    expect(asserted).toBe(true);
     expect(capturedTransaction ?? null).toBeNull();
   });
 
