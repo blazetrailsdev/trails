@@ -90,7 +90,7 @@ export class Renderer {
       const collection = collectionFromOptions(options);
 
       if (collection !== undefined) {
-        return new CollectionRenderer(this.lookupContext).renderCollectionWithPartial(
+        return new CollectionRenderer(this.lookupContext, options).renderCollectionWithPartial(
           collection,
           partial,
           context,
@@ -99,7 +99,7 @@ export class Renderer {
       }
 
       if (Object.prototype.hasOwnProperty.call(options, "object")) {
-        return new ObjectRenderer(this.lookupContext).renderObjectWithPartial(
+        return new ObjectRenderer(this.lookupContext, options).renderObjectWithPartial(
           options.object,
           partial,
           context,
@@ -107,21 +107,21 @@ export class Renderer {
         );
       }
 
-      return new PartialRenderer(this.lookupContext).render(partial, context, block);
+      return new PartialRenderer(this.lookupContext, options).render(partial, context, block);
     }
 
     // partial is an object — derive path from toPartialPath()
     const collection = collectionFromObject(partial) ?? collectionFromOptions(options);
 
     if (collection !== undefined) {
-      return new CollectionRenderer(this.lookupContext).renderCollectionDerivePartial(
+      return new CollectionRenderer(this.lookupContext, options).renderCollectionDerivePartial(
         collection,
         context,
         block,
       );
     }
 
-    return new ObjectRenderer(this.lookupContext).renderObjectDerivePartial(
+    return new ObjectRenderer(this.lookupContext, options).renderObjectDerivePartial(
       partial,
       context,
       block,
