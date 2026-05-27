@@ -55,6 +55,8 @@ export interface RouteOptions {
   anchor?: boolean;
   shallow?: boolean;
   internal?: boolean;
+  /** Rails `on:` option — scopes the route to `:member`, `:collection`, or `:new`. */
+  on?: string;
   /**
    * Mounted Rack-compatible app (set by `Mapper#mount`). When present the
    * route forwards requests to this app rather than to a controller action.
