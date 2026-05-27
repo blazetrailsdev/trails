@@ -57,9 +57,10 @@ export class LockingType extends ValueType<number> {
     this.name = subtype.name;
   }
 
-  // Rails' LockingType has no cast() override, but AR initializes new records via
-  // from_database (deserialize), so new records get 0, not nil. We coerce null → 0
-  // in cast() to match that observable behavior without changing the AR init path.
+  // Diverges from Rails: Rails' LockingType has no cast() override (cast(nil) → nil).
+  // We coerce null → 0 here so that user-declared locking attributes (via
+  // this.attribute("lock_version", "integer")) also return 0 for new records,
+  // matching the observable behavior Rails gets via from_database initialization.
   override cast(value: unknown): number {
     return (this._subtype.cast(value) as number | null) ?? 0;
   }

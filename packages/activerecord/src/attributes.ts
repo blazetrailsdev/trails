@@ -144,11 +144,12 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     registerWithSuperclass(cacheHost);
 
     // Phase 1: seed from _attributeDefinitions (all entries — schema-reflected
-    // columns and direct defineAttribute() calls). Schema entries use
-    // Attribute.fromDatabase; user entries use withCastValue + withUserDefault.
-    // Mirrors: columns_hash.transform_values { Attribute.from_database(...) }
-    // (our _attributeDefinitions is the equivalent of columns_hash since both
-    // schema and user-direct entries live there).
+    // columns and direct defineAttribute() calls).
+    // For entries with a default: schema columns use fromDatabase, user-declared
+    // columns use withCastValue + withUserDefault (preserving user semantics).
+    // For entries without a default: all entries use fromDatabase(null, type),
+    // mirroring Rails' columns_hash.transform_values { Attribute.from_database(...) }.
+    // The fromDatabase path matters for LockingType: deserialize(null) → 0.
     const defs: Map<string, AttributeDefinition> = cacheHost._attributeDefinitions;
     const attrMap = new Map<string, Attribute>();
     for (const [name, def] of defs) {

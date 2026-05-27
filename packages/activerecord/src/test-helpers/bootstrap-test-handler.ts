@@ -28,8 +28,17 @@ export async function bootstrapTestHandler(): Promise<void> {
       await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
     }
   }
-  // Sync the global Arel visitor so Node#toSql() uses the adapter-specific
-  // visitor (e.g. SQLite strips FOR UPDATE). Mirrors the sync in Base.adapter setter.
+  syncHandlerVisitor();
+}
+
+/**
+ * Re-sync the global Arel `toSql` visitor to match the handler's adapter.
+ * Must be called from a `beforeEach` in handler-suite files because
+ * `test-setup.ts` resets the global visitor to the default after every test.
+ *
+ * @internal
+ */
+export function syncHandlerVisitor(): void {
   const visitor = (Base.adapter as { visitor?: object }).visitor;
   if (visitor) {
     setToSqlVisitor(
