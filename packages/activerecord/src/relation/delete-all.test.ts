@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 function epochMs(v: unknown): number {
@@ -14,15 +14,14 @@ function epochMs(v: unknown): number {
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany, processDependentAssociations } from "../associations.js";
 
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-let _adapter: SidecarAdapter;
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  ({ adapter: _adapter } = createSidecarTestAdapter());
-  await defineSchema(_adapter, {
+  await defineSchema({
     posts: {
       title: "string",
       author: "string",
@@ -36,26 +35,15 @@ beforeAll(async () => {
     delete_all_posts: { title: "string", author_id: "integer" },
   });
 });
-withTransactionalFixtures(() => _adapter);
-function freshAdapter(): DatabaseAdapter {
-  return _adapter;
-}
 
 // ==========================================================================
 // DeleteAllTest — targets relation/delete_all_test.rb
 // ==========================================================================
 describe("DeleteAllTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("delete all removes all records", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -68,7 +56,6 @@ describe("DeleteAllTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -79,17 +66,11 @@ describe("DeleteAllTest", () => {
 });
 
 describe("DeleteAllTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   function makeModel() {
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
-        this.adapter = adapter;
       }
     }
     return { Post };
@@ -195,14 +176,12 @@ describe("DeleteAllTest", () => {
 
 describe("DeleteAllTest", () => {
   it("updateAll does not run callbacks", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
 
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -220,13 +199,10 @@ describe("DeleteAllTest", () => {
   });
 
   it("update column should not modify updated at", async () => {
-    const adapter = freshAdapter();
-
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
 
@@ -241,13 +217,11 @@ describe("DeleteAllTest", () => {
   });
 
   it("deleteAll does not run callbacks", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
 
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => {
           log.push("before_destroy");
         });
@@ -262,13 +236,11 @@ describe("DeleteAllTest", () => {
   });
 
   it("destroyAll runs callbacks on each record", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
 
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterDestroy((r: any) => {
           log.push(r.name);
         });
@@ -284,13 +256,10 @@ describe("DeleteAllTest", () => {
   });
 
   it("updateAll returns count of affected rows", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
 
@@ -302,12 +271,9 @@ describe("DeleteAllTest", () => {
   });
 
   it("deleteAll on empty table returns 0", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -316,17 +282,11 @@ describe("DeleteAllTest", () => {
 });
 
 describe("DeleteAllTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("delete all removes all matching records", async () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     await Item.create({ name: "A", active: true });
@@ -343,7 +303,6 @@ describe("DeleteAllTest", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterDestroy((r: any) => {
           log.push(r.name);
         });
@@ -362,7 +321,6 @@ describe("DeleteAllTest", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => {
           log.push("destroyed");
         });
@@ -378,7 +336,6 @@ describe("DeleteAllTest", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("saved");
         });
@@ -394,7 +351,6 @@ describe("DeleteAllTest", () => {
     class Item extends Base {
       static {
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     await Item.create({ active: true });
@@ -407,7 +363,6 @@ describe("DeleteAllTest", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     expect(await Item.all().deleteAll()).toBe(0);
@@ -417,7 +372,6 @@ describe("DeleteAllTest", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await Item.create({ name: "A" });
@@ -432,7 +386,6 @@ describe("DeleteAllTest", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await Item.create({ name: "A" });
@@ -445,7 +398,6 @@ describe("DeleteAllTest", () => {
     class Item extends Base {
       static {
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
     await Item.create({ status: "old" });
@@ -458,7 +410,6 @@ describe("DeleteAllTest", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await Item.create({ name: "a" });
@@ -473,14 +424,12 @@ describe("DeleteAllTest", () => {
     class DeleteAllAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class DeleteAllPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(DeleteAllAuthor);

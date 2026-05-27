@@ -5,18 +5,15 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, Relation } from "../index.js";
 
-import { createPooledTestAdapter, adapterType, type SidecarAdapter } from "../test-adapter.js";
+import { adapterType } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-let _adapter: SidecarAdapter;
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  ({ adapter: _adapter } = await createPooledTestAdapter());
-  // dropExisting: true is a workaround for cross-file pooled-adapter collision.
-  // Once D-W (IF NOT EXISTS in defineSchema) lands, remove this.
   await defineSchema(
-    _adapter,
     {
       posts: {
         title: "string",
@@ -36,21 +33,15 @@ beforeAll(async () => {
     { dropExisting: true },
   );
 });
-withTransactionalFixtures(() => _adapter);
-function freshAdapter(): DatabaseAdapter {
-  return _adapter;
-}
 
 // ==========================================================================
 // NamedScopingTest — targets scoping/named_scoping_test.rb
 // ==========================================================================
 describe("NamedScopingTest", () => {
   it("implements enumerable", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -60,11 +51,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("found items are cached", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "cached" });
@@ -76,11 +65,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("reload expires cache of found items", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "original" });
@@ -92,11 +79,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("delegates finds and calculations to the base class", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -105,12 +90,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("calling merge at first in scope", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "pub", published: true });
@@ -120,12 +103,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes with options limit finds to those matching the criteria specified", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adp;
         this.scope("published", () => Post.where({ published: true }));
       }
     }
@@ -136,12 +117,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes with string name can be composed", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adp;
         this.scope("published", () => Post.where({ published: true }));
         this.scope("titled", () => Post.order("title"));
       }
@@ -152,12 +131,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes are composable", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adp;
         this.scope("published", () => Post.where({ published: true }));
       }
     }
@@ -168,11 +145,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("procedural scopes", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.scope("titled", () => Post.order("title"));
       }
     }
@@ -183,11 +158,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("procedural scopes returning nil", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.scope("noop", () => Post.all());
       }
     }
@@ -197,11 +170,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("positional scope method", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.scope("titledPositional", (rel: any, t: string) => rel.where({ title: t }));
       }
     }
@@ -211,11 +182,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("positional klass method", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.scope("titledKlass", (rel: any, t: string) => rel.where({ title: t }));
       }
     }
@@ -225,11 +194,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("scope with object", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.scope("recent", () => Post.order("title"));
       }
     }
@@ -240,11 +207,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("scope with kwargs", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.scope("byTitleKwargs", (rel: any, opts: { title: string }) =>
           rel.where({ title: opts.title }),
         );
@@ -256,11 +221,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("scope should respond to own methods and methods of the proxy", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.scope("pub2", () => Post.where({ title: "pub2" }));
       }
     }
@@ -270,11 +233,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("active records have scope named __all__", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const rel = Post.all();
@@ -282,11 +243,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("active records have scope named __scoped__", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const rel = Post.all();
@@ -294,11 +253,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("first and last should allow integers for limit", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -309,11 +266,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("empty should not load results", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const rel = Post.all();
@@ -323,11 +278,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("any should not load results", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -337,11 +290,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("many should not load results", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -352,11 +303,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("many should return false if none or one", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "only" });
@@ -365,11 +314,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("many should return true if more than one", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -379,34 +326,28 @@ describe("NamedScopingTest", () => {
   });
 
   it("model class should respond to any", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     expect(typeof Post.all().isAny).toBe("function");
   });
 
   it("model class should respond to many", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     expect(typeof Post.all().isMany).toBe("function");
   });
 
   it("should build on top of scope", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adp;
         this.scope("publishedScope", () => Post.where({ published: true }));
       }
     }
@@ -415,12 +356,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("should create on top of scope", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adp;
         this.scope("publishedScope2", () => Post.where({ published: true }));
       }
     }
@@ -429,12 +368,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("should build on top of chained scopes", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adp;
         this.scope("publishedScope3", () => Post.where({ published: true }));
         this.scope("titledScope", () => Post.order("title"));
       }
@@ -444,11 +381,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("find all should behave like select", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -458,11 +393,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("size should use count when results are not loaded", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -473,11 +406,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("size should use length when results are loaded", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -489,12 +420,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("chaining combines conditions when searching", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "target", published: true });
@@ -504,11 +433,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("chaining applies last conditions when creating", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const p = await Post.where({ title: "chain" }).create();
@@ -516,11 +443,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("nested scoping", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.scope("titledNested", () => Post.order("title"));
       }
     }
@@ -531,12 +456,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes on relations", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adp;
         this.scope("publishedRel", () => Post.where({ published: true }));
       }
     }
@@ -547,11 +470,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("model class should respond to none", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const results = await Post.all().none().toArray();
@@ -559,11 +480,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("model class should respond to one", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "only" });
@@ -572,11 +491,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("model class should respond to extending", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -585,12 +502,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes batch finders", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adp;
         this.scope("publishedBatch", () => Post.where({ published: true }));
       }
     }
@@ -603,12 +518,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("define scope for reserved words", () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adp;
         this.scope("open", () => Post.where({ status: "open" }));
       }
     }
@@ -617,11 +530,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes name is relation method", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.scope("where", () => Post.all());
       }
     }
@@ -630,11 +541,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("active records have scope named  all  ", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "test" });
@@ -643,11 +552,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("active records have scope named  scoped  ", () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const rel = Post.all();
@@ -656,11 +563,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("rand should select a random object from proxy", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "A" });
@@ -673,12 +578,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("index on scope", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adp;
         this.scope("published", () => Post.where({ published: true }));
       }
     }
@@ -695,22 +598,18 @@ describe("NamedScopingTest", () => {
 // ==========================================================================
 describe("NamedScopingTest", () => {
   it("method missing priority when delegating", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     expect(Post.where({ title: "test" })).toBeInstanceOf(Relation);
   });
 
   it("scope should respond to own methods and methods of the proxy", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const rel = Post.all();
@@ -719,12 +618,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes with options limit finds to those matching the criteria specified", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("views", "integer");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "popular", views: 100 });
@@ -734,12 +631,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes are composable", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("views", "integer");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a", views: 5 });
@@ -749,11 +644,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("first and last should not use query when results are loaded", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "x" });
@@ -763,11 +656,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("empty should not load results", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     for (let i = 0; i < 3; i++) await Post.create({ title: `p2-${i}` });
@@ -777,11 +668,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("any should not fire query if scope loaded", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -793,11 +682,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("any should call proxy found if using a block", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "match" });
@@ -808,12 +695,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("many should call proxy found if using a block", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("views", "integer");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a", views: 10 });
@@ -825,11 +710,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("many should not fire query if scope loaded", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -841,12 +724,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("should build new on top of scope", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adp;
       }
     }
     const post = Post.where({ status: "draft" }).new({ title: "new post" }) as any;
@@ -855,12 +736,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("should create with bang on top of scope", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adp;
       }
     }
     const post = (await Post.where({ status: "active" }).create({ title: "bang created" })) as any;
@@ -869,11 +748,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("reserved scope names", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     expect(typeof Post.where).toBe("function");
@@ -881,12 +758,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("should use where in query for scope", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adp;
       }
     }
     const sql = Post.where({ status: "active" }).toSql();
@@ -894,11 +769,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("should not duplicates where values", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const sql = Post.where({ title: "a" }).where({ title: "a" }).toSql();
@@ -906,11 +779,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("chaining with duplicate joins", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const sql = Post.where({ title: "test" }).order("title").toSql();
@@ -918,12 +789,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("nested scopes queries size", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("views", "integer");
-        this.adapter = adp;
       }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `p2-${i}`, views: i });
@@ -931,11 +800,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes to get newest", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "old" });
@@ -944,11 +811,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("test index on scope", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -957,22 +822,18 @@ describe("NamedScopingTest", () => {
   });
 
   it("test spaces in scope names", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
 
   it("test rand should select a random object from proxy", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -982,22 +843,18 @@ describe("NamedScopingTest", () => {
   });
 
   it("eager default scope relations are remove", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
   });
 
   it("subclass merges scopes properly", async () => {
-    const adp = freshAdapter();
     class Animal extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     class Dog extends Animal {}
@@ -1007,11 +864,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes are reset on association reload", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -1022,23 +877,19 @@ describe("NamedScopingTest", () => {
   });
 
   it("scope with annotation", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     expect(Post.where({ title: "annotated" })).toBeInstanceOf(Relation);
   });
 
   it("chaining applies last conditions when creating", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adp;
       }
     }
     const post = (await Post.where({ status: "draft" }).create({ title: "chained" })) as any;
@@ -1046,12 +897,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("chaining combines conditions when searching", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a", status: "active" });
@@ -1060,11 +909,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes on relations", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     await Post.create({ title: "a" });
@@ -1072,11 +919,9 @@ describe("NamedScopingTest", () => {
   });
 
   it("class method in scope", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
       static recent() {
         return this.order("id DESC").limit(3);
@@ -1092,11 +937,6 @@ describe("NamedScopingTest", () => {
 // NamedScopingTest3 — additional missing tests from scoping/named_scoping_test.rb
 // ==========================================================================
 describe("NamedScopingTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("has many associations have access to scopes", () => {
     expect(true).toBe(true);
   });
@@ -1116,7 +956,6 @@ describe("NamedScopingTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
@@ -1125,7 +964,6 @@ describe("NamedScopingTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -1150,8 +988,6 @@ describe("NamedScopingTest", () => {
 });
 
 describe("NamedScopingTest", () => {
-  let adapter: DatabaseAdapter;
-
   class Product extends Base {
     static {
       this.attribute("name", "string");
@@ -1159,11 +995,6 @@ describe("NamedScopingTest", () => {
       this.attribute("active", "boolean", { default: true });
     }
   }
-
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Product.adapter = adapter;
-  });
 
   it("defines and uses a named scope", async () => {
     Product.scope("cheap", (rel) => rel.where({ price: 1 }));
@@ -1182,13 +1013,10 @@ describe("NamedScopingTest", () => {
 
 describe("NamedScopingTest", () => {
   it("scope is accessible on Relation via proxy", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
         this.scope("active", (rel: any) => rel.where({ active: true }));
       }
     }
@@ -1202,13 +1030,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("scope is chainable with other query methods", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
         this.scope("active", (rel: any) => rel.where({ active: true }));
       }
     }
@@ -1222,13 +1047,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("scope is accessible as a static method on the class", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
         this.scope("active", (rel: any) => rel.where({ active: true }));
       }
     }
@@ -1242,14 +1064,11 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes chain together", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
         this.attribute("role", "string");
-        this.adapter = adapter;
         this.scope("active", (rel: any) => rel.where({ active: true }));
         this.scope("admins", (rel: any) => rel.where({ role: "admin" }));
       }
@@ -1265,13 +1084,10 @@ describe("NamedScopingTest", () => {
   });
 
   it("scope with arguments", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
         this.scope("olderThan", (rel: any, age: number) => rel.where({ age }));
       }
     }
@@ -1287,13 +1103,11 @@ describe("NamedScopingTest", () => {
 
 describe("NamedScopingTest", () => {
   it("adds extension methods to the scoped relation", () => {
-    const adapter = freshAdapter();
     class Article extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
         this.scope("published", (rel: any) => rel.where({ status: "published" }), {
           countPublished: async function (this: any) {
             return this.count();
@@ -1308,18 +1122,12 @@ describe("NamedScopingTest", () => {
 });
 
 describe("NamedScopingTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("named scope filters records", async () => {
     class Product extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("price", "integer");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
         this.scope("cheap", (rel: any) => rel.where("price < ?", 10));
         this.scope("active", (rel: any) => rel.where({ active: true }));
       }
@@ -1337,7 +1145,6 @@ describe("NamedScopingTest", () => {
       static {
         this.attribute("price", "integer");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
         this.scope("cheap", (rel: any) => rel.where("price < ?", 10));
         this.scope("active", (rel: any) => rel.where({ active: true }));
       }
@@ -1355,7 +1162,6 @@ describe("NamedScopingTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adapter;
         this.defaultScope((rel: any) => rel.where({ published: true }));
       }
     }
@@ -1370,7 +1176,6 @@ describe("NamedScopingTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adapter;
         this.defaultScope((rel: any) => rel.where({ published: true }));
       }
     }
@@ -1384,7 +1189,6 @@ describe("NamedScopingTest", () => {
     class Post extends Base {
       static {
         this.attribute("published", "boolean");
-        this.adapter = adapter;
         this.defaultScope((rel: any) => rel.where({ published: true }));
       }
     }
@@ -1398,7 +1202,6 @@ describe("NamedScopingTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adapter;
         this.defaultScope((rel: any) => rel.where({ published: true }));
       }
     }
@@ -1413,7 +1216,6 @@ describe("NamedScopingTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
-        this.adapter = adapter;
         this.defaultScope((rel: any) => rel.where({ published: true }));
       }
     }
@@ -1426,8 +1228,6 @@ describe("NamedScopingTest", () => {
 });
 
 describe("NamedScopingTest", () => {
-  let adapter: DatabaseAdapter;
-
   class Post extends Base {
     static {
       this.attribute("title", "string");
@@ -1437,9 +1237,6 @@ describe("NamedScopingTest", () => {
   }
 
   beforeEach(() => {
-    adapter = freshAdapter();
-    Post.adapter = adapter;
-
     // Re-register scopes for each test
     Post.scope("published", (rel: any) => rel.where({ status: "published" }));
     Post.scope("draft", (rel: any) => rel.where({ status: "draft" }));
@@ -1521,12 +1318,6 @@ describe("NamedScopingTest", () => {
 });
 
 describe("NamedScopingTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   // Rails: test_scope_is_chainable
   it("scopes are chainable with where", async () => {
     class Post extends Base {
@@ -1534,7 +1325,6 @@ describe("NamedScopingTest", () => {
         this.attribute("title", "string");
         this.attribute("status", "string");
         this.attribute("featured", "boolean");
-        this.adapter = adapter;
         this.scope("published", (rel: any) => rel.where({ status: "published" }));
       }
     }
@@ -1555,7 +1345,6 @@ describe("NamedScopingTest", () => {
         this.attribute("title", "string");
         this.attribute("status", "string");
         this.attribute("featured", "boolean");
-        this.adapter = adapter;
         this.scope("published", (rel: any) => rel.where({ status: "published" }));
         this.scope("featured", (rel: any) => rel.where({ featured: true }));
       }
@@ -1576,7 +1365,6 @@ describe("NamedScopingTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
         this.scope("published", (rel: any) => rel.where({ status: "published" }));
       }
     }
@@ -1595,7 +1383,6 @@ describe("NamedScopingTest", () => {
         this.attribute("title", "string");
         this.attribute("status", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
         this.defaultScope((rel: any) => rel.where({ active: true }));
         this.scope("published", (rel: any) => rel.where({ status: "published" }));
       }
