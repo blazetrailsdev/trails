@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import {
   connectedToStack,
@@ -449,6 +450,8 @@ describe("ConnectionHandlingTest", () => {
 });
 
 describe("withRoleAndShard loads Relation return values within scope (Story K gap 5)", () => {
+  setupHandlerSuite();
+
   it("calls .load() on a Relation returned from the block", async () => {
     const { withRoleAndShard } = await import("./connection-handling.js");
     let loadCalled = false;
@@ -462,12 +465,7 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
       },
     };
 
-    const adapter = createTestAdapter();
-    class FakeModel extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class FakeModel extends Base {}
 
     await withRoleAndShard.call(FakeModel as any, undefined, undefined, false, () => fakeRelation);
 
@@ -476,12 +474,7 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
 
   it("does not call .load() on non-Relation return values", async () => {
     const { withRoleAndShard } = await import("./connection-handling.js");
-    const adapter = createTestAdapter();
-    class FakeModel extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class FakeModel extends Base {}
 
     const result = await withRoleAndShard.call(
       FakeModel as any,
@@ -507,12 +500,7 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
       },
     };
 
-    const adapter = createTestAdapter();
-    class FakeModel extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class FakeModel extends Base {}
 
     await withRoleAndShard.call(
       FakeModel as any,

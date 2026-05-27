@@ -2,41 +2,30 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
 import { typeRegistry } from "@blazetrails/activemodel";
 
-import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-const TEST_SCHEMA = {
-  posts: {
-    title: "string",
-    priority: "integer",
-    status: "string",
-  },
-} as const;
-
-// -- Helpers --
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
+vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 describe("CustomPropertiesTest", () => {
-  // Module-level: no DB writes through this one — used only by sync tests that
-  // construct in-memory models. Keep sync to avoid top-level await.
-  const adapter = createTestAdapter();
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
+      posts: { title: "string", priority: "integer", status: "string" },
+    });
+  });
 
   it("overloading types", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("score", "string");
-        this.adapter = adp;
       }
     }
     // Override the type of score from string to integer
@@ -49,12 +38,10 @@ describe("CustomPropertiesTest", () => {
     expect(p.score).toBe(42);
   });
   it("overloaded properties save", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("priority", "integer", { default: 1 });
-        this.adapter = adp;
       }
     }
     const p = await Post.create({ title: "test" });
@@ -70,7 +57,6 @@ describe("CustomPropertiesTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("score", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const p = new Post({ title: "hello", score: 42 });
@@ -79,11 +65,9 @@ describe("CustomPropertiesTest", () => {
   });
 
   it(".type_for_attribute supports attribute aliases", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.aliasAttribute("heading", "title");
       }
     }
@@ -91,23 +75,19 @@ describe("CustomPropertiesTest", () => {
     expect((p as any).heading).toBe("hello");
   });
   it("overloaded properties with limit", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("short_title", "string");
-        this.adapter = adp;
       }
     }
     const p = new Post({ short_title: "abcdefghij" });
     expect(p.short_title).toBe("abcdefghij");
   });
   it("overloaded default but keeping its own type", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("count", "integer", { default: 10 });
-        this.adapter = adp;
       }
     }
     const p = new Post({});
@@ -115,11 +95,9 @@ describe("CustomPropertiesTest", () => {
     expect(typeof p.count).toBe("number");
   });
   it("attributes with overridden types keep their type when a default value is configured separately", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("score", "integer");
-        this.adapter = adp;
       }
     }
     class CustomPost extends (Post as any) {
@@ -132,22 +110,18 @@ describe("CustomPropertiesTest", () => {
     expect(typeof p.score).toBe("number");
   });
   it("extra options are forwarded to the type caster constructor", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string", { default: "forwarded" });
-        this.adapter = adp;
       }
     }
     const p = new Post({});
     expect(p.title).toBe("forwarded");
   });
   it("time zone aware attribute", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("created_at", "string");
-        this.adapter = adp;
       }
     }
     const now = new Date().toISOString();
@@ -155,11 +129,9 @@ describe("CustomPropertiesTest", () => {
     expect(p.created_at).toBe(now);
   });
   it("nonexistent attribute", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const p = new Post({ title: "hi" });
@@ -170,12 +142,10 @@ describe("CustomPropertiesTest", () => {
   // column) are not yet supported — save attempts to INSERT the column.
   // Rails treats these as not-persisted with the default returned on read.
   it.skip("model with nonexistent attribute with default value can be saved", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("virtual_field", "string", { default: "computed" });
-        this.adapter = adp;
       }
     }
     const p = await Post.create({ title: "test" });
@@ -184,12 +154,10 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("changing defaults", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string", { default: "draft" });
-        this.adapter = adp;
       }
     }
     const p = new Post({});
@@ -197,12 +165,10 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("defaults are not touched on the columns", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string", { default: "active" });
-        this.adapter = adp;
       }
     }
     // The column itself should not have the default baked in; only instances get it
@@ -211,12 +177,10 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("children inherit custom properties", async () => {
-    const adp = await freshAdapter();
     class Animal extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("legs", "integer", { default: 4 });
-        this.adapter = adp;
       }
     }
     class Dog extends (Animal as any) {}
@@ -226,12 +190,10 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("children can override parents", async () => {
-    const adp = await freshAdapter();
     class Vehicle extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("speed", "integer", { default: 60 });
-        this.adapter = adp;
       }
     }
     class Bicycle extends (Vehicle as any) {
@@ -244,12 +206,10 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("overloading properties does not attribute method order", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adp;
       }
     }
     // Overloading body with a default should not change attribute order
@@ -263,12 +223,10 @@ describe("CustomPropertiesTest", () => {
     expect(p.body).toBe("default body");
   });
   it("caches are cleared", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = adp;
       }
     }
     const p1 = new Post({});
@@ -287,11 +245,9 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("the given default value is cast from user", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = adp;
       }
     }
     const p = new Post({});
@@ -300,7 +256,6 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("procs for default values", async () => {
-    const adp = await freshAdapter();
     const calls: number[] = [];
     class Post extends Base {
       static {
@@ -310,7 +265,6 @@ describe("CustomPropertiesTest", () => {
             return "generated";
           },
         });
-        this.adapter = adp;
       }
     }
     const p1 = new Post({});
@@ -322,11 +276,9 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("procs for default values are evaluated even after column_defaults is called", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("seq", "integer", { default: () => Math.floor(Math.random() * 1000) });
-        this.adapter = adp;
       }
     }
     // column_defaults evaluates the proc
@@ -338,7 +290,6 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("procs are memoized before type casting", async () => {
-    const adp = await freshAdapter();
     let callCount = 0;
     class Post extends Base {
       static {
@@ -348,7 +299,6 @@ describe("CustomPropertiesTest", () => {
             return "tok_" + callCount;
           },
         });
-        this.adapter = adp;
       }
     }
     const p = new Post({});
@@ -359,12 +309,10 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("user provided defaults are persisted even if unchanged", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string", { default: "draft" });
-        this.adapter = adp;
       }
     }
     const p = await Post.create({ title: "test" });
@@ -374,11 +322,9 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("array types can be specified", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("tags", "string", { default: "[]" });
-        this.adapter = adp;
       }
     }
     const p = new Post({});
@@ -387,22 +333,18 @@ describe("CustomPropertiesTest", () => {
     expect(p.tags).toBe('["a","b"]');
   });
   it("range types can be specified", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("price_range", "string", { default: "0-100" });
-        this.adapter = adp;
       }
     }
     const p = new Post({});
     expect(p.price_range).toBe("0-100");
   });
   it("attributes added after subclasses load are inherited", async () => {
-    const adp = await freshAdapter();
     class Animal extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     class Dog extends (Animal as any) {}
@@ -413,12 +355,10 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("attributes not backed by database columns are not dirty when unchanged", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("virtual", "string");
-        this.adapter = adp;
       }
     }
     const p = new Post({ title: "hello" });
@@ -427,12 +367,10 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("attributes not backed by database columns are always initialized", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("memo", "string", { default: "" });
-        this.adapter = adp;
       }
     }
     const p = new Post({});
@@ -442,12 +380,10 @@ describe("CustomPropertiesTest", () => {
   // BLOCKED: same virtual-attribute gap — INSERT tries to write the
   // non-existent column. See sibling skipped test above.
   it.skip("attributes not backed by database columns return the default on models loaded from database", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("virtual_status", "string", { default: "pending" });
-        this.adapter = adp;
       }
     }
     const p = await Post.create({ title: "test" });
@@ -455,11 +391,9 @@ describe("CustomPropertiesTest", () => {
     expect(reloaded.virtual_status).toBe("pending");
   });
   it("attributes not backed by database columns keep their type when a default value is configured separately", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("score", "integer");
-        this.adapter = adp;
       }
     }
     class CustomPost extends (Post as any) {
@@ -473,12 +407,10 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("attributes not backed by database columns properly interact with mutation and dirty", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("note", "string");
-        this.adapter = adp;
       }
     }
     const p = new Post({ title: "hello" });
@@ -489,12 +421,10 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("attributes not backed by database columns appear in inspect", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("virtual_field", "string", { default: "v" });
-        this.adapter = adp;
       }
     }
     const p = new Post({ title: "hi" });
@@ -503,12 +433,10 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("attributes do not require a type", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("metadata", "string");
-        this.adapter = adp;
       }
     }
     const p = new Post({ metadata: "anything" });
@@ -517,37 +445,31 @@ describe("CustomPropertiesTest", () => {
   it("attributes do not require a connection is established", () => {
     // Rails parity: assert_not_called(ActiveRecord::Base, :lease_connection).
     // Use a bare adapter (no defineSchema / no DDL) so the test still exercises
-    // the "no connection needed" guarantee. Don't go through freshAdapter()
-    // here — that calls defineSchema and would mask any regression.
-    const adp = createTestAdapter();
+    // the "no connection needed" guarantee. No defineSchema call here —
+    // that would mask the "no connection needed" regression.
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("cached", "string", { default: "yes" });
-        this.adapter = adp;
       }
     }
     const p = new Post({});
     expect(p.cached).toBe("yes");
   });
   it("unknown type error is raised", async () => {
-    const adp = await freshAdapter();
     // Using a type that doesn't have special casting should still work as pass-through
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const p = new Post({ title: "test" });
     expect(p.title).toBe("test");
   });
   it("immutable_strings_by_default changes schema inference for string columns", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const p = new Post({ title: "hello" });
@@ -555,22 +477,18 @@ describe("CustomPropertiesTest", () => {
     expect(val).toBe("hello");
   });
   it("immutable_strings_by_default retains limit information", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const p = new Post({ title: "hello" });
     expect(typeof p.title).toBe("string");
   });
   it("immutable_strings_by_default does not affect `attribute :foo, :string`", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     const p = new Post({ name: "test" });
@@ -579,11 +497,9 @@ describe("CustomPropertiesTest", () => {
     expect(p.name).toBe("changed");
   });
   it("serialize boolean for both string types", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("active", "integer");
-        this.adapter = adp;
       }
     }
     const p1 = new Post({ active: 1 });
@@ -595,11 +511,9 @@ describe("CustomPropertiesTest", () => {
 
 describe("DefineAttributeTest", () => {
   it("define_attribute registers a type object directly", () => {
-    const adp = createTestAdapter();
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
       static {
-        this.adapter = adp;
         this.defineAttribute("score", intType);
       }
     }
@@ -608,11 +522,9 @@ describe("DefineAttributeTest", () => {
   });
 
   it("define_attribute with default value", () => {
-    const adp = createTestAdapter();
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
       static {
-        this.adapter = adp;
         this.defineAttribute("rating", intType, { default: 5 });
       }
     }
@@ -621,12 +533,10 @@ describe("DefineAttributeTest", () => {
   });
 
   it("define_attribute preserves existing default when no default given", () => {
-    const adp = createTestAdapter();
     const strType = typeRegistry.lookup("string");
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
       static {
-        this.adapter = adp;
         this.defineAttribute("score", strType, { default: "10" });
         this.defineAttribute("score", intType);
       }
@@ -636,11 +546,9 @@ describe("DefineAttributeTest", () => {
   });
 
   it("define_attribute with userProvidedDefault false uses database cast", () => {
-    const adp = createTestAdapter();
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
       static {
-        this.adapter = adp;
         this.defineAttribute("views", intType, { default: "0", userProvidedDefault: false });
       }
     }
@@ -649,12 +557,10 @@ describe("DefineAttributeTest", () => {
   });
 
   it("define_attribute invalidates _defaultAttributes cache", () => {
-    const adp = createTestAdapter();
     const strType = typeRegistry.lookup("string");
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
       static {
-        this.adapter = adp;
         this.defineAttribute("score", strType);
       }
     }
@@ -667,11 +573,9 @@ describe("DefineAttributeTest", () => {
 
 describe("DefaultAttributesTest", () => {
   it("_default_attributes returns an AttributeSet", () => {
-    const adp = createTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const defaults = Post._defaultAttributes();
@@ -679,11 +583,9 @@ describe("DefaultAttributesTest", () => {
   });
 
   it("_default_attributes includes declared attributes", () => {
-    const adp = createTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string", { default: "Untitled" });
-        this.adapter = adp;
       }
     }
     const defaults = Post._defaultAttributes();
@@ -691,22 +593,18 @@ describe("DefaultAttributesTest", () => {
   });
 
   it("_default_attributes is cached", () => {
-    const adp = createTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     expect(Post._defaultAttributes()).toBe(Post._defaultAttributes());
   });
 
   it("_default_attributes cache is invalidated when attribute is defined", () => {
-    const adp = createTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const first = Post._defaultAttributes();
@@ -717,11 +615,9 @@ describe("DefaultAttributesTest", () => {
   });
 
   it("new record attributes are seeded from _default_attributes", () => {
-    const adp = createTestAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "string", { default: "draft" });
-        this.adapter = adp;
       }
     }
     const p = new Post({});
@@ -729,13 +625,8 @@ describe("DefaultAttributesTest", () => {
   });
 
   it("_defaultAttributes seeds schema columns via fromDatabase then replays user pending queue", () => {
-    const adp = createTestAdapter();
     const intType = typeRegistry.lookup("integer");
-    class Post extends Base {
-      static {
-        this.adapter = adp;
-      }
-    }
+    class Post extends Base {}
     Post.defineAttribute("views", intType, { default: 0, userProvidedDefault: false });
     Post.attribute("title", "string", { default: "untitled" });
 
@@ -745,13 +636,8 @@ describe("DefaultAttributesTest", () => {
   });
 
   it("user attribute() declaration overrides schema column type via pending queue", () => {
-    const adp = createTestAdapter();
     const intType = typeRegistry.lookup("integer");
-    class Post extends Base {
-      static {
-        this.adapter = adp;
-      }
-    }
+    class Post extends Base {}
     Post.defineAttribute("score", intType, { default: 0, userProvidedDefault: false });
     Post.attribute("score", "string");
 
@@ -760,13 +646,8 @@ describe("DefaultAttributesTest", () => {
   });
 
   it("attribute() overriding only type preserves the schema default", () => {
-    const adp = createTestAdapter();
     const intType = typeRegistry.lookup("integer");
-    class Post extends Base {
-      static {
-        this.adapter = adp;
-      }
-    }
+    class Post extends Base {}
     // Schema reflection gives score a default of 5
     Post.defineAttribute("score", intType, { default: 5, userProvidedDefault: false });
     // User overrides type to string without specifying a default
@@ -781,14 +662,12 @@ describe("DefaultAttributesTest", () => {
 
 describe("DefineAttributeSTITest", () => {
   it("defineAttribute on STI subclass routes to the STI base", () => {
-    const adp = createTestAdapter();
     const intType = typeRegistry.lookup("integer");
     class Animal extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
         (this as any)._inheritanceColumn = "type";
-        this.adapter = adp;
       }
     }
     class Dog extends (Animal as any) {}
@@ -800,11 +679,9 @@ describe("DefineAttributeSTITest", () => {
   });
 
   it("_defaultAttributes on STI subclass uses the base cache", () => {
-    const adp = createTestAdapter();
     class Vehicle extends Base {
       static {
         this.attribute("speed", "integer", { default: 60 });
-        this.adapter = adp;
       }
     }
     class Car extends (Vehicle as any) {}
@@ -814,12 +691,10 @@ describe("DefineAttributeSTITest", () => {
   });
 
   it("defineAttribute for id does not install an accessor", () => {
-    const adp = createTestAdapter();
     const strType = typeRegistry.lookup("string");
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     Post.defineAttribute("id", strType);
@@ -831,11 +706,9 @@ describe("DefineAttributeSTITest", () => {
 
 describe("ResetDefaultAttributesCascadeTest", () => {
   it("adding an attribute to a superclass invalidates an AR subclass _defaultAttributes cache", () => {
-    const adp = createTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     class SpecialPost extends (Post as any) {}
