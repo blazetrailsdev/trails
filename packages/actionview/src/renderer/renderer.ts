@@ -15,7 +15,8 @@ export { RenderedTemplate };
  * `TemplateRenderer` (Phase 3b) or `PartialRenderer` / `CollectionRenderer` /
  * `ObjectRenderer` (Phase 3c).
  *
- * A new sub-renderer instance is created per call — no cross-call state.
+ * A new sub-renderer instance is created per render call. `cacheHits` is the
+ * only instance-level mutable state and accumulates across calls.
  */
 export class Renderer {
   lookupContext: LookupContext;
