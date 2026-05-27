@@ -407,6 +407,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
 
     let bObservedOpen = -1;
     let bObservedInTransaction = true;
+    let bObservedCurrentTransaction: unknown = "unset";
 
     await Promise.all([
       sidecarA.withinNewTransaction({ joinable: false }, async () => {
@@ -420,14 +421,18 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
         await bReady;
         bObservedOpen = sidecarB.openTransactions;
         bObservedInTransaction = sidecarB.inTransaction;
+        bObservedCurrentTransaction = sidecarB.currentTransaction();
         // Let chain A finish.
         signalADone!();
       })(),
     ]);
 
     // Chain B must not have observed chain A's transaction state.
+    // currentTransaction() is the most critical: Base.transaction() consults
+    // it first to decide whether to join a foreign frame.
     expect(bObservedOpen).toBe(0);
     expect(bObservedInTransaction).toBe(false);
+    expect(bObservedCurrentTransaction).toBeNull();
   });
 
   it("currentTransaction() returns null for a chain outside any withinNewTransaction", () => {
