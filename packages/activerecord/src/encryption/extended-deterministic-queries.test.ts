@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import type { TestDatabaseAdapter } from "../test-adapter.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import {
   AdditionalValue,
   EncryptedQuery,
@@ -19,8 +19,9 @@ import { UniquenessValidator } from "../validations.js";
 import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
-import { createTestAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
+
+setupHandlerSuite();
 
 // 32 bytes (base64-encoded) for AES-256-GCM. Cipher decodes the key from
 // base64, so we pad a known repeating byte to 32 bytes and encode. Shared
@@ -36,13 +37,12 @@ const TEST_KEY = Buffer.alloc(32, "x").toString("base64");
  * can wrap each test in BEGIN/ROLLBACK — DDL inside beforeEach would
  * auto-commit on MariaDB and break the outer wrap.
  */
-function buildBooks(adapter: TestDatabaseAdapter) {
+function buildBooks() {
   class UnencryptedBook extends Base {
     static {
       this._tableName = "books";
       this.attribute("id", "integer");
       this.attribute("name", "string");
-      this.adapter = adapter;
     }
   }
   class EncryptedBook extends Base {
@@ -50,7 +50,6 @@ function buildBooks(adapter: TestDatabaseAdapter) {
       this._tableName = "books";
       this.attribute("id", "integer");
       this.attribute("name", "string");
-      this.adapter = adapter;
       this.encrypts("name", { deterministic: true, key: TEST_KEY });
     }
   }
@@ -59,7 +58,6 @@ function buildBooks(adapter: TestDatabaseAdapter) {
       this._tableName = "books";
       this.attribute("id", "integer");
       this.attribute("name", "string");
-      this.adapter = adapter;
       this.encrypts("name", { deterministic: true, downcase: true, key: TEST_KEY });
     }
   }
@@ -68,7 +66,6 @@ function buildBooks(adapter: TestDatabaseAdapter) {
       this._tableName = "books";
       this.attribute("id", "integer");
       this.attribute("name", "string");
-      this.adapter = adapter;
       this.encrypts("name", { deterministic: true, supportUnencryptedData: false, key: TEST_KEY });
     }
   }
@@ -77,7 +74,6 @@ function buildBooks(adapter: TestDatabaseAdapter) {
       this._tableName = "books";
       this.attribute("id", "integer");
       this.attribute("name", "string");
-      this.adapter = adapter;
       this.encrypts("name", { deterministic: true, supportUnencryptedData: true, key: TEST_KEY });
     }
   }
@@ -92,7 +88,6 @@ function buildBooks(adapter: TestDatabaseAdapter) {
 }
 
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
-  let adapter: TestDatabaseAdapter;
   let books: ReturnType<typeof buildBooks>;
 
   // Snapshot global state up front and restore it after the whole
@@ -129,16 +124,15 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
 
     installExtendedQueriesIfConfigured();
 
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { books: { name: "string" } });
-    books = buildBooks(adapter);
+    await defineSchema({ books: { name: "string" } });
+    books = buildBooks();
     // Warm the books table once before any test runs so the first create
     // doesn't race with the test-adapter's regex-recovery schema path on
     // MariaDB. Subsequent tests reuse the warmed schema cache.
     await books.EncryptedBook.where("1=1").toArray();
   });
 
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   afterAll(() => {
     Relation.prototype.where = savedMethods.where as typeof Relation.prototype.where;
@@ -422,13 +416,11 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
   });
 
   it("reads IN-array values from a real Relation via whereValuesHash() (integration)", () => {
-    const adapter = createTestAdapter();
     class Contact extends Base {
       static {
         this._tableName = "contacts";
         this.attribute("id", "integer");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
     const rel = Contact.all().where({ email: ["a@x", "b@x"] });
@@ -438,7 +430,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
   });
 
   it("unwraps AdditionalValue trailers end-to-end on a real Relation", () => {
-    const adapter = createTestAdapter();
     const type = makeType(true);
     const prevType = makeType(true);
 
@@ -447,7 +438,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
         this._tableName = "contacts";
         this.attribute("id", "integer");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
     (Contact as any)._encryptedAttributes = new Set(["email"]);
