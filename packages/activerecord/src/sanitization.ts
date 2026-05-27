@@ -58,6 +58,7 @@ function _sanitizeSqlArray(quoter: Quoter, template: string, binds: unknown[]): 
   }
 
   if (statement === "") {
+    raiseIfBindArityMismatch(statement, 0, binds.length);
     return statement;
   }
 
@@ -70,6 +71,7 @@ function _sanitizeSqlArray(quoter: Quoter, template: string, binds: unknown[]): 
     return statement.replace(/%s/g, () => quoter.quoteString(String(values.shift() ?? "")));
   }
 
+  raiseIfBindArityMismatch(statement, 0, binds.length);
   return statement;
 }
 
@@ -200,13 +202,18 @@ export function disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], permi
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_like
  */
 export function sanitizeSqlLike(value: string, escapeChar: string = "\\"): string {
-  return value
-    .replace(
-      new RegExp(escapeChar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"),
-      () => escapeChar + escapeChar,
-    )
-    .replace(/%/g, () => escapeChar + "%")
-    .replace(/_/g, () => escapeChar + "_");
+  // Empty escape character: Rails inserts "" before each wildcard — net no-op.
+  if (escapeChar === "") return value;
+  // Rails inserts the escape character before each % and _ in a single pass.
+  // When escapeChar is not itself a wildcard, it also escapes occurrences of
+  // escapeChar in the string first (via the same single pattern union).
+  // Using a single pass avoids double-escaping the prefix inserted for one
+  // wildcard when the escape character happens to be the other wildcard.
+  const escapedEsc = escapeChar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (escapeChar !== "%" && escapeChar !== "_") {
+    return value.replace(new RegExp(`${escapedEsc}|[%_]`, "g"), (c) => escapeChar + c);
+  }
+  return value.replace(/[%_]/g, (c) => escapeChar + c);
 }
 
 /**

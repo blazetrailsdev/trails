@@ -2,32 +2,20 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base, Range } from "./index.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+setupHandlerSuite();
 
 // ==========================================================================
 // SanitizeTest — targets sanitize_test.rb
 // ==========================================================================
 describe("SanitizeTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("sanitize sql array handles named bind variables", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where("title = ?", "hello").toSql();
@@ -38,7 +26,6 @@ describe("SanitizeTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where("title = :title", { title: "hello" }).toSql();
@@ -49,7 +36,6 @@ describe("SanitizeTest", () => {
     class Post extends Base {
       static {
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ age: new Range(18, 30) }).toSql();
@@ -59,11 +45,9 @@ describe("SanitizeTest", () => {
 
 describe("SanitizeTest", () => {
   it("sanitize sql array handles empty statement", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.sanitizeSqlArray("SELECT 1");
@@ -71,48 +55,44 @@ describe("SanitizeTest", () => {
   });
 
   it("sanitize sql like", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    const sql = Post.sanitizeSqlArray("title LIKE ?", "%hello%");
-    expect(sql).toContain("hello");
+    expect(Post.sanitizeSqlLike("100%")).toBe("100\\%");
+    expect(Post.sanitizeSqlLike("snake_cased_string")).toBe("snake\\_cased\\_string");
+    expect(Post.sanitizeSqlLike("C:\\Programs\\MsPaint")).toBe("C:\\\\Programs\\\\MsPaint");
+    expect(Post.sanitizeSqlLike("normal string 42")).toBe("normal string 42");
   });
 
   it("sanitize sql like with custom escape character", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    const result = Post.sanitizeSqlLike("100%", "!");
-    expect(result).toBe("100!%");
+    expect(Post.sanitizeSqlLike("100%", "!")).toBe("100!%");
+    expect(Post.sanitizeSqlLike("snake_cased_string", "!")).toBe("snake!_cased!_string");
+    expect(Post.sanitizeSqlLike("great!", "!")).toBe("great!!");
+    expect(Post.sanitizeSqlLike("C:\\Programs\\MsPaint", "!")).toBe("C:\\Programs\\MsPaint");
+    expect(Post.sanitizeSqlLike("normal string 42", "!")).toBe("normal string 42");
   });
 
   it("sanitize sql like with wildcard as escape character", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    const result = Post.sanitizeSqlLike("50%_off", "\\");
-    expect(result).toContain("\\%");
-    expect(result).toContain("\\_");
+    expect(Post.sanitizeSqlLike("1_000%", "_")).toBe("1__000_%");
+    expect(Post.sanitizeSqlLike("1_000%", "%")).toBe("1%_000%%");
   });
 
   it("sanitize sql like example use case", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const userInput = "50% off";
@@ -136,23 +116,22 @@ describe("SanitizeTest", () => {
   });
 
   it("bind arity", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    const sql = Post.sanitizeSqlArray("title = ?", "hello");
-    expect(sql).toContain("'hello'");
+    expect(() => Post.sanitizeSqlArray("")).not.toThrow();
+    expect(() => Post.sanitizeSqlArray("", "extra")).toThrow(/wrong number of bind variables/);
+    expect(() => Post.sanitizeSqlArray("?")).toThrow(/wrong number of bind variables/);
+    expect(() => Post.sanitizeSqlArray("?", 1)).not.toThrow();
+    expect(() => Post.sanitizeSqlArray("?", 1, 1)).toThrow(/wrong number of bind variables/);
   });
 
   it("named bind arity", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where("title = :title", { title: "world" }).toSql();
@@ -160,11 +139,9 @@ describe("SanitizeTest", () => {
   });
 
   it("bind enumerable", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ title: ["a", "b", "c"] }).toSql();
@@ -172,11 +149,9 @@ describe("SanitizeTest", () => {
   });
 
   it("bind empty enumerable", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ title: [] }).toSql();
@@ -184,11 +159,9 @@ describe("SanitizeTest", () => {
   });
 
   it("bind empty range", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("score", "integer");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ score: new Range(1, 10) }).toSql();
@@ -196,11 +169,9 @@ describe("SanitizeTest", () => {
   });
 
   it("bind empty string", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.sanitizeSqlArray("title = ?", "");
@@ -208,16 +179,16 @@ describe("SanitizeTest", () => {
   });
 
   it("bind chars", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
-    const sql = Post.sanitizeSqlArray("title = ?", "it's");
-    expect(sql).toBeDefined();
-    expect(typeof sql).toBe("string");
+    const a = Post.adapter;
+    expect(Post.sanitizeSqlArray("name=?", "Bambi")).toBe(`name=${a.quote("Bambi")}`);
+    expect(Post.sanitizeSqlArray("name=?", "Bambi\nand\nThumper")).toBe(
+      `name=${a.quote("Bambi\nand\nThumper")}`,
+    );
   });
 
   it.skip("named bind with postgresql type casts", () => {
@@ -228,11 +199,9 @@ describe("SanitizeTest", () => {
   });
 
   it("named bind with literal colons", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // A value containing a literal colon should be preserved in the output
@@ -244,7 +213,6 @@ describe("SanitizeTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = freshAdapter();
       }
     }
     const sql = Post.sanitizeSqlArray("title = ?", "hello");
@@ -255,7 +223,6 @@ describe("SanitizeTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = freshAdapter();
       }
     }
     const sql = Post.sanitizeSqlArray("title = ? AND id = ?", "hello", 1);
@@ -299,8 +266,8 @@ describe("sanitizeSql", () => {
     class User extends Base {
       static _tableName = "users";
     }
-
-    expect(User.sanitizeSqlArray("name = ?", "O'Brien")).toBe("name = 'O''Brien'");
+    const a = User.adapter;
+    expect(User.sanitizeSqlArray("name = ?", "O'Brien")).toBe(`name = ${a.quote("O'Brien")}`);
   });
 
   it("sanitizeSql handles string passthrough", () => {
@@ -315,9 +282,12 @@ describe("sanitizeSql", () => {
     class User extends Base {
       static _tableName = "users";
     }
-
+    const a = User.adapter as unknown as {
+      castBoundValue(v: unknown): unknown;
+      quote(v: unknown): string;
+    };
     expect(User.sanitizeSql(["name = ? AND age > ?", "Alice", 30])).toBe(
-      "name = 'Alice' AND age > 30",
+      `name = ${a.quote(a.castBoundValue("Alice"))} AND age > ${a.quote(a.castBoundValue(30))}`,
     );
   });
 
@@ -328,6 +298,16 @@ describe("sanitizeSql", () => {
     expect(() => Post.sanitizeSqlArray("title = ? AND body = ?", "hello")).toThrow(
       /wrong number of bind variables \(1 for 2\)/,
     );
+  });
+
+  it("sanitizeSqlArray raises on extra binds with no placeholders", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    expect(() => Post.sanitizeSqlArray("SELECT 1", "extra")).toThrow(
+      /wrong number of bind variables \(1 for 0\)/,
+    );
+    expect(() => Post.sanitizeSqlArray("SELECT 1")).not.toThrow();
   });
 
   it("sanitizeSql dispatches through this.sanitizeSqlArray (subclass override)", () => {
@@ -400,8 +380,9 @@ describe("sanitizeSql", () => {
       class Post extends Base {
         static _tableName = "posts";
       }
+      const qs = (v: unknown) => Post.adapter.quoteString(String(v));
       const result = Post.sanitizeSqlArray("name='%s' and group_id='%s'", "foo'bar", 4);
-      expect(result).toBe("name='foo''bar' and group_id='4'");
+      expect(result).toBe(`name='${qs("foo'bar")}' and group_id='${qs(4)}'`);
     });
 
     it("sanitize sql array %s format raises on arity mismatch", () => {
@@ -435,11 +416,17 @@ describe("sanitizeSql", () => {
       class Post extends Base {
         static _tableName = "posts";
       }
+      const a = Post.adapter as unknown as {
+        castBoundValue(v: unknown): unknown;
+        quote(v: unknown): string;
+      };
       const result = Post.sanitizeSqlArray("id = :id AND status = :status", {
         id: 42,
         status: "active",
       });
-      expect(result).toBe("id = 42 AND status = 'active'");
+      expect(result).toBe(
+        `id = ${a.quote(a.castBoundValue(42))} AND status = ${a.quote(a.castBoundValue("active"))}`,
+      );
     });
 
     // D-Y-INCOMPATIBLE: same SQLite boolean quoting as above — canonical adapter
@@ -466,7 +453,7 @@ describe("sanitizeSql", () => {
         static _tableName = "posts";
       }
       const result = Post.sanitizeSqlArray("title = :title", { title: "It's a title" });
-      expect(result).toBe("title = 'It''s a title'");
+      expect(result).toBe(`title = ${Post.adapter.quote("It's a title")}`);
     });
 
     it("handles PostgreSQL type casts in named bind variable patterns", () => {
@@ -547,7 +534,6 @@ describe("sanitizeSql", () => {
       class Post extends Base {
         static _tableName = "posts";
       }
-      Post.adapter = freshAdapter();
       const sql = Post.sanitizeSqlArray("active = ?", true);
       const a = Post.adapter as unknown as {
         castBoundValue(v: unknown): unknown;
