@@ -1,5 +1,6 @@
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
+import { GeneratorError } from "./generated-attribute.js";
 import { type DatabaseName } from "./database.js";
 
 // CLI-friendly DB aliases — `trails new -d sqlite|postgres|mysql` maps
@@ -11,19 +12,57 @@ const DB_ALIAS: Record<string, DatabaseName> = {
 };
 
 export type AppDatabase = "sqlite" | "postgres" | "mysql" | DatabaseName;
+export type PackageManager = "pnpm" | "npm" | "yarn";
+export type SqliteDriver = "better-sqlite3" | "node-sqlite" | "expo-sqlite";
+
+export const VALID_PACKAGE_MANAGERS: readonly PackageManager[] = ["pnpm", "npm", "yarn"];
+export const VALID_SQLITE_DRIVERS: readonly SqliteDriver[] = [
+  "better-sqlite3",
+  "node-sqlite",
+  "expo-sqlite",
+];
 
 export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "appPath"> {
   appPath?: string;
   database?: AppDatabase;
   skipDocker?: boolean;
+  packageManager?: PackageManager;
+  sqliteDriver?: SqliteDriver;
 }
 
 export class AppGenerator extends AppBase {
+  readonly packageManager: PackageManager;
+  readonly sqliteDriver: SqliteDriver;
+
   constructor(options: AppGeneratorOptions) {
     const database = options.database
       ? ((DB_ALIAS[options.database] ?? options.database) as DatabaseName)
       : undefined;
     super({ ...options, appPath: options.appPath ?? options.cwd, database });
+    this.packageManager = options.packageManager ?? "pnpm";
+    this.sqliteDriver = options.sqliteDriver ?? "better-sqlite3";
+    if (!VALID_PACKAGE_MANAGERS.includes(this.packageManager)) {
+      throw new GeneratorError(
+        `Unknown package manager '${this.packageManager}'. Valid options: ${VALID_PACKAGE_MANAGERS.join(", ")}`,
+      );
+    }
+    if (!VALID_SQLITE_DRIVERS.includes(this.sqliteDriver)) {
+      throw new GeneratorError(
+        `Unknown SQLite driver '${this.sqliteDriver}'. Valid options: ${VALID_SQLITE_DRIVERS.join(", ")}`,
+      );
+    }
+  }
+
+  private pmInstall(): string {
+    return this.packageManager === "yarn" ? "yarn" : `${this.packageManager} install`;
+  }
+
+  private pmLockFile(): string {
+    return this.packageManager === "pnpm"
+      ? "pnpm-lock.yaml"
+      : this.packageManager === "yarn"
+        ? "yarn.lock"
+        : "package-lock.json";
   }
 
   async run(): Promise<string[]> {
@@ -52,6 +91,12 @@ export class AppGenerator extends AppBase {
 
   private createRootFiles(name: string): void {
     const dep = this.database.pkgDependency;
+    // For sqlite3, omit the driver dep when using node-sqlite (built-in) or
+    // expo-sqlite (app responsibility). Other databases always include it.
+    const dbDep =
+      this.database.name === "sqlite3" && this.sqliteDriver !== "better-sqlite3"
+        ? {}
+        : { [dep.name]: dep.version };
     this.createFile(
       "package.json",
       JSON.stringify(
@@ -85,7 +130,7 @@ export class AppGenerator extends AppBase {
             "@blazetrails/actionpack": "*",
             "@blazetrails/actionview": "*",
             "@blazetrails/trailties": "*",
-            [dep.name]: dep.version,
+            ...dbDep,
           },
           devDependencies: {
             "@blazetrails/trails-tsc": "*",
@@ -172,7 +217,7 @@ This application was generated with [trails](https://github.com/blazetrailsdev/b
 ## Getting started
 
     cd ${name}
-    pnpm install
+    ${this.pmInstall()}
     trails db setup
     trails server
 
@@ -252,7 +297,7 @@ function system(command) {
 }
 
 console.log("== Installing dependencies ==");
-system("pnpm install");
+system("${this.pmInstall()}");
 
 console.log("\\n== Preparing database ==");
 system("trails db setup");
@@ -895,11 +940,11 @@ FROM base AS build
 
 RUN apt-get update -qq && apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3
 
-COPY package.json pnpm-lock.yaml* ./
-RUN corepack enable pnpm && pnpm install
+COPY package.json ${this.pmLockFile()}* ./
+RUN ${this.packageManager === "pnpm" ? "corepack enable pnpm && pnpm install" : this.packageManager === "yarn" ? "corepack enable yarn && yarn" : this.pmInstall()}
 
 COPY . .
-RUN pnpm run build
+RUN ${this.packageManager === "pnpm" ? "pnpm" : this.packageManager} run build
 
 FROM base
 
@@ -967,7 +1012,9 @@ dist
 };
 `;
       default:
-        return `export default {
+        return `import "@blazetrails/activesupport/sqlite/${this.sqliteDriver}";
+
+export default {
   development: {
     adapter: "sqlite3",
     database: "db/development.sqlite3",
