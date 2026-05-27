@@ -2,32 +2,20 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base, Range } from "./index.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+setupHandlerSuite();
 
 // ==========================================================================
 // SanitizeTest — targets sanitize_test.rb
 // ==========================================================================
 describe("SanitizeTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("sanitize sql array handles named bind variables", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where("title = ?", "hello").toSql();
@@ -38,7 +26,6 @@ describe("SanitizeTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where("title = :title", { title: "hello" }).toSql();
@@ -49,7 +36,6 @@ describe("SanitizeTest", () => {
     class Post extends Base {
       static {
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ age: new Range(18, 30) }).toSql();
@@ -59,11 +45,9 @@ describe("SanitizeTest", () => {
 
 describe("SanitizeTest", () => {
   it("sanitize sql array handles empty statement", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.sanitizeSqlArray("SELECT 1");
@@ -71,11 +55,9 @@ describe("SanitizeTest", () => {
   });
 
   it("sanitize sql like", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.sanitizeSqlArray("title LIKE ?", "%hello%");
@@ -83,11 +65,9 @@ describe("SanitizeTest", () => {
   });
 
   it("sanitize sql like with custom escape character", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const result = Post.sanitizeSqlLike("100%", "!");
@@ -95,11 +75,9 @@ describe("SanitizeTest", () => {
   });
 
   it("sanitize sql like with wildcard as escape character", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const result = Post.sanitizeSqlLike("50%_off", "\\");
@@ -108,11 +86,9 @@ describe("SanitizeTest", () => {
   });
 
   it("sanitize sql like example use case", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const userInput = "50% off";
@@ -136,11 +112,9 @@ describe("SanitizeTest", () => {
   });
 
   it("bind arity", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.sanitizeSqlArray("title = ?", "hello");
@@ -148,11 +122,9 @@ describe("SanitizeTest", () => {
   });
 
   it("named bind arity", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where("title = :title", { title: "world" }).toSql();
@@ -160,11 +132,9 @@ describe("SanitizeTest", () => {
   });
 
   it("bind enumerable", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ title: ["a", "b", "c"] }).toSql();
@@ -172,11 +142,9 @@ describe("SanitizeTest", () => {
   });
 
   it("bind empty enumerable", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ title: [] }).toSql();
@@ -184,11 +152,9 @@ describe("SanitizeTest", () => {
   });
 
   it("bind empty range", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("score", "integer");
-        this.adapter = adapter;
       }
     }
     const sql = Post.where({ score: new Range(1, 10) }).toSql();
@@ -196,11 +162,9 @@ describe("SanitizeTest", () => {
   });
 
   it("bind empty string", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.sanitizeSqlArray("title = ?", "");
@@ -208,11 +172,9 @@ describe("SanitizeTest", () => {
   });
 
   it("bind chars", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.sanitizeSqlArray("title = ?", "it's");
@@ -228,11 +190,9 @@ describe("SanitizeTest", () => {
   });
 
   it("named bind with literal colons", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // A value containing a literal colon should be preserved in the output
@@ -244,7 +204,6 @@ describe("SanitizeTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = freshAdapter();
       }
     }
     const sql = Post.sanitizeSqlArray("title = ?", "hello");
@@ -255,11 +214,10 @@ describe("SanitizeTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = freshAdapter();
       }
     }
     const sql = Post.sanitizeSqlArray("title = ? AND id = ?", "hello", 1);
-    const a = Post.adapter as unknown as {
+    const a = Base.adapter as unknown as {
       castBoundValue(v: unknown): unknown;
       quote(v: unknown): string;
     };
@@ -547,9 +505,8 @@ describe("sanitizeSql", () => {
       class Post extends Base {
         static _tableName = "posts";
       }
-      Post.adapter = freshAdapter();
       const sql = Post.sanitizeSqlArray("active = ?", true);
-      const a = Post.adapter as unknown as {
+      const a = Base.adapter as unknown as {
         castBoundValue(v: unknown): unknown;
         quote(v: unknown): string;
       };
