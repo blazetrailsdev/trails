@@ -1251,6 +1251,10 @@ export class Base extends Model {
     this._recordTimestamps = value;
   }
 
+  // Mirrors: ActiveRecord::AttributeMethods::Dirty — class_attribute :partial_updates/:partial_inserts, default: true
+  static partialUpdates = true;
+  static partialInserts = true;
+
   static async noTouching<R>(fn: () => R | Promise<R>): Promise<R> {
     return _noTouchingBlock(this, fn);
   }
@@ -2518,6 +2522,16 @@ export class Base extends Model {
 
   private _pendingOperation: Promise<void> | null = null;
   private _skipTouch = false;
+  private _instanceRecordTimestamps: boolean | null = null;
+
+  // Mirrors: ActiveRecord class_attribute :record_timestamps instance-level override
+  get recordTimestamps(): boolean {
+    return this._instanceRecordTimestamps ?? (this.constructor as typeof Base).recordTimestamps;
+  }
+
+  set recordTimestamps(value: boolean) {
+    this._instanceRecordTimestamps = value;
+  }
 
   private _performInsert(): void {
     const ctor = this.constructor as typeof Base;
@@ -2533,7 +2547,7 @@ export class Base extends Model {
     const table = ctor.arelTable;
 
     // Auto-populate timestamps (unless touch: false or recordTimestamps disabled)
-    if (!this._skipTouch && ctor.recordTimestamps !== false) {
+    if (!this._skipTouch && this.recordTimestamps !== false) {
       const now = Timestamp.currentTimeFromProperTimezone();
       for (const col of Timestamp.allTimestampAttributesInModel.call(ctor)) {
         if (ctor._attributeDefinitions.has(col) && this._readAttribute(col) == null) {
@@ -2628,7 +2642,7 @@ export class Base extends Model {
     const table = ctor.arelTable;
 
     // Auto-populate update timestamps (unless touch: false or recordTimestamps disabled)
-    if (!this._skipTouch && ctor.recordTimestamps !== false) {
+    if (!this._skipTouch && this.recordTimestamps !== false) {
       const now = Timestamp.currentTimeFromProperTimezone();
       for (const col of Timestamp.timestampAttributesForUpdateInModel.call(ctor)) {
         if (ctor._attributeDefinitions.has(col) && !this.willSaveChangeToAttribute(col)) {

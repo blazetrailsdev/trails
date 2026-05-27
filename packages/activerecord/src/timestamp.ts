@@ -161,6 +161,7 @@ interface TimestampInstanceHost {
   clearAttributeChange?(name: string): void;
   hasChangesToSave?: boolean;
   id?: unknown;
+  recordTimestamps?: boolean;
   constructor: TimestampHost & { recordTimestamps: boolean; partialUpdates?: boolean };
 }
 
@@ -285,9 +286,9 @@ export async function recordUpdateTimestamps(this: TimestampInstanceHost): Promi
 
 /** @internal */
 export function shouldRecordTimestamps(this: TimestampInstanceHost): boolean {
+  const recordTs = this.recordTimestamps ?? this.constructor.recordTimestamps;
   return (
-    this.constructor.recordTimestamps !== false &&
-    (!this.constructor.partialUpdates || this.hasChangesToSave !== false)
+    recordTs !== false && (!this.constructor.partialUpdates || this.hasChangesToSave !== false)
   );
 }
 

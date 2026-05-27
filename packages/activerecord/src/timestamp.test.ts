@@ -69,8 +69,19 @@ describe("TimestampTest", () => {
   it("saving when instance record timestamps is false doesnt update its timestamp", async () => {
     const Post = makePost();
     const post = await Post.create({ title: "test" });
-    await post.save();
-    expect(post.isPersisted()).toBe(true);
+    // Push updated_at into the past so a same-tick save cannot produce a false pass.
+    const pastTime = Temporal.Now.instant().subtract({ hours: 1 });
+    await post.updateColumns({ updated_at: pastTime });
+    const previousUpdatedAt = post.updated_at as Temporal.Instant | null;
+    expect(previousUpdatedAt).not.toBeNull();
+    expect(Post.recordTimestamps).toBe(true);
+
+    post.recordTimestamps = false;
+    post.title = "Updated";
+    const result = await post.save();
+    expect(result).toBe(true);
+
+    expect(post.updated_at).toEqual(previousUpdatedAt);
   });
 
   it("touching updates timestamp with given time", async () => {

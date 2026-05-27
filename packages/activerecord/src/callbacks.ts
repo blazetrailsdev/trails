@@ -235,7 +235,7 @@ export async function _createRecord(this: any): Promise<boolean> {
   // Rails: _run_create_callbacks { super } — returns whether callbacks completed.
   const ctor = this.constructor as any;
   return runAllCallbacks(ctor.prototype, "create", this, async () => {
-    if (ctor.recordTimestamps !== false) {
+    if ((this.recordTimestamps ?? ctor.recordTimestamps) !== false) {
       const time = currentTimeFromProperTimezone();
       for (const col of allTimestampAttributesInModel.call(ctor)) {
         if (ctor._attributeDefinitions?.has(col) && this._readAttribute?.(col) == null) {
@@ -266,8 +266,12 @@ export async function _updateRecord(this: any): Promise<boolean> {
     // when the model has record_timestamps enabled and has changes to save.
     // Mirror record_update_timestamps: use _skipTouch (Rails' @_touch_record flag)
     // and the shared currentTimeFromProperTimezone() helper (Temporal.Instant).
-    const hasChanges = Object.keys(this.changes ?? {}).length > 0;
-    const wroteTimestamps = !this._skipTouch && ctor.recordTimestamps !== false && hasChanges;
+    const hasChanges =
+      "hasChangesToSave" in this
+        ? !!(this.hasChangesToSave as boolean)
+        : Object.keys(this.changes ?? {}).length > 0;
+    const instanceRecordTs = this.recordTimestamps ?? ctor.recordTimestamps;
+    const wroteTimestamps = !this._skipTouch && instanceRecordTs !== false && hasChanges;
     if (wroteTimestamps) {
       const time = currentTimeFromProperTimezone();
       const updateAttrs = timestampAttributesForUpdateInModel.call(ctor);
@@ -286,7 +290,7 @@ export async function _updateRecord(this: any): Promise<boolean> {
     // Rails: Timestamp#_update_record writes once via record_update_timestamps;
     // super does not.
     const previousSkipTouch = this._skipTouch;
-    const skipInnerTouch = wroteTimestamps || ctor.recordTimestamps === false || !hasChanges;
+    const skipInnerTouch = wroteTimestamps || instanceRecordTs === false || !hasChanges;
     if (skipInnerTouch) this._skipTouch = true;
     try {
       await this._performUpdate();

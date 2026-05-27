@@ -25,6 +25,7 @@ export class BelongsTo extends SingularAssociation {
       "counterCache",
       "optional",
       "default",
+      "touch",
     ];
     if (options.polymorphic) valid.push("foreignType");
     if (options.dependent === "destroyAsync") valid.push("ensuringOwnerWas");
