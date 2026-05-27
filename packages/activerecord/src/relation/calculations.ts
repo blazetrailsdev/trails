@@ -663,7 +663,7 @@ export function lookupCastTypeFromJoinDependencies(
   const deps = joinDependencies ?? buildJoinDependencies.call(rel as any);
   for (const jd of deps) {
     for (const node of jd) {
-      const klass = node.modelClass;
+      const klass = node.baseKlass;
       if (!klass) continue;
       const rawTypes: unknown =
         typeof klass.attributeTypes === "function" ? klass.attributeTypes() : klass.attributeTypes;

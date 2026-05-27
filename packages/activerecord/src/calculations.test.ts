@@ -7182,7 +7182,7 @@ describe("bigint aggregates (big_integer columns)", () => {
 describe("lookupCastTypeFromJoinDependencies", () => {
   it("returns cast type from a joined table's attributeTypes", () => {
     const intType = { cast: (v: unknown) => Number(v) };
-    const fakeNode = { modelClass: { attributeTypes: () => ({ credit_limit: intType }) } };
+    const fakeNode = { baseKlass: { attributeTypes: () => ({ credit_limit: intType }) } };
     const fakeJd = [fakeNode];
     const result = lookupCastTypeFromJoinDependencies({} as any, "credit_limit", [
       fakeJd,
@@ -7191,7 +7191,7 @@ describe("lookupCastTypeFromJoinDependencies", () => {
   });
 
   it("returns null when name is not in any joined table", () => {
-    const fakeNode = { modelClass: { attributeTypes: () => ({ other: {} }) } };
+    const fakeNode = { baseKlass: { attributeTypes: () => ({ other: {} }) } };
     const result = lookupCastTypeFromJoinDependencies({} as any, "missing", [
       [fakeNode],
     ] as unknown as JoinDependency[]);
@@ -7201,8 +7201,8 @@ describe("lookupCastTypeFromJoinDependencies", () => {
   it("returns first match when multiple join deps are present", () => {
     const type1 = { cast: (v: unknown) => String(v) };
     const type2 = { cast: (v: unknown) => Number(v) };
-    const node1 = { modelClass: { attributeTypes: () => ({ name: type1 }) } };
-    const node2 = { modelClass: { attributeTypes: () => ({ name: type2 }) } };
+    const node1 = { baseKlass: { attributeTypes: () => ({ name: type1 }) } };
+    const node2 = { baseKlass: { attributeTypes: () => ({ name: type2 }) } };
     const result = lookupCastTypeFromJoinDependencies({} as any, "name", [
       [node1],
       [node2],
@@ -7212,7 +7212,7 @@ describe("lookupCastTypeFromJoinDependencies", () => {
 
   it("supports attributeTypes as a plain object", () => {
     const strType = { cast: (v: unknown) => String(v) };
-    const fakeNode = { modelClass: { attributeTypes: { title: strType } } };
+    const fakeNode = { baseKlass: { attributeTypes: { title: strType } } };
     const result = lookupCastTypeFromJoinDependencies({} as any, "title", [
       [fakeNode],
     ] as unknown as JoinDependency[]);
@@ -7221,7 +7221,7 @@ describe("lookupCastTypeFromJoinDependencies", () => {
 
   it("supports attributeTypes as a Map", () => {
     const strType = { cast: (v: unknown) => String(v) };
-    const fakeNode = { modelClass: { attributeTypes: new Map([["title", strType]]) } };
+    const fakeNode = { baseKlass: { attributeTypes: new Map([["title", strType]]) } };
     const result = lookupCastTypeFromJoinDependencies({} as any, "title", [
       [fakeNode],
     ] as unknown as JoinDependency[]);
@@ -7230,8 +7230,8 @@ describe("lookupCastTypeFromJoinDependencies", () => {
 
   it("skips nodes without modelClass", () => {
     const type = { cast: (v: unknown) => v };
-    const nodeMissing = { modelClass: undefined };
-    const nodeGood = { modelClass: { attributeTypes: () => ({ val: type }) } };
+    const nodeMissing = { baseKlass: undefined };
+    const nodeGood = { baseKlass: { attributeTypes: () => ({ val: type }) } };
     const result = lookupCastTypeFromJoinDependencies({} as any, "val", [
       [nodeMissing, nodeGood],
     ] as unknown as JoinDependency[]);

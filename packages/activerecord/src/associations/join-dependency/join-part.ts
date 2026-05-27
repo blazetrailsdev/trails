@@ -8,14 +8,25 @@
  */
 
 import type { Base } from "../../base.js";
-import type { Table } from "@blazetrails/arel";
-import type { JoinNode } from "../join-dependency.js";
+import type { Table, Nodes } from "@blazetrails/arel";
 
 export abstract class JoinPart {
   readonly baseKlass: typeof Base;
   readonly children: JoinPart[] = [];
+
+  tableIndex = -1;
+  tableAlias = "";
+  tableName = "";
+  columns: string[] = [];
+  assocName = "";
+  assocType: "hasMany" | "hasOne" | "belongsTo" = "hasMany";
+  arelJoin: Nodes.Join | null = null;
   /** @internal */
-  readonly _joinNode: JoinNode | null = null;
+  nodeReflection: any | null = null;
+  isThroughNode = false;
+  immediateAssocName = "";
+  parentPath: string | null = null;
+  effectiveSqlName = "";
 
   constructor(baseKlass: typeof Base, children?: JoinPart[]) {
     this.baseKlass = baseKlass;

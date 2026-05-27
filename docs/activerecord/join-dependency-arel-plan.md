@@ -5,34 +5,29 @@ All plan PRs (1–7b, F1–F6) have shipped.
 
 ## Post-merge follow-ups
 
-**From #2429 (F2 — through-associations)**
+### PR A — F3: JoinNode elimination (~200 LOC) — in progress
 
-- [ ] ~220 LOC: Delete dead `_addThroughAssociation` + `_finishThroughTarget` — retained as fallback when no reflection exists. Deletion blocked on a cleanup pass over the same area.
-- [ ] ~10 LOC: Add `isCollection()` delegation to `PolymorphicReflection` — workaround reaches into `_reflection.macro`.
-- [ ] `PolymorphicReflection#joinScopes` `buildScope(table)` ignores the `table` parameter. Works because the relation's default table matches, but diverges from Rails.
+- [x] Delete `JoinNode` interface, fold properties onto `JoinPart` subclasses
+- [x] Delete `_pushTreeNode`, build tree nodes directly via `_insertTreeNode`
+- [x] Delete `JoinTreeNode` class, replaced by `JoinLeaf`
 
-**From #2435 (F3 — eliminate \_nodes)**
+### PR B — F2 cleanup + F4 helpers + F5/F6 wiring (~270 LOC)
 
-- [ ] ~150 LOC: Delete `JoinNode` interface, fold properties onto `JoinPart` subclasses — `JoinNode` still exported and used by relation.ts (~6 call sites).
-- [ ] ~30 LOC: Delete `_pushTreeNode`, build tree nodes directly in `addAssociation` — blocked on JoinNode deletion.
-- [ ] ~20 LOC: Delete `JoinTreeNode` class — used as fallback when reflection is null.
+- [ ] ~220 LOC: Delete dead `_addThroughAssociation` + `_finishThroughTarget`
+- [ ] ~20–30 LOC: Add public `aliasTracker` getter + `findReflection` helper
+- [ ] ~50 LOC: Port `build` (depends on `checkValidity!` / `checkEagerLoadable!`)
+- [ ] ~30 LOC: Implement `associationCached` shortcut in `_constructRecursive`
+- [ ] ~10 LOC: Wire `_references` param in `joinConstraints`
+- [ ] ~30 LOC: Pass `column_types` from result set for extra-column type-casting
 
-**From #2447 (F5 — AliasTracker wiring)**
+### Already shipped (verified 2026-05-27)
 
-- [ ] `JoinAssociation#joinConstraints` accepts `aliasTracker` as 4th param but does not use it in the body — wired for signature parity only. Will matter when `make_constraints`/`@joined_tables` dedup is ported.
-- [ ] `_references` param on `JoinDependency#joinConstraints` is unused — Rails uses it for eager-load reference tracking.
-
-**From #2448 (F4 — nested hydration)**
-
-- [ ] ~20–30 LOC: add `aliasTracker` getter + `findReflection` helper to `join-dependency.ts` (brings api:compare to 19/21).
-- [ ] ~50 LOC: port `build` — depends on `reflection.checkValidity!` / `checkEagerLoadable!`.
-- [ ] ~30 LOC: implement `association_cached?` shortcut in `_constructRecursive` for singular already-cached associations.
-- [ ] ~20 LOC: move `setInverseInstance` call into `constructModel` before proxy wiring to match Rails ordering.
-- [ ] ~40 LOC: implement readonly/strictLoading propagation in `_constructRecursive`.
-
-**From #2430 (F6 — extra columns)**
-
-- [ ] ~30 LOC: Pass `column_types` from result set for proper type-casting of extra columns. Low priority — only matters if adapter returns uncast DB types for computed columns.
+- [x] `PolymorphicReflection.isCollection()` delegation — in `reflection.ts`
+- [x] `PolymorphicReflection#joinScopes` now passes `table` to `buildScope` — in `reflection.ts`
+- [x] `aliasTracker` wired into `JoinAssociation#joinConstraints` body — in `join-association.ts` / `join-dependency.ts`
+- [x] `checkEagerLoadable!` called — in `join-dependency.ts` `addAssociation`
+- [x] `setInverseInstance` call ordering — in `join-dependency.ts` `_wireAssociationProxy`
+- [x] readonly/strictLoading propagation — in `join-association.ts` `isReadonly` / `isStrictLoading`
 
 ## Non-goals
 
