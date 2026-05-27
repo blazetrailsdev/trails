@@ -1113,7 +1113,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(items).toHaveLength(1);
   });
 
-  it("include? - has many through", async () => {
+  it("include?", async () => {
     class HmtPerson extends Base {
       static {
         this.attribute("name", "string");
@@ -7389,7 +7389,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect((tags[0] as any).name).toBe("Ruby");
   });
 
-  it("tags has many posts through association with composite query constraints", async () => {
+  it("tags has manu posts through association with composite query constraints", async () => {
     // Rails: tag.blog_posts.to_a uses JOIN with composite blog_id constraint
     // Core: reverse of above — tags to posts through composite FK
     class CqTag2 extends Base {
