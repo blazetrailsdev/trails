@@ -41,8 +41,9 @@ export function lockingEnabled(modelClass: typeof Base): boolean {
 /**
  * Type wrapper for the lock_version column that ensures nil → 0 on
  * serialize/deserialize so passing nil doesn't trigger StaleObjectError.
- * cast() delegates unchanged to the subtype (no nil → 0 coercion), preserving
- * null for new records that explicitly pass nil — matching Rails' LockingType.
+ * cast() coerces null → 0; deserialize() and serialize() also coerce null → 0.
+ * Rails' LockingType has no cast() override but AR seeds defaults via
+ * from_database, so both paths produce 0 for new records with no lock default.
  *
  * Mirrors: ActiveRecord::Locking::LockingType
  */
@@ -56,12 +57,12 @@ export class LockingType extends ValueType<number> {
     this.name = subtype.name;
   }
 
-  // cast() intentionally does NOT coerce null → 0. Rails' LockingType also leaves cast()
-  // unchanged so that new records receiving an explicit nil get null, not 0. The nil → 0
-  // coercion was removed when hookAttributeType() was wired in #1366; serialize/deserialize
-  // still apply the coercion via toInt() to guard against StaleObjectError on persisted rows.
-  override cast(value: unknown): number | null {
-    return this._subtype.cast(value) as number | null;
+  // Diverges from Rails: Rails' LockingType has no cast() override (cast(nil) → nil).
+  // We coerce null → 0 here so that user-declared locking attributes (via
+  // this.attribute("lock_version", "integer")) also return 0 for new records,
+  // matching the observable behavior Rails gets via from_database initialization.
+  override cast(value: unknown): number {
+    return (this._subtype.cast(value) as number | null) ?? 0;
   }
 
   override deserialize(value: unknown): number {
@@ -221,7 +222,7 @@ export async function _updateRow(
   const baseConstraints = buildBaseConstraints(this, ctor);
   const updateConstraints = { ...baseConstraints, [col]: _lockValueForDatabase.call(this, col) };
 
-  attributeNames = [...attributeNames, col];
+  attributeNames = [...attributeNames.filter((n) => n !== col), col];
   this.writeAttribute(col, (Number(this.readAttribute(col)) || 0) + 1);
 
   try {

@@ -124,12 +124,14 @@ export function defineAttribute(
  *
  * Mirrors: ActiveRecord::Attributes::ClassMethods#_default_attributes
  *
- * Seeds from `_attributeDefinitions` (all entries — the equivalent of Rails'
- * `columns_hash`) then replays user-declared `attribute()` calls from the
- * pending-modification queue. Schema entries are built with
- * `Attribute.fromDatabase`; direct `defineAttribute()` entries use
- * `withCastValue`/`withUserDefault`. Matches Rails' two-phase approach:
- * `columns_hash` seed → `apply_pending_attribute_modifications`.
+ * Seeds from `_attributeDefinitions` then replays user-declared `attribute()`
+ * calls from the pending-modification queue. Entries with an explicit default
+ * use `Attribute.fromDatabase` (schema) or `withUserDefault` (user-declared).
+ * Entries without a default use `Attribute.fromDatabase(null, type)` for all
+ * attributes — mirroring Rails' `columns_hash.transform_values { from_database }`.
+ * Using `fromDatabase` (rather than `withCastValue`) means the type's
+ * `deserialize(null)` is called, which is required for `LockingType` to return
+ * 0 instead of null for new records that have no lock column default.
  */
 export function _defaultAttributes(this: AnyClass): AttributeSet {
   // For STI subclasses, delegate to the STI base so cache invalidation
@@ -142,11 +144,12 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     registerWithSuperclass(cacheHost);
 
     // Phase 1: seed from _attributeDefinitions (all entries — schema-reflected
-    // columns and direct defineAttribute() calls). Schema entries use
-    // Attribute.fromDatabase; user entries use withCastValue + withUserDefault.
-    // Mirrors: columns_hash.transform_values { Attribute.from_database(...) }
-    // (our _attributeDefinitions is the equivalent of columns_hash since both
-    // schema and user-direct entries live there).
+    // columns and direct defineAttribute() calls).
+    // For entries with a default: schema columns use fromDatabase, user-declared
+    // columns use withCastValue + withUserDefault (preserving user semantics).
+    // For entries without a default: all entries use fromDatabase(null, type),
+    // mirroring Rails' columns_hash.transform_values { Attribute.from_database(...) }.
+    // The fromDatabase path matters for LockingType: deserialize(null) → 0.
     const defs: Map<string, AttributeDefinition> = cacheHost._attributeDefinitions;
     const attrMap = new Map<string, Attribute>();
     for (const [name, def] of defs) {
@@ -160,7 +163,10 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
           attrMap.set(name, base.withUserDefault(def.defaultValue));
         }
       } else {
-        attrMap.set(name, Attribute.withCastValue(name, null, def.type));
+        // Seed via fromDatabase(null, type), mirroring Rails'
+        // columns_hash.transform_values { Attribute.from_database(col.name, col.default, type) }.
+        // This matters for LockingType: deserialize(null) → 0, not null.
+        attrMap.set(name, Attribute.fromDatabase(name, null, def.type));
       }
     }
 

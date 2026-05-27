@@ -1,5 +1,5 @@
-import { beforeAll, afterAll } from "vitest";
-import { bootstrapTestHandler } from "./bootstrap-test-handler.js";
+import { beforeAll, beforeEach, afterAll } from "vitest";
+import { bootstrapTestHandler, syncHandlerVisitor } from "./bootstrap-test-handler.js";
 import { pushSkipGlobalReset, popSkipGlobalReset } from "./skip-global-reset.js";
 
 /**
@@ -16,6 +16,11 @@ export function setupHandlerSuite(): void {
   beforeAll(async () => {
     await bootstrapTestHandler();
     pushSkipGlobalReset();
+  });
+  // Re-sync after every test because test-setup.ts afterEach resets the
+  // global visitor to the default Visitors.ToSql.
+  beforeEach(() => {
+    syncHandlerVisitor();
   });
   afterAll(() => {
     popSkipGlobalReset();
