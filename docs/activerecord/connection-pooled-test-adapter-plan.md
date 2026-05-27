@@ -5,7 +5,7 @@
 > - A0 spike, B (#2242), C (#2245): shipped
 > - **D-X driver-pool collapse:** PG (#2279) + MySQL (#2278) — shipped. All three adapters now single-connection per adapter, Rails-shape.
 > - **D-Y central canonical schema:** #2372 shipped. Per-worker preload + additive `defineSchema` fast-path. ~18 sites annotated `D-Y-INCOMPATIBLE`.
-> - **D-1..N bypass elimination (Model.adapter = X):** 7 codemod variants + 18 bespoke/bundle PRs shipped. **~97 files fully cleared; 38 remaining** (verified grep). Three giants (calculations, finder, inheritance) all shipped. Remaining is long-tail bundles.
+> - **D-1..N bypass elimination (Model.adapter = X):** **~124 files fully cleared; 11 remaining** (verified grep 2026-05-27 17:45 UTC). Giants shipped: calculations, finder, inheritance, cascaded-eager-loading, instrumentation, nested-attributes, has-one-associations, scoping+delete-all, attribute-methods+migration, locking-bundle (#2496 enum cluster), nested-through+multiparam (#2499), join-model (#2495), sanitize (#2480), relation/where (#2506), autosave-association (#2509), has-one-through+default-scoping (#2505), enum+singles+uniqueness (#2496). Remaining 11: 3 singles (dirty/migration/tx-instr 1 site each — partial-clearing in #2507), locking (32, in flight), transactions (81, in flight), base (172, in flight), persistence (214, in flight), relations (234), associations (407), has-many-associations (443), has-many-through (485).
 > - Phase E (delete singleton/AsyncContext filter): gated on D-1..N reaching critical mass.
 > - Phase F (move DDL tracking onto AbstractAdapter): open; bundles with TM Phase 9b-4 absorption.
 > - Phase G (fixture adoption): batch 1 shipped (#2391, 2 files). Tracked separately in [`fixtures-adoption-plan.md`](fixtures-adoption-plan.md).
@@ -350,6 +350,9 @@ bundle PRs (the current pattern). Each bundle clears 1–4 files at ~250 LOC.
 - Finder tests use `seedUsers()` helpers instead of fixtures — Phase G scope (#2436).
 - Collection-cache-key test doesn't use real Arel table alias (#2453).
 - `select.test.ts` still needs D-1 conversion (7 bypass sites) (#2456).
+- **#2480 (sanitize):** 6 skips remain — `disallow_raw_sql!` ×2 (column-ref checks), `sanitize_sql_array_handles_relations` (Relation#toSql integration), `named_bind_with_postgresql_type_casts` (PG-specific), 2 boolean-quoting D-Y-INCOMPATIBLE. `castBoundValue` only reachable via `as unknown as` cast → missing from `DatabaseAdapter` interface.
+- **#2484 (has-one-associations):** clean conversion; 28 skips carry pre-existing BLOCKED association-proxy rationale (`loadHasOne` vs `firm.account`).
+- **#2506 (relation/where):** 31 skips all carry rationale; common blocker is the polymorphic/association/composite-PK WHERE clause gap in `relation/where-clause.ts`. Worth a dedicated implementation PR after D-1 closes.
 
 ### Phase E — Delete `_sharedAdapter`, `AsyncContext` filter, manual TX depth
 
