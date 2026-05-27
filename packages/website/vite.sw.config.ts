@@ -58,7 +58,7 @@ export default defineConfig({
       pkgAlias("@blazetrails/globalid/signed-global-id", "../globalid/src/signed-global-id.ts"),
       pkgAlias("@blazetrails/globalid", "../globalid/src/index.ts"),
       pkgAlias("@blazetrails/did-you-mean", "../did-you-mean/src/index.ts"),
-      pkgAlias("@blazetrails/nokogiri", "../nokogiri/src/index.ts"),
+      pkgAlias("@blazetrails/nokogiri", "src/stubs/nokogiri-stub.ts"),
     ],
   },
   build: {
