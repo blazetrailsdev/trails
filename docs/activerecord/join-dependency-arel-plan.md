@@ -1,6 +1,6 @@
 # JoinDependency → Full Rails Fidelity Plan
 
-All plan PRs (1–7b, F2–F6) have shipped.
+All plan PRs (1–7b, F1–F6) have shipped.
 ([merged PR list](https://github.com/blazetrailsdev/trails/pulls?q=is%3Apr+is%3Amerged+JoinDependency+OR+JoinAssociation+OR+AliasTracker+OR+%22join-dependency%22))
 
 ## Post-merge follow-ups
