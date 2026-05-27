@@ -13,28 +13,22 @@ function isTemporalDatetime(v: unknown): boolean {
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, RecordNotFound } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // ==========================================================================
 // PersistenceTest — targets persistence_test.rb
 // ==========================================================================
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       topics: { title: "string", body: "string", replies_count: "integer" },
       minimals: {},
     });
@@ -44,7 +38,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const topic = new Topic();
@@ -55,11 +48,7 @@ describe("PersistenceTest", () => {
   });
 
   it("save for record with only primary key", async () => {
-    class Minimal extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class Minimal extends Base {}
     const m = new Minimal();
     await m.save();
     expect(m.isPersisted()).toBe(true);
@@ -69,7 +58,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -81,7 +69,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -93,7 +80,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "a" });
@@ -105,7 +91,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "a" });
@@ -118,7 +103,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "a" });
@@ -130,7 +114,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Topic.create({ title: "a" });
@@ -143,7 +126,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "original" });
@@ -156,7 +138,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "a" });
@@ -169,7 +150,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("replies_count", "integer");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ replies_count: 0 });
@@ -181,7 +161,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("replies_count", "integer");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ replies_count: 0 });
@@ -193,7 +172,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("replies_count", "integer");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ replies_count: 10 });
@@ -205,7 +183,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("replies_count", "integer");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ replies_count: 10 });
@@ -217,7 +194,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "a" });
@@ -230,7 +206,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -243,7 +218,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old", body: "old" });
@@ -256,7 +230,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await expect(Topic.find(999)).rejects.toThrow(RecordNotFound);
@@ -266,7 +239,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "a" });
@@ -279,7 +251,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -292,7 +263,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -310,7 +280,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -326,7 +295,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Topic.create({ title: "a" });
@@ -343,7 +311,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const result = await Topic.create([{ title: "a" }, { title: "b" }]);
@@ -356,7 +323,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const result = await Topic.createBang([{ title: "a" }, { title: "b" }]);
@@ -369,7 +335,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const single = Topic.build({ title: "a" }, (r) => {
@@ -387,7 +352,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const result = Topic.new([{ title: "a" }, { title: "b" }]);
@@ -401,7 +365,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "a" }, (record) => {
@@ -419,7 +382,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validatesPresenceOf("title");
       }
     }
@@ -438,7 +400,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     let calls = 0;
@@ -453,7 +414,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "a" });
@@ -467,10 +427,10 @@ describe("PersistenceTest", () => {
 // More PersistenceTest
 // ==========================================================================
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       topics: { title: "string", updated_at: "datetime" },
       counters: { count: "integer" },
     });
@@ -480,7 +440,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validatesPresenceOf("title");
       }
     }
@@ -491,7 +450,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -505,7 +463,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "a" });
@@ -518,7 +475,6 @@ describe("PersistenceTest", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const c = new Counter();
@@ -530,7 +486,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "a" });
@@ -544,17 +499,14 @@ describe("PersistenceTest", () => {
 // PersistenceTest (continued) — more persistence_test.rb coverage
 // ==========================================================================
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       items: { label: "string" },
       posts: { title: "string", body: "string" },
       cm_items: { title: "string" },
     });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   it("fills auto populated columns on creation", async () => {
@@ -563,7 +515,6 @@ describe("PersistenceTest", () => {
         this.attribute("label", "string");
       }
     }
-    Item.adapter = adapter;
     const record = await Item.create({ label: "x" });
     expect(record.id).not.toBeNull();
     expect(record.isPersisted()).toBe(true);
@@ -575,7 +526,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
       }
     }
-    Post.adapter = adapter;
     const post = Post.new({ title: "built" });
     expect((post as any).title).toBe("built");
     expect((post as any).isNewRecord()).toBe(true);
@@ -587,7 +537,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
       }
     }
-    Post.adapter = adapter;
     const posts = [{ title: "a" }, { title: "b" }].map((attrs) => Post.new(attrs));
     expect(posts.length).toBe(2);
     expect(posts.every((p) => (p as any).isNewRecord())).toBe(true);
@@ -599,7 +548,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
       }
     }
-    Post.adapter = adapter;
     const post = (await Post.create({ title: null })) as any;
     expect(post.id).toBeDefined();
   });
@@ -610,7 +558,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
       }
     }
-    Post.adapter = adapter;
     const post = (await Post.create({ title: undefined })) as any;
     expect(post.id).toBeDefined();
   });
@@ -621,7 +568,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
       }
     }
-    CmItem.adapter = adapter;
     const items = await Promise.all([
       CmItem.create({ title: "a" }),
       CmItem.create({ title: "b" }),
@@ -637,7 +583,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
       }
     }
-    Post.adapter = adapter;
     const p1 = (await Post.create({ title: "a" })) as any;
     const p2 = (await Post.create({ title: "b" })) as any;
     await Post.delete(p1.id);
@@ -652,7 +597,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
       }
     }
-    Post.adapter = adapter;
     const p = (await Post.create({ title: "original" })) as any;
     await Post.update(p.id, { title: "updated" });
     const found = (await Post.find(p.id)) as any;
@@ -665,7 +609,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
       }
     }
-    Post.adapter = adapter;
     await expect(Post.find(99999)).rejects.toThrow();
   });
 
@@ -675,7 +618,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
       }
     }
-    Post.adapter = adapter;
     const p = (await Post.create({ title: "original" })) as any;
     await p.update({ title: "updated" });
     expect(p.title).toBe("updated");
@@ -687,7 +629,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
       }
     }
-    Post.adapter = adapter;
     const p1 = (await Post.create({ title: "a" })) as any;
     const p2 = (await Post.create({ title: "b" })) as any;
     await p1.update({ title: "a2" });
@@ -702,7 +643,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
       }
     }
-    Post.adapter = adapter;
     const p = Post.new({}) as any;
     expect(p.errors).toBeDefined();
   });
@@ -714,7 +654,6 @@ describe("PersistenceTest", () => {
         this.attribute("body", "string");
       }
     }
-    Post.adapter = adapter;
     const p = (await Post.create({ title: "t" })) as any;
     expect(p.id).toBeDefined();
   });
@@ -724,11 +663,11 @@ describe("PersistenceTest", () => {
 // PersistenceTest2 — additional coverage for persistence_test.rb
 // ==========================================================================
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   let Post: typeof Base;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       posts: { title: "string", body: "string" },
       cb_posts: { title: "string" },
       special_posts: { title: "string", body: "string" },
@@ -744,11 +683,7 @@ describe("PersistenceTest", () => {
         this.attribute("body", "string");
       }
     }
-    PostClass.adapter = adapter;
     Post = PostClass;
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   it("delete", async () => {
@@ -806,7 +741,6 @@ describe("PersistenceTest", () => {
         this.attribute("name", "string");
       }
     }
-    Item.adapter = adapter;
     expect(Item.primaryKey).toBe("uuid");
   });
 
@@ -817,7 +751,6 @@ describe("PersistenceTest", () => {
         this.attribute("updated_at", "datetime");
       }
     }
-    TimedPost.adapter = adapter;
     const p = await TimedPost.create({ title: "timed" });
     await p.updateColumn("title", "changed");
     expect(p.title).toBe("changed");
@@ -865,7 +798,6 @@ describe("PersistenceTest", () => {
         });
       }
     }
-    CBPost.adapter = adapter;
     const p = await CBPost.create({});
     expect(p.title).toBe("default");
   });
@@ -890,7 +822,6 @@ describe("PersistenceTest", () => {
         this.tableName = "special_posts";
       }
     }
-    SpecialPost.adapter = adapter;
     const sp = await SpecialPost.create({ title: "special" });
     expect(sp.isPersisted()).toBe(true);
   });
@@ -913,7 +844,6 @@ describe("PersistenceTest", () => {
         this.attribute("count", "integer", { default: 0 });
       }
     }
-    CountPost.adapter = adapter;
     const p = await CountPost.create({});
     p.increment("count");
     expect(p.count).toBe(1);
@@ -926,7 +856,6 @@ describe("PersistenceTest", () => {
         this.attribute("count", "integer", { default: 5 });
       }
     }
-    CountPost2.adapter = adapter;
     const p = await CountPost2.create({});
     p.decrement("count");
     expect(p.count).toBe(4);
@@ -946,7 +875,6 @@ describe("PersistenceTest", () => {
         this.attribute("created_at", "datetime");
       }
     }
-    TSPost.adapter = adapter;
     const p = await TSPost.create({ title: "ts" });
     expect(p.isPersisted()).toBe(true);
   });
@@ -990,10 +918,10 @@ describe("PersistenceTest", () => {
 // PersistenceTest3 — additional missing tests from persistence_test.rb
 // ==========================================================================
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       default_records: { name: "string" },
       posts: { title: "string", views: "integer", updated_at: "string" },
     });
@@ -1009,7 +937,6 @@ describe("PersistenceTest", () => {
     class DefaultRecord extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const record = await DefaultRecord.create({ name: "test" });
@@ -1057,7 +984,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("views", "integer");
         this.attribute("updated_at", "string");
-        this.adapter = adapter;
       }
     }
     const p = (await Post.create({ views: 5 })) as any;
@@ -1073,7 +999,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "factory" });
@@ -1083,7 +1008,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "factory2" });
@@ -1105,7 +1029,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "old" });
@@ -1156,11 +1079,11 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       animals: { name: "string", type: "string" },
       dogs: { name: "string", type: "string" },
       minimals: {},
@@ -1188,7 +1111,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("created_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const now = Temporal.Now.instant();
@@ -1204,7 +1126,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -1224,7 +1145,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -1239,7 +1159,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
         this.attribute("body", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old", body: "content" });
@@ -1255,7 +1174,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1278,7 +1196,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t1 = await Topic.createBang({ title: "a" });
@@ -1291,7 +1208,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -1303,7 +1219,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -1316,7 +1231,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1330,14 +1244,12 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
-        this.adapter = adapter;
       }
     }
     class Dog extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
-        this.adapter = adapter;
       }
     }
     const a = await Animal.create({ name: "Rex" });
@@ -1351,13 +1263,11 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true });
-        this.adapter = adapter;
       }
     }
     class OtherTopic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = new Topic({});
@@ -1372,13 +1282,11 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class OtherTopic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1391,13 +1299,11 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class OtherTopic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1409,13 +1315,11 @@ describe("PersistenceTest", () => {
     class Animal extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Dog extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const a = await Animal.create({ name: "Rex" });
@@ -1429,7 +1333,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -1442,7 +1345,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1457,7 +1359,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1469,7 +1370,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = new Topic({ title: "instantiated" });
@@ -1481,7 +1381,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1493,7 +1392,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -1510,7 +1408,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
         this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1523,7 +1420,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -1546,7 +1442,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Topic.create({ title: "a" });
@@ -1559,7 +1454,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Topic.create({ title: "a" });
@@ -1572,7 +1466,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Topic.create({ title: "a" });
@@ -1584,7 +1477,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await expect(Topic.find(null as any)).rejects.toThrow();
@@ -1594,7 +1486,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "original" });
@@ -1607,7 +1498,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1620,7 +1510,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1632,7 +1521,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = new Topic({ title: "test" });
@@ -1645,7 +1533,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = new Topic({ title: "test" });
@@ -1657,7 +1544,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "original" });
@@ -1671,7 +1557,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("active", "boolean", { default: false });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ active: false });
@@ -1685,7 +1570,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ count: 5 });
@@ -1701,7 +1585,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ count: 0 });
@@ -1719,7 +1602,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ count: 10 });
@@ -1736,7 +1618,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ count: 1, updated_at: instant("2020-01-01T00:00:00Z") });
@@ -1752,7 +1633,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -1763,7 +1643,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -1778,7 +1657,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -1791,7 +1669,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -1804,7 +1681,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const t = new Topic();
@@ -1816,7 +1692,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("count", "integer");
-        this.adapter = adapter;
       }
     }
     const t = new Topic();
@@ -1828,7 +1703,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ count: 0 });
@@ -1842,7 +1716,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("count", "integer", { default: 0 });
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ count: 0 });
@@ -1854,7 +1727,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -1867,7 +1739,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await expect(Topic.destroy([99999])).rejects.toThrow();
@@ -1879,7 +1750,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -1893,7 +1763,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Topic.create({ title: "a" });
@@ -1916,7 +1785,6 @@ describe("PersistenceTest", () => {
         this.attribute("order_id", "integer");
         this.attribute("item_name", "string");
         this.primaryKey = ["shop_id", "order_id"];
-        this.adapter = adapter;
       }
     }
     await OrderItem.create({ shop_id: 1, order_id: 10, item_name: "A" });
@@ -1943,7 +1811,6 @@ describe("PersistenceTest", () => {
         this.attribute("order_id", "integer");
         this.attribute("item_name", "string");
         this.primaryKey = ["shop_id", "order_id"];
-        this.adapter = adapter;
       }
     }
     await OrderItem.create({ shop_id: 1, order_id: 10, item_name: "A" });
@@ -1963,7 +1830,6 @@ describe("PersistenceTest", () => {
         this.attribute("order_id", "integer");
         this.attribute("item_name", "string");
         this.primaryKey = ["shop_id", "order_id"];
-        this.adapter = adapter;
       }
     }
     await OrderItem.create({ shop_id: 1, order_id: 10, item_name: "A" });
@@ -1978,7 +1844,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "prefetched" });
@@ -1990,7 +1855,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const topics = [{ title: "a" }, { title: "b" }].map((attrs) => Topic.new(attrs));
@@ -1999,11 +1863,7 @@ describe("PersistenceTest", () => {
   });
 
   it("save for record with only primary key that is provided", async () => {
-    class Minimal extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class Minimal extends Base {}
     const m = new Minimal();
     await m.save();
     expect(m.isPersisted()).toBe(true);
@@ -2015,7 +1875,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -2025,11 +1884,7 @@ describe("PersistenceTest", () => {
   });
 
   it("update for record with only primary key", async () => {
-    class Minimal extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class Minimal extends Base {}
     const m = await Minimal.create({});
     await m.update({});
     expect(m.isPersisted()).toBe(true);
@@ -2039,7 +1894,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "v1" });
@@ -2052,7 +1906,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "same" });
@@ -2065,7 +1918,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await expect(Topic.update(99999, { title: "x" })).rejects.toThrow();
@@ -2076,7 +1928,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "a", body: "b" });
@@ -2090,7 +1941,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -2104,7 +1954,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -2117,7 +1966,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -2129,7 +1977,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -2143,7 +1990,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "a", body: "b" });
@@ -2158,7 +2004,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -2172,7 +2017,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -2188,7 +2032,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -2203,7 +2046,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old", body: "content" });
@@ -2217,7 +2059,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "a", body: "b" });
@@ -2231,7 +2072,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -2244,7 +2084,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -2256,7 +2095,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -2268,7 +2106,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     // Deleting a non-existent id should not throw, just return 0
@@ -2280,7 +2117,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -2292,7 +2128,6 @@ describe("PersistenceTest", () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const t = await Topic.create({ title: "old" });
@@ -2306,7 +2141,6 @@ describe("PersistenceTest", () => {
       class Topic extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adapter;
         }
       }
       const t = await Topic.create({ title: "test" });
@@ -2319,16 +2153,13 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       users: { name: "string", age: "integer", email: "string" },
       posts: { title: "string", created_at: "datetime", updated_at: "datetime" },
     });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   it("update column", async () => {
@@ -2338,7 +2169,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -2360,7 +2190,6 @@ describe("PersistenceTest", () => {
         this.attribute("name", "string");
         this.attribute("email", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
 
@@ -2377,7 +2206,6 @@ describe("PersistenceTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2392,7 +2220,6 @@ describe("PersistenceTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2406,7 +2233,6 @@ describe("PersistenceTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2417,23 +2243,19 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       users: { name: "string", email: "string" },
       posts: { title: "string", created_at: "datetime", updated_at: "datetime" },
     });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   it("update does not run sql if record has not changed", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2447,7 +2269,6 @@ describe("PersistenceTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2465,7 +2286,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -2483,7 +2303,6 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
         this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
 
@@ -2504,7 +2323,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
 
@@ -2519,10 +2337,10 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { items: { name: "string" } });
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ items: { name: "string" } });
   });
 
   it("destroyBy destroys matching records with callbacks", async () => {
@@ -2531,7 +2349,6 @@ describe("PersistenceTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
 
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
@@ -2548,7 +2365,6 @@ describe("PersistenceTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
 
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
@@ -2560,10 +2376,10 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { items: { status: "string" } });
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ items: { status: "string" } });
   });
 
   it("updates all records", async () => {
@@ -2572,7 +2388,6 @@ describe("PersistenceTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("status", "string");
-    Item.adapter = adapter;
 
     await Item.create({ status: "old" });
     await Item.create({ status: "old" });
@@ -2584,10 +2399,10 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { items: { name: "string" } });
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ items: { name: "string" } });
   });
 
   it("finds and updates a record by id", async () => {
@@ -2596,7 +2411,6 @@ describe("PersistenceTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
 
     const item = await Item.create({ name: "Old" });
     const updated = await Item.update(item.id, { name: "New" });
@@ -2605,10 +2419,10 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { items: { name: "string" } });
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ items: { name: "string" } });
   });
 
   it("destroys all records", async () => {
@@ -2617,7 +2431,6 @@ describe("PersistenceTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
 
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
@@ -2628,13 +2441,10 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { users: { name: "string" } });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ users: { name: "string" } });
   });
 
   it("skips validation when validate: false", async () => {
@@ -2643,7 +2453,6 @@ describe("PersistenceTest", () => {
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
     User.validates("name", { presence: true });
 
     const user = new User({ name: "" });
@@ -2656,15 +2465,12 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       posts: { title: "string", updated_at: "datetime" },
     });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   it("skips timestamp updates on save", async () => {
@@ -2674,7 +2480,6 @@ describe("PersistenceTest", () => {
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
     Post.attribute("updated_at", "datetime");
-    Post.adapter = adapter;
 
     const post = await Post.create({ title: "Hello" });
     const originalUpdatedAt = post.updated_at;
@@ -2694,7 +2499,6 @@ describe("PersistenceTest", () => {
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
     Post.attribute("updated_at", "datetime");
-    Post.adapter = adapter;
 
     const post = await Post.create({ title: "Hello" });
     const originalUpdatedAt = post.updated_at;
@@ -2707,13 +2511,10 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { users: { name: "string", email: "string" } });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ users: { name: "string", email: "string" } });
   });
 
   it("updates a single attribute and saves, skipping validations", async () => {
@@ -2723,7 +2524,6 @@ describe("PersistenceTest", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("email", "string");
-    User.adapter = adapter;
     User.validates("email", { presence: true });
 
     const user = await User.create({ name: "Alice", email: "alice@test.com" });
@@ -2735,13 +2535,10 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { users: { name: "string" } });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ users: { name: "string" } });
   });
 
   it("destroys a single record by id", async () => {
@@ -2750,7 +2547,6 @@ describe("PersistenceTest", () => {
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
 
     const user = await User.create({ name: "Alice" });
     await User.destroy(user.id);
@@ -2763,7 +2559,6 @@ describe("PersistenceTest", () => {
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
 
     const u1 = await User.create({ name: "Alice" });
     const u2 = await User.create({ name: "Bob" });
@@ -2775,13 +2570,10 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { users: { name: "string" } });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ users: { name: "string" } });
   });
 
   it("updates and raises on validation failure", async () => {
@@ -2791,7 +2583,6 @@ describe("PersistenceTest", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.validates("name", { presence: true });
-    User.adapter = adapter;
 
     const user = await User.create({ name: "Alice" });
     const updated = await User.updateBang(user.id, { name: "Bob" });
@@ -2802,10 +2593,10 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       posts: { title: "string", body: "string", views: "integer", published: "boolean" },
       animals: { name: "string" },
       dogs: { name: "string" },
@@ -2816,7 +2607,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = new Post({ title: "Hello" });
@@ -2829,7 +2619,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true });
-        this.adapter = adapter;
       }
     }
     const p = new Post();
@@ -2842,7 +2631,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true });
-        this.adapter = adapter;
       }
     }
     const p = new Post();
@@ -2853,7 +2641,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Test" });
@@ -2866,7 +2653,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true });
-        this.adapter = adapter;
       }
     }
     await expect(Post.createBang({})).rejects.toThrow("Validation failed");
@@ -2877,7 +2663,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true });
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({});
@@ -2890,7 +2675,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Old" });
@@ -2904,7 +2688,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true });
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Hello" });
@@ -2915,7 +2698,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Hello" });
@@ -2930,7 +2712,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => {
           log.push("before_destroy");
         });
@@ -2946,7 +2727,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "A" });
@@ -2959,7 +2739,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("views", "integer");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ views: 5 });
@@ -2971,7 +2750,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("views", "integer");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ views: 5 });
@@ -2983,7 +2761,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("views", "integer");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({});
@@ -2995,7 +2772,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("views", "integer");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ views: 5 });
@@ -3007,7 +2783,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("published", "boolean");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ published: false });
@@ -3021,13 +2796,11 @@ describe("PersistenceTest", () => {
     class Animal extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Dog extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const animal = await Animal.create({ name: "Rex" });
@@ -3040,7 +2813,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Hello" });
@@ -3052,7 +2824,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "A" });
@@ -3066,7 +2837,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     await Post.create({ title: "A" });
@@ -3078,7 +2848,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Old" });
@@ -3090,7 +2859,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Original" });
@@ -3103,7 +2871,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Hello" });
@@ -3115,7 +2882,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Old" });
@@ -3131,7 +2897,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true });
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -3149,7 +2914,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Old", body: "content" });
@@ -3163,7 +2927,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = new Post({ title: "Hello" });
@@ -3174,7 +2937,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Hello" });
@@ -3186,7 +2948,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Hello" });
@@ -3198,7 +2959,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const original = await Post.create({ title: "Original" });
@@ -3210,7 +2970,8 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Post extends Base {
     static {
@@ -3219,14 +2980,12 @@ describe("PersistenceTest", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       posts: { title: "string", body: "string" },
       requireds: { name: "string" },
       trackeds: { name: "string" },
     });
-    Post.adapter = adapter;
   });
 
   // -- save --
@@ -3262,7 +3021,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     await expect(Required.createBang({})).rejects.toThrow("Validation failed");
@@ -3287,7 +3045,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     const r = await Required.create({ name: "valid" });
@@ -3300,7 +3057,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     const r = await Required.create({ name: "valid" });
@@ -3335,7 +3091,6 @@ describe("PersistenceTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => {
           log.push("before_destroy");
         });
@@ -3362,7 +3117,6 @@ describe("PersistenceTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => {
           log.push("before_destroy");
         });
@@ -3391,7 +3145,6 @@ describe("PersistenceTest", () => {
     expect(p.isPersisted()).toBe(false);
 
     await p.save();
-    Post.adapter = adapter;
     expect(p.isPersisted()).toBe(true);
 
     await p.destroy();
@@ -3408,7 +3161,8 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Topic extends Base {
     static {
@@ -3418,17 +3172,12 @@ describe("PersistenceTest", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Topic.adapter = adapter;
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       topics: { title: "string", content: "string", approved: "boolean" },
       validateds: { title: "string" },
       trackeds: { title: "string" },
     });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   it("update column", async () => {
@@ -3450,7 +3199,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true });
-        this.adapter = adapter;
       }
     }
 
@@ -3466,7 +3214,6 @@ describe("PersistenceTest", () => {
     class Tracked extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -3524,7 +3271,8 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Topic extends Base {
     static {
@@ -3535,10 +3283,8 @@ describe("PersistenceTest", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Topic.adapter = adapter;
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       topics: {
         title: "string",
         created_at: "datetime",
@@ -3547,9 +3293,6 @@ describe("PersistenceTest", () => {
       },
       trackeds: { title: "string", updated_at: "datetime" },
     });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   it("touching a record updates its timestamp", async () => {
@@ -3577,7 +3320,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -3592,7 +3334,8 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class User extends Base {
     static {
@@ -3604,10 +3347,8 @@ describe("PersistenceTest", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    User.adapter = adapter;
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       users: {
         name: "string",
         email: "string",
@@ -3616,9 +3357,6 @@ describe("PersistenceTest", () => {
         updated_at: "datetime",
       },
     });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   // Rails: test_save_with_no_changes
@@ -3709,16 +3447,13 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       posts: { title: "string", status: "string" },
     });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   // Rails: test_update_all
@@ -3727,7 +3462,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("status", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3751,7 +3485,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -3775,7 +3508,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => {
           log.push("before_destroy");
         });
@@ -3799,7 +3531,6 @@ describe("PersistenceTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.beforeDestroy((record: any) => {
           destroyed.push(record.title);
         });
@@ -3816,11 +3547,11 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       users: {
         name: "string",
         email: "string",
@@ -3828,9 +3559,6 @@ describe("PersistenceTest", () => {
         last_login_at: "datetime",
       },
     });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   // Rails: test_update_column_does_not_trigger_callbacks
@@ -3841,7 +3569,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
         this.beforeSave(() => {
           log.push("before_save");
         });
@@ -3865,7 +3592,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
 
@@ -3883,7 +3609,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
 
@@ -3901,7 +3626,6 @@ describe("PersistenceTest", () => {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
         this.attribute("last_login_at", "datetime");
-        this.adapter = adapter;
       }
     }
 
@@ -3918,7 +3642,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
 
@@ -3930,13 +3653,10 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { users: { name: "string" } });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ users: { name: "string" } });
   });
 
   it("returns false before first save", () => {
@@ -3945,7 +3665,6 @@ describe("PersistenceTest", () => {
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
 
     const user = new User({ name: "Alice" });
     expect(user.isPreviouslyNewRecord()).toBe(false);
@@ -3957,7 +3676,6 @@ describe("PersistenceTest", () => {
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
 
     const user = new User({ name: "Alice" });
     await user.save();
@@ -3971,7 +3689,6 @@ describe("PersistenceTest", () => {
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
 
     const user = await User.create({ name: "Alice" });
     expect(user.isPreviouslyNewRecord()).toBe(true);
@@ -3981,23 +3698,19 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       counters: { hits: "integer", count: "integer", stock: "integer" },
       features: { enabled: "boolean", active: "boolean" },
     });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   it("increment attribute", () => {
     class Counter extends Base {
       static {
         this.attribute("hits", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const c = new Counter();
@@ -4011,7 +3724,6 @@ describe("PersistenceTest", () => {
     class Counter extends Base {
       static {
         this.attribute("stock", "integer", { default: 10 });
-        this.adapter = adapter;
       }
     }
     const c = new Counter();
@@ -4023,7 +3735,6 @@ describe("PersistenceTest", () => {
     class Feature extends Base {
       static {
         this.attribute("enabled", "boolean", { default: false });
-        this.adapter = adapter;
       }
     }
     const f = new Feature();
@@ -4035,7 +3746,6 @@ describe("PersistenceTest", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const c = await Counter.create({ count: 10 });
@@ -4048,7 +3758,6 @@ describe("PersistenceTest", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const c = await Counter.create({ count: 10 });
@@ -4061,7 +3770,6 @@ describe("PersistenceTest", () => {
     class Feature extends Base {
       static {
         this.attribute("active", "boolean", { default: true });
-        this.adapter = adapter;
       }
     }
     const f = await Feature.create({ active: true });
@@ -4072,23 +3780,19 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
       counters: { count: "integer", a: "integer", b: "integer" },
       features: { active: "boolean" },
     });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   it("increment attribute", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const c = new Counter();
@@ -4100,7 +3804,6 @@ describe("PersistenceTest", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 5 });
-        this.adapter = adapter;
       }
     }
     const c = new Counter();
@@ -4112,7 +3815,6 @@ describe("PersistenceTest", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 10 });
-        this.adapter = adapter;
       }
     }
     const c = new Counter();
@@ -4124,7 +3826,6 @@ describe("PersistenceTest", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 10 });
-        this.adapter = adapter;
       }
     }
     const c = new Counter();
@@ -4136,7 +3837,6 @@ describe("PersistenceTest", () => {
     class Feature extends Base {
       static {
         this.attribute("active", "boolean", { default: false });
-        this.adapter = adapter;
       }
     }
     const f = new Feature();
@@ -4150,7 +3850,6 @@ describe("PersistenceTest", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const c = await Counter.create({ count: 5 });
@@ -4163,7 +3862,6 @@ describe("PersistenceTest", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const c = await Counter.create({ count: 5 });
@@ -4176,7 +3874,6 @@ describe("PersistenceTest", () => {
     class Feature extends Base {
       static {
         this.attribute("active", "boolean", { default: false });
-        this.adapter = adapter;
       }
     }
     const f = await Feature.create({ active: false });
@@ -4190,7 +3887,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("a", "integer", { default: 0 });
         this.attribute("b", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const c = new Counter();
@@ -4201,13 +3897,10 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    await defineSchema(adapter, { users: { name: "string" } });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({ users: { name: "string" } });
   });
 
   it("createBang throws on validation failure", async () => {
@@ -4215,7 +3908,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     await expect(User.createBang({})).rejects.toThrow("Validation failed");
@@ -4226,7 +3918,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -4237,7 +3928,6 @@ describe("PersistenceTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -4250,7 +3940,6 @@ describe("PersistenceTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeDestroy(() => {
           log.push("before_destroy");
         });
@@ -4266,7 +3955,6 @@ describe("PersistenceTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice" });
@@ -4278,7 +3966,6 @@ describe("PersistenceTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = await User.create({ name: "Alice" });
@@ -4287,7 +3974,8 @@ describe("PersistenceTest", () => {
   });
 });
 describe("PersistenceTest", () => {
-  let adapter: DatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
   class Article extends Base {
     static {
@@ -4297,10 +3985,8 @@ describe("PersistenceTest", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
-    Article.adapter = adapter;
-    await defineSchema(adapter, {
+  beforeAll(async () => {
+    await defineSchema({
       articles: { title: "string", body: "string", views: "integer" },
       validateds: { name: "string" },
       requireds: { name: "string" },
@@ -4308,9 +3994,6 @@ describe("PersistenceTest", () => {
       posts: { title: "string", body: "string" },
       users: { name: "string" },
     });
-  });
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 
   describe("save", () => {
@@ -4335,7 +4018,6 @@ describe("PersistenceTest", () => {
         static {
           this.attribute("name", "string");
           this.validates("name", { presence: true });
-          this.adapter = adapter;
         }
       }
       const v = new Validated();
@@ -4347,7 +4029,6 @@ describe("PersistenceTest", () => {
         static {
           this.attribute("name", "string");
           this.validates("name", { presence: true });
-          this.adapter = adapter;
         }
       }
       const v = new Validated();
@@ -4362,7 +4043,6 @@ describe("PersistenceTest", () => {
         static {
           this.attribute("name", "string");
           this.validates("name", { presence: true });
-          this.adapter = adapter;
         }
       }
       const r = new Required();
@@ -4395,7 +4075,6 @@ describe("PersistenceTest", () => {
         static {
           this.attribute("name", "string");
           this.validates("name", { presence: true });
-          this.adapter = adapter;
         }
       }
       await expect(Required.createBang({})).rejects.toThrow();
@@ -4421,7 +4100,6 @@ describe("PersistenceTest", () => {
         static {
           this.attribute("name", "string");
           this.validates("name", { presence: true });
-          this.adapter = adapter;
         }
       }
       const v = await Validated.create({ name: "ok" });
@@ -4436,7 +4114,6 @@ describe("PersistenceTest", () => {
         static {
           this.attribute("name", "string");
           this.validates("name", { presence: true });
-          this.adapter = adapter;
         }
       }
       const v = await Validated.create({ name: "ok" });
@@ -4498,7 +4175,6 @@ describe("PersistenceTest", () => {
       class Tracked extends Base {
         static {
           this.attribute("name", "string");
-          this.adapter = adapter;
           this.beforeDestroy(() => {
             log.push("before_destroy");
           });
@@ -4793,7 +4469,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const p = new Post({ title: "Hello", body: "World" });
@@ -4808,7 +4483,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
-        this.adapter = adapter;
       }
     }
     const r = new Required();
@@ -4822,7 +4496,6 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Old", body: "Content" });
@@ -4835,7 +4508,6 @@ describe("PersistenceTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const u = new User({ name: "dean" });
