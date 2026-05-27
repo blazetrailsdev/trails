@@ -27,17 +27,17 @@ export class Renderer {
 
   /**
    * Main render entry point shared by ActionView and ActionController.
-   * Returns the rendered body string.
+   * Returns a Promise resolving to the rendered body string.
    */
-  render(context: ViewContext, options: RenderOptions): string {
-    return this.renderToObject(context, options).body;
+  async render(context: ViewContext, options: RenderOptions): Promise<string> {
+    return (await this.renderToObject(context, options)).body;
   }
 
   /**
    * Like `render` but returns a `RenderedTemplate` object carrying the body.
    * @internal
    */
-  renderToObject(context: ViewContext, options: RenderOptions): RenderedTemplate {
+  async renderToObject(context: ViewContext, options: RenderOptions): Promise<RenderedTemplate> {
     if (Object.prototype.hasOwnProperty.call(options, "partial")) {
       return this.renderPartialToObject(context, options);
     }
@@ -49,26 +49,33 @@ export class Renderer {
    * string wrapped in an array; for templates this would be a streaming body
    * (Phase 3d). Currently both paths return an array.
    */
-  renderBody(context: ViewContext, options: RenderOptions): string[] {
+  async renderBody(context: ViewContext, options: RenderOptions): Promise<string[]> {
     if (Object.prototype.hasOwnProperty.call(options, "partial")) {
-      return [this.renderPartial(context, options)];
+      return [await this.renderPartial(context, options)];
     }
     // Phase 3d: StreamingTemplateRenderer. For now delegate to template renderer.
-    return [this.renderTemplateToObject(context, options).body];
+    return [(await this.renderTemplateToObject(context, options)).body];
   }
 
   /**
    * Render a partial and return the body string.
    * @internal
    */
-  renderPartial(context: ViewContext, options: RenderOptions, block?: unknown): string {
-    return this.renderPartialToObject(context, options, block).body;
+  async renderPartial(
+    context: ViewContext,
+    options: RenderOptions,
+    block?: unknown,
+  ): Promise<string> {
+    return (await this.renderPartialToObject(context, options, block)).body;
   }
 
   /** Tracks partial cache hits across renders on this Renderer instance. */
   cacheHits: Record<string, number> = {};
 
-  private renderTemplateToObject(context: ViewContext, options: RenderOptions): RenderedTemplate {
+  private renderTemplateToObject(
+    context: ViewContext,
+    options: RenderOptions,
+  ): Promise<RenderedTemplate> {
     return new TemplateRenderer(this.lookupContext).render(context, options);
   }
 
@@ -76,7 +83,7 @@ export class Renderer {
     context: ViewContext,
     options: RenderOptions,
     block?: unknown,
-  ): RenderedTemplate {
+  ): RenderedTemplate | Promise<RenderedTemplate> {
     const partial = options.partial;
 
     if (typeof partial === "string") {

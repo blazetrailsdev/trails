@@ -240,7 +240,9 @@ export abstract class AbstractRenderer {
     this.lookupContext = lookupContext;
   }
 
-  abstract render(...args: unknown[]): RenderedTemplate | RenderedCollection;
+  abstract render(
+    ...args: unknown[]
+  ): Promise<RenderedTemplate> | RenderedTemplate | RenderedCollection;
 
   // --- delegates to lookupContext (mirrors AbstractRenderer's `delegate`) ---
 
