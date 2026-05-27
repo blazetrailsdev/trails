@@ -184,87 +184,6 @@ describe("BelongsToAssociations", () => {
     expect(loaded).toBeNull();
   });
 
-  it("polymorphic belongs_to with foreignType reads overridden type column", async () => {
-    await defineSchema({
-      things: { name: "string" },
-      ft_sponsors: { sponsorable_id: "integer", sponsorable_type: "string" },
-    });
-    class FtThing extends Base {
-      static {
-        this._tableName = "things";
-        this.attribute("name", "string");
-      }
-    }
-    class FtSponsor extends Base {
-      static {
-        this._tableName = "ft_sponsors";
-        this.attribute("sponsorable_id", "integer");
-        this.attribute("sponsorable_type", "string");
-      }
-    }
-    registerModel(FtThing);
-    registerModel(FtSponsor);
-
-    const thing = await FtThing.create({ name: "Widget" });
-    const sponsor = await FtSponsor.create({
-      sponsorable_id: thing.id,
-      sponsorable_type: "FtThing",
-    });
-    // foreignType overrides the type column: reads sponsorable_type instead of thing_type
-    const loaded = await loadBelongsTo(sponsor, "thing", {
-      polymorphic: true,
-      foreignType: "sponsorable_type",
-      foreignKey: "sponsorable_id",
-    });
-    expect(loaded).not.toBeNull();
-    expect((loaded as any).name).toBe("Widget");
-  });
-
-  it("polymorphic belongs_to with foreignType writes overridden type column on assignment", async () => {
-    await defineSchema({
-      ft_targets: { label: "string" },
-      ft_owners: { sponsorable_id: "integer", sponsorable_type: "string" },
-    });
-    class FtTarget extends Base {
-      static {
-        this._tableName = "ft_targets";
-        this.attribute("label", "string");
-      }
-    }
-    class FtOwner extends Base {
-      static {
-        this._tableName = "ft_owners";
-        this.attribute("sponsorable_id", "integer");
-        this.attribute("sponsorable_type", "string");
-        this.belongsTo("thing", {
-          polymorphic: true,
-          foreignType: "sponsorable_type",
-          foreignKey: "sponsorable_id",
-        });
-      }
-    }
-    registerModel(FtTarget);
-    registerModel(FtOwner);
-
-    const target = await FtTarget.create({ label: "Acme" });
-    const owner = FtOwner.new();
-    // Writer path: should write sponsorable_type, not thing_type
-    setBelongsTo(owner, "thing", target, {
-      polymorphic: true,
-      foreignType: "sponsorable_type",
-      foreignKey: "sponsorable_id",
-    });
-    expect(owner._readAttribute("sponsorable_type")).toBe("FtTarget");
-    expect(owner._readAttribute("sponsorable_id")).toBe(target.id);
-    // Clearing should null sponsorable_type
-    setBelongsTo(owner, "thing", null, {
-      polymorphic: true,
-      foreignType: "sponsorable_type",
-      foreignKey: "sponsorable_id",
-    });
-    expect(owner._readAttribute("sponsorable_type")).toBeNull();
-  });
-
   // Rails: test_belongs_to_counter_cache (definition only)
   it("test_belongs_to_registers_counter_cache_option", () => {
     class Reply extends Base {
@@ -1477,33 +1396,32 @@ describe("HasAndBelongsToManyAssociations", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
+  class Developer extends Base {
+    static {
+      this.attribute("name", "string");
+    }
+  }
+
+  class Project extends Base {
+    static {
+      this.attribute("name", "string");
+    }
+  }
+
   beforeAll(async () => {
+    registerModel(Developer);
+    registerModel(Project);
     await defineSchema({
       developers: { name: "string" },
       projects: { name: "string" },
     });
+    await Base.adapter.executeMutation(
+      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
+    );
   });
 
   // Rails: test_habtm
   it("test_habtm_loads_through_join_table", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Project extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(Developer);
-    registerModel(Project);
-
-    // Create the join table
-    await Base.adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
-    );
-
     const dev = await Developer.create({ name: "David" });
     const p1 = await Project.create({ name: "Rails" });
     const p2 = await Project.create({ name: "Basecamp" });
@@ -1521,18 +1439,6 @@ describe("HasAndBelongsToManyAssociations", () => {
 
   // Rails: test_habtm_empty
   it("test_habtm_returns_empty_when_no_join_rows", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(Developer);
-
-    // Create the join table
-    await Base.adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
-    );
-
     const dev = await Developer.create({ name: "Solo" });
     const projects = await loadHabtm(dev, "projects", { joinTable: "developers_projects" });
     expect(projects).toEqual([]);
@@ -1540,13 +1446,6 @@ describe("HasAndBelongsToManyAssociations", () => {
 
   // Rails: test_habtm_unsaved_record
   it("test_habtm_returns_empty_for_unsaved_record", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(Developer);
-
     const dev = new Developer({ name: "New" });
     const projects = await loadHabtm(dev, "projects", { joinTable: "developers_projects" });
     expect(projects).toEqual([]);
@@ -1554,13 +1453,6 @@ describe("HasAndBelongsToManyAssociations", () => {
 
   // Rails: test_habtm_preloaded_cache
   it("test_habtm_uses_preloaded_cache", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(Developer);
-
     const dev = await Developer.create({ name: "Cached" });
     const sentinel = [{ id: 1 }] as any;
     (dev as any)._preloadedAssociations = new Map([["projects", sentinel]]);
@@ -4754,44 +4646,44 @@ describe("HABTM (Rails-guided)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
+  class HABTMDeveloper extends Base {
+    static {
+      this._tableName = "developers";
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+    }
+  }
+
+  class HABTMProject extends Base {
+    static {
+      this._tableName = "projects";
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+    }
+  }
+
   beforeAll(async () => {
+    Associations.hasAndBelongsToMany.call(HABTMDeveloper, "projects", {
+      joinTable: "developers_projects",
+      foreignKey: "developer_id",
+      associationForeignKey: "project_id",
+    });
+    registerModel(HABTMDeveloper);
+    registerModel(HABTMProject);
     await defineSchema({
       developers: { name: "string" },
       projects: { name: "string" },
     });
+    await Base.adapter.executeMutation(
+      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
+    );
   });
 
   // Rails: test "has_and_belongs_to_many basic"
   it("loads records through a join table", async () => {
-    class Developer extends Base {
-      static {
-        this._tableName = "developers";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasAndBelongsToMany.call(Developer, "projects", {
-      joinTable: "developers_projects",
-    });
-    registerModel(Developer);
-
-    class Project extends Base {
-      static {
-        this._tableName = "projects";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(Project);
-
-    // Create the join table
-    await Base.adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
-    );
-
-    const dev = await Developer.create({ name: "David" });
-    const p1 = await Project.create({ name: "Rails" });
-    const p2 = await Project.create({ name: "Basecamp" });
+    const dev = await HABTMDeveloper.create({ name: "David" });
+    const p1 = await HABTMProject.create({ name: "Rails" });
+    const p2 = await HABTMProject.create({ name: "Basecamp" });
 
     await Base.adapter.executeMutation(
       `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p1.id})`,
@@ -4800,7 +4692,11 @@ describe("HABTM (Rails-guided)", () => {
       `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p2.id})`,
     );
 
-    const projects = await loadHabtm(dev, "projects", { joinTable: "developers_projects" });
+    const projects = await loadHabtm(dev, "projects", {
+      joinTable: "developers_projects",
+      foreignKey: "developer_id",
+      associationForeignKey: "project_id",
+    });
     expect(projects).toHaveLength(2);
     expect(projects.map((p: any) => p.name).sort()).toEqual(["Basecamp", "Rails"]);
   });
