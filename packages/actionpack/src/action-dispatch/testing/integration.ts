@@ -84,6 +84,21 @@ const STATUS_RANGES: Record<string, [number, number]> = {
 const ABSOLUTE_URL_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
 
 const DEFAULT_HOST = "www.example.com";
+
+/** @internal */
+function splitHostPort(host: string): [string, string | undefined] {
+  if (host.startsWith("[")) {
+    const close = host.indexOf("]");
+    if (close === -1) return [host, undefined];
+    const rest = host.slice(close + 1);
+    return [host.slice(0, close + 1), rest.startsWith(":") ? rest.slice(1) : undefined];
+  }
+  // Unbracketed multi-colon string is a bare IPv6 address with no port.
+  const colons = (host.match(/:/g) ?? []).length;
+  if (colons > 1) return [host, undefined];
+  const idx = host.indexOf(":");
+  return idx === -1 ? [host, undefined] : [host.slice(0, idx), host.slice(idx + 1)];
+}
 const DEFAULT_REMOTE_ADDR = "127.0.0.1";
 const DEFAULT_ACCEPT =
   "text/xml,application/xml,application/xhtml+xml," +
@@ -869,22 +884,35 @@ export class IntegrationTest {
       // No route matched — create a 404-like response. Mirror the same
       // host/scheme/cookie env keys as the matched branch so request.url and
       // request.cookies are accurate for 404s too.
+      const [noRouteHostname, noRoutePort] = splitHostPort(this.host);
       const noRouteEnv: Record<string, unknown> = {
         REQUEST_METHOD: method,
         PATH_INFO: pathInfo,
         QUERY_STRING: queryString,
         HTTP_HOST: this.host,
-        SERVER_NAME: this.host.split(":")[0],
-        SERVER_PORT: this.host.split(":")[1] ?? (this._https ? "443" : "80"),
+        SERVER_NAME: noRouteHostname,
+        SERVER_PORT: noRoutePort ?? (this._https ? "443" : "80"),
         HTTPS: this._https ? "on" : "off",
         "rack.url_scheme": this._https ? "https" : "http",
         REMOTE_ADDR: this.remoteAddr,
         HTTP_ACCEPT: this.accept,
+        ...(options.env ?? {}),
       };
       if (Object.keys(this._persistentCookies).length > 0) {
         noRouteEnv.HTTP_COOKIE = Object.entries(this._persistentCookies)
           .map(([k, v]) => `${k}=${v}`)
           .join("; ");
+      }
+      if (options.headers) {
+        for (const [name, value] of Object.entries(options.headers)) {
+          const envKey = name.startsWith("HTTP_")
+            ? name
+            : "HTTP_" + name.toUpperCase().replace(/-/g, "_");
+          noRouteEnv[envKey] = value;
+        }
+      }
+      if (options.body) {
+        noRouteEnv["rack.input"] = options.body;
       }
       noRouteEnv.REQUEST_URI = this.buildFullUri(
         (noRouteEnv.PATH_INFO as string) +
@@ -913,13 +941,14 @@ export class IntegrationTest {
     }
 
     // Build env
+    const [hostname, port] = splitHostPort(this.host);
     const env: Record<string, unknown> = {
       REQUEST_METHOD: method,
       PATH_INFO: pathInfo,
       QUERY_STRING: queryString,
       HTTP_HOST: this.host,
-      SERVER_NAME: this.host.split(":")[0],
-      SERVER_PORT: this.host.split(":")[1] ?? (this._https ? "443" : "80"),
+      SERVER_NAME: hostname,
+      SERVER_PORT: port ?? (this._https ? "443" : "80"),
       HTTPS: this._https ? "on" : "off",
       "rack.url_scheme": this._https ? "https" : "http",
       REMOTE_ADDR: this.remoteAddr,

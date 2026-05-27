@@ -584,4 +584,104 @@ describe("ActionDispatch::IntegrationTest", () => {
       expect(app._mockSession).toBe(app);
     });
   });
+
+  describe("follow_redirect! preserves HTTP_REFERER on 404 target", () => {
+    let redirectApp: IntegrationTest;
+
+    beforeEach(() => {
+      redirectApp = new IntegrationTest();
+    });
+
+    afterEach(() => {
+      redirectApp.reset();
+    });
+
+    it("follow_redirect! sets HTTP_REFERER even when redirect target is a 404", async () => {
+      class RedirectToMissingController extends Base {
+        async index() {
+          this.redirectTo("/this-path-does-not-exist");
+        }
+      }
+      redirectApp.routes.draw((r) => {
+        r.get("/redirect-to-missing", { to: "redirector#index", as: "redirector" });
+      });
+      redirectApp.registerController("redirector", RedirectToMissingController);
+
+      await redirectApp.get("/redirect-to-missing");
+      redirectApp.assertResponse("redirect");
+      await redirectApp.followRedirectBang();
+
+      expect(redirectApp.status).toBe(404);
+      expect(redirectApp.request.env.HTTP_REFERER).toBe(
+        "http://www.example.com/redirect-to-missing",
+      );
+    });
+
+    it("follow_redirect! merges options.headers into 404 env", async () => {
+      class RedirectToMissing2Controller extends Base {
+        async index() {
+          this.redirectTo("/no-route-here");
+        }
+      }
+      redirectApp.routes.draw((r) => {
+        r.get("/redirect-to-missing2", { to: "redirector2#index", as: "redirector2" });
+      });
+      redirectApp.registerController("redirector2", RedirectToMissing2Controller);
+
+      await redirectApp.get("/redirect-to-missing2");
+      redirectApp.assertResponse("redirect");
+      await redirectApp.followRedirectBang({ headers: { "X-Custom-Header": "sentinel" } });
+
+      expect(redirectApp.status).toBe(404);
+      expect(redirectApp.request.env.HTTP_X_CUSTOM_HEADER).toBe("sentinel");
+    });
+
+    it("merges options.env into 404 request env", async () => {
+      await app.get("/no-such-route", { env: { "X-CUSTOM-ENV": "env-value" } });
+      expect(app.status).toBe(404);
+      expect(app.request.env["X-CUSTOM-ENV"]).toBe("env-value");
+    });
+
+    it("sets rack.input on 404 request when body option is provided", async () => {
+      await app.get("/no-such-route", { body: "test-body" });
+      expect(app.status).toBe(404);
+      expect(app.request.env["rack.input"]).toBe("test-body");
+    });
+  });
+
+  describe("IPv6 host parsing", () => {
+    afterEach(() => {
+      app.reset();
+    });
+
+    it("correctly parses SERVER_NAME and SERVER_PORT for IPv6 host", async () => {
+      app.host = "[::1]:3000";
+      await app.get("/posts");
+      expect(app.request.env.SERVER_NAME).toBe("[::1]");
+      expect(app.request.env.SERVER_PORT).toBe("3000");
+    });
+
+    it("correctly parses SERVER_NAME for bare IPv6 host without port", async () => {
+      app.host = "[::1]";
+      await app.get("/posts");
+      expect(app.request.env.SERVER_NAME).toBe("[::1]");
+      expect(app.request.env.SERVER_PORT).toBe("80");
+    });
+
+    it("correctly handles unbracketed IPv6 address as SERVER_NAME with no port", async () => {
+      app.host = "::1";
+      await app.get("/no-such-route");
+      expect(app.status).toBe(404);
+      expect(app.request.env.SERVER_NAME).toBe("::1");
+      expect(app.request.env.SERVER_PORT).toBe("80");
+    });
+
+    it("correctly parses SERVER_NAME and SERVER_PORT for IPv6 host on 404 path", async () => {
+      app.host = "[::1]:3000";
+      await app.get("/no-such-route");
+      expect(app.status).toBe(404);
+      expect(app.request.env.SERVER_NAME).toBe("[::1]");
+      expect(app.request.env.SERVER_PORT).toBe("3000");
+    });
+  });
 });
