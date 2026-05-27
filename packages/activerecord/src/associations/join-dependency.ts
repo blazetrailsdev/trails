@@ -681,8 +681,8 @@ export class JoinDependency {
 
       if (
         child.assocType !== "hasMany" &&
-        typeof arParent.associationCached === "function" &&
-        arParent.associationCached(child.immediateAssocName)
+        typeof arParent.isAssociationCached === "function" &&
+        arParent.isAssociationCached(child.immediateAssocName)
       ) {
         const model = arParent.association?.(child.immediateAssocName)?.target;
         this._constructRecursive(
