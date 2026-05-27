@@ -11,11 +11,13 @@
 | --------------------------------------------------------- | ----- | --------------------------------------------------------------------------------- |
 | WHERE with associations/polymorphic/CPK                   | 31    | `PredicateBuilder#buildFromHash` doesn't expand association keys                  |
 | load_async / FutureResult                                 | 28    | Ruby-thread-only; PERMANENT-SKIP                                                  |
-| Scoping — Arel nodes in `order()` / `reverseOrder`        | 28    | `orderBang` pre-renders Arel nodes to raw strings; `reverseOrder` can't flip them |
+| Scoping — Arel nodes in `order()` / `reverseOrder`        | 20    | `orderBang` pre-renders Arel nodes to raw strings; `reverseOrder` can't flip them |
+| Scoping — query cache + select narrowing                  | 8     | 6 need query cache (→ P12), 2 need select narrowing (→ R3b)                       |
 | Query cache                                               | 27    | Blocked on connection-pool (per-thread cache architecture)                        |
 | Hash-form select                                          | 23    | `arelColumnsFromHash` doesn't handle `{ expr => alias }`                          |
 | WhereChain `.associated`/`.missing` with enums            | 12    | Bypasses predicate builder; enum cast never applied                               |
-| Standalone relation tests                                 | 27    | Mixed: eager_load toSql, parameterized joins, reorder, lock, fixture gaps         |
+| lock / FOR UPDATE                                         | 7     | Lock clause not propagated to Arel SQL manager                                    |
+| Standalone relation (joins, eager, race, fixture)         | 8     | Parameterized joins (2), eager_load toSql (3 → assoc A5), race/fixture/Ruby (3)   |
 | Calculations with associations                            | 12    | Fixture-dependent + grouped association join                                      |
 | `inOrderOf`                                               | 4     | `field-ordered-values.ts` not implemented                                         |
 | Misc (batches, update-all, delegation, predicate-builder) | ~6    | Scattered single-test gaps                                                        |
@@ -172,17 +174,19 @@ joins.
 
 ---
 
-## Track 6: Standalone relation gaps (unlocks ~15 actionable tests)
+## Track 6: Standalone relation gaps (unlocks ~20 actionable tests)
 
 ### PR R6a: `lock()` / `lock("FOR SHARE")` in toSql
 
 **Problem:** `lock()` not emitting `FOR UPDATE` / custom lock clause in SQL.
+7 tests across `relations.test.ts` cover: `lock()` default FOR UPDATE,
+custom lock clause, `toSql` output, and `locked` preventing arel build.
 
 **Files:**
 
 - `relation/query-methods.ts` or `relation.ts` — lock value propagation to Arel
 
-**Est:** ~30 LOC (2 tests)
+**Est:** ~40 LOC (7 tests)
 
 ---
 
@@ -211,14 +215,18 @@ bind parameters in join string not implemented.
 
 ---
 
-## Permanently skipped (not actionable)
+## Permanently skipped / cross-blocked (not actionable here)
 
-| Cluster                               | Tests | Reason                             |
-| ------------------------------------- | ----- | ---------------------------------- |
-| load_async / FutureResult             | 28    | Ruby thread pool; no JS equivalent |
-| Query cache (per-thread architecture) | 14    | Blocked on connection-pool track   |
-| Query cache (GVL/fork)                | 6     | Ruby-only                          |
-| SimpleDelegator where                 | 2     | Ruby-only; no JS equivalent        |
+| Cluster                               | Tests | Reason                                     |
+| ------------------------------------- | ----- | ------------------------------------------ |
+| load_async / FutureResult             | 28    | Ruby thread pool; no JS equivalent         |
+| Query cache (per-thread architecture) | 14    | Blocked on connection-pool track (see P12) |
+| Query cache (GVL/fork)                | 6     | Ruby-only                                  |
+| SimpleDelegator where                 | 2     | Ruby-only; no JS equivalent                |
+| eager_load toSql + STI + non-preload  | 3     | Blocked on associations track (see A5)     |
+| findOrCreateBy race condition         | 1     | Concurrency edge case; low priority        |
+| Calculations with associations        | 12    | Fixture-dependent + Phase G                |
+| Alternate PK where                    | 1     | Fixture-dependent                          |
 
 ---
 
@@ -239,15 +247,19 @@ R5, R6a, R6b, R6c (all standalone)
 | #   | PR  | Tests unlocked                 | Depends on |
 | --- | --- | ------------------------------ | ---------- |
 | 1   | R1  | 31 (where + associations)      | —          |
-| 2   | R3  | 25 (Arel order + reverse)      | —          |
+| 2   | R3  | 28 (Arel order + reverse)      | —          |
 | 3   | R2  | 23 (hash select)               | —          |
 | 4   | R4  | 12 (associated/missing + enum) | R1         |
-| 5   | R5  | 4 (inOrderOf)                  | —          |
-| 6   | R6a | 2 (lock)                       | —          |
-| 7   | R6b | 1 (having hash)                | —          |
-| 8   | R6c | 2 (parameterized joins)        | —          |
+| 5   | R6a | 7 (lock / FOR UPDATE)          | —          |
+| 6   | R5  | 4 (inOrderOf)                  | —          |
+| 7   | R6c | 2 (parameterized joins)        | —          |
+| 8   | R6b | 1 (having hash)                | —          |
 | 9   | R3b | 2 (select narrowing)           | R3         |
 
-**Total actionable:** ~102 tests across 9 PRs
-**Permanently skipped:** ~50 tests (Ruby-only or blocked on connection-pool)
-**Fixture-gated:** ~12 calculations tests (Phase G dependency)
+**Coverage:** 275 tests total.
+
+- **Actionable here:** ~110 tests across 9 PRs (R1–R6c)
+- **Cross-blocked:** ~47 tests (connection-pool P12, associations A5, Phase G fixtures)
+- **Permanently skipped:** ~36 tests (load_async, GVL/fork, SimpleDelegator)
+- **Absorbed into other PRs:** ~82 tests (reorder/reverseOrder → R3, lock → R6a,
+  scoping Arel → R3, relations.test.ts select → R2)

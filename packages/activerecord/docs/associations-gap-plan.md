@@ -1,8 +1,8 @@
 # Associations gap plan
 
-339 skipped tests across 33 files. This plan organizes the gaps into
-PR-sized work items (~150–300 LOC each), ordered by unlock potential
-(tests unblocked per PR).
+339 skipped tests across 33 files. 20 PRs across 9 tracks, organized
+by unlock potential (tests unblocked per PR). ~310 actionable,
+~18 permanent-skip (marshal, Ruby-only), ~10 scattered single-test gaps.
 
 ---
 
@@ -266,6 +266,126 @@ fires callbacks directly, bypassing `addToTarget`. Skips
 
 ---
 
+## Track 6: HABTM (unlocks ~15 tests, 24 total — 4 scope-chain, 2 eager, 3 cross-blocker)
+
+### PR F1: HABTM join-table quoting, aliasing, and timestamps
+
+**Problem:** Multiple small gaps in the HABTM join-table insert/query path:
+
+- String PKs are not quoted in the IN clause
+- Join table is not aliased for disambiguation in self-joins
+- `created_at`/`updated_at` not written on join inserts
+- `partial_inserts: false` config not respected (should INSERT all columns)
+- Duplicate `hasAndBelongsToMany` declarations don't replace prior ones
+
+**Files:**
+
+- `associations/builder/has-and-belongs-to-many.ts` — join insert path
+- `associations/has-and-belongs-to-many-association.ts` — join query path
+
+**Rails ref:** `has_and_belongs_to_many_association.rb` `insert_record`,
+`has_and_belongs_to_many.rb` builder
+
+**Est:** ~120 LOC
+
+---
+
+### PR F2: HABTM `extend:` option + scope chain composition
+
+**Problem:** `extend:` option is not implemented — module methods are not
+mixed into CollectionProxy. 4 tests are blocked on scope chain composition
+(scoped find on through/habtm incorrectly marks results readonly; `find`
+with `group:` option not supported on collection relation; `having()` not
+supported on scoped collection relation).
+
+**Files:**
+
+- `associations/collection-proxy.ts` — `extend:` mixin
+- `associations/collection-association.ts` — scope chain composition
+
+**Rails ref:** `collection_proxy.rb` `extend`, `collection_association.rb`
+
+**Est:** ~80 LOC
+
+---
+
+## Track 7: has_one :through (unlocks ~21 tests)
+
+### PR G1: has_one :through eager loading + scoped conditions
+
+**Problem:** 16 tests in `has-one-through-associations.test.ts` — fixture
+gaps (~6), non-preload JOIN-based eager loading (~3, blocked on A5),
+scoped has_one :through with WHERE conditions on through/source (~3),
+and `ThroughReflection.isPolymorphic()` not recognizing `has_one :as`
+as polymorphic (~1). 5 tests in `has-one-through-disable-joins-associations.test.ts`
+blocked on `disableJoins` scope chain.
+
+**Files:**
+
+- `associations/has-one-through-association.ts` — scope/eager wiring
+- `reflection.ts` — `ThroughReflection.isPolymorphic()`
+
+**Depends on:** PR A5 (nested eager_load) for JOIN-based tests
+
+**Est:** ~100 LOC (impl) + ~100 LOC (test bodies)
+
+---
+
+## Track 8: AssociationScope + nested-through (unlocks ~25 tests)
+
+### PR H1: `AssociationScope` full scope-building parity
+
+**Problem:** 13 tests in `association-scope.test.ts` cover the core
+scope-building pipeline: hasMany/belongsTo FK constraints, STI
+`type_condition`, polymorphic type WHERE, `scope_for_association`
+(default_scope flow-through), 0-arity scope lambda with `this=relation`,
+and through-chain `reverse_each` scope merging. Test bodies exist but
+the scope builder doesn't fully implement these paths.
+
+**Files:**
+
+- `associations/association-scope.ts` — scope-building pipeline
+
+**Rails ref:** `associations/association_scope.rb` `scope`, `add_constraints`
+
+**Est:** ~150 LOC
+
+---
+
+### PR H2: Nested-through edge cases (distinct, STI, polymorphic scope, alias)
+
+**Problem:** 12 tests in `nested-through-associations.test.ts` — distinct
+on nested through, STI on nested through reflection, polymorphic scope
+on nested through, and AliasTracker integration (table referenced
+multiple times emits wrong aliases).
+
+**Files:**
+
+- `associations/join-dependency.ts` — AliasTracker alias emission
+- `associations/preloader/through-association.ts` — nested chain walking
+
+**Depends on:** PR A4 (through-association scope), PR A5 (JoinDependency)
+
+**Est:** ~100 LOC
+
+---
+
+## Track 9: Scattered single-test gaps (unlocks ~10 tests)
+
+These are individual root causes that don't cluster into a track:
+
+| Test file                             | Gap                                                                                      | Est     |
+| ------------------------------------- | ---------------------------------------------------------------------------------------- | ------- |
+| `has-many-associations.test.ts`       | Counter cache updates in memory after create/push/empty (3 tests)                        | ~40 LOC |
+| `belongs-to-associations.test.ts`     | `readonly` check on save (1 test)                                                        | ~10 LOC |
+| `nested-error.test.ts`                | Nested attributes error semantics (4 tests) — blocked on `accepts_nested_attributes_for` | Phase G |
+| `extension.test.ts`                   | Collection extension module mixing (4 tests) — same as F2 `extend:`                      | F2      |
+| `required.test.ts`                    | `belongsToRequiredByDefault` config (1 test)                                             | ~10 LOC |
+| `left-outer-join-association.test.ts` | Arel join node in left outer join (3 tests)                                              | ~30 LOC |
+| `inner-join-association.test.ts`      | Inner join edge cases (2 tests)                                                          | ~20 LOC |
+
+---
+
 ## Dependency graph
 
 ```
@@ -282,24 +402,40 @@ D1 (standalone)
 D2 (blocked on Phase G fixtures)
 
 E1 → E2 (unified dispatch before create() can use it)
+
+F1, F2 (standalone)
+
+A5 → G1 (has_one :through eager loading needs nested eager_load)
+
+H1 (standalone)
+A4 + A5 → H2 (nested-through needs through-scope + JoinDependency)
 ```
 
 ## Priority order
 
-| #   | PR  | Tests unlocked            | Depends on |
-| --- | --- | ------------------------- | ---------- |
-| 1   | A1  | ~40 (preloader target)    | —          |
-| 2   | C1  | ~15 (auto inverse)        | —          |
-| 3   | A3  | ~20 (polymorphic preload) | —          |
-| 4   | B1  | ~15 (HMT build)           | —          |
-| 5   | A2  | ~10 (scope/strict)        | —          |
-| 6   | B3  | ~15 (HMT delete)          | —          |
-| 7   | A4  | ~15 (through scope/STI)   | —          |
-| 8   | E1  | ~8 (callback abort)       | —          |
-| 9   | C2  | ~5 (inverse on push)      | C1         |
-| 10  | B2  | ~10 (HMT concat)          | B1         |
-| 11  | E2  | ~4 (create dedup)         | E1         |
-| 12  | D1  | ~3 (type mismatch)        | —          |
-| 13  | A5  | ~20 (nested eager_load)   | A1–A4      |
-| 14  | C3  | ~3 (preloader inverse)    | C1         |
-| 15  | D2  | ~24 (has_one fixtures)    | Phase G    |
+| #   | PR  | Tests unlocked                  | Depends on |
+| --- | --- | ------------------------------- | ---------- |
+| 1   | A1  | ~40 (preloader target)          | —          |
+| 2   | H1  | ~13 (association scope)         | —          |
+| 3   | C1  | ~15 (auto inverse)              | —          |
+| 4   | A3  | ~20 (polymorphic preload)       | —          |
+| 5   | B1  | ~15 (HMT build)                 | —          |
+| 6   | F1  | ~11 (HABTM join table)          | —          |
+| 7   | A2  | ~10 (scope/strict)              | —          |
+| 8   | B3  | ~15 (HMT delete)                | —          |
+| 9   | A4  | ~15 (through scope/STI)         | —          |
+| 10  | E1  | ~8 (callback abort)             | —          |
+| 11  | F2  | ~8 (HABTM extend + scope chain) | —          |
+| 12  | C2  | ~5 (inverse on push)            | C1         |
+| 13  | B2  | ~10 (HMT concat)                | B1         |
+| 14  | E2  | ~4 (create dedup)               | E1         |
+| 15  | D1  | ~3 (type mismatch)              | —          |
+| 16  | A5  | ~20 (nested eager_load)         | A1–A4      |
+| 17  | G1  | ~21 (has_one :through)          | A5         |
+| 18  | H2  | ~12 (nested-through edges)      | A4, A5     |
+| 19  | C3  | ~3 (preloader inverse)          | C1         |
+| 20  | D2  | ~24 (has_one fixtures)          | Phase G    |
+
+**Coverage:** 339 tests total. ~310 accounted for above, ~18 permanent-skip
+(marshal, Ruby-only), ~10 scattered single-test gaps (counter cache,
+`belongsToRequiredByDefault`, nested attributes — see Track 9).
