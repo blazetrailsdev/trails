@@ -3,29 +3,90 @@ import { UrlConfig } from "./url-config.js";
 
 describe("DatabaseConfigurations", () => {
   describe("UrlConfigTest", () => {
-    it.skip("schema dump parsing", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in url-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in url-config.test.ts
-    });
-    it.skip("query cache parsing", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in url-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in url-config.test.ts
-    });
-    it.skip("replica parsing", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in url-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in url-config.test.ts
-    });
-    it.skip("database tasks parsing", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in url-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in url-config.test.ts
+    it("schema dump parsing", () => {
+      let config = new UrlConfig(
+        "default_env",
+        "primary",
+        "postgres://localhost/foo?schema_dump=false",
+        {},
+      );
+      expect(config.schemaDump()).toBeNull();
+
+      config = new UrlConfig(
+        "default_env",
+        "primary",
+        "postgres://localhost/foo?schema_dump=db/foo_schema.rb",
+        {},
+      );
+      expect(config.schemaDump()).toBe("db/foo_schema.rb");
+
+      config = new UrlConfig("default_env", "primary", "postgres://localhost/foo", {});
+      expect(config.schemaDump("ruby")).toBe("schema.rb");
     });
 
-    // Mirrors Rails' UrlConfig#database — when the configuration hash
-    // doesn't carry an explicit `database`, fall back to the URL path.
+    it("query cache parsing", () => {
+      let config = new UrlConfig(
+        "default_env",
+        "primary",
+        "postgres://localhost/foo?query_cache=false",
+        {},
+      );
+      expect(config.queryCache).toBe(false);
+
+      config = new UrlConfig(
+        "default_env",
+        "primary",
+        "postgres://localhost/foo?query_cache=42",
+        {},
+      );
+      expect(config.queryCache).toBe("42");
+    });
+
+    it("replica parsing", () => {
+      let config = new UrlConfig("default_env", "primary", "postgres://localhost/foo", {});
+      expect(config.replica).toBe(false);
+
+      config = new UrlConfig("default_env", "primary", "postgres://localhost/foo?replica=true", {});
+      expect(config.replica).toBe(true);
+
+      config = new UrlConfig(
+        "default_env",
+        "primary",
+        "postgres://localhost/foo?replica=false",
+        {},
+      );
+      expect(config.replica).toBe(false);
+
+      config = new UrlConfig(
+        "default_env",
+        "primary",
+        "postgres://localhost/foo?replica=random",
+        {},
+      );
+      expect(config.replica).toBe(true);
+    });
+
+    it("database tasks parsing", () => {
+      let config = new UrlConfig("default_env", "primary", "postgres://localhost/foo", {});
+      expect(config.databaseTasks()).toBe(true);
+
+      config = new UrlConfig(
+        "default_env",
+        "primary",
+        "postgres://localhost/foo?database_tasks=random",
+        {},
+      );
+      expect(config.databaseTasks()).toBe(true);
+
+      config = new UrlConfig(
+        "default_env",
+        "primary",
+        "postgres://localhost/foo?database_tasks=false",
+        {},
+      );
+      expect(config.databaseTasks()).toBe(false);
+    });
+
     it("derives database from a parseable URL when configuration.database is unset", () => {
       const cfg = new UrlConfig("test", "primary", "postgres://h/mydb");
       expect(cfg.database).toBe("mydb");
