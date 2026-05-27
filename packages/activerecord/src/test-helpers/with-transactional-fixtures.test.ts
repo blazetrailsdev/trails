@@ -379,9 +379,10 @@ describe("withTransactionalFixtures (pooled adapter)", () => {
 //
 // Today this passes because SidecarFixtures._txVisible() gates
 // currentTransaction()/inTransaction/openTransactions behind the AsyncContext
-// flag set by withinNewTransaction(). After Phase E2/E3 delete the
-// AsyncContext filter, this test must STILL pass — the connection pool's
-// per-checkout serialization replaces the filter as the isolation mechanism.
+// flag set by withinNewTransaction(). E2/E3 delete that filter; E5 rewires
+// createSidecarTestAdapter() through the pool so each chain's checkout
+// provides natural isolation. This test must remain green through E2–E5 in
+// sequence: E2/E3 without E5 would break it (shared adapter, no filter).
 //
 // The test documents the invariant so regressions are caught immediately.
 describe("concurrency isolation: two concurrent transaction chains stay independent", () => {

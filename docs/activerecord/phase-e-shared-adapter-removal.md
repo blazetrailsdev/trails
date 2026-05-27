@@ -24,8 +24,10 @@ describe `"concurrency isolation: two concurrent transaction chains stay indepen
 
 ## Inventory (verified 2026-05-27)
 
-All symbols live in two files. Zero external consumers outside these files
-(confirmed by `grep -rl` across the repo).
+All runtime definitions and call sites live in two files. Additional matches
+exist in docs and tests (this file, `with-transactional-fixtures.test.ts`) but
+carry no runtime semantics — the deletion PRs (E2–E5) only touch the two
+implementation files listed below.
 
 ### `_sharedAdapter` — `packages/activerecord/src/test-adapter.ts`
 
@@ -127,8 +129,8 @@ instances. Rails clears schema cache at the pool level (`ConnectionPool#clear_ca
 rather than per-connection, matching the invariant that schema state is shared
 across all connections in a pool.
 
-Implementation path (E5): call `pool.getAdapters().forEach(a => a.schemaCache?.clear())`
-(or equivalent iteration over the pool's live connections) after `dropAllTables`.
+Implementation path (E5): call `pool.connections.forEach(a => a.schemaCache?.clear())`
+(`pool.connections` is the existing getter at `connection-pool.ts:470`) after `dropAllTables`.
 `withTransactionalFixtures` already calls `schemaCache.clear()` in `afterEach`
 for the per-test case; `resetTestAdapterState` covers the global-reset path.
 
