@@ -43,8 +43,10 @@ export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions
     const precision = (opts.precision ?? 3) as number;
     const significant = (opts.significant ?? true) as boolean;
 
+    const roundMode = opts.roundMode as string | undefined;
+
     let num = this.numberAsFloat();
-    num = new RoundingHelper({ precision, significant }).round(num);
+    num = new RoundingHelper({ precision, significant, roundMode }).round(num);
 
     const units = this.opts.units;
     const exponent = this.calculateExponent(units, Math.abs(num));
