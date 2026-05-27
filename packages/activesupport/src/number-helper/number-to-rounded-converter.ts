@@ -4,21 +4,23 @@ import { NumberToDelimitedConverter } from "./number-to-delimited-converter.js";
 import type { NumberToRoundedOptions } from "../number-helper.js";
 
 export class NumberToRoundedConverter extends NumberConverter<NumberToRoundedOptions> {
+  static override namespace = "precision";
+
   protected get validateFloat(): boolean {
     return true;
   }
 
   protected convert(): string {
-    const {
-      precision = 3,
-      separator = ".",
-      delimiter = "",
-      significant = false,
-      stripInsignificantZeros = false,
-    } = this.opts;
+    const opts = this.options;
+    const precision = (opts.precision ?? 3) as number;
+    const separator = (opts.separator ?? ".") as string;
+    const delimiter = (opts.delimiter ?? "") as string;
+    const significant = (opts.significant ?? false) as boolean;
+    const stripInsignificantZeros = (opts.stripInsignificantZeros ?? false) as boolean;
+    const roundMode = opts.roundMode as string | undefined;
 
     const num = this.numberAsFloat();
-    const helper = new RoundingHelper({ precision, significant });
+    const helper = new RoundingHelper({ precision, significant, roundMode });
     const rounded = helper.round(num);
 
     let str: string;

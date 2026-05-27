@@ -9,7 +9,9 @@ export class NumberToDelimitedConverter extends NumberConverter<NumberWithDelimi
   }
 
   protected convert(): string {
-    const { delimiter = ",", separator = "." } = this.opts;
+    const opts = this.options;
+    const delimiter = (opts.delimiter ?? ",") as string;
+    const separator = (opts.separator ?? ".") as string;
     const str = String(this.number);
     const parts = str.split(".");
     const left = parts[0].replace(DEFAULT_DELIMITER_REGEX, `$1${delimiter}`);

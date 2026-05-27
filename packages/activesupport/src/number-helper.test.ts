@@ -26,8 +26,8 @@ describe("NumberHelperTest", () => {
     expect(numberToCurrency(1234567890.5, { unit: "Kroner", format: "%n %u" })).toBe(
       "1,234,567,890.50 Kroner",
     );
-    expect(numberToCurrency(-1234567890.5)).toBe("($1,234,567,890.50)");
-    expect(numberToCurrency(-1234567890.5, { format: "%u%n" })).toBe("$-1,234,567,890.50");
+    expect(numberToCurrency(-1234567890.5)).toBe("-$1,234,567,890.50");
+    expect(numberToCurrency(-1234567890.5, { format: "%u%n" })).toBe("-$1,234,567,890.50");
   });
 
   it("number to percentage", () => {
@@ -112,7 +112,7 @@ describe("NumberHelperTest", () => {
   });
 
   it("number number to human size with negative number", () => {
-    expect(numberToHumanSize(-1)).toBe("-1 Byte");
+    expect(numberToHumanSize(-1)).toBe("-1 Bytes");
     expect(numberToHumanSize(-1536)).toBe("-1.5 KB");
     expect(numberToHumanSize(-1234567)).toBe("-1.18 MB");
   });

@@ -43,6 +43,13 @@ export type UnportedFile = { reason: string } &
 
 export const UNPORTED_FILES: UnportedFile[] = [
   {
+    pattern: "i18n_railtie.rb",
+    package: "activesupport",
+    reason:
+      "Rails boot lifecycle hook that wires I18n into the Railtie/Application init sequence. " +
+      "No JS equivalent — I18n is configured directly in user code.",
+  },
+  {
     pattern: "migration/compatibility", // test excluded by extract-ruby-tests.rb SKIP_PATTERNS (/\/migration\//)
     reason: "Pre-1.0: legacy Rails version migration compatibility shims.",
   },

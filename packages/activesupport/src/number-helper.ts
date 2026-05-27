@@ -22,6 +22,7 @@ export interface NumberToPhoneOptions {
 }
 
 export interface NumberToCurrencyOptions {
+  locale?: string;
   precision?: number;
   unit?: string;
   separator?: string;
@@ -31,6 +32,7 @@ export interface NumberToCurrencyOptions {
 }
 
 export interface NumberToPercentageOptions {
+  locale?: string;
   precision?: number;
   separator?: string;
   delimiter?: string;
@@ -40,19 +42,23 @@ export interface NumberToPercentageOptions {
 }
 
 export interface NumberWithDelimiterOptions {
+  locale?: string;
   delimiter?: string;
   separator?: string;
 }
 
 export interface NumberToRoundedOptions {
+  locale?: string;
   precision?: number;
   separator?: string;
   delimiter?: string;
   significant?: boolean;
   stripInsignificantZeros?: boolean;
+  roundMode?: string;
 }
 
 export interface NumberToHumanSizeOptions {
+  locale?: string;
   precision?: number;
   separator?: string;
   delimiter?: string;
@@ -61,12 +67,13 @@ export interface NumberToHumanSizeOptions {
 }
 
 export interface NumberToHumanOptions {
+  locale?: string;
   precision?: number;
   separator?: string;
   delimiter?: string;
   significant?: boolean;
   stripInsignificantZeros?: boolean;
-  units?: Record<string, string>;
+  units?: Record<string, string> | string;
   format?: string;
 }
 
