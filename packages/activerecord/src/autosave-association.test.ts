@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
 import {
   Base,
@@ -15,16 +15,15 @@ import {
 } from "./index.js";
 import { Associations, setBelongsTo, association, loadHasManyThrough } from "./associations.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
-import type { DatabaseAdapter } from "./adapter.js";
 import {
   markForDestruction,
   isMarkedForDestruction,
   computePrimaryKey,
   addAutosaveAssociationCallbacks,
 } from "./autosave-association.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const UNIVERSAL_AUTOSAVE_SCHEMA: Schema = {
   pirates: { catchphrase: "string" },
@@ -166,35 +165,22 @@ const UNIVERSAL_AUTOSAVE_SCHEMA: Schema = {
   nauto_tags: { name: "string", nauto_article_id: "integer" },
 };
 
-async function setupAutosaveAdapter(): Promise<TestDatabaseAdapter> {
-  const a = createTestAdapter();
-  await defineSchema(a, UNIVERSAL_AUTOSAVE_SCHEMA);
-  return a;
-}
-
 function cacheAssoc(record: Base, name: string, value: unknown) {
   if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
   (record as any)._cachedAssociations.set(name, value);
 }
 
+setupHandlerSuite();
+beforeAll(async () => {
+  await defineSchema(UNIVERSAL_AUTOSAVE_SCHEMA);
+});
+
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
-  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeAll(async () => {
-    adapter = await setupAutosaveAdapter();
-    await defineSchema(adapter, {
-      pirates: { catchphrase: "string" },
-      ships: { name: "string", pirate_id: "integer" },
-      birds: { name: "string", pirate_id: "integer" },
-      parts: { name: "string", ship_id: "integer" },
-      parrots: { name: "string" },
-      parrots_pirates: { pirate_id: "integer", parrot_id: "integer" },
-    });
-  });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   function makePirateShip() {
     class Pirate extends Base {
@@ -222,10 +208,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
         this.validates("name", { presence: true });
       }
     }
-    Pirate.adapter = adapter;
-    Ship.adapter = adapter;
-    Bird.adapter = adapter;
-    Part.adapter = adapter;
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
     registerModel("Bird", Bird);
@@ -511,8 +493,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
         this.attribute("catchphrase", "string");
       }
     }
-    Pirate.adapter = adapter;
-    Parrot.adapter = adapter;
     registerModel("Parrot", Parrot);
     registerModel("Pirate", Pirate);
     Associations.hasAndBelongsToMany.call(Pirate, "parrots", {
@@ -644,28 +624,11 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
-  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeAll(async () => {
-    adapter = await setupAutosaveAdapter();
-    await defineSchema(adapter, {
-      companies: { name: "string" },
-      clients: { name: "string", company_id: "integer" },
-      unvalidated_clients: { name: "string", company_id: "integer" },
-      cpk_order_pks: {
-        columns: { shop_id: "integer", id: "integer", status: "string" },
-        primaryKey: ["shop_id", "id"],
-      },
-      cpk_book_fks: { order_id: "integer", title: "string" },
-      aid_firms: { name: "string" },
-      aid_contracts: { aid_firm_id: "integer", aid_developer_id: "integer" },
-      aid_developers: { name: "string" },
-    });
-  });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   function makeModels() {
     class Company extends Base {
@@ -680,8 +643,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         this.validates("name", { presence: true });
       }
     }
-    Company.adapter = adapter;
-    Client.adapter = adapter;
     registerModel("Company", Company);
     registerModel("Client", Client);
     Associations.hasMany.call(Company, "clients", { autosave: true });
@@ -723,7 +684,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         this.attribute("company_id", "integer");
       }
     }
-    UnvalidatedClient.adapter = adapter;
     registerModel("UnvalidatedClient", UnvalidatedClient);
     Associations.hasMany.call(Company, "unvalidatedClients", { autosave: true });
     const company = await Company.create({ name: "Acme" });
@@ -830,14 +790,12 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkBookFk extends Base {
       static {
         this.attribute("order_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CpkOrderPk", CpkOrderPk);
@@ -862,20 +820,17 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     class AidFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class AidContract extends Base {
       static {
         this.attribute("aid_firm_id", "integer");
         this.attribute("aid_developer_id", "integer");
-        this.adapter = adapter;
       }
     }
     class AidDeveloper extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(AidFirm, "aidContracts", {
@@ -1002,15 +957,11 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
-  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeAll(async () => {
-    adapter = await setupAutosaveAdapter();
-  });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   function makeModels() {
     class Firm extends Base {
@@ -1025,8 +976,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.validates("credit_limit", { presence: true });
       }
     }
-    Firm.adapter = adapter;
-    Account.adapter = adapter;
     registerModel("Firm", Firm);
     registerModel("Account", Account);
     Associations.hasOne.call(Firm, "account", { autosave: true });
@@ -1047,8 +996,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.validates("credit_limit", { presence: true });
       }
     }
-    PFirm.adapter = adapter;
-    PAccount.adapter = adapter;
     registerModel("PFirm", PFirm);
     registerModel("PAccount", PAccount);
     Associations.hasOne.call(PFirm, "pAccount", { foreignKey: "p_firm_id" });
@@ -1082,7 +1029,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.attribute("firm_id", "integer");
       }
     }
-    LooseAccount.adapter = adapter;
     registerModel("LooseAccount", LooseAccount);
     Associations.hasOne.call(Firm, "looseAccount", { autosave: true });
     const firm = await Firm.create({ name: "Acme" });
@@ -1171,8 +1117,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.attribute("cb_firm_id", "integer");
       }
     }
-    CbFirm.adapter = adapter;
-    CbAccount.adapter = adapter;
     registerModel("CbFirm", CbFirm);
     registerModel("CbAccount", CbAccount);
     Associations.hasOne.call(CbFirm, "cbAccount", {
@@ -1216,8 +1160,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.attribute("cu_firm_id", "integer");
       }
     }
-    CuFirm.adapter = adapter;
-    CuAccount.adapter = adapter;
     registerModel("CuFirm", CuFirm);
     registerModel("CuAccount", CuAccount);
     Associations.hasOne.call(CuFirm, "cuAccount", {
@@ -1257,8 +1199,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.attribute("cs_firm_id", "integer");
       }
     }
-    CsFirm.adapter = adapter;
-    CsAccount.adapter = adapter;
     registerModel("CsFirm", CsFirm);
     registerModel("CsAccount", CsAccount);
     Associations.hasOne.call(CsFirm, "csAccount", {
@@ -1293,8 +1233,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
-    CbParent.adapter = adapter;
-    CbChild.adapter = adapter;
     registerModel("CbParent", CbParent);
     registerModel("CbChild", CbChild);
     Associations.hasOne.call(CbParent, "cbChild", {
@@ -1341,8 +1279,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
-    PolyParent.adapter = adapter;
-    PolyChild.adapter = adapter;
     registerModel("PolyParent", PolyParent);
     registerModel("PolyChild", PolyChild);
     Associations.hasOne.call(PolyParent, "polyChild", {
@@ -1386,8 +1322,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.attribute("cb_owner_id", "integer");
       }
     }
-    CbOwner.adapter = adapter;
-    CbPet.adapter = adapter;
     registerModel("CbOwner", CbOwner);
     registerModel("CbPet", CbPet);
     Associations.belongsTo.call(CbPet, "cbOwner", {
@@ -1434,8 +1368,6 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         this.attribute("employable_type", "string");
       }
     }
-    PolyAsParent.adapter = adapter;
-    PolyAsChild.adapter = adapter;
     registerModel("PolyAsParent", PolyAsParent);
     registerModel("PolyAsChild", PolyAsChild);
     Associations.hasOne.call(PolyAsParent, "polyAsChild", {
@@ -1475,14 +1407,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
-  let adapter: DatabaseAdapter;
+  useHandlerTransactionalFixtures();
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeEach(async () => {
-    adapter = await setupAutosaveAdapter();
-  });
 
   function makeModels() {
     class Pirate extends Base {
@@ -1497,8 +1426,6 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         this.validates("name", { presence: true });
       }
     }
-    Pirate.adapter = adapter;
-    Ship.adapter = adapter;
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
     Associations.hasOne.call(Pirate, "ship", { autosave: true });
@@ -1572,12 +1499,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     // Rails: test "should not ignore different error messages on the same attribute"
     // When multiple validators fire on the same child attribute, all messages
     // should be merged onto the parent under the dotted attribute key.
-    const innerAdapter = await setupAutosaveAdapter();
     class DualValidShip extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
-        this.adapter = innerAdapter;
         this.validates("name", { presence: true });
         this.validates("name", { format: { with: /\w/ } });
       }
@@ -1585,7 +1510,6 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     class DualPirate extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = innerAdapter;
       }
     }
     registerModel("DualPirate", DualPirate);
@@ -1611,7 +1535,6 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         this.attribute("pirate_id", "integer");
       }
     }
-    FlexShip.adapter = adapter;
     registerModel("FlexShip", FlexShip);
     Associations.hasOne.call(Pirate, "flexShip", { autosave: true });
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
@@ -1624,12 +1547,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   it("should allow to bypass validations on associated models at any depth", async () => {
     // Rails: test "should allow to bypass validations on associated models at any depth"
     // save(validate: false) should skip validation on the parent and all nested records.
-    const innerAdapter = await setupAutosaveAdapter();
     class DeepPart extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("ship_id", "integer");
-        this.adapter = innerAdapter;
         this.validates("name", { presence: true });
       }
     }
@@ -1637,14 +1558,12 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
       static {
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
-        this.adapter = innerAdapter;
         this.validates("name", { presence: true });
       }
     }
     class DeepPirate extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = innerAdapter;
         this.validates("catchphrase", { presence: true });
       }
     }
@@ -1696,7 +1615,6 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
-    CcPirate.adapter = adapter;
     registerModel("CcPirate", CcPirate);
     const pirate = new CcPirate({ catchphrase: "Cancelled" });
     const saved = await pirate.save();
@@ -1756,9 +1674,6 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         this.attribute("name", "string");
       }
     }
-    SwapChef.adapter = adapter;
-    SwapCakeDesigner.adapter = adapter;
-    SwapDrinkDesigner.adapter = adapter;
     registerModel("SwapChef", SwapChef);
     registerModel("SwapCakeDesigner", SwapCakeDesigner);
     registerModel("SwapDrinkDesigner", SwapDrinkDesigner);
@@ -1799,15 +1714,11 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
-  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeAll(async () => {
-    adapter = await setupAutosaveAdapter();
-  });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   function makeModels() {
     class Author extends Base {
@@ -1822,8 +1733,6 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("author_id", "integer");
       }
     }
-    Author.adapter = adapter;
-    Post.adapter = adapter;
     registerModel("Author", Author);
     registerModel("Post", Post);
     Associations.belongsTo.call(Post, "author", { autosave: true });
@@ -1854,7 +1763,6 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("name", "string");
       }
     }
-    FlexAuthor.adapter = adapter;
     registerModel("FlexAuthor", FlexAuthor);
     class FlexPost extends Base {
       static {
@@ -1862,7 +1770,6 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("flex_author_id", "integer");
       }
     }
-    FlexPost.adapter = adapter;
     registerModel("FlexPost", FlexPost);
     Associations.belongsTo.call(FlexPost, "flexAuthor", { autosave: true });
     const author = new FlexAuthor({ name: "" });
@@ -1926,14 +1833,12 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     class PolyMember extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class PolySponsor extends Base {
       static {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(PolyMember);
@@ -1984,7 +1889,6 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("id", "integer");
         this.attribute("status", "string");
         this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
       }
     }
     class CpkBook2 extends Base {
@@ -1992,7 +1896,6 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("shop_id", "integer");
         this.attribute("order_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CpkOrder2", CpkOrder2);
@@ -2024,15 +1927,11 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
-  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeAll(async () => {
-    adapter = await setupAutosaveAdapter();
-  });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   function makeModels() {
     class Pirate extends Base {
@@ -2047,8 +1946,6 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("pirate_id", "integer");
       }
     }
-    Pirate.adapter = adapter;
-    Ship.adapter = adapter;
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
     Associations.belongsTo.call(Ship, "pirate", { autosave: true });
@@ -2107,7 +2004,6 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("catchphrase", "string");
       }
     }
-    FlexPirate.adapter = adapter;
     registerModel("FlexPirate", FlexPirate);
     class FlexShip extends Base {
       static {
@@ -2115,7 +2011,6 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("flex_pirate_id", "integer");
       }
     }
-    FlexShip.adapter = adapter;
     registerModel("FlexShip", FlexShip);
     Associations.belongsTo.call(FlexShip, "flexPirate", { autosave: true });
     const pirate = new FlexPirate({ catchphrase: "" });
@@ -2143,7 +2038,6 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
         });
       }
     }
-    CcShip.adapter = adapter;
     registerModel("CcShip", CcShip);
     const ship = new CcShip({ name: "Cancelled" });
     const saved = await ship.save();
@@ -2193,15 +2087,11 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes", () => {
-  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeAll(async () => {
-    adapter = await setupAutosaveAdapter();
-  });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   function makeModels() {
     class Pirate extends Base {
@@ -2216,8 +2106,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
         this.validates("name", { presence: true });
       }
     }
-    Pirate.adapter = adapter;
-    Bird.adapter = adapter;
     registerModel("Pirate", Pirate);
     registerModel("Bird", Bird);
     Associations.hasMany.call(Pirate, "birds", { autosave: true });
@@ -2276,8 +2164,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
         this.validates("name", { presence: true });
       }
     }
-    Parent.adapter = adapter;
-    Child.adapter = adapter;
     registerModel(`${seed}Parent`, Parent);
     registerModel(`${seed}Child`, Child);
     Associations.hasMany.call(Parent, "children", {
@@ -2326,8 +2212,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
         return this.errors.empty;
       }
     }
-    P.adapter = adapter;
-    C.adapter = adapter;
     registerModel("BaseErrP", P);
     registerModel("BaseErrC", C);
     Associations.hasMany.call(P, "kids", {
@@ -2369,8 +2253,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
           this.attribute("name", "string");
         }
       }
-      Person.adapter = adapter;
-      Reference.adapter = adapter;
       registerModel("Person", Person);
       registerModel("Reference", Reference);
       Associations.hasMany.call(Person, "references", {
@@ -2421,8 +2303,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
           this.validates("reference", { presence: true });
         }
       }
-      Person.adapter = adapter;
-      Reference.adapter = adapter;
       registerModel("Person", Person);
       registerModel("Reference", Reference);
       Associations.hasOne.call(Person, "reference", {
@@ -2464,19 +2344,17 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 });
 
 describe("TestAutosaveAssociationsInGeneral", () => {
+  useHandlerTransactionalFixtures();
   it("autosave works even when other callbacks update the parent model", async () => {
-    const adapter = await setupAutosaveAdapter();
     class Ship extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Pirate extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
         this.beforeSave(function (record: any) {
           record.catchphrase = "Ahoy!";
         });
@@ -2504,11 +2382,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // Rails: test "autosave does not pass through non custom validation contexts"
     // When autosave validates an associated record, it should NOT pass the owner's
     // standard (:create/:update) validation context — only custom contexts propagate.
-    const innerAdapter = await setupAutosaveAdapter();
     class Person extends Base {
       static {
         this.attribute("first_name", "string");
-        this.adapter = innerAdapter;
         // :create-only validation — should not fire when context is :update
         this.validate(
           function (record: any) {
@@ -2523,7 +2399,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     class Reference extends Base {
       static {
         this.attribute("person_id", "integer");
-        this.adapter = innerAdapter;
       }
     }
     registerModel("Person", Person);
@@ -2552,19 +2427,16 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // Rails association_valid? always validates; the `|| context` guard in error
     // propagation (autosave_association.rb:384) means custom contexts fire even
     // on unchanged persisted children, unlike the default :create/:update skip.
-    const innerAdapter = await setupAutosaveAdapter();
     class Widget extends Base {
       static {
         this.attribute("status", "string");
         this.attribute("owner_id", "integer");
-        this.adapter = innerAdapter;
         this.validates("status", { presence: true, on: "publish" } as any);
       }
     }
     class Owner extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = innerAdapter;
       }
     }
     registerModel("Widget", Widget);
@@ -2587,13 +2459,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   });
 
   it("autosave collection association callbacks get called once", async () => {
-    const adapter = await setupAutosaveAdapter();
     let saveCount = 0;
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
         this.beforeSave(() => {
           saveCount++;
         });
@@ -2602,7 +2472,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Book", Book);
@@ -2624,13 +2493,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   });
 
   it("autosave has one association callbacks get called once", async () => {
-    const adapter = await setupAutosaveAdapter();
     let saveCount = 0;
     class Profile extends Base {
       static {
         this.attribute("bio", "string");
         this.attribute("user_id", "integer");
-        this.adapter = adapter;
         this.beforeSave(() => {
           saveCount++;
         });
@@ -2639,7 +2506,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Profile", Profile);
@@ -2661,12 +2527,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   });
 
   it("autosave belongs to association callbacks get called once", async () => {
-    const adapter = await setupAutosaveAdapter();
     let saveCount = 0;
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeSave(() => {
           saveCount++;
         });
@@ -2676,7 +2540,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -2702,18 +2565,15 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // branch fires even when `autosave` is unset, so default belongs_to
     // saves a new target during owner save and writes the parent PK back
     // onto the owner's foreign key.
-    const adapter = await setupAutosaveAdapter();
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -2737,11 +2597,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // When the FK array is longer than the PK array, Ruby Array#zip
     // drops the extra FK entries; the loop only writes the positions
     // where both sides exist. No CompositePrimaryKeyMismatchError.
-    const adapter = await setupAutosaveAdapter();
     class Parent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Child extends Base {
@@ -2749,7 +2607,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("parent_id", "integer");
         this.attribute("region", "string");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("ZipParent", Parent);
@@ -2781,11 +2638,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // false; Rails' `saved if autosave` clamps the return to nil for the
     // default branch, so the lambda doesn't `throw(:abort)` and the owner
     // save still succeeds — the child simply remains unpersisted.
-    const adapter = await setupAutosaveAdapter();
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -2793,7 +2648,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("DefaultAutosaveAuthor", Author);
@@ -2821,18 +2675,15 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // When PK is longer, the trailing pairs have `foreign_key = nil`;
     // Ruby's `self[nil] = id` would raise — our impl skips the nil-FK
     // partner so a misconfigured pair doesn't blow up the owner save.
-    const adapter = await setupAutosaveAdapter();
     class Parent extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Child extends Base {
       static {
         this.attribute("parent_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("LongPkParent", Parent);
@@ -2862,14 +2713,12 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // option, the writer fills `${assoc}_${pk}` columns at assignment.
     // After autosave, FK propagation must hit the same columns so a
     // newly-saved parent's PK lands on the owner.
-    const adapter = await setupAutosaveAdapter();
     class CompParent extends Base {
       static {
         this.primaryKey = ["region_id", "id"];
         this.attribute("region_id", "integer");
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class CompChild extends Base {
@@ -2877,7 +2726,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("comp_parent_region_id", "integer");
         this.attribute("comp_parent_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("CompParent", CompParent);
@@ -2896,13 +2744,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   });
 
   it("should not add the same callbacks multiple times for has one", async () => {
-    const adapter = await setupAutosaveAdapter();
     let saveCount = 0;
     class Profile extends Base {
       static {
         this.attribute("bio", "string");
         this.attribute("user_id", "integer");
-        this.adapter = adapter;
         this.beforeSave(() => {
           saveCount++;
         });
@@ -2911,7 +2757,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Profile", Profile);
@@ -2935,12 +2780,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   });
 
   it("should not add the same callbacks multiple times for belongs to", async () => {
-    const adapter = await setupAutosaveAdapter();
     let saveCount = 0;
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeSave(() => {
           saveCount++;
         });
@@ -2950,7 +2793,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -2972,13 +2814,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   });
 
   it("should not add the same callbacks multiple times for has many", async () => {
-    const adapter = await setupAutosaveAdapter();
     let saveCount = 0;
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
         this.beforeSave(() => {
           saveCount++;
         });
@@ -2987,7 +2827,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Book", Book);
@@ -3009,12 +2848,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   });
 
   it("should not add the same callbacks multiple times for has and belongs to many", async () => {
-    const adapter = await setupAutosaveAdapter();
     let saveCount = 0;
     class Parrot extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.beforeSave(() => {
           saveCount++;
         });
@@ -3023,7 +2860,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     class Pirate extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Parrot", Parrot);
@@ -3091,15 +2927,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 });
 
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeAll(async () => {
-    adapter = await setupAutosaveAdapter();
-  });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   function makeModels() {
     class Pirate extends Base {
@@ -3120,9 +2952,6 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
         this.validates("name", { presence: true });
       }
     }
-    Pirate.adapter = adapter;
-    Ship.adapter = adapter;
-    Part.adapter = adapter;
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
     registerModel("Part", Part);
@@ -3196,18 +3025,13 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 });
 
 describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
-    adapter = await setupAutosaveAdapter();
-  });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   it("should generate validation methods for has_many associations", async () => {
     class VmParent extends Base {
       static {
         this._tableName = "vm_parents";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class VmChild extends Base {
@@ -3215,7 +3039,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
         this._tableName = "vm_children";
         this.attribute("val", "string");
         this.attribute("vm_parent_id", "integer");
-        this.adapter = adapter;
         this.validates("val", { presence: true });
       }
     }
@@ -3237,7 +3060,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
       static {
         this._tableName = "vo_parents";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class VoChild extends Base {
@@ -3245,7 +3067,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
         this._tableName = "vo_children";
         this.attribute("val", "string");
         this.attribute("vo_parent_id", "integer");
-        this.adapter = adapter;
         this.validates("val", { presence: true });
       }
     }
@@ -3267,7 +3088,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
       static {
         this._tableName = "nv_parents";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class NvChild extends Base {
@@ -3275,7 +3095,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
         this._tableName = "nv_children";
         this.attribute("val", "string");
         this.attribute("nv_parent_id", "integer");
-        this.adapter = adapter;
         this.validates("val", { presence: true });
       }
     }
@@ -3297,7 +3116,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
       static {
         this._tableName = "bv_owners";
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -3306,7 +3124,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
         this._tableName = "bv_children";
         this.attribute("val", "string");
         this.attribute("bv_owner_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("BvOwner", BvOwner);
@@ -3327,7 +3144,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
       static {
         this._tableName = "nb_owners";
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -3336,7 +3152,6 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
         this._tableName = "nb_children";
         this.attribute("val", "string");
         this.attribute("nb_owner_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("NbOwner", NbOwner);
@@ -3357,14 +3172,12 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
       static {
         this._tableName = "hv_parents";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HvTag extends Base {
       static {
         this._tableName = "hv_tags";
         this.attribute("label", "string");
-        this.adapter = adapter;
         this.validates("label", { presence: true });
       }
     }
@@ -3383,15 +3196,11 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
 });
 
 describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeAll(async () => {
-    adapter = await setupAutosaveAdapter();
-  });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   function makeModels() {
     class Pirate extends Base {
@@ -3412,9 +3221,6 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
         this.validates("name", { presence: true });
       }
     }
-    Pirate.adapter = adapter;
-    Ship.adapter = adapter;
-    Part.adapter = adapter;
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
     registerModel("Part", Part);
@@ -3457,19 +3263,17 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 });
 
 describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
+  useHandlerTransactionalFixtures();
   it("autosave new record on belongs to can be disabled per relationship", async () => {
-    const adapter = await setupAutosaveAdapter();
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("Author", Author);
@@ -3490,18 +3294,15 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
   });
 
   it("autosave new record on has one can be disabled per relationship", async () => {
-    const adapter = await setupAutosaveAdapter();
     class Profile extends Base {
       static {
         this.attribute("bio", "string");
         this.attribute("user_id", "integer");
-        this.adapter = adapter;
       }
     }
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Profile", Profile);
@@ -3522,18 +3323,15 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
   });
 
   it("autosave new record on has many can be disabled per relationship", async () => {
-    const adapter = await setupAutosaveAdapter();
     class Book extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("Book", Book);
@@ -3554,19 +3352,16 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
   });
 
   it("autosave new record with after create callback", async () => {
-    const adapter = await setupAutosaveAdapter();
     const log: string[] = [];
     class Ship extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Pirate extends Base {
       static {
         this.attribute("catchphrase", "string");
-        this.adapter = adapter;
         this.afterCreate(() => {
           log.push("pirate_created");
         });
@@ -3599,12 +3394,11 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
+  useHandlerTransactionalFixtures();
   it("should automatically validate associations", async () => {
-    const adapter = await setupAutosaveAdapter();
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -3625,11 +3419,9 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
     /* needs autosave association integration */
   });
   it("validations still fire on unchanged association with custom validation context", async () => {
-    const adapter = await setupAutosaveAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validates("title", { presence: true, on: "create" });
       }
     }
@@ -3640,12 +3432,11 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
+  useHandlerTransactionalFixtures();
   it("should automatically validate associations with :validate => true", async () => {
-    const adapter = await setupAutosaveAdapter();
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -3655,11 +3446,9 @@ describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
   });
 
   it("should not automatically validate associations without :validate => true", async () => {
-    const adapter = await setupAutosaveAdapter();
     class Item extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     const item = new Item({ label: "fine" });
@@ -3668,11 +3457,9 @@ describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
   });
 
   it("validations still fire on unchanged association with custom validation context", async () => {
-    const adapter = await setupAutosaveAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
         this.validates("title", { presence: true, on: "create" });
       }
     }
@@ -3683,12 +3470,11 @@ describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
+  useHandlerTransactionalFixtures();
   it("should automatically validate associations with :validate => true", async () => {
-    const adapter = await setupAutosaveAdapter();
     class Profile extends Base {
       static {
         this.attribute("bio", "string");
-        this.adapter = adapter;
         this.validates("bio", { presence: true });
       }
     }
@@ -3698,11 +3484,9 @@ describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
   });
 
   it("should not automatically add validate associations without :validate => true", async () => {
-    const adapter = await setupAutosaveAdapter();
     class Address extends Base {
       static {
         this.attribute("street", "string");
-        this.adapter = adapter;
       }
     }
     const a = new Address({ street: "123 Main" });
@@ -3712,20 +3496,18 @@ describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
+  useHandlerTransactionalFixtures();
   it("should not has one through model", async () => {
-    const adapter = await setupAutosaveAdapter();
     class HotOrg extends Base {
       static {
         this._tableName = "hot_orgs";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HotMember extends Base {
       static {
         this._tableName = "hot_members";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class HotDetail extends Base {
@@ -3733,7 +3515,6 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
         this._tableName = "hot_details";
         this.attribute("hot_org_id", "integer");
         this.attribute("hot_member_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("HotOrg", HotOrg);
@@ -3771,19 +3552,16 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
     expect(reloadedOrg.name).toBe("Org");
   });
   it("should not reversed has one through model", async () => {
-    const adapter = await setupAutosaveAdapter();
     class RevOrg extends Base {
       static {
         this._tableName = "rev_orgs";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class RevMember extends Base {
       static {
         this._tableName = "rev_members";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class RevDetail extends Base {
@@ -3791,7 +3569,6 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
         this._tableName = "rev_details";
         this.attribute("rev_org_id", "integer");
         this.attribute("rev_member_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("RevOrg", RevOrg);
@@ -3829,12 +3606,11 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
+  useHandlerTransactionalFixtures();
   it("should automatically validate associations with :validate => true", async () => {
-    const adapter = await setupAutosaveAdapter();
     class Tag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -3843,11 +3619,9 @@ describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
     expect(valid).toBe(false);
   });
   it("should not automatically validate associations without :validate => true", async () => {
-    const adapter = await setupAutosaveAdapter();
     class Label extends Base {
       static {
         this.attribute("text", "string");
-        this.adapter = adapter;
       }
     }
     const l = new Label({ text: "fine" });
@@ -3857,6 +3631,7 @@ describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
+  useHandlerTransactionalFixtures();
   it.skip("after save callback with autosave", () => {
     // BLOCKED: associations — autosave feature gap
     // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
@@ -3866,13 +3641,12 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
 });
 
 describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => {
+  useHandlerTransactionalFixtures();
   it("should not raise error", async () => {
-    const adapter = await setupAutosaveAdapter();
     class BtOwner extends Base {
       static {
         this._tableName = "bt_owners";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class BtRecord extends Base {
@@ -3880,7 +3654,6 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
         this._tableName = "bt_records";
         this.attribute("value", "string");
         this.attribute("bt_owner_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("BtOwner", BtOwner);
@@ -3899,14 +3672,13 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
 });
 
 describe("TestAutosaveAssociationWithTouch", () => {
+  useHandlerTransactionalFixtures();
   it("autosave with touch should not raise system stack error", async () => {
-    const adapter = await setupAutosaveAdapter();
     class TchParent extends Base {
       static {
         this._tableName = "tch_parents";
         this.attribute("name", "string");
         this.attribute("updated_at", "string");
-        this.adapter = adapter;
       }
     }
     class TchChild extends Base {
@@ -3914,7 +3686,6 @@ describe("TestAutosaveAssociationWithTouch", () => {
         this._tableName = "tch_children";
         this.attribute("value", "string");
         this.attribute("tch_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("TchParent", TchParent);
@@ -3939,6 +3710,7 @@ describe("TestAutosaveAssociationWithTouch", () => {
 });
 
 describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAcceptsNestedAttributes", () => {
+  useHandlerTransactionalFixtures();
   it.skip("should update children when association redefined in subclass", () => {
     // BLOCKED: associations — autosave feature gap
     // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
@@ -3948,11 +3720,7 @@ describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAccep
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
-    adapter = await setupAutosaveAdapter();
-  });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   function makeModels() {
     class Pirate extends Base {
@@ -3967,8 +3735,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
         this.validates("name", { presence: true });
       }
     }
-    Pirate.adapter = adapter;
-    Bird.adapter = adapter;
     registerModel("Pirate", Pirate);
     registerModel("Bird", Bird);
     Associations.hasMany.call(Pirate, "birds", { autosave: true });
@@ -3996,13 +3762,12 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 });
 
 describe("should update children when autosave is true and parent is new but child is not", () => {
+  useHandlerTransactionalFixtures();
   it("should update children when autosave is true and parent is new but child is not", async () => {
-    const adapter = await setupAutosaveAdapter();
     class UcParent extends Base {
       static {
         this._tableName = "uc_parents";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class UcChild extends Base {
@@ -4010,7 +3775,6 @@ describe("should update children when autosave is true and parent is new but chi
         this._tableName = "uc_children";
         this.attribute("val", "string");
         this.attribute("uc_parent_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("UcParent", UcParent);
@@ -4033,20 +3797,17 @@ describe("should update children when autosave is true and parent is new but chi
     expect(reloaded.readAttribute("uc_parent_id")).toBe(parent.id);
   });
   it("should automatically save the associated models", async () => {
-    const adapter = await setupAutosaveAdapter();
     class NAutoTag extends Base {
       static {
         this._tableName = "nauto_tags";
         this.attribute("name", "string");
         this.attribute("nauto_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NAutoArticle extends Base {
       static {
         this._tableName = "nauto_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NAutoArticle, "nautoTags", {
@@ -4066,20 +3827,17 @@ describe("should update children when autosave is true and parent is new but chi
   });
 
   it("should automatically save bang the associated models", async () => {
-    const adapter = await setupAutosaveAdapter();
     class ASB1Tag extends Base {
       static {
         this._tableName = "asb1_tags";
         this.attribute("name", "string");
         this.attribute("asb1_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class ASB1Article extends Base {
       static {
         this._tableName = "asb1_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(ASB1Article, "asb1Tags", {
@@ -4098,20 +3856,17 @@ describe("should update children when autosave is true and parent is new but chi
   });
 
   it("should not update children when parent creation with no reason", async () => {
-    const adapter = await setupAutosaveAdapter();
     class NUCTag extends Base {
       static {
         this._tableName = "nuc_tags";
         this.attribute("name", "string");
         this.attribute("nuc_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NUCArticle extends Base {
       static {
         this._tableName = "nuc_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NUCArticle, "nucTags", {
@@ -4130,13 +3885,11 @@ describe("should update children when autosave is true and parent is new but chi
   });
 
   it("should automatically validate the associated models", async () => {
-    const adapter = await setupAutosaveAdapter();
     class AVTag extends Base {
       static {
         this._tableName = "av_tags";
         this.attribute("name", "string");
         this.attribute("av_article_id", "integer");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -4144,7 +3897,6 @@ describe("should update children when autosave is true and parent is new but chi
       static {
         this._tableName = "av_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(AVArticle, "avTags", {
@@ -4160,13 +3912,11 @@ describe("should update children when autosave is true and parent is new but chi
   });
 
   it("should not use default invalid error on associated models", async () => {
-    const adapter = await setupAutosaveAdapter();
     class NDITag extends Base {
       static {
         this._tableName = "ndi_tags";
         this.attribute("name", "string");
         this.attribute("ndi_article_id", "integer");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -4174,7 +3924,6 @@ describe("should update children when autosave is true and parent is new but chi
       static {
         this._tableName = "ndi_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NDIArticle, "ndiTags", {
@@ -4194,13 +3943,11 @@ describe("should update children when autosave is true and parent is new but chi
   });
 
   it("should default invalid error from i18n", async () => {
-    const adapter = await setupAutosaveAdapter();
     class DITag extends Base {
       static {
         this._tableName = "di_tags";
         this.attribute("name", "string");
         this.attribute("di_article_id", "integer");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -4208,7 +3955,6 @@ describe("should update children when autosave is true and parent is new but chi
       static {
         this._tableName = "di_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(DIArticle, "diTags", {
@@ -4226,13 +3972,11 @@ describe("should update children when autosave is true and parent is new but chi
   });
 
   it("should allow to bypass validations on the associated models on update", async () => {
-    const adapter = await setupAutosaveAdapter();
     class BVUTag extends Base {
       static {
         this._tableName = "bvu_tags";
         this.attribute("name", "string");
         this.attribute("bvu_article_id", "integer");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -4240,7 +3984,6 @@ describe("should update children when autosave is true and parent is new but chi
       static {
         this._tableName = "bvu_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(BVUArticle, "bvuTags", {
@@ -4259,13 +4002,11 @@ describe("should update children when autosave is true and parent is new but chi
   });
 
   it("should validation the associated models on create", async () => {
-    const adapter = await setupAutosaveAdapter();
     class VCTag extends Base {
       static {
         this._tableName = "vc_tags";
         this.attribute("name", "string");
         this.attribute("vc_article_id", "integer");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -4273,7 +4014,6 @@ describe("should update children when autosave is true and parent is new but chi
       static {
         this._tableName = "vc_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(VCArticle, "vcTags", {
@@ -4289,13 +4029,11 @@ describe("should update children when autosave is true and parent is new but chi
   });
 
   it("should allow to bypass validations on the associated models on create", async () => {
-    const adapter = await setupAutosaveAdapter();
     class BVTag extends Base {
       static {
         this._tableName = "bv_tags";
         this.attribute("name", "string");
         this.attribute("bv_article_id", "integer");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -4303,7 +4041,6 @@ describe("should update children when autosave is true and parent is new but chi
       static {
         this._tableName = "bv_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(BVArticle, "bvTags", {
@@ -4322,13 +4059,11 @@ describe("should update children when autosave is true and parent is new but chi
   });
 
   it("should not save and return false if a callback cancelled saving in either create or update", async () => {
-    const adapter = await setupAutosaveAdapter();
     class CBTag extends Base {
       static {
         this._tableName = "cb_tags";
         this.attribute("name", "string");
         this.attribute("cb_article_id", "integer");
-        this.adapter = adapter;
         this.beforeSave(function (record: any) {
           if (record.name === "cancel") return false;
         });
@@ -4338,7 +4073,6 @@ describe("should update children when autosave is true and parent is new but chi
       static {
         this._tableName = "cb_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel(CBTag);
@@ -4350,20 +4084,17 @@ describe("should update children when autosave is true and parent is new but chi
   });
 
   it("should not load the associated models if they were not loaded yet", async () => {
-    const adapter = await setupAutosaveAdapter();
     class NLTag extends Base {
       static {
         this._tableName = "nl_tags";
         this.attribute("name", "string");
         this.attribute("nl_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class NLArticle extends Base {
       static {
         this._tableName = "nl_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(NLArticle, "nlTags", {
@@ -4379,13 +4110,11 @@ describe("should update children when autosave is true and parent is new but chi
     expect(saved).toBe(true);
   });
   it("should merge errors on the associated models onto the parent even if it is not valid", async () => {
-    const adapter = await setupAutosaveAdapter();
     class METag extends Base {
       static {
         this._tableName = "me_tags";
         this.attribute("name", "string");
         this.attribute("me_article_id", "integer");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -4393,7 +4122,6 @@ describe("should update children when autosave is true and parent is new but chi
       static {
         this._tableName = "me_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(MEArticle, "meTags", {
@@ -4411,20 +4139,17 @@ describe("should update children when autosave is true and parent is new but chi
   });
 
   it("should rollback any changes if an exception occurred while saving", async () => {
-    const adapter = await setupAutosaveAdapter();
     class RBTag extends Base {
       static {
         this._tableName = "rb_tags";
         this.attribute("name", "string");
         this.attribute("rb_article_id", "integer");
-        this.adapter = adapter;
       }
     }
     class RBArticle extends Base {
       static {
         this._tableName = "rb_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(RBArticle, "rbTags", {
@@ -4446,13 +4171,11 @@ describe("should update children when autosave is true and parent is new but chi
   });
 
   it("should still raise an ActiveRecordRecord Invalid exception if we want that", async () => {
-    const adapter = await setupAutosaveAdapter();
     class RITag extends Base {
       static {
         this._tableName = "ri_tags";
         this.attribute("name", "string");
         this.attribute("ri_article_id", "integer");
-        this.adapter = adapter;
         this.validates("name", { presence: true });
       }
     }
@@ -4460,7 +4183,6 @@ describe("should update children when autosave is true and parent is new but chi
       static {
         this._tableName = "ri_articles";
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(RIArticle, "riTags", {
@@ -4479,24 +4201,18 @@ describe("should update children when autosave is true and parent is new but chi
 });
 
 describe("ChangedForAutosaveTest", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
-    adapter = await setupAutosaveAdapter();
-  });
-  withTransactionalFixtures(() => adapter);
+  useHandlerTransactionalFixtures();
 
   it("parent is changed_for_autosave when nested autosave child is changed", () => {
     class Child extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Parent extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
         (this as any)._associations = [
           { name: "children", type: "hasMany", options: { autosave: true } },
         ];
@@ -4521,13 +4237,11 @@ describe("ChangedForAutosaveTest", () => {
     class Child2 extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
       }
     }
     class Parent2 extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
         (this as any)._associations = [
           { name: "child", type: "hasOne", options: { autosave: true } },
         ];
@@ -4551,7 +4265,6 @@ describe("ChangedForAutosaveTest", () => {
     class A extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
         (this as any)._associations = [
           { name: "b", type: "hasOne", options: { autosave: true, className: "CycleB" } },
         ];
@@ -4560,7 +4273,6 @@ describe("ChangedForAutosaveTest", () => {
     class B extends Base {
       static {
         this.attribute("id", "integer");
-        this.adapter = adapter;
         (this as any)._associations = [
           { name: "a", type: "belongsTo", options: { autosave: true, className: "CycleA" } },
         ];
@@ -4584,12 +4296,12 @@ describe("ChangedForAutosaveTest", () => {
 });
 
 describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
+  useHandlerTransactionalFixtures();
   // When a class has queryConstraints and the has_one uses an explicit composite FK,
   // assoc.options.foreignKey is the composite array. The reflection normalizes it
   // into options.queryConstraints internally. computePrimaryKey(reflection) therefore
   // hits branch 2 and returns queryConstraintsList — pairing with the composite FK.
   it("pairs queryConstraintsList PK with explicit composite FK on QC owner", async () => {
-    const adapter = await setupAutosaveAdapter();
     class QcOwner extends Base {
       static {
         this.attribute("tenant_id", "integer");
@@ -4597,7 +4309,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
         this.attribute("name", "string");
         (this as any)._queryConstraintsList = ["tenant_id", "id"];
         (this as any)._hasQueryConstraints = true;
-        this.adapter = adapter;
       }
     }
     class QcChild extends Base {
@@ -4605,7 +4316,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
         this.attribute("tenant_id", "integer");
         this.attribute("qc_owner_id", "integer");
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("QcOwner", QcOwner);
@@ -4639,7 +4349,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
     // instead the composite/scalar mismatch path is reached. In a properly configured
     // association both FK and PK would be composite, so no-mismatch is the happy path.
     // This test confirms the collapse does NOT fire for QC-derived PK arrays.
-    const adapter = await setupAutosaveAdapter();
     class QcNoCollapse extends Base {
       static {
         this.attribute("tenant_id", "integer");
@@ -4648,7 +4357,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
         // QC list — ctor.primaryKey remains scalar "id"
         (this as any)._queryConstraintsList = ["tenant_id", "id"];
         (this as any)._hasQueryConstraints = true;
-        this.adapter = adapter;
       }
     }
     class QcNoCollapseChild extends Base {
@@ -4656,7 +4364,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
         this.attribute("tenant_id", "integer");
         this.attribute("qc_no_collapse_id", "integer");
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("QcNoCollapse", QcNoCollapse);
@@ -4687,7 +4394,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
   // so composite FK and composite PK are paired and assigned correctly.
   // This exercises the "no explicit FK → computePrimaryKey → QC branch" path.
   it("uses queryConstraintsList as PK when class has_query_constraints? and no explicit FK", async () => {
-    const adapter = await setupAutosaveAdapter();
     class QcTenant extends Base {
       static {
         this.attribute("tenant_id", "integer");
@@ -4696,7 +4402,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
         // Simulate a model with query_constraints [:tenant_id, :id]
         (this as any)._queryConstraintsList = ["tenant_id", "id"];
         (this as any)._hasQueryConstraints = true;
-        this.adapter = adapter;
       }
     }
     class QcTenantRecord extends Base {
@@ -4704,7 +4409,6 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
         this.attribute("tenant_id", "integer");
         this.attribute("qc_tenant_id", "integer");
         this.attribute("note", "string");
-        this.adapter = adapter;
       }
     }
     registerModel("QcTenant", QcTenant);
