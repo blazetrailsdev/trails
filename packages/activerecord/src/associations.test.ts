@@ -8584,7 +8584,7 @@ describe("PreloaderTest", () => {
   // multi-database scenario.
   it.skip("multi database polymorphic preload with same table name", () => {
     // BLOCKED: D-1 — this test bypassed the connection handler via direct adapter assignment (multi-DB pattern).
-    // Needs reimplementation against the pool (no bypass). Tracked in connection-pooled-test-adapter-plan.md.
+    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/connection-pooled-test-adapter-plan.md.
   });
 
   it("preload with available records", async () => {
