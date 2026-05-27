@@ -244,19 +244,19 @@ export class Mapper {
     }
 
     // Member routes last (they have :id which would greedily match collection paths)
-    if (allowed.has("show")) {
+    if (allowed.has("edit")) {
       this.routes.push(
-        new Route("GET", `${shallowPath}/:id`, controller, "show", {
-          name: shallowName(singular),
+        new Route("GET", `${shallowPath}/:id/${editPath}`, controller, "edit", {
+          name: shallowName(`edit_${singular}`),
           constraints,
         }),
       );
     }
 
-    if (allowed.has("edit")) {
+    if (allowed.has("show")) {
       this.routes.push(
-        new Route("GET", `${shallowPath}/:id/${editPath}`, controller, "edit", {
-          name: shallowName(`edit_${singular}`),
+        new Route("GET", `${shallowPath}/:id`, controller, "show", {
+          name: shallowName(singular),
           constraints,
         }),
       );
@@ -985,7 +985,25 @@ export class Mapper {
     } else if (scopeModulePrefix && controller && !controller.includes("/")) {
       controller = scopeModulePrefix + "/" + controller;
     }
-    const name = options.as ?? options.name;
+    const explicitName = options.as !== undefined ? options.as : options.name;
+    // Mirrors Rails normalize_name: tr("/","_") on the path, but only for
+    // purely static paths — skip segments containing ":" (dynamic) or "()"
+    // (optional) so we don't produce names like "photos_:id".
+    const inferredName =
+      options.as === undefined && options.name === undefined && !isRedirect
+        ? (() => {
+            const cleaned = path.replace(/^\/+/, "").replace(/\(\.:format\)$/, "");
+            const segs = cleaned.split("/").filter(Boolean);
+            if (
+              segs.length === 0 ||
+              segs.some((s) => !/^\w+$/.test(s)) ||
+              !/^[_a-zA-Z]/.test(segs[0])
+            )
+              return undefined;
+            return segs.join("_");
+          })()
+        : undefined;
+    const name = explicitName ?? inferredName;
     const namePrefix = this.currentNamePrefix();
     const fullName = name ? (namePrefix ? `${namePrefix}_${name}` : name) : undefined;
 

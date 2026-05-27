@@ -100,6 +100,8 @@ export class Route {
   readonly ip: string | RegExp;
   readonly redirectTarget: string | RedirectOptions | RedirectFunction | undefined;
   readonly anchor: boolean;
+  /** @internal True unless `format: false` was passed — controls `(.:format)` display in rails routes. */
+  readonly formatted: boolean;
   /** Marks routes that should be hidden from `bin/rails routes` (info routes etc). */
   readonly internal: boolean;
   /** Mounted Rack app, set by `Mapper#mount`. */
@@ -142,6 +144,7 @@ export class Route {
     this.redirectTarget = options.redirect ?? deriveRedirectTarget(options.redirectEndpoint);
     if (options.redirectEndpoint) this._redirectEndpoint = options.redirectEndpoint;
     this.anchor = options.anchor !== false;
+    this.formatted = options.format !== false;
     this.internal = options.internal === true;
     this.app = options.app;
 
