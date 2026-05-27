@@ -168,9 +168,6 @@ importers:
 
   packages/activesupport:
     dependencies:
-      '@blazetrails/nokogiri':
-        specifier: workspace:*
-        version: link:../nokogiri
       '@js-temporal/polyfill':
         specifier: ^0.5.1
         version: 0.5.1
@@ -186,6 +183,10 @@ importers:
       yaml:
         specifier: ^2.8.3
         version: 2.8.3
+    devDependencies:
+      '@blazetrails/nokogiri':
+        specifier: workspace:*
+        version: link:../nokogiri
 
   packages/arel:
     dependencies:

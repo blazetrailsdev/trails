@@ -5,7 +5,7 @@ const CONTENT_ROOT = "__content__";
 function isModuleNotFound(e: unknown, pkg: string): boolean {
   if (!(e instanceof Error)) return false;
   const code = (e as NodeJS.ErrnoException).code;
-  return code === "ERR_MODULE_NOT_FOUND" || e.message.includes(pkg);
+  return code === "ERR_MODULE_NOT_FOUND" && e.message.includes(pkg);
 }
 
 type XmlHash = Record<string, unknown>;
