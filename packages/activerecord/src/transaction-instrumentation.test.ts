@@ -17,6 +17,12 @@ import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 // stack. A dedicated adapter keeps assertions deterministic and
 // adapter-agnostic; the instrumentation paths under test live in
 // `connection-adapters/abstract/transaction.ts`, not in the driver.
+//
+// D-1 non-candidate: this file's TM-isolation need is structural.
+// With a shared handler-resolved adapter (pool: 1), TM state from one
+// test's transaction accumulates and causes afterCommit/afterRollback
+// callbacks to miss in later tests. The per-test fresh SQLite3Adapter
+// pattern is required for deterministic assertions.
 async function freshIsolatedAdapter(): Promise<SQLite3Adapter> {
   const adapter = new SQLite3Adapter(":memory:");
   await defineSchema(adapter, { topics: { title: "string", updated_at: "datetime" } });
