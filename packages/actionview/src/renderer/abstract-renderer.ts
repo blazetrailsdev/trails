@@ -16,7 +16,7 @@ export interface RenderableTemplate {
   /** Virtual path relative to the view root (e.g. `"users/_card"`). */
   readonly virtualPath?: string | null;
   /** Render the template body, returning the HTML/text output. */
-  render(view: ViewContext, locals: Record<string, unknown>): Promise<string>;
+  render(locals: Record<string, unknown>, context?: ViewContext): Promise<string>;
 }
 
 /**

@@ -64,7 +64,7 @@ export class Renderer {
     return this.renderPartialToObject(context, options, block).body;
   }
 
-  /** @internal */
+  /** Tracks partial cache hits across renders on this Renderer instance. */
   cacheHits: Record<string, number> = {};
 
   private renderTemplateToObject(context: ViewContext, options: RenderOptions): RenderedTemplate {
@@ -121,11 +121,13 @@ export class Renderer {
   }
 }
 
+/** @internal */
 function collectionFromOptions(options: RenderOptions): readonly unknown[] | undefined {
   if (!Object.prototype.hasOwnProperty.call(options, "collection")) return undefined;
   return (options.collection as readonly unknown[] | null | undefined) ?? [];
 }
 
+/** @internal */
 function collectionFromObject(object: unknown): readonly unknown[] | undefined {
   if (
     object !== null &&
