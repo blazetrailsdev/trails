@@ -1195,6 +1195,12 @@ describe("Rails-guided: migrations", () => {
 // ==========================================================================
 // MigrationTest — targets migration_test.rb
 // ==========================================================================
+// D-1 partial conversion: columnsHash()-only tests drop their adapter assignment
+// (adapter-independent). The 3 DB-operation tests and the DDL sub-describes retain
+// freshAdapterWithSchema()/freshContext() isolation — adding setupHandlerSuite() here
+// would call pushSkipGlobalReset() and prevent the per-test DDL cleanup that the
+// MigrationContext-based tests (ReservedWordsMigrationTest, BulkAlterTable, etc.)
+// depend on. Same structural reason as transaction-instrumentation.test.ts.
 describe("MigrationTest", () => {
   let adapter: DatabaseAdapter;
 
@@ -1214,6 +1220,7 @@ describe("MigrationTest", () => {
     // shared test adapter, which rewrites every CREATE TABLE into
     // CREATE TABLE IF NOT EXISTS (test-adapter.ts:812-814). Until that
     // rewrite is gated, this stays a smoke test for create-then-insert.
+    // D-1 carve-out: uses own freshAdapterWithSchema() for DDL isolation.
     const adp = await freshAdapterWithSchema();
     class Post extends Base {
       static {
@@ -1230,7 +1237,6 @@ describe("MigrationTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const cols = Post.columnsHash();
@@ -1242,7 +1248,6 @@ describe("MigrationTest", () => {
     class Product extends Base {
       static {
         this.attribute("price", "decimal");
-        this.adapter = adapter;
       }
     }
     const cols = Product.columnsHash();
@@ -1251,6 +1256,7 @@ describe("MigrationTest", () => {
   });
 
   it("instance based migration up", async () => {
+    // D-1 carve-out: uses own freshAdapterWithSchema() for DDL isolation.
     const adp = await freshAdapterWithSchema();
     class Event extends Base {
       static {
@@ -1264,6 +1270,7 @@ describe("MigrationTest", () => {
   });
 
   it("instance based migration down", async () => {
+    // D-1 carve-out: uses own freshAdapterWithSchema() for DDL isolation.
     const adp = await freshAdapterWithSchema();
     class Event extends Base {
       static {
@@ -1282,7 +1289,6 @@ describe("MigrationTest", () => {
     class SchemaVersion extends Base {
       static {
         this.attribute("version", "string");
-        this.adapter = adapter;
       }
     }
     expect(SchemaVersion.tableName).toBeDefined();
@@ -1299,7 +1305,6 @@ describe("MigrationTest", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer");
-        this.adapter = adapter;
       }
     }
     const cols = Counter.columnsHash();
@@ -1310,7 +1315,6 @@ describe("MigrationTest", () => {
     class Document extends Base {
       static {
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
     const cols = Document.columnsHash();
@@ -1321,7 +1325,6 @@ describe("MigrationTest", () => {
     class UserProfile extends Base {
       static {
         this.attribute("bio", "string");
-        this.adapter = adapter;
       }
     }
     expect(typeof UserProfile.tableName).toBe("string");
@@ -1332,7 +1335,6 @@ describe("MigrationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     const cols = Post.columnsHash();
@@ -2280,7 +2282,6 @@ describe("MigrationTest", () => {
     class Article extends Base {
       static {
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const cols = (Article as any).columnsHash();
@@ -2293,7 +2294,6 @@ describe("MigrationTest", () => {
     class Attachment extends Base {
       static {
         this.attribute("data", "string");
-        this.adapter = adapter;
       }
     }
     const cols = (Attachment as any).columnsHash();
@@ -2306,7 +2306,6 @@ describe("MigrationTest", () => {
     class Post extends Base {
       static {
         this.attribute("content", "string");
-        this.adapter = adapter;
       }
     }
     const cols = (Post as any).columnsHash();
