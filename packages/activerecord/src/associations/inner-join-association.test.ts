@@ -6,11 +6,11 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-const TEST_SCHEMA: Schema = {
+const TEST_SCHEMA = {
   authors: { name: "string" },
   posts: { title: "string", author_id: "integer" },
   comments: { body: "string", type: "string", post_id: "integer" },
@@ -21,40 +21,31 @@ const TEST_SCHEMA: Schema = {
   habtm_posts: { title: "string" },
   habtm_tags: { name: "string" },
   habtm_posts_habtm_tags: { habtm_post_id: "integer", habtm_tag_id: "integer" },
-};
-
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
+} as const;
 
 describe("InnerJoinAssociationTest", () => {
-  let adapter: TestDatabaseAdapter;
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    await defineSchema(TEST_SCHEMA);
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Comment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(Post, "author", {});
@@ -226,13 +217,11 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("find with sti join", async () => {
-    const a = adapter;
     class Comment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("type", "string");
         this.attribute("post_id", "integer");
-        this.adapter = a;
       }
     }
     enableSti(Comment);
@@ -243,7 +232,6 @@ describe("InnerJoinAssociationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = a;
       }
     }
     Associations.hasMany.call(Post, "specialComments", {
@@ -283,27 +271,23 @@ describe("InnerJoinAssociationTest", () => {
     class ThrAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class ThrPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("thr_author_id", "integer");
-        this.adapter = adapter;
       }
     }
     class ThrTagging extends Base {
       static {
         this.attribute("thr_post_id", "integer");
         this.attribute("thr_tag_id", "integer");
-        this.adapter = adapter;
       }
     }
     class ThrTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasMany.call(ThrAuthor, "thrPosts", { foreignKey: "thr_author_id" });
@@ -402,13 +386,11 @@ describe("InnerJoinAssociationTest", () => {
     class HabtmPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
       }
     }
     class HabtmTag extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     Associations.hasAndBelongsToMany.call(HabtmPost, "habtmTags", {
