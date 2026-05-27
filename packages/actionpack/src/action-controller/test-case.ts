@@ -719,20 +719,40 @@ export class TestSession {
     for (const [k, v] of Object.entries(initial)) this._data.set(String(k), v);
   }
 
+  /** Mirrors Rails `TestSession#id` — session identity object with `publicId`. */
+  get id(): { publicId: string } {
+    const pid = this._id;
+    return { publicId: pid };
+  }
+
   get(key: string): unknown {
-    return this._data.get(key);
+    if (String(key) === "session_id") return this._id;
+    return this._data.get(String(key));
   }
 
   set(key: string, value: unknown): void {
-    this._data.set(key, value);
+    this._data.set(String(key), value);
   }
 
   has(key: string): boolean {
-    return this._data.has(key);
+    return this._data.has(String(key));
   }
 
-  delete(key: string): void {
-    this._data.delete(key);
+  delete(key: string): unknown {
+    const k = String(key);
+    const val = this._data.get(k);
+    this._data.delete(k);
+    return val;
+  }
+
+  /** Mirrors Rails `TestSession#update` — merges hash into session data. */
+  update(hash: Record<string, unknown>): void {
+    for (const [k, v] of Object.entries(hash)) this._data.set(String(k), v);
+  }
+
+  /** Mirrors Rails `TestSession#merge!` — alias for {@link update}. */
+  mergeBang(hash: Record<string, unknown>): void {
+    this.update(hash);
   }
 
   clear(): void {
