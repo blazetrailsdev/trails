@@ -17,14 +17,13 @@ import {
   singularize as _singularize,
 } from "@blazetrails/activesupport";
 import { Table, Nodes } from "@blazetrails/arel";
-import { modelRegistry } from "../associations.js";
+import { modelRegistry, isAssociationCached } from "../associations.js";
 import { reflectOnAssociation } from "../reflection.js";
 import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
 import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js";
-import { isAssociationCached } from "../associations.js";
 import { ConfigurationError } from "../errors.js";
 import { AliasTracker } from "./alias-tracker.js";
 
