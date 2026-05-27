@@ -40,7 +40,6 @@ const PERMANENT_REDIRECT_REQUEST_METHODS = ["GET", "HEAD"];
 
 export class SSL {
   private app: RackApp;
-  private redirect: boolean;
   private redirectPort: number | undefined;
   private redirectHost: string | undefined;
   private redirectBody: string[] | undefined;
@@ -60,17 +59,14 @@ export class SSL {
     this.sslDefaultRedirectStatus = options.sslDefaultRedirectStatus;
 
     if (options.redirect === false) {
-      this.redirect = false;
       this.redirectExclude = () => true;
     } else if (typeof options.redirect === "object") {
-      this.redirect = true;
       this.redirectStatusOverride = options.redirect.status;
       this.redirectPort = options.redirect.port;
       this.redirectHost = options.redirect.host;
       this.redirectBody = options.redirect.body;
       this.redirectExclude = options.redirect.exclude ?? (() => false);
     } else {
-      this.redirect = true;
       this.redirectExclude = () => false;
     }
 
