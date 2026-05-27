@@ -1,3 +1,7 @@
+/**
+ * Tests to increase Rails test coverage matching.
+ * Test names are chosen to match Ruby test names from the Rails test suite.
+ */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
