@@ -945,6 +945,7 @@ describe("WhereTest", () => {
         this._tableName = "wnil_orders";
         this._primaryKey = ["shop_id", "id"];
         this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
         this.hasMany("books", { className: "WnilBook", foreignKey: ["shop_id", "order_id"] });
       }
     }
@@ -964,13 +965,14 @@ describe("WhereTest", () => {
 
     const order = (await WnilOrder.create({ shop_id: 1 })) as InstanceType<typeof WnilOrder>;
     const otherOrder = (await WnilOrder.create({ shop_id: 2 })) as InstanceType<typeof WnilOrder>;
+    // Use readAttribute to get the scalar auto-increment id, not the composite .id accessor
     const book = (await WnilBook.create({
-      shop_id: order.shop_id,
-      order_id: (order as any).id,
+      shop_id: order.readAttribute("shop_id"),
+      order_id: order.readAttribute("id"),
     })) as InstanceType<typeof WnilBook>;
     const decoy = (await WnilBook.create({
-      shop_id: otherOrder.shop_id,
-      order_id: (otherOrder as any).id,
+      shop_id: otherOrder.readAttribute("shop_id"),
+      order_id: otherOrder.readAttribute("id"),
     })) as InstanceType<typeof WnilBook>;
 
     const found = (await WnilBook.where({ order }).toArray()).map((r: any) => r.id);
