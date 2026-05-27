@@ -370,37 +370,6 @@ describe("ContentSecurityPolicyTest", () => {
   });
 });
 
-describe("ContentSecurityPolicyIntegrationTest", () => {
-  it("adds nonce to script src content security policy", () => {
-    const policy = new ContentSecurityPolicy();
-    policy.scriptSrc("'self'");
-    const header = policy.build(undefined, "abc123");
-    expect(header).toContain("'nonce-abc123'");
-  });
-
-  it("adds nonce to style src content security policy", () => {
-    const policy = new ContentSecurityPolicy();
-    policy.styleSrc("'self'");
-    const header = policy.build(undefined, "xyz789");
-    expect(header).toContain("'nonce-xyz789'");
-  });
-
-  it("generates no content security policy", () => {
-    const policy = new ContentSecurityPolicy();
-    expect(policy.build()).toBe("");
-  });
-});
-
-describe("DefaultContentSecurityPolicyIntegrationTest", () => {
-  it("adds nonce to script src content security policy only once", () => {
-    const policy = new ContentSecurityPolicy();
-    policy.scriptSrc("'self'");
-    const header = policy.build(undefined, "abc123");
-    const matches = header.match(/nonce-abc123/g);
-    expect(matches?.length).toBe(1);
-  });
-});
-
 // ==========================================================================
 // Full-stack integration tests
 // dispatch/content_security_policy_test.rb
@@ -483,11 +452,11 @@ CspIntegrationController.contentSecurityPolicy({ only: ["reportOnly"] }, (p) => 
 });
 CspIntegrationController.contentSecurityPolicyReportOnly({ only: ["reportOnly"] });
 CspIntegrationController.contentSecurityPolicy({ only: ["scriptSrc"] }, (p) => {
-  p.defaultSrc(false as never);
+  p.defaultSrc(false);
   p.scriptSrc(":self");
 });
 CspIntegrationController.contentSecurityPolicy({ only: ["styleSrc"] }, (p) => {
-  p.defaultSrc(false as never);
+  p.defaultSrc(false);
   p.styleSrc(":self");
 });
 CspIntegrationController.contentSecurityPolicy(false, { only: ["noPolicy"] });
