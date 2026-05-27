@@ -2291,6 +2291,18 @@ describe("TestUrlGenerationErrors", () => {
     const routes = new RouteSet();
     expect(() => routes.pathFor("nonexistent")).toThrow(/No route matches name/);
   });
+
+  it.skip("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", () => {
+    // pending: optimized named-route helpers (product_path(nil) positional form) not ported
+  });
+
+  it.skip("URL helpers raise a 'constraint failure' error for a nil param with non-optimized helpers", () => {
+    // pending: url_helpers keyword-arg form (product_path(id: nil)) not ported
+  });
+
+  it.skip("exceptions have suggestions for fix", () => {
+    // pending: DidYouMean integration (error.detailed_message) not ported
+  });
 });
 
 describe("TestAltApp", () => {
@@ -2472,4 +2484,63 @@ describe("TestRelativeUrlRootGeneration", () => {
   // Both tests require url_helpers with SCRIPT_NAME/relative_url_root not ported
   it.skip("url helpers", () => {});
   it.skip("optimized url helpers", () => {});
+});
+
+describe("TestHttpMethods", () => {
+  // Tests require HTTP dispatch with per-method route matching — not ported
+  it.skip("request method  can be matched", () => {
+    // pending: HTTP dispatch layer (RoutedRackApp) and dynamic per-verb route
+    // matching for all RFC HTTP methods (RFC2616/2518/3253/3648/3744/5323/4791/5789)
+    // not ported; also the dynamic test-name interpolation collapses to a single
+    // test:compare entry for all methods
+  });
+});
+
+describe("TestUriPathEscaping", () => {
+  // Tests require url_helpers segment_path/splat_path and HTTP dispatch — not ported
+  it.skip("escapes slash in generated path segment", () => {
+    // pending: url_helpers (segment_path) not ported
+  });
+  it.skip("unescapes recognized path segment", () => {
+    // pending: HTTP dispatch with path_parameters not ported
+  });
+  it.skip("does not escape slash in generated path splat", () => {
+    // pending: url_helpers (splat_path) not ported
+  });
+  it.skip("unescapes recognized path splat", () => {
+    // pending: HTTP dispatch with path_parameters not ported
+  });
+});
+
+describe("TestMultipleNestedController", () => {
+  it.skip("controller option which starts with '/' from multiple nested controller", () => {
+    // pending: url_for with '/' absolute controller prefix in nested namespace not ported
+  });
+});
+
+describe("TestRedirectInterpolation", () => {
+  // Tests require HTTP dispatch with redirect middleware and %{param} interpolation
+  it.skip("redirect escapes interpolated parameters with redirect proc", () => {
+    // pending: redirect() string interpolation escaping not ported
+  });
+  it.skip("redirect escapes interpolated parameters with option proc", () => {
+    // pending: redirect(path:) option interpolation escaping not ported
+  });
+  it.skip("path redirect escapes interpolated parameters correctly", () => {
+    // pending: redirect() path + query string interpolation escaping not ported
+  });
+});
+
+describe("TestConstraintsAccessingParameters", () => {
+  it.skip("parameters are reset between constraint checks", () => {
+    // pending: request.params isolation between successive constraint evaluations
+    // requires HTTP dispatch layer not ported
+  });
+});
+
+describe("TestDefaultUrlOptions", () => {
+  it.skip("positional args with format false", () => {
+    // pending: positional argument form of url_helpers (archived_posts_path(2014, 12, 13))
+    // and default_url_options scoping not ported
+  });
 });
