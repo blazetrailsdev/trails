@@ -1,4 +1,9 @@
-import { I18n, MissingTranslationData } from "@blazetrails/activesupport";
+import {
+  I18n,
+  MissingTranslationData,
+  HtmlSafeTranslation,
+  htmlEscape,
+} from "@blazetrails/activesupport";
 
 /**
  * Host shape `translate` / `localize` mix into. Trails' `Metal` provides
@@ -37,6 +42,18 @@ export function translate(
     if (options.default !== undefined) return options.default;
     return `Translation missing: ${I18n.locale}.`;
   }
+
+  const isHtmlKey = HtmlSafeTranslation.htmlSafeTranslationKey(key);
+  const i18nTranslate = (k: string, opts: Record<string, unknown>) =>
+    isHtmlKey
+      ? HtmlSafeTranslation.translate(k, opts)
+      : I18n.translate(k, opts as Parameters<typeof I18n.translate>[1]);
+
+  if (isHtmlKey && options.default !== undefined) {
+    const defs = Array.isArray(options.default) ? options.default : [options.default];
+    options = { ...options, default: defs.map((v) => htmlEscapeDefault(v)) };
+  }
+
   if (key.startsWith(".")) {
     const path = this.constructor.controllerPath().replace(/\//g, ".");
     const scopedKey = `${path}.${this.actionName}${key}`;
@@ -51,13 +68,10 @@ export function translate(
     delete passOptions.default;
     delete passOptions.raise;
 
-    const direct = I18n.translate(scopedKey, passOptions as Parameters<typeof I18n.translate>[1]);
+    const direct = i18nTranslate(scopedKey, passOptions);
     if (!isMissing(direct)) return direct;
 
-    const fallback = I18n.translate(
-      fallbackKey,
-      passOptions as Parameters<typeof I18n.translate>[1],
-    );
+    const fallback = i18nTranslate(fallbackKey, passOptions);
     if (!isMissing(fallback)) return fallback;
 
     // User-supplied defaults — Rails treats Symbols as keys to try
@@ -68,7 +82,7 @@ export function translate(
       const defs = Array.isArray(options.default) ? options.default : [options.default];
       for (const d of defs as unknown[]) {
         if (typeof d === "string" && d.startsWith(":")) {
-          const r = I18n.translate(d.slice(1), passOptions as Parameters<typeof I18n.translate>[1]);
+          const r = i18nTranslate(d.slice(1), passOptions);
           if (!isMissing(r)) return r;
         } else {
           return d;
@@ -89,7 +103,12 @@ export function translate(
     }
     return direct; // "Translation missing: ..." from the scoped lookup
   }
-  return I18n.translate(key, options as Parameters<typeof I18n.translate>[1]);
+  return i18nTranslate(key, options);
+}
+
+function htmlEscapeDefault(value: unknown): unknown {
+  if (typeof value === "string") return htmlEscape(value);
+  return value;
 }
 
 function isMissing(value: unknown): boolean {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { I18n, MissingTranslationData } from "@blazetrails/activesupport";
+import { I18n, MissingTranslationData, isHtmlSafe } from "@blazetrails/activesupport";
 import {
   l,
   localize,
@@ -132,15 +132,33 @@ describe("TranslationControllerTest", () => {
     expect(controller.t(".twoz", { default: ["baz", ":twoz"] })).toBe("baz");
   });
 
-  // BLOCKED: trails has no `html_safe?` marker on strings. The whole
-  // _html-suffix → html_safe + interpolation-escape feature is an
-  // actionview-tier concern (~200 LOC: html_safe brand on strings,
-  // sanitize-on-interpolate in I18n, _html-suffix detection in
-  // translate). All 7 of the following depend on it.
-  it.skip("default translation as unsafe html", () => {});
-  it.skip("default translation as safe html", () => {});
-  it.skip("default translation with raise as unsafe html", () => {});
-  it.skip("default translation with raise as safe html", () => {});
+  it("default translation as unsafe html", () => {
+    controller.actionName = "index";
+    const translation = controller.t(".twoz", { default: ["<tag>"] });
+    expect(String(translation)).toBe("<tag>");
+    expect(isHtmlSafe(translation)).toBe(false);
+  });
+
+  it("default translation as safe html", () => {
+    controller.actionName = "index";
+    const translation = controller.t(".twoz_html", { default: ["<tag>"] });
+    expect(String(translation)).toBe("&lt;tag&gt;");
+    expect(isHtmlSafe(translation)).toBe(true);
+  });
+
+  it("default translation with raise as unsafe html", () => {
+    controller.actionName = "index";
+    const translation = controller.t(".twoz", { raise: true, default: ["<tag>"] });
+    expect(String(translation)).toBe("<tag>");
+    expect(isHtmlSafe(translation)).toBe(false);
+  });
+
+  it("default translation with raise as safe html", () => {
+    controller.actionName = "index";
+    const translation = controller.t(".twoz_html", { raise: true, default: ["<tag>"] });
+    expect(String(translation)).toBe("&lt;tag&gt;");
+    expect(isHtmlSafe(translation)).toBe(true);
+  });
 
   it("localize", () => {
     const time = new Date(Date.UTC(2000, 0, 1, 0, 0, 0));
@@ -148,12 +166,46 @@ describe("TranslationControllerTest", () => {
     expect(controller.l(time)).toBe(localize.call(controller as unknown as TranslationHost, time));
   });
 
-  it.skip("translate does not mark plain text as safe html", () => {});
-  it.skip("translate marks translations with a html suffix as safe html", () => {});
-  it.skip("translate marks translation with nested html key", () => {});
-  it.skip("translate escapes interpolations in translations with a html suffix", () => {});
-  it.skip("translate marks translation with missing html key as safe html", () => {});
-  it.skip("translate marks translation with missing nested html key as safe html", () => {});
+  it("translate does not mark plain text as safe html", () => {
+    controller.actionName = "index";
+    const translation = controller.t(".hello");
+    expect(String(translation)).toBe("<a>Hello World</a>");
+    expect(isHtmlSafe(translation)).toBe(false);
+  });
+
+  it("translate marks translations with a html suffix as safe html", () => {
+    controller.actionName = "index";
+    const translation = controller.t(".hello_html");
+    expect(String(translation)).toBe("<a>Hello World</a>");
+    expect(isHtmlSafe(translation)).toBe(true);
+  });
+
+  it("translate marks translation with nested html key", () => {
+    controller.actionName = "index";
+    const translation = controller.t(".nested.html");
+    expect(String(translation)).toBe("<a>nested</a>");
+    expect(isHtmlSafe(translation)).toBe(true);
+  });
+
+  it("translate escapes interpolations in translations with a html suffix", () => {
+    controller.actionName = "index";
+    const translation = controller.t(".interpolated_html", { word: "<World>" });
+    expect(String(translation)).toBe("<a>Hello &lt;World&gt;</a>");
+    expect(isHtmlSafe(translation)).toBe(true);
+  });
+
+  it("translate marks translation with missing html key as safe html", () => {
+    controller.actionName = "index";
+    const translation = controller.t("<tag>.html");
+    expect(isHtmlSafe(translation)).toBe(false);
+    expect(String(translation)).toBe("Translation missing: en.<tag>.html");
+  });
+
+  it("translate marks translation with missing nested html key as safe html", () => {
+    controller.actionName = "index";
+    const translation = controller.t(".<tag>.html");
+    expect(isHtmlSafe(translation)).toBe(false);
+  });
 });
 
 // ==========================================================================
