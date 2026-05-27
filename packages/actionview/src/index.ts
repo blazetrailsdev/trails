@@ -41,11 +41,8 @@ export type {
   RenderOptions as RenderingOptions,
 } from "./rendering.js";
 
-export {
-  Renderer,
-  type RendererDefaults,
-  type RenderOptions as RendererOptions,
-} from "./renderer.js";
+export { Renderer, RenderedTemplate } from "./renderer.js";
+export type { ViewContext, RenderOptions as RendererOptions } from "./renderer.js";
 
 export { OutputBuffer, RawOutputBuffer, StreamingBuffer, RawStreamingBuffer } from "./buffers.js";
 
