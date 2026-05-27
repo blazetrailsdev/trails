@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { castEnumValue, Base, Relation, defineEnum, readEnumValue } from "./index.js";
 import {
   assertValidEnumDefinitionValues,
@@ -12,9 +12,9 @@ import {
 } from "./enum.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
-import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // -- Helpers --
 const TEST_SCHEMA = {
@@ -60,29 +60,22 @@ const TEST_SCHEMA = {
   },
 } as const;
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+beforeAll(async () => {
+  await defineSchema(TEST_SCHEMA);
+});
 
 // ==========================================================================
 // EnumTest — targets enum_test.rb
 // ==========================================================================
 describe("EnumTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(async () => {
-    adapter = await freshAdapter();
-  });
-
   it("query state by predicate", async () => {
     class Post extends Base {
       static _tableName = "posts";
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = adapter;
     defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
     const p = new Post({ status: 0 });
     expect(readEnumValue(p, "status")).toBe("draft");
@@ -94,7 +87,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = adapter;
     defineEnum(Post, "status", { draft: 0, published: 1 });
     const p0 = new Post({ status: 0 });
     const p1 = new Post({ status: 1 });
@@ -108,11 +100,9 @@ describe("EnumTest", () => {
 // ==========================================================================
 describe("EnumTest", () => {
   it("direct assignment", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     const p = (await Post.create({ status: 0 })) as any;
@@ -120,11 +110,9 @@ describe("EnumTest", () => {
   });
 
   it("assign string value", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     const p = (await Post.create({ status: 1 })) as any;
@@ -132,11 +120,9 @@ describe("EnumTest", () => {
   });
 
   it("build from where", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     const sql = Post.where({ status: 0 }).toSql();
@@ -144,11 +130,9 @@ describe("EnumTest", () => {
   });
 
   it("find via where with values", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     await Post.create({ status: 0 });
@@ -157,11 +141,9 @@ describe("EnumTest", () => {
   });
 
   it("find via where with large number", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     const results = await Post.where({ status: 9999 }).toArray();
@@ -169,12 +151,10 @@ describe("EnumTest", () => {
   });
 
   it("persist changes that are dirty", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const p = (await Post.create({ status: 0, title: "dirty-test" })) as any;
@@ -184,11 +164,9 @@ describe("EnumTest", () => {
   });
 
   it("update by declaration", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     const p = (await Post.create({ status: 0 })) as any;
@@ -197,11 +175,9 @@ describe("EnumTest", () => {
   });
 
   it("enum changed attributes", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     const p = (await Post.create({ status: 0 })) as any;
@@ -214,53 +190,45 @@ describe("EnumTest", () => {
 // ==========================================================================
 describe("EnumTest", () => {
   it("query state by predicate with prefix", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static _tableName = "posts";
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = adp;
     defineEnum(Post, "status", { draft: 0, published: 1 }, { prefix: "state" });
     const p = new Post({ status: 0 });
     expect(readEnumValue(p, "status")).toBe("draft");
   });
 
   it("query state by predicate with :prefix", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static _tableName = "posts";
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = adp;
     defineEnum(Post, "status", { active: 0, inactive: 1 }, { prefix: true });
     const p = new Post({ status: 0 });
     expect(readEnumValue(p, "status")).toBe("active");
   });
 
   it("query state by predicate with :suffix", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static _tableName = "posts";
     }
     Post.attribute("id", "integer");
     Post.attribute("role", "integer");
-    Post.adapter = adp;
     defineEnum(Post, "role", { admin: 0, user: 1 }, { suffix: true });
     const p = new Post({ role: 1 });
     expect(readEnumValue(p, "role")).toBe("user");
   });
 
   it("declare multiple enums with prefix: true", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static _tableName = "posts";
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
     Post.attribute("role", "integer");
-    Post.adapter = adp;
     defineEnum(Post, "status", { draft: 0, published: 1 }, { prefix: true });
     defineEnum(Post, "role", { admin: 0, user: 1 }, { prefix: true });
     const p = new Post({ status: 0, role: 1 });
@@ -269,11 +237,9 @@ describe("EnumTest", () => {
   });
 
   it("validate uniqueness", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     const p = (await Post.create({ status: 0 })) as any;
@@ -281,11 +247,9 @@ describe("EnumTest", () => {
   });
 
   it("reverted changes that are not dirty", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     const p = (await Post.create({ status: 0 })) as any;
@@ -295,11 +259,9 @@ describe("EnumTest", () => {
   });
 
   it("enums can have values as strings", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     defineEnum(Post, "status", { draft: 0, published: 1 });
@@ -308,11 +270,9 @@ describe("EnumTest", () => {
   });
 
   it("saved enum changes", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     defineEnum(Post, "status", { draft: 0, published: 1 });
@@ -322,11 +282,9 @@ describe("EnumTest", () => {
   });
 
   it("enum scopes create where clause", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     defineEnum(Post, "status", { draft: 0, published: 1 });
@@ -335,11 +293,9 @@ describe("EnumTest", () => {
   });
 
   it("enum with nil value", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     defineEnum(Post, "status", { draft: 0, published: 1 });
@@ -349,11 +305,9 @@ describe("EnumTest", () => {
   });
 
   it("building new record with scope", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     defineEnum(Post, "status", { draft: 0, published: 1 });
@@ -362,11 +316,9 @@ describe("EnumTest", () => {
   });
 
   it("custom primary key after failed save", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     defineEnum(Post, "status", { draft: 0, published: 1 });
@@ -376,11 +328,9 @@ describe("EnumTest", () => {
   });
 
   it("enum values are a hash", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
@@ -393,11 +343,9 @@ describe("EnumTest", () => {
   });
 
   it("assign value", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     defineEnum(Post, "status", { draft: 0, published: 1 });
@@ -406,8 +354,7 @@ describe("EnumTest", () => {
     expect(readEnumValue(p, "status")).toBe("published");
   });
 
-  async function makeBook() {
-    const adp = await freshAdapter();
+  function makeBook() {
     class Book extends Base {
       static _tableName = "books";
     }
@@ -415,7 +362,6 @@ describe("EnumTest", () => {
     Book.attribute("status", "integer");
     Book.attribute("language", "integer");
     Book.attribute("name", "string");
-    Book.adapter = adp;
     defineEnum(Book, "status", { proposed: 0, written: 1, published: 2 });
     defineEnum(Book, "language", { english: 0, spanish: 1, french: 2 });
     return Book;
@@ -453,7 +399,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("color", "string");
-    Post.adapter = await freshAdapter();
     defineEnum(Post, "color", { red: "red", green: "green", blue: "blue" });
     const p = new Post({ color: "red" });
     expect(readEnumValue(p, "color")).toBe("red");
@@ -472,7 +417,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = await freshAdapter();
     defineEnum(Post, "status", { draft: 0, published: 1 });
     await Post.create({ status: 0 });
     await Post.create({ status: 1 });
@@ -486,7 +430,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = await freshAdapter();
     defineEnum(Post, "status", { draft: 0, published: 1 });
     await Post.create({ status: 0 });
     await Post.create({ status: 1 });
@@ -501,7 +444,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = await freshAdapter();
     defineEnum(Post, "status", { draft: 0, published: 1 }, { suffix: "status" });
     const p = new Post({ status: 0 });
     expect((p as any).isDraftStatus()).toBe(true);
@@ -513,7 +455,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = await freshAdapter();
     defineEnum(Post, "status", { draft: 0, published: 1 }, { prefix: "post" });
     const p = new Post({ status: 0 });
     expect((p as any).isPostDraft()).toBe(true);
@@ -539,7 +480,6 @@ describe("EnumTest", () => {
     }
     TestBook.attribute("id", "integer");
     TestBook.attribute("status", "integer");
-    TestBook.adapter = await freshAdapter();
     defineEnum(TestBook, "status", mapping);
     expect(mapping).toEqual(original);
   });
@@ -550,7 +490,6 @@ describe("EnumTest", () => {
     }
     TestBook.attribute("id", "integer");
     TestBook.attribute("status", "integer");
-    TestBook.adapter = await freshAdapter();
     defineEnum(TestBook, "status", { draft: 0, published: 1 });
     defineEnum(TestBook, "status", { active: 0, inactive: 1 });
     const b = new TestBook({ status: 0 });
@@ -558,12 +497,10 @@ describe("EnumTest", () => {
   });
 
   it("overriding enum definition on subclass", async () => {
-    const adp = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     defineEnum(Book, "status", { proposed: 0, written: 1, published: 2 });
@@ -647,12 +584,10 @@ describe("EnumTest", () => {
   });
 
   it("building new objects with enum scopes", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     defineEnum(Post, "status", { draft: 0, written: 1, published: 2 });
@@ -661,12 +596,10 @@ describe("EnumTest", () => {
     expect((p as any).isDraft()).toBe(false);
   });
   it("creating new objects with enum scopes", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("status", "integer");
-        this.adapter = adp;
       }
     }
     defineEnum(Post, "status", { draft: 0, written: 1, published: 2 });
@@ -680,7 +613,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = await freshAdapter();
     defineEnum(Post, "status", { draft: 0, published: 1 });
 
     const conflicts = ["valid", "save"];
@@ -696,7 +628,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = await freshAdapter();
 
     const conflicts = ["all", "where"];
     conflicts.forEach((value, i) => {
@@ -712,7 +643,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = await freshAdapter();
     defineEnum(Post, "status", { draft: 0, published: 1 }, { prefix: true });
     const p = new Post({ status: 0 });
     expect((p as any).isStatusDraft()).toBe(true);
@@ -725,7 +655,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = await freshAdapter();
     defineEnum(Post, "status", { draft: 0, published: 1 }, { suffix: true });
     const p = new Post({ status: 1 });
     expect((p as any).isDraftStatus()).toBe(false);
@@ -738,7 +667,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("difficulty", "integer");
-    Post.adapter = await freshAdapter();
     defineEnum(Post, "difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "to_read" });
     const p = new Post({ difficulty: 0 });
     expect(typeof (Post as any).easyToRead).toBe("function");
@@ -757,7 +685,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("difficulty", "integer");
-    Post.adapter = await freshAdapter();
     defineEnum(Post, "difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "to_read" });
     const p = new Post({ difficulty: 1 }); // medium
     expect((p as any).isMediumToRead()).toBe(true);
@@ -775,7 +702,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer", { default: 0 });
-    Post.adapter = await freshAdapter();
     defineEnum(Post, "status", { draft: 0, published: 1 });
     const p = new Post({});
     expect(readEnumValue(p, "status")).toBe("draft");
@@ -787,7 +713,6 @@ describe("EnumTest", () => {
     }
     Cat.attribute("id", "integer");
     Cat.attribute("breed", "string");
-    Cat.adapter = await freshAdapter();
     defineEnum(Cat, "breed", {
       "American Bobtail": "american_bobtail",
       "Balinese-Javanese": "balinese_javanese",
@@ -814,13 +739,12 @@ describe("EnumTest", () => {
 // EnumTest2 — more targets for enum_test.rb
 // ==========================================================================
 describe("EnumTest", () => {
-  function makeEnum(adp: DatabaseAdapter) {
+  function makeEnum() {
     class P extends Base {
       static {
         this.tableName = "posts";
         this.attribute("id", "integer");
         this.attribute("status", "integer");
-        this.adapter = adp;
         defineEnum(this, "status", { draft: 0, published: 1, archived: 2 });
       }
     }
@@ -828,12 +752,10 @@ describe("EnumTest", () => {
   }
 
   it("enums are distinct per class", async () => {
-    const adp = await freshAdapter();
     class PA extends Base {
       static {
         this.tableName = "posts";
         this.attribute("status", "integer");
-        this.adapter = adp;
         defineEnum(this, "status", { draft: 0, published: 1 });
       }
     }
@@ -841,7 +763,6 @@ describe("EnumTest", () => {
       static {
         this.tableName = "posts";
         this.attribute("status", "integer");
-        this.adapter = adp;
         defineEnum(this, "status", { pending: 0, approved: 1 });
       }
     }
@@ -850,23 +771,20 @@ describe("EnumTest", () => {
   });
 
   it("enum values are a hash", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     const p = new P({ status: 0 });
     expect(readEnumValue(p, "status")).toBe("draft");
     expect(readEnumValue(new P({ status: 1 }), "status")).toBe("published");
   });
 
   it("building new record with enum scope", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     const p = new P({ status: 0 });
     expect(readEnumValue(p, "status")).toBe("draft");
   });
 
   it("reverted changes are not dirty with enum", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     const p = (await P.create({ status: 0 })) as any;
     p.writeAttribute("status", 1);
     p.writeAttribute("status", 0);
@@ -874,8 +792,7 @@ describe("EnumTest", () => {
   });
 
   it("enum values can be used in where", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     await P.create({ status: 0 });
     await P.create({ status: 1 });
     const results = await P.where({ status: 1 }).toArray();
@@ -883,8 +800,7 @@ describe("EnumTest", () => {
   });
 
   it("enum saved changes", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     const p = (await P.create({ status: 0 })) as any;
     p.writeAttribute("status", 1);
     await p.save();
@@ -892,16 +808,14 @@ describe("EnumTest", () => {
   });
 
   it("direct assignment of enum value", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     const p = (await P.create({ status: 0 })) as any;
     p.writeAttribute("status", 1);
     expect(readEnumValue(p, "status")).toBe("published");
   });
 
   it("find via where with enum values", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     await P.create({ status: 0 });
     await P.create({ status: 0 });
     await P.create({ status: 1 });
@@ -910,8 +824,7 @@ describe("EnumTest", () => {
   });
 
   it("persist changes that are dirty with enum", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     const p = (await P.create({ status: 0 })) as any;
     p.writeAttribute("status", 1);
     expect(p.changed).toBe(true);
@@ -920,19 +833,16 @@ describe("EnumTest", () => {
   });
 
   it("validate uniqueness of enum value", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     const p = new P({ status: 0 });
     expect(readEnumValue(p, "status")).toBe("draft");
   });
 
   it("enum prefix with custom prefix", async () => {
-    const adp = await freshAdapter();
     class PL extends Base {
       static {
         this.tableName = "posts";
         this.attribute("status", "integer");
-        this.adapter = adp;
         defineEnum(this, "status", { draft: 0, published: 1 }, { prefix: "article" });
       }
     }
@@ -941,12 +851,10 @@ describe("EnumTest", () => {
   });
 
   it("enum suffix", async () => {
-    const adp = await freshAdapter();
     class PM extends Base {
       static {
         this.tableName = "posts";
         this.attribute("status", "integer");
-        this.adapter = adp;
         defineEnum(this, "status", { draft: 0, published: 1 }, { suffix: "state" });
       }
     }
@@ -955,31 +863,27 @@ describe("EnumTest", () => {
   });
 
   it("enum with nil value query", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     await P.create({ status: null });
     const results = await P.where({ status: null }).toArray();
     expect(results.length).toBe(1);
   });
 
   it("enum changed attributes after update", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     const p = (await P.create({ status: 0 })) as any;
     p.writeAttribute("status", 1);
     expect(p.changedAttributes).toContain("status");
   });
 
   it("enum string assignment", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     const p = new P({ status: 0 });
     expect(readEnumValue(p, "status")).toBe("draft");
   });
 
   it("enum scopes filter correctly", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     await P.create({ status: 0 });
     await P.create({ status: 1 });
     const results = await P.where({ status: 0 }).toArray();
@@ -988,31 +892,27 @@ describe("EnumTest", () => {
   });
 
   it("enum update by setter", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     const p = (await P.create({ status: 0 })) as any;
     p.writeAttribute("status", 1);
     expect(readEnumValue(p, "status")).toBe("published");
   });
 
   it("build from where with enum", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     const p = P.where({ status: 0 }).build() as any;
     expect(p.readAttribute("status")).toBe(0);
   });
 
   it("enum predicate returns false for other values", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     const p = new P({ status: 0 });
     expect(readEnumValue(p, "status")).toBe("draft");
     expect(readEnumValue(p, "status")).not.toBe("published");
   });
 
   it("enum scopes create a where clause", async () => {
-    const adp = await freshAdapter();
-    const P = makeEnum(adp);
+    const P = makeEnum();
     const sql = P.where({ status: 0 }).toSql();
     expect(sql).toContain("0");
   });
@@ -1022,11 +922,6 @@ describe("EnumTest", () => {
 // EnumTest3 — additional missing tests from enum_test.rb
 // ==========================================================================
 describe("EnumTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
-  });
-
   it("type.cast", () => {
     expect(true).toBe(true);
   });
@@ -1039,9 +934,6 @@ describe("EnumTest", () => {
       this.attribute("status", "string");
     }
   }
-  beforeEach(() => {
-    StringStatusPost.adapter = adapter;
-  });
   it("find via where with strings", () => {
     expect(StringStatusPost.where({ status: "active" })).toBeInstanceOf(Relation);
   });
@@ -1229,12 +1121,6 @@ describe("EnumTest", () => {
 });
 
 describe("EnumTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(async () => {
-    adapter = await freshAdapter();
-  });
-
   it("find via scope", async () => {
     class Post extends Base {
       static _tableName = "posts";
@@ -1242,7 +1128,6 @@ describe("EnumTest", () => {
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
     Post.attribute("status", "integer");
-    Post.adapter = adapter;
     defineEnum(Post, "status", ["draft", "published", "archived"]);
 
     await Post.create({ title: "A", status: 0 });
@@ -1264,7 +1149,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = adapter;
     defineEnum(Post, "status", ["draft", "published", "archived"]);
 
     const post = new Post({ status: 0 });
@@ -1279,7 +1163,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = adapter;
     defineEnum(Post, "status", ["draft", "published", "archived"]);
 
     const post = new Post({ status: 0 });
@@ -1295,7 +1178,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = adapter;
     defineEnum(Post, "status", { draft: 0, published: 5, archived: 10 });
 
     const post = new Post({ status: 5 });
@@ -1309,7 +1191,6 @@ describe("EnumTest", () => {
     }
     Post.attribute("id", "integer");
     Post.attribute("status", "integer");
-    Post.adapter = adapter;
     defineEnum(Post, "status", ["draft", "published", "archived"]);
 
     const post = new Post({ status: 2 });
@@ -1318,18 +1199,12 @@ describe("EnumTest", () => {
 });
 
 describe("EnumTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
-  });
-
   it("generates bang setter that persists", async () => {
     class Task extends Base {
       static _tableName = "tasks";
     }
     Task.attribute("id", "integer");
     Task.attribute("status", "integer");
-    Task.adapter = adapter;
     defineEnum(Task, "status", ["pending", "active", "completed"]);
 
     const task = await Task.create({ status: 0 });
@@ -1346,7 +1221,6 @@ describe("EnumTest", () => {
     }
     Task.attribute("id", "integer");
     Task.attribute("status", "integer");
-    Task.adapter = adapter;
     defineEnum(Task, "status", ["pending", "active", "completed"]);
 
     await Task.create({ status: 0 }); // pending
@@ -1359,18 +1233,12 @@ describe("EnumTest", () => {
 });
 
 describe("EnumTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
-  });
-
   it("prefix: true uses attribute name as prefix", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("status", "integer");
-    Item.adapter = adapter;
     defineEnum(Item, "status", ["draft", "published"], { prefix: true });
 
     const item = await Item.create({ status: 0 });
@@ -1387,7 +1255,6 @@ describe("EnumTest", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("role", "integer");
-    Item.adapter = adapter;
     defineEnum(Item, "role", ["admin", "user"], { prefix: "access" });
 
     const item = await Item.create({ role: 0 });
@@ -1398,13 +1265,11 @@ describe("EnumTest", () => {
 
 describe("EnumTest", () => {
   it("defines enum attribute with predicate methods", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("status", "integer");
-        this.adapter = adapter;
         this.enum("status", { active: 0, inactive: 1, banned: 2 });
       }
     }
@@ -1416,13 +1281,11 @@ describe("EnumTest", () => {
   });
 
   it("sets enum value by name", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("status", "integer");
-        this.adapter = adapter;
         this.enum("status", { active: 0, inactive: 1 });
       }
     }
@@ -1433,13 +1296,11 @@ describe("EnumTest", () => {
   });
 
   it("provides bang setter methods", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("status", "integer");
-        this.adapter = adapter;
         this.enum("status", { active: 0, inactive: 1 });
       }
     }
@@ -1462,13 +1323,11 @@ describe("EnumTest", () => {
   });
 
   it("creates scopes for each enum value", async () => {
-    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("status", "integer");
-        this.adapter = adapter;
         this.enum("status", { active: 0, inactive: 1 });
       }
     }
@@ -1481,16 +1340,10 @@ describe("EnumTest", () => {
 });
 
 describe("EnumTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
-  });
-
   it("creates query predicates for each value", async () => {
     class Task extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Task, "status", ["pending", "active", "completed"]);
@@ -1504,7 +1357,6 @@ describe("EnumTest", () => {
     class Task extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Task, "status", ["pending", "active", "completed"]);
@@ -1518,7 +1370,6 @@ describe("EnumTest", () => {
     class Task extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Task, "status", ["pending", "active", "completed"]);
@@ -1535,7 +1386,6 @@ describe("EnumTest", () => {
     class Task extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Task, "status", ["pending", "active", "completed"]);
@@ -1550,7 +1400,6 @@ describe("EnumTest", () => {
     class Task extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Task, "status", ["pending", "active", "completed"]);
@@ -1563,7 +1412,6 @@ describe("EnumTest", () => {
     class Task extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Task, "status", ["pending", "active", "completed"]);
@@ -1578,19 +1426,12 @@ describe("EnumTest", () => {
 });
 
 describe("EnumTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(async () => {
-    adapter = await freshAdapter();
-  });
-
   // Rails: test "enums are stored as integers"
   it("stores enum values as integers in the database", async () => {
     class Conversation extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Conversation, "status", ["active", "archived"]);
@@ -1606,7 +1447,6 @@ describe("EnumTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Conversation, "status", { active: 0, archived: 1, trashed: 2 });
@@ -1622,7 +1462,6 @@ describe("EnumTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Conversation, "status", ["active", "archived"]);
@@ -1644,7 +1483,6 @@ describe("EnumTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Conversation, "status", ["active", "archived"]);
@@ -1660,7 +1498,6 @@ describe("EnumTest", () => {
       static {
         this.attribute("id", "integer");
         this.attribute("status", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Conversation, "status", ["active", "archived"]);
@@ -1679,7 +1516,6 @@ describe("EnumTest", () => {
         this.attribute("id", "integer");
         this.attribute("status", "integer");
         this.attribute("priority", "integer");
-        this.adapter = adapter;
       }
     }
     defineEnum(Conversation, "status", ["active", "archived"]);
@@ -1691,18 +1527,11 @@ describe("EnumTest", () => {
   });
 });
 describe("EnumTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(async () => {
-    adapter = await freshAdapter();
-  });
-
   describe("defineEnum with array form", () => {
     it("creates mapping from array", () => {
       class Post extends Base {
         static {
           this.attribute("status", "integer");
-          this.adapter = adapter;
         }
       }
       defineEnum(Post, "status", ["draft", "published", "archived"]);
@@ -1721,7 +1550,6 @@ describe("EnumTest", () => {
       class Post extends Base {
         static {
           this.attribute("status", "integer");
-          this.adapter = adapter;
         }
       }
       defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
@@ -1737,7 +1565,6 @@ describe("EnumTest", () => {
       class Post extends Base {
         static {
           this.attribute("status", "integer");
-          this.adapter = adapter;
         }
       }
       defineEnum(Post, "status", ["draft", "published"]);
@@ -1754,7 +1581,6 @@ describe("EnumTest", () => {
       class Post extends Base {
         static {
           this.attribute("status", "integer");
-          this.adapter = adapter;
         }
       }
       defineEnum(Post, "status", ["draft", "published"]);
@@ -1781,7 +1607,6 @@ describe("EnumTest", () => {
       class Post extends Base {
         static {
           this.attribute("status", "integer");
-          this.adapter = adapter;
         }
       }
       defineEnum(Post, "status", ["draft", "published"]);
@@ -1795,7 +1620,6 @@ describe("EnumTest", () => {
       class Task extends Base {
         static {
           this.attribute("priority", "integer");
-          this.adapter = adapter;
           this.enum("priority", { low: 0, medium: 1, high: 2 });
         }
       }
@@ -1809,7 +1633,6 @@ describe("EnumTest", () => {
       class Task extends Base {
         static {
           this.attribute("priority", "integer");
-          this.adapter = adapter;
           this.enum("priority", { low: 0, medium: 1, high: 2 });
         }
       }
@@ -1823,7 +1646,6 @@ describe("EnumTest", () => {
       class Task extends Base {
         static {
           this.attribute("priority", "integer");
-          this.adapter = adapter;
           this.enum("priority", { low: 0, medium: 1, high: 2 });
         }
       }
@@ -1838,7 +1660,6 @@ describe("EnumTest", () => {
       class Task extends Base {
         static {
           this.attribute("priority", "integer");
-          this.adapter = adapter;
           this.enum("priority", { low: 0, medium: 1, high: 2 });
         }
       }
@@ -1852,7 +1673,6 @@ describe("EnumTest", () => {
       class Task extends Base {
         static {
           this.attribute("priority", "integer");
-          this.adapter = adapter;
           this.enum("priority", { low: 0, medium: 1, high: 2 });
         }
       }
@@ -1865,7 +1685,6 @@ describe("EnumTest", () => {
       class Task extends Base {
         static {
           this.attribute("status", "integer");
-          this.adapter = adapter;
           this.enum("status", { active: 0, archived: 1 }, { prefix: true });
         }
       }
@@ -1881,7 +1700,6 @@ describe("EnumTest", () => {
       class Task extends Base {
         static {
           this.attribute("priority", "integer");
-          this.adapter = adapter;
           this.enum("priority", { low: 0, medium: 1, high: 2 });
         }
       }
@@ -1900,11 +1718,9 @@ describe("EnumTest", () => {
     });
   });
   it("reverted changes are not dirty going from nil to value and back", async () => {
-    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("subtitle", "string");
-        this.adapter = adp;
       }
     }
     const post = (await Post.create({ subtitle: null })) as any;

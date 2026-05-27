@@ -2,15 +2,16 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
 
-import { createTestAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { Schema } from "../test-helpers/define-schema.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-const CLUSTER_A_SCHEMA = {
+const MERGED_SCHEMA: Schema = {
   posts: {
     title: "string",
     author: "string",
@@ -24,26 +25,61 @@ const CLUSTER_A_SCHEMA = {
     uuid: "string",
     saved_count: "integer",
     order: "string",
+    slug: "string",
+    published: "integer",
   },
   items: { code: "integer", name: "string" },
   comments: { body: "string", commentable_type: "string", commentable_id: "integer" },
   articles: { title: "string" },
   special_posts: { title: "string" },
-} as const;
+  orders: {
+    shop_id: "integer",
+    order_num: "integer",
+    total: "integer",
+    status: "string",
+    region: "string",
+    note: "string",
+    code: "string",
+    tenant: "string",
+    name: "string",
+    a: "integer",
+    b: "integer",
+    c: "integer",
+    val: "string",
+    active: "boolean",
+    price: "float",
+  },
+  order_as: { shop_id: "integer", order_num: "integer" },
+  order_bs: { shop_id: "integer", order_num: "integer" },
+  tokens: {
+    columns: { token: "string", label: "string" },
+    primaryKey: ["token"],
+  },
+  slots: {
+    columns: { room_id: "integer", slot_num: "integer", title: "string" },
+    primaryKey: ["room_id", "slot_num"],
+  },
+  emails: { address: "string" },
+  usernames: { name: "string" },
+  memberships: { user_id: "integer", group_id: "integer" },
+  topics: { title: "string" },
+  entries: { group_id: "integer", seq: "integer" },
+  // Separate table for the empty-string composite key test: orders.shop_id
+  // is integer for all other composite-key tests; PG rejects varchar=integer.
+  str_orders: { shop_id: "string", code: "string" },
+};
 
-async function freshAdapterA(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, CLUSTER_A_SCHEMA);
-  return adapter;
-}
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+beforeAll(async () => {
+  await defineSchema(MERGED_SCHEMA);
+});
 
 describe("UniquenessValidationTest", () => {
   it("validate uniqueness with alias attribute", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.aliasAttribute("heading", "title");
         this.validatesUniqueness("title");
       }
@@ -58,11 +94,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validates uniqueness with nil value", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -73,11 +107,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validates uniqueness with validates", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -89,11 +121,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness when integer out of range", async () => {
-    const adp = await freshAdapterA();
     class Item extends Base {
       static {
         this.attribute("code", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("code");
       }
     }
@@ -103,12 +133,10 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness when integer out of range show order does not matter", async () => {
-    const adp = await freshAdapterA();
     class Item extends Base {
       static {
         this.attribute("code", "integer");
         this.attribute("name", "string");
-        this.adapter = adp;
         this.validatesUniqueness("code");
       }
     }
@@ -118,11 +146,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validates uniqueness with newline chars", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -134,12 +160,10 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with scope", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title", { scope: "author" });
       }
     }
@@ -153,11 +177,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with aliases", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.aliasAttribute("heading", "title");
         this.validatesUniqueness("title");
       }
@@ -180,12 +202,10 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with object scope", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("org_id", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("title", { scope: "org_id" });
       }
     }
@@ -197,13 +217,11 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with polymorphic object scope", async () => {
-    const adp = await freshAdapterA();
     class Comment extends Base {
       static {
         this.attribute("body", "string");
         this.attribute("commentable_type", "string");
         this.attribute("commentable_id", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("body", { scope: ["commentable_type", "commentable_id"] });
       }
     }
@@ -215,13 +233,11 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with composed attribute scope", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("year", "integer");
         this.attribute("month", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("title", { scope: ["year", "month"] });
       }
     }
@@ -233,11 +249,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with object arg", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -248,18 +262,15 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness scoped to defining class", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
     class Article extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -269,13 +280,11 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with scope array", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
         this.attribute("category", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title", { scope: ["author", "category"] });
       }
     }
@@ -287,11 +296,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case insensitive uniqueness", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -301,11 +308,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case sensitive uniqueness with special sql like chars", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -317,11 +322,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case insensitive uniqueness with special sql like chars", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -331,11 +334,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness by default database collation", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -345,11 +346,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case sensitive uniqueness", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -361,11 +360,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case sensitive uniqueness with attribute passed as integer", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("code", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("code");
       }
     }
@@ -375,11 +372,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with non standard table names", async () => {
-    const adp = await freshAdapterA();
     class SpecialPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -389,12 +384,10 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validates uniqueness inside scoping", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("org_id", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("title", { scope: "org_id" });
       }
     }
@@ -404,11 +397,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with columns which are sql keywords", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("order", "string");
-        this.adapter = adp;
         this.validatesUniqueness("order");
       }
     }
@@ -418,11 +409,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with limit", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -432,11 +421,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with limit and utf8", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -446,11 +433,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate straight inheritance uniqueness", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -459,12 +444,10 @@ describe("UniquenessValidationTest", () => {
     expect(await p2.save()).toBe(false);
   });
   it("validate uniqueness with conditions", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("active", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("title", {
           conditions: function (this: any) {
             return this.where({ active: 1 });
@@ -483,11 +466,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with non callable conditions is not supported", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title", { conditions: "not a function" as any });
       }
     }
@@ -496,12 +477,10 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with conditions with record arg", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("active", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -512,11 +491,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness on existing relation", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -526,11 +503,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness on empty relation", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -539,11 +514,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness of custom primary key", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -553,11 +526,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness without primary key", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -567,11 +538,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness ignores itself when primary key changed", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -581,12 +550,10 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with after create performing save", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("saved_count", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("title");
         this.afterCreate(async function (record: any) {
           record.saved_count = 1;
@@ -598,11 +565,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness uuid", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("uuid", "string");
-        this.adapter = adp;
         this.validatesUniqueness("uuid");
       }
     }
@@ -612,11 +577,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness regular id", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -626,11 +589,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with singleton class", async () => {
-    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -642,30 +603,11 @@ describe("UniquenessValidationTest", () => {
   });
 });
 
-async function freshAdapterIndex(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, {
-    posts: {
-      title: "string",
-      body: "string",
-      active: "integer",
-      published: "integer",
-      category: "string",
-      slug: "string",
-      author: "string",
-      year: "integer",
-    },
-  });
-  return adapter;
-}
-
 describe("UniquenessValidationWithIndexTest", () => {
   it("new record", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -674,12 +616,10 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("changing non unique attribute", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -689,11 +629,9 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("changing unique attribute", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -704,12 +642,10 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("changing non unique attribute and unique attribute is nil", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -719,12 +655,10 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("conditions", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("active", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -734,11 +668,9 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("case sensitive", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -750,12 +682,10 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("partial index", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("published", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -766,11 +696,9 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("non unique index", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -780,12 +708,10 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("scope", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("category", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title", { scope: "category" });
       }
     }
@@ -797,11 +723,9 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("uniqueness on relation", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -810,11 +734,9 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("uniqueness on custom relation primary key", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("slug", "string");
-        this.adapter = adp;
         this.validatesUniqueness("slug");
       }
     }
@@ -824,12 +746,10 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("index of sublist of columns", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title", { scope: "author" });
       }
     }
@@ -839,13 +759,11 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("index of columns list and extra columns", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
         this.attribute("year", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("title", { scope: ["author", "year"] });
       }
     }
@@ -855,11 +773,9 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("expression index", async () => {
-    const adp = await freshAdapterIndex();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -869,49 +785,13 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 });
 
-async function freshAdapterCompositeOrders(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, {
-    orders: {
-      shop_id: "integer",
-      order_num: "integer",
-      total: "integer",
-      status: "string",
-      region: "string",
-      note: "string",
-      code: "string",
-      tenant: "string",
-      name: "string",
-      a: "integer",
-      b: "integer",
-      c: "integer",
-      val: "string",
-      active: "boolean",
-      price: "float",
-    },
-    order_as: { shop_id: "integer", order_num: "integer" },
-    order_bs: { shop_id: "integer", order_num: "integer" },
-  });
-  return adapter;
-}
-
-async function freshAdapterCompositeOrders2(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, {
-    orders: { shop_id: "string", code: "string" },
-  });
-  return adapter;
-}
-
 describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation for model with composite key", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
         this.attribute("total", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -921,12 +801,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation with different composite key values", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -936,12 +814,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key new record", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -950,13 +826,11 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key update", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
         this.attribute("status", "string");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -966,12 +840,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key update to conflicting value", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -982,12 +854,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key with nil scope", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -998,12 +868,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key with nil attribute", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1014,12 +882,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key error message", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1030,12 +896,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key custom message", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id", message: "is already used" });
       }
     }
@@ -1046,13 +910,11 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key three columns", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("region", "string");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: ["shop_id", "region"] });
       }
     }
@@ -1064,12 +926,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key allows same attr different scope", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("code", "string");
-        this.adapter = adp;
         this.validatesUniqueness("code", { scope: "shop_id" });
       }
     }
@@ -1079,12 +939,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key multiple records same scope", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1096,12 +954,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key resave existing", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1110,12 +966,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key with string scope", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("tenant", "string");
         this.attribute("code", "string");
-        this.adapter = adp;
         this.validatesUniqueness("code", { scope: "tenant" });
       }
     }
@@ -1127,12 +981,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key destroy and recreate", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1143,12 +995,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key empty table", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1157,12 +1007,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key with zero values", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1172,12 +1020,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key with negative values", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1187,14 +1033,12 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key many scopes", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("a", "integer");
         this.attribute("b", "integer");
         this.attribute("c", "integer");
         this.attribute("val", "string");
-        this.adapter = adp;
         this.validatesUniqueness("val", { scope: ["a", "b", "c"] });
       }
     }
@@ -1206,12 +1050,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key is valid check", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1221,12 +1063,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key different attribute same scope value", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1236,12 +1076,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key with boolean scope", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("active", "boolean");
         this.attribute("code", "string");
-        this.adapter = adp;
         this.validatesUniqueness("code", { scope: "active" });
       }
     }
@@ -1253,12 +1091,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key both attributes strings", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("tenant", "string");
         this.attribute("name", "string");
-        this.adapter = adp;
         this.validatesUniqueness("name", { scope: "tenant" });
       }
     }
@@ -1268,12 +1104,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key large number of records", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1287,12 +1121,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key with conditions", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1302,12 +1134,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key scope not matching", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1319,13 +1149,11 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key update non-unique field", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
         this.attribute("note", "string");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1335,13 +1163,11 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key multiple validations", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
         this.attribute("code", "string");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
         this.validatesUniqueness("code");
       }
@@ -1352,12 +1178,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key different classes independent", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class OrderA extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1365,7 +1189,6 @@ describe("UniquenessWithCompositeKey", () => {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1375,12 +1198,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key first record always valid", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1389,12 +1210,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key persisted record count", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1405,12 +1224,11 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key with empty string", async () => {
-    const adp = await freshAdapterCompositeOrders2();
     class Order extends Base {
       static {
+        this._tableName = "str_orders";
         this.attribute("shop_id", "string");
         this.attribute("code", "string");
-        this.adapter = adp;
         this.validatesUniqueness("code", { scope: "shop_id" });
       }
     }
@@ -1420,13 +1238,11 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key scope array with two elements", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("a", "integer");
         this.attribute("b", "integer");
         this.attribute("val", "string");
-        this.adapter = adp;
         this.validatesUniqueness("val", { scope: ["a", "b"] });
       }
     }
@@ -1436,12 +1252,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key error does not persist", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1455,12 +1269,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key special characters in string", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("tenant", "string");
         this.attribute("code", "string");
-        this.adapter = adp;
         this.validatesUniqueness("code", { scope: "tenant" });
       }
     }
@@ -1470,12 +1282,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key with float scope", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("price", "float");
         this.attribute("code", "string");
-        this.adapter = adp;
         this.validatesUniqueness("code", { scope: "price" });
       }
     }
@@ -1487,12 +1297,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key save bang raises on duplicate", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1502,12 +1310,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key valid after fixing conflict", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1519,12 +1325,10 @@ describe("UniquenessWithCompositeKey", () => {
   });
 
   it("uniqueness validation composite key does not pollute other instances", async () => {
-    const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
         this.attribute("shop_id", "integer");
         this.attribute("order_num", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("order_num", { scope: "shop_id" });
       }
     }
@@ -1535,17 +1339,12 @@ describe("UniquenessWithCompositeKey", () => {
     expect(await o3.save()).toBe(true);
     expect(o3.errors.fullMessages.length).toBe(0);
   });
-});
 
-describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation for model with composite key duplicate check", async () => {
-    const adp = createTestAdapter();
-    await defineSchema(adp, { entries: { group_id: "integer", seq: "integer" } });
     class Entry extends Base {
       static {
         this.attribute("group_id", "integer");
         this.attribute("seq", "integer");
-        this.adapter = adp;
         this.validatesUniqueness("seq", { scope: "group_id" });
       }
     }
@@ -1555,31 +1354,13 @@ describe("UniquenessWithCompositeKey", () => {
   });
 });
 
-async function freshAdapterBindParams(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, {
-    tokens: {
-      columns: { token: "string", label: "string" },
-      primaryKey: ["token"],
-    },
-    slots: {
-      columns: { room_id: "integer", slot_num: "integer", title: "string" },
-      primaryKey: ["room_id", "slot_num"],
-    },
-    items: { name: "string" },
-  });
-  return adapter;
-}
-
 describe("UniquenessBindParamsTest", () => {
   it("uniqueness excludes self with string primary key", async () => {
-    const adp = await freshAdapterBindParams();
     class Token extends Base {
       static {
         this.primaryKey = "token";
         this.attribute("token", "string");
         this.attribute("label", "string");
-        this.adapter = adp;
         this.validatesUniqueness("label");
       }
     }
@@ -1593,14 +1374,12 @@ describe("UniquenessBindParamsTest", () => {
   });
 
   it("uniqueness excludes self with composite primary key", async () => {
-    const adp = await freshAdapterBindParams();
     class Slot extends Base {
       static {
         this.primaryKey = ["room_id", "slot_num"];
         this.attribute("room_id", "integer");
         this.attribute("slot_num", "integer");
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title");
       }
     }
@@ -1614,11 +1393,9 @@ describe("UniquenessBindParamsTest", () => {
   });
 
   it("uniqueness uses id_in_database when pk was changed in memory", async () => {
-    const adp = await freshAdapterBindParams();
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
         this.validatesUniqueness("name");
       }
     }
@@ -1635,25 +1412,11 @@ describe("UniquenessBindParamsTest", () => {
   });
 });
 
-async function freshAdapterValidation2(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, {
-    emails: { address: "string" },
-    usernames: { name: "string" },
-    memberships: { user_id: "integer", group_id: "integer" },
-    topics: { title: "string" },
-  });
-  return adapter;
-}
-
 describe("UniquenessValidationTest", () => {
   it("validate uniqueness", async () => {
-    const adapter = await freshAdapterValidation2();
-
     class Email extends Base {
       static {
         this.attribute("address", "string");
-        this.adapter = adapter;
         this.validatesUniqueness("address");
       }
     }
@@ -1668,12 +1431,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("allows same value if record is itself", async () => {
-    const adapter = await freshAdapterValidation2();
-
     class Username extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.validatesUniqueness("name");
       }
     }
@@ -1685,13 +1445,10 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with scope", async () => {
-    const adapter = await freshAdapterValidation2();
-
     class Membership extends Base {
       static {
         this.attribute("user_id", "integer");
         this.attribute("group_id", "integer");
-        this.adapter = adapter;
         this.validatesUniqueness("user_id", { scope: "group_id" });
       }
     }
@@ -1706,11 +1463,9 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validates uniqueness case insensitive", async () => {
-    const adp = await freshAdapterValidation2();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validatesUniqueness("title", { caseSensitive: false });
       }
     }
@@ -1729,26 +1484,35 @@ describe("UniquenessValidationTest", () => {
   // [object Promise]". Stubbed here so the contract is exercised without
   // requiring a live PG connection.
   it("awaits async adapter.caseInsensitiveComparison without leaking a Promise into where()", async () => {
-    const adp = await freshAdapterValidation2();
+    const adp = Base.adapter as any;
+    const hadOwn = Object.prototype.hasOwnProperty.call(adp, "caseInsensitiveComparison");
+    const orig = adp.caseInsensitiveComparison;
     let wasAwaited = false;
-    (adp as any).caseInsensitiveComparison = async (attribute: any, value: unknown) => {
+    adp.caseInsensitiveComparison = async (attribute: any, value: unknown) => {
       await Promise.resolve();
       wasAwaited = true;
       return attribute.lower().eq((attribute.relation as any).lower(value));
     };
 
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adp;
-        this.validatesUniqueness("title", { caseSensitive: false });
+    try {
+      class Topic extends Base {
+        static {
+          this.attribute("title", "string");
+          this.validatesUniqueness("title", { caseSensitive: false });
+        }
+      }
+
+      await Topic.create({ title: "Hello" });
+      const t2 = new Topic({ title: "HELLO" });
+      expect(await t2.save()).toBe(false);
+      expect(wasAwaited).toBe(true);
+      expect(t2.errors.on("title")).toBeTruthy();
+    } finally {
+      if (hadOwn) {
+        adp.caseInsensitiveComparison = orig;
+      } else {
+        delete adp.caseInsensitiveComparison;
       }
     }
-
-    await Topic.create({ title: "Hello" });
-    const t2 = new Topic({ title: "HELLO" });
-    expect(await t2.save()).toBe(false);
-    expect(wasAwaited).toBe(true);
-    expect(t2.errors.on("title")).toBeTruthy();
   });
 });
