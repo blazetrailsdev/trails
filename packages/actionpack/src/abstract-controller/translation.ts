@@ -43,7 +43,7 @@ export function translate(
     return `Translation missing: ${I18n.locale}.`;
   }
 
-  const isHtmlKey = HtmlSafeTranslation.htmlSafeTranslationKey(key);
+  const isHtmlKey = HtmlSafeTranslation.isHtmlSafeTranslationKey(key);
   const i18nTranslate = (k: string, opts: Record<string, unknown>) =>
     isHtmlKey
       ? HtmlSafeTranslation.translate(k, opts)

@@ -8,7 +8,7 @@ const HTML_KEY_PATTERN = /(?:_|\b)html$/;
 /** @internal */
 export const HtmlSafeTranslation = {
   translate(key: string, options: Record<string, unknown> = {}): unknown {
-    if (htmlSafeTranslationKey(key)) {
+    if (isHtmlSafeTranslationKey(key)) {
       const htmlSafeOptions = htmlEscapeTranslationOptions({ ...options });
 
       let exception = false;
@@ -37,11 +37,22 @@ export const HtmlSafeTranslation = {
     return I18n.translate(key, options as Parameters<typeof I18n.translate>[1]);
   },
 
-  htmlSafeTranslationKey: htmlSafeTranslationKey,
+  isHtmlSafeTranslationKey: isHtmlSafeTranslationKey,
+  /** @internal */
+  htmlEscapeTranslationOptions: htmlEscapeTranslationOptions,
+  /** @internal */
+  isI18nOption: isI18nOption,
+  /** @internal */
+  htmlSafeTranslation: htmlSafeTranslationResult,
 };
 
-function htmlSafeTranslationKey(key: string): boolean {
+function isHtmlSafeTranslationKey(key: string): boolean {
   return HTML_KEY_PATTERN.test(key);
+}
+
+/** @internal */
+function isI18nOption(name: string): boolean {
+  return I18N_OPTION_NAMES.has(name);
 }
 
 /** @internal */
