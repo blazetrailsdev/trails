@@ -291,26 +291,7 @@ it; if not, this PR inlines via T1 primitives.
 
 ## Phase 2 — Core composition (open items)
 
-### PR 2.1b — Trailtie configurable + framework block runners (~200 LOC)
-
-**Blocked by:** PR 2.1 (shipped).
-
-**Source:** `vendor/rails/railties/lib/rails/railtie/configurable.rb` (36 LOC), `vendor/rails/railties/lib/rails/railtie/configuration.rb` (114 LOC).
-
-**Node/TS fit:** `Configurable` is `ActiveSupport::Concern` + sealed-class guard. We use the `host = (k) => k as unknown as Host` cast pattern for per-subclass static state (already in `trailtie.ts` + `engine.ts`); a third call site here justifies factoring a shared `_perClassState<K>(key)` helper.
-
-**Dependencies:**
-
-- `activesupport`'s `Concern` (shipped).
-- `actionpack`'s `MiddlewareStackProxy` for `Configuration.appMiddleware` — verify shipped before adding (otherwise stub).
-
-**Scope:**
-
-- (a) `Configurable` sealed-class guard. Helper file at `packages/trailties/src/trailtie/configurable.ts` was deleted before 2.1 merge; recreate.
-- (b) Framework block runners — `Trailtie.rakeTasks` / `console` / `runner` / `generators` / `server` registration + `run*Blocks` ancestor walk (previously implemented + tested in a 2.1 draft, dropped for size).
-- (c) `Configuration` lifecycle hooks (`beforeConfiguration` / `beforeInitialize` / `beforeEagerLoad` / `afterInitialize` / `afterRoutesLoaded`) backed by a class-side hook registry.
-- (d) `Configuration.appMiddleware` / `appGenerators` stubs once `actionpack` `MiddlewareStackProxy` lands.
-- (e) Factor `_perClassState<K>(key)` helper out of `trailtie.ts` + `engine.ts` (third call site triggers extraction).
+### PR 2.1b closed (#2238 — Trailtie configurable + framework block runners)
 
 ### PR 2.5c closed (#2184 — Application routes-reloader + config_for + credentials wiring)
 
@@ -418,7 +399,7 @@ Sized work that doesn't belong to a single open PR. Bundle into the most relevan
 - **`.ts` template files** for `app:template`: first-class support requires registering a `ts-node`/`tsx` ESM hook at launch.
 - **`MigrationGenerator.generate` shell-out** (optional): needed to wire `add_migrations` into PR 1.14c-2 (authentication).
 - **`Engine#allLoadPaths(addAutoloadPathsToLoadPath)` single-flag memoization** (per #2174): documented Rails-mirrored quirk — if both `true` and `false` are called in one process, cache returns wrong shape. Worth a JSDoc `@internal` flagging.
-- **`Engine#config` cast smell** (per #2174): runtime `instanceof` + cast on `this._config`. Cleaner with a generic `_config<T extends Configuration>` field on `Trailtie`. Bundle into PR 2.1b when factoring `_perClassState`.
+- **`Engine#config` cast smell** (per #2174): fixed — `Engine#config` and `Application#config` now use a local variable to avoid `as` casts.
 
 ---
 
