@@ -1,3 +1,4 @@
+import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 import { type DatabaseName } from "./database.js";
 
@@ -482,62 +483,75 @@ export const filterParameters = [
   private createAppFiles(name: string): void {
     this.createFile(
       "src/app/controllers/application-controller.ts",
-      `import { ActionController } from "@blazetrails/actionpack";
-
-export class ApplicationController extends ActionController.Base {
-}
-`,
+      tsModule({
+        imports: [{ from: "@blazetrails/actionpack", named: { ActionController: "named" } }],
+        declarations: [
+          tsClass({
+            name: "ApplicationController",
+            extends: ref("ActionController.Base"),
+            body: [],
+          }),
+        ],
+      }),
     );
 
     this.createFile("src/app/controllers/concerns/.gitkeep", "");
 
     this.createFile(
       "src/app/models/application-record.ts",
-      `import { ActiveRecord } from "@blazetrails/activerecord";
-
-export class ApplicationRecord extends ActiveRecord.Base {
-}
-`,
+      tsModule({
+        imports: [{ from: "@blazetrails/activerecord", named: { ActiveRecord: "named" } }],
+        declarations: [
+          tsClass({ name: "ApplicationRecord", extends: ref("ActiveRecord.Base"), body: [] }),
+        ],
+      }),
     );
 
     this.createFile("src/app/models/concerns/.gitkeep", "");
 
     this.createFile(
       "src/app/helpers/application-helper.ts",
-      `export const ApplicationHelper = {
-};
-`,
+      tsModule({ declarations: [tsRaw(`export const ApplicationHelper = {\n};`)] }),
     );
 
     this.createFile(
       "src/app/jobs/application-job.ts",
-      `export class ApplicationJob {
-  queueAs = "default";
-}
-`,
+      tsModule({
+        declarations: [
+          tsClass({
+            name: "ApplicationJob",
+            body: [tsField("queueAs", "string", { inferType: true, initializer: '"default"' })],
+          }),
+        ],
+      }),
     );
 
     this.createFile(
       "src/app/mailers/application-mailer.ts",
-      `export class ApplicationMailer {
-  defaultFrom = "from@example.com";
-  layout = "mailer";
-}
-`,
+      tsModule({
+        declarations: [
+          tsClass({
+            name: "ApplicationMailer",
+            body: [
+              tsField("defaultFrom", "string", {
+                inferType: true,
+                initializer: '"from@example.com"',
+              }),
+              tsField("layout", "string", { inferType: true, initializer: '"mailer"' }),
+            ],
+          }),
+        ],
+      }),
     );
 
     this.createFile(
       "src/app/channels/application-cable/connection.ts",
-      `export class Connection {
-}
-`,
+      tsModule({ declarations: [tsClass({ name: "Connection", body: [] })] }),
     );
 
     this.createFile(
       "src/app/channels/application-cable/channel.ts",
-      `export class Channel {
-}
-`,
+      tsModule({ declarations: [tsClass({ name: "Channel", body: [] })] }),
     );
 
     this.createFile(

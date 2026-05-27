@@ -1,0 +1,204 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > application-controller.ts 1`] = `
+"import { ActionController } from "@blazetrails/actionpack";
+
+export class ApplicationController extends ActionController.Base {
+
+}
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > application-helper.ts 1`] = `
+"export const ApplicationHelper = {
+};
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > application-job.ts 1`] = `
+"export class ApplicationJob {
+  queueAs = "default";
+}
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > application-mailer.ts 1`] = `
+"export class ApplicationMailer {
+  defaultFrom = "from@example.com";
+
+  layout = "mailer";
+}
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > application-record.ts 1`] = `
+"import { ActiveRecord } from "@blazetrails/activerecord";
+
+export class ApplicationRecord extends ActiveRecord.Base {
+
+}
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > channel.ts 1`] = `
+"export class Channel {
+
+}
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > config.ts 1`] = `
+"import { app } from "./src/config/application.js";
+
+export default app;
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > config/application.ts 1`] = `
+"import { ActiveRecord } from "@blazetrails/activerecord";
+import { ActiveSupport } from "@blazetrails/activesupport";
+import databaseConfig from "./database.js";
+import { drawRoutes } from "./routes.js";
+
+export const app = {
+  name: "my-app",
+  config: {
+    database: databaseConfig,
+    // config
+  },
+  routes: drawRoutes,
+};
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > config/cable.ts 1`] = `
+"export default {
+  development: {
+    adapter: "async",
+  },
+  test: {
+    adapter: "test",
+  },
+  production: {
+    adapter: "redis",
+    url: process.env.REDIS_URL || "redis://localhost:6379/1",
+  },
+};
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > config/puma.ts 1`] = `
+"const port = parseInt(process.env.PORT || "3000", 10);
+const environment = process.env.NODE_ENV || "development";
+
+export default {
+  port,
+  environment,
+  pidfile: "tmp/pids/server.pid",
+  workers: parseInt(process.env.WEB_CONCURRENCY || "0", 10),
+  maxThreads: parseInt(process.env.TRAILS_MAX_THREADS || "5", 10),
+  minThreads: parseInt(process.env.TRAILS_MIN_THREADS || "5", 10),
+};
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > config/routes.ts 1`] = `
+"// Define your application routes here.
+// Example:
+//   router.resources("posts");
+//   router.get("/", "home#index");
+
+export function drawRoutes(router: any): void {
+  // routes
+}
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > config/storage.ts 1`] = `
+"export default {
+  local: {
+    service: "Disk",
+    root: "storage",
+  },
+  test: {
+    service: "Disk",
+    root: "tmp/storage",
+  },
+};
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > connection.ts 1`] = `
+"export class Connection {
+
+}
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > environments/development.ts 1`] = `
+"export default {
+  cacheClasses: false,
+  eagerLoad: false,
+  considerAllRequestsLocal: true,
+  serverTiming: true,
+  cacheStore: "memory",
+  // config
+};
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > environments/production.ts 1`] = `
+"export default {
+  cacheClasses: true,
+  eagerLoad: true,
+  considerAllRequestsLocal: false,
+  forceSSL: true,
+  logLevel: "info",
+  cacheStore: "memory",
+  // config
+};
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > environments/test.ts 1`] = `
+"export default {
+  cacheClasses: true,
+  eagerLoad: false,
+  considerAllRequestsLocal: true,
+  cacheStore: "null",
+  // config
+};
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > test-helper.ts 1`] = `
+"// Test helper — loaded before all test files.
+import { ActiveRecord } from "@blazetrails/activerecord";
+
+export async function setupTestDatabase(): Promise<void> {
+  // Configure test database connection
+}
+"
+`;
+
+exports[`AppGenerator > snapshots emitted TypeScript sources > vite.config.ts 1`] = `
+"import { defineConfig } from "vite";
+import { trailsPlugin } from "@blazetrails/trailties/vite";
+
+export default defineConfig({
+  plugins: [trailsPlugin()],
+  root: "src/app/assets",
+  base: "/assets/",
+  publicDir: "../../../public",
+  build: {
+    outDir: "../../../public/assets",
+    manifest: true,
+    rollupOptions: {
+      input: {
+        application: "stylesheets/application.css",
+      },
+    },
+  },
+});
+"
+`;
