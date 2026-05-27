@@ -720,6 +720,22 @@ describe("PerFormTokensControllerTest", () => {
       }),
     ).toBe(true);
   });
+
+  it("ignores origin during generation with protocol-relative url", () => {
+    const csrf = new RequestForgeryProtection({ perFormTokens: true });
+    const session: Record<string, unknown> = {};
+    const tokenWithOrigin = csrf.generatePerFormToken(
+      session,
+      "//example.com/per_form_tokens/post_one/",
+      "POST",
+    );
+    expect(
+      csrf.verifyToken(session, tokenWithOrigin, {
+        actionPath: "/per_form_tokens/post_one",
+        method: "POST",
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("PrependProtectForgeryBaseControllerTest", () => {
