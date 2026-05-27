@@ -2,19 +2,18 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { quoteColumnName } from "../test-helpers/quote-regex.js";
-import type { DatabaseAdapter } from "../adapter.js";
 
-let _adapter: SidecarAdapter;
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  ({ adapter: _adapter } = createSidecarTestAdapter());
-  await defineSchema(_adapter, {
+  await defineSchema({
     posts: { title: "string", body: "string", status: "string" },
     items: { name: "string", status: "string", category: "string" },
     developers: { name: "string", salary: "integer" },
@@ -22,27 +21,16 @@ beforeAll(async () => {
     users: { name: "string", email: "string", role: "string" },
   });
 });
-withTransactionalFixtures(() => _adapter);
-function freshAdapter(): DatabaseAdapter {
-  return _adapter;
-}
 
 // ==========================================================================
 // SelectTest — targets relation/select_test.rb
 // ==========================================================================
 describe("SelectTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("select with columns", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.select("title").toSql();
@@ -54,7 +42,6 @@ describe("SelectTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Post.select("title").reselect("body").toSql();
@@ -63,17 +50,11 @@ describe("SelectTest", () => {
 });
 
 describe("SelectTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   function makeModel() {
     class Developer extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("salary", "integer");
-        this.adapter = adapter;
       }
     }
     return { Developer };
@@ -244,18 +225,12 @@ describe("SelectTest", () => {
 });
 
 describe("select block form", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("filters loaded records with a function", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
 
     await Item.create({ name: "Apple" });
     await Item.create({ name: "Banana" });
@@ -274,7 +249,6 @@ describe("regroup()", () => {
     Item.attribute("id", "integer");
     Item.attribute("category", "string");
     Item.attribute("status", "string");
-    Item.adapter = freshAdapter();
 
     const sql = Item.all().group("category").regroup("status").toSql();
     expect(sql).toContain("GROUP BY");
@@ -284,18 +258,12 @@ describe("regroup()", () => {
 });
 
 describe("distinct count", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("count with distinct uses COUNT(DISTINCT ...)", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("category", "string");
-    Item.adapter = adapter;
 
     await Item.create({ category: "A" });
     await Item.create({ category: "A" });
@@ -316,7 +284,6 @@ describe("having hash form", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("category", "string");
-    Item.adapter = freshAdapter();
 
     const sql = Item.all()
       .select("category", "COUNT(*) AS cnt")
@@ -344,17 +311,11 @@ describe("distinctOn", () => {
 });
 
 describe("Relation Select (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("select specific columns in SQL", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
     const sql = User.all().select("name").toSql();
@@ -366,7 +327,6 @@ describe("Relation Select (Rails-guided)", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Apple" });
@@ -381,7 +341,6 @@ describe("Relation Select (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.attribute("email", "string");
-        this.adapter = adapter;
       }
     }
     const sql = User.all().select("name").reselect("email").toSql();
@@ -393,7 +352,6 @@ describe("Relation Select (Rails-guided)", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const sql = User.all().distinct().toSql();
