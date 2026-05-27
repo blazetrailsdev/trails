@@ -280,4 +280,17 @@ describe("RoutesInspectorTest", () => {
     // pending: `to: () => [...]` (lambda/proc endpoint) throws in Mapper#addRoute
     // because parseEndpoint receives a function instead of a string.
   });
+
+  // Non-Rails test: verifies RouteWrapper#path suppresses (.:format) when
+  // format: false was passed (covered indirectly by regression_route_with_controller_regexp
+  // in Rails, which is skipped here for unrelated reasons).
+  it("format false suppresses (.:format) suffix", () => {
+    const output = draw((r) => {
+      r.get("/health", { to: "health#show", format: false });
+    });
+    expect(output).toEqual([
+      "Prefix Verb URI Pattern Controller#Action",
+      "health GET  /health     health#show",
+    ]);
+  });
 });

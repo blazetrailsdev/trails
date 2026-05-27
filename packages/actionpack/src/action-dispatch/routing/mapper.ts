@@ -985,12 +985,12 @@ export class Mapper {
     } else if (scopeModulePrefix && controller && !controller.includes("/")) {
       controller = scopeModulePrefix + "/" + controller;
     }
-    const explicitName = options.as ?? options.name;
+    const explicitName = options.as !== undefined ? options.as : options.name;
     // Mirrors Rails normalize_name: tr("/","_") on the path, but only for
     // purely static paths — skip segments containing ":" (dynamic) or "()"
     // (optional) so we don't produce names like "photos_:id".
     const inferredName =
-      !explicitName && !isRedirect
+      options.as === undefined && options.name === undefined && !isRedirect
         ? (() => {
             const cleaned = path.replace(/^\/+/, "").replace(/\(\.:format\)$/, "");
             const segs = cleaned.split("/").filter(Boolean);
