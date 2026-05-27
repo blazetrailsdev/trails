@@ -78,11 +78,12 @@ const SCHEMA: Schema = {
   btav_posts: { author_id: "integer" },
   btnr_authors: {},
   btnr_posts: { author_id: "integer" },
-  // wnil_* tables for "where with nil cpk association": cpk_orders uses auto-id
-  // + shop_id; cpk_books uses shop_id + order_id FK. Model-level CPK ["shop_id", "id"].
+  // wnil_* tables for "where with nil cpk association": wnil_orders uses auto-id
+  // + shop_id; wnil_books uses shop_id + order_id as the composite FK.
+  // Model-level CPK ["shop_id", "id"] is set on WnilOrder at runtime.
   wnil_orders: { shop_id: "integer" },
   wnil_books: { shop_id: "integer", order_id: "integer" },
-  // poly_* tables for polymorphic WHERE tests (SQL-shape; no DB fixtures needed)
+  // poly_* tables for polymorphic WHERE tests (DB round-trips).
   poly_price_estimates: {
     estimate_of_type: "string",
     estimate_of_id: "integer",
