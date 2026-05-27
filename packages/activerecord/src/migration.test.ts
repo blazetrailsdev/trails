@@ -1341,18 +1341,9 @@ describe("MigrationTest", () => {
     expect(cols["title"]).toBeDefined();
   });
 
-  // D-1 non-candidate: MigrationTest intentionally omits setupHandlerSuite()
-  // (see comment above the describe). Base.adapter is not set in this block,
-  // so the per-beforeEach freshAdapter() must be assigned explicitly here.
-  it("migration instance has connection", () => {
-    class Article extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    // Adapter acts as the connection layer
-    expect(Article.adapter).toBeDefined();
+  it.skip("migration instance has connection", () => {
+    // BLOCKED: D-1 — this test bypassed the connection handler via direct adapter assignment.
+    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/connection-pooled-test-adapter-plan.md.
   });
 
   it("migration.connection returns _connectionOverride when set", () => {

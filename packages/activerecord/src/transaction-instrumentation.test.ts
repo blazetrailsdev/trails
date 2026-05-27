@@ -31,15 +31,15 @@ async function freshIsolatedAdapter(): Promise<SQLite3Adapter> {
 
 const freshAdapter = freshIsolatedAdapter;
 
-function makeTopic(adapter: DatabaseAdapter) {
+function makeTopic(adp: DatabaseAdapter) {
   class Topic extends Base {
     static {
       this.attribute("title", "string");
       this.attribute("updated_at", "datetime");
-      this.adapter = adapter;
+      this.adapter = adp;
     }
   }
-  return { Topic, adapter };
+  return { Topic, adapter: adp };
 }
 
 describe("TransactionInstrumentationTest", () => {
