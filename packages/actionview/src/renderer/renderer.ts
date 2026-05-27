@@ -3,6 +3,7 @@ import type { ViewContext, RenderOptions } from "./abstract-renderer.js";
 import { RenderedTemplate } from "./abstract-renderer.js";
 import { TemplateRenderer } from "./template-renderer.js";
 import { PartialRenderer, ObjectRenderer, CollectionRenderer } from "./partial-renderer.js";
+import { StreamingBody } from "./streaming-template-renderer.js";
 
 export type { ViewContext, RenderOptions };
 export { RenderedTemplate };
@@ -53,7 +54,9 @@ export class Renderer {
     if (Object.prototype.hasOwnProperty.call(options, "partial")) {
       return [await this.renderPartial(context, options)];
     }
-    // Phase 3d: StreamingTemplateRenderer. For now delegate to template renderer.
+    if (options.stream) {
+      return new StreamingBody(this.lookupContext, context, options).toArray();
+    }
     return [(await this.renderTemplateToObject(context, options)).body];
   }
 

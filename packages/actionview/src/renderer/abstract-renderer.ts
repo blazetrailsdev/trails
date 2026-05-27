@@ -64,6 +64,7 @@ export interface RenderOptions {
   formats?: string[];
   variants?: string[];
   cached?: boolean;
+  stream?: boolean;
   [key: string]: unknown;
 }
 
