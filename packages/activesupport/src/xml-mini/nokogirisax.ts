@@ -1,4 +1,10 @@
 const CONTENT_KEY = "__content__";
+
+function isModuleNotFound(e: unknown, pkg: string): boolean {
+  if (!(e instanceof Error)) return false;
+  const code = (e as NodeJS.ErrnoException).code;
+  return code === "ERR_MODULE_NOT_FOUND" || e.message.includes(pkg);
+}
 const HASH_SIZE_KEY = "__hash_size__";
 
 type XmlHash = Record<string, unknown>;
@@ -7,10 +13,13 @@ async function loadNokogiri() {
   try {
     return await import("@blazetrails/nokogiri");
   } catch (e) {
-    throw new Error(
-      "@blazetrails/nokogiri is not installed. Add it as a dependency to use the Nokogiri SAX backend.",
-      { cause: e },
-    );
+    if (isModuleNotFound(e, "@blazetrails/nokogiri")) {
+      throw new Error(
+        "@blazetrails/nokogiri is not installed. Add it as a dependency to use the Nokogiri SAX backend.",
+        { cause: e },
+      );
+    }
+    throw e;
   }
 }
 
