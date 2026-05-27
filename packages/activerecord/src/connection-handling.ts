@@ -667,6 +667,14 @@ async function establishWithConfig(
     },
   );
 
+  // Mirror Rails: establish_connection makes the receiver its own connection
+  // class so it gets an independent pool entry under its own name instead of
+  // inheriting the Base pool. Without this Tag.establishConnection and
+  // Tag2.establishConnection both resolve connectionClassForSelf() → Base and
+  // register under the same "Base" pool key, defeating cross-connection
+  // isolation tests.
+  modelClass.connectionClass = true;
+
   // Honor the active connected_to scope so callers like
   // `connected_to(role:, shard:) { establish_connection(db_config) }` register
   // the new pool under the current role/shard instead of writing/default.

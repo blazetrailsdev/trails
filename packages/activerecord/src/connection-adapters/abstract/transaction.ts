@@ -914,7 +914,10 @@ export class TransactionManager {
       if (
         this._connection.supportsLazyTransactions?.() &&
         this.isLazyTransactionsEnabled() &&
-        _lazy
+        _lazy &&
+        !isolation // isolated transactions must materialize eagerly so the
+        // snapshot is taken before the first read (mirrors Rails' per-query
+        // materialize_transactions call in with_raw_connection)
       ) {
         this._hasUnmaterializedTransactions = true;
       } else {
