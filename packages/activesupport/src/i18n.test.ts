@@ -177,4 +177,37 @@ describe("I18nTest", () => {
   it("translate { raise: true } honors a supplied default (does not throw)", () => {
     expect(I18n.translate("nope", { raise: true, default: "fallback" })).toBe("fallback");
   });
+
+  it("translate interpolates %{name} placeholders", () => {
+    I18n.backend.storeTranslations("en", { greeting: "Hello %{name}!" });
+    expect(I18n.translate("greeting", { name: "World" })).toBe("Hello World!");
+  });
+
+  it("translate leaves unmatched %{name} placeholders intact", () => {
+    I18n.backend.storeTranslations("en", { greeting: "Hello %{name}!" });
+    expect(I18n.translate("greeting")).toBe("Hello %{name}!");
+  });
+
+  it("translate does not interpolate reserved keys like locale/default/raise", () => {
+    I18n.backend.storeTranslations("en", { msg: "%{locale} %{default} %{raise}" });
+    expect(I18n.translate("msg", { locale: "en", default: "x", raise: true })).toBe(
+      "%{locale} %{default} %{raise}",
+    );
+  });
+
+  it("translate interpolates count (not a reserved key)", () => {
+    I18n.backend.storeTranslations("en", { items: "%{count} items" });
+    expect(I18n.translate("items", { count: 5 })).toBe("5 items");
+  });
+
+  it("translate interpolates string defaults", () => {
+    expect(I18n.translate("missing.key", { default: "Hello %{name}!", name: "World" })).toBe(
+      "Hello World!",
+    );
+  });
+
+  it("translate does not interpolate prototype properties", () => {
+    I18n.backend.storeTranslations("en", { msg: "%{toString} %{constructor}" });
+    expect(I18n.translate("msg")).toBe("%{toString} %{constructor}");
+  });
 });

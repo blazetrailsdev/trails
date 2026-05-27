@@ -17,6 +17,20 @@ function dig(obj: TranslationHash, keys: string[]): TranslationValue | undefined
   return current;
 }
 
+const I18N_RESERVED_KEYS = new Set(["locale", "default", "raise", "scope", "separator"]);
+
+function interpolate(value: TranslationValue, options: TranslateOptions): TranslationValue {
+  if (typeof value !== "string") return value;
+  const hasInterpolation = value.includes("%{");
+  if (!hasInterpolation) return value;
+  return value.replace(/%\{(\w+)\}/g, (match, name) => {
+    if (Object.hasOwn(options, name) && !I18N_RESERVED_KEYS.has(name)) {
+      return String(options[name]);
+    }
+    return match;
+  });
+}
+
 class SimpleBackend {
   private translations: Record<string, TranslationHash> = {};
 
@@ -209,6 +223,7 @@ interface TranslateOptions {
    * "Translation missing: …" string for unknown keys. Mirrors Rails
    * `I18n.t(key, raise: true)`. A supplied `default` still wins. */
   raise?: boolean;
+  [key: string]: unknown;
 }
 
 /**
@@ -273,8 +288,8 @@ class I18nModule {
     const locale = options.locale ?? this.locale;
     const keyStr = symbolToString(key);
     const result = this.backend.lookup(locale, keyStr);
-    if (result !== undefined) return result;
-    if (options.default !== undefined) return options.default;
+    if (result !== undefined) return interpolate(result, options);
+    if (options.default !== undefined) return interpolate(options.default, options);
     if (options.raise) throw new MissingTranslationData(locale, keyStr);
     return `Translation missing: ${locale}.${keyStr}`;
   }

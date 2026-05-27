@@ -383,6 +383,7 @@ export {
   xmlNameEscape,
   isHtmlSafe,
 } from "./core-ext/string/output-safety.js";
+export { HtmlSafeTranslation } from "./html-safe-translation.js";
 // KeyGenerator uses getCrypto() adapter — import from "@blazetrails/activesupport/key-generator"
 export { BacktraceCleaner } from "./backtrace-cleaner.js";
 export { OrderedHash } from "./ordered-hash.js";
