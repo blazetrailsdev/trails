@@ -392,8 +392,8 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
     // Coordinate so chain B reads state WHILE chain A holds an open transaction.
     // Without coordination, chain B would read before chain A's async TM open,
     // passing vacuously regardless of whether the filter is in place.
-    let signalBReady: () => void;
-    let signalADone: () => void;
+    let signalBReady!: () => void;
+    let signalADone!: () => void;
     const bReady = new Promise<void>((r) => {
       signalBReady = r;
     });
