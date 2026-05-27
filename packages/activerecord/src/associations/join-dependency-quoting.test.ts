@@ -1,6 +1,6 @@
 /**
  * Covers the Arel node construction in JoinDependency's direct-path
- * `addAssociation`. Verifies that the returned JoinNode carries an
+ * `addAssociation`. Verifies that the returned JoinPart carries an
  * `arelJoin` (Nodes.OuterJoin) with the correct ON predicate structure
  * for polymorphic :as, STI subclass IN-list, and basic foreign-key joins.
  *
@@ -158,8 +158,8 @@ describe("JoinDependency Arel node construction", () => {
 
     expect(jd.joinRoot.baseKlass).toBe(Owner);
     expect(jd.joinRoot.children).toHaveLength(1);
-    expect(jd.joinRoot.children[0]._joinNode).not.toBeNull();
-    expect(jd.joinRoot.children[0]._joinNode!.immediateAssocName).toBe("assets");
+    expect(jd.joinRoot.children[0].tableIndex).toBeGreaterThanOrEqual(0);
+    expect(jd.joinRoot.children[0].immediateAssocName).toBe("assets");
     expect(jd.joinRoot.children[0].baseKlass).toBe(Asset);
   });
 
@@ -182,10 +182,10 @@ describe("JoinDependency Arel node construction", () => {
 
     expect(jd.joinRoot.children).toHaveLength(1);
     const assetsNode = jd.joinRoot.children[0];
-    expect(assetsNode._joinNode!.immediateAssocName).toBe("assets");
+    expect(assetsNode.immediateAssocName).toBe("assets");
     expect(assetsNode.children).toHaveLength(1);
     const commentsNode = assetsNode.children[0];
-    expect(commentsNode._joinNode!.immediateAssocName).toBe("comments");
+    expect(commentsNode.immediateAssocName).toBe("comments");
     expect(commentsNode.baseKlass).toBe(Comment);
   });
 
@@ -226,7 +226,7 @@ describe("JoinDependency Arel node construction", () => {
     const child = jd.joinRoot.children[0];
     expect(child).toBeInstanceOf(JoinAssociation);
     expect((child as JoinAssociation).reflection).toBeDefined();
-    expect(child._joinNode).not.toBeNull();
-    expect(child._joinNode!.immediateAssocName).toBe("assets");
+    expect(child.tableIndex).toBeGreaterThanOrEqual(0);
+    expect(child.immediateAssocName).toBe("assets");
   });
 });

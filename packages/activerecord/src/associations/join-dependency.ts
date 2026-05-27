@@ -26,31 +26,6 @@ import { JoinPart } from "./join-dependency/join-part.js";
 import { AssociationNotFoundError } from "./errors.js";
 import { AliasTracker } from "./alias-tracker.js";
 
-export interface JoinNode {
-  tableIndex: number;
-  tableAlias: string;
-  tableName: string;
-  modelClass: typeof Base;
-  columns: string[];
-  assocName: string;
-  assocType: "hasMany" | "hasOne" | "belongsTo";
-  arelJoin: Nodes.Join | null;
-  /** Reflection for this association — used by hydration for readonly/strictLoading propagation. */
-  reflection: any | null;
-  /** True for intermediate through-table nodes (JOIN chain only, not hydrated). */
-  isThroughNode: boolean;
-  /** The immediate association name (without parent prefix) */
-  immediateAssocName: string;
-  /** Dotted parent path, or null if directly on the base model */
-  parentPath: string | null;
-  /**
-   * The SQL name used for this node's table in JOIN and SELECT expressions.
-   * Equals tableName when the real name was free (no collision); equals
-   * tableAlias (tN) when there was a naming collision.
-   */
-  effectiveSqlName: string;
-}
-
 export interface AliasMap {
   alias: string;
   tableIndex: number;
@@ -89,11 +64,11 @@ function getModelColumns(modelClass: any): string[] {
  * fast lookup from (node, column) to alias string.
  */
 export class Aliases {
-  private _aliasCache: Map<JoinNode | null, Map<string, string>>;
-  private _columnsCache: Map<JoinNode | null, AliasMap[]>;
+  private _aliasCache: Map<JoinPart | null, Map<string, string>>;
+  private _columnsCache: Map<JoinPart | null, AliasMap[]>;
   private _allColumns: AliasMap[];
 
-  constructor(tables: Array<{ node: JoinNode | null; columns: AliasMap[] }>) {
+  constructor(tables: Array<{ node: JoinPart | null; columns: AliasMap[] }>) {
     this._aliasCache = new Map();
     this._columnsCache = new Map();
     this._allColumns = [];
@@ -112,11 +87,11 @@ export class Aliases {
     return this._allColumns;
   }
 
-  columnAliases(node: JoinNode | null): AliasMap[] {
+  columnAliases(node: JoinPart | null): AliasMap[] {
     return this._columnsCache.get(node) ?? [];
   }
 
-  columnAlias(node: JoinNode | null, column: string): string | undefined {
+  columnAlias(node: JoinPart | null, column: string): string | undefined {
     return this._aliasCache.get(node)?.get(column);
   }
 }
@@ -148,11 +123,11 @@ export class JoinDependency {
     return this._joinRoot;
   }
 
-  get nodes(): JoinNode[] {
-    const result: JoinNode[] = [];
+  get nodes(): JoinPart[] {
+    const result: JoinPart[] = [];
     this._joinRoot.each((part) => {
-      if (part !== this._joinRoot && part._joinNode) {
-        result.push(part._joinNode);
+      if (part !== this._joinRoot && part.tableIndex >= 0) {
+        result.push(part);
       }
     });
     return result;
@@ -161,7 +136,7 @@ export class JoinDependency {
   addAssociation(
     assocName: string,
     options?: { fromModel?: any; fromAlias?: string; parentAssocName?: string },
-  ): JoinNode | null {
+  ): JoinPart | null {
     const modelClass = (options?.fromModel ?? this._baseModel) as any;
     const associations: any[] = modelClass._associations ?? [];
     const assocDef = associations.find((a: any) => a.name === assocName);
@@ -314,22 +289,6 @@ export class JoinDependency {
       arelJoin = new this._joinType(targetArelTable, new Nodes.On(predicate));
     }
 
-    const node: JoinNode = {
-      tableIndex,
-      tableAlias,
-      tableName: targetTable!,
-      effectiveSqlName: effectiveName,
-      modelClass: targetModel!,
-      columns,
-      assocName: options?.parentAssocName ? `${options.parentAssocName}.${assocName}` : assocName,
-      immediateAssocName: assocName,
-      parentPath: options?.parentAssocName ?? null,
-      assocType,
-      arelJoin,
-      reflection: reflection ?? null,
-      isThroughNode: false,
-    };
-
     for (let i = 0; i < columns.length; i++) {
       this._aliases.push({
         alias: `t${tableIndex}_r${i}`,
@@ -339,15 +298,30 @@ export class JoinDependency {
       });
     }
 
-    this._pushTreeNode(node);
-    return node;
+    const treePart = reflection ? new JoinAssociation(reflection) : new JoinLeaf(targetModel!);
+    treePart.tableIndex = tableIndex;
+    treePart.tableAlias = tableAlias;
+    treePart.tableName = targetTable!;
+    treePart.effectiveSqlName = effectiveName;
+    treePart.columns = columns;
+    treePart.assocName = options?.parentAssocName
+      ? `${options.parentAssocName}.${assocName}`
+      : assocName;
+    treePart.immediateAssocName = assocName;
+    treePart.parentPath = options?.parentAssocName ?? null;
+    treePart.assocType = assocType;
+    treePart.arelJoin = arelJoin;
+    treePart.nodeReflection = reflection ?? null;
+    treePart.isThroughNode = false;
+    this._insertTreeNode(treePart);
+    return treePart;
   }
 
   /**
    * Add a nested association path like "comments.author".
    * Walks the chain, adding JOINs for each segment.
    */
-  addNestedAssociation(path: string): JoinNode | null {
+  addNestedAssociation(path: string): JoinPart | null {
     const parts = path.split(".");
     if (parts.length === 1) return this.addAssociation(parts[0]);
 
@@ -358,7 +332,7 @@ export class JoinDependency {
 
     let currentModel = this._baseModel as any;
     let currentAlias = this._baseAlias;
-    let lastNode: JoinNode | null = null;
+    let lastNode: JoinPart | null = null;
     let parentPath = "";
 
     for (const part of parts) {
@@ -376,7 +350,7 @@ export class JoinDependency {
         return null;
       }
       lastNode = node;
-      currentModel = node.modelClass;
+      currentModel = node.baseKlass;
       // Use effectiveSqlName, not tableAlias: the JOIN SQL references the
       // effective name (real table name or tN alias), so the next level's ON
       // clause must use the same name as the source of the join.
@@ -404,9 +378,8 @@ export class JoinDependency {
   get reflections(): any[] {
     const result: any[] = [];
     this._joinRoot.eachChildren((parent, child) => {
-      const node = child._joinNode;
-      if (!node) return;
-      const reflection = reflectOnAssociation(parent.baseKlass as any, node.immediateAssocName);
+      if (child.tableIndex < 0) return;
+      const reflection = reflectOnAssociation(parent.baseKlass as any, child.immediateAssocName);
       if (reflection) result.push(reflection);
     });
     return result;
@@ -469,9 +442,9 @@ export class JoinDependency {
     }
 
     const joins = intersection.flatMap(([l, r]) => {
-      if (r instanceof JoinAssociation || r instanceof JoinTreeNode) {
-        const originalTable = r._joinNode?.effectiveSqlName ?? r.table;
-        const lEffective = l._joinNode?.effectiveSqlName;
+      if (r instanceof JoinAssociation || r instanceof JoinLeaf) {
+        const originalTable = r.effectiveSqlName || r.table;
+        const lEffective = l.effectiveSqlName;
         let resolvedTable: string;
         if (lEffective) {
           resolvedTable = lEffective;
@@ -497,7 +470,7 @@ export class JoinDependency {
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ): Nodes.Join[] {
     const joins: Nodes.Join[] = [];
-    const arelJoin = child._joinNode?.arelJoin;
+    const arelJoin = child.arelJoin;
     if (arelJoin) {
       if (!(arelJoin instanceof joinType) && arelJoin instanceof Nodes.Join) {
         joins.push(new joinType(arelJoin.left, arelJoin.right));
@@ -516,9 +489,8 @@ export class JoinDependency {
   ): void {
     const toTable = new Table(toTableName);
     for (const child of parent.children) {
-      const joinNode = child._joinNode;
-      if (!joinNode?.arelJoin) continue;
-      const arelJoin = joinNode.arelJoin;
+      if (!child.arelJoin) continue;
+      const arelJoin = child.arelJoin;
       const on = arelJoin.right;
       if (!(on instanceof Nodes.On)) continue;
       const rebound = rebindTableReferences(on.expr as Nodes.Node, fromTableName, toTable);
@@ -527,7 +499,7 @@ export class JoinDependency {
           left: Nodes.Node,
           right: Nodes.Node,
         ) => Nodes.Join;
-        joinNode.arelJoin = new JoinClass(arelJoin.left, new Nodes.On(rebound));
+        child.arelJoin = new JoinClass(arelJoin.left, new Nodes.On(rebound));
       }
     }
   }
@@ -547,11 +519,11 @@ export class JoinDependency {
     return relation;
   }
 
-  each(callback: (node: JoinNode, index: number) => void): void {
+  each(callback: (part: JoinPart, index: number) => void): void {
     this.nodes.forEach(callback);
   }
 
-  [Symbol.iterator](): Iterator<JoinNode> {
+  [Symbol.iterator](): Iterator<JoinPart> {
     return this.nodes[Symbol.iterator]();
   }
 
@@ -613,8 +585,8 @@ export class JoinDependency {
     const baseColumns = getModelColumns(this._baseModel);
     const columnNames = new Set(this._aliases.map((a) => a.alias));
 
-    const nodeReadonly = new Map<JoinNode, boolean>();
-    const nodeStrictLoading = new Map<JoinNode, boolean>();
+    const nodeReadonly = new Map<JoinPart, boolean>();
+    const nodeStrictLoading = new Map<JoinPart, boolean>();
     for (const node of this.nodes) {
       nodeReadonly.set(node, this._isNodeReadonly(node));
       nodeStrictLoading.set(node, this._isNodeStrictLoading(node));
@@ -675,15 +647,14 @@ export class JoinDependency {
     modelCache: Map<JoinPart, Map<unknown, any>>,
     seenChildren: WeakMap<object, Map<string, Set<unknown>>>,
     assocMap: Map<unknown, Map<string, any[]>>,
-    nodeReadonly: Map<JoinNode, boolean>,
-    nodeStrictLoading: Map<JoinNode, boolean>,
+    nodeReadonly: Map<JoinPart, boolean>,
+    nodeStrictLoading: Map<JoinPart, boolean>,
     strictLoadingValue?: boolean,
   ): void {
     for (const child of treeNode.children) {
-      const node = child._joinNode;
-      if (!node) continue;
+      if (child.tableIndex < 0) continue;
 
-      if (node.isThroughNode) {
+      if (child.isThroughNode) {
         this._constructRecursive(
           child,
           arParent,
@@ -701,28 +672,28 @@ export class JoinDependency {
 
       const childAttrs: Record<string, unknown> = {};
       let hasNonNull = false;
-      for (let i = 0; i < node.columns.length; i++) {
-        const val = row[`t${node.tableIndex}_r${i}`];
-        childAttrs[node.columns[i]] = val;
+      for (let i = 0; i < child.columns.length; i++) {
+        const val = row[`t${child.tableIndex}_r${i}`];
+        childAttrs[child.columns[i]] = val;
         if (val !== null && val !== undefined) hasNonNull = true;
       }
 
       if (!hasNonNull) {
-        this._markAssociationLoaded(arParent, node);
+        this._markAssociationLoaded(arParent, child);
         continue;
       }
 
-      const rawChildPk = childAttrs[(node.modelClass as any).primaryKey ?? "id"];
+      const rawChildPk = childAttrs[(child.baseKlass as any).primaryKey ?? "id"];
 
       let parentSeen = seenChildren.get(arParent);
       if (!parentSeen) {
         parentSeen = new Map();
         seenChildren.set(arParent, parentSeen);
       }
-      let seenPks = parentSeen.get(node.immediateAssocName);
+      let seenPks = parentSeen.get(child.immediateAssocName);
       if (!seenPks) {
         seenPks = new Set();
-        parentSeen.set(node.immediateAssocName, seenPks);
+        parentSeen.set(child.immediateAssocName, seenPks);
       }
       const alreadySeen = seenPks.has(rawChildPk);
 
@@ -733,49 +704,46 @@ export class JoinDependency {
       }
       let childInstance = nodeCache.get(rawChildPk);
       if (!childInstance) {
-        childInstance = this.constructModel(childAttrs, node, strictLoadingValue);
+        childInstance = this.constructModel(childAttrs, child, strictLoadingValue);
         if (rawChildPk != null) nodeCache.set(rawChildPk, childInstance);
       }
 
       if (!alreadySeen) {
         seenPks.add(rawChildPk);
 
-        const isCollection = node.assocType === "hasMany";
+        const isCollection = child.assocType === "hasMany";
 
-        // Populate _preloadedAssociations on the correct intermediate parent.
         if (!(arParent as any)._preloadedAssociations) {
           (arParent as any)._preloadedAssociations = new Map();
         }
-        // Initialize collection array before wiring: syncAssociationInstance will setTarget()
-        // it onto the proxy, making proxy.target and _preloadedAssociations share the same
-        // reference so proxy.target.push() keeps both in sync without a double-push.
         if (
           isCollection &&
-          !(arParent as any)._preloadedAssociations.has(node.immediateAssocName)
+          !(arParent as any)._preloadedAssociations.has(child.immediateAssocName)
         ) {
-          (arParent as any)._preloadedAssociations.set(node.immediateAssocName, []);
+          (arParent as any)._preloadedAssociations.set(child.immediateAssocName, []);
         }
 
-        this._wireAssociationProxy(arParent, node, childInstance);
+        this._wireAssociationProxy(arParent, child, childInstance);
 
-        if (nodeReadonly.get(node)) {
+        if (nodeReadonly.get(child)) {
           (childInstance as any)._readonly = true;
         }
         if (
-          nodeStrictLoading.get(node) &&
+          nodeStrictLoading.get(child) &&
           typeof (childInstance as any).strictLoadingBang === "function"
         ) {
           (childInstance as any).strictLoadingBang();
         }
 
         if (!isCollection) {
-          (arParent as any)._preloadedAssociations.set(node.immediateAssocName, childInstance);
+          (arParent as any)._preloadedAssociations.set(child.immediateAssocName, childInstance);
         }
 
         if (treeNode === this._joinRoot) {
           const rootAssocs = assocMap.get(rootParentKey)!;
-          if (!rootAssocs.has(node.immediateAssocName)) rootAssocs.set(node.immediateAssocName, []);
-          rootAssocs.get(node.immediateAssocName)!.push(childInstance);
+          if (!rootAssocs.has(child.immediateAssocName))
+            rootAssocs.set(child.immediateAssocName, []);
+          rootAssocs.get(child.immediateAssocName)!.push(childInstance);
         }
       }
 
@@ -811,7 +779,7 @@ export class JoinDependency {
     const baseAliasMap: AliasMap[] = this._aliases.filter(
       (a) => a.tableIndex === this._baseTableIndex,
     );
-    const tables: Array<{ node: JoinNode | null; columns: AliasMap[] }> = [
+    const tables: Array<{ node: JoinPart | null; columns: AliasMap[] }> = [
       { node: null, columns: baseAliasMap },
     ];
     for (const node of this.nodes) {
@@ -841,10 +809,10 @@ export class JoinDependency {
    */
   private constructModel(
     attrs: Record<string, unknown>,
-    node: JoinNode | null,
+    node: JoinPart | null,
     strictLoadingValue?: boolean,
   ): any {
-    const modelClass = node ? node.modelClass : this._baseModel;
+    const modelClass = node ? node.baseKlass : this._baseModel;
     const model = (modelClass as any)._instantiate(attrs);
     if (strictLoadingValue && typeof model.strictLoadingBang === "function") {
       model.strictLoadingBang();
@@ -857,7 +825,7 @@ export class JoinDependency {
    * Wire a child model into the parent's association proxy.
    * Mirrors Rails' `construct_model` setting `other.target` and `other.loaded`.
    */
-  private _wireAssociationProxy(parent: any, node: JoinNode, child: any): void {
+  private _wireAssociationProxy(parent: any, node: JoinPart, child: any): void {
     if (typeof parent.association !== "function") return;
     try {
       const proxy = parent.association(node.immediateAssocName);
@@ -886,7 +854,7 @@ export class JoinDependency {
    * @internal
    * Mark an association as loaded (empty) when the join row is all-null.
    */
-  private _markAssociationLoaded(parent: any, node: JoinNode): void {
+  private _markAssociationLoaded(parent: any, node: JoinPart): void {
     if (typeof parent.association !== "function") return;
     try {
       const proxy = parent.association(node.immediateAssocName);
@@ -903,11 +871,11 @@ export class JoinDependency {
    * Mirrors Rails' `JoinAssociation#readonly?` — checks if the reflection's
    * scope marks the association as readonly.
    */
-  private _isNodeReadonly(node: JoinNode): boolean {
-    const refl = node.reflection;
+  private _isNodeReadonly(node: JoinPart): boolean {
+    const refl = node.nodeReflection;
     if (!refl || typeof refl.scopeFor !== "function") return false;
     try {
-      const baseRel = (node.modelClass as any)._allForPreload?.();
+      const baseRel = (node.baseKlass as any)._allForPreload?.();
       if (!baseRel) return false;
       const scopeRel = refl.scopeFor(baseRel);
       return !!scopeRel?._isReadonly;
@@ -916,13 +884,9 @@ export class JoinDependency {
     }
   }
 
-  /**
-   * @internal
-   * Mirrors Rails' `JoinAssociation#strict_loading?` — checks if the
-   * reflection has `strict_loading: true` in its options.
-   */
-  private _isNodeStrictLoading(node: JoinNode): boolean {
-    const refl = node.reflection;
+  /** @internal */
+  private _isNodeStrictLoading(node: JoinPart): boolean {
+    const refl = node.nodeReflection;
     if (!refl) return false;
     return !!refl.strictLoading;
   }
@@ -939,32 +903,24 @@ export class JoinDependency {
     }
   }
 
-  private _pushTreeNode(node: JoinNode): void {
-    const parentPath = node.parentPath;
+  private _insertTreeNode(treePart: JoinPart): void {
+    const parentPath = treePart.parentPath;
     let parent: JoinPart;
     if (parentPath) {
       const found = this._treeNodesByPath.get(parentPath);
       if (!found) {
         throw new Error(
-          `JoinDependency tree: parent path "${parentPath}" not found for "${node.immediateAssocName}"`,
+          `JoinDependency tree: parent path "${parentPath}" not found for "${treePart.immediateAssocName}"`,
         );
       }
       parent = found;
     } else {
       parent = this._joinRoot;
     }
-    let treePart: JoinPart;
-    if (node.reflection) {
-      const ja = new JoinAssociation(node.reflection);
-      (ja as any)._joinNode = node;
-      treePart = ja;
-    } else {
-      treePart = new JoinTreeNode(node.modelClass, node);
-    }
     parent.children.push(treePart);
     const fullPath = parentPath
-      ? `${parentPath}.${node.immediateAssocName}`
-      : node.immediateAssocName;
+      ? `${parentPath}.${treePart.immediateAssocName}`
+      : treePart.immediateAssocName;
     this._treeNodesByPath.set(fullPath, treePart);
   }
 
@@ -1000,7 +956,7 @@ export class JoinDependency {
     modelClass: any,
     sourceAlias: string,
     parentAssocName?: string,
-  ): JoinNode | null {
+  ): JoinPart | null {
     const chain = reflection.chain;
     if (!chain || chain.length < 2) return null;
 
@@ -1085,8 +1041,8 @@ export class JoinDependency {
     // last is the target. chainTables is in forward order.
     // After joinConstraints reversal: joins[0] corresponds to chain[last],
     // joins[last] corresponds to chain[0] (the target/ThroughReflection).
-    // Register all tables and create JoinNodes.
-    let targetNode: JoinNode | null = null;
+    // Register all tables and create JoinParts.
+    let targetNode: JoinPart | null = null;
 
     // Map each join to its chain entry. joinConstraints reverses the chain,
     // so joins[i] corresponds to chainTables[chain.length - 1 - i].
@@ -1116,44 +1072,40 @@ export class JoinDependency {
         const fullAssocName = parentAssocName
           ? `${parentAssocName}.${assocDef.name}`
           : assocDef.name;
-        const node: JoinNode = {
-          tableIndex: entry.tableIndex,
-          tableAlias: entry.tableAlias,
-          tableName: entry.tableName,
-          effectiveSqlName: entry.effectiveName,
-          modelClass: entry.model,
-          columns,
-          assocName: fullAssocName,
-          immediateAssocName: assocDef.name,
-          parentPath: parentAssocName ?? null,
-          assocType: assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type,
-          arelJoin,
-          reflection,
-          isThroughNode: false,
-        };
-        this._pushTreeNode(node);
-        targetNode = node;
+        const treePart = new JoinAssociation(reflection);
+        treePart.tableIndex = entry.tableIndex;
+        treePart.tableAlias = entry.tableAlias;
+        treePart.tableName = entry.tableName;
+        treePart.effectiveSqlName = entry.effectiveName;
+        treePart.columns = columns;
+        treePart.assocName = fullAssocName;
+        treePart.immediateAssocName = assocDef.name;
+        treePart.parentPath = parentAssocName ?? null;
+        treePart.assocType = assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type;
+        treePart.arelJoin = arelJoin;
+        treePart.nodeReflection = reflection;
+        treePart.isThroughNode = false;
+        this._insertTreeNode(treePart);
+        targetNode = treePart;
       } else {
         const reflName = chain[chainIdx].name ?? entry.tableName;
         const throughName = `_through_${reflName}`;
         const throughNodeName = parentAssocName ? `${parentAssocName}.${throughName}` : throughName;
         const refl = chain[chainIdx];
-        const node: JoinNode = {
-          tableIndex: entry.tableIndex,
-          tableAlias: entry.tableAlias,
-          tableName: entry.tableName,
-          effectiveSqlName: entry.effectiveName,
-          modelClass: entry.model,
-          columns,
-          assocName: throughNodeName,
-          immediateAssocName: throughName,
-          parentPath: parentAssocName ?? null,
-          assocType: ((refl as any)._reflection ?? refl).macro === "hasOne" ? "hasOne" : "hasMany",
-          arelJoin,
-          reflection: null,
-          isThroughNode: true,
-        };
-        this._pushTreeNode(node);
+        const treePart = new JoinLeaf(entry.model);
+        treePart.tableIndex = entry.tableIndex;
+        treePart.tableAlias = entry.tableAlias;
+        treePart.tableName = entry.tableName;
+        treePart.effectiveSqlName = entry.effectiveName;
+        treePart.columns = columns;
+        treePart.assocName = throughNodeName;
+        treePart.immediateAssocName = throughName;
+        treePart.parentPath = parentAssocName ?? null;
+        treePart.assocType =
+          ((refl as any)._reflection ?? refl).macro === "hasOne" ? "hasOne" : "hasMany";
+        treePart.arelJoin = arelJoin;
+        treePart.isThroughNode = true;
+        this._insertTreeNode(treePart);
       }
     }
 
@@ -1166,7 +1118,7 @@ export class JoinDependency {
     sourceAlias: string,
     sourcePk: string,
     parentAssocName?: string,
-  ): JoinNode | null {
+  ): JoinPart | null {
     const associations: any[] = modelClass._associations ?? [];
     const throughAssocDef = associations.find((a: any) => a.name === assocDef.options.through);
     if (!throughAssocDef) return null;
@@ -1247,22 +1199,19 @@ export class JoinDependency {
       const throughNodeName = parentAssocName
         ? `${parentAssocName}._through_${assocDef.options.through}`
         : `_through_${assocDef.options.through}`;
-      const throughNode: JoinNode = {
-        tableIndex: throughTableIndex,
-        tableAlias: throughAlias,
-        tableName: throughTable,
-        effectiveSqlName: throughEffective,
-        modelClass: throughModel as typeof Base,
-        columns: throughColumns,
-        assocName: throughNodeName,
-        immediateAssocName: `_through_${assocDef.options.through}`,
-        parentPath: parentAssocName ?? null,
-        assocType: throughAssocDef.type === "hasOne" ? "hasOne" : "hasMany",
-        arelJoin: throughArelJoin,
-        reflection: null,
-        isThroughNode: true,
-      };
-      this._pushTreeNode(throughNode);
+      const throughTreePart = new JoinLeaf(throughModel as typeof Base);
+      throughTreePart.tableIndex = throughTableIndex;
+      throughTreePart.tableAlias = throughAlias;
+      throughTreePart.tableName = throughTable;
+      throughTreePart.effectiveSqlName = throughEffective;
+      throughTreePart.columns = throughColumns;
+      throughTreePart.assocName = throughNodeName;
+      throughTreePart.immediateAssocName = `_through_${assocDef.options.through}`;
+      throughTreePart.parentPath = parentAssocName ?? null;
+      throughTreePart.assocType = throughAssocDef.type === "hasOne" ? "hasOne" : "hasMany";
+      throughTreePart.arelJoin = throughArelJoin;
+      throughTreePart.isThroughNode = true;
+      this._insertTreeNode(throughTreePart);
 
       const recursiveNode = this.addAssociation(sourceName, {
         fromModel: throughModel,
@@ -1424,7 +1373,7 @@ export class JoinDependency {
     throughModel: typeof Base,
     throughAssocDef: any,
     parentAssocName?: string,
-  ): JoinNode | null {
+  ): JoinPart | null {
     // Association scope predicates (Arel-based, no regex)
     if (assocDef.options.scope && typeof assocDef.options.scope === "function") {
       const scopeRel = assocDef.options.scope((targetModel as any)._allForPreload());
@@ -1486,44 +1435,41 @@ export class JoinDependency {
     const throughNodeName = parentAssocName
       ? `${parentAssocName}._through_${assocDef.options.through}`
       : `_through_${assocDef.options.through}`;
-    const throughNode: JoinNode = {
-      tableIndex: throughTableIndex,
-      tableAlias: throughAlias,
-      tableName: throughTable,
-      effectiveSqlName: throughEffective,
-      modelClass: throughModel as typeof Base,
-      columns: throughColumns,
-      assocName: throughNodeName,
-      immediateAssocName: `_through_${assocDef.options.through}`,
-      parentPath: parentAssocName ?? null,
-      assocType: throughAssocDef.type === "hasOne" ? "hasOne" : "hasMany",
-      arelJoin: throughArelJoin,
-      reflection: null,
-      isThroughNode: true,
-    };
-    this._pushTreeNode(throughNode);
+    const throughTreePart = new JoinLeaf(throughModel as typeof Base);
+    throughTreePart.tableIndex = throughTableIndex;
+    throughTreePart.tableAlias = throughAlias;
+    throughTreePart.tableName = throughTable;
+    throughTreePart.effectiveSqlName = throughEffective;
+    throughTreePart.columns = throughColumns;
+    throughTreePart.assocName = throughNodeName;
+    throughTreePart.immediateAssocName = `_through_${assocDef.options.through}`;
+    throughTreePart.parentPath = parentAssocName ?? null;
+    throughTreePart.assocType = throughAssocDef.type === "hasOne" ? "hasOne" : "hasMany";
+    throughTreePart.arelJoin = throughArelJoin;
+    throughTreePart.isThroughNode = true;
+    this._insertTreeNode(throughTreePart);
 
     const parentModel = parentAssocName
-      ? (this._treeNodesByPath.get(parentAssocName)?._joinNode?.modelClass ?? this._baseModel)
+      ? (this._treeNodesByPath.get(parentAssocName)?.baseKlass ?? this._baseModel)
       : this._baseModel;
     const targetReflection = reflectOnAssociation(parentModel as any, assocDef.name);
-    const node: JoinNode = {
-      tableIndex: targetTableIndex,
-      tableAlias: targetAlias,
-      effectiveSqlName: targetEffective,
-      tableName: targetTable,
-      modelClass: targetModel,
-      columns: targetColumns,
-      assocName: fullAssocName,
-      immediateAssocName: assocDef.name,
-      parentPath: parentAssocName ?? null,
-      assocType: assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type,
-      arelJoin: targetArelJoin,
-      reflection: targetReflection ?? null,
-      isThroughNode: false,
-    };
-    this._pushTreeNode(node);
-    return node;
+    const targetTreePart = targetReflection
+      ? new JoinAssociation(targetReflection)
+      : new JoinLeaf(targetModel);
+    targetTreePart.tableIndex = targetTableIndex;
+    targetTreePart.tableAlias = targetAlias;
+    targetTreePart.tableName = targetTable;
+    targetTreePart.effectiveSqlName = targetEffective;
+    targetTreePart.columns = targetColumns;
+    targetTreePart.assocName = fullAssocName;
+    targetTreePart.immediateAssocName = assocDef.name;
+    targetTreePart.parentPath = parentAssocName ?? null;
+    targetTreePart.assocType = assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type;
+    targetTreePart.arelJoin = targetArelJoin;
+    targetTreePart.nodeReflection = targetReflection ?? null;
+    targetTreePart.isThroughNode = false;
+    this._insertTreeNode(targetTreePart);
+    return targetTreePart;
   }
 }
 
@@ -1541,7 +1487,7 @@ function rebindTableReferences(
   }
   if (node instanceof Nodes.And) {
     return new Nodes.And(
-      node.children.map((c) => rebindTableReferences(c, fromTableName, toTable)),
+      node.children.map((c: Nodes.Node) => rebindTableReferences(c, fromTableName, toTable)),
     );
   }
   // Nary nodes (Or) — have children array
@@ -1583,17 +1529,15 @@ function rebindTableReferences(
   return node;
 }
 
-class JoinTreeNode extends JoinPart {
-  override readonly _joinNode: JoinNode;
+class JoinLeaf extends JoinPart {
   private _tableOverride: string | null = null;
 
-  constructor(baseKlass: typeof Base, joinNode: JoinNode) {
+  constructor(baseKlass: typeof Base) {
     super(baseKlass);
-    this._joinNode = joinNode;
   }
 
   get table(): string {
-    return this._tableOverride ?? this._joinNode.effectiveSqlName;
+    return this._tableOverride ?? this.effectiveSqlName;
   }
 
   set table(value: string) {
@@ -1602,14 +1546,9 @@ class JoinTreeNode extends JoinPart {
 
   override isMatch(other: JoinPart): boolean {
     if (this === other) return true;
-    if (!(other instanceof JoinTreeNode)) return false;
+    if (!(other instanceof JoinLeaf)) return false;
     return (
-      this._joinNode.immediateAssocName === other._joinNode.immediateAssocName &&
-      this._joinNode.modelClass === other._joinNode.modelClass
+      this.immediateAssocName === other.immediateAssocName && this.baseKlass === other.baseKlass
     );
-  }
-
-  match(other: JoinPart): boolean {
-    return this.isMatch(other);
   }
 }

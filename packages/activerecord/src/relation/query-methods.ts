@@ -1214,7 +1214,7 @@ function addTreeToJoinDependency(
     const children = subtree;
     if (Object.keys(children).length > 0) {
       addTreeToJoinDependency(jd, children, modelName, {
-        fromModel: node.modelClass,
+        fromModel: node.baseKlass,
         // effectiveSqlName is the name that actually appears in JOIN SQL (the
         // real table name unless aliased due to collision). Using tableAlias
         // here would generate ON clauses referencing e.g. "t1" when the JOIN
@@ -1999,7 +1999,7 @@ export function lookupTableKlassFromJoinDependencies(
 ): unknown {
   let found: unknown = null;
   eachJoinDependencies.call(this, undefined, (join: any) => {
-    if (tableName === join.tableName) found = join.modelClass;
+    if (tableName === join.tableName) found = join.baseKlass;
   });
   return found;
 }
