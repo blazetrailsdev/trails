@@ -20,9 +20,9 @@ All plan PRs (1–7b, F1–F6) have shipped.
 - [x] Wire `_references` param in `joinConstraints`
 - [ ] ~30 LOC: Pass `column_types` from result set for extra-column type-casting
 
-### PR C — F2 dead code deletion (~220 LOC)
+### PR C — F2 dead code deletion — in progress
 
-- [ ] Delete dead `_addThroughAssociation` + `_finishThroughTarget` fallback path
+- [x] Delete dead `_addThroughAssociation` + `_finishThroughTarget` fallback path
 
 ### Already shipped (verified 2026-05-27)
 
