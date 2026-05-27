@@ -1,6 +1,6 @@
 # Connection-pooled test adapter — Rails-parity epic
 
-> **Status (2026-05-26):**
+> **Status (2026-05-27):**
 >
 > - A0 spike, B (#2242), C (#2245): shipped
 > - **D-X driver-pool collapse:** PG (#2279) + MySQL (#2278) — shipped. All three adapters now single-connection per adapter, Rails-shape.
