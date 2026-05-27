@@ -1,4 +1,5 @@
 import { Base } from "../base.js";
+import { setToSqlVisitor } from "@blazetrails/arel";
 
 /**
  * Bootstrap `Base.connectionHandler` for the current worker so that models
@@ -16,14 +17,25 @@ import { Base } from "../base.js";
  * @internal
  */
 export async function bootstrapTestHandler(): Promise<void> {
-  if (Base.isConnectedQ()) return;
-  const pgUrl = process.env.PG_TEST_URL;
-  const mysqlUrl = process.env.MYSQL_TEST_URL;
-  if (pgUrl) {
-    await Base.establishConnection(pgUrl);
-  } else if (mysqlUrl) {
-    await Base.establishConnection(mysqlUrl);
-  } else {
-    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+  if (!Base.isConnectedQ()) {
+    const pgUrl = process.env.PG_TEST_URL;
+    const mysqlUrl = process.env.MYSQL_TEST_URL;
+    if (pgUrl) {
+      await Base.establishConnection(pgUrl);
+    } else if (mysqlUrl) {
+      await Base.establishConnection(mysqlUrl);
+    } else {
+      await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    }
+  }
+  // Sync the global Arel visitor so Node#toSql() uses the adapter-specific
+  // visitor (e.g. SQLite strips FOR UPDATE). Mirrors the sync in Base.adapter setter.
+  const visitor = (Base.adapter as { visitor?: object }).visitor;
+  if (visitor) {
+    setToSqlVisitor(
+      (visitor as object).constructor as new () => {
+        compile(node: import("@blazetrails/arel").Nodes.Node): string;
+      },
+    );
   }
 }

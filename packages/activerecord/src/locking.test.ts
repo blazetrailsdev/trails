@@ -1,15 +1,15 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/locking_test.rb
  */
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, transaction, registerModel, StaleObjectError } from "./index.js";
 import { Associations } from "./associations.js";
 
-import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
-import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
   people: { name: "string", first_name: "string", lock_version: "integer" },
@@ -19,50 +19,31 @@ const TEST_SCHEMA = {
   frogs: { name: "string" },
   lock_without_defaults: { title: "string", lock_version: "integer", updated_at: "datetime" },
   lock_without_defaults_cust: { title: "string", custom_lock_version: "integer" },
+  string_key_objects: {
+    columns: {
+      id: { type: "string" as const, null: false },
+      name: "string" as const,
+      lock_version: { type: "integer" as const, default: 0 },
+    },
+    primaryKey: ["id"] as ["id"],
+  },
 } as const;
 
-const openAdapters: SQLite3Adapter[] = [];
-function makeSQLitePerson() {
-  const adapter = new SQLite3Adapter(":memory:");
-  openAdapters.push(adapter);
-  adapter.exec("CREATE TABLE people (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
-  class Person extends Base {
-    static {
-      this._tableName = "people";
-      this.attribute("name", "string");
-      this.adapter = adapter;
-    }
-  }
-  return { Person, adapter };
-}
-
-// -- Helpers --
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
-afterEach(() => {
-  for (const a of openAdapters.splice(0)) a.close();
-});
-
 describe("OptimisticLockingTest", () => {
-  async function makePerson() {
-    const adapter = await freshAdapter();
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
+  it("quote value passed lock col", async () => {
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
-    return { Person, adapter };
-  }
-
-  it("quote value passed lock col", async () => {
-    const { Person } = await makePerson();
     const p = await Person.create({ name: "anika" });
     expect(p.lock_version).toBe(0);
     await p.update({ name: "anika2" });
@@ -70,18 +51,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("non integer lock destroy", async () => {
-    const adapter = new SQLite3Adapter(":memory:");
-    openAdapters.push(adapter);
-    adapter.exec(
-      "CREATE TABLE string_key_objects (id TEXT PRIMARY KEY, name TEXT, lock_version INTEGER DEFAULT 0)",
-    );
     class StringKeyObject extends Base {
       static {
+        this._tableName = "string_key_objects";
         this.attribute("id", "string");
         this.primaryKey = "id";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const s1 = await StringKeyObject.create({ id: "record1", name: "original" });
@@ -97,7 +73,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock destroy", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p1 = await Person.create({ name: "Test" });
     const p2 = await Person.find(p1.id);
     await p1.update({ name: "Changed" });
@@ -105,7 +87,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock new when explicitly passing nil", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = new Person({ lock_version: null });
     // When nil is passed, default should still apply or be null
     // Rails sets it to 0 by default
@@ -113,13 +101,25 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock new when explicitly passing value", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = new Person({ lock_version: 42 });
     expect(p.lock_version).toBe(42);
   });
 
   it("touch existing lock", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = await Person.create({ name: "Szymon" });
     expect(p.lock_version).toBe(0);
     await p.update({ name: "Szymon Updated" });
@@ -127,7 +127,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("touch stale object", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p1 = await Person.create({ name: "Szymon" });
     const p2 = await Person.find(p1.id);
     await p1.update({ name: "Changed by p1" });
@@ -154,31 +160,47 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("explicit update lock column raise error", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = await Person.create({ name: "Test" });
     await expect(p.update({ lock_version: 999 })).rejects.toThrow();
   });
 
   it("lock column name existing", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     // lock_version should be a defined attribute
     expect((Person as any)._attributeDefinitions.has("lock_version")).toBe(true);
   });
 
   it("lock column is mass assignable", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = await Person.create({ name: "Test", lock_version: 5 });
     expect(p.lock_version).toBe(5);
   });
 
   it("lock without default sets version to zero", async () => {
-    const adapter = await freshAdapter();
     class PersonNoDefault extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer");
-        this.adapter = adapter;
       }
     }
     const p = await PersonNoDefault.create({ name: "Test" });
@@ -188,13 +210,12 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("touch existing lock without default should work with null in the database", async () => {
-    const adapter = await freshAdapter();
     class LockWithoutDefault extends Base {
       static {
+        this._tableName = "lock_without_defaults";
         this.attribute("title", "string");
         this.attribute("lock_version", "integer");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     // Create without specifying lock_version (null in DB, treated as 0 by locking)
@@ -208,13 +229,12 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("touch stale object with lock without default", async () => {
-    const adapter = await freshAdapter();
     class LockWithoutDefault extends Base {
       static {
+        this._tableName = "lock_without_defaults";
         this.attribute("title", "string");
         this.attribute("lock_version", "integer");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const t1 = await LockWithoutDefault.create({ title: "title1" });
@@ -225,13 +245,11 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock without default should work with null in the database", async () => {
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer");
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ name: "Test" });
@@ -240,13 +258,11 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("update with lock version without default should work on dirty value before type cast", async () => {
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer");
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ name: "Test" });
@@ -255,13 +271,11 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("destroy with lock version without default should work on dirty value before type cast", async () => {
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer");
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ name: "Test" });
@@ -270,13 +284,11 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock without default queries count", async () => {
-    const adapter = await freshAdapter();
     class PersonNoDefault extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer");
-        this.adapter = adapter;
       }
     }
     await PersonNoDefault.create({ name: "A" });
@@ -286,14 +298,12 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock with custom column without default sets version to zero", async () => {
-    const adapter = await freshAdapter();
     class LockCustom extends Base {
       static {
         this._tableName = "lock_without_defaults_cust";
         this.lockingColumn = "custom_lock_version";
         this.attribute("title", "string");
         this.attribute("custom_lock_version", "integer");
-        this.adapter = adapter;
       }
     }
     const t1 = new LockCustom();
@@ -305,14 +315,12 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock with custom column without default should work with null in the database", async () => {
-    const adapter = await freshAdapter();
     class LockCustom extends Base {
       static {
         this._tableName = "lock_without_defaults_cust";
         this.lockingColumn = "custom_lock_version";
         this.attribute("title", "string");
         this.attribute("custom_lock_version", "integer");
-        this.adapter = adapter;
       }
     }
     const t1 = await LockCustom.create({ title: "title1" });
@@ -330,20 +338,24 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("readonly attributes", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = await Person.create({ name: "Test" });
     p.readonlyBang();
     await expect(p.update({ name: "Changed" })).rejects.toThrow();
   });
 
   it("quote table name reserved word references", async () => {
-    const adapter = await freshAdapter();
     class Reference extends Base {
       static {
         this._tableName = "references";
         this.attribute("favorite", "boolean");
         this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const ref = await Reference.create({ favorite: false });
@@ -354,7 +366,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("update without attributes does not only update lock version", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = await Person.create({ name: "Test" });
     expect(p.lock_version).toBe(0);
     // Saving without changes should not increment lock_version
@@ -387,7 +405,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("yaml dumping with lock column", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = await Person.create({ name: "Test" });
     // JSON serialization should include lock_version
     const json = p.asJson();
@@ -396,7 +420,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock version increments on each save", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = await Person.create({ name: "Test" });
     expect(p.lock_version).toBe(0);
     await p.update({ name: "V1" });
@@ -408,7 +438,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("stale object error includes record", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p1 = await Person.create({ name: "Test" });
     const p2 = await Person.find(p1.id);
     await p1.update({ name: "Changed" });
@@ -422,14 +458,26 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock version is persisted after create", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = await Person.create({ name: "Test" });
     const reloaded = await Person.find(p.id);
     expect(reloaded.lock_version).toBe(0);
   });
 
   it("lock version is persisted after update", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = await Person.create({ name: "Test" });
     await p.update({ name: "Updated" });
     const reloaded = await Person.find(p.id);
@@ -437,7 +485,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("multiple sequential updates increment correctly", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = await Person.create({ name: "Test" });
     for (let i = 1; i <= 5; i++) {
       await p.update({ name: `Version ${i}` });
@@ -446,13 +500,25 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("new record has default lock version", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = new Person({ name: "Test" });
     expect(p.lock_version).toBe(0);
   });
 
   it("create with explicit lock version preserves it", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = await Person.create({ name: "Test", lock_version: 10 });
     expect(p.lock_version).toBe(10);
     await p.update({ name: "Updated" });
@@ -460,18 +526,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("non integer lock existing", async () => {
-    const adapter = new SQLite3Adapter(":memory:");
-    openAdapters.push(adapter);
-    adapter.exec(
-      "CREATE TABLE string_key_objects (id TEXT PRIMARY KEY, name TEXT, lock_version INTEGER DEFAULT 0)",
-    );
     class StringKeyObject extends Base {
       static {
+        this._tableName = "string_key_objects";
         this.attribute("id", "string");
         this.primaryKey = "id";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const s1 = await StringKeyObject.create({ id: "record1", name: "original" });
@@ -485,7 +546,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock repeating", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = await Person.create({ name: "Test" });
     expect(p.lock_version).toBe(0);
     await p.update({ name: "V1" });
@@ -497,21 +564,31 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock new", async () => {
-    const { Person } = await makePerson();
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+      }
+    }
     const p = await Person.create({ name: "New" });
     expect(p.lock_version).toBe(0);
   });
 });
 
 describe("OptimisticLockingWithSchemaChangeTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   it("destroy dependents", async () => {
-    const adapter = await freshAdapter();
     class LockPerson extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     class LockPet extends Base {
@@ -519,7 +596,6 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
         this._tableName = "pets";
         this.attribute("name", "string");
         this.attribute("person_id", "integer");
-        this.adapter = adapter;
       }
     }
     registerModel("LockPerson", LockPerson);
@@ -539,13 +615,11 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   it("destroy existing object with locking column value null in the database", async () => {
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer");
-        this.adapter = adapter;
       }
     }
     // Create with null lock_version (no default)
@@ -557,13 +631,11 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
 
   it("destroy stale object", async () => {
     // Destroy currently does not check lock_version, so this tests basic destroy
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ name: "Test" });
@@ -574,13 +646,11 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   it("update after schema change with lock version", async () => {
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ name: "Test" });
@@ -590,13 +660,11 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   it("stale update after schema change", async () => {
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const p1 = await Person.create({ name: "Test" });
@@ -606,13 +674,11 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   it("null lock version in database allows first update", async () => {
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer");
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ name: "Test" });
@@ -622,13 +688,11 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   it("reloaded record has correct lock version", async () => {
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
         this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ name: "Test" });
@@ -639,10 +703,10 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
 });
 
 describe("OptimisticLockingTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
   });
 
   it("lock existing", async () => {
@@ -652,7 +716,6 @@ describe("OptimisticLockingTest", () => {
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
     Post.attribute("lock_version", "integer", { default: 0 });
-    Post.adapter = adapter;
 
     const post = await Post.create({ title: "Hello" });
     expect(post.lock_version).toBe(0);
@@ -671,7 +734,6 @@ describe("OptimisticLockingTest", () => {
     Post.attribute("id", "integer");
     Post.attribute("title", "string");
     Post.attribute("lock_version", "integer", { default: 0 });
-    Post.adapter = adapter;
 
     const post1 = await Post.create({ title: "Hello" });
     const post2 = await Post.find(post1.id);
@@ -685,10 +747,10 @@ describe("OptimisticLockingTest", () => {
 });
 
 describe("OptimisticLockingTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
   });
 
   // Rails: test "lock_version is incremented on save"
@@ -699,7 +761,6 @@ describe("OptimisticLockingTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
 
@@ -718,7 +779,6 @@ describe("OptimisticLockingTest", () => {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
 
@@ -732,13 +792,17 @@ describe("OptimisticLockingTest", () => {
 });
 
 describe("PessimisticLockingTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
   it("typical find with lock", async () => {
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ name: "Test" });
@@ -756,41 +820,33 @@ describe("PessimisticLockingTest", () => {
   });
 
   it("lock does not raise when the object is not dirty", async () => {
-    // An object without pending changes can be saved without error
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
-    const p = await Person.create({ name: "Test" });
-    // Saving a clean record should not throw
-    await p.save();
-    expect(p.isPersisted()).toBe(true);
+    const person = await Person.create({ name: "Test" });
+    await expect(person.lockBang()).resolves.not.toThrow();
   });
 
   it("lock raises when the record is dirty", async () => {
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("first_name", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ first_name: "Test" });
     p.first_name = "fooman";
     await expect(p.lockBang()).rejects.toThrow(/Changed attributes: "first_name"/);
   });
+
   it("locking in after save callback", async () => {
-    const adapter = await freshAdapter();
     class Frog extends Base {
       static {
         this._tableName = "frogs";
         this.attribute("name", "string");
-        this.adapter = adapter;
         this.afterSave(async (record: any) => {
           await record.lockBang();
         });
@@ -798,52 +854,55 @@ describe("PessimisticLockingTest", () => {
     }
     const frog = await Frog.create({ name: "Old Frog" });
     frog.name = "New Frog";
-    await frog.save();
-    expect(frog.name).toBe("New Frog");
+    await expect(frog.saveBang()).resolves.not.toThrow();
   });
 
   it("with lock commits transaction", async () => {
-    // Test that transaction commit works (even without pessimistic lock)
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
-        this.attribute("name", "string");
-        this.adapter = adapter;
+        this.attribute("first_name", "string");
       }
     }
-    await transaction(Person, async () => {
-      await Person.create({ name: "Inside transaction" });
+    const person = await Person.create({ first_name: "original" });
+    await person.withLock(async () => {
+      person.first_name = "fooman";
+      await person.saveBang();
     });
-    const all = await Person.all().toArray();
-    expect(all.length).toBe(1);
+    const reloaded = await Person.find(person.id);
+    expect((reloaded as any).first_name).toBe("fooman");
   });
 
   it("with lock rolls back transaction", async () => {
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
-        this.attribute("name", "string");
-        this.adapter = adapter;
+        this.attribute("first_name", "string");
       }
     }
-    const p = await Person.create({ name: "Original" });
+    const person = await Person.create({ first_name: "original" });
+    const old = (person as any).first_name;
     try {
-      await p.withLock(async (record) => {
-        record.name = "Changed";
-        await record.save();
+      await person.withLock(async () => {
+        (person as any).first_name = "fooman";
+        await person.saveBang();
         throw new Error("oops");
       });
     } catch {
       // expected
     }
-    const reloaded = await Person.find(p.id);
-    expect(reloaded.name).toBe("Original");
+    const reloaded = await Person.find(person.id);
+    expect((reloaded as any).first_name).toBe(old);
   });
 
   it("with lock configures transaction", async () => {
-    const { Person, adapter } = makeSQLitePerson();
+    const adapter = Base.adapter as any;
+    class Person extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("name", "string");
+      }
+    }
     const p = await Person.create({ name: "Test" });
     await Person.transaction(async () => {
       const outerTx = adapter.transactionManager.currentTransaction;
@@ -857,21 +916,20 @@ describe("PessimisticLockingTest", () => {
   });
 
   it.skip("lock sending custom lock statement", async () => {
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ name: "Test" });
     // Intercept execute to capture the SQL lockBang generates, then
     // delegate to the real adapter so the record reloads properly
     const capturedSql: string[] = [];
-    const origExecute = adapter.execute.bind(adapter);
+    const origExecute = Base.adapter.execute.bind(Base.adapter);
+    const { vi } = await import("vitest");
     const spy = vi
-      .spyOn(adapter, "execute")
+      .spyOn(Base.adapter, "execute")
       .mockImplementation(async (sql: string, binds?: unknown[]) => {
         capturedSql.push(sql);
         const cleaned = sql.replace(/\s+FOR UPDATE\b.*/i, "");
@@ -896,12 +954,10 @@ describe("PessimisticLockingTest", () => {
   });
 
   it("with lock locks with no args", async () => {
-    const adapter = await freshAdapter();
     class Person extends Base {
       static {
         this._tableName = "people";
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const p = await Person.create({ name: "Test" });
