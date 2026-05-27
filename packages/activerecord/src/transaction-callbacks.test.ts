@@ -2,36 +2,28 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, transaction, beforeCommit } from "./index.js";
-
-import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-// Shared schema covers every table any test in this file persists against.
-// Each test class redeclares only the columns it touches via `this.attribute`;
-// extra columns in the table are harmless and the union keeps `freshAdapter`
-// single-shaped so callers don't have to remember which subset they need.
-const CALLBACK_SCHEMA = {
-  topics: { title: "string" },
-  orders: { total: "integer", amount: "integer" },
-  payments: { amount: "integer" },
-  invoices: { total: "integer" },
-  posts: {
-    title: "string",
-    lock_version: "integer",
-    published: "boolean",
-  },
-  widgets: { name: "string" },
-} as const;
-
-// -- Helpers --
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, CALLBACK_SCHEMA);
-  return adapter;
-}
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+beforeAll(async () => {
+  await defineSchema({
+    topics: { title: "string" },
+    orders: { total: "integer", amount: "integer" },
+    payments: { amount: "integer" },
+    invoices: { total: "integer" },
+    posts: {
+      title: "string",
+      lock_version: "integer",
+      published: "boolean",
+    },
+    widgets: { name: "string" },
+  });
+});
 
 describe("TransactionCallbacksTest", () => {
   it.skip("before commit exception should pop transaction stack", () => {
@@ -42,11 +34,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("dont call any callbacks after transaction commits for invalid record", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validates("title", { presence: true });
       }
     }
@@ -61,11 +51,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("dont call any callbacks after explicit transaction commits for invalid record", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.validates("title", { presence: true });
       }
     }
@@ -81,11 +69,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("dont call after commit on update based on previous transaction", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const called: string[] = [];
@@ -105,11 +91,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("dont call after commit on destroy based on previous transaction", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const called: string[] = [];
@@ -131,11 +115,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("only call after commit on save after transaction commits for saving record", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const called: string[] = [];
@@ -150,11 +132,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("only call after commit on update after transaction commits for existing record", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const topic = await Topic.create({ title: "original" });
@@ -170,11 +150,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("only call after commit on destroy after transaction commits for destroyed record", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const called: string[] = [];
@@ -197,11 +175,9 @@ describe("TransactionCallbacksTest", () => {
     /* fixture-dependent */
   });
   it("no after commit on destroy after transaction commits for destroyed new record", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const called: string[] = [];
@@ -217,11 +193,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("only call after commit on create and doesnt leaky", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const called: number[] = [];
@@ -251,11 +225,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("call after rollback after transaction rollsback", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const called: string[] = [];
@@ -272,11 +244,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("only call after rollback on update after transaction rollsback for existing record", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const topic = await Topic.create({ title: "original" });
@@ -301,11 +271,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("only call after rollback on destroy after transaction rollsback for destroyed record", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const t = await Topic.create({ title: "test" });
@@ -323,11 +291,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("only call after rollback on create after transaction rollsback for new record", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const called: string[] = [];
@@ -363,11 +329,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("after commit callback should not swallow errors", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     Topic.afterCommit(function () {
@@ -381,11 +345,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("after commit callback when raise should not restore state", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     Topic.afterCommit(function () {
@@ -401,11 +363,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("after rollback callback should not swallow errors when set to raise", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     Topic.afterRollback(function () {
@@ -422,11 +382,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("after commit callback should not rollback state that already been succeeded", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     let commitCalled = false;
@@ -451,11 +409,9 @@ describe("TransactionCallbacksTest", () => {
     /* fixture-dependent */
   });
   it("after rollback callbacks should validate on condition", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     expect(() => Topic.afterRollback(() => {}, { on: "save" })).toThrow(
@@ -464,11 +420,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("after commit callbacks should validate on condition", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     expect(() => Topic.afterCommit(() => {}, { on: "save" })).toThrow(
@@ -477,11 +431,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("after commit chain not called on errors", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const called: string[] = [];
@@ -505,11 +457,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("saving two records that override object id should run after commit callbacks for both", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const called: string[] = [];
@@ -524,11 +474,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("saving two records that override object id should run after rollback callbacks for both", async () => {
-    const adp = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const called: string[] = [];
@@ -546,13 +494,11 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("after commit does not mutate the if options array", async () => {
-    const adp = await freshAdapter();
     const opts = ["create", "update"];
     const original = [...opts];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     Topic.afterCommit(function () {
@@ -565,12 +511,10 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("only call after commit on create after transaction commits for new record", async () => {
-    const adp = await freshAdapter();
     const history: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.afterCreateCommit(() => {
           history.push("commit_on_create");
         });
@@ -588,12 +532,10 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("afterSaveCommit fires on create and update but not destroy", async () => {
-    const adp = await freshAdapter();
     const history: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.afterSaveCommit(() => {
           history.push("save_commit");
         });
@@ -614,12 +556,10 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("afterUpdateCommit fires on update but not create", async () => {
-    const adp = await freshAdapter();
     const history: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.afterUpdateCommit(() => {
           history.push("update_commit");
         });
@@ -635,12 +575,10 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("afterDestroyCommit fires on destroy but not create or update", async () => {
-    const adp = await freshAdapter();
     const history: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.afterDestroyCommit(() => {
           history.push("destroy_commit");
         });
@@ -667,12 +605,10 @@ describe("TransactionCallbacksTest", () => {
 
   describe("CallbackOrderTest", () => {
     it("callbacks run in order defined in model if not using run after transaction callbacks in order defined", async () => {
-      const adp = await freshAdapter();
       const history: number[] = [];
       class Topic extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adp;
           this.afterCommit(() => {
             history.push(1);
           });
@@ -693,13 +629,11 @@ describe("TransactionCallbacksTest", () => {
 
 describe("TransactionCallbacksTest", () => {
   it("fires afterCommit callback outside transaction", async () => {
-    const adapter = await freshAdapter();
     const log: string[] = [];
 
     class Order extends Base {
       static {
         this.attribute("total", "integer");
-        this.adapter = adapter;
         this.afterCommit((record: any) => {
           log.push("committed");
         });
@@ -711,13 +645,11 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("call after commit after transaction commits", async () => {
-    const adapter = await freshAdapter();
     const log: string[] = [];
 
     class Payment extends Base {
       static {
         this.attribute("amount", "integer");
-        this.adapter = adapter;
         this.afterCommit((record: any) => {
           log.push("committed");
         });
@@ -731,12 +663,10 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("afterCommit fires immediately outside transaction (Rails-guided)", async () => {
-    const adp = await freshAdapter();
     const log: string[] = [];
     class Order extends Base {
       static {
         this.attribute("amount", "integer");
-        this.adapter = adp;
         this.afterCommit(() => {
           log.push("committed");
         });
@@ -747,12 +677,10 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("afterCommit fires on transaction commit (Rails-guided)", async () => {
-    const adp = await freshAdapter();
     const log: string[] = [];
     class Invoice extends Base {
       static {
         this.attribute("total", "integer");
-        this.adapter = adp;
         this.afterCommit(() => {
           log.push("invoice committed");
         });
@@ -765,14 +693,12 @@ describe("TransactionCallbacksTest", () => {
   });
   describe("TransactionAfterCommitCallbacksWithOptimisticLockingTest", () => {
     it("after commit callbacks with optimistic locking", async () => {
-      const adapter = await freshAdapter();
       const log: string[] = [];
       class Post extends Base {
         static {
           this._tableName = "posts";
           this.attribute("title", "string");
           this.attribute("lock_version", "integer", { default: 0 });
-          this.adapter = adapter;
           this.afterCreate(function () {
             log.push("created");
           });
@@ -791,12 +717,10 @@ describe("TransactionCallbacksTest", () => {
 
   describe("CallbacksOnMultipleActionsTest", () => {
     it("after commit on multiple actions", async () => {
-      const adapter = await freshAdapter();
       const log: string[] = [];
       class Post extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adapter;
           this.afterCreate(function () {
             log.push("created");
           });
@@ -834,12 +758,10 @@ describe("TransactionCallbacksTest", () => {
 
   describe("CallbackOrderTest", () => {
     it("callbacks run in order defined in model if using run after transaction callbacks in order defined", async () => {
-      const adapter = await freshAdapter();
       const log: string[] = [];
       class Post extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adapter;
           this.beforeCreate(function () {
             log.push("first");
           });
@@ -860,12 +782,10 @@ describe("TransactionCallbacksTest", () => {
 
   describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
     it("trigger once on multiple deletion within transaction", async () => {
-      const adp = await freshAdapter();
       const log: string[] = [];
       class Topic extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adp;
           this.afterDestroy((record: any) => {
             log.push("destroyed:" + record.title);
           });
@@ -879,12 +799,10 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it("trigger once on multiple deletions", async () => {
-      const adp = await freshAdapter();
       const log: string[] = [];
       class Topic extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adp;
           this.afterDestroy((record: any) => {
             log.push("destroyed:" + record.title);
           });
@@ -898,12 +816,10 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it("trigger once on multiple deletions in a transaction", async () => {
-      const adp = await freshAdapter();
       const log: string[] = [];
       class Topic extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adp;
           this.afterDestroy((record: any) => {
             log.push("destroyed:" + record.title);
           });
@@ -921,12 +837,10 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it("rollback on multiple deletions", async () => {
-      const adp = await freshAdapter();
       const log: string[] = [];
       class Topic extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adp;
           this.afterDestroy((record: any) => {
             log.push("destroyed");
           });
@@ -949,12 +863,10 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it("trigger on update where row was deleted", async () => {
-      const adp = await freshAdapter();
       const log: string[] = [];
       class Topic extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adp;
           this.afterUpdate(function () {
             log.push("updated");
           });
@@ -974,13 +886,11 @@ describe("TransactionCallbacksTest", () => {
 
   describe("CallbacksOnActionAndConditionTest", () => {
     it("callback on action with condition", async () => {
-      const adapter = await freshAdapter();
       const log: string[] = [];
       class Post extends Base {
         static {
           this.attribute("title", "string");
           this.attribute("published", "boolean", { default: false });
-          this.adapter = adapter;
           this.beforeSave(function (record: any) {
             if (record.published) {
               log.push("published_save");
@@ -997,12 +907,10 @@ describe("TransactionCallbacksTest", () => {
 
   describe("CallbacksOnMultipleInstancesInATransactionTest", () => {
     it("created callback called on last to save of separate instances in a transaction", async () => {
-      const adp = await freshAdapter();
       const log: string[] = [];
       class Topic extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adp;
           this.afterCreate((record: any) => {
             log.push("created:" + record.title);
           });
@@ -1018,12 +926,10 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it("created callback called on first to save in transaction with old configuration", async () => {
-      const adp = await freshAdapter();
       const log: string[] = [];
       class Topic extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adp;
           this.afterCreate((record: any) => {
             log.push("created:" + record.title);
           });
@@ -1037,11 +943,9 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it("updated callback called on last to save of separate instances in a transaction", async () => {
-      const adp = await freshAdapter();
       class Topic extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adp;
         }
       }
       const t1 = await Topic.create({ title: "a" });
@@ -1060,11 +964,9 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it("updated callback called on first to save in transaction with old configuration", async () => {
-      const adp = await freshAdapter();
       class Topic extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adp;
         }
       }
       const t1 = await Topic.create({ title: "a" });
@@ -1081,11 +983,9 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it("destroyed callback called on destroyed instance when preceded in transaction by save from separate instance", async () => {
-      const adp = await freshAdapter();
       class Topic extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adp;
         }
       }
       const t1 = await Topic.create({ title: "a" });
@@ -1113,11 +1013,9 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it("destroyed callbacks called on destroyed instance even when followed by update from separate instances in a transaction", async () => {
-      const adp = await freshAdapter();
       class Topic extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adp;
         }
       }
       const t1 = await Topic.create({ title: "a" });
@@ -1147,12 +1045,10 @@ describe("TransactionCallbacksTest", () => {
 
   describe("SetCallbackTest", () => {
     it("set callback with on", async () => {
-      const adapter = await freshAdapter();
       const log: string[] = [];
       class Post extends Base {
         static {
           this.attribute("title", "string");
-          this.adapter = adapter;
           this.beforeCreate(function () {
             log.push("before_create");
           });
@@ -1170,11 +1066,9 @@ describe("TransactionCallbacksTest", () => {
 
 describe("hasTransactionalCallbacks regression", () => {
   it("returns true for a model with only beforeCommit callbacks", () => {
-    const adp = createTestAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     beforeCommit(Widget, () => {});

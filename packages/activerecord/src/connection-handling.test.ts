@@ -462,12 +462,7 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
       },
     };
 
-    const adapter = createTestAdapter();
-    class FakeModel extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class FakeModel extends Base {}
 
     await withRoleAndShard.call(FakeModel as any, undefined, undefined, false, () => fakeRelation);
 
@@ -476,12 +471,7 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
 
   it("does not call .load() on non-Relation return values", async () => {
     const { withRoleAndShard } = await import("./connection-handling.js");
-    const adapter = createTestAdapter();
-    class FakeModel extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class FakeModel extends Base {}
 
     const result = await withRoleAndShard.call(
       FakeModel as any,
@@ -507,12 +497,7 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
       },
     };
 
-    const adapter = createTestAdapter();
-    class FakeModel extends Base {
-      static {
-        this.adapter = adapter;
-      }
-    }
+    class FakeModel extends Base {}
 
     await withRoleAndShard.call(
       FakeModel as any,
