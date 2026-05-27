@@ -698,9 +698,6 @@ export class RouteSet {
     if (name && !ROUTE_NAME_RE.test(name)) {
       throw new Error(`Invalid route name: '${name}'`);
     }
-    // TODO: throw on duplicate when mapper no longer emits colliding names for
-    // non-inflecting words (e.g. resources("sheep") emits "sheep" for both
-    // index and show when singularize("sheep") === "sheep").
     this.routes.push(route);
     if (name) this.namedRoutes.set(name, route);
     this._journeyRouter = null;

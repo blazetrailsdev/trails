@@ -256,7 +256,7 @@ export class Mapper {
     if (allowed.has("show")) {
       this.routes.push(
         new Route("GET", `${shallowPath}/:id`, controller, "show", {
-          name: shallowName(singular),
+          name: singular !== name ? shallowName(singular) : undefined,
           constraints,
         }),
       );
