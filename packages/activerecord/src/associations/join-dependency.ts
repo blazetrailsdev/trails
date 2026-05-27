@@ -108,7 +108,7 @@ export class JoinDependency {
   private readonly _joinRoot: JoinBase;
   private readonly _joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
   private _treeNodesByPath: Map<string, JoinPart> = new Map();
-  private _references: Record<string, string> = {};
+  private _references: Record<string, string> = Object.create(null) as Record<string, string>;
   constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
@@ -405,7 +405,7 @@ export class JoinDependency {
     references?: string[],
   ): Nodes.Join[] {
     if (aliasTracker) this._aliasTracker = aliasTracker;
-    this._references = {};
+    this._references = Object.create(null) as Record<string, string>;
     if (references) {
       for (const tableName of references) {
         this._references[tableName] = tableName;
@@ -659,6 +659,7 @@ export class JoinDependency {
     nodeStrictLoading: Map<JoinPart, boolean>,
     strictLoadingValue?: boolean,
   ): void {
+    if (arParent == null) return;
     for (const child of treeNode.children) {
       if (child.tableIndex < 0) continue;
 
@@ -683,22 +684,20 @@ export class JoinDependency {
         typeof arParent.associationCached === "function" &&
         arParent.associationCached(child.immediateAssocName)
       ) {
-        const cached = arParent.association?.(child.immediateAssocName)?.target;
-        if (cached) {
-          this._constructRecursive(
-            child,
-            cached,
-            rootParentKey,
-            row,
-            modelCache,
-            seenChildren,
-            assocMap,
-            nodeReadonly,
-            nodeStrictLoading,
-            strictLoadingValue,
-          );
-          continue;
-        }
+        const model = arParent.association?.(child.immediateAssocName)?.target;
+        this._constructRecursive(
+          child,
+          model,
+          rootParentKey,
+          row,
+          modelCache,
+          seenChildren,
+          assocMap,
+          nodeReadonly,
+          nodeStrictLoading,
+          strictLoadingValue,
+        );
+        continue;
       }
 
       const childAttrs: Record<string, unknown> = {};
@@ -825,6 +824,7 @@ export class JoinDependency {
    * Mirrors: ActiveRecord::Associations::JoinDependency#build
    */
   private build(associations: Record<PropertyKey, any>, baseKlass: typeof Base): JoinAssociation[] {
+    if (!associations || typeof associations !== "object") return [];
     return Reflect.ownKeys(associations).map((name) => {
       const right = associations[name];
       const reflection = this.findReflection(baseKlass, String(name));
