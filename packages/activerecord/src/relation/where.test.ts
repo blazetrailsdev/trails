@@ -962,16 +962,24 @@ describe("WhereTest", () => {
     });
 
     const order = (await WnilOrder.create({ shop_id: 1 })) as InstanceType<typeof WnilOrder>;
+    const otherOrder = (await WnilOrder.create({ shop_id: 2 })) as InstanceType<typeof WnilOrder>;
     const book = (await WnilBook.create({
       shop_id: order.shop_id,
       order_id: (order as any).id,
     })) as InstanceType<typeof WnilBook>;
-    const found = await WnilBook.where({ order }).toArray();
-    expect(found.map((r: any) => r.id)).toContain((book as any).id);
+    const decoy = (await WnilBook.create({
+      shop_id: otherOrder.shop_id,
+      order_id: (otherOrder as any).id,
+    })) as InstanceType<typeof WnilBook>;
+
+    const found = (await WnilBook.where({ order }).toArray()).map((r: any) => r.id);
+    expect(found).toContain((book as any).id);
+    expect(found).not.toContain((decoy as any).id);
 
     await WnilBook.where({ id: (book as any).id }).updateAll({ shop_id: null, order_id: null });
-    const foundNil = await WnilBook.where({ order: null }).toArray();
-    expect(foundNil.map((r: any) => r.id)).toContain((book as any).id);
+    const foundNil = (await WnilBook.where({ order: null }).toArray()).map((r: any) => r.id);
+    expect(foundNil).toContain((book as any).id);
+    expect(foundNil).not.toContain((decoy as any).id);
   });
   it("belongs to shallow where", () => {
     class BtsAuthor extends Base {
@@ -1164,6 +1172,12 @@ describe("WhereTest", () => {
       estimate_of_id: (car as any).id,
       price: 300,
     })) as InstanceType<typeof PolyMPriceEstimate>;
+    // decoy: same type as treasure1 but a different id — must not appear in results
+    const decoy = (await PolyMPriceEstimate.create({
+      estimate_of_type: "PolyMTreasure",
+      estimate_of_id: 99999,
+      price: 0,
+    })) as InstanceType<typeof PolyMPriceEstimate>;
 
     const expected = [(pe1 as any).id, (pe2 as any).id, (pe3 as any).id].sort();
     const actual = (
@@ -1172,6 +1186,7 @@ describe("WhereTest", () => {
       .map((r: any) => r.id)
       .sort();
     expect(actual).toEqual(expected);
+    expect(actual).not.toContain((decoy as any).id);
   });
   it("polymorphic nested relation where", () => {
     class PolyRTreasure extends Base {
