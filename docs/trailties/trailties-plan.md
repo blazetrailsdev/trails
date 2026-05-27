@@ -20,12 +20,17 @@ current state.
    Option B design. Per-generator tests must include (a) snapshot, (b)
    `parseTs`, (c) `assertNoRubySource`.
 1. **No `node:*` imports** in `packages/trailties/src/` except `bin.ts`.
+   Known exceptions pending cleanup: `commands/destroy.ts`,
+   `generators/base.ts`, `source-annotation-extractor.ts` — scheduled
+   for the async-fs rollout (see "Code quality" section).
 2. **No `process.*` references** in `packages/trailties/src/` after PR 0.3.
    Enforced by ESLint via `blazetrails/no-process-bypass`. Use the
    `processAdapter` snapshot for `env` / `cwd` / `stdout`.
-3. **Trailties code uses async fs only.** `fsAdapter` exposes both sync
-   and async surfaces; trailties imports only the async ones and `await`s
-   every call.
+3. **Trailties code uses async fs only** (target state). Known sync
+   callers: `generators/base.ts` (`createFile`, `appendToFile`,
+   `insertIntoFile`, `fileExists`, `removeFile`), `commands/destroy.ts`,
+   `commands/console.ts`, `source-annotation-extractor.ts`. Cleanup
+   tracked under "Async-fs rollout" in the code quality section.
 4. **No new third-party runtime deps in trailties.**
 5. **PR size ceiling: 300 LOC** (CLAUDE.md). Splits use the `<base>` / `<base>b` pattern.
 6. **Test names match Rails verbatim** where Rails has tests (CLAUDE.md).

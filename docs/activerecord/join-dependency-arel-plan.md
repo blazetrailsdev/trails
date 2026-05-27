@@ -22,7 +22,7 @@
 
 ## Post-merge follow-ups (audited 2026-05-26)
 
-Items surfaced during the original PR 1–7b sequence. Checked items are shipped; unchecked items are open follow-ups folded into the F-series PRs below.
+Items surfaced during the original PR 1–7b sequence. Checked items are shipped. Remaining open items from the F-series are tracked under "Post-merge follow-ups from F-series" below.
 
 - [x] ~200 LOC: `walk()` deduplication — shipped in #2405.
 - [x] ~100 LOC: eliminate `_nodes` array — shipped in #2435 (F3).

@@ -247,7 +247,7 @@ imports from PR 1's types but doesn't modify the same files.
 
 **From #2428 (PR 1 — Driver + Server + SystemTestCase)**
 
-- [ ] ~30 LOC: Browser class stubs (9 methods, 0% in api:compare). Rails' Browser is `:nodoc:` but tracked. Thin stubs or @internal delegation from Driver.
+- [ ] ~30 LOC: Browser api:compare stubs (9 methods, 0%). No real Browser abstraction (see "No `Browser` class" above) — thin `@internal` delegation to `Driver`, or mark all 9 as `@internal` skip in api:compare.
 - [ ] `servedBy()` stores `_serverHost`/`_serverPort` but `startApplication()` doesn't consume them. Wire when needed.
 - [ ] `urlHelpers()` returns undefined — needs routing infrastructure wired.
 - [ ] `Driver.use()` is async (Rails is sync via Capybara lazy registration). Idempotency guard added.
