@@ -10,11 +10,19 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 
+export interface RedirectOptions {
+  status?: number;
+  port?: number;
+  host?: string;
+  body?: string[];
+  /** Exclude matching requests from redirect and secure-cookie flagging. */
+  exclude?: (env: RackEnv) => boolean;
+}
+
 export interface SSLOptions {
-  redirect?: boolean | { status?: number; port?: number };
+  redirect?: boolean | RedirectOptions;
   hsts?: boolean | HSTSOptions;
   secureCookies?: boolean;
-  exclude?: (env: RackEnv) => boolean;
   /** Mirrors Rails `ssl_default_redirect_status:` constructor kwarg. */
   sslDefaultRedirectStatus?: number;
 }
@@ -32,13 +40,14 @@ const PERMANENT_REDIRECT_REQUEST_METHODS = ["GET", "HEAD"];
 
 export class SSL {
   private app: RackApp;
-  private redirect: boolean;
   private redirectPort: number | undefined;
+  private redirectHost: string | undefined;
+  private redirectBody: string[] | undefined;
+  private redirectExclude: (env: RackEnv) => boolean;
   private hsts: Required<HSTSOptions>;
   private secureCookies: boolean;
   private sslDefaultRedirectStatus: number | undefined;
   private redirectStatusOverride: number | undefined;
-  private exclude?: (env: RackEnv) => boolean;
 
   static defaultHstsOptions(): Required<HSTSOptions> {
     return { expires: HSTS_EXPIRES_IN, subdomains: true, preload: false };
@@ -46,18 +55,19 @@ export class SSL {
 
   constructor(app: RackApp, options: SSLOptions = {}) {
     this.app = app;
-    this.exclude = options.exclude;
     this.secureCookies = options.secureCookies !== false;
     this.sslDefaultRedirectStatus = options.sslDefaultRedirectStatus;
 
     if (options.redirect === false) {
-      this.redirect = false;
+      this.redirectExclude = () => true;
     } else if (typeof options.redirect === "object") {
-      this.redirect = true;
       this.redirectStatusOverride = options.redirect.status;
       this.redirectPort = options.redirect.port;
+      this.redirectHost = options.redirect.host;
+      this.redirectBody = options.redirect.body;
+      this.redirectExclude = options.redirect.exclude ?? (() => false);
     } else {
-      this.redirect = true;
+      this.redirectExclude = () => false;
     }
 
     this.hsts = this.normalizeHstsOptions(options.hsts);
@@ -75,26 +85,23 @@ export class SSL {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    if (this.exclude?.(env)) {
-      return this.app(env);
-    }
-
     const scheme = (env["rack.url_scheme"] as string) || "http";
     const isSSL =
       scheme === "https" ||
       (env["HTTP_X_FORWARDED_PROTO"] as string)?.split(",")[0]?.trim() === "https";
 
-    if (!isSSL && this.redirect) {
-      return this.redirectToHttps(env);
+    if (!isSSL) {
+      if (!this.redirectExclude(env)) {
+        return this.redirectToHttps(env);
+      }
+      return this.app(env);
     }
 
     const [status, headers, body] = await this.app(env);
 
-    if (isSSL) {
-      this.setHstsHeaderBang(headers);
-    }
+    this.setHstsHeaderBang(headers);
 
-    if (isSSL && this.secureCookies && headers["set-cookie"]) {
+    if (this.secureCookies && !this.redirectExclude(env) && headers["set-cookie"]) {
       this.flagCookiesAsSecureBang(headers);
     }
 
@@ -103,12 +110,13 @@ export class SSL {
 
   private redirectToHttps(env: RackEnv): RackResponse {
     const location = this.httpsLocationFor(env);
+    const body = this.redirectBody ?? [
+      `<html><body>You are being <a href="${location}">redirected</a>.</body></html>`,
+    ];
     return [
       this.redirectStatusOverride ?? this.redirectionStatus(env),
       { "content-type": "text/html; charset=utf-8", location },
-      bodyFromString(
-        `<html><body>You are being <a href="${location}">redirected</a>.</body></html>`,
-      ),
+      bodyFromString(body.join("")),
     ];
   }
 
@@ -123,12 +131,17 @@ export class SSL {
   /** @internal */
   private httpsLocationFor(env: RackEnv): string {
     const httpHost = (env["HTTP_HOST"] as string) || (env["SERVER_NAME"] as string) || "localhost";
-    const hostNoPort = httpHost.replace(/:\d+$/, "");
-    const port = this.redirectPort;
+    const requestHostNoPort = httpHost.replace(/:\d+$/, "");
+    const requestPortMatch = httpHost.match(/:(\d+)$/);
+    const requestPort = requestPortMatch ? parseInt(requestPortMatch[1], 10) : 80;
+
+    const host = this.redirectHost ?? requestHostNoPort;
+    const port = this.redirectPort ?? requestPort;
+
     const path = (env["PATH_INFO"] as string) || "/";
     const qs = (env["QUERY_STRING"] as string) || "";
-    let location = `https://${hostNoPort}`;
-    if (port && port !== 80 && port !== 443) location += `:${port}`;
+    let location = `https://${host}`;
+    if (port !== 80 && port !== 443) location += `:${port}`;
     location += path;
     if (qs) location += `?${qs}`;
     return location;
