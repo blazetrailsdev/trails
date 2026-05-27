@@ -33,7 +33,7 @@ const MERGED_SCHEMA: Schema = {
   articles: { title: "string" },
   special_posts: { title: "string" },
   orders: {
-    shop_id: "string",
+    shop_id: "integer",
     order_num: "integer",
     total: "integer",
     status: "string",
@@ -64,6 +64,9 @@ const MERGED_SCHEMA: Schema = {
   memberships: { user_id: "integer", group_id: "integer" },
   topics: { title: "string" },
   entries: { group_id: "integer", seq: "integer" },
+  // Separate table for the empty-string composite key test: orders.shop_id
+  // is integer for all other composite-key tests; PG rejects varchar=integer.
+  str_orders: { shop_id: "string", code: "string" },
 };
 
 setupHandlerSuite();
@@ -1223,6 +1226,7 @@ describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation composite key with empty string", async () => {
     class Order extends Base {
       static {
+        this._tableName = "str_orders";
         this.attribute("shop_id", "string");
         this.attribute("code", "string");
         this.validatesUniqueness("code", { scope: "shop_id" });
