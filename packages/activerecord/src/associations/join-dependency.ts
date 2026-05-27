@@ -107,6 +107,7 @@ export class JoinDependency {
   private readonly _joinRoot: JoinBase;
   private readonly _joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
   private _treeNodesByPath: Map<string, JoinPart> = new Map();
+  private _references: Record<string, string> = {};
   constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
@@ -400,9 +401,15 @@ export class JoinDependency {
   joinConstraints(
     joinsToAdd: JoinDependency[],
     aliasTracker?: AliasTracker,
-    _references?: string[],
+    references?: string[],
   ): Nodes.Join[] {
     if (aliasTracker) this._aliasTracker = aliasTracker;
+    this._references = {};
+    if (references) {
+      for (const tableName of references) {
+        this._references[tableName] = tableName;
+      }
+    }
     const joins = this.makeJoinConstraints(this._joinRoot, this._joinType);
 
     for (const oj of joinsToAdd) {
@@ -670,6 +677,29 @@ export class JoinDependency {
         continue;
       }
 
+      if (
+        child.assocType !== "hasMany" &&
+        typeof arParent.associationCached === "function" &&
+        arParent.associationCached(child.immediateAssocName)
+      ) {
+        const cached = arParent.association?.(child.immediateAssocName)?.target;
+        if (cached) {
+          this._constructRecursive(
+            child,
+            cached,
+            rootParentKey,
+            row,
+            modelCache,
+            seenChildren,
+            assocMap,
+            nodeReadonly,
+            nodeStrictLoading,
+            strictLoadingValue,
+          );
+          continue;
+        }
+      }
+
       const childAttrs: Record<string, unknown> = {};
       let hasNonNull = false;
       for (let i = 0; i < child.columns.length; i++) {
@@ -770,11 +800,43 @@ export class JoinDependency {
     return this._baseAlias;
   }
 
+  /** @internal */
+  private get aliasTracker(): AliasTracker {
+    return this._aliasTracker;
+  }
+
   /**
-   * Builds and returns an Aliases object covering all tables in this dependency.
-   *
-   * Mirrors: ActiveRecord::Associations::JoinDependency#aliases
+   * @internal
+   * Mirrors: ActiveRecord::Associations::JoinDependency#find_reflection
    */
+  private findReflection(klass: typeof Base, name: string): any {
+    const reflection = reflectOnAssociation(klass as any, name);
+    if (!reflection) {
+      throw new AssociationNotFoundError(klass, name);
+    }
+    return reflection;
+  }
+
+  /**
+   * @internal
+   * Mirrors: ActiveRecord::Associations::JoinDependency#build
+   */
+  private build(associations: Record<PropertyKey, any>, baseKlass: typeof Base): JoinAssociation[] {
+    return Reflect.ownKeys(associations).map((name) => {
+      const right = associations[name];
+      const reflection = this.findReflection(baseKlass, String(name));
+      (reflection as any).checkValidityBang?.();
+      (reflection as any).checkEagerLoadableBang?.();
+
+      if (reflection.polymorphic?.()) {
+        throw new Error(`Cannot eagerly load the polymorphic association '${String(name)}'`);
+      }
+
+      return new JoinAssociation(reflection, this.build(right, reflection.klass));
+    });
+  }
+
+  /** @internal */
   private aliases(): Aliases {
     const baseAliasMap: AliasMap[] = this._aliases.filter(
       (a) => a.tableIndex === this._baseTableIndex,
