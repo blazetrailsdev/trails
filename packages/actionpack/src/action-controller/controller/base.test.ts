@@ -598,6 +598,9 @@ describe("ControllerClassTests", () => {
     expect(SuperAdminController.controllerName()).toBe("super_admin");
     expect(new SuperAdminController().controllerName()).toBe("super_admin");
   });
+
+  // pending: ActionView::RecordIdentifier (dom_id / dom_class) not yet ported.
+  it.skip("no deprecation when action view record identifier is included", () => {});
 });
 
 // ==========================================================================
@@ -629,6 +632,27 @@ describe("ControllerInstanceTests", () => {
     const c = new EmptyController();
     expect(c.inspect()).toMatch(/^#<EmptyController>$/);
   });
+
+  // pending: In Rails, SimpleController defines `def status` which shadows
+  // ActionController::Base's internal `status` method, and action_methods
+  // returns Set["status", "hello"]. In TS, `status` is a getter/setter
+  // accessor on Metal — TypeScript (TS2416/TS2426) disallows overriding an
+  // accessor with a regular method in a subclass, so the Rails pattern is
+  // not representable directly. Tracked as a TS accessor-shadowing gap.
+  it.skip("action methods with inherited shadowed internal method", () => {});
+
+  // pending: JS class naming does not support Object.const_set semantics.
+  // In Ruby, `Object.const_set("ExamplesController", klass)` gives the
+  // anonymous class a name; JS engines derive class names from variable
+  // bindings at parse time, so assigning to globalThis does not rename
+  // an already-created anonymous class.
+  it.skip("temporary anonymous controllers", () => {});
+
+  // pending: default headers are not yet applied inside dispatch().
+  // Rails wires DefaultHeaders via merge_default_headers in
+  // ActionDispatch::Response.create; our dispatch() commits _headers
+  // but does not call applyDefaultHeaders(). Tracked separately.
+  it.skip("response has default headers", () => {});
 });
 
 // ==========================================================================
@@ -653,6 +677,11 @@ describe("PerformActionTest", () => {
     await c.dispatch("arbitrary_action", makeRequest(), makeResponse());
     expect(c.body).toBe("Response for arbitrary_action");
   });
+
+  // pending: did_you_mean suggestions not implemented for ActionNotFound.
+  // Rails delegates to the did_you_mean gem via detailed_message; our
+  // AbstractController::ActionNotFound does not carry spelling suggestions.
+  it.skip("exceptions have suggestions for fix", () => {});
 });
 
 describe("withoutModules", () => {
@@ -670,6 +699,81 @@ describe("withoutModules", () => {
 
   it("ignores unknown names", () => {
     expect(Base.withoutModules("NotAModule")).toEqual(MODULES);
+  });
+});
+
+// ==========================================================================
+// controller/base_test.rb — UrlOptionsTest / DefaultUrlOptionsTest /
+//   OptionalDefaultUrlOptionsControllerTest / EmptyUrlOptionsTest
+// (all pending — full RouteSet wiring to controller not yet ported)
+// ==========================================================================
+describe("UrlOptionsTest", () => {
+  it.skip("url for query params included", () => {});
+  it.skip("url options override", () => {});
+  it.skip("url helpers does not become actions", () => {});
+});
+
+describe("DefaultUrlOptionsTest", () => {
+  it.skip("default url options override", () => {});
+  it.skip("default url options are used in non positional parameters", () => {});
+});
+
+describe("OptionalDefaultUrlOptionsControllerTest", () => {
+  it.skip("default url options override missing positional arguments", () => {});
+});
+
+describe("EmptyUrlOptionsTest", () => {
+  it.skip("ensure url for works as expected when called with no options if default url options is not set", () => {});
+  it.skip("named routes with path without doing a request first", () => {});
+});
+
+// ==========================================================================
+// controller/base_test.rb — BaseTest
+// ==========================================================================
+describe("BaseTest", () => {
+  // Rails reads action_controller/base.rb, scans every `include X` line,
+  // and asserts MODULES matches exactly (order included). We can't scan
+  // the TS source at runtime, so we assert the full expected array directly —
+  // equivalent coverage: any addition/removal/reorder in MODULES will fail.
+  it("included modules are tracked", () => {
+    expect(MODULES).toEqual([
+      "AbstractController::Rendering",
+      "AbstractController::Translation",
+      "AbstractController::AssetPaths",
+      "Helpers",
+      "UrlFor",
+      "Redirecting",
+      "ActionView::Layouts",
+      "Rendering",
+      "Renderers::All",
+      "ConditionalGet",
+      "EtagWithTemplateDigest",
+      "EtagWithFlash",
+      "Caching",
+      "MimeResponds",
+      "ImplicitRender",
+      "StrongParameters",
+      "ParameterEncoding",
+      "Cookies",
+      "Flash",
+      "FormBuilder",
+      "RequestForgeryProtection",
+      "ContentSecurityPolicy",
+      "PermissionsPolicy",
+      "RateLimiting",
+      "AllowBrowser",
+      "Streaming",
+      "DataStreaming",
+      "HttpAuthentication::Basic::ControllerMethods",
+      "HttpAuthentication::Digest::ControllerMethods",
+      "HttpAuthentication::Token::ControllerMethods",
+      "DefaultHeaders",
+      "Logging",
+      "AbstractController::Callbacks",
+      "Rescue",
+      "Instrumentation",
+      "ParamsWrapper",
+    ]);
   });
 });
 
