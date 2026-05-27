@@ -2,21 +2,14 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, serialize, SerializationTypeMismatch } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
 
 describe("SerializedAttributeTest", () => {
   setupHandlerSuite();
@@ -767,23 +760,12 @@ describe("serialize (Rails-guided)", () => {
 // ==========================================================================
 
 describe("SerializedAttributeTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
-  afterAll(() => {
-    vi.unstubAllEnvs();
-  });
-
   it("serialized attribute — stores and retrieves JSON", async () => {
     class Topic extends Base {
       static {
         this.attribute("content", "string");
       }
     }
-    Topic.adapter = adapter;
     serialize(Topic, "content", { coder: "json" });
 
     const topic = new Topic({});
@@ -810,7 +792,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("data", "string");
       }
     }
-    Settings.adapter = adapter;
     serialize(Settings, "data", { coder: customCoder });
 
     const s = new Settings({});
@@ -824,7 +805,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("tags", "string");
       }
     }
-    TagList.adapter = adapter;
     serialize(TagList, "tags", { coder: "array" });
 
     const t = new TagList({});
@@ -838,7 +818,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("tags", "string");
       }
     }
-    TagList2.adapter = adapter;
     serialize(TagList2, "tags", { coder: "array" });
 
     const t = new TagList2({});
@@ -852,7 +831,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("settings", "string");
       }
     }
-    Prefs.adapter = adapter;
     serialize(Prefs, "settings", { coder: "hash" });
 
     const p = new Prefs({});
@@ -866,7 +844,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("settings", "string");
       }
     }
-    Prefs2.adapter = adapter;
     serialize(Prefs2, "settings", { coder: "hash" });
 
     const p = new Prefs2({});
@@ -880,7 +857,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("body", "string");
       }
     }
-    Doc.adapter = adapter;
     serialize(Doc, "body");
 
     const d = new Doc({});
@@ -894,7 +870,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("options", "string");
       }
     }
-    Config.adapter = adapter;
     serialize(Config, "options", { coder: "json" });
 
     const c = new Config({});
@@ -908,7 +883,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("data", "string");
       }
     }
-    Blob.adapter = adapter;
     serialize(Blob, "data", { coder: "json" });
 
     const b = new Blob({});
@@ -924,7 +898,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("meta", "string");
       }
     }
-    Multi.adapter = adapter;
     serialize(Multi, "tags", { coder: "array" });
     serialize(Multi, "meta", { coder: "hash" });
 
@@ -942,7 +915,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("data", "string");
       }
     }
-    Mixed.adapter = adapter;
     serialize(Mixed, "data", { coder: "json" });
 
     const m = new Mixed({ name: "Alice", data: JSON.stringify({ x: 1 }) });
@@ -956,7 +928,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("payload", "string");
       }
     }
-    JsonDefault.adapter = adapter;
     serialize(JsonDefault, "payload");
 
     const j = new JsonDefault({});
@@ -970,7 +941,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("active", "string");
       }
     }
-    Flags.adapter = adapter;
     serialize(Flags, "active", { coder: "json" });
 
     const f = new Flags({});
@@ -984,7 +954,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("active", "string");
       }
     }
-    Flags2.adapter = adapter;
     serialize(Flags2, "active", { coder: "json" });
 
     const f = new Flags2({});
@@ -998,7 +967,6 @@ describe("SerializedAttributeTest", () => {
         this.attribute("count", "string");
       }
     }
-    Counter.adapter = adapter;
     serialize(Counter, "count", { coder: "json" });
 
     const c = new Counter({});
@@ -1013,7 +981,6 @@ describe("SerializedAttributeTest", () => {
       static {
         this.attribute("preferences", "string");
         this.aliasAttribute("prefs", "preferences");
-        this.adapter = adapter;
       }
     }
     serialize(User, "preferences", { coder: "json" });
