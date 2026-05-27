@@ -23,6 +23,14 @@ import type { DatabaseAdapter } from "./adapter.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { AbstractAdapter } from "./index.js";
 
+// D-1 non-candidates: makeSQLiteTopic / makeSQLiteMovie and the inline
+// SQLite adapter tests below create isolated in-memory adapters because
+// they verify actual DB transaction rollback semantics (Rollback exceptions,
+// afterSave callback failures, frozen-state restoration, CPK/custom-PK
+// rollback). Using transactional fixtures (useHandlerTransactionalFixtures)
+// would wrap the entire test in a transaction, which conflicts with
+// asserting rollback behavior inside nested transactions. Isolated adapters
+// are structurally required for deterministic assertions in these tests.
 const openAdapters: SQLite3Adapter[] = [];
 
 function makeSQLiteTopic() {

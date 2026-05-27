@@ -8577,6 +8577,11 @@ describe("PreloaderTest", () => {
     }).call();
     expect(spy).toHaveBeenCalledTimes(2);
   });
+  // D-1 non-candidate: this test intentionally uses two separate adapters
+  // (adapterA, adapterB) to verify that LoaderQuery#hashKey uses adapter
+  // identity to distinguish queries against identically-named tables on
+  // different databases. A single shared Base.adapter cannot express this
+  // multi-database scenario.
   it("multi database polymorphic preload with same table name", async () => {
     const adapterA = createTestAdapter();
     const adapterB = createTestAdapter();

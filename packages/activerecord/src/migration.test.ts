@@ -1341,6 +1341,9 @@ describe("MigrationTest", () => {
     expect(cols["title"]).toBeDefined();
   });
 
+  // D-1 non-candidate: MigrationTest intentionally omits setupHandlerSuite()
+  // (see comment above the describe). Base.adapter is not set in this block,
+  // so the per-beforeEach freshAdapter() must be assigned explicitly here.
   it("migration instance has connection", () => {
     class Article extends Base {
       static {
