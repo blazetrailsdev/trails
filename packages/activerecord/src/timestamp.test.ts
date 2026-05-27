@@ -69,6 +69,10 @@ describe("TimestampTest", () => {
   it("saving when instance record timestamps is false doesnt update its timestamp", async () => {
     const Post = makePost();
     const post = await Post.create({ title: "test" });
+    // Mirror Rails setup: update_columns(updated_at: Time.now.prev_month) so the
+    // baseline is clearly in the past and a same-tick save can't produce a false pass.
+    const pastTime = Temporal.Now.instant().subtract({ hours: 1 });
+    await post.updateColumns({ updated_at: pastTime });
     const previousUpdatedAt = post.updated_at as Temporal.Instant | null;
     expect(previousUpdatedAt).not.toBeNull();
     expect(Post.recordTimestamps).toBe(true);
