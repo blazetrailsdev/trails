@@ -569,11 +569,11 @@ describe("PersistenceTest", () => {
         this.attribute("title", "string");
       }
     }
-    const items = await Promise.all([
-      CmItem.create({ title: "a" }),
-      CmItem.create({ title: "b" }),
-      CmItem.create({ title: "c" }),
-    ]);
+    const items = [
+      await CmItem.create({ title: "a" }),
+      await CmItem.create({ title: "b" }),
+      await CmItem.create({ title: "c" }),
+    ];
     expect(items.length).toBe(3);
     expect(items.every((p: Base) => p.id)).toBe(true);
   });
