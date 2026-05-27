@@ -2,40 +2,30 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-let _adapter: SidecarAdapter;
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
 beforeAll(async () => {
-  ({ adapter: _adapter } = createSidecarTestAdapter());
-  await defineSchema(_adapter, {
+  await defineSchema({
     posts: { title: "string", author: "string" },
     items: { name: "string", status: "string" },
     users: { name: "string", age: "integer", active: "boolean" },
   });
 });
-withTransactionalFixtures(() => _adapter);
-function freshAdapter(): DatabaseAdapter {
-  return _adapter;
-}
 
 describe("RelationMergingTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   function makeModel() {
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
-        this.adapter = adapter;
       }
     }
     return { Post };
@@ -215,17 +205,11 @@ describe("RelationMergingTest", () => {
 });
 
 describe("MergingDifferentRelationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   function makeModel() {
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
-        this.adapter = adapter;
       }
     }
     return { Post };
@@ -287,17 +271,11 @@ describe("MergingDifferentRelationsTest", () => {
 });
 
 describe("RelationMergingTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   function makeModel() {
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author", "string");
-        this.adapter = adapter;
       }
     }
     return { Post };
@@ -314,11 +292,6 @@ describe("RelationMergingTest", () => {
 });
 
 describe("merge()", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("combines conditions from two relations", async () => {
     class Item extends Base {
       static _tableName = "items";
@@ -326,7 +299,6 @@ describe("merge()", () => {
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.attribute("status", "string");
-    Item.adapter = adapter;
 
     await Item.create({ name: "A", status: "active" });
     await Item.create({ name: "B", status: "inactive" });
@@ -348,7 +320,6 @@ describe("merge()", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
 
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
@@ -383,7 +354,6 @@ describe("merge()", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
 
     await Item.create({ name: "B" });
     await Item.create({ name: "A" });
@@ -400,7 +370,6 @@ describe("from()", () => {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
-    Item.adapter = freshAdapter();
 
     const sql = Item.all().from('"other_items"').toSql();
     expect(sql).toContain('FROM "other_items"');
@@ -409,18 +378,12 @@ describe("from()", () => {
 });
 
 describe("unscope()", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("removes where conditions", async () => {
     class Item extends Base {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
 
     await Item.create({ name: "A" });
     await Item.create({ name: "B" });
@@ -435,7 +398,6 @@ describe("unscope()", () => {
     }
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
-    Item.adapter = adapter;
 
     await Item.create({ name: "B" });
     await Item.create({ name: "A" });
@@ -449,7 +411,6 @@ describe("unscope()", () => {
       static _tableName = "items";
     }
     Item.attribute("id", "integer");
-    Item.adapter = adapter;
 
     const sql = Item.all().limit(5).offset(10).unscope("limit", "offset").toSql();
     expect(sql).not.toContain("LIMIT");
@@ -459,13 +420,11 @@ describe("unscope()", () => {
 
 describe("pluck with Arel nodes", () => {
   it("accepts Arel Attribute nodes", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
 
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -478,13 +437,11 @@ describe("pluck with Arel nodes", () => {
 
 describe("only()", () => {
   it("keeps only specified query parts", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
 
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -502,13 +459,11 @@ describe("only()", () => {
 
 describe("unscope()", () => {
   it("removes specified query parts", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
     User.attribute("id", "integer");
     User.attribute("name", "string");
-    User.adapter = adapter;
 
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -522,17 +477,11 @@ describe("unscope()", () => {
 });
 
 describe("Relation Merging (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("merge combines two relations", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice", active: true });
@@ -547,16 +496,10 @@ describe("Relation Merging (Rails-guided)", () => {
 });
 
 describe("Unscope (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("removes where conditions", async () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await Item.create({ name: "A" });
@@ -570,7 +513,6 @@ describe("Unscope (Rails-guided)", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Item.all().order({ name: "asc" }).unscope("order").toSql();
@@ -581,7 +523,6 @@ describe("Unscope (Rails-guided)", () => {
     class Item extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const sql = Item.all().limit(5).offset(10).unscope("limit", "offset").toSql();
@@ -591,16 +532,10 @@ describe("Unscope (Rails-guided)", () => {
 });
 
 describe("Pluck (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("pluck single column", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice" });
@@ -613,7 +548,6 @@ describe("Pluck (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.attribute("age", "integer");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice", age: 25 });
@@ -629,7 +563,6 @@ describe("Pluck (Rails-guided)", () => {
       static {
         this.attribute("name", "string");
         this.attribute("active", "boolean");
-        this.adapter = adapter;
       }
     }
     await User.create({ name: "Alice", active: true });
@@ -641,7 +574,6 @@ describe("Pluck (Rails-guided)", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     expect(await User.all().pluck("name")).toEqual([]);
@@ -651,7 +583,6 @@ describe("Pluck (Rails-guided)", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const alice = await User.create({ name: "Alice" });

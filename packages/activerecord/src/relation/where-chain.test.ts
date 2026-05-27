@@ -2,17 +2,18 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, Range, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { quoteTableName } from "../test-helpers/quote-regex.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
-const _adapter: SidecarAdapter = createSidecarTestAdapter().adapter;
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+
 beforeAll(async () => {
   const authorCols = { name: "string" as const };
   const postCols = {
@@ -21,7 +22,7 @@ beforeAll(async () => {
     category_id: "integer" as const,
     score: "integer" as const,
   };
-  await defineSchema(_adapter, {
+  await defineSchema({
     posts: postCols,
     authors: authorCols,
     articles: postCols,
@@ -41,24 +42,17 @@ beforeAll(async () => {
     cpk_orders: { shop_id: "integer", order_id: "integer", cpk_shop_id: "integer" },
   });
 });
-withTransactionalFixtures(() => _adapter);
-function freshAdapter(): DatabaseAdapter {
-  return _adapter;
-}
 
 describe("WhereChainTest", () => {
-  const adapter = freshAdapter();
   class Post extends Base {
     static {
       this.attribute("title", "string");
       this.attribute("author_id", "integer");
-      this.adapter = adapter;
     }
   }
   class Author extends Base {
     static {
       this.attribute("name", "string");
-      this.adapter = adapter;
     }
   }
   Associations.belongsTo.call(Post, "author", {});
@@ -174,18 +168,15 @@ describe("WhereChainTest", () => {
     /* fixture-dependent */
   });
   it("associated with add joins before", async () => {
-    const a = freshAdapter();
     class JbAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     class JbPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("jb_author_id", "integer");
-        this.adapter = a;
       }
     }
     registerModel("JbAuthor", JbAuthor);
@@ -204,18 +195,15 @@ describe("WhereChainTest", () => {
   });
 
   it("associated with add left joins before", async () => {
-    const a = freshAdapter();
     class LjAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     class LjPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("lj_author_id", "integer");
-        this.adapter = a;
       }
     }
     registerModel("LjAuthor", LjAuthor);
@@ -234,18 +222,15 @@ describe("WhereChainTest", () => {
   });
 
   it("associated with add left outer joins before", async () => {
-    const a = freshAdapter();
     class LoAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     class LoPost extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("lo_author_id", "integer");
-        this.adapter = a;
       }
     }
     registerModel("LoAuthor", LoAuthor);
@@ -264,11 +249,9 @@ describe("WhereChainTest", () => {
   });
 
   it("associated with composite primary key", async () => {
-    const a = freshAdapter();
     class CpkShop extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = a;
       }
     }
     class CpkOrder extends Base {
@@ -277,7 +260,6 @@ describe("WhereChainTest", () => {
         this.attribute("shop_id", "integer");
         this.attribute("order_id", "integer");
         this.attribute("cpk_shop_id", "integer");
-        this.adapter = a;
       }
     }
     registerModel("CpkShop", CpkShop);
@@ -304,25 +286,21 @@ describe("WhereChainTest", () => {
     );
   });
   it("missing with multiple association", () => {
-    const adapter2 = freshAdapter();
     class Article extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
         this.attribute("category_id", "integer");
-        this.adapter = adapter2;
       }
     }
     class ArtAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter2;
       }
     }
     class ArtCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter2;
       }
     }
     Associations.belongsTo.call(Article, "artAuthor", { foreignKey: "author_id" });
@@ -484,17 +462,11 @@ describe("WhereChainTest", () => {
 });
 
 describe("WhereChainTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   function makePost() {
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adapter;
       }
     }
     return Post;
@@ -607,13 +579,11 @@ describe("WhereChainTest", () => {
     class MaAuthor extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class MaCategory extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     class MaPost extends Base {
@@ -621,7 +591,6 @@ describe("WhereChainTest", () => {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
         this.attribute("category_id", "integer");
-        this.adapter = adapter;
       }
     }
     Associations.belongsTo.call(MaPost, "maAuthor", { foreignKey: "author_id" });
@@ -658,7 +627,6 @@ describe("WhereChainTest", () => {
       static {
         this.attribute("title", "string");
         this.attribute("score", "integer");
-        this.adapter = adapter;
       }
     }
     await RrPost.create({ title: "Low", score: 5 });
