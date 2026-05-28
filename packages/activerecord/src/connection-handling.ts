@@ -13,6 +13,7 @@ import {
 import {
   resolve as resolveConnectionAdapter,
   resolveSync as resolveConnectionAdapterSync,
+  resolveSyncError as resolveConnectionAdapterSyncError,
 } from "./connection-adapters.js";
 import {
   buildAdapterArg,
@@ -879,6 +880,7 @@ _setAdapterClassResolver(
   async (adapterName) => _loadAdapter(adapterName),
   (adapterName) => resolveConnectionAdapterSync(adapterName),
   (adapterName, configuration) => buildAdapterArg(adapterName, configuration),
+  (adapterName) => resolveConnectionAdapterSyncError(adapterName),
 );
 
 /**

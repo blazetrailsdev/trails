@@ -46,19 +46,23 @@ export function _setDefaultEnvGetter(fn: () => string): void {
 type AdapterClassResolver = (adapterName: string) => Promise<new (...args: any[]) => unknown>;
 type AdapterClassResolverSync = (adapterName: string) => (new (...args: any[]) => unknown) | null;
 type AdapterArgBuilder = (adapterName: string, configuration: Record<string, unknown>) => unknown;
+type LoadErrorLookup = (adapterName: string) => unknown | null;
 let _adapterClassResolver: AdapterClassResolver | null = null;
 let _adapterClassResolverSync: AdapterClassResolverSync | null = null;
 let _buildAdapterArg: AdapterArgBuilder = (_n, c) => c;
+let _loadAdapterError: LoadErrorLookup | null = null;
 
 /** @internal Set by connection-handling.ts to break circular dependency */
 export function _setAdapterClassResolver(
   fn: AdapterClassResolver,
   syncFn?: AdapterClassResolverSync,
   argBuilder?: AdapterArgBuilder,
+  errorLookup?: LoadErrorLookup,
 ): void {
   _adapterClassResolver = fn;
   if (syncFn) _adapterClassResolverSync = syncFn;
   if (argBuilder) _buildAdapterArg = argBuilder;
+  if (errorLookup) _loadAdapterError = errorLookup;
 }
 
 /**
@@ -173,9 +177,13 @@ export class DatabaseConfig {
     }
     const Klass = _adapterClassResolverSync(this.adapter);
     if (!Klass) {
+      const loadError = _loadAdapterError?.(this.adapter);
+      const remediation = loadError
+        ? `loader failed: ${(loadError as Error).message ?? loadError}`
+        : `await pool.adapterReady or this.loadAdapter() before calling newConnection`;
       throw new Error(
-        `Adapter "${this.adapter}" not pre-resolved. Await pool.adapterReady, ` +
-          `or call ${this.adapter}.loadAdapter() before calling newConnection.`,
+        `Adapter "${this.adapter}" not pre-resolved — ${remediation}.`,
+        loadError ? { cause: loadError } : undefined,
       );
     }
     const arg = _buildAdapterArg(this.adapter, this.configuration as Record<string, unknown>);
