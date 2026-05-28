@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { ConnectionFailed } from "./errors.js";
 
@@ -321,12 +321,14 @@ describe("AdapterConnectionTest", () => {
     const a = new AbstractAdapter();
     (a as any)._config.retryDeadline = 0.1;
     let attempts = 0;
-    await a.withRawConnection({ allowRetry: true }, async () => {
-      if (attempts === 0) {
-        attempts++;
-        throw new ConnectionFailed("Something happened to the connection");
-      }
-    });
+    await expect(
+      a.withRawConnection({ allowRetry: true }, async () => {
+        if (attempts === 0) {
+          attempts++;
+          throw new ConnectionFailed("Something happened to the connection");
+        }
+      }),
+    ).resolves.toBeUndefined();
     expect(attempts).toBe(1);
   });
   it("does not reconnect and retry queries when retries are disabled", async () => {
@@ -343,24 +345,19 @@ describe("AdapterConnectionTest", () => {
     expect(attempts).toBe(1);
   });
   it("does not reconnect and retry queries that exceed retry deadline", async () => {
-    vi.useFakeTimers();
-    try {
-      const a = new AbstractAdapter();
-      (a as any)._config.retryDeadline = 0.1;
-      let attempts = 0;
-      await expect(
-        a.withRawConnection({ allowRetry: true }, async () => {
-          if (attempts === 0) {
-            await vi.advanceTimersByTimeAsync(200);
-            attempts++;
-            throw new ConnectionFailed("Something happened to the connection");
-          }
-        }),
-      ).rejects.toBeInstanceOf(ConnectionFailed);
-      expect(attempts).toBe(1);
-    } finally {
-      vi.useRealTimers();
-    }
+    const a = new AbstractAdapter();
+    (a as any)._config.retryDeadline = 0.01; // 10ms
+    let attempts = 0;
+    await expect(
+      a.withRawConnection({ allowRetry: true }, async () => {
+        if (attempts === 0) {
+          await new Promise<void>((r) => setTimeout(r, 20)); // 20ms > 10ms deadline
+          attempts++;
+          throw new ConnectionFailed("Something happened to the connection");
+        }
+      }),
+    ).rejects.toBeInstanceOf(ConnectionFailed);
+    expect(attempts).toBe(1);
   });
   it.skip("#execute is retryable", () => {
     // BLOCKED: connection-pool
