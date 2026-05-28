@@ -385,7 +385,8 @@ describe("withTransactionalFixtures (pooled adapter)", () => {
 // checkout provides natural isolation. These tests are skipped from E3 until
 // E5 ships; they document the invariant and will be unskipped at that point.
 describe("concurrency isolation: two concurrent transaction chains stay independent", () => {
-  it.skip("chain B sees openTransactions=0 while chain A is mid-transaction (re-enable at E5)", async () => {
+  // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
+  it.skip("chain B sees openTransactions=0 while chain A is mid-transaction", async () => {
     const { fixtures: sidecarA } = createSidecarTestAdapter();
     const { fixtures: sidecarB } = createSidecarTestAdapter();
 
@@ -441,7 +442,8 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
     expect(bObservedCurrentTxJoinable).toBe(false);
   });
 
-  it.skip("currentTransaction() returns null for a chain outside any withinNewTransaction (re-enable at E5)", () => {
+  // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
+  it.skip("currentTransaction() returns null for a chain outside any withinNewTransaction", () => {
     const { fixtures } = createSidecarTestAdapter();
     expect(fixtures.currentTransaction()).toBeNull();
   });
