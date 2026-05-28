@@ -723,10 +723,13 @@ export class AbstractAdapter implements Quoting {
   }
 
   reconnectBang(): void {
-    // Base implementation clears caches and marks verified.
+    // Base implementation clears caches and marks the connection as verified.
     // Concrete adapters (SQLite3, PostgreSQL, MySQL) override to
-    // actually close and reopen the raw connection.
+    // actually close and reopen the raw connection, then call super.
     this.clearCacheBang();
+    this._rawConnectionDirty = false;
+    this._lastActivity = Date.now();
+    this._verified = true;
   }
 
   disconnectBang(): void {
@@ -1347,7 +1350,8 @@ export class AbstractAdapter implements Quoting {
   }
 
   cleanBang(): void {
-    this.clearCacheBang();
+    this._rawConnectionDirty = false;
+    this._verified = false;
   }
 
   // --- Comparison helpers ---

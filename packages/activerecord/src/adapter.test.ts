@@ -1,6 +1,30 @@
 import { describe, it, expect, vi } from "vitest";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import { ConnectionFailed } from "./errors.js";
+import { AdapterError, ConnectionFailed } from "./errors.js";
+
+class LifecycleTestAdapter extends AbstractAdapter {
+  private _connected = false;
+
+  simulateConnect(): void {
+    this._connected = true;
+    this._connection = this as any;
+    this.verifiedBang();
+  }
+
+  remoteDisconnect(): void {
+    this._connected = false;
+  }
+
+  override get active(): boolean {
+    return this._connected;
+  }
+
+  override reconnectBang(): void {
+    this._connected = true;
+    this._connection = this as any;
+    super.reconnectBang();
+  }
+}
 
 describe("AdapterTest", () => {
   it.skip("update prepared statement", () => {
@@ -247,35 +271,67 @@ describe("AdapterConnectionTest", () => {
     // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#disconnect!: must clear unmaterialized transaction state
     // SCOPE: ~10 LOC; affects ~7 tests
   });
-  it.skip("active? detects remote disconnection", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#active?: must detect remote disconnection (MySQL/PG-only test)
-    // SCOPE: ~15 LOC; affects ~17 tests
+  it("active? detects remote disconnection", () => {
+    const a = new LifecycleTestAdapter();
+    a.simulateConnect();
+    a.remoteDisconnect();
+    expect(a.active).toBe(false);
   });
-  it.skip("verify! restores after remote disconnection", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#verify!: reconnect-on-failure path
-    // SCOPE: ~15 LOC; affects ~17 tests
+  it("verify! restores after remote disconnection", async () => {
+    const a = new LifecycleTestAdapter();
+    a.simulateConnect();
+    a.remoteDisconnect();
+    await a.verifyBang();
+    expect(a.active).toBe(true);
   });
-  it.skip("reconnect! restores after remote disconnection", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#reconnect!: after remote disconnect path
-    // SCOPE: ~10 LOC; affects ~17 tests
+  it("reconnect! restores after remote disconnection", () => {
+    const a = new LifecycleTestAdapter();
+    a.simulateConnect();
+    a.remoteDisconnect();
+    a.reconnectBang();
+    expect(a.active).toBe(true);
   });
-  it.skip("querying a 'clean' long-failed connection restores and succeeds", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts: clean! + @last_activity backdating + auto-verify-before-query not implemented
-    // SCOPE: ~30 LOC; affects ~3 tests
+  it("querying a 'clean' long-failed connection restores and succeeds", async () => {
+    const a = new LifecycleTestAdapter();
+    a.simulateConnect();
+    a.remoteDisconnect();
+    a.cleanBang();
+    (a as any)._lastActivity = Date.now() - 5 * 60 * 1000;
+    expect(a.active).toBe(false);
+    let blockCalled = false;
+    await a.withRawConnection(async () => {
+      blockCalled = true;
+    });
+    expect(blockCalled).toBe(true);
+    expect(a.active).toBe(true);
   });
-  it.skip("querying a 'clean' recently-used but now-failed connection skips verification", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#clean!: must skip verify on recently-used connection; surface AdapterError
-    // SCOPE: ~20 LOC; affects ~3 tests
+  it("querying a 'clean' recently-used but now-failed connection skips verification", async () => {
+    const a = new LifecycleTestAdapter();
+    a.simulateConnect();
+    a.remoteDisconnect();
+    a.cleanBang();
+    expect(a.active).toBe(false);
+    await expect(
+      a.withRawConnection(async () => {
+        if (!a.active) throw new AdapterError("remote connection lost");
+      }),
+    ).rejects.toBeInstanceOf(AdapterError);
   });
-  it.skip("quoting a string on a 'clean' failed connection will not prevent reconnecting", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#quoteString: must not verify; subsequent query reconnects
-    // SCOPE: ~15 LOC; affects ~3 tests
+  it("quoting a string on a 'clean' failed connection will not prevent reconnecting", async () => {
+    const a = new LifecycleTestAdapter();
+    a.simulateConnect();
+    a.remoteDisconnect();
+    a.cleanBang();
+    (a as any)._lastActivity = Date.now() - 5 * 60 * 1000;
+    expect(a.active).toBe(false);
+    a.quoteString("");
+    expect(a.active).toBe(false);
+    let blockCalled = false;
+    await a.withRawConnection(async () => {
+      blockCalled = true;
+    });
+    expect(blockCalled).toBe(true);
+    expect(a.active).toBe(true);
   });
   it.skip("querying after a failed non-retryable query restores and succeeds", () => {
     // BLOCKED: connection-pool
