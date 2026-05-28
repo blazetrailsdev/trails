@@ -7,6 +7,9 @@ scripts/test-deps/output/
 scripts/guides-typecheck/.tmp/
 scripts/api-compare/.rack-source
 scripts/api-compare/.rails-source
+
+# Local cache for the rfcs sibling-repo CLI (pnpm tasks).
+.tasks/
 .claude/settings.local.json
 .claude/worktrees/
 .claude/hooks/

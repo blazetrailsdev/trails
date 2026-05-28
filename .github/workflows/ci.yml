@@ -120,7 +120,9 @@ jobs:
           # leaf packages (arel/activemodel/activesupport) and the
           # scripts/guides-typecheck self-test. Rack is excluded here — it
           # has its own job above.
-          UNIT_TESTS_PKGS_RE='^packages/(arel|activemodel|activesupport)/'
+          # scripts/tasks/ also rides on this gate since it's bundled into the
+          # same vitest invocation as the leaf packages and guides-typecheck.
+          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|scripts/tasks/)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
           # Today guides only import @blazetrails/activerecord,
@@ -384,6 +386,7 @@ jobs:
           packages/activemodel
           packages/activesupport
           scripts/guides-typecheck
+          scripts/tasks
 
   rack-tests:
     name: Rack Tests
