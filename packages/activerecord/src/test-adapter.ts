@@ -15,11 +15,12 @@
  * declare their tables up front.
  */
 
-import { getAsyncContext, type AsyncContext } from "@blazetrails/activesupport";
-
 import { inspectExplainOption } from "./adapter.js";
 import type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
-import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
+import {
+  NullTransaction,
+  type TransactionManager,
+} from "./connection-adapters/abstract/transaction.js";
 import type { SchemaCache } from "./connection-adapters/schema-cache.js";
 import {
   clearAppliedSchemaSignatures,
@@ -56,25 +57,6 @@ export const adapterType: "sqlite" | "postgres" | "mysql" = PG_TEST_URL
     : "sqlite";
 
 let _sharedAdapter: any = null;
-
-// Async-chain visibility flag for `currentTransaction()` / `inTransaction` /
-// `openTransactions` on the wrapper. Set while a `withinNewTransaction` body
-// is executing on this chain so callers in OUR chain see the inner adapter's
-// transaction state; callers from foreign chains see an empty wrapper.
-let _txLockHeld: AsyncContext<true> | null = null;
-let _txLockHeldAdapter: ReturnType<typeof getAsyncContext> | null = null;
-function _txLockStorage(): AsyncContext<true> {
-  // Recreate storage if ActiveSupport.asyncContextAdapter is swapped at
-  // runtime (matches the pattern in transactions.ts / core.ts /
-  // explain-registry.ts). Caching the first adapter forever would leak
-  // visibility state across browser-compat / DI swaps.
-  const asyncContext = getAsyncContext();
-  if (!_txLockHeld || _txLockHeldAdapter !== asyncContext) {
-    _txLockHeld = asyncContext.create<true>();
-    _txLockHeldAdapter = asyncContext;
-  }
-  return _txLockHeld;
-}
 
 let _factory: () => TestAdapterFixtures;
 
@@ -339,10 +321,9 @@ export async function resetTestAdapterState(): Promise<void> {
 /**
  * Thin wrapper around a real database adapter that:
  *   1. Routes transactions through the inner adapter's TM (Phase 1)
- *   2. Provides async-chain-aware visibility for `currentTransaction()`
- *   3. Patches SQLite-specific SQL incompatibilities (Phase 9 will move
+ *   2. Patches SQLite-specific SQL incompatibilities (Phase 9 will move
  *      these into SQLite3Adapter directly)
- *   4. Tracks CREATE/DROP TABLE for `defineSchema`'s cache invalidation
+ *   3. Tracks CREATE/DROP TABLE for `defineSchema`'s cache invalidation
  */
 type BooleanCapability =
   | "supportsIndexesInCreate"
@@ -388,24 +369,9 @@ class TestAdapterFixtures implements DatabaseAdapter {
   }
 
   private inner: DatabaseAdapter;
-  // Counts manual beginTransaction()/commit()/rollback() pairs on this
-  // wrapper instance. Direct callers (migrations, fixtures, query-cache
-  // tests) don't go through withinNewTransaction so they don't set the
-  // AsyncLocalStorage flag — without this counter the chain-aware
-  // delegations would hide the transaction state from them.
-  private _manualTxDepth = 0;
 
   constructor(inner: DatabaseAdapter) {
     this.inner = inner;
-  }
-
-  /**
-   * True when this caller should see the inner adapter's transaction state.
-   * Either we entered through withinNewTransaction (storage set) or the
-   * caller manually opened a transaction on this wrapper instance.
-   */
-  private _txVisible(): boolean {
-    return _txLockStorage().getStore() === true || this._manualTxDepth > 0;
   }
 
   get schemaCache(): SchemaCache | undefined {
@@ -469,30 +435,17 @@ class TestAdapterFixtures implements DatabaseAdapter {
     fn: (tx?: unknown) => Promise<T> | T,
   ): Promise<T> {
     const inner = this.inner as any;
-    // Per-connection serialization lives in TransactionManager in Phase 8
-    // (#1669). The wrapper tags this async chain so _txVisible() can expose
-    // transaction state to in-chain callers without leaking it across
-    // foreign chains.
-    const storage = _txLockStorage();
-    const run = () => inner.withinNewTransaction(opts, fn);
     const tm = inner.transactionManager as
       | { synchronize?<R>(fn: () => Promise<R> | R): Promise<R> }
       | undefined;
-    const wrapped = storage.getStore() === true ? run : () => storage.run(true, run);
-    if (tm?.synchronize) return tm.synchronize(wrapped);
-    return wrapped();
+    const run = () => inner.withinNewTransaction(opts, fn);
+    if (tm?.synchronize) return tm.synchronize(run);
+    return run();
   }
 
   currentTransaction() {
-    // Async-chain-aware: a foreign concurrent caller must NOT see another
-    // chain's TM frame as joinable. database-statements.transaction() checks
-    // currentTransaction() before falling through to withinNewTransaction;
-    // if we exposed a foreign frame here it would "join" and bypass the
-    // TM mutex entirely (failure mode: Promise.all top-level transactions
-    // observing each other's frame as joinable, breaking serialization).
-    // Return null when our own chain has no transaction open.
-    if (!this._txVisible()) return null;
-    return (this.inner as any).currentTransaction?.();
+    const tx = (this.inner as any).currentTransaction?.();
+    return tx instanceof NullTransaction ? null : tx;
   }
 
   addTransactionRecord(record: unknown, ensureFinalize?: boolean) {
@@ -505,20 +458,12 @@ class TestAdapterFixtures implements DatabaseAdapter {
 
   async beginTransaction(): Promise<void> {
     await this.inner.beginTransaction();
-    this._manualTxDepth++;
   }
   async commit(): Promise<void> {
-    // Only decrement on success — failed COMMIT can leave PG/MySQL in an
-    // unresolved transaction (driver clears `inTransaction` only when COMMIT
-    // succeeds). If we decremented in finally, TestAdapterFixtures would report
-    // no tx while inner is still mid-transaction, sending the next
-    // transaction() call down the wrong path.
     await this.inner.commit();
-    if (this._manualTxDepth > 0) this._manualTxDepth--;
   }
   async rollback(): Promise<void> {
     await this.inner.rollback();
-    if (this._manualTxDepth > 0) this._manualTxDepth--;
   }
   async createSavepoint(name: string): Promise<void> {
     return this.inner.createSavepoint(name);
@@ -533,15 +478,10 @@ class TestAdapterFixtures implements DatabaseAdapter {
     this.inner.clearCacheBang?.();
   }
   get inTransaction(): boolean {
-    // Async-chain-aware (see currentTransaction comment): hide the inner
-    // adapter's transaction state from foreign async chains so callers from
-    // unrelated chains don't observe a transaction they aren't part of.
-    if (!this._txVisible()) return false;
     return this.inner.inTransaction;
   }
 
   get openTransactions(): number {
-    if (!this._txVisible()) return 0;
     return this.inner.openTransactions ?? 0;
   }
 

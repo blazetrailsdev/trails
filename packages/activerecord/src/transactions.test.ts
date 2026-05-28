@@ -2481,11 +2481,10 @@ describe("SchemaAdapter TM delegation", () => {
     expect(innerType).toBe(SavepointTransaction.name);
   });
 
-  it("concurrent Promise.all top-level transactions are serialized (no shared TM frame)", async () => {
-    // Regression: before the per-inner-adapter mutex + async-chain-aware
-    // delegations, two concurrent top-level transactions would race the
-    // shared TM stack and corrupt instrumenter state (the failure that
-    // hit MariaDB CI).
+  it.skip("concurrent Promise.all top-level transactions are serialized (no shared TM frame)", async () => {
+    // E2: tests AsyncContext chain-isolation on the wrapper, which was deleted
+    // in favour of pool-per-connection isolation (tested by the E1 safety-net
+    // in with-transactional-fixtures.test.ts). Wrapper deleted entirely in E4.
     const testAdapter = createTestAdapter();
     await defineSchema(testAdapter, { items: { name: "string" } });
     class Item extends Base {
@@ -2539,11 +2538,7 @@ describe("SchemaAdapter TM delegation", () => {
     expect(await Item.count()).toBe(7);
   });
 
-  it("manual beginTransaction/commit pair exposes inner state via _manualTxDepth", async () => {
-    // Direct adapter.beginTransaction() callers (query-cache tests,
-    // migrations, fixtures) don't enter withinNewTransaction so they don't
-    // set the AsyncLocalStorage flag. _manualTxDepth tracks them per
-    // wrapper so the chain-aware delegations expose inner state.
+  it("manual beginTransaction/commit pair delegates inner state unconditionally", async () => {
     const testAdapter = createTestAdapter();
     await defineSchema(testAdapter, { items: { name: "string" } });
     class Item extends Base {
@@ -2552,26 +2547,20 @@ describe("SchemaAdapter TM delegation", () => {
         this.adapter = testAdapter;
       }
     }
-    // Prime the schema before beginTransaction so MySQL DDL doesn't
-    // implicit-commit the manual transaction.
     await Item.create({ name: "prime" });
 
-    // Before any manual tx: state hidden.
     expect((testAdapter as any).inTransaction).toBe(false);
     expect((testAdapter as any).openTransactions).toBe(0);
     expect((testAdapter as any).currentTransaction?.()).toBeNull();
 
     await testAdapter.beginTransaction();
-    // After manual BEGIN: inner state visible to this wrapper.
     expect((testAdapter as any).inTransaction).toBe(true);
     expect((testAdapter as any).openTransactions).toBeGreaterThan(0);
 
     await testAdapter.commit();
-    // After commit: state hidden again.
     expect((testAdapter as any).inTransaction).toBe(false);
     expect((testAdapter as any).openTransactions).toBe(0);
 
-    // Rollback path also clears.
     await testAdapter.beginTransaction();
     expect((testAdapter as any).inTransaction).toBe(true);
     await testAdapter.rollback();
