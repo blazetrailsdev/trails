@@ -103,7 +103,7 @@ export type AssociationSpec = string | { [assoc: string]: AssociationSpec | Asso
 // ---------------------------------------------------------------------------
 interface QueryMethodsHost {
   _whereClause: WhereClause;
-  _orderClauses: Array<string | [string, "asc" | "desc"] | { raw: string }>;
+  _orderClauses: Array<string | [string, "asc" | "desc"] | { raw: string } | Nodes.Node>;
   _rawOrderClauses: string[];
   _reordering: boolean;
   _limitValue: number | null;
@@ -351,10 +351,37 @@ function regroupBang(this: QueryMethodsHost, ...columns: string[]): any {
   return this;
 }
 
+/**
+ * Resolve one entry of a node-keyed order Map into a stored order clause.
+ * Arel node keys become Ascending/Descending nodes (preserving identity for
+ * reverseOrder); string keys become validated `[col, dir]` tuples.
+ * @internal
+ */
+function orderHashEntry(
+  host: QueryMethodsHost,
+  key: unknown,
+  dir: unknown,
+): Nodes.Node | [string, "asc" | "desc"] {
+  if (!/^(asc|desc)$/i.test(String(dir))) {
+    throw argumentError(`Direction "${dir}" is invalid. Valid directions are: asc, desc`);
+  }
+  const direction = String(dir).toLowerCase() as "asc" | "desc";
+  if (key instanceof Nodes.Node) {
+    return direction === "desc" ? (key as any).desc() : (key as any).asc();
+  }
+  disallowRawSqlBang([String(key)], resolveOrderMatcher(host));
+  return [String(key), direction];
+}
+
 function orderBang(
   this: QueryMethodsHost,
   ...args: Array<
-    string | Record<string, "asc" | "desc"> | Nodes.Node | string[] | [Nodes.Node, ...unknown[]]
+    | string
+    | Record<string, "asc" | "desc">
+    | Nodes.Node
+    | string[]
+    | [Nodes.Node, ...unknown[]]
+    | Map<Nodes.Node | string, "asc" | "desc">
   >
 ): any {
   let i = 0;
@@ -379,13 +406,18 @@ function orderBang(
           if (elem.trim() !== "") this._orderClauses.push(elem);
         }
       }
+    } else if (arg instanceof Map) {
+      // Hash form with Arel node keys: order(arelTable.get("id") => "desc").
+      // JS object keys can't be Arel nodes, so a Map is the faithful analog of
+      // Rails' `order(node => :desc)`.
+      for (const [key, dir] of arg) {
+        this._orderClauses.push(orderHashEntry(this, key, dir));
+      }
     } else if (arg instanceof Nodes.Node) {
-      // Pre-render to raw SQL string tagged as { raw } so _applyOrderToManager
-      // emits it verbatim (bypasses column qualification). Using { raw } rather
-      // than a live Nodes.Node keeps _orderClauses serializable (inspect(), merge
-      // dedup, etc. use JSON.stringify on the array).
-      const rawSql = (arg as any).value ?? (arg as Nodes.Node).toSql();
-      if (rawSql && rawSql.trim() !== "") this._orderClauses.push({ raw: String(rawSql) });
+      // Preserve the Arel node identity (Ascending/Descending/Attribute/...) so
+      // reverseOrderBang can flip it via .reverse()/.desc(), mirroring Rails'
+      // reverse_sql_order. _applyOrderToManager emits the node directly.
+      this._orderClauses.push(arg);
     } else if (typeof arg === "string") {
       if (arg.trim() === "") {
         const next = args[i + 1];
@@ -422,7 +454,12 @@ function orderBang(
 function reorderBang(
   this: QueryMethodsHost,
   ...args: Array<
-    string | Record<string, "asc" | "desc"> | Nodes.Node | string[] | [Nodes.Node, ...unknown[]]
+    | string
+    | Record<string, "asc" | "desc">
+    | Nodes.Node
+    | string[]
+    | [Nodes.Node, ...unknown[]]
+    | Map<Nodes.Node | string, "asc" | "desc">
   >
 ): any {
   this._orderClauses = [];
@@ -447,13 +484,15 @@ function reorderBang(
           if (elem.trim() !== "") this._orderClauses.push(elem);
         }
       }
+    } else if (arg instanceof Map) {
+      for (const [key, dir] of arg) {
+        this._orderClauses.push(orderHashEntry(this, key, dir));
+      }
     } else if (arg instanceof Nodes.Node) {
-      // Pre-render to raw SQL string tagged as { raw } so _applyOrderToManager
-      // emits it verbatim (bypasses column qualification). Using { raw } rather
-      // than a live Nodes.Node keeps _orderClauses serializable (inspect(), merge
-      // dedup, etc. use JSON.stringify on the array).
-      const rawSql = (arg as any).value ?? (arg as Nodes.Node).toSql();
-      if (rawSql && rawSql.trim() !== "") this._orderClauses.push({ raw: String(rawSql) });
+      // Preserve the Arel node identity (Ascending/Descending/Attribute/...) so
+      // reverseOrderBang can flip it via .reverse()/.desc(), mirroring Rails'
+      // reverse_sql_order. _applyOrderToManager emits the node directly.
+      this._orderClauses.push(arg);
     } else if (typeof arg === "string") {
       if (arg.trim() === "") {
         const next = args[i + 1];
@@ -1053,6 +1092,14 @@ function optimizerHintsBang(this: QueryMethodsHost, ...hints: string[]): any {
 
 function reverseOrderBang(this: QueryMethodsHost): any {
   this._orderClauses = this._orderClauses.map((clause) => {
+    if (clause instanceof Nodes.Node) {
+      // Mirrors Rails reverse_sql_order: flip Arel::Nodes::Ordering subclasses
+      // (Ascending/Descending/NullsFirst/NullsLast) via reverse(), and fall back
+      // to desc() for bare expressions (Attribute, NodeExpression).
+      if (typeof (clause as any).reverse === "function") return (clause as any).reverse();
+      if (typeof (clause as any).desc === "function") return (clause as any).desc();
+      return clause;
+    }
     if (typeof clause === "object" && !Array.isArray(clause) && "raw" in clause) {
       // Mirrors Rails reverse_sql_order string case: flip trailing ASC↔DESC,
       // or append DESC if no direction present.

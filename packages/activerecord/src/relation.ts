@@ -259,7 +259,8 @@ export class Relation<T extends Base> {
   private _modelClass: typeof Base;
   /** @internal */
   _whereClause: WhereClause = WhereClause.empty();
-  private _orderClauses: Array<string | [string, "asc" | "desc"] | { raw: string }> = [];
+  private _orderClauses: Array<string | [string, "asc" | "desc"] | { raw: string } | Nodes.Node> =
+    [];
   private _rawOrderClauses: string[] = [];
   private _reordering = false;
   private _limitValue: number | null = null;
@@ -818,6 +819,7 @@ export class Relation<T extends Base> {
       | Nodes.Node
       | string[]
       | [Nodes.Node, ...unknown[]]
+      | Map<Nodes.Node | string, "asc" | "desc">
     >
   ): Relation<T> {
     return this._clone().orderBang(...(args as any));
@@ -937,6 +939,7 @@ export class Relation<T extends Base> {
       | Nodes.Node
       | string[]
       | [Nodes.Node, ...unknown[]]
+      | Map<Nodes.Node | string, "asc" | "desc">
     >
   ): Relation<T> {
     return this._clone().reorderBang(...(args as any));
@@ -3775,6 +3778,12 @@ export class Relation<T extends Base> {
       manager.order(new Nodes.SqlLiteral(rawClause));
     }
     for (const clause of this._orderClauses) {
+      if (clause instanceof Nodes.Node) {
+        // Arel order nodes (Ascending/Descending/Attribute/...) preserved by
+        // orderBang — emit directly so identity survives to the SQL manager.
+        manager.order(clause);
+        continue;
+      }
       if (typeof clause === "object" && !Array.isArray(clause) && "raw" in clause) {
         manager.order(new Nodes.SqlLiteral((clause as { raw: string }).raw));
         continue;

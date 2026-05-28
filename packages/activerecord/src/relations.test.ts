@@ -226,7 +226,7 @@ describe("RelationTest", () => {
       expect(posts[0].category).toBe("art");
     });
 
-    it.skip("reorder replaces existing order", async () => {
+    it("reorder replaces existing order", async () => {
       const posts = await Post.all().order("title").reorder({ views: "asc" }).toArray();
       expect(posts[0].views).toBe(10);
     });
@@ -2053,7 +2053,7 @@ describe("RelationTest", () => {
   });
 
   // -- reorder replaces existing order --
-  it.skip("reorder replaces existing order", async () => {
+  it("reorder replaces existing order", async () => {
     const items = await Widget.all().order({ name: "asc" }).reorder({ name: "desc" }).toArray();
     expect(items[0].name).toBe("D");
   });
@@ -4036,7 +4036,7 @@ describe("RelationTest", () => {
 
   // -- reorder --
 
-  it.skip("reorder replaces existing order", () => {
+  it("reorder replaces existing order", () => {
     const rel = Product.all().order("name").reorder({ price: "desc" });
     const sql = rel.toSql();
     // Should have price DESC, not name ASC
