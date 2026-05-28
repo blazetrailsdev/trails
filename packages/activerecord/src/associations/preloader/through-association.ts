@@ -364,12 +364,30 @@ export class ThroughAssociation extends Association {
 
     if (options.disableJoins) return scope;
 
+    // Carry the through reflection's own scope `annotate(...)` comments onto the
+    // through query. Mirrors Rails' through_scope, which reads
+    // `reflection_scope.values[:annotate]` before applying source_type
+    // (preloader/through_association.rb). Without this, custom SQL annotations
+    // on the intermediate association are silently dropped.
+    const reflScope = this._reflectionScope;
+    const annotations: string[] = reflScope?._annotations ?? [];
+    if (annotations.length > 0) {
+      scope = scope.annotate(...annotations);
+    }
+
     // source_type: filter through records by polymorphic type column
     if (options.sourceType) {
       const foreignType = (this.reflection as any).foreignType;
       if (foreignType) {
         scope = scope.where({ [foreignType]: options.sourceType });
       }
+    }
+
+    // cascade_strict_loading: a strict-loading preload scope propagates to the
+    // through query so intermediate records inherit the constraint
+    // (preloader/through_association.rb, Association#cascade_strict_loading).
+    if (this._preloadScope?.isStrictLoading) {
+      scope = scope.strictLoading?.() ?? scope;
     }
 
     return scope;
