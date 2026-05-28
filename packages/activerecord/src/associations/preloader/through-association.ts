@@ -364,6 +364,17 @@ export class ThroughAssociation extends Association {
 
     if (options.disableJoins) return scope;
 
+    // Carry the through reflection's own scope `annotate(...)` comments onto the
+    // through query. Mirrors Rails' through_scope, which reads
+    // `reflection_scope.values[:annotate]` before applying source_type
+    // (preloader/through_association.rb). Without this, custom SQL annotations
+    // on the intermediate association are silently dropped.
+    const reflScope = this._reflectionScope;
+    const annotations: string[] = reflScope?._annotations ?? [];
+    if (annotations.length > 0) {
+      scope = scope.annotate(...annotations);
+    }
+
     // source_type: filter through records by polymorphic type column
     if (options.sourceType) {
       const foreignType = (this.reflection as any).foreignType;
@@ -371,8 +382,18 @@ export class ThroughAssociation extends Association {
         scope = scope.where({ [foreignType]: options.sourceType });
       }
     }
+    // Rails' `elsif !reflection_scope.where_clause.empty?` branch copies the
+    // reflection scope's WHERE onto the through query and adds
+    // `includes!(source)` / `references!` so target-table columns resolve via a
+    // JOIN on the through query (a single-query strategy). Our preloader applies
+    // those target-table conditions at the source-preloader stage instead (see
+    // `_getSourcePreloaders`), so the literal JOIN branch is intentionally not
+    // mirrored here — it is covered by the join-based eager-loading path.
 
-    return scope;
+    // cascade_strict_loading: a strict-loading preload scope propagates to the
+    // through query so intermediate records inherit the constraint
+    // (preloader/through_association.rb:145, Association#cascade_strict_loading).
+    return this._cascadeStrictLoading(scope);
   }
 
   private get _throughReflection(): AssociationLikeReflection | null {
