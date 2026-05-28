@@ -6,6 +6,7 @@ import { setSchemaCacheIgnoredTables } from "../ar-config.js";
 import { StatementInvalid } from "../errors.js";
 import { SchemaStatements } from "./abstract/schema-statements.js";
 import { TableDefinition } from "./abstract/schema-definitions.js";
+import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -595,26 +596,52 @@ function makeMockAdapter(cache: SchemaCache) {
 }
 
 describe("DDL cache-invalidation safety-net", () => {
-  it("dropTable clears schema cache entry", async () => {
+  it("dropTable clears schema cache entry before DROP SQL", async () => {
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("id", "integer")]);
     expect(cache.isCached("posts")).toBe(true);
 
-    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
+    const order: string[] = [];
+    const adapter = makeMockAdapter(cache);
+    const origClear = cache.clearDataSourceCacheBang.bind(cache);
+    vi.spyOn(cache, "clearDataSourceCacheBang").mockImplementation((pool, name) => {
+      order.push(`clear:${name}`);
+      origClear(pool, name);
+    });
+    (adapter.executeMutation as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      order.push("sql");
+      return 0;
+    });
+
+    const ss = new SchemaStatements(adapter as any);
     await ss.dropTable("posts");
 
     expect(cache.isCached("posts")).toBe(false);
+    expect(order).toEqual(["clear:posts", "sql"]);
   });
 
-  it("dropJoinTable clears schema cache entry (via dropTable)", async () => {
+  it("dropJoinTable clears schema cache entry before DROP SQL (via dropTable)", async () => {
     const cache = new SchemaCache();
     cache.setColumns("accounts_people", [makeColumn("account_id", "integer")]);
     expect(cache.isCached("accounts_people")).toBe(true);
 
-    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
+    const order: string[] = [];
+    const adapter = makeMockAdapter(cache);
+    const origClear = cache.clearDataSourceCacheBang.bind(cache);
+    vi.spyOn(cache, "clearDataSourceCacheBang").mockImplementation((pool, name) => {
+      order.push(`clear:${name}`);
+      origClear(pool, name);
+    });
+    (adapter.executeMutation as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      order.push("sql");
+      return 0;
+    });
+
+    const ss = new SchemaStatements(adapter as any);
     await ss.dropJoinTable("accounts", "people");
 
     expect(cache.isCached("accounts_people")).toBe(false);
+    expect(order).toEqual(["clear:accounts_people", "sql"]);
   });
 
   // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
@@ -705,5 +732,40 @@ describe("DDL cache-invalidation safety-net", () => {
     await ss.changeColumn("posts", "title", "text");
 
     expect(cache.isCached("posts")).toBe(false);
+  });
+});
+
+describe("SchemaCache DDL invalidation", () => {
+  let adapter: SQLite3Adapter;
+
+  function warmCache(tableName: string) {
+    adapter.schemaCache.setColumns(tableName, [makeColumn("id", "integer")]);
+  }
+
+  beforeEach(async () => {
+    adapter = new SQLite3Adapter(":memory:");
+    await adapter.createTable("things", (t) => {
+      t.string("name");
+      t.integer("count");
+    });
+    warmCache("things");
+    expect(adapter.schemaCache.isCached("things")).toBe(true);
+  });
+
+  afterEach(async () => {
+    await adapter.close();
+  });
+
+  it("dropTable clears cache before DROP TABLE", async () => {
+    await adapter.dropTable("things");
+    expect(adapter.schemaCache.isCached("things")).toBe(false);
+  });
+
+  it("renameTable clears both old and new names before ALTER TABLE RENAME", async () => {
+    warmCache("stuff"); // simulate stale cache for the destination name
+    expect(adapter.schemaCache.isCached("stuff")).toBe(true);
+    await adapter.renameTable("things", "stuff");
+    expect(adapter.schemaCache.isCached("things")).toBe(false);
+    expect(adapter.schemaCache.isCached("stuff")).toBe(false);
   });
 });

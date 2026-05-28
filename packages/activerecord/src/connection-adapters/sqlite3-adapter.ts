@@ -983,7 +983,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async renameTable(tableName: string, newName: string): Promise<void> {
-    this.schemaCache.clear();
+    this.schemaCache.clearDataSourceCacheBang(this.pool, tableName);
+    this.schemaCache.clearDataSourceCacheBang(this.pool, newName);
     await this.executeMutation(
       `ALTER TABLE ${quoteTableName(tableName)} RENAME TO ${quoteTableName(newName)}`,
     );

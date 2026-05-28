@@ -3605,6 +3605,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async renameTable(oldName: string, newName: string): Promise<void> {
     const { schema: oldSchema, table: unqualifiedOld } = this.parseSchemaQualifiedName(oldName);
     const { table: unqualifiedNew } = this.parseSchemaQualifiedName(newName);
+    this.schemaCache.clearDataSourceCacheBang(this.pool, oldName);
+    this.schemaCache.clearDataSourceCacheBang(this.pool, newName);
     await this.exec(
       `ALTER TABLE ${this.quoteTableName(oldName)} RENAME TO ${this.quoteIdentifier(unqualifiedNew)}`,
     );

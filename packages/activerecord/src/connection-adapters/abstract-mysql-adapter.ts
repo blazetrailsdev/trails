@@ -562,8 +562,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async renameTable(tableName: string, newName: string): Promise<void> {
-    void tableName;
-    void newName;
+    this.schemaCache.clearDataSourceCacheBang(this.pool, tableName);
+    this.schemaCache.clearDataSourceCacheBang(this.pool, newName);
+    await this._execMutation(
+      `RENAME TABLE ${this.quoteTableName(tableName)} TO ${this.quoteTableName(newName)}`,
+    );
+    await this.schemaStatements().renameTableIndexes(tableName, newName);
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
