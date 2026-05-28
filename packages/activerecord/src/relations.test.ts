@@ -3,6 +3,7 @@ import { Base, Relation, Range, RecordNotFound, SoleRecordExceeded } from "./ind
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { adapterType } from "./test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
 
 // Ensure spies and mocks created inside individual tests don't leak
@@ -314,10 +315,12 @@ describe("RelationTest", () => {
       expect(sql).toContain("COUNT(*) > 1");
     });
 
-    it.skip("having with hash form", () => {
+    it("having with hash form", () => {
       const sql = Post.all().group("category").having({ count: 5 }).toSql();
       expect(sql).toContain("HAVING");
-      expect(sql).toContain(`"count" = 5`);
+      // Identifier quoting is adapter-specific ("count" vs `count`) and the
+      // column may be table-qualified; assert the predicate regardless.
+      expect(sql).toMatch(/count[`"]? = 5/);
     });
   });
 
@@ -439,12 +442,12 @@ describe("RelationTest", () => {
   // ── lock ──
 
   describe("lock", () => {
-    it.skip("adds FOR UPDATE by default", () => {
+    it.skipIf(adapterType === "sqlite")("adds FOR UPDATE by default", () => {
       const sql = Post.all().lock().toSql();
       expect(sql).toContain("FOR UPDATE");
     });
 
-    it.skip("accepts a custom lock clause", () => {
+    it.skipIf(adapterType === "sqlite")("accepts a custom lock clause", () => {
       const sql = Post.all().lock("FOR SHARE").toSql();
       expect(sql).toContain("FOR SHARE");
     });
@@ -2665,7 +2668,7 @@ describe("RelationTest", () => {
 describe("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  it.skip("toSql includes FOR UPDATE", () => {
+  it.skipIf(adapterType === "sqlite")("toSql includes FOR UPDATE", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -2675,7 +2678,7 @@ describe("RelationTest", () => {
     expect(sql).toContain("FOR UPDATE");
   });
 
-  it.skip("toSql includes custom lock clause", () => {
+  it.skipIf(adapterType === "sqlite")("toSql includes custom lock clause", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -3830,7 +3833,7 @@ describe("RelationTest", () => {
 describe("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  it.skip("lock generates FOR UPDATE SQL", () => {
+  it.skipIf(adapterType === "sqlite")("lock generates FOR UPDATE SQL", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -3840,7 +3843,7 @@ describe("RelationTest", () => {
     expect(sql).toContain("FOR UPDATE");
   });
 
-  it.skip("lock with custom clause", () => {
+  it.skipIf(adapterType === "sqlite")("lock with custom clause", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -4492,7 +4495,7 @@ describe("RelationTest", () => {
     expect(result[0].name).toBe("A");
   });
 
-  it.skip("lock generates FOR UPDATE in SQL", async () => {
+  it.skipIf(adapterType === "sqlite")("lock generates FOR UPDATE in SQL", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -4501,7 +4504,7 @@ describe("RelationTest", () => {
     expect(User.all().lock().toSql()).toContain("FOR UPDATE");
   });
 
-  it.skip("lock with custom clause", async () => {
+  it.skipIf(adapterType === "sqlite")("lock with custom clause", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -6518,14 +6521,15 @@ describe("RelationTest", () => {
     expect(Post.where({ title: "x" }).unscope("where")).toBeInstanceOf(Relation);
   });
 
-  it.skip("locked should not build arel", () => {
+  it("locked should not build arel", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.all().lock().toSql();
-    expect(sql).toContain("FOR UPDATE");
+    const posts = Post.all().lock();
+    expect(posts.isLocked).toBe(true);
+    expect(() => posts.lock(false)).not.toThrow();
   });
 
   it("relation join method", () => {

@@ -1093,6 +1093,15 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * Check if this relation carries a lock clause.
+   *
+   * Mirrors: ActiveRecord::Relation#locked? (`alias :locked? :lock_value`)
+   */
+  get isLocked(): boolean {
+    return this._lockValue !== null;
+  }
+
+  /**
    * Check if this relation has strict loading enabled.
    *
    * Mirrors: ActiveRecord::Relation#strict_loading?
