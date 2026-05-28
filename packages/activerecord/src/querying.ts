@@ -886,7 +886,7 @@ export function and<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Querying#in_order_of */
 export function inOrderOf<T extends typeof Base>(
   this: T,
-  column: string,
+  column: string | import("@blazetrails/arel").Nodes.Node,
   values: unknown[],
   filter?: boolean,
 ): Relation<InstanceType<T>> {
