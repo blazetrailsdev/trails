@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "../../base.js";
 import type { AbstractReflection } from "../../reflection.js";
 import { Association } from "./association.js";
@@ -152,25 +153,25 @@ export class Branch {
 
   groupedRecords(): Map<AbstractReflection, Base[]> {
     const h = new Map<AbstractReflection, Base[]>();
+    const polymorphicParent = !this.isRoot() && this.parent!.isPolymorphic();
 
     for (const record of this.sourceRecords) {
       const reflection = (record.constructor as typeof Base)._reflectOnAssociation(
         this.association!,
       );
 
-      if (!reflection) continue;
-
-      try {
-        if (!(record as any).association(this.association!).klass) continue;
-      } catch {
+      if (
+        (polymorphicParent && !reflection) ||
+        !(record as any).association(this.association!).klass
+      ) {
         continue;
       }
 
-      const existing = h.get(reflection);
+      const existing = h.get(reflection!);
       if (existing) {
         existing.push(record);
       } else {
-        h.set(reflection, [record]);
+        h.set(reflection!, [record]);
       }
     }
     return h;
@@ -253,19 +254,12 @@ export class Branch {
 
     const arr = Array.isArray(children) ? children : [children];
     return arr.flatMap((assoc) => {
-      if (typeof assoc === "string" || typeof assoc === "symbol") {
-        return [
-          new Branch({
-            parent: this,
-            association: assoc,
-            children: null,
-            associateByDefault: this.associateByDefault,
-            scope: this.scope,
-          }),
-        ];
+      // Flatten nested arrays, mirroring Rails' `Array.wrap` + `Array(...)`.
+      if (Array.isArray(assoc)) {
+        return this._buildChildren(assoc);
       }
 
-      if (typeof assoc === "object" && assoc !== null && !Array.isArray(assoc)) {
+      if (typeof assoc === "object" && assoc !== null) {
         return Reflect.ownKeys(assoc)
           .filter((k): k is string | symbol => typeof k === "string" || typeof k === "symbol")
           .map(
@@ -280,7 +274,17 @@ export class Branch {
           );
       }
 
-      throw new TypeError(`Invalid association specifier: ${typeof assoc}`);
+      // Scalar leaf: string/symbol pass; any other type raises ArgumentError
+      // through _normalizeAssociationName, mirroring Rails' `association.to_sym`.
+      return [
+        new Branch({
+          parent: this,
+          association: assoc,
+          children: null,
+          associateByDefault: this.associateByDefault,
+          scope: this.scope,
+        }),
+      ];
     });
   }
 
@@ -293,7 +297,14 @@ export class Branch {
       }
       return description;
     }
-    return String(association);
+    // Rails coerces the name with `association.to_sym`; anything that doesn't
+    // respond to it (e.g. an Integer) raises ArgumentError (branch.rb:11-18).
+    if (typeof association !== "string") {
+      throw new ArgumentError(
+        `Association names must be Symbol or String, got: ${rubyClassName(association)}`,
+      );
+    }
+    return association;
   }
 
   private _preloaderFor(
@@ -302,21 +313,17 @@ export class Branch {
     if ((reflection as any).options?.through) {
       return ThroughAssociation;
     }
-    if ((reflection as any).isThroughReflection?.()) {
-      return ThroughAssociation;
-    }
-    // HABTM stores through in _associations, not on reflection
-    const model = (reflection as any).activeRecord;
-    if (model?._associations) {
-      const assocDef = (model._associations as any[]).find(
-        (a: any) => a.name === (reflection as any).name,
-      );
-      if (assocDef?.options?.through) {
-        return ThroughAssociation;
-      }
-    }
     return Association;
   }
+}
+
+/**
+ * Ruby class name for an invalid association specifier (e.g. `10` → "Integer").
+ * @internal
+ */
+function rubyClassName(value: unknown): string {
+  if (typeof value === "number") return Number.isInteger(value) ? "Integer" : "Float";
+  return (value as any)?.constructor?.name ?? typeof value;
 }
 
 /** @internal */

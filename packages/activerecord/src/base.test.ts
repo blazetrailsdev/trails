@@ -1942,6 +1942,7 @@ describe("BasicsTest", () => {
     class Bulb extends Base {
       static {
         this.attribute("car_id", "integer");
+        this.belongsTo("car", { className: "Car", foreignKey: "car_id" });
       }
     }
     class Car extends Base {
@@ -1970,6 +1971,7 @@ describe("BasicsTest", () => {
     class Bulb extends Base {
       static {
         this.attribute("car_id", "integer");
+        this.belongsTo("car", { className: "Car", foreignKey: "car_id" });
       }
     }
     class Car extends Base {

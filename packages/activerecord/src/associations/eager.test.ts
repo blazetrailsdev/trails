@@ -325,6 +325,22 @@ const TEST_SCHEMA: Schema = {
   ptc_posts: { title: "string" },
   ptc_taggings: { taggable_id: "integer", taggable_type: "string", ptc_tag_id: "integer" },
   ptc_tags: { name: "string" },
+  sg_authors: { name: "string" },
+  sg_comments: { body: "string", sg_post_id: "integer" },
+  sg_posts: { title: "string", sg_author_id: "integer" },
+  sg_memberships: { kind: "string" },
+  sg_members: { name: "string", sg_post_id: "integer" },
+  sg_organizations: { name: "string", sg_membership_id: "integer" },
+  sg_sponsors: { sponsorable_id: "integer", sponsorable_type: "string" },
+  eager_nl_authors: { name: "string" },
+  eager_nl_posts: { title: "string", eager_nl_author_id: "integer" },
+  eager_tl_authors: { name: "string" },
+  eager_tl_posts: { title: "string" },
+  eager_tl_comments: {
+    body: "string",
+    eager_tl_post_id: "integer",
+    eager_tl_author_id: "integer",
+  },
   sti_share_comments: { body: "string", type: "string", sti_share_post_id: "integer" },
   sti_share_posts: { title: "string" },
   // HABTM join tables — no implicit primary key.
@@ -365,6 +381,83 @@ const TEST_SCHEMA: Schema = {
     primaryKey: false,
   },
 };
+// Shared models for the polymorphic-preload guard tests (Rails' Sponsor → sponsorable fixtures).
+class SgAuthor extends Base {
+  static {
+    this.attribute("name", "string");
+  }
+}
+class SgComment extends Base {
+  static {
+    this.attribute("body", "string");
+    this.attribute("sg_post_id", "integer");
+  }
+}
+class SgPost extends Base {
+  static {
+    this.attribute("title", "string");
+    this.attribute("sg_author_id", "integer");
+  }
+}
+class SgMembership extends Base {
+  static {
+    this.attribute("kind", "string");
+  }
+}
+class SgMember extends Base {
+  static {
+    this.attribute("name", "string");
+    this.attribute("sg_post_id", "integer");
+  }
+}
+class SgOrganization extends Base {
+  static {
+    this.attribute("name", "string");
+    this.attribute("sg_membership_id", "integer");
+  }
+}
+class SgSponsor extends Base {
+  static {
+    this.attribute("sponsorable_id", "integer");
+    this.attribute("sponsorable_type", "string");
+  }
+}
+Associations.belongsTo.call(SgPost, "author", {
+  className: "SgAuthor",
+  foreignKey: "sg_author_id",
+});
+Associations.hasOne.call(SgPost, "firstComment", {
+  className: "SgComment",
+  foreignKey: "sg_post_id",
+});
+Associations.belongsTo.call(SgMember, "post", { className: "SgPost", foreignKey: "sg_post_id" });
+Associations.belongsTo.call(SgOrganization, "membership", {
+  className: "SgMembership",
+  foreignKey: "sg_membership_id",
+});
+Associations.belongsTo.call(SgSponsor, "sponsorable", { polymorphic: true });
+
+function registerSponsorableModels(): void {
+  registerModel("SgAuthor", SgAuthor);
+  registerModel("SgComment", SgComment);
+  registerModel("SgPost", SgPost);
+  registerModel("SgMembership", SgMembership);
+  registerModel("SgMember", SgMember);
+  registerModel("SgOrganization", SgOrganization);
+  registerModel("SgSponsor", SgSponsor);
+}
+
+async function seedSponsors(): Promise<void> {
+  const author = await SgAuthor.create({ name: "David" });
+  const post = await SgPost.create({ title: "Welcome", sg_author_id: author.id });
+  await SgComment.create({ body: "First!", sg_post_id: post.id });
+  const membership = await SgMembership.create({ kind: "gold" });
+  const member = await SgMember.create({ name: "M", sg_post_id: post.id });
+  const org = await SgOrganization.create({ name: "O", sg_membership_id: membership.id });
+  await SgSponsor.create({ sponsorable_type: "SgMember", sponsorable_id: member.id });
+  await SgSponsor.create({ sponsorable_type: "SgOrganization", sponsorable_id: org.id });
+}
+
 // ==========================================================================
 // EagerAssociationTest — targets associations/eager_test.rb
 // ==========================================================================
@@ -373,6 +466,7 @@ describe("EagerAssociationTest", () => {
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
+    registerSponsorableModels();
   });
   it("should work inverse of with eager load", async () => {
     class EagerInvParent extends Base {
@@ -925,27 +1019,68 @@ describe("EagerAssociationTest", () => {
   });
 
   it("nested loading does not raise exception when association does not exist", async () => {
-    class EagerNlWidget extends Base {
+    class EagerNlAuthor extends Base {
       static {
         this.attribute("name", "string");
       }
     }
-    registerModel("EagerNlWidget", EagerNlWidget);
-    await EagerNlWidget.create({ name: "W" });
-    // Including a nonexistent association should not throw
-    const widgets = await EagerNlWidget.all().includes("nonExistentAssoc").toArray();
-    expect(widgets).toHaveLength(1);
+    class EagerNlPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("eager_nl_author_id", "integer");
+      }
+    }
+    Associations.belongsTo.call(EagerNlPost, "author", {
+      className: "EagerNlAuthor",
+      foreignKey: "eager_nl_author_id",
+    });
+    registerModel("EagerNlAuthor", EagerNlAuthor);
+    registerModel("EagerNlPost", EagerNlPost);
+    // author is null → the nested `nonExisting` branch has no source records (eager_test.rb:380).
+    await EagerNlPost.create({ title: "Authorless", eager_nl_author_id: null as any });
+    const posts = await EagerNlPost.all().includes({ author: "nonExisting" }).toArray();
+    expect(posts).toHaveLength(1);
   });
   it("three level nested preloading does not raise exception when association does not exist", async () => {
-    class EagerTlWidget extends Base {
+    class EagerTlAuthor extends Base {
       static {
         this.attribute("name", "string");
       }
     }
-    registerModel("EagerTlWidget", EagerTlWidget);
-    await EagerTlWidget.create({ name: "W" });
-    const widgets = await EagerTlWidget.all().includes("nonExistent").toArray();
-    expect(widgets).toHaveLength(1);
+    class EagerTlPost extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    class EagerTlComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("eager_tl_post_id", "integer");
+        this.attribute("eager_tl_author_id", "integer");
+      }
+    }
+    Associations.hasMany.call(EagerTlPost, "comments", {
+      className: "EagerTlComment",
+      foreignKey: "eager_tl_post_id",
+    });
+    Associations.belongsTo.call(EagerTlComment, "author", {
+      className: "EagerTlAuthor",
+      foreignKey: "eager_tl_author_id",
+    });
+    registerModel("EagerTlAuthor", EagerTlAuthor);
+    registerModel("EagerTlPost", EagerTlPost);
+    registerModel("EagerTlComment", EagerTlComment);
+    const post = await EagerTlPost.create({ title: "P" });
+    await EagerTlComment.create({
+      body: "C",
+      eager_tl_post_id: post.id,
+      eager_tl_author_id: null as any,
+    });
+    // comment author is null → third-level `essays` branch never iterates (eager_test.rb:386).
+    const posts = await EagerTlPost.all()
+      .preload({ comments: [{ author: "essays" }] })
+      .toArray();
+    expect(posts).toHaveLength(1);
   });
   it("nested loading through has one association", async () => {
     class NestHoAuthor extends Base {
@@ -3046,9 +3181,17 @@ describe("EagerAssociationTest", () => {
     registerModel("EagerWidget", EagerWidget);
 
     await EagerWidget.create({ name: "w1" });
-    // Querying with an invalid include should not crash or should handle gracefully
-    const widgets = await EagerWidget.all().includes("nonExistent").toArray();
-    expect(widgets).toHaveLength(1);
+    const expected =
+      /Association named 'monkeys' was not found on EagerWidget; perhaps you misspelled it\?/;
+    await expect(EagerWidget.all().includes("monkeys").toArray()).rejects.toThrow(expected);
+    await expect(
+      EagerWidget.all()
+        .includes(["monkeys"] as any)
+        .toArray(),
+    ).rejects.toThrow(expected);
+    await expect(EagerWidget.all().includes("monkeys", "elephants").toArray()).rejects.toThrow(
+      expected,
+    );
   });
 
   it.skip("exceptions have suggestions for fix", async () => {
@@ -4549,9 +4692,14 @@ describe("EagerAssociationTest", () => {
     }
     registerModel("PiaWidget", PiaWidget);
     await PiaWidget.create({ name: "w" });
-    // Preloading a non-existent association should handle gracefully (no crash)
-    const widgets = await PiaWidget.all().preload("nonExistent").toArray();
-    expect(widgets).toHaveLength(1);
+    await expect(
+      PiaWidget.all()
+        .preload(10 as any)
+        .toArray(),
+    ).rejects.toThrow(/Association names must be Symbol or String, got: Integer/);
+    await expect(PiaWidget.all().preload("doesNotExists").toArray()).rejects.toThrow(
+      /Association named 'doesNotExists' was not found on PiaWidget; perhaps you misspelled it\?/,
+    );
   });
   it("associations with extensions are not instance dependent", async () => {
     class AweAuthor extends Base {
@@ -4755,20 +4903,41 @@ describe("EagerAssociationTest", () => {
     expect(comments).toHaveLength(1);
     expect(comments[0].body).toBe("C");
   });
-  it.skip("preloading through a polymorphic association doesn't require the association to exist", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("preloading through a polymorphic association doesn't require the association to exist", async () => {
+    await seedSponsors();
+    const sponsors = await SgSponsor.all()
+      .preload({ sponsorable: ["post", "membership"] })
+      .toArray();
+    expect(sponsors).toHaveLength(2);
+    const sponsorables = sponsors.map((s) => (s as any)._preloadedAssociations.get("sponsorable"));
+    expect(sponsorables.every((s: any) => s != null)).toBe(true);
+    const member = sponsorables.find((s: any) => s?.constructor.name === "SgMember");
+    const org = sponsorables.find((s: any) => s?.constructor.name === "SgOrganization");
+    expect((member as any)._preloadedAssociations.has("post")).toBe(true);
+    expect((org as any)._preloadedAssociations.has("membership")).toBe(true);
   });
-  it.skip("preloading a regular association through a polymorphic association doesn't require the association to exist on all types", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("preloading a regular association through a polymorphic association doesn't require the association to exist on all types", async () => {
+    await seedSponsors();
+    const sponsors = await SgSponsor.all()
+      .preload({ sponsorable: [{ post: "firstComment" }, "membership"] })
+      .toArray();
+    expect(sponsors).toHaveLength(2);
+    const member = sponsors
+      .map((s) => (s as any)._preloadedAssociations.get("sponsorable"))
+      .find((s: any) => s?.constructor.name === "SgMember");
+    const post = (member as any)._preloadedAssociations.get("post");
+    expect(post).toBeTruthy();
+    expect((post as any)._preloadedAssociations.get("firstComment")?.body).toBe("First!");
   });
-  it.skip("preloading a regular association with a typo through a polymorphic association still raises", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("preloading a regular association with a typo through a polymorphic association still raises", async () => {
+    await seedSponsors();
+    await expect(
+      SgSponsor.all()
+        .preload({ sponsorable: [{ post: "fistComment" }, "membership"] })
+        .toArray(),
+    ).rejects.toThrow(
+      /Association named 'fistComment' was not found on SgPost; perhaps you misspelled it\?/,
+    );
   });
   it.skip("preloading belongs_to association associated by a composite query_constraints", () => {
     // BLOCKED: associations — eager-loading feature gap
