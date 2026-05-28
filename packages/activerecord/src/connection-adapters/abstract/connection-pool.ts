@@ -902,11 +902,24 @@ export class ConnectionPool implements ReapablePool {
 
   // --- Connection creation ---
 
+  /**
+   * Mirrors Rails:
+   *
+   *   def new_connection
+   *     connection = db_config.new_connection
+   *     connection.pool = self
+   *     connection
+   *   end
+   *
+   * Falls back to `poolConfig.adapterFactory` when one is given (trails-
+   * specific extension for tests that need to inject a specific adapter
+   * instance), but the default path now delegates to `dbConfig.newConnection`
+   * just like Rails.
+   */
   newConnection(): DatabaseAdapter {
-    if (!this.poolConfig.adapterFactory) {
-      throw new ConnectionNotEstablished("No adapter factory configured for connection pool");
-    }
-    const conn = this.poolConfig.adapterFactory();
+    const conn = this.poolConfig.adapterFactory
+      ? this.poolConfig.adapterFactory()
+      : (this.dbConfig.newConnection() as DatabaseAdapter);
     // Set the back-reference so AbstractAdapter#schemaCache can reach
     // pool.poolConfig.schemaCache to share the raw SchemaCache across
     // every connection in this pool. Rails' AbstractAdapter has the

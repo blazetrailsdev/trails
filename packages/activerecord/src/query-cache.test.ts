@@ -47,9 +47,7 @@ function makePoolWithQCache(
     reapingFrequency: null,
     queryCache,
   });
-  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-    adapterFactory: createTestAdapter,
-  });
+  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default");
   return new ConnectionPool(pc);
 }
 

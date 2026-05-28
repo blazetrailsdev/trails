@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
-import { createTestAdapter } from "../test-adapter.js";
 import { Base } from "../base.js";
 
 describe("ConnectionHandlerTest", () => {
@@ -25,7 +24,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    const pool = handler.establishConnection(config, { adapterFactory: createTestAdapter });
+    const pool = handler.establishConnection(config);
     expect(pool).toBeTruthy();
     expect(pool.dbConfig.adapter).toBe("sqlite3");
   });
@@ -62,7 +61,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    const pool = handler.establishConnection(config, { adapterFactory: createTestAdapter });
+    const pool = handler.establishConnection(config);
     expect(pool.dbConfig.name).toBe("primary");
   });
 
@@ -71,7 +70,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    const pool = handler.establishConnection(config, { adapterFactory: createTestAdapter });
+    const pool = handler.establishConnection(config);
     expect(pool.dbConfig.envName).toBe("development");
     expect(pool.dbConfig.name).toBe("primary");
   });
@@ -81,7 +80,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    const pool = handler.establishConnection(config, { adapterFactory: createTestAdapter });
+    const pool = handler.establishConnection(config);
     expect(pool.dbConfig.envName).toBe("development");
   });
 
@@ -90,7 +89,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "test.db",
     });
-    const pool = handler.establishConnection(config, { adapterFactory: createTestAdapter });
+    const pool = handler.establishConnection(config);
     expect(pool.dbConfig.database).toBe("test.db");
   });
 
@@ -106,7 +105,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    handler.establishConnection(config, { owner: "MyModel", adapterFactory: createTestAdapter });
+    handler.establishConnection(config, { owner: "MyModel" });
     const pool = handler.retrieveConnectionPool("MyModel");
     expect(pool).toBeTruthy();
   });
@@ -123,7 +122,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary");
     expect(pool).toBeTruthy();
   });
@@ -134,7 +133,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     pool.leaseConnection();
     expect(handler.activeConnections).toBe(true);
@@ -146,7 +145,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary");
     expect(pool).toBeTruthy();
     expect(pool!.dbConfig.database).toBe("dev.db");
@@ -166,8 +165,8 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "animals.db",
     });
-    handler.establishConnection(config1, { owner: "primary", adapterFactory: createTestAdapter });
-    handler.establishConnection(config2, { owner: "animals", adapterFactory: createTestAdapter });
+    handler.establishConnection(config1, { owner: "primary" });
+    handler.establishConnection(config2, { owner: "animals" });
     expect(handler.connectionPools).toHaveLength(2);
   });
 
@@ -202,8 +201,8 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "child.db",
     });
-    handler.establishConnection(config1, { owner: "primary", adapterFactory: createTestAdapter });
-    handler.establishConnection(config2, { owner: "child", adapterFactory: createTestAdapter });
+    handler.establishConnection(config1, { owner: "primary" });
+    handler.establishConnection(config2, { owner: "child" });
     handler.removeConnection("child");
     expect(handler.retrieveConnectionPool("primary")).toBeTruthy();
     expect(handler.retrieveConnectionPool("child")).toBeUndefined();
@@ -216,7 +215,6 @@ describe("ConnectionHandlerTest", () => {
     });
     const pool1 = handler.establishConnection(config, {
       owner: "primary",
-      adapterFactory: createTestAdapter,
     });
     const pool2 = handler.retrieveConnectionPool("primary");
     expect(pool1).toBe(pool2);
@@ -234,12 +232,10 @@ describe("ConnectionHandlerTest", () => {
     handler.establishConnection(writing, {
       owner: "primary",
       role: "writing",
-      adapterFactory: createTestAdapter,
     });
     handler.establishConnection(reading, {
       owner: "primary",
       role: "reading",
-      adapterFactory: createTestAdapter,
     });
     const writingPool = handler.retrieveConnectionPool("primary", { role: "writing" });
     const readingPool = handler.retrieveConnectionPool("primary", { role: "reading" });
@@ -262,12 +258,10 @@ describe("ConnectionHandlerTest", () => {
     handler.establishConnection(shard1, {
       owner: "primary",
       shard: "one",
-      adapterFactory: createTestAdapter,
     });
     handler.establishConnection(shard2, {
       owner: "primary",
       shard: "two",
-      adapterFactory: createTestAdapter,
     });
     const pool1 = handler.retrieveConnectionPool("primary", { shard: "one" });
     const pool2 = handler.retrieveConnectionPool("primary", { shard: "two" });
@@ -287,12 +281,10 @@ describe("ConnectionHandlerTest", () => {
     });
     const oldPool = handler.establishConnection(config1, {
       owner: "primary",
-      adapterFactory: createTestAdapter,
     });
     const disconnectSpy = vi.spyOn(oldPool, "disconnect");
     const newPool = handler.establishConnection(config2, {
       owner: "primary",
-      adapterFactory: createTestAdapter,
     });
     expect(disconnectSpy).toHaveBeenCalled();
     expect(newPool).not.toBe(oldPool);
@@ -345,7 +337,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    handler.establishConnection(config, { owner: "primary" });
     expect(handler.connectionPoolNames()).toContain("primary");
   });
 
@@ -354,7 +346,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    handler.establishConnection(config, { owner: "primary" });
     const pools: unknown[] = [];
     handler.eachConnectionPool(null, (pool) => pools.push(pool));
     expect(pools).toHaveLength(1);
@@ -365,7 +357,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     pool.leaseConnection();
     expect(pool.activeConnection).toBeTruthy();
@@ -378,7 +370,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     pool.leaseConnection();
     handler.clearAllConnectionsBang();
@@ -397,7 +389,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    handler.establishConnection(config, { owner: "primary" });
     const conn = handler.retrieveConnection("primary");
     expect(conn).toBeTruthy();
     expect(conn.adapterName).toBeTruthy();
@@ -414,7 +406,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     pool.leaseConnection();
     expect(handler.isConnected("primary")).toBe(true);
@@ -426,7 +418,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    handler.establishConnection(config, { owner: "primary" });
     expect(handler.retrieveConnectionPool("primary")).toBeTruthy();
     handler.removeConnectionPool("primary");
     expect(handler.retrieveConnectionPool("primary")).toBeUndefined();
@@ -437,7 +429,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    handler.establishConnection(config, { owner: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     pool.leaseConnection();
     pool.releaseConnection();
@@ -458,12 +450,10 @@ describe("ConnectionHandlerTest", () => {
     handler.establishConnection(config1, {
       owner: "primary",
       role: "writing",
-      adapterFactory: createTestAdapter,
     });
     handler.establishConnection(config2, {
       owner: "primary",
       role: "reading",
-      adapterFactory: createTestAdapter,
     });
     expect(handler.connectionPoolList("writing")).toHaveLength(1);
     expect(handler.connectionPoolList("reading")).toHaveLength(1);
@@ -479,7 +469,6 @@ describe("ConnectionHandlerTest", () => {
     handler.establishConnection(config, {
       owner: "primary",
       role: "writing",
-      adapterFactory: createTestAdapter,
     });
     const pool = handler.retrieveConnectionPool("primary", { role: "writing" })!;
     pool.leaseConnection();
@@ -503,7 +492,7 @@ describe("ConnectionHandlerTest", () => {
       adapter: "sqlite3",
       database: "dev.db",
     });
-    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    handler.establishConnection(config, { owner: "primary" });
     const pools: unknown[] = [];
     handler.eachConnectionPool(null, (pool) => pools.push(pool));
     expect(pools).toHaveLength(1);
@@ -516,12 +505,10 @@ describe("ConnectionHandlerTest", () => {
     });
     const pool1 = handler.establishConnection(config, {
       owner: "primary",
-      adapterFactory: createTestAdapter,
     });
     const disconnectSpy = vi.spyOn(pool1, "disconnect");
     const pool2 = handler.establishConnection(config, {
       owner: "primary",
-      adapterFactory: createTestAdapter,
     });
     expect(disconnectSpy).not.toHaveBeenCalled();
     expect(pool2).toBe(pool1);
@@ -534,13 +521,11 @@ describe("ConnectionHandlerTest", () => {
     });
     const pool1 = handler.establishConnection(config, {
       owner: "primary",
-      adapterFactory: createTestAdapter,
     });
     const disconnectSpy = vi.spyOn(pool1, "disconnect");
     const pool2 = handler.establishConnection(config, {
       owner: "primary",
       clobber: true,
-      adapterFactory: createTestAdapter,
     });
     expect(disconnectSpy).toHaveBeenCalled();
     expect(pool2).not.toBe(pool1);
@@ -566,7 +551,6 @@ describe("ConnectionHandlerTest", () => {
     handler.establishConnection(config, {
       owner: "primary",
       role: "writing",
-      adapterFactory: createTestAdapter,
     });
     expect(() =>
       handler.retrieveConnectionPool("primary", { role: "reading", strict: true }),

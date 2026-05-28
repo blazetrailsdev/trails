@@ -1,7 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { ShardSelector } from "./middleware/shard-selector.js";
-import { createTestAdapter } from "./test-adapter.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 
 describe("ShardSelectorTest", () => {
@@ -15,7 +14,6 @@ describe("ShardSelectorTest", () => {
       owner: "Base",
       role: "writing",
       shard: "shard_one",
-      adapterFactory: createTestAdapter,
     });
   }
 
