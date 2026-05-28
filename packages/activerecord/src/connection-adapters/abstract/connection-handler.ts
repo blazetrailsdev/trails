@@ -91,6 +91,7 @@ export class ConnectionHandler {
       owner?: string | ConnectionOwner;
       role?: string;
       shard?: string;
+      clobber?: boolean;
       adapterFactory?: () => DatabaseAdapter;
     } = {},
   ): ConnectionPool {
@@ -103,6 +104,7 @@ export class ConnectionHandler {
 
     const role = options.role ?? "writing";
     const shard = options.shard ?? "default";
+    const clobber = options.clobber ?? false;
 
     const poolConfig = this.resolvePoolConfig(config, ownerName, role, shard, {
       adapterFactory: options.adapterFactory,
@@ -112,6 +114,20 @@ export class ConnectionHandler {
     const poolManager = this.setPoolManager(poolKey);
 
     const existingPoolConfig = poolManager.getPoolConfig(role, shard);
+
+    if (!clobber && existingPoolConfig && existingPoolConfig.dbConfig === poolConfig.dbConfig) {
+      if (!(ownerName instanceof ConnectionDescriptor)) {
+        const owner = ownerName as ConnectionOwner;
+        if (
+          owner.primaryClassQ?.() &&
+          existingPoolConfig.connectionDescriptor.name !== owner.name
+        ) {
+          existingPoolConfig.connectionDescriptor = owner;
+        }
+      }
+      return existingPoolConfig.pool;
+    }
+
     if (existingPoolConfig) {
       this.disconnectPoolFromPoolManager(poolManager, role, shard);
     }

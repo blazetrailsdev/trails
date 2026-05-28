@@ -508,4 +508,68 @@ describe("ConnectionHandlerTest", () => {
     handler.eachConnectionPool(null, (pool) => pools.push(pool));
     expect(pools).toHaveLength(1);
   });
+
+  it("re-establishing with same config object returns existing pool without disconnect", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    const pool1 = handler.establishConnection(config, {
+      owner: "primary",
+      adapterFactory: createTestAdapter,
+    });
+    const disconnectSpy = vi.spyOn(pool1, "disconnect");
+    const pool2 = handler.establishConnection(config, {
+      owner: "primary",
+      adapterFactory: createTestAdapter,
+    });
+    expect(disconnectSpy).not.toHaveBeenCalled();
+    expect(pool2).toBe(pool1);
+  });
+
+  it("re-establishing with same config and clobber true disconnects old pool", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    const pool1 = handler.establishConnection(config, {
+      owner: "primary",
+      adapterFactory: createTestAdapter,
+    });
+    const disconnectSpy = vi.spyOn(pool1, "disconnect");
+    const pool2 = handler.establishConnection(config, {
+      owner: "primary",
+      clobber: true,
+      adapterFactory: createTestAdapter,
+    });
+    expect(disconnectSpy).toHaveBeenCalled();
+    expect(pool2).not.toBe(pool1);
+  });
+
+  it("clear all connections bang is safe on empty handler", () => {
+    expect(() => handler.clearAllConnectionsBang()).not.toThrow();
+  });
+
+  it("flush idle connections bang is safe on empty handler", () => {
+    expect(() => handler.flushIdleConnectionsBang()).not.toThrow();
+  });
+
+  it("clear active connections bang is safe on empty handler", () => {
+    expect(() => handler.clearActiveConnectionsBang()).not.toThrow();
+  });
+
+  it("retrieve connection pool strict mode raises with role in message", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    handler.establishConnection(config, {
+      owner: "primary",
+      role: "writing",
+      adapterFactory: createTestAdapter,
+    });
+    expect(() =>
+      handler.retrieveConnectionPool("primary", { role: "reading", strict: true }),
+    ).toThrow(/No database connection defined.*'reading' role/);
+  });
 });
