@@ -689,15 +689,24 @@ export class AbstractAdapter implements Quoting {
   }
 
   lease(): void {
+    // Mirrors Rails' `lease` (abstract_adapter.rb:267). Rails branches the
+    // message on whether `@owner` is the current execution context; trails is
+    // single-threaded so the lease always belongs to the current "thread".
     if (this._inUse) {
       throw new ActiveRecordError(
-        "Cannot lease connection, it is already in use by a different thread.",
+        "Cannot lease connection, it is already leased by the current thread.",
       );
     }
     this._inUse = true;
   }
 
   expire(): void {
+    // Mirrors Rails' `expire` (abstract_adapter.rb:303): raise rather than
+    // silently no-op when the connection isn't currently leased. Rails'
+    // "owned by a different thread" branch can't arise single-threaded.
+    if (!this._inUse) {
+      throw new ActiveRecordError("Cannot expire connection, it is not currently leased.");
+    }
     this._inUse = false;
     this._owner = null;
     this._idleSince = Date.now();
@@ -1088,12 +1097,15 @@ export class AbstractAdapter implements Quoting {
   }
 
   close(): void {
-    // Mirrors Rails' `close` (abstract_adapter.rb:830): check the connection
-    // back in to its pool. Standalone adapters with no pool just expire.
+    // Mirrors Rails' `close` (abstract_adapter.rb:830): `pool.checkin self`.
+    // Rails adapters always carry a pool (NullPool by default), whose
+    // `checkin` is a no-op; trails leaves `pool` null for standalone adapters,
+    // so the no-pool branch expires a leased connection and otherwise no-ops
+    // (matching NullPool#checkin).
     const pool = this.pool as { checkin?: (conn: unknown) => void } | null;
     if (pool && typeof pool.checkin === "function") {
       pool.checkin(this);
-    } else {
+    } else if (this._inUse) {
       this.expire();
     }
   }
