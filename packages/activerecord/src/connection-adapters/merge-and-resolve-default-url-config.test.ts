@@ -7,6 +7,7 @@ import {
   InvalidConfigurationError,
   type RawConfigurations,
 } from "../database-configurations.js";
+import { protocolAdapters, setProtocolAdapters } from "../ar-config.js";
 
 const DEFAULT_ENV = "default_env";
 
@@ -14,12 +15,14 @@ let savedDatabaseUrl: string | undefined;
 let savedRailsEnv: string | undefined;
 let savedRackEnv: string | undefined;
 let savedDefaultEnv: string;
+let savedProtocolMapping: Record<string, string>;
 
 beforeEach(() => {
   savedDatabaseUrl = process.env["DATABASE_URL"];
   savedRailsEnv = process.env["RAILS_ENV"];
   savedRackEnv = process.env["RACK_ENV"];
   savedDefaultEnv = DatabaseConfigurations.defaultEnv;
+  savedProtocolMapping = { ...protocolAdapters };
   delete process.env["DATABASE_URL"];
   delete process.env["RAILS_ENV"];
   delete process.env["RACK_ENV"];
@@ -34,6 +37,7 @@ afterEach(() => {
   if (savedRackEnv !== undefined) process.env["RACK_ENV"] = savedRackEnv;
   else delete process.env["RACK_ENV"];
   DatabaseConfigurations.defaultEnv = savedDefaultEnv;
+  setProtocolAdapters(savedProtocolMapping);
 });
 
 function resolveConfig(
@@ -57,10 +61,9 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it.skip("invalid symbol config", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for MergeAndResolveDefaultUrlConfigTest
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
-    // Ruby-specific: symbol values like :bar aren't valid in TS configs
+    // Ruby-specific: Rails rejects a Symbol value (`{ "foo" => :bar }`). TS has no
+    // Symbol-keyed config equivalent distinct from the "invalid string config" case
+    // already covered above; nothing to assert.
   });
 
   it("resolver with database uri and current env symbol key", () => {
@@ -149,10 +152,10 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it.skip("resolver with database uri containing only database name", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
-    // Rails treats bare "foo" as database name; our URL parser requires a scheme
+    // FOLLOW-UP (not P5): Rails' URI parser turns a bare "foo" into { database: "foo" },
+    // overriding the config's database. Our buildUrlHash passes scheme-less strings
+    // through as { url } to preserve SQLite `:memory:` / bare-path behavior, so the
+    // override doesn't happen. Reconciling the two needs a dedicated change.
   });
 
   it("jdbc url", () => {
@@ -180,11 +183,20 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     expect(actual).toEqual({ adapter: "postgresql", database: "foo", host: "localhost" });
   });
 
-  it.skip("url with hyphenated scheme", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
-    // Requires ConnectionAdapters.register which maps custom schemes; skip for now
+  it("url with hyphenated scheme", () => {
+    // Rails registers the ibm_db adapter here so it's loadable; the resolver
+    // itself derives the adapter name purely from the scheme (hyphens → underscores,
+    // falling through when no protocol mapping exists), so no registration is needed.
+    process.env["DATABASE_URL"] = "ibm-db://localhost/foo";
+    const config = {
+      default_env: { adapter: "abstract", database: "not_foo", host: "localhost" },
+    };
+    const actual = resolveDbConfig(DEFAULT_ENV, config);
+    expect(actual.configurationHash).toEqual({
+      adapter: "ibm_db",
+      database: "foo",
+      host: "localhost",
+    });
   });
 
   it("string connection", () => {
@@ -342,10 +354,9 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it.skip("separate database env vars", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
-    // Requires PRIMARY_DATABASE_URL / ANIMALS_DATABASE_URL per-name env var logic
+    // FOLLOW-UP (not P5): requires per-name env var resolution
+    // (PRIMARY_DATABASE_URL / ANIMALS_DATABASE_URL), which is separate infrastructure
+    // from the protocol-adapter-mapping work in this PR.
   });
 
   it("does not change other environments", () => {
@@ -391,24 +402,38 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     });
   });
 
-  it.skip("protocol adapter mapping is used and can be updated", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
-    // Requires mutable ActiveRecord.protocol_adapters — not yet implemented
+  it("protocol adapter mapping is used and can be updated", () => {
+    protocolAdapters.potato = "postgresql";
+    process.env["DATABASE_URL"] = "potato://localhost/exampledb";
+    DatabaseConfigurations.defaultEnv = "production";
+    const actual = resolveDbConfig("production", {});
+    expect(actual.configurationHash).toEqual({
+      adapter: "postgresql",
+      database: "exampledb",
+      host: "localhost",
+    });
   });
 
-  it.skip("protocol adapter mapping translates underscores to dashes", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
-    // Requires mutable ActiveRecord.protocol_adapters — not yet implemented
+  it("protocol adapter mapping translates underscores to dashes", () => {
+    protocolAdapters.custom_protocol = "postgresql";
+    process.env["DATABASE_URL"] = "custom-protocol://localhost/exampledb";
+    DatabaseConfigurations.defaultEnv = "production";
+    const actual = resolveDbConfig("production", {});
+    expect(actual.configurationHash).toEqual({
+      adapter: "postgresql",
+      database: "exampledb",
+      host: "localhost",
+    });
   });
 
-  it.skip("protocol adapter mapping handles sqlite3 file urls", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
-    // Requires mutable ActiveRecord.protocol_adapters — not yet implemented
+  it("protocol adapter mapping handles sqlite3 file urls", () => {
+    protocolAdapters.custom_protocol = "sqlite3";
+    process.env["DATABASE_URL"] = "custom-protocol:/path/to/db.sqlite3";
+    DatabaseConfigurations.defaultEnv = "production";
+    const actual = resolveDbConfig("production", {});
+    expect(actual.configurationHash).toEqual({
+      adapter: "sqlite3",
+      database: "/path/to/db.sqlite3",
+    });
   });
 });
