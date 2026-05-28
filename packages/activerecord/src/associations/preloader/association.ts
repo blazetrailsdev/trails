@@ -309,6 +309,10 @@ export class Association {
   }
 
   private _buildScope(): any {
+    // Mirror Rails' build_scope `scope = klass.scope_for_association`:
+    // _allForPreload() applies the target model's default_scope while skipping
+    // any enclosing current_scope (e.g. inside `scoping {}`), matching
+    // scope_for_association's "default_scoped, ignoring current_scope" semantics.
     let scope = (this.klass as any)._allForPreload();
 
     const type = (this.reflection as any).type;
@@ -327,11 +331,11 @@ export class Association {
       if (scopeResult) scope = scopeResult;
     }
 
-    if (this._preloadScope) {
+    if (this._preloadScope && !this._preloadScope.isEmptyScope) {
       scope = scope.merge(this._preloadScope);
     }
 
-    return scope;
+    return this._cascadeStrictLoading(scope);
   }
 
   /**
