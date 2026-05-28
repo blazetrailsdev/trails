@@ -635,8 +635,7 @@ export class ConnectionPool implements ReapablePool {
       return pinned;
     }
     const conn = this._acquireConnection();
-    this._cacheConfig.checkoutAndVerify(conn as unknown as QueryCacheHost);
-    return conn;
+    return checkoutAndVerify(this, conn);
   }
 
   async checkoutAsync(timeout?: number): Promise<DatabaseAdapter> {
@@ -653,8 +652,7 @@ export class ConnectionPool implements ReapablePool {
     }
     const conn = this._tryAcquire();
     if (conn) {
-      this._cacheConfig.checkoutAndVerify(conn as unknown as QueryCacheHost);
-      return conn;
+      return checkoutAndVerify(this, conn);
     }
 
     const t = timeout ?? this.checkoutTimeout;
@@ -675,8 +673,7 @@ export class ConnectionPool implements ReapablePool {
       throw new ConnectionNotEstablished("Connection pool has been discarded");
     }
     this._checkedOut.add(c);
-    this._cacheConfig.checkoutAndVerify(c as unknown as QueryCacheHost);
-    return c;
+    return checkoutAndVerify(this, c);
   }
 
   private _acquireConnection(): DatabaseAdapter {
@@ -1478,6 +1475,13 @@ function checkoutNewConnection(pool: Pool): DatabaseAdapter {
  * Verifies/cleans the connection; on any error the connection is removed
  * from the pool and disconnected, then the error is rethrown so the caller
  * can retry from a fresh slot.
+ *
+ * We have no generic `define_callbacks :checkout` dispatcher, but the block
+ * still runs both effects Rails' :checkout chain produces in core AR: the
+ * `clean!` block body (cleanBang) and the only registered :checkout callback,
+ * QueryCache's cache wiring (query_cache.rb:132), ported here as
+ * `_cacheConfig.checkoutAndVerify`. The railties `set_callback(:checkout)` in
+ * console_sandbox.rb is sandbox-only and out of scope.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_and_verify
  *
