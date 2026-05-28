@@ -398,7 +398,8 @@ export function isConnectionClass(this: CoreHost): boolean {
 export function connectionClassForSelf(this: CoreHost): CoreHost {
   let klass: CoreHost | null = this;
   while (klass) {
-    if (klass._connectionClass) return klass;
+    if (Object.prototype.hasOwnProperty.call(klass, "_connectionClass") && klass._connectionClass)
+      return klass;
     if (klass.name === "Base") return klass;
     klass = parentClass(klass);
   }
