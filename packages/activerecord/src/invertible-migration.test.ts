@@ -27,9 +27,9 @@ describe("InvertibleMigrationTest", () => {
     return m;
   }
 
-  /** Helper: verify table exists by checking adapter's internal state */
-  function tableExists(tableName: string): boolean {
-    return (adapter as any).tables.has(tableName);
+  /** Helper: verify table exists by querying the live DB */
+  async function tableExists(tableName: string): Promise<boolean> {
+    return (adapter as any).schemaStatements().tableExists(tableName);
   }
 
   it("no reverse", async () => {
@@ -63,7 +63,7 @@ describe("InvertibleMigrationTest", () => {
     }
     const m = makeMigration(new CreateHorses());
     await m.up();
-    expect(tableExists("horses")).toBe(true);
+    expect(await tableExists("horses")).toBe(true);
   });
 
   it("migrate down", async () => {
@@ -76,9 +76,9 @@ describe("InvertibleMigrationTest", () => {
     }
     const m = makeMigration(new CreateHorses());
     await m.up();
-    expect(tableExists("horses")).toBe(true);
+    expect(await tableExists("horses")).toBe(true);
     await m.down();
-    expect(tableExists("horses")).toBe(false);
+    expect(await tableExists("horses")).toBe(false);
   });
 
   it("migrate revert", async () => {
@@ -91,9 +91,9 @@ describe("InvertibleMigrationTest", () => {
     }
     const m = makeMigration(new CreateAnimals());
     await m.up();
-    expect(tableExists("animals")).toBe(true);
+    expect(await tableExists("animals")).toBe(true);
     await m.down();
-    expect(tableExists("animals")).toBe(false);
+    expect(await tableExists("animals")).toBe(false);
   });
 
   it("migrate revert by part", async () => {
@@ -110,9 +110,9 @@ describe("InvertibleMigrationTest", () => {
     }
     const m = makeMigration(new AddColumnMig());
     await m.up();
-    expect(tableExists("widgets")).toBe(true);
+    expect(await tableExists("widgets")).toBe(true);
     await m.down();
-    expect(tableExists("widgets")).toBe(false);
+    expect(await tableExists("widgets")).toBe(false);
   });
 
   it("migrate revert whole migration", async () => {
@@ -131,10 +131,10 @@ describe("InvertibleMigrationTest", () => {
     }
     const m1 = makeMigration(new CreateFoo());
     await m1.up();
-    expect(tableExists("foo")).toBe(true);
+    expect(await tableExists("foo")).toBe(true);
     const m2 = makeMigration(new RevertFoo());
     await m2.up();
-    expect(tableExists("foo")).toBe(false);
+    expect(await tableExists("foo")).toBe(false);
   });
 
   it("migrate nested revert whole migration", async () => {
@@ -148,9 +148,9 @@ describe("InvertibleMigrationTest", () => {
     const m = makeMigration(new CreateBar());
     await m.up();
     await m.down();
-    expect(tableExists("bar_table")).toBe(false);
+    expect(await tableExists("bar_table")).toBe(false);
     await m.up();
-    expect(tableExists("bar_table")).toBe(true);
+    expect(await tableExists("bar_table")).toBe(true);
   });
 
   it("migrate revert transaction", async () => {
@@ -164,7 +164,7 @@ describe("InvertibleMigrationTest", () => {
     const m = makeMigration(new CreateItems());
     await m.up();
     await m.down();
-    expect(tableExists("items")).toBe(false);
+    expect(await tableExists("items")).toBe(false);
   });
 
   it.skip("migrate revert change column default", async () => {
@@ -191,13 +191,13 @@ describe("InvertibleMigrationTest", () => {
 
     const m1 = makeMigration(new (CreateHorses as any)());
     await m1.migrate("up");
-    expect(tableExists("horses")).toBe(true);
+    expect(await tableExists("horses")).toBe(true);
 
     const m2 = makeMigration(new (ChangeDefault as any)());
     await m2.migrate("up");
     await m2.migrate("down");
     // If reversal works, changeColumnDefault(from: "Diomed", to: "Sekitoba") ran
-    expect(tableExists("horses")).toBe(true);
+    expect(await tableExists("horses")).toBe(true);
   });
   it("migrate revert change column comment", () => {
     const recorder = new CommandRecorder();
@@ -251,11 +251,11 @@ describe("InvertibleMigrationTest", () => {
     }
     const m = makeMigration(new MultiOp());
     await m.up();
-    expect(tableExists("first_table")).toBe(true);
-    expect(tableExists("second_table")).toBe(true);
+    expect(await tableExists("first_table")).toBe(true);
+    expect(await tableExists("second_table")).toBe(true);
     await m.down();
-    expect(tableExists("first_table")).toBe(false);
-    expect(tableExists("second_table")).toBe(false);
+    expect(await tableExists("first_table")).toBe(false);
+    expect(await tableExists("second_table")).toBe(false);
   });
 
   it("legacy up", async () => {
@@ -271,7 +271,7 @@ describe("InvertibleMigrationTest", () => {
     }
     const m = makeMigration(new LegacyUp());
     await m.up();
-    expect(tableExists("legacy")).toBe(true);
+    expect(await tableExists("legacy")).toBe(true);
   });
 
   it("legacy down", async () => {
@@ -288,7 +288,7 @@ describe("InvertibleMigrationTest", () => {
     const m = makeMigration(new LegacyDown());
     await m.up();
     await m.down();
-    expect(tableExists("legacy2")).toBe(false);
+    expect(await tableExists("legacy2")).toBe(false);
   });
 
   it("up", async () => {
@@ -301,7 +301,7 @@ describe("InvertibleMigrationTest", () => {
     }
     const m = makeMigration(new UpMig());
     await m.migrate("up");
-    expect(tableExists("up_test")).toBe(true);
+    expect(await tableExists("up_test")).toBe(true);
   });
 
   it("down", async () => {
@@ -315,7 +315,7 @@ describe("InvertibleMigrationTest", () => {
     const m = makeMigration(new DownMig());
     await m.migrate("up");
     await m.migrate("down");
-    expect(tableExists("down_test")).toBe(false);
+    expect(await tableExists("down_test")).toBe(false);
   });
 
   it.skip("migrate down with table name prefix", () => {
@@ -343,8 +343,8 @@ describe("InvertibleMigrationTest", () => {
     }
     const m = makeMigration(new FKMig());
     await m.up();
-    expect(tableExists("authors_fk")).toBe(true);
-    expect(tableExists("books_fk")).toBe(true);
+    expect(await tableExists("authors_fk")).toBe(true);
+    expect(await tableExists("books_fk")).toBe(true);
     await m.down();
   });
 
@@ -361,7 +361,7 @@ describe("InvertibleMigrationTest", () => {
     await m.up();
     // Down should reverse without error
     await m.down();
-    expect(tableExists("idx_test")).toBe(false);
+    expect(await tableExists("idx_test")).toBe(false);
   });
 
   it.skip("migrate revert add index without name on expression", () => {

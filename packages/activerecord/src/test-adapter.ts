@@ -28,11 +28,6 @@ import {
 } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { SidecarFixtures } from "./test-helpers/sidecar-fixtures.js";
-import {
-  clearDdlTrackers,
-  getCreatedTables,
-  recordDdlTracking,
-} from "./test-helpers/ddl-tracker.js";
 import { Base } from "./base.js";
 import { Visitors } from "@blazetrails/arel";
 import { DatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
@@ -156,7 +151,6 @@ const _factory: () => TestAdapterFixtures = () =>
 /** DatabaseAdapter wrapper returned by {@link createTestAdapter}, with test-only accessors. */
 export interface TestDatabaseAdapter extends DatabaseAdapter {
   readonly innerAdapter: DatabaseAdapter;
-  readonly tables: Set<string>;
 }
 
 /**
@@ -241,9 +235,7 @@ export async function cleanupTestAdapter(_adapter: DatabaseAdapter): Promise<voi
  * starts from a clean slate. Called from a global `beforeEach` hook in
  * test-setup-ar.ts.
  *
- * Drops tables based on the *actual database state*, not in-memory
- * tracking — direct adapter use can leave `_createdTables` out of sync
- * with the real schema.
+ * Drops tables based on the actual database state.
  *
  *   - PG: enumerate every user schema via `current_schemas(false)`, not
  *     just `public`. Tests that create custom schemas (e.g. schema.test.ts
@@ -253,9 +245,7 @@ export async function cleanupTestAdapter(_adapter: DatabaseAdapter): Promise<voi
  *     FOREIGN_KEY_CHECKS=0 for the whole sequence. Per-statement exec()s
  *     can't reliably bracket the drops because each call may pick a
  *     different pool connection.
- *   - SQLite: query `sqlite_master` (excluding internal `sqlite_*`
- *     tables) so tables created via raw `adapter.exec()` — which bypass
- *     `_createdTables` — also get dropped.
+ *   - SQLite: query `sqlite_master` (excluding internal `sqlite_*` tables).
  *
  * Idempotent and safe to call when no tables exist.
  *
@@ -271,7 +261,6 @@ export async function resetTestAdapterState(): Promise<void> {
       _pool.connections.forEach((a) => a.schemaCache?.clear());
       clearAppliedSchemaSignatures();
       restoreCanonicalSchemaSignaturesUnlessAdapter(adapter);
-      clearDdlTrackers();
       Base._modelsByName.clear();
     },
     { preventPermanentCheckout: true },
@@ -370,26 +359,12 @@ class TestAdapterFixtures implements DatabaseAdapter {
     return this.inner;
   }
 
-  /**
-   * @deprecated F4: this getter will be removed; use schemaCache.dataSourceExists() instead.
-   */
-  get tables(): Set<string> {
-    return getCreatedTables();
-  }
-
   async execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]> {
     return this.inner.execute(sql, binds, name);
   }
 
   async executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number> {
-    const createMatch = sql.match(
-      /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:["`](\w+)["`]|(\w+))/i,
-    );
-    const dropMatch = sql.match(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+(?:["`](\w+)["`]|(\w+))/i);
-
-    const result = await this.inner.executeMutation(sql, binds, name);
-    recordDdlTracking(sql, createMatch, dropMatch);
-    return result;
+    return this.inner.executeMutation(sql, binds, name);
   }
 
   async withinNewTransaction<T>(
@@ -456,12 +431,7 @@ class TestAdapterFixtures implements DatabaseAdapter {
   }
 
   async exec(sql: string): Promise<void> {
-    const createMatch = sql.match(
-      /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:["`](\w+)["`]|(\w+))/i,
-    );
-    const dropMatch = sql.match(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+(?:["`](\w+)["`]|(\w+))/i);
     await (this.inner as unknown as { exec(sql: string): Promise<void> }).exec(sql);
-    recordDdlTracking(sql, createMatch, dropMatch);
   }
 
   async explain(

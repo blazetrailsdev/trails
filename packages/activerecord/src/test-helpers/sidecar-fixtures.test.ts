@@ -21,17 +21,6 @@ describe("createSidecarTestAdapter (path 2 sidecar)", () => {
     expect(a.fixtures).not.toBe(b.fixtures);
   });
 
-  it("records CREATE/DROP TABLE via fixtures.exec for defineSchema cache invalidation", async () => {
-    const { adapter, fixtures } = createSidecarTestAdapter();
-    const table = "sidecar_smoke_test";
-    const q = adapter.adapterName === "mysql" ? "`" : '"';
-    await fixtures.exec(`CREATE TABLE ${q}${table}${q} (id INTEGER PRIMARY KEY)`);
-    const { getCreatedTables } = await import("./ddl-tracker.js");
-    expect(getCreatedTables().has(table)).toBe(true);
-    await fixtures.exec(`DROP TABLE ${q}${table}${q}`);
-    expect(getCreatedTables().has(table)).toBe(false);
-  });
-
   // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
   it.skip("hides transaction state from foreign async chains", async () => {
     const { fixtures } = createSidecarTestAdapter();

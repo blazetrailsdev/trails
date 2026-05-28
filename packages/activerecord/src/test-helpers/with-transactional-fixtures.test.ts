@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
-  adapterType,
   createPooledTestAdapter,
   createSidecarTestAdapter,
   createTestAdapter,
@@ -8,7 +7,6 @@ import {
   type SidecarAdapter,
   type TestDatabaseAdapter,
 } from "../test-adapter.js";
-import { snapshotDdlTrackers } from "./ddl-tracker.js";
 import { shouldSkipGlobalReset } from "./skip-global-reset.js";
 import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { defineSchema } from "./define-schema.js";
@@ -257,54 +255,6 @@ describe("withTransactionalFixtures (raw adapter)", () => {
     expect(rows).toHaveLength(0);
   });
 });
-
-// DDL inside an it() body updates the module-level `_createdTables` /
-// `_createdColumns` trackers (via `recordDdlTracking` in the
-// `SchemaAdapter` wrapper). The outer transaction rolls back the DDL on
-// the DB side; the helper restores the trackers to their pre-test
-// snapshot so a follow-up `defineSchema` call can correctly recreate the
-// rolled-back table.
-//
-// Skipped on MySQL/MariaDB: the helper's docs flag DDL inside `it()` as
-// undefined behavior there (DDL implicitly commits and escapes the
-// wrap). Running this describe against MySQL would leak the table into
-// the live schema. SQLite + PG (which do transactional DDL) cover the
-// behavior under test.
-describe.skipIf(adapterType === "mysql")(
-  "withTransactionalFixtures (DDL tracker invalidation)",
-  () => {
-    let adapter: TestDatabaseAdapter;
-    let outerTables: Set<string>;
-
-    beforeAll(async () => {
-      adapter = createTestAdapter();
-      // Register an outer-scope table so the snapshot has at least one
-      // entry to preserve across rollback — without this, the
-      // preservation assertion below would be vacuous.
-      await defineSchema(adapter, { ddl_tracker_outer: { name: "string" } });
-      outerTables = snapshotDdlTrackers().tables;
-      expect(outerTables.has("ddl_tracker_outer")).toBe(true);
-    });
-
-    withTransactionalFixtures(() => adapter);
-
-    it("createTable inside a test populates the tables tracker", async () => {
-      await (adapter as unknown as AdapterWithExec).exec(
-        `CREATE TABLE ddl_tracker_inner (id INTEGER PRIMARY KEY)`,
-      );
-      const tables = snapshotDdlTrackers().tables;
-      expect(tables.has("ddl_tracker_inner")).toBe(true);
-      expect(tables.has("ddl_tracker_outer")).toBe(true);
-    });
-
-    it("next test sees the inner tracker reset but outer entries preserved", () => {
-      const tables = snapshotDdlTrackers().tables;
-      expect(tables.has("ddl_tracker_inner")).toBe(false);
-      expect(tables.has("ddl_tracker_outer")).toBe(true);
-      for (const t of outerTables) expect(tables.has(t)).toBe(true);
-    });
-  },
-);
 
 // When `invalidateSchemaCache: false`, the helper skips `schemaCache.clear()`
 // in afterEach. Cached column reflection survives across tests — pay this
