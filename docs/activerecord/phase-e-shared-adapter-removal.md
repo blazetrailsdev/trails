@@ -1,7 +1,12 @@
 # Phase E — delete `_sharedAdapter`, AsyncContext filter, manual TX depth
 
-> **Status (2026-05-27):** E1 (this doc + concurrency safety-net) in flight.
-> E2–E5 gated on D-1..N reaching zero bypass sites.
+> **Status: Shipped 2026-05-28.**
+>
+> - E1 (#2514) — audit doc + concurrency safety-net test
+> - E2 (#2527) — delete AsyncContext filter + `_manualTxDepth` from `TestAdapterFixtures`
+> - E3 (#2533) — delete same from `SidecarFixtures`
+> - E4 — skipped; delete-wrapper-class absorbed into F5 (#2545) instead
+> - E5 (#2536) — delete `_sharedAdapter`; wire `createSidecarTestAdapter()` through pool
 
 Cleanup phase. After all test files are on the connection pool (Phase D complete),
 delete the singleton state and the trails-specific chain-isolation patch over it.

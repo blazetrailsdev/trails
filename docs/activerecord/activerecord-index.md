@@ -33,17 +33,16 @@ TM Phase 9b-1 (PG visitor) and 9b-2a–e (MySQL visitor incl. Arel
 `Table.star`) already merged 2026-05-20→21. 9b-3 is closed
 (see Phase 2). 9b-4 is bundled with Pool Phase F (see Phase 2).
 
-### Phase 2 — Test-infra collapse (after Phase 1)
+### Phase 2 — Test-infra collapse — **Complete** (see [`connection-pooled-test-adapter-plan.md`](connection-pooled-test-adapter-plan.md) archive)
 
-- **Pool Phase E** — delete `_sharedAdapter`, AsyncContext filter,
-  `_manualTxDepth`, `_txLockStorage` (~150 LOC net delete). Gated on Phase D.
-- **TM Phase 9b-4 + Pool Phase F (bundled)** — delete `SchemaAdapter`,
-  move DDL tracking to `AbstractAdapter` `onDdl?` hook, delete sidecar.
-  End state: `createTestAdapter()` returns a real adapter from the pool
-  with `pinConnectionBang`. ~400 LOC net delete.
-- TM Phase 9b-3 (delete dormant fallback) is **closed-don't-reopen**
-  per #2189 — the fallback is Rails-parity live code for HABTM join
-  models. Not part of this phase.
+Pool Phases E and F shipped 2026-05-28. End state: NO `_sharedAdapter`,
+NO `_txLockStorage`/`_manualTxDepth`/AsyncContext filter, NO `recordDdlTracking`/
+`ddl-tracker.ts`, NO `TestAdapterFixtures`/`SidecarFixtures` wrappers, NO Proxy.
+`createTestAdapter()` returns the raw pool-leased `DatabaseAdapter`. Full Rails parity.
+
+- **Pool Phase E** — shipped: E1 (#2514), E2 (#2527), E3 (#2533), E5 (#2536). E4 absorbed into F5.
+- **Pool Phase F** — shipped: F1 (#2537), F2 (#2538), F3 (in main), F4 (in main), F5 (#2545).
+- TM Phase 9b-3 (delete dormant fallback) remains **closed-don't-reopen** — live Rails-parity code for HABTM join models.
 
 ### Phase 3 — Fixtures port strict-flip
 
@@ -58,7 +57,7 @@ run in parallel with Phase 1/2.
 - PR 7b — ~30 LOC strict-fail flip + remove 4 `unported-files.ts` exclusions.
 - PR 8 — proof-of-concept conversion of one test file to `useFixtures(...)`.
 
-### Phase 3b — Fixtures adoption (inventory ships now; conversion gated on Phase 2)
+### Phase 3b — Fixtures adoption — **actively pickable** (Phase 2 gate lifted)
 
 Owner: [`fixtures-adoption-plan.md`](fixtures-adoption-plan.md). Migrates
 the existing AR test suite from inline `defineSchema()` + `Model.create`
@@ -72,17 +71,16 @@ un-skipping; both run in parallel once gated).
   with per-file tier (1/2/3/4) classification.
 - **Spike S1 — worker-level fixture seed** (~100–150 LOC, standalone PR).
   Ships before Phase B so the canary is pure conversion, not pattern+infra.
-- **Phase B — Canary conversion** (1 file, ≤300 LOC). **Gated on pool
-  Phase E.**
+- **Phase B — Canary conversion** (1 file, ≤300 LOC). Pool Phase E gate lifted.
 - **Phase C — Tier 1 sweep** (~12–18 batch PRs at the 300-LOC ceiling).
 - **Phase D — Loader gap PRs + Tier 2 → 1 promotion** (4 loader PRs +
   4 batch PRs).
 - **Phase E — Tier 3 surgery** (per-file bespoke, ~10–20 small PRs).
 - **Phase F** — `blazetrails/prefer-fixtures` lint rule + CLAUDE.md update + retire `defineSchema()` per-file usage.
 
-Total ~30–45 PRs, ~2–4 weeks Phase C steady-state once pool E lands.
+Total ~30–45 PRs, ~2–4 weeks Phase C steady-state. Pool Phase E has landed.
 
-### Phase 4 — test:compare drive
+### Phase 4 — test:compare drive — **actively pickable** (Phase 1/2 gate lifted)
 
 Owner: [`activerecord-100-plan.md`](activerecord-100-plan.md) (live
 batches + strategy + BLOCKED vocab) + [`activerecord-test-compare-100.md`](activerecord-test-compare-100.md)

@@ -1,6 +1,12 @@
 # Phase F — Delete `recordDdlTracking` (Rails parity)
 
-> **Status (2026-05-27):** F1 (audit + safety-net tests) open. F2–F5 not started.
+> **Status: Shipped 2026-05-28.**
+>
+> - F1 (#2537) — audit + concurrency baseline + schema-cache invalidation safety-net tests
+> - F2 (#2538) — inline `clearDataSourceCacheBang` at missing DDL sites; unskip safety-net tests
+> - F3 (in main) — delete `TestDatabaseAdapter.tables` getter; migrate `define-schema.ts` consumer
+> - F4 (in main) — delete `recordDdlTracking` / `_createdTables` / `_createdColumns` / `ddl-tracker.ts`; delete `TestAdapterFixtures` and `SidecarFixtures` wrappers
+> - F5 (#2545) — delete `createTestAdapter()` shim; return real adapter directly. Also absorbed `useTransactionalTests` opt-out deletion (not originally in scope but required for no-Proxy completion) and the E4 wrapper-class deletion.
 
 Rails has neither `onDdl` nor `recordDdlTracking`. DDL side-effects are handled
 inline at each schema-mutating method via `schema_cache.clear_data_source_cache!`
@@ -26,17 +32,16 @@ Phase F removes the trails-specific DDL tracker and aligns with Rails:
 
 ## F1 — Audit findings (verified 2026-05-27)
 
-### 1. E5 state
+### 1. E5 state (at time of F1 audit)
 
-`_sharedAdapter` is still present in
-`packages/activerecord/src/test-adapter.ts` (lines 59–312). E5 has not yet
-merged. F1 is safe to land before E5; it is purely additive.
+`_sharedAdapter` was still present in
+`packages/activerecord/src/test-adapter.ts` when F1 landed. E5 (#2536) has since
+merged, removing it. F1 landed before E5; it was purely additive.
 
 The concurrency-isolation test (`with-transactional-fixtures.test.ts`, describe
-"concurrency isolation: two concurrent transaction chains stay independent") is
-correctly `.skip`ped with the note "Skipped at E3: AsyncContext filter removed;
-pool-backed isolation lands at E5." This is the expected baseline; both tests
-pass as skipped.
+"concurrency isolation: two concurrent transaction chains stay independent") was
+correctly `.skip`ped at F1 time with the note "Skipped at E3: AsyncContext filter
+removed; pool-backed isolation lands at E5." That skip was unskipped once E5 merged.
 
 ### 2. Inventory — DDL methods in `abstract/schema-statements.ts`
 
@@ -158,11 +163,11 @@ double-invalidation:
 
 ## Phase F sub-phase checklist
 
-- [x] **F1** — Audit + concurrency baseline + safety-net tests (#TBD)
-- [ ] **F2** — Inline `clearDataSourceCacheBang` at missing DDL sites; unskip
-      safety-net tests
-- [ ] **F3** — Delete `TestDatabaseAdapter.tables` getter; migrate
-      `define-schema.ts:503` consumer to `schemaCache` introspection
-- [ ] **F4** — Delete `recordDdlTracking` / `_createdTables` / `_createdColumns`
-      / `ddl-tracker.ts`; delete `TestAdapterFixtures` and `SidecarFixtures`
-- [ ] **F5** — Delete `createTestAdapter()` shim; return real adapter directly
+- [x] **F1** — Audit + concurrency baseline + safety-net tests (#2537)
+- [x] **F2** — Inline `clearDataSourceCacheBang` at missing DDL sites; unskip
+      safety-net tests (#2538)
+- [x] **F3** — Delete `TestDatabaseAdapter.tables` getter; migrate
+      `define-schema.ts:503` consumer to `schemaCache` introspection (in main)
+- [x] **F4** — Delete `recordDdlTracking` / `_createdTables` / `_createdColumns`
+      / `ddl-tracker.ts`; delete `TestAdapterFixtures` and `SidecarFixtures` (in main)
+- [x] **F5** — Delete `createTestAdapter()` shim; return real adapter directly (#2545)
