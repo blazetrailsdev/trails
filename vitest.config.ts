@@ -182,6 +182,14 @@ export default defineConfig({
           // time than the rare hidden flake costs. Revisit if a real
           // regression slips through.
           retry: process.env.PG_TEST_URL || process.env.MYSQL_TEST_URL ? 2 : 0,
+          // Large-schema beforeAll(defineSchema(...)) calls on MariaDB issue
+          // hundreds of CREATE TABLE statements (e.g. has-many-associations.test.ts
+          // creates ~354 tables in one beforeAll). At ~30ms per CREATE on MariaDB
+          // that's ~10.7s, just over the 10s vitest default and a frequent CI
+          // flake source. Bump to 30s to absorb DDL load + CI contention. See
+          // docs/activerecord/phase-f-ddl-tracking-removal.md for context on why
+          // beforeAll-side existence checks no longer batch.
+          hookTimeout: 30_000,
           pool: "forks",
           poolOptions: { forks: { maxForks: TEST_FORKS } },
         },
