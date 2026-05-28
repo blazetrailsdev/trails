@@ -158,13 +158,16 @@ export class HasAndBelongsToMany {
       model._associations = [...(model._associations ?? [])];
     }
 
-    // Mirrors Ruby's `define_method`/reflection overwrite semantics: a second
-    // `has_and_belongs_to_many :name` on the same class replaces the first
-    // rather than layering a duplicate (Rails stores reflections in a hash
-    // keyed by name — see associations.rb). Without this, re-declaring would
-    // append a second HABTM entry plus a second middle `has_many`, so adding
-    // one record would insert two join rows. Drop any prior definition for
-    // this association name and its derived middle name before re-building.
+    // Array-side analog of Rails' `Reflection.add_reflection`
+    // (reflection.rb:23-28), which replaces rather than layers:
+    //   ar._reflections = ar._reflections.except(name).merge!(name => reflection)
+    // `_reflections` is a hash keyed by name, so `except(name)` drops any prior
+    // entry before re-adding. Our `addReflection` mirrors that for the
+    // reflection hash, but the parallel `_associations` array (trails-specific
+    // infra with no Rails counterpart) would otherwise drift by appending a
+    // duplicate HABTM entry plus a duplicate middle `has_many` — and adding one
+    // record would then insert two join rows. Apply the same `except(name)`
+    // here for the association name and its derived middle name.
     const priorMiddleName = [pluralize(model.name.toLowerCase()), name].sort().join("_");
     model._associations = model._associations.filter(
       (a: { name: string }) => a.name !== name && a.name !== priorMiddleName,

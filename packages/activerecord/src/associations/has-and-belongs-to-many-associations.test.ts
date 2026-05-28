@@ -1373,51 +1373,67 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("redefine habtm", async () => {
-    // Mirrors Rails: re-declaring the same HABTM replaces the prior
-    // definition rather than layering a duplicate. A duplicate middle
-    // has_many would insert two join rows for a single add and break save.
+    // Mirrors Rails (models/developer.rb:74, models/project.rb:42): Developer
+    // declares `special_projects` as a second HABTM over the SAME
+    // `developers_projects` join table (with `association_foreign_key`
+    // :project_id), pointing at SpecialProject < Project. SubDeveloper < Developer
+    // inherits it. Building + saving through the inherited collection must work.
+    // Inline models use a `Rd` prefix to avoid colliding with the shared
+    // Developer/Project declared in the enclosing describe; the structure
+    // mirrors Rails one-for-one (Developer / Project / SpecialProject < Project
+    // / SubDeveloper < Developer).
     const a2 = freshAdapter();
     await defineSchema(a2, {
       rd_developers: { name: "string" },
-      rd_projects: { name: "string" },
-      rd_developers_projects: { rd_developer_id: "integer", rd_project_id: "integer" },
+      rd_projects: { name: "string", type: "string" },
+      rd_developer_projects: { developer_id: "integer", project_id: "integer" },
     });
     class RdDeveloper extends Base {
       static {
+        this._tableName = "rd_developers";
         this.attribute("name", "string");
         this.adapter = a2;
       }
     }
     class RdProject extends Base {
       static {
+        this._tableName = "rd_projects";
         this.attribute("name", "string");
+        this.attribute("type", "string");
         this.adapter = a2;
       }
     }
+    class RdSpecialProject extends RdProject {}
     registerModel("RdDeveloper", RdDeveloper);
     registerModel("RdProject", RdProject);
-    Associations.hasAndBelongsToMany.call(RdDeveloper, "rdProjects", {
+    registerModel("RdSpecialProject", RdSpecialProject);
+    Associations.hasAndBelongsToMany.call(RdDeveloper, "projects", {
       className: "RdProject",
-      joinTable: "rd_developers_projects",
+      joinTable: "rd_developer_projects",
+      foreignKey: "developer_id",
     });
-    // Second declaration must replace, not append.
-    Associations.hasAndBelongsToMany.call(RdDeveloper, "rdProjects", {
-      className: "RdProject",
-      joinTable: "rd_developers_projects",
+    Associations.hasAndBelongsToMany.call(RdDeveloper, "specialProjects", {
+      className: "RdSpecialProject",
+      joinTable: "rd_developer_projects",
+      foreignKey: "developer_id",
+      associationForeignKey: "project_id",
     });
+    class RdSubDeveloper extends RdDeveloper {}
+    registerModel("RdSubDeveloper", RdSubDeveloper);
 
-    const habtmDefs = (RdDeveloper as any)._associations.filter(
-      (a: any) => a.name === "rdProjects",
+    const child = new RdSubDeveloper({ name: "Aredridel" });
+    await association(child, "specialProjects").push(
+      new RdSpecialProject({ name: "Special Project" }),
     );
-    expect(habtmDefs.length).toBe(1);
-    const middleDefs = (RdDeveloper as any)._associations.filter((a: any) => a.type === "hasMany");
-    expect(middleDefs.length).toBe(1);
+    expect(await child.save()).toBe(true);
 
-    const child = await RdDeveloper.create({ name: "Aredridel" });
-    const project = await RdProject.create({ name: "Special Project" });
-    await association(child, "rdProjects").push(project);
-    const rows = await a2.execute("select * from rd_developers_projects");
-    expect(rows.length).toBe(1);
+    const specialProjects = await loadHabtm(child, "specialProjects", {
+      className: "RdSpecialProject",
+      joinTable: "rd_developer_projects",
+      foreignKey: "developer_id",
+      associationForeignKey: "project_id",
+    } as any);
+    expect(specialProjects.length).toBe(1);
   });
 
   it.skip("habtm with reflection using class name and fixtures", () => {
