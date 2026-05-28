@@ -1,6 +1,5 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
-import { fireAssocCallbacks } from "../associations.js";
 import { underscore } from "@blazetrails/activesupport";
 import { Association } from "./association.js";
 import { RecordNotSaved, Rollback } from "../errors.js";
@@ -685,8 +684,12 @@ async function removeRecords(
   records: Base[],
   method: string,
 ): Promise<void> {
-  // Rails remove_records: fire before callbacks, delete persisted, remove from target, fire after
-  for (const record of records) callback(assoc, "beforeRemove", record);
+  // Rails remove_records: catch(:abort) { each before_remove } || return —
+  // a single aborted before_remove halts the whole removal (no record is
+  // deleted or removed from the target).
+  for (const record of records) {
+    if (!callback(assoc, "beforeRemove", record)) return;
+  }
   if (existingRecords.length > 0) {
     await Promise.resolve(deleteRecords(assoc, existingRecords, method));
   }
@@ -757,10 +760,8 @@ function replaceOnTarget(
     index = (assoc.target as Base[]).indexOf(record);
   }
 
-  if (!skipCallbacks) {
-    const proceed = fireAssocCallbacks(assoc.reflection.options.beforeAdd, assoc.owner, record);
-    if (proceed === false) return null;
-  }
+  // Rails: catch(:abort) { callback(:before_add, record) } || return unless skip_callbacks
+  if (!skipCallbacks && !callback(assoc, "beforeAdd", record)) return null;
 
   assoc.setInverseInstance(record);
   replaced._associationIds = null;
@@ -772,26 +773,49 @@ function replaceOnTarget(
     target.push(record);
   }
 
-  if (!skipCallbacks) {
-    fireAssocCallbacks(assoc.reflection.options.afterAdd, assoc.owner, record);
-  }
+  if (!skipCallbacks) callback(assoc, "afterAdd", record);
 
   return record;
 }
 
-/** @internal */
-function callback(assoc: CollectionAssociation, method: string, record: Base): void {
-  for (const cb of callbacksFor(assoc, method)) {
-    if (typeof cb === "function") cb(method, assoc.owner, record);
+/**
+ * Unified association-callback dispatch. Mirrors Rails'
+ * `CollectionAssociation#callback`: looks up the registered callbacks for
+ * `kind` (`beforeAdd`/`afterAdd`/`beforeRemove`/`afterRemove`) and invokes
+ * each. Returns `false` if any callback aborts (Rails `throw :abort`,
+ * modelled here as a callback returning `false`), so callers can halt the
+ * add/remove like Rails' `catch(:abort) ... || return`.
+ *
+ * Arity note: Rails procs take `(method, owner, record)` and `callback`
+ * passes the kind through (so the symbol case can `callback.send(method, ...)`).
+ * Here the builder binds the method/symbol at registration time, so the
+ * stored procs take `(owner, record)` — the same 2-arg shape consumed by
+ * `fireAssocCallbacks` on the CollectionProxy add/remove paths, which read
+ * the identical callback array. Keeping the 2-arg convention lets both
+ * dispatch sites share one proc array; passing `kind` here would break the
+ * proxy's `cb(owner, record)` call site.
+ * @internal
+ */
+function callback(assoc: CollectionAssociation, kind: string, record: Base): boolean {
+  for (const cb of callbacksFor(assoc, kind)) {
+    if (typeof cb === "function" && (cb as any)(assoc.owner, record) === false) return false;
   }
+  return true;
 }
 
 /** @internal */
 function callbacksFor(assoc: CollectionAssociation, callbackName: string): unknown[] {
+  // The builder stores normalized callbacks both as the
+  // `<kind>For<Name>` class attribute (Rails parity) and on the reflection
+  // options; either is the same array. Prefer the class attribute, matching
+  // Rails' `owner.class.send("#{callback_name}_for_#{reflection.name}")`.
   const fullName = `${callbackName}For${assoc.reflection.name.charAt(0).toUpperCase()}${assoc.reflection.name.slice(1)}`;
   const owner = assoc.owner.constructor as any;
-  if (typeof owner[fullName] === "function") return owner[fullName]();
-  return [];
+  const stored = owner[fullName];
+  if (typeof stored === "function") return stored();
+  if (Array.isArray(stored)) return stored;
+  const fromOptions = (assoc.reflection.options as any)[callbackName];
+  return Array.isArray(fromOptions) ? fromOptions : fromOptions != null ? [fromOptions] : [];
 }
 
 /** @internal */
