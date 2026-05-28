@@ -382,6 +382,13 @@ export class ThroughAssociation extends Association {
         scope = scope.where({ [foreignType]: options.sourceType });
       }
     }
+    // Rails' `elsif !reflection_scope.where_clause.empty?` branch copies the
+    // reflection scope's WHERE onto the through query and adds
+    // `includes!(source)` / `references!` so target-table columns resolve via a
+    // JOIN on the through query (a single-query strategy). Our preloader applies
+    // those target-table conditions at the source-preloader stage instead (see
+    // `_getSourcePreloaders`), so the literal JOIN branch is intentionally not
+    // mirrored here — it is covered by the join-based eager-loading path.
 
     // cascade_strict_loading: a strict-loading preload scope propagates to the
     // through query so intermediate records inherit the constraint
