@@ -370,7 +370,9 @@ class TestAdapterFixtures implements DatabaseAdapter {
     return this.inner;
   }
 
-  /** Expose created tables for test introspection. */
+  /**
+   * @deprecated F4: this getter will be removed; use schemaCache.dataSourceExists() instead.
+   */
   get tables(): Set<string> {
     return getCreatedTables();
   }

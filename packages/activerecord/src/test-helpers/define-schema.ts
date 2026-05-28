@@ -489,20 +489,6 @@ function tableSignature(table: TableSchema): string {
   return JSON.stringify({ columns: sortedCols, primaryKey: pk ?? null });
 }
 
-/**
- * Some adapters (notably the test adapter) expose the set of currently
- * created tables. When available, use it to invalidate stale cache entries
- * — e.g. when an external `resetTestAdapterState` dropped tables out from
- * under us. Returns `null` when the adapter doesn't expose this signal, in
- * which case we trust the cache alone.
- *
- * @internal
- */
-function adapterKnownTables(adapter: DatabaseAdapter): Set<string> | null {
-  const candidate = (adapter as unknown as { tables?: unknown }).tables;
-  return candidate instanceof Set ? (candidate as Set<string>) : null;
-}
-
 export async function defineSchema(schema: Schema, opts?: DefineSchemaOpts): Promise<void>;
 export async function defineSchema(
   adapter: DatabaseAdapter,
@@ -578,7 +564,6 @@ async function _defineSchemaImpl(
         : COLUMN_TYPE_MAP_SQLITE;
 
   const cache = getCache(adapter);
-  const known = adapterKnownTables(adapter);
 
   // Record the per-adapter opt-out flag *before* any DDL runs. Phase 6.3's
   // global `beforeEach` will read this via `getUseTransactionalTests()` to
@@ -597,7 +582,12 @@ async function _defineSchemaImpl(
     const raw = schema[table];
     const newSig = tableSignature(raw);
     const cachedSig = cache.get(table);
-    const stillExists = known ? known.has(table) : cachedSig !== undefined;
+    const sc = adapter.schemaCache;
+    const pool = adapter.pool ?? null;
+    const stillExists =
+      sc && pool !== null
+        ? ((await sc.dataSourceExists(pool, table)) ?? cachedSig !== undefined)
+        : cachedSig !== undefined;
     if (cachedSig === newSig && stillExists) {
       // D-Z: table persists across files. Reset auto-increment so tests
       // that depend on id=1 (e.g. toParam, findEach start/finish) work.
