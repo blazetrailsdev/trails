@@ -74,6 +74,10 @@ describe("CollectionProxy#count — non-through fast path", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
+      // Ignore adapter-internal SCHEMA introspection (e.g. PG type-map loads
+      // that LEFT JOIN pg_range) — matches Rails' SQLCounter, which never
+      // counts SCHEMA queries; not a CollectionProxy query.
+      if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
     let n: number;
@@ -120,6 +124,10 @@ describe("CollectionProxy#count — non-through fast path", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
+      // Ignore adapter-internal SCHEMA introspection (e.g. PG type-map loads
+      // that LEFT JOIN pg_range) — matches Rails' SQLCounter, which never
+      // counts SCHEMA queries; not a CollectionProxy query.
+      if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
     try {

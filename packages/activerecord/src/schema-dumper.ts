@@ -531,7 +531,21 @@ export class SchemaDumper {
     if (isDatabaseAdapter(sourceOrAdapter)) {
       const source = new AdapterSchemaSource(sourceOrAdapter);
       const lang = (options.language as SchemaDumpLanguage) ?? "ts";
-      return this.create(source, { ...options, language: lang }).dump() as Promise<string>;
+      const dumperOptions = { ...options, language: lang };
+      // Instantiate the adapter-specific subclass when the adapter exposes
+      // createSchemaDumper() (MySQL/PG/SQLite) so dialect overrides like
+      // MySQL's schemaPrecision (datetime precision 0 → `precision: nil`)
+      // apply. Mirrors Rails' `connection.create_schema_dumper`, which mixes
+      // the adapter's SchemaDumper module into the dumper. Falls back to the
+      // base class for adapters without the hook.
+      const createDialectDumper = (sourceOrAdapter as { createSchemaDumper?: unknown })
+        .createSchemaDumper;
+      const dumper =
+        typeof createDialectDumper === "function"
+          ? ((createDialectDumper.call(sourceOrAdapter, source, dumperOptions) ??
+              this.create(source, dumperOptions)) as SchemaDumper)
+          : this.create(source, dumperOptions);
+      return dumper.dump() as Promise<string>;
     }
     return this.create(sourceOrAdapter, options).dump();
   }
@@ -856,6 +870,24 @@ export class SchemaDumper {
   }
 
   /**
+   * Hook for adapter subclasses to adjust the introspected `precision` of a
+   * datetime/timestamp column before it is emitted. Default: identity.
+   *
+   * Mirrors Rails' `MySQL::SchemaDumper#schema_precision`: a bare MySQL
+   * `datetime` introspects as precision 0 (via `extract_precision`'s
+   * `super || 0`), and the dumper rewrites that to `precision: nil` so the
+   * column round-trips; a `timestamp(0)` instead omits precision entirely.
+   *
+   * @internal
+   */
+  protected mapDatetimePrecisionForDump(
+    _dslType: string,
+    precision: number | null | undefined,
+  ): number | null | undefined {
+    return precision;
+  }
+
+  /**
    * Hook for adapter subclasses to reorder the primary-key column list emitted
    * inside `tableOpts.primaryKey` for composite PKs. Default: identity
    * (preserve `SHOW COLUMNS` declaration order). MySQL overrides this to
@@ -934,13 +966,16 @@ export class SchemaDumper {
         colspec.limit = col.limit;
       if (extraOpts?.precision === undefined) {
         if (dslType === "datetime" || dslType === "timestamp") {
-          // precision: 6 is the default for datetime — omit it; precision: null → "nil"
-          if (col.precision === undefined) {
+          // precision: 6 is the default for datetime — omit it; precision: null → "nil".
+          // mapDatetimePrecisionForDump lets dialect dumpers adjust the introspected
+          // precision (e.g. MySQL maps a bare `datetime` (precision 0) to `nil`).
+          const precision = this.mapDatetimePrecisionForDump(dslType, col.precision);
+          if (precision === undefined) {
             // not set — omit
-          } else if (col.precision === null) {
+          } else if (precision === null) {
             colspec.precision = null;
-          } else if (col.precision !== SchemaDumper.DEFAULT_DATETIME_PRECISION) {
-            colspec.precision = col.precision;
+          } else if (precision !== SchemaDumper.DEFAULT_DATETIME_PRECISION) {
+            colspec.precision = precision;
           }
         } else if (col.precision !== undefined && col.precision !== null) {
           colspec.precision = col.precision;

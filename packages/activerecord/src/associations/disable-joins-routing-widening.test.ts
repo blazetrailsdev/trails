@@ -146,6 +146,12 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
+      // Ignore adapter-internal schema/type-map introspection (name "SCHEMA"),
+      // matching Rails' SQLCounter which never counts SCHEMA queries. PG's
+      // type-map loader issues a `pg_type LEFT JOIN pg_range` query lazily on a
+      // cold connection; it is not an association query and must not trip the
+      // no-JOIN assertion below.
+      if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
     try {
@@ -195,6 +201,12 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
+      // Ignore adapter-internal schema/type-map introspection (name "SCHEMA"),
+      // matching Rails' SQLCounter which never counts SCHEMA queries. PG's
+      // type-map loader issues a `pg_type LEFT JOIN pg_range` query lazily on a
+      // cold connection; it is not an association query and must not trip the
+      // no-JOIN assertion below.
+      if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
     let loaded: any;

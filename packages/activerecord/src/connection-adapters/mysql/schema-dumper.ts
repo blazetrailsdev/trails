@@ -160,6 +160,20 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return super.schemaLimit(column);
   }
 
+  /**
+   * Mirrors Rails' `MySQL::SchemaDumper#schema_precision`: a bare `datetime`
+   * (introspected precision 0) dumps as `precision: nil`, while a bare
+   * `timestamp`/`time` (precision 0) omits precision entirely.
+   * @internal
+   */
+  protected override mapDatetimePrecisionForDump(
+    dslType: string,
+    precision: number | null | undefined,
+  ): number | null | undefined {
+    if (precision === 0) return dslType === "datetime" ? null : undefined;
+    return precision;
+  }
+
   /** @internal */
   protected override schemaPrecision(column: MysqlColumn): string | undefined {
     const sqlType = (column.sqlType ?? "").toLowerCase();

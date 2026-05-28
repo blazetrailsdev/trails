@@ -873,8 +873,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     await conn.query(this.mysqlQuote(sql));
   }
 
-  createSchemaDumper(source: SchemaSource, _options: unknown = {}): MysqlSchemaDumper {
-    const dumper = new MysqlSchemaDumper(source);
+  createSchemaDumper(
+    source: SchemaSource,
+    options: Record<string, unknown> = {},
+  ): MysqlSchemaDumper {
+    const dumper = new MysqlSchemaDumper(source, options);
     dumper.connection = this;
     return dumper;
   }

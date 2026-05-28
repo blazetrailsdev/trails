@@ -166,6 +166,10 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
+      // Ignore adapter-internal SCHEMA introspection (e.g. PG type-map loads
+      // that LEFT JOIN pg_range) — matches Rails' SQLCounter, which never
+      // counts SCHEMA queries; not an association JOIN.
+      if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
     try {
@@ -207,6 +211,10 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;
+      // Ignore adapter-internal SCHEMA introspection (e.g. PG type-map loads
+      // that LEFT JOIN pg_range) — matches Rails' SQLCounter, which never
+      // counts SCHEMA queries; not an association JOIN.
+      if (event?.payload?.name === "SCHEMA") return;
       if (typeof sql === "string") observed.push(sql);
     });
     let loaded: any;

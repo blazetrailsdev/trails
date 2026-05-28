@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { adapterType, createSidecarTestAdapter, createTestAdapter } from "../test-adapter.js";
-import { getUseTransactionalTests } from "./use-transactional-tests.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { clearAppliedSchemaSignatures, defineSchema, type ColumnSpec } from "./define-schema.js";
 import { dropAllTables } from "./drop-all-tables.js";
@@ -333,44 +332,6 @@ describe("defineSchema", () => {
 
     const rows = await adapter.execute(`SELECT * FROM "items"`);
     expect(rows).toHaveLength(0);
-  });
-
-  describe("useTransactionalTests flag", () => {
-    it("defaults to true when option omitted", async () => {
-      await defineSchema(adapter, { t1: { name: "string" } });
-      expect(getUseTransactionalTests(adapter)).toBe(true);
-    });
-
-    it("defaults to true when explicitly set to true", async () => {
-      await defineSchema(adapter, { t1: { name: "string" } }, { useTransactionalTests: true });
-      expect(getUseTransactionalTests(adapter)).toBe(true);
-    });
-
-    it("records false when explicitly opted out", async () => {
-      await defineSchema(adapter, { t1: { name: "string" } }, { useTransactionalTests: false });
-      expect(getUseTransactionalTests(adapter)).toBe(false);
-    });
-
-    it("is per-adapter: opting out one does not affect another", async () => {
-      const other = createTestAdapter();
-      await defineSchema(adapter, { t1: { name: "string" } }, { useTransactionalTests: false });
-      await defineSchema(other, { t2: { name: "string" } });
-      expect(getUseTransactionalTests(adapter)).toBe(false);
-      expect(getUseTransactionalTests(other)).toBe(true);
-    });
-
-    it("re-running defineSchema with a new flag overrides the prior value", async () => {
-      await defineSchema(adapter, { t1: { name: "string" } }, { useTransactionalTests: false });
-      expect(getUseTransactionalTests(adapter)).toBe(false);
-
-      await defineSchema(adapter, { t1: { name: "string" } }, { dropExisting: true });
-      expect(getUseTransactionalTests(adapter)).toBe(true);
-    });
-
-    it("defaults to true for an adapter that never called defineSchema", () => {
-      const fresh = createTestAdapter();
-      expect(getUseTransactionalTests(fresh)).toBe(true);
-    });
   });
 
   describe("clearAppliedSchemaSignatures", () => {

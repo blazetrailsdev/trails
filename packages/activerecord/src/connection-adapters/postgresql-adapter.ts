@@ -4623,8 +4623,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return new PgTable(tableName, base as SchemaStatementsConstraintLike);
   }
 
-  createSchemaDumper(source: SchemaSource, _options: unknown = {}): PgSchemaDumper {
-    return new PgSchemaDumper(source);
+  createSchemaDumper(source: SchemaSource, options: Record<string, unknown> = {}): PgSchemaDumper {
+    return new PgSchemaDumper(source, options);
   }
 
   /** @internal */

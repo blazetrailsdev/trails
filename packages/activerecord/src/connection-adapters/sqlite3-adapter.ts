@@ -913,8 +913,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.executeMutation(`DROP INDEX IF EXISTS ${quoteColumnName(indexName)}`);
   }
 
-  createSchemaDumper(source: SchemaSource, _options: unknown = {}): Sqlite3SchemaDumper {
-    return new Sqlite3SchemaDumper(source);
+  createSchemaDumper(
+    source: SchemaSource,
+    options: Record<string, unknown> = {},
+  ): Sqlite3SchemaDumper {
+    return new Sqlite3SchemaDumper(source, options);
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#virtual_table_exists?

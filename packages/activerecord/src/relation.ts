@@ -243,8 +243,7 @@ function hasTopLevelComma(s: string): boolean {
 }
 
 function resolveColumnNameMatcher(adapter: any): RegExp {
-  // Walk adapter → inner (TestAdapterFixtures wraps the real adapter) to find a
-  // static columnNameMatcher on the concrete adapter class.
+  // Walk adapter → inner to find a static columnNameMatcher on the concrete adapter class.
   let a = adapter;
   while (a) {
     const matcher = (a.constructor as any)?.columnNameMatcher?.();
@@ -2321,8 +2320,7 @@ export class Relation<T extends Base> {
       const binaryBytes = this._binaryByteLength(b);
       if (binaryBytes !== null) return `<${binaryBytes} bytes of binary data>`;
       if (typeof adapter.typeCast !== "function") {
-        // Match the "throw loudly" contract the TestAdapterFixtures /
-        // QueryCacheAdapter wrappers use — a silent fallback would
+        // Match the "throw loudly" contract the QueryCacheAdapter wrapper uses — a silent fallback would
         // make EXPLAIN output depend on whether the adapter
         // happens to implement `typeCast`, and nothing we ship does
         // without it.
@@ -3639,9 +3637,7 @@ export class Relation<T extends Base> {
    * Returns the adapter's SELECT visitor when one is defined, or null.
    *
    * Real adapters (PG, SQLite, MySQL) expose `visitor` — use it to
-   * get dialect-correct quoting. `TestAdapterFixtures` delegates
-   * `visitor` to its inner adapter, so wrapped real adapters resolve
-   * through here the same as a bare adapter. Returns null when no
+   * get dialect-correct quoting. Returns null when no
    * adapter is established (e.g. HABTM join models where adapter resolution throws) or
    * when the adapter is a mock/partial that doesn't define `visitor`;
    * callers then fall back to `manager.toSql()` / `node.toSql()` (global

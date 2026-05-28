@@ -1,6 +1,5 @@
 import type { DatabaseAdapter } from "../adapter.js";
 import { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
-import { setUseTransactionalTests } from "./use-transactional-tests.js";
 
 export type PrimitiveColumnSpec =
   | "string"
@@ -65,15 +64,6 @@ export type Schema = Record<string, TableSchema>;
 
 export interface DefineSchemaOpts {
   dropExisting?: boolean;
-  /**
-   * Mirror of Rails' `self.use_transactional_tests = false`. When `false`,
-   * the global per-test `BEGIN`/`ROLLBACK` wrap (Phase 6.3) is bypassed for
-   * tests using this adapter. Required for tests that mutate schema
-   * mid-body (migration tests, schema-dump tests, DDL tests) — DDL inside a
-   * transaction either commits implicitly (MySQL) or breaks rollback
-   * semantics (PG/SQLite savepoint interactions). Defaults to `true`.
-   */
-  useTransactionalTests?: boolean;
 }
 
 /** @internal */
@@ -277,13 +267,6 @@ function _stripUrlCredentials(s: string): string {
  * connected to, or `null` when no stringable identity is available
  * (callers fall back to the {@link _fallbackSchemaSignatures} WeakMap).
  *
- * Does NOT unwrap `innerAdapter` chains: wrappers like
- * `TestAdapterFixtures` carry their own per-wrapper `tables: Set<string>`
- * that `defineSchema` reads via `adapterKnownTables`, so sharing one
- * cache entry across wrappers would desync the cache from the per-wrapper
- * "tables I know about" view and cause cross-file table leakage. Only
- * raw adapters (pool-leased `SidecarAdapter`, etc.) share by DB identity.
- *
  * Reads private fields by name on purpose — defineSchema is test-only
  * infrastructure and there is no public surface for "which DB are you
  * connected to" on AbstractAdapter today. Strips URL credentials so the
@@ -295,9 +278,6 @@ function _stripUrlCredentials(s: string): string {
 function databaseIdentity(adapter: DatabaseAdapter): string | null {
   const real = adapter;
   const a = real as unknown as Record<string, unknown>;
-  // Wrapper shapes (e.g. TestAdapterFixtures with an `innerAdapter` field)
-  // intentionally don't share — see fn docstring.
-  if ((a as { innerAdapter?: unknown }).innerAdapter !== undefined) return null;
   if (real.adapterName === "sqlite") {
     const fn = a["_filename"];
     if (typeof fn === "string" && fn !== ":memory:" && fn !== "") return `sqlite:${fn}`;
@@ -564,12 +544,6 @@ async function _defineSchemaImpl(
         : COLUMN_TYPE_MAP_SQLITE;
 
   const cache = getCache(adapter);
-
-  // Record the per-adapter opt-out flag *before* any DDL runs. Phase 6.3's
-  // global `beforeEach` will read this via `getUseTransactionalTests()` to
-  // decide whether to wrap the test in BEGIN/ROLLBACK. Default is true; only
-  // an explicit `false` opts out.
-  setUseTransactionalTests(adapter, opts?.useTransactionalTests !== false);
 
   if (opts?.dropExisting) {
     for (const table of [...order].reverse()) {

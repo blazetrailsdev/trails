@@ -1,9 +1,8 @@
 import { beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import type { DatabaseAdapter } from "../adapter.js";
-import { resetTestAdapterState, type TestDatabaseAdapter } from "../test-adapter.js";
+import { resetTestAdapterState } from "../test-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { popSkipGlobalReset, pushSkipGlobalReset } from "./skip-global-reset.js";
-import { getUseTransactionalTests } from "./use-transactional-tests.js";
 import {
   _restoreAppliedSchemaSignaturesForAdapter,
   _snapshotAppliedSchemaSignaturesForAdapter,
@@ -18,21 +17,17 @@ interface TxnHost {
 }
 
 /**
- * The helper accepts either the {@link TestDatabaseAdapter} produced by
- * {@link createTestAdapter} (whose `transactionManager` lives on the wrapped
- * `innerAdapter`) or a raw `DatabaseAdapter` constructed directly by a test
- * file (`new PostgreSQLAdapter(...)`, `new SQLite3Adapter(...)`, etc.) which
- * exposes `transactionManager` on itself via `AbstractAdapter`. Adapter-cluster
- * tests under `adapters/**` predominantly take the raw path. Not every
- * `DatabaseAdapter` shape in the repo carries `transactionManager` (e.g. the
- * `QueryCacheAdapter` wrapper in `query-cache.ts`), so the union narrows to
- * adapters that do — type-checking matches runtime behavior.
+ * The helper accepts any `DatabaseAdapter` — pool-leased adapters from
+ * `createTestAdapter()` and raw adapters constructed directly by test files
+ * (`new PostgreSQLAdapter(...)`, `new SQLite3Adapter(...)`, etc.). The
+ * non-pooled path requires `transactionManager` at runtime, but the pooled
+ * path (detected via `.pool.pinConnectionBang`) handles transactions through
+ * the pool, so the static type stays `DatabaseAdapter`.
  */
-export type TransactionalFixturesAdapter = TestDatabaseAdapter | (DatabaseAdapter & TxnHost);
+export type TransactionalFixturesAdapter = DatabaseAdapter;
 
 function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"] {
-  const wrapped = (adapter as Partial<TestDatabaseAdapter>).innerAdapter;
-  const host = (wrapped ?? adapter) as unknown as Partial<TxnHost>;
+  const host = adapter as unknown as Partial<TxnHost>;
   if (!host.transactionManager) {
     throw new Error(
       `withTransactionalFixtures: adapter ${(adapter as { adapterName?: string }).adapterName ?? "unknown"} ` +
@@ -59,16 +54,7 @@ function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"
  * @internal
  */
 function clearSchemaCache(adapter: TransactionalFixturesAdapter): void {
-  const wrapped = (adapter as Partial<TestDatabaseAdapter>).innerAdapter;
-  const host = (wrapped ?? adapter) as DatabaseAdapter;
-  host.schemaCache?.clear();
-}
-
-function adapterAndInner(
-  adapter: TransactionalFixturesAdapter,
-): readonly [DatabaseAdapter, DatabaseAdapter | null] {
-  const wrapped = (adapter as Partial<TestDatabaseAdapter>).innerAdapter ?? null;
-  return [adapter as DatabaseAdapter, wrapped];
+  (adapter as DatabaseAdapter).schemaCache?.clear();
 }
 
 /**
@@ -78,8 +64,7 @@ function adapterAndInner(
  * non-pooled adapters keep `AbstractAdapter#pool === null`.
  */
 function pooledAdapterPool(adapter: TransactionalFixturesAdapter): ConnectionPool | null {
-  const wrapped = (adapter as Partial<TestDatabaseAdapter>).innerAdapter;
-  const host = (wrapped ?? adapter) as { pool?: unknown };
+  const host = adapter as { pool?: unknown };
   const pool = host.pool;
   if (pool && typeof (pool as ConnectionPool).pinConnectionBang === "function") {
     return pool as ConnectionPool;
@@ -110,28 +95,8 @@ function pooledAdapterPool(adapter: TransactionalFixturesAdapter): ConnectionPoo
  * Nested `transaction { ... }` calls inside a test become savepoints because
  * the outer transaction is opened with `joinable: false`.
  *
- * Honors the per-adapter `useTransactionalTests` flag set by `defineSchema`:
- * when `false` at `beforeAll` time, the helper deactivates and the file
- * falls back to the global `resetTestAdapterState` beforeEach. Mirrors
- * Rails' per-test-class `self.use_transactional_tests = false`
- * (test_fixtures.rb:108 `run_in_transaction?`).
- *
- * Timing: the flag is read once in `beforeAll`. To opt out, callers must
- * set the flag BEFORE `withTransactionalFixtures(...)`'s beforeAll runs —
- * either via `defineSchema(adapter, ..., { useTransactionalTests: false })`
- * inside a user `beforeAll` that runs first, or by calling
- * `setUseTransactionalTests(adapter, false)` directly. Setting the flag
- * per-test (in `beforeEach`) is too late: the helper has already decided.
- * Files that need per-test schema registration AND opt-out should simply
- * not call `withTransactionalFixtures` at all — there's no benefit.
- *
- * When opted out, the global reset drops all tables before each test, so
- * opted-out files using this helper still need per-test schema setup
- * (matching Rails' non-transactional path in test_fixtures.rb:135-138,
- * which reloads fixtures every test).
- *
  * @example
- *   let adapter: TestDatabaseAdapter;
+ *   let adapter: DatabaseAdapter;
  *   beforeAll(async () => {
  *     adapter = createTestAdapter();
  *     await defineSchema(adapter, { ... });
@@ -169,23 +134,18 @@ export function withTransactionalFixtures(
   options: WithTransactionalFixturesOptions = {},
 ): void {
   const { invalidateSchemaCache = true } = options;
-  let active = true;
   // Snapshots of defineSchema's per-adapter signature cache taken at the
   // start of each test. On rollback we restore — preserving signatures for
   // tables created outside the test transaction (e.g. in `beforeAll`) while
   // discarding signatures for any `defineSchema(...)` that ran inside the
   // `it()` body (whose DDL was rolled back at the DB).
   let outerSig: Map<string, string> | null = null;
-  let innerSig: Map<string, string> | null = null;
 
   beforeAll(() => {
-    active = getUseTransactionalTests(getAdapter());
-    if (!active) return;
     pushSkipGlobalReset();
   });
 
   afterAll(async () => {
-    if (!active) return;
     // Only reset when the outermost scope exits, mirroring Rails
     // ConnectionPool#unpin_connection! finalizing at depth zero
     // (connection_pool.rb:347).
@@ -193,11 +153,9 @@ export function withTransactionalFixtures(
   });
 
   beforeEach(async () => {
-    if (!active) return;
-    const [outer, inner] = adapterAndInner(getAdapter());
-    outerSig = _snapshotAppliedSchemaSignaturesForAdapter(outer);
-    innerSig = inner ? _snapshotAppliedSchemaSignaturesForAdapter(inner) : null;
-    const pool = pooledAdapterPool(getAdapter());
+    const adapter = getAdapter();
+    outerSig = _snapshotAppliedSchemaSignaturesForAdapter(adapter);
+    const pool = pooledAdapterPool(adapter);
     if (pool) {
       // Mirrors Rails test_fixtures.rb:177-184 pin/lease lifecycle:
       //   pool.pin_connection!(lock_threads)
@@ -215,28 +173,25 @@ export function withTransactionalFixtures(
       await pool.pinConnectionBang({ fixture: true });
       pool.leaseConnection();
     } else {
-      // Non-pooled (wrapper/sidecar) path — preserved verbatim. Mirrors
-      // Rails ConnectionPool#pin_connection! body.
-      await tm(getAdapter()).beginTransaction({ joinable: false, _lazy: false });
+      // Non-pooled path — preserved verbatim. Mirrors Rails
+      // ConnectionPool#pin_connection! body.
+      await tm(adapter).beginTransaction({ joinable: false, _lazy: false });
     }
   });
 
   afterEach(async () => {
-    if (!active) return;
-    const pool = pooledAdapterPool(getAdapter());
+    const adapter = getAdapter();
+    const pool = pooledAdapterPool(adapter);
     if (pool) {
       // Mirrors Rails test_fixtures.rb teardown:
       //   @fixture_connection_pools.map(&:unpin_connection!)
       await pool.unpinConnectionBang();
     } else {
-      const t = tm(getAdapter());
+      const t = tm(adapter);
       while (t.openTransactions > 0) await t.rollbackTransaction();
     }
-    if (invalidateSchemaCache) clearSchemaCache(getAdapter());
-    const [outer, inner] = adapterAndInner(getAdapter());
-    if (outerSig) _restoreAppliedSchemaSignaturesForAdapter(outer, outerSig);
-    if (inner && innerSig) _restoreAppliedSchemaSignaturesForAdapter(inner, innerSig);
+    if (invalidateSchemaCache) clearSchemaCache(adapter);
+    if (outerSig) _restoreAppliedSchemaSignaturesForAdapter(adapter, outerSig);
     outerSig = null;
-    innerSig = null;
   });
 }

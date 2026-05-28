@@ -78,7 +78,5 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
     const a = await createPooledTestAdapter();
     const b = await createPooledTestAdapter();
     expect(a.pool).toBe(b.pool);
-    // SidecarFixtures handles are independent instances.
-    expect(a.fixtures).not.toBe(b.fixtures);
   });
 });

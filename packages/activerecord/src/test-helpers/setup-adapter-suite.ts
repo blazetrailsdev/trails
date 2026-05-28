@@ -5,14 +5,8 @@ import { TEST_SCHEMA } from "./test-schema.js";
 
 /**
  * Subset of {@link DefineSchemaOpts} exposed through this helper.
- *
- * `useTransactionalTests: false` is intentionally rejected: the helper sets
- * schema up exactly once in `beforeAll`, but when transactional fixtures are
- * opted out, the global `resetTestAdapterState` beforeEach (in
- * `test-setup-ar.ts`) drops every table before each test. The shared schema
- * would vanish and subsequent tests would fail. Files needing per-test
- * schema mutation should call `defineSchema` directly inside their own
- * `beforeEach` rather than this helper.
+ * Files needing per-test schema mutation should call `defineSchema` directly
+ * inside their own `beforeEach` rather than this helper.
  */
 export interface AdapterSuiteSchemaOpts {
   dropExisting?: boolean;

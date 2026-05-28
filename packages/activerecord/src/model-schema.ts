@@ -841,9 +841,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   const cache = startingAdapter.schemaCache;
   if (!cache) return;
   const table = schemaHost.tableName;
-  // Resolve a target for schemaCache lookups. Prefer `.pool` because some
-  // wrapper adapters (e.g. TestAdapterFixtures) expose their unwrapped inner
-  // adapter through this getter. If `.pool` is an actual ConnectionPool
+  // Resolve a target for schemaCache lookups. If `.pool` is an actual ConnectionPool
   // (has `withConnection`), wrap startingAdapter in a FakePool — mirroring
   // Rails' BoundSchemaReflection.for_lone_connection. On lone-connection
   // pools (SQLite :memory: + size 1) the connection is already permanently

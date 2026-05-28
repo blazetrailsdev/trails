@@ -153,10 +153,9 @@ export interface DatabaseAdapter {
    * Mirrors: the include-pattern in Rails where each adapter mixes in its
    * own SchemaStatements module.
    *
-   * The optional `host` lets test wrappers (e.g. the handle returned by
-   * `createTestAdapter()`) ask the inner adapter to instantiate its
-   * dialect-specific SchemaStatements while keeping the wrapper itself
-   * as the adapter handle — so spies on the wrapper still observe calls.
+   * The optional `host` parameter lets a caller ask this adapter to
+   * instantiate its dialect-specific SchemaStatements bound to a different
+   * host — so spies on the host still observe calls.
    */
   schemaStatements?(
     host?: DatabaseAdapter,

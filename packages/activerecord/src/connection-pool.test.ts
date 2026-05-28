@@ -15,7 +15,7 @@ import {
   BoundSchemaReflection,
 } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { newRawTestAdapter } from "./test-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./adapter.js";
 import type { AdapterName, DatabaseAdapter } from "./adapter.js";
@@ -44,7 +44,7 @@ function makePool(size: number = 5): ConnectionPool {
     reapingFrequency: null,
   });
   const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-    adapterFactory: createTestAdapter,
+    adapterFactory: newRawTestAdapter,
   });
   return new ConnectionPool(pc);
 }
@@ -337,7 +337,7 @@ it("reaper flushes idle connections after idle_timeout", () => {
       reapingFrequency: 10,
     });
     const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: createTestAdapter,
+      adapterFactory: newRawTestAdapter,
     });
     const pool = new ConnectionPool(pc);
     const conn = pool.checkout();
@@ -379,7 +379,7 @@ it("idle timeout configuration", () => {
     keepConfig,
     "writing",
     "default",
-    { adapterFactory: createTestAdapter },
+    { adapterFactory: newRawTestAdapter },
   );
   const keepPool = new ConnectionPool(keepPc);
   const keepConn = keepPool.checkout();
@@ -400,7 +400,7 @@ it("idle timeout configuration", () => {
     flushConfig,
     "writing",
     "default",
-    { adapterFactory: createTestAdapter },
+    { adapterFactory: newRawTestAdapter },
   );
   const flushPool = new ConnectionPool(flushPc);
   vi.useFakeTimers();
@@ -428,7 +428,7 @@ it("disable flush", () => {
     reapingFrequency: null,
   });
   const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-    adapterFactory: createTestAdapter,
+    adapterFactory: newRawTestAdapter,
   });
   const pool = new ConnectionPool(pc);
   const conn = pool.checkout();
@@ -741,7 +741,7 @@ it("role and shard is returned", () => {
     reapingFrequency: null,
   });
   const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "reading", "shard_one", {
-    adapterFactory: createTestAdapter,
+    adapterFactory: newRawTestAdapter,
   });
   const pool = new ConnectionPool(pc);
   expect(pool.role).toBe("reading");
@@ -963,7 +963,7 @@ it("inspect does not show secrets", () => {
     database: "test.db",
   });
   const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "reading", "shard_one", {
-    adapterFactory: createTestAdapter,
+    adapterFactory: newRawTestAdapter,
   });
   const pool2 = new ConnectionPool(pc);
   expect(pool2.inspect()).toMatch(/shard="shard_one"/);
@@ -996,9 +996,7 @@ describe("ConnectionPool schema cache", () => {
     // fix routes the raw cache through pool.poolConfig.schemaCache,
     // and this test locks that in.
     //
-    // Uses SQLite3Adapter (not createTestAdapter) because the latter
-    // is a DatabaseStatementsMixin stub without the AbstractAdapter
-    // schemaCache getter.
+    // Uses a dedicated fresh adapter to get AbstractAdapter's schemaCache getter.
     const fs = await import("node:fs");
     const path = await import("node:path");
     const os = await import("node:os");
@@ -1271,7 +1269,7 @@ describe("ConnectionPool schema cache", () => {
         dbConfig,
         "writing",
         "default",
-        { adapterFactory: createTestAdapter },
+        { adapterFactory: newRawTestAdapter },
       );
       expect(
         (pc.schemaReflection as unknown as { _cachePath: string | null })._cachePath,
@@ -1298,7 +1296,7 @@ describe("ConnectionPool schema cache", () => {
         dbConfig,
         "writing",
         "default",
-        { adapterFactory: createTestAdapter },
+        { adapterFactory: newRawTestAdapter },
       );
       const cachePath = (pc.schemaReflection as unknown as { _cachePath: string | null })
         ._cachePath;
@@ -1320,7 +1318,7 @@ describe("ConnectionPool schema cache", () => {
       schemaCachePath: "db/custom_cache.json",
     });
     const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: createTestAdapter,
+      adapterFactory: newRawTestAdapter,
     });
     const reflection = pc.schemaReflection;
     expect(reflection).toBeInstanceOf(SchemaReflection);
@@ -1542,7 +1540,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
         dbConfig,
         "writing",
         "default",
-        { adapterFactory: createTestAdapter },
+        { adapterFactory: newRawTestAdapter },
       );
       const pool = new ConnectionPool(pc);
       const max = (pool.queryCache as unknown as { _maxSize: number })._maxSize;

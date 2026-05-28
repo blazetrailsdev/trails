@@ -7,8 +7,8 @@ import {
   type SidecarAdapter,
   type TestDatabaseAdapter,
 } from "../test-adapter.js";
-import { shouldSkipGlobalReset } from "./skip-global-reset.js";
 import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
+import { NullTransaction } from "../connection-adapters/abstract/transaction.js";
 import { defineSchema } from "./define-schema.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 
@@ -63,48 +63,6 @@ describe("withTransactionalFixtures", () => {
   it("nested transaction commit was a savepoint release, outer still rolls back", async () => {
     const rows = await a().execute(`SELECT * FROM fixture_users`);
     expect(rows).toHaveLength(0);
-  });
-});
-
-// Mirrors Rails' per-class `self.use_transactional_tests = false`
-// (test_fixtures.rb:34, 108): when the flag is false, transactional
-// fixtures deactivate and the file falls back to the legacy global reset.
-describe("withTransactionalFixtures (useTransactionalTests=false opt-out)", () => {
-  let adapter: TestDatabaseAdapter;
-  const a = (): AdapterWithExec => adapter as unknown as AdapterWithExec;
-
-  // Exercises the supported integration: defineSchema(..., { useTransactionalTests: false })
-  // sets the per-adapter flag, then withTransactionalFixtures reads it in
-  // its beforeAll (registered next, so user's beforeAll runs first).
-  beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(
-      adapter,
-      { optout_marker: { name: "string" } },
-      { useTransactionalTests: false },
-    );
-  });
-
-  withTransactionalFixtures(() => adapter);
-
-  // The helper is inactive — it must not open a transaction in beforeEach.
-  // If the helper were active, its beforeEach would have opened the outer
-  // tx and our manual beginTransaction would nest as a savepoint
-  // (openTransactions==2); when inactive, openTransactions==1 after our
-  // manual begin.
-  it("does not open a transaction in beforeEach when opted out", async () => {
-    const tm = (createSidecarTestAdapter().adapter as unknown as TmHandle).transactionManager;
-    expect(tm.openTransactions).toBe(0);
-    await tm.beginTransaction({});
-    expect(tm.openTransactions).toBe(1);
-    await tm.rollbackTransaction();
-  });
-
-  it("does not push the global-reset skip when opted out", () => {
-    // When useTransactionalTests=false, the helper must not call
-    // pushSkipGlobalReset — otherwise opted-out files would silently
-    // bypass the global resetTestAdapterState beforeEach they rely on.
-    expect(shouldSkipGlobalReset()).toBe(false);
   });
 });
 
@@ -330,15 +288,15 @@ describe("withTransactionalFixtures (pooled adapter)", () => {
 // so the test targets that mechanism directly — the invariant boundary is the
 // same whether callers go via Base.transaction() or withinNewTransaction().
 //
-// E3 deleted the AsyncContext _txVisible() filter from SidecarFixtures.
-// E5 rewires createSidecarTestAdapter() through the pool so each chain's
-// checkout provides natural isolation. These tests are skipped from E3 until
-// E5 ships; they document the invariant and will be unskipped at that point.
+// F5 removed SidecarFixtures; createSidecarTestAdapter() now returns the raw
+// pool-leased adapter directly. Pool-backed isolation (each checkout gets its
+// own AsyncLocalStorage context) lands at E5; these tests remain skipped until
+// that ships.
 describe("concurrency isolation: two concurrent transaction chains stay independent", () => {
   // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
   it.skip("chain B sees openTransactions=0 while chain A is mid-transaction", async () => {
-    const { fixtures: sidecarA } = createSidecarTestAdapter();
-    const { fixtures: sidecarB } = createSidecarTestAdapter();
+    const { adapter: sidecarA } = createSidecarTestAdapter();
+    const { adapter: sidecarB } = createSidecarTestAdapter();
 
     // Coordinate so chain B reads state WHILE chain A holds an open transaction.
     // Without coordination, chain B would read before chain A's async TM open,
@@ -360,7 +318,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
       sidecarA.withinNewTransaction({ joinable: false }, async () => {
         // Verify chain A genuinely has an open transaction before signalling B,
         // so a vacuous pass (e.g. lazy open) is caught immediately.
-        expect(sidecarA.adapter.openTransactions).toBeGreaterThan(0);
+        expect(sidecarA.openTransactions).toBeGreaterThan(0);
         // Transaction is open. Signal chain B to read.
         signalBReady!();
         // Hold the transaction open until chain B has read.
@@ -394,7 +352,11 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
 
   // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
   it.skip("currentTransaction() returns null for a chain outside any withinNewTransaction", () => {
-    const { fixtures } = createSidecarTestAdapter();
-    expect(fixtures.currentTransaction()).toBeNull();
+    const { adapter } = createSidecarTestAdapter();
+    // Pool-leased adapters return NullTransaction (not null) when no transaction
+    // is open — NullTransaction is the Rails-correct sentinel for "no transaction".
+    expect(adapter.openTransactions).toBe(0);
+    expect(adapter.inTransaction).toBe(false);
+    expect(adapter.currentTransaction()).toBeInstanceOf(NullTransaction);
   });
 });
