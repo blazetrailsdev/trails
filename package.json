@@ -21,6 +21,7 @@
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "api:compare": "bash scripts/api-compare/run.sh",
+    "fixtures:adoption:inventory": "pnpm tsx scripts/fixtures-inventory/inventory.ts",
     "fixtures:compare": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/fixtures-compare/compare.ts",
     "rails-privates:manifest": "pnpm tsx scripts/build-rails-privates-manifest.ts",
     "api:moves": "pnpm tsx scripts/api-compare/moves.ts",
