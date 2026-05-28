@@ -20,6 +20,7 @@ import {
   LockWaitTimeout,
 } from "../errors.js";
 import { Notifications } from "@blazetrails/activesupport";
+import { disablePreparedStatements } from "../ar-config.js";
 import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
 import { stripSqlComments } from "./sql-classification.js";
@@ -676,7 +677,11 @@ export class AbstractAdapter implements Quoting {
         `preparedStatements must be a boolean; got ${typeof value}: ${String(value)}`,
       );
     }
-    this._preparedStatements = value;
+    // Mirrors Rails' `@prepared_statements = !ActiveRecord.disable_prepared_statements && ...`
+    // (abstract_adapter.rb:159). Every concrete adapter assigns
+    // `this.preparedStatements` from its config in the constructor, so honoring
+    // the global toggle here covers (re-)establishConnection uniformly.
+    this._preparedStatements = value && !disablePreparedStatements;
   }
 
   get active(): boolean {
@@ -684,10 +689,24 @@ export class AbstractAdapter implements Quoting {
   }
 
   lease(): void {
+    // Mirrors Rails' `lease` (abstract_adapter.rb:267). Rails branches the
+    // message on whether `@owner` is the current execution context; trails is
+    // single-threaded so the lease always belongs to the current "thread".
+    if (this._inUse) {
+      throw new ActiveRecordError(
+        "Cannot lease connection, it is already leased by the current thread.",
+      );
+    }
     this._inUse = true;
   }
 
   expire(): void {
+    // Mirrors Rails' `expire` (abstract_adapter.rb:303): raise rather than
+    // silently no-op when the connection isn't currently leased. Rails'
+    // "owned by a different thread" branch can't arise single-threaded.
+    if (!this._inUse) {
+      throw new ActiveRecordError("Cannot expire connection, it is not currently leased.");
+    }
     this._inUse = false;
     this._owner = null;
     this._idleSince = Date.now();
@@ -1078,7 +1097,17 @@ export class AbstractAdapter implements Quoting {
   }
 
   close(): void {
-    this.expire();
+    // Mirrors Rails' `close` (abstract_adapter.rb:830): `pool.checkin self`.
+    // Rails adapters always carry a pool (NullPool by default), whose
+    // `checkin` is a no-op; trails leaves `pool` null for standalone adapters,
+    // so the no-pool branch expires a leased connection and otherwise no-ops
+    // (matching NullPool#checkin).
+    const pool = this.pool as { checkin?: (conn: unknown) => void } | null;
+    if (pool && typeof pool.checkin === "function") {
+      pool.checkin(this);
+    } else if (this._inUse) {
+      this.expire();
+    }
   }
 
   requiresReloading(): boolean {
@@ -1148,10 +1177,12 @@ export class AbstractAdapter implements Quoting {
 
   stealBang(): void {
     if (!this._inUse) {
-      throw new Error("Cannot steal connection, it is not currently leased.");
+      throw new ActiveRecordError("Cannot steal connection, it is not currently leased.");
     }
+    // Mirrors Rails' `steal!` (abstract_adapter.rb:319): the connection stays
+    // in use; only the owning thread is reassigned. Do NOT call `lease()` — it
+    // raises when already leased.
     this._owner = null;
-    this.lease();
   }
 
   get secondsIdle(): number {

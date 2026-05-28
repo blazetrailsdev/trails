@@ -27,6 +27,19 @@ export function setProtocolAdapters(value: Record<string, string>): void {
   protocolAdapters = value;
 }
 
+/**
+ * When true, prepared statements are disabled globally regardless of a
+ * connection config's `preparedStatements: true`. Adapters consult this on
+ * (re-)establishConnection — it is applied in the `preparedStatements` setter,
+ * the single chokepoint every adapter constructor flows through. Mirrors
+ * `ActiveRecord.disable_prepared_statements` (active_record.rb:182).
+ */
+export let disablePreparedStatements = false;
+
+export function setDisablePreparedStatements(value: boolean): void {
+  disablePreparedStatements = value;
+}
+
 /** @internal */
 export let indexNestedAttributeErrors = false;
 

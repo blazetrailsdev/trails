@@ -129,6 +129,8 @@ export {
   isSchemaCacheIgnoredTable,
   protocolAdapters,
   setProtocolAdapters,
+  disablePreparedStatements,
+  setDisablePreparedStatements,
 } from "./ar-config.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export {

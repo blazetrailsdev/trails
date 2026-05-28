@@ -840,6 +840,9 @@ export class ConnectionPool implements ReapablePool {
         if (this._checkedOut.has(conn)) {
           this._checkedOut.delete(conn);
           this._leases?.peek(ctx)?.clear(conn);
+          // Mirror Rails' `checkin` (which calls `expire`): clear the in-use
+          // flag so a survivor re-entering `_available` can be re-leased.
+          (conn as unknown as { expire?: () => void }).expire?.();
         }
         if (reloadable.has(conn)) {
           (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();

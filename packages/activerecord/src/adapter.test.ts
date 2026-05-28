@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
+import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
-import { Base } from "./index.js";
+import { Base, disablePreparedStatements, setDisablePreparedStatements } from "./index.js";
 import { Result } from "./result.js";
 
 class LifecycleTestAdapter extends AbstractAdapter {
@@ -135,10 +136,26 @@ describe("AdapterTest", () => {
     // ROOT-CAUSE: connection-adapters/abstract-mysql-adapter.ts: MySQL-only cross-DB select via establishConnection + configurations.configsFor
     // SCOPE: ~25 LOC port + ARTest config wiring; affects ~1 test
   });
-  it.skip("disable prepared statements", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#preparedStatements getter/setter + connection-handling.ts#establishConnection: no global ActiveRecord.disablePreparedStatements toggle exists to override the per-config prepared_statements:true on (re-)establishConnection
-    // SCOPE: ~25 LOC; affects ~1 test
+  it("disable prepared statements", async () => {
+    // Rails establishes a connection with `prepared_statements: true` and
+    // asserts `lease_connection.prepared_statements?` flips false once the
+    // global `ActiveRecord.disable_prepared_statements` toggle is set. Rails
+    // gates this `unless in_memory_db?`; our default test DB is sqlite
+    // `:memory:`, so we exercise the same setter chokepoint by constructing
+    // the adapter with `preparedStatements: true` on each side of the toggle.
+    const original = disablePreparedStatements;
+    try {
+      const enabled = new SQLite3Adapter(":memory:", { preparedStatements: true });
+      expect(enabled.preparedStatements).toBe(true);
+      await enabled.close();
+
+      setDisablePreparedStatements(true);
+      const disabled = new SQLite3Adapter(":memory:", { preparedStatements: true });
+      expect(disabled.preparedStatements).toBe(false);
+      await disabled.close();
+    } finally {
+      setDisablePreparedStatements(original);
+    }
   });
   it.skip("table alias", () => {
     // BLOCKED: schema
