@@ -5,6 +5,7 @@ import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { setSchemaCacheIgnoredTables } from "../ar-config.js";
 import { StatementInvalid } from "../errors.js";
 import { SchemaStatements } from "./abstract/schema-statements.js";
+import { TableDefinition } from "./abstract/schema-definitions.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -588,6 +589,8 @@ function makeMockAdapter(cache: SchemaCache) {
     pool: {},
     quoteDefaultExpression: (_v: unknown) => "",
     supportsDatetimeWithPrecision: () => false,
+    createTableDefinition: (n: string, opts: Record<string, unknown>) =>
+      new TableDefinition(n, { ...opts, adapterName: "sqlite" }),
   };
 }
 
