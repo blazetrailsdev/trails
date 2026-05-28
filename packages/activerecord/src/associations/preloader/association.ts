@@ -327,7 +327,7 @@ export class Association {
       if (scopeResult) scope = scopeResult;
     }
 
-    if (this._preloadScope && !this._preloadScope.isEmptyScope?.()) {
+    if (this._preloadScope && !this._preloadScope.isEmptyScope) {
       scope = scope.merge(this._preloadScope);
     }
 
