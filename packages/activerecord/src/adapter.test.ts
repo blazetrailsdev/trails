@@ -1,4 +1,6 @@
-import { describe, it } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
+import { ConnectionFailed } from "./errors.js";
 
 describe("AdapterTest", () => {
   it.skip("update prepared statement", () => {
@@ -315,20 +317,50 @@ describe("AdapterConnectionTest", () => {
     // ROOT-CAUSE: connection-adapters/abstract/transaction.ts: dirty (post-write) transaction must raise ConnectionFailed and not retry block
     // SCOPE: ~20 LOC; affects ~3 tests
   });
-  it.skip("can reconnect and retry queries under limit when retry deadline is set", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#withRawConnection: allowRetry + retryDeadline knob not implemented
-    // SCOPE: ~25 LOC; affects ~3 tests
+  it("can reconnect and retry queries under limit when retry deadline is set", async () => {
+    const a = new AbstractAdapter();
+    (a as any)._config.retryDeadline = 0.1;
+    let attempts = 0;
+    await a.withRawConnection({ allowRetry: true }, async () => {
+      if (attempts === 0) {
+        attempts++;
+        throw new ConnectionFailed("Something happened to the connection");
+      }
+    });
+    expect(attempts).toBe(1);
   });
-  it.skip("does not reconnect and retry queries when retries are disabled", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#withRawConnection: default (allowRetry: false) must surface ConnectionFailed
-    // SCOPE: ~10 LOC; affects ~3 tests
+  it("does not reconnect and retry queries when retries are disabled", async () => {
+    const a = new AbstractAdapter();
+    let attempts = 0;
+    await expect(
+      a.withRawConnection(async () => {
+        if (attempts === 0) {
+          attempts++;
+          throw new ConnectionFailed("Something happened to the connection");
+        }
+      }),
+    ).rejects.toBeInstanceOf(ConnectionFailed);
+    expect(attempts).toBe(1);
   });
-  it.skip("does not reconnect and retry queries that exceed retry deadline", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#withRawConnection: retryDeadline expiration must surface ConnectionFailed
-    // SCOPE: ~15 LOC; affects ~3 tests
+  it("does not reconnect and retry queries that exceed retry deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      const a = new AbstractAdapter();
+      (a as any)._config.retryDeadline = 0.1;
+      let attempts = 0;
+      await expect(
+        a.withRawConnection({ allowRetry: true }, async () => {
+          if (attempts === 0) {
+            await vi.advanceTimersByTimeAsync(200);
+            attempts++;
+            throw new ConnectionFailed("Something happened to the connection");
+          }
+        }),
+      ).rejects.toBeInstanceOf(ConnectionFailed);
+      expect(attempts).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it.skip("#execute is retryable", () => {
     // BLOCKED: connection-pool
