@@ -328,17 +328,17 @@ it.skip("reap inactive", () => {
 
 it("reaper flushes idle connections after idle_timeout", () => {
   vi.useFakeTimers();
+  const dbConfig = new HashConfig("test", "primary", {
+    adapter: "sqlite3",
+    database: "test.db",
+    idleTimeout: 1,
+    reapingFrequency: 10,
+  });
+  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
+    adapterFactory: createTestAdapter,
+  });
+  const pool = new ConnectionPool(pc);
   try {
-    const dbConfig = new HashConfig("test", "primary", {
-      adapter: "sqlite3",
-      database: "test.db",
-      idleTimeout: 1,
-      reapingFrequency: 10,
-    });
-    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
-      adapterFactory: createTestAdapter,
-    });
-    const pool = new ConnectionPool(pc);
     const conn = pool.checkout();
     pool.checkin(conn);
     expect(pool.stat().connections).toBe(1);
@@ -351,6 +351,12 @@ it("reaper flushes idle connections after idle_timeout", () => {
     vi.advanceTimersByTime(10_000);
     expect(pool.stat().connections).toBe(0);
   } finally {
+    // Discard the pool so the next reaper tick removes it, then advance to
+    // trigger that tick and let the reaper clear its per-frequency timer entry.
+    // Without this, Reaper._timers retains the fake-interval handle and later
+    // pools with the same reapingFrequency never spawn a real timer.
+    pool.discardBang();
+    vi.advanceTimersByTime(10_000);
     vi.useRealTimers();
   }
 });
