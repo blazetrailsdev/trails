@@ -603,10 +603,10 @@ describe("DDL cache-invalidation safety-net", () => {
 
     const order: string[] = [];
     const adapter = makeMockAdapter(cache);
-    vi.spyOn(cache, "clearDataSourceCacheBang").mockImplementation((_pool, name) => {
+    const origClear = cache.clearDataSourceCacheBang.bind(cache);
+    vi.spyOn(cache, "clearDataSourceCacheBang").mockImplementation((pool, name) => {
       order.push(`clear:${name}`);
-      cache.setColumns(name, []); // actually clear so isCached reflects it
-      (cache as any)._columns?.delete(name);
+      origClear(pool, name);
     });
     (adapter.executeMutation as ReturnType<typeof vi.fn>).mockImplementation(async () => {
       order.push("sql");
@@ -627,9 +627,10 @@ describe("DDL cache-invalidation safety-net", () => {
 
     const order: string[] = [];
     const adapter = makeMockAdapter(cache);
-    vi.spyOn(cache, "clearDataSourceCacheBang").mockImplementation((_pool, name) => {
+    const origClear = cache.clearDataSourceCacheBang.bind(cache);
+    vi.spyOn(cache, "clearDataSourceCacheBang").mockImplementation((pool, name) => {
       order.push(`clear:${name}`);
-      (cache as any)._columns?.delete(name);
+      origClear(pool, name);
     });
     (adapter.executeMutation as ReturnType<typeof vi.fn>).mockImplementation(async () => {
       order.push("sql");
