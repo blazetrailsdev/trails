@@ -73,10 +73,59 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
 
-  it.skip("should property quote string primary keys", () => {
-    // BLOCKED: associations — habtm
-    // ROOT-CAUSE: habtm join query does not quote string PKs in the IN clause
-    // SCOPE: associations/builder/has-and-belongs-to-many.ts — string PK quoting in join SELECT
+  it("should property quote string primary keys", async () => {
+    // Mirrors Rails' setup_data_for_habtm_case: a HABTM between models with
+    // string primary keys. The join row must store the string PKs verbatim
+    // ("c1"/"t1"), and the join query must round-trip them.
+    const a2 = freshAdapter();
+    await defineSchema(a2, {
+      countries: { country_id: "string", name: "string" },
+      treaties: { treaty_id: "string", name: "string" },
+      countries_treaties: { country_id: "string", treaty_id: "string" },
+    });
+    class Country extends Base {
+      static {
+        this.primaryKey = "country_id";
+        this.attribute("country_id", "string");
+        this.attribute("name", "string");
+        this.adapter = a2;
+      }
+    }
+    class Treaty extends Base {
+      static {
+        this.primaryKey = "treaty_id";
+        this.attribute("treaty_id", "string");
+        this.attribute("name", "string");
+        this.adapter = a2;
+      }
+    }
+    class CountryTreaty extends Base {
+      static {
+        this._tableName = "countries_treaties";
+        this.primaryKey = ["country_id", "treaty_id"];
+        this.attribute("country_id", "string");
+        this.attribute("treaty_id", "string");
+        this.adapter = a2;
+      }
+    }
+    registerModel("Country", Country);
+    registerModel("Treaty", Treaty);
+    await Country.create({ country_id: "c1", name: "France" });
+    await Treaty.create({ treaty_id: "t1", name: "Paris" });
+    await CountryTreaty.create({ country_id: "c1", treaty_id: "t1" });
+
+    const record = (await a2.execute("select * from countries_treaties"))[0];
+    expect(record.country_id).toBe("c1");
+    expect(record.treaty_id).toBe("t1");
+
+    const country = await Country.find("c1");
+    const treaties = await loadHabtm(country, "treaties", {
+      className: "Treaty",
+      joinTable: "countries_treaties",
+      foreignKey: "country_id",
+    });
+    expect(treaties.length).toBe(1);
+    expect((treaties[0] as any).treaty_id).toBe("t1");
   });
 
   it("proper usage of primary keys and join table", async () => {
@@ -146,10 +195,52 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(devs.length).toBe(1);
   });
 
-  it.skip("adding from the project fixed timestamp", () => {
-    // BLOCKED: associations — habtm
-    // ROOT-CAUSE: habtm join records do not write created_at/updated_at; needs timestamp support on join inserts
-    // SCOPE: associations/builder/has-and-belongs-to-many.ts — timestamp columns on join table insert
+  it("adding from the project fixed timestamp", async () => {
+    // Mirrors Rails: adding a developer to a project's collection inserts a
+    // join row only — it must NOT re-save the owner, so the owner's
+    // updated_at is unchanged ("fixed timestamp").
+    const a2 = freshAdapter();
+    await defineSchema(a2, {
+      ts_developers: { name: "string", created_at: "datetime", updated_at: "datetime" },
+      ts_projects: { name: "string" },
+      ts_developers_projects: { ts_developer_id: "integer", ts_project_id: "integer" },
+    });
+    class TsDeveloper extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
+        this.adapter = a2;
+      }
+    }
+    class TsProject extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = a2;
+      }
+    }
+    registerModel("TsDeveloper", TsDeveloper);
+    registerModel("TsProject", TsProject);
+    Associations.hasAndBelongsToMany.call(TsDeveloper, "tsProjects", {
+      className: "TsProject",
+      joinTable: "ts_developers_projects",
+    });
+
+    const jamis = await TsDeveloper.create({ name: "Jamis" });
+    const p1 = await TsProject.create({ name: "P1" });
+    const actionController = await TsProject.create({ name: "ActionController" });
+    await association(jamis, "tsProjects").push(p1);
+
+    const updatedAt = String((jamis as any).updated_at);
+    await association(jamis, "tsProjects").push(actionController);
+    expect(String((jamis as any).updated_at)).toBe(updatedAt);
+
+    const projects = await loadHabtm(jamis, "tsProjects", {
+      className: "TsProject",
+      joinTable: "ts_developers_projects",
+      foreignKey: "ts_developer_id",
+    });
+    expect(projects.length).toBe(2);
   });
 
   it("adding multiple", async () => {
@@ -1282,9 +1373,19 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("redefine habtm", () => {
-    // BLOCKED: associations — habtm
-    // ROOT-CAUSE: calling hasAndBelongsToMany twice for the same name does not replace the prior declaration
-    // SCOPE: associations/builder/has-and-belongs-to-many.ts — redefinition/overwrite semantics
+    // BLOCKED: associations — habtm subclass redeclaration
+    // Rails' test_redefine_habtm (test file:81-87) has SubDeveloper < Developer
+    // re-declare `:special_projects` over the same join table with the FK
+    // options SWAPPED (foreign_key: project_id, association_foreign_key:
+    // developer_id) vs Developer's declaration, and asserts the subclass's
+    // version governs the join on `child.special_projects << ...; child.save`.
+    // ROOT-CAUSE: the has_many :through insert path does not honor a subclass's
+    // re-declared HABTM FKs — pushing on the subclass writes null/parent-mapped
+    // join FKs, and the COW-inherited parent middle `has_many` (whose derived
+    // name differs from the subclass's) is not suppressed, so it double-inserts.
+    // SCOPE: through-insert FK governance + orphaned-middle suppression for
+    // subclass HABTM redeclaration — a separate feature from the F1 insert/
+    // query gaps; tracked as a follow-up.
   });
 
   it.skip("habtm with reflection using class name and fixtures", () => {
@@ -1375,10 +1476,26 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((projects[0] as any).name).toBe("SameProj");
   });
 
-  it.skip("has and belongs to many while partial inserts false", () => {
-    // BLOCKED: associations — habtm
-    // ROOT-CAUSE: habtm join insert does not respect partial_inserts: false config (should INSERT all columns)
-    // SCOPE: associations/builder/has-and-belongs-to-many.ts — partial_inserts config on join table INSERT
+  it("has and belongs to many while partial inserts false", async () => {
+    // Mirrors Rails: with partial_inserts disabled, INSERTs name every column
+    // (not just the dirty ones). Adding a project and saving the developer
+    // must still succeed through the HABTM join insert path.
+    const original = Base.partialInserts;
+    Base.partialInserts = false;
+    try {
+      const developer = new Developer({ name: "Mehmet Emin İNAÇ" });
+      const proxy = association(developer, "projects");
+      await proxy.push(new Project({ name: "Bounty" }));
+      expect(await developer.save()).toBe(true);
+      const projects = await loadHabtm(developer, "projects", {
+        className: "Project",
+        joinTable: "developer_projects",
+        foreignKey: "developer_id",
+      });
+      expect(projects.length).toBe(1);
+    } finally {
+      Base.partialInserts = original;
+    }
   });
 
   it("has and belongs to many with belongs to", async () => {
