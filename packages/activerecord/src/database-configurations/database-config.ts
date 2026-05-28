@@ -5,6 +5,13 @@
  * Concrete subclasses (HashConfig, UrlConfig) implement the accessor methods.
  */
 
+import {
+  resolve as resolveConnectionAdapter,
+  resolveSync as resolveConnectionAdapterSync,
+  resolveSyncError as resolveConnectionAdapterSyncError,
+} from "../connection-adapters.js";
+import { buildAdapterArg } from "../connection-adapters/adapter-args.js";
+
 export interface DatabaseConfigOptions {
   adapter?: string;
   database?: string;
@@ -39,30 +46,6 @@ let _defaultEnvGetter: (() => string) | null = null;
 /** @internal Set by DatabaseConfigurations to break circular dependency */
 export function _setDefaultEnvGetter(fn: () => string): void {
   _defaultEnvGetter = fn;
-}
-
-// Registered by connection-handling.ts so DatabaseConfig#adapterClass and
-// #newConnection can resolve adapter classes without a circular import.
-type AdapterClassResolver = (adapterName: string) => Promise<new (...args: any[]) => unknown>;
-type AdapterClassResolverSync = (adapterName: string) => (new (...args: any[]) => unknown) | null;
-type AdapterArgBuilder = (adapterName: string, configuration: Record<string, unknown>) => unknown[];
-type LoadErrorLookup = (adapterName: string) => unknown | null;
-let _adapterClassResolver: AdapterClassResolver | null = null;
-let _adapterClassResolverSync: AdapterClassResolverSync | null = null;
-let _buildAdapterArg: AdapterArgBuilder = (_n, c) => [c];
-let _loadAdapterError: LoadErrorLookup | null = null;
-
-/** @internal Set by connection-handling.ts to break circular dependency */
-export function _setAdapterClassResolver(
-  fn: AdapterClassResolver,
-  syncFn?: AdapterClassResolverSync,
-  argBuilder?: AdapterArgBuilder,
-  errorLookup?: LoadErrorLookup,
-): void {
-  _adapterClassResolver = fn;
-  if (syncFn) _adapterClassResolverSync = syncFn;
-  if (argBuilder) _buildAdapterArg = argBuilder;
-  if (errorLookup) _loadAdapterError = errorLookup;
 }
 
 /**
@@ -134,50 +117,46 @@ export class DatabaseConfig {
   }
 
   /**
-   * Mirrors: DatabaseConfig#adapter_class
+   * Mirrors Rails:
    *
-   * Returns the adapter class for this configuration. Resolved through the
-   * adapter loader registered by connection-handling.ts (mirroring Rails'
-   * ActiveRecord::ConnectionAdapters.resolve).
+   *   def adapter_class
+   *     @adapter_class ||= ActiveRecord::ConnectionAdapters.resolve(adapter)
+   *   end
+   *
+   * Async in trails because ESM imports are async (Rails' autoload is sync).
+   * After at least one await, the sync mirror is populated and
+   * {@link newConnection} can run sync.
    */
   async adapterClass(): Promise<new (...args: any[]) => unknown> {
-    if (!_adapterClassResolver) {
-      throw new Error("Adapter class resolver not registered — import connection-handling first");
-    }
     if (!this.adapter) {
       throw new Error(`Database configuration missing adapter: ${this.inspect()}`);
     }
-    return _adapterClassResolver(this.adapter);
+    return resolveConnectionAdapter(this.adapter);
   }
 
   /**
-   * Mirrors: DatabaseConfig#new_connection
+   * Mirrors Rails:
    *
    *   def new_connection
    *     adapter_class.new(configuration_hash)
    *   end
    *
-   * Synchronous in trails because adapter classes are pre-resolved (via
-   * {@link _setAdapterClassResolver}'s async loader registered at module
-   * init). Pre-warm by awaiting {@link loadAdapter} before the first call —
-   * `ConnectionHandler.establishConnection` does this automatically and
-   * exposes the resulting promise as `pool.adapterReady`.
+   * Synchronous because adapter classes are pre-resolved (via
+   * {@link loadAdapter} or the async resolve kicked off by
+   * `ConnectionHandler.establishConnection`, exposed as `pool.adapterReady`).
    *
    * Uses {@link buildAdapterArg} for the trails-specific argument shape
-   * (SQLite takes a filename string, PG/MySQL take a config object). Rails
-   * passes `configuration_hash` directly because its adapter constructors
-   * uniformly accept a hash; trails' adapter constructors don't (yet).
+   * (SQLite takes `[filename, options?]`; PG/MySQL take a single config
+   * object). Rails passes `configuration_hash` directly because its adapter
+   * constructors uniformly accept a hash; trails' don't (yet).
    */
   newConnection(): unknown {
-    if (!_adapterClassResolverSync) {
-      throw new Error("Adapter class resolver not registered — import connection-handling first");
-    }
     if (!this.adapter) {
       throw new Error(`Database configuration missing adapter: ${this.inspect()}`);
     }
-    const Klass = _adapterClassResolverSync(this.adapter);
+    const Klass = resolveConnectionAdapterSync(this.adapter);
     if (!Klass) {
-      const loadError = _loadAdapterError?.(this.adapter);
+      const loadError = resolveConnectionAdapterSyncError(this.adapter);
       const remediation = loadError
         ? `loader failed: ${(loadError as Error).message ?? loadError}`
         : `await pool.adapterReady or this.loadAdapter() before calling newConnection`;
@@ -186,7 +165,7 @@ export class DatabaseConfig {
         loadError ? { cause: loadError } : undefined,
       );
     }
-    const args = _buildAdapterArg(this.adapter, this.configuration as Record<string, unknown>);
+    const args = buildAdapterArg(this.adapter, this.configuration as Record<string, unknown>);
     return new (Klass as new (...args: unknown[]) => unknown)(...args);
   }
 

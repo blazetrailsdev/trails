@@ -49,6 +49,16 @@ describe("buildAdapterArg", () => {
     it("defaults to :memory: when neither url nor database is set", () => {
       expect(buildAdapterArg("sqlite3", { adapter: "sqlite3" })).toEqual([":memory:"]);
     });
+
+    it("prefers explicit database over url (matches non-sqlite precedence)", () => {
+      expect(
+        buildAdapterArg("sqlite3", {
+          adapter: "sqlite3",
+          url: "sqlite3://old.db",
+          database: "mutated.db",
+        }),
+      ).toEqual(["mutated.db"]);
+    });
   });
 
   describe("postgresql / mysql2", () => {

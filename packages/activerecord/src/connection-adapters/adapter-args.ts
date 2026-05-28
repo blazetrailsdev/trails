@@ -69,7 +69,12 @@ export function buildAdapterArg(
   const url = configuration.url as string | undefined;
   const database = configuration.database as string | undefined;
   if (normalized === "sqlite") {
-    const filename = parseSqliteUrl(url || database || ":memory:");
+    // Prefer an explicit `database` over `url` so caller-mutated configs
+    // (e.g. autoConnect rewriting the database for a per-worker slot, db:create
+    // swapping in a fresh database name) win over the original URL — matches
+    // the non-SQLite branch which only falls back to `url` when `database` is
+    // unset.
+    const filename = parseSqliteUrl(database || url || ":memory:");
     // Keep only the SQLite3Adapter constructor's `options` keys so we don't
     // forward unrelated database.yml entries (pool, host, etc.) into the
     // options object. The adapter ignores unknown keys today but accepting

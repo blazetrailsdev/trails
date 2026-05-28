@@ -6,14 +6,10 @@ import { getFsAsync, getPathAsync, getEnv } from "@blazetrails/activesupport";
 import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
-import {
-  _setAdapterClassResolver,
-  type DatabaseConfig,
-} from "./database-configurations/database-config.js";
+import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import {
   resolve as resolveConnectionAdapter,
   resolveSync as resolveConnectionAdapterSync,
-  resolveSyncError as resolveConnectionAdapterSyncError,
 } from "./connection-adapters.js";
 import {
   buildAdapterArg,
@@ -872,18 +868,6 @@ export const ClassMethods = {
   withRoleAndShard,
   appendToConnectedToStack,
 };
-
-// Register adapter class resolver so DatabaseConfig#adapterClass and
-// #newConnection can resolve adapters (matching Rails'
-// ActiveRecord::ConnectionAdapters.resolve). Pass the adapter name through
-// unchanged — the registry handles canonical names and aliases, so caller
-// overrides like register("mysql2", ...) aren't shadowed by normalization.
-_setAdapterClassResolver(
-  async (adapterName) => _loadAdapter(adapterName),
-  (adapterName) => resolveConnectionAdapterSync(adapterName),
-  (adapterName, configuration) => buildAdapterArg(adapterName, configuration),
-  (adapterName) => resolveConnectionAdapterSyncError(adapterName),
-);
 
 /**
  * Resolve a config-or-env value through Base.configurations and set the
