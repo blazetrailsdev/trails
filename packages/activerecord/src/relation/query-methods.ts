@@ -1110,11 +1110,17 @@ function reverseOrderBang(this: QueryMethodsHost): any {
             `Order ${JSON.stringify(raw)} cannot be reversed automatically`,
           );
         }
-        // Mutually exclusive, mirroring Rails `gsub(asc) || gsub(desc) || (s << " DESC")`.
-        let flipped: string;
-        if (/\s+ASC$/i.test(raw)) flipped = raw.replace(/\s+ASC$/i, " DESC");
-        else if (/\s+DESC$/i.test(raw)) flipped = raw.replace(/\s+DESC$/i, " ASC");
-        else flipped = `${raw} DESC`;
+        // Mirror Rails' String branch: split comma-separated terms and flip each
+        // via `gsub(asc) || gsub(desc) || (s << " DESC")` (mutually exclusive).
+        const flipped = raw
+          .split(",")
+          .map((term) => {
+            const s = term.trim();
+            if (/\s+ASC$/i.test(s)) return s.replace(/\s+ASC$/i, " DESC");
+            if (/\s+DESC$/i.test(s)) return s.replace(/\s+DESC$/i, " ASC");
+            return `${s} DESC`;
+          })
+          .join(", ");
         return new Nodes.SqlLiteral(flipped);
       }
       // Mirrors Rails reverse_sql_order: flip Arel::Nodes::Ordering subclasses

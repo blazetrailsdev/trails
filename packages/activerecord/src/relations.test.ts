@@ -4800,6 +4800,9 @@ describe("RelationTest", () => {
     // Reversing a plain SQL string flips "ASC" → "DESC" (and only once).
     expect(sql).toContain("DESC");
     expect(sql).not.toContain("ASC");
+    // Comma-separated literal terms each flip, mirroring Rails' String branch.
+    const multi = Post.order(arelSql("title ASC, id ASC")).reverseOrder().toSql();
+    expect(multi).toContain("title DESC, id DESC");
   });
 
   it("reverse order with function", () => {
