@@ -334,6 +334,16 @@ export class Association {
     return scope;
   }
 
+  /**
+   * Propagate strict loading from the preload scope onto a derived scope.
+   *
+   * Mirrors: ActiveRecord::Associations::Preloader::Association#cascade_strict_loading
+   * @internal
+   */
+  protected _cascadeStrictLoading(scope: any): any {
+    return this._preloadScope?.isStrictLoading ? (scope.strictLoading?.() ?? scope) : scope;
+  }
+
   private _uniqueOwners(owners: Base[]): Base[] {
     const seen = new Set<Base>();
     return owners.filter((o) => {
@@ -576,6 +586,5 @@ function buildScope(assoc: Association): unknown {
 
 /** @internal */
 function cascadeStrictLoading(assoc: Association, scope: unknown): unknown {
-  const ps = (assoc as any)._preloadScope;
-  return ps?.strictLoadingValue ? (scope as any).strictLoading?.() : scope;
+  return (assoc as any)._cascadeStrictLoading(scope);
 }
