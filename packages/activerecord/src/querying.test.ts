@@ -3,6 +3,7 @@ import { Base, Relation } from "./index.js";
 import { registerModel } from "./associations.js";
 import { _queryBySql, _loadFromSql } from "./querying.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { Result } from "./result.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -170,14 +171,14 @@ describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
   });
 
   it("accepts preparable/async/allowRetry opts without error", async () => {
-    vi.spyOn(Model.adapter, "execute").mockResolvedValueOnce([]);
+    vi.spyOn(Model.adapter, "execQuery").mockResolvedValueOnce(Result.fromRowHashes([]));
     await expect(
       _queryBySql.call(Model, "SELECT 1", [], { preparable: true, async: false, allowRetry: true }),
     ).resolves.toEqual([]);
   });
 
   it("opts default to empty object — omitting opts still works", async () => {
-    vi.spyOn(Model.adapter, "execute").mockResolvedValueOnce([{ id: 1 }]);
+    vi.spyOn(Model.adapter, "execQuery").mockResolvedValueOnce(Result.fromRowHashes([{ id: 1 }]));
     const rows = await _queryBySql.call(Model, "SELECT 1");
     expect(rows).toEqual([{ id: 1 }]);
   });
