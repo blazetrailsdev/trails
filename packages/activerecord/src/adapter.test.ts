@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { Nodes } from "@blazetrails/arel";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
+import { Base } from "./index.js";
+import { Result } from "./result.js";
 
 class LifecycleTestAdapter extends AbstractAdapter {
   private _connected = false;
@@ -23,6 +26,36 @@ class LifecycleTestAdapter extends AbstractAdapter {
     this._connected = true;
     this._connection = this as any;
     super.reconnectBang();
+  }
+}
+
+// Adapter that intercepts selectAll to capture allowRetry and simulate reconnects.
+class QueryTestAdapter extends LifecycleTestAdapter {
+  capturedAllowRetry: boolean | undefined;
+  failOnce = false;
+
+  override async selectAll(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    opts?: { allowRetry?: boolean },
+  ): Promise<Result> {
+    this.capturedAllowRetry = opts?.allowRetry ?? false;
+    return this.withRawConnection({ allowRetry: opts?.allowRetry ?? false }, async () => {
+      if (this.failOnce) {
+        this.failOnce = false;
+        throw new ConnectionFailed("remote disconnect");
+      }
+      return Result.fromRowHashes([]);
+    });
+  }
+}
+
+// Minimal Post model for retryable-classification tests.
+class PostForRetryTest extends Base {
+  static {
+    this.attribute("title", "string");
+    this.attribute("tags_count", "integer");
   }
 }
 
@@ -343,20 +376,52 @@ describe("AdapterConnectionTest", () => {
     // ROOT-CAUSE: connection-adapters/abstract-adapter.ts: idempotent SELECT auto-retry on ConnectionFailed not implemented
     // SCOPE: ~25 LOC; affects ~5 tests
   });
-  it.skip("#find and #find_by queries with known attributes are retried and result in a reconnect", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: relation/finder-methods.ts: find/findBy with known attrs marked retryable on ConnectionFailed
-    // SCOPE: ~15 LOC; affects ~5 tests
+  it("#find and #find_by queries with known attributes are retried and result in a reconnect", async () => {
+    const adapter = new QueryTestAdapter();
+    adapter.simulateConnect();
+    PostForRetryTest.adapter = adapter as any;
+
+    adapter.failOnce = true;
+    await PostForRetryTest.where({ id: 1 }).limit(1).toArray();
+    expect(adapter.capturedAllowRetry).toBe(true);
+    expect(adapter.active).toBe(true);
+
+    adapter.failOnce = true;
+    await PostForRetryTest.where({ title: "Welcome to the weblog" }).limit(1).toArray();
+    expect(adapter.capturedAllowRetry).toBe(true);
+    expect(adapter.active).toBe(true);
   });
-  it.skip("queries containing SQL fragments are not retried", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: relation/query-methods.ts: raw-SQL where/select/find_by must NOT be marked retryable
-    // SCOPE: ~15 LOC; affects ~5 tests
+  it("queries containing SQL fragments are not retried", async () => {
+    const adapter = new QueryTestAdapter();
+    adapter.simulateConnect();
+    PostForRetryTest.adapter = adapter as any;
+
+    adapter.failOnce = true;
+    await expect(PostForRetryTest.where("1 = 1").limit(1).toArray()).rejects.toBeInstanceOf(
+      ConnectionFailed,
+    );
+    expect(adapter.capturedAllowRetry).toBe(false);
+
+    adapter.simulateConnect();
+    adapter.failOnce = true;
+    await expect(
+      PostForRetryTest.select("title AS custom_title").limit(1).toArray(),
+    ).rejects.toBeInstanceOf(ConnectionFailed);
+    expect(adapter.capturedAllowRetry).toBe(false);
   });
-  it.skip("queries containing SQL functions are not retried", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: relation/query-methods.ts: Arel NamedFunction in WHERE must NOT be marked retryable
-    // SCOPE: ~10 LOC; affects ~5 tests
+  it("queries containing SQL functions are not retried", async () => {
+    const adapter = new QueryTestAdapter();
+    adapter.simulateConnect();
+    PostForRetryTest.adapter = adapter as any;
+
+    const tagsCountAttr = PostForRetryTest.arelTable.get("tags_count");
+    const absTagsCount = new Nodes.NamedFunction("ABS", [tagsCountAttr]);
+
+    adapter.failOnce = true;
+    await expect(
+      (PostForRetryTest as any).where(absTagsCount.eq(2)).limit(1).toArray(),
+    ).rejects.toBeInstanceOf(ConnectionFailed);
+    expect(adapter.capturedAllowRetry).toBe(false);
   });
   it.skip("transaction restores after remote disconnection", () => {
     // BLOCKED: transactions

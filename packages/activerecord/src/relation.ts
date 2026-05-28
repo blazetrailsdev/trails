@@ -1959,9 +1959,15 @@ export class Relation<T extends Base> {
       this.loadRecords(loadedRecords);
     } else {
       const sql = this._toSql();
+      // After _toSql(), the visitor's collector.retryable reflects whether every
+      // node in the compiled Arel tree is retryable. Raw SQL fragments set it false.
+      const v = this._setOperation ? null : this._selectVisitor();
+      const allowRetry = v ? ((v as any).collector?.retryable ?? false) : false;
       const result = await this._modelClass.connection.selectAll(
         sql,
         `${this._modelClass.name} Load`,
+        [],
+        { allowRetry },
       );
       if (token !== this._loadToken) return [];
       const rows = result.toArray();

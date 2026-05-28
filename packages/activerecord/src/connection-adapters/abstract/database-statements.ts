@@ -75,7 +75,12 @@ export function inspectExplainOption(o: unknown): string {
 export interface DatabaseStatementsHost {
   preparedStatements?: boolean;
   execute?(sql: string, name?: string | null): Promise<unknown>;
-  selectAll?(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  selectAll?(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    opts?: { allowRetry?: boolean },
+  ): Promise<Result>;
   /** @internal */
   internalExecute?(sql: string, name?: string, binds?: unknown[]): Promise<unknown>;
   /** @internal */
@@ -206,12 +211,16 @@ export function toSqlAndBinds(
     const visitor = (this as any)?.visitor as Visitors.ToSql | undefined;
     if (visitor && node instanceof Nodes.Node) {
       const [sql, extractedBinds] = visitor.compileWithBinds(node);
+      // compileWithBinds sets visitor.collector.retryable during traversal.
+      // A non-retryable SqlLiteral (raw SQL) or NamedFunction sets it false.
+      // This mirrors Rails' `allow_retry = collector.retryable` in to_sql_and_binds.
+      const compiledAllowRetry = (visitor as any).collector?.retryable ?? false;
       // Type-cast bind objects (QueryAttribute) to primitive values
       // for adapter execution, matching Rails' type_casted_binds
       const castedBinds = extractedBinds.map((b) =>
         b instanceof ModelAttribute ? b.valueForDatabase : b,
       );
-      return [sql, castedBinds, preparable, allowRetry];
+      return [sql, castedBinds, preparable, compiledAllowRetry];
     }
     const sql = (node as any).toSql();
     return [sql, [], preparable, allowRetry];
@@ -1339,7 +1348,7 @@ interface DatabaseStatementsDefaultsHost {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result>;
 }
 
@@ -1350,12 +1359,13 @@ export const DatabaseStatements = {
     sql: string,
     name?: string | null,
     binds?: unknown[],
+    opts?: { allowRetry?: boolean },
   ): Promise<Result> {
     // Rails: select_all → internal_exec_query → exec_query. Delegating
     // here lets adapters that override execQuery (e.g. PostgreSQLAdapter,
     // which populates columnTypes via its type_map) have their override
     // picked up automatically.
-    return this.execQuery(sql, name, binds);
+    return this.execQuery(sql, name, binds, { allowRetry: opts?.allowRetry ?? false });
   },
 
   async selectOne(
@@ -1410,8 +1420,12 @@ export const DatabaseStatements = {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    _options?: { prepare?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result> {
+    // options.allowRetry is captured here and will flow to withRawConnection
+    // once pool integration lands (connection-pool track). Real adapters that
+    // override execQuery should forward allowRetry to their execute path.
+    void options;
     const rows = await this.execute(sql, binds, name ?? "SQL");
     return Result.fromRowHashes(rows);
   },

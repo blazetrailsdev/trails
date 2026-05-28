@@ -319,7 +319,12 @@ export interface AbstractAdapter {
   dataSources(): Promise<string[]>;
   isDataSourceExists(name: string): Promise<boolean>;
   // --- DatabaseStatements ---
-  selectAll(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  selectAll(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    opts?: { allowRetry?: boolean },
+  ): Promise<Result>;
   selectOne(
     sql: string,
     name?: string | null,

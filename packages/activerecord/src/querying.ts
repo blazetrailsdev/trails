@@ -19,13 +19,16 @@ export async function findBySql<T extends typeof Base>(
   this: T,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
+  opts: { allowRetry?: boolean } | ((record: InstanceType<T>) => void) = {},
   block?: (record: InstanceType<T>) => void,
 ): Promise<InstanceType<T>[]> {
-  const rows = await _queryBySql.call(this, sql, binds);
-  return _loadFromSql.call<T, [Record<string, unknown>[], typeof block], InstanceType<T>[]>(
+  const resolvedOpts = typeof opts === "function" ? {} : opts;
+  const resolvedBlock = typeof opts === "function" ? opts : block;
+  const rows = await _queryBySql.call(this, sql, binds, { allowRetry: resolvedOpts.allowRetry });
+  return _loadFromSql.call<T, [Record<string, unknown>[], typeof resolvedBlock], InstanceType<T>[]>(
     this,
     rows,
-    block,
+    resolvedBlock,
   );
 }
 
@@ -37,12 +40,14 @@ export async function asyncFindBySql<T extends typeof Base>(
   this: T,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
+  opts: { allowRetry?: boolean } | ((record: InstanceType<T>) => void) = {},
   block?: (record: InstanceType<T>) => void,
 ): Promise<InstanceType<T>[]> {
-  return findBySql.call<T, [typeof sql, typeof binds, typeof block], Promise<InstanceType<T>[]>>(
+  return findBySql.call<T, Parameters<typeof findBySql<T>>, Promise<InstanceType<T>[]>>(
     this,
     sql,
     binds,
+    opts as any,
     block,
   );
 }
@@ -83,15 +88,15 @@ export async function _queryBySql(
   this: typeof Base,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
-  _opts: { preparable?: boolean | null; async?: boolean; allowRetry?: boolean } = {},
+  opts: { preparable?: boolean | null; async?: boolean; allowRetry?: boolean } = {},
 ): Promise<Record<string, unknown>[]> {
-  if (Array.isArray(sql)) {
-    // Array form [sql, ...values] — interpolate into the string
-    return this.connection.execute(this.sanitizeSql(sql));
-  }
-  // String SQL with separate binds — pass directly to adapter
-  // (matching Rails where binds go to connection.select_all)
-  return this.connection.execute(sql, binds);
+  // Rails: connection.select_all(sanitize_sql(sql), "#{name} Load", binds, allow_retry:)
+  const resolvedSql = Array.isArray(sql) ? this.sanitizeSql(sql) : sql;
+  const resolvedBinds = Array.isArray(sql) ? [] : binds;
+  const result = await this.connection.selectAll(resolvedSql, `${this.name} Load`, resolvedBinds, {
+    allowRetry: opts.allowRetry ?? false,
+  });
+  return result.toArray();
 }
 
 /**

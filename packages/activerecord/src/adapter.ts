@@ -269,7 +269,12 @@ export interface DatabaseAdapter {
   // Mirrors ActiveRecord::ConnectionAdapters::DatabaseStatements.
   // Default implementations delegate to execute()/executeMutation().
 
-  selectAll(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  selectAll(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    opts?: { allowRetry?: boolean },
+  ): Promise<Result>;
   selectOne(
     sql: string,
     name?: string | null,

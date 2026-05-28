@@ -224,17 +224,22 @@ export class StatementCache {
    * Execute the cached statement with the given bind values.
    * Mirrors: ActiveRecord::StatementCache#execute
    */
-  async execute(params: unknown[], connection: unknown): Promise<InstanceType<typeof Base>[]> {
+  async execute(
+    params: unknown[],
+    connection: unknown,
+    opts: { allowRetry?: boolean } = {},
+  ): Promise<InstanceType<typeof Base>[]> {
     const bindValues = this._bindMap.bind(params);
     const sql = this._queryBuilder.sqlFor(bindValues, connection);
+    const allowRetry = opts.allowRetry ?? this._queryBuilder.retryable;
     // PartialQuery inlines values into the SQL string — pass empty binds
     // to avoid findBySql trying to re-substitute them.
     if (this._queryBuilder instanceof PartialQuery) {
-      return this._model.findBySql(sql);
+      return this._model.findBySql(sql, [], { allowRetry });
     }
     // Type-cast bind objects to primitives for the adapter
     const castedBinds = bindValues.map((b) => (b instanceof Attribute ? b.valueForDatabase : b));
-    return this._model.findBySql(sql, castedBinds);
+    return this._model.findBySql(sql, castedBinds, { allowRetry });
   }
 
   /**
