@@ -2211,8 +2211,8 @@ describe("TransactionTest", () => {
 
     it("calls clearCacheBang and re-raises when the body throws the expired error", async () => {
       const { PreparedStatementCacheExpired } = await import("./errors.js");
-      // After D-1 the TM's _connection is a pooled real adapter instance, not
-      // _sharedAdapter. Spy on AbstractAdapter.prototype to catch any adapter call.
+      // The TM's _connection is a pooled adapter instance; spy on the prototype
+      // to catch any adapter call regardless of which pool slot is active.
       const spy = vi.spyOn(
         AbstractAdapter.prototype as unknown as Required<DatabaseAdapter>,
         "clearCacheBang",

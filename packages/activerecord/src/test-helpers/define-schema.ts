@@ -456,11 +456,10 @@ export function restoreCanonicalSchemaSignatures(): void {
 
 /**
  * Like {@link restoreCanonicalSchemaSignatures} but skips the restore when
- * `adapter` resolves to the same DB identity as the canonical preload.  Used
- * by `resetTestAdapterState` after `dropAllTables(_sharedAdapter)`: if the
- * shared adapter points at the canonical DB, the canonical tables no longer
- * exist, so restoring their signatures would make the fast-path lie and skip
- * DDL for tables that were just dropped.
+ * `adapter` resolves to the same DB identity as the canonical preload. If the
+ * adapter points at the canonical DB, the canonical tables no longer exist
+ * after a `dropAllTables` call, so restoring their signatures would make the
+ * fast-path lie and skip DDL for tables that were just dropped.
  *
  * @internal
  */
