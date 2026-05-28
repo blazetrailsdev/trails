@@ -875,6 +875,7 @@ export class ConnectionPool implements ReapablePool {
     const now = Date.now();
     const minimumIdleMs = minimumIdle * 1000;
 
+    const idle: DatabaseAdapter[] = [];
     const all = this._available.clear();
     for (const conn of all) {
       const lastCheckin = this._lastCheckinAt.get(conn) ?? 0;
@@ -883,9 +884,14 @@ export class ConnectionPool implements ReapablePool {
         const connIdx = this._connections.indexOf(conn);
         if (connIdx >= 0) this._connections.splice(connIdx, 1);
         this._lastCheckinAt.delete(conn);
+        idle.push(conn);
       } else {
         this._available.add(conn);
       }
+    }
+
+    for (const conn of idle) {
+      (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
     }
   }
 

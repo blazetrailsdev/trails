@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
+import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import { Notifications } from "@blazetrails/activesupport";
+import { Visitors } from "@blazetrails/arel";
 import {
   ConnectionPool,
   withExecutionContext,
@@ -7,7 +9,11 @@ import {
 import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
-import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
+import {
+  SchemaCache,
+  SchemaReflection,
+  BoundSchemaReflection,
+} from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { createTestAdapter } from "./test-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -317,10 +323,42 @@ it("reap and active", () => {
 });
 
 it.skip("reap inactive", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
-  /* needs reaper/idle timeout */
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
+  /* JS has no threads; dead-owner recovery via reap() is a no-op */
+});
+
+it("reaper flushes idle connections after idle_timeout", () => {
+  try {
+    vi.useFakeTimers();
+    const dbConfig = new HashConfig("test", "primary", {
+      adapter: "sqlite3",
+      database: "test.db",
+      idleTimeout: 1,
+      reapingFrequency: 10,
+    });
+    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
+      adapterFactory: createTestAdapter,
+    });
+    const pool = new ConnectionPool(pc);
+    const conn = pool.checkout();
+    pool.checkin(conn);
+    expect(pool.stat().connections).toBe(1);
+
+    // Advance past the idleTimeout but not yet past the reaping interval
+    vi.advanceTimersByTime(2000);
+    expect(pool.stat().connections).toBe(1);
+
+    // Advance past the reaping interval — reaper fires reap() + flush()
+    vi.advanceTimersByTime(10_000);
+    expect(pool.stat().connections).toBe(0);
+  } finally {
+    // Clear Reaper static state directly (mirrors reaper.test.ts teardown) so
+    // later tests with the same reapingFrequency get a fresh real timer.
+    (Reaper as any)._timers.forEach((t: any) => clearInterval(t));
+    (Reaper as any)._timers.clear();
+    (Reaper as any)._pools.clear();
+    vi.useRealTimers();
+  }
 });
 
 it.skip("inactive are returned from dead thread", () => {
@@ -434,9 +472,13 @@ it("remove connection", () => {
   expect(pool.stat().connections).toBe(0);
 });
 
-it.skip("remove connection for thread", () => {
-  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
-  /* needs thread tracking */
+it("remove connection for thread", () => {
+  const pool = makePool();
+  const conn = pool.leaseConnection();
+  pool.remove(conn);
+  const conn2 = pool.leaseConnection();
+  expect(conn2).not.toBe(conn);
+  pool.releaseConnection();
 });
 
 it("active connection?", () => {
@@ -559,11 +601,11 @@ it("clearReloadableConnections only disconnects reloadable adapters", () => {
   pool.checkin(reused);
 });
 
-it.skip("pool sets connection visitor", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
-  /* needs visitor pattern */
+it("pool sets connection visitor", () => {
+  const pool = makeTransactionAwarePool(5);
+  const conn = pool.leaseConnection();
+  expect((conn as unknown as { visitor: unknown }).visitor).toBeInstanceOf(Visitors.ToSql);
+  pool.releaseConnection();
 });
 
 it("anonymous class exception", async () => {
@@ -631,11 +673,19 @@ it("sets pool schema reflection", () => {
   expect(pool.schemaReflection).not.toBe(original);
 });
 
-it.skip("pool sets connection schema cache", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
-  /* needs schema cache */
+it("pool sets connection schema cache", () => {
+  const pool = makeTransactionAwarePool(5);
+  // Two simultaneous checkouts return distinct connections.
+  const conn1 = pool.checkout();
+  const conn2 = pool.checkout();
+  expect(conn1).not.toBe(conn2);
+  // Both connections share the same raw SchemaCache instance via poolConfig.
+  const cache1 = (conn1 as unknown as { schemaCache: SchemaCache }).schemaCache;
+  const cache2 = (conn2 as unknown as { schemaCache: SchemaCache }).schemaCache;
+  expect(cache1).toBeInstanceOf(SchemaCache);
+  expect(cache1).toBe(cache2);
+  pool.checkin(conn1);
+  pool.checkin(conn2);
 });
 
 it.skip("concurrent connection establishment", () => {
