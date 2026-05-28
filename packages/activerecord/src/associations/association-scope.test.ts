@@ -91,7 +91,7 @@ describe("AssociationScope", () => {
     expect(typeof upcased.scope).toBe("function");
   });
 
-  it.skip("builds a hasMany scope with WHERE on the target's FK = owner.PK", async () => {
+  it("builds a hasMany scope with WHERE on the target's FK = owner.PK", async () => {
     const { AsAuthor } = makeModels();
     const author = new AsAuthor({ id: 7, name: "Alice" });
     const reflection = (AsAuthor as any)._reflectOnAssociation("as_posts");
@@ -104,10 +104,10 @@ describe("AssociationScope", () => {
     });
 
     const sql = scope.toSql();
-    expect(sql).toMatch(/"as_posts".*"as_author_id"\s*=\s*7/s);
+    expect(sql).toMatch(/["`]as_posts["`].*["`]as_author_id["`]\s*=\s*7/s);
   });
 
-  it.skip("builds a belongsTo scope with WHERE on the target's PK = owner.FK + limit(1)", async () => {
+  it("builds a belongsTo scope with WHERE on the target's PK = owner.FK + limit(1)", async () => {
     const { AsAuthor, AsPost } = makeModels();
     const post = new AsPost({ id: 1, as_author_id: 42, title: "x" });
     const reflection = (AsPost as any)._reflectOnAssociation("as_author");
@@ -122,7 +122,7 @@ describe("AssociationScope", () => {
 
     const sql = scope.toSql();
     // belongsTo → WHERE target.id = owner.fk; isCollection? false → LIMIT 1.
-    expect(sql).toMatch(/"as_authors".*"id"\s*=\s*42.*LIMIT\s+1/s);
+    expect(sql).toMatch(/["`]as_authors["`].*["`]id["`]\s*=\s*42.*LIMIT\s+1/s);
   });
 
   it("getBindValues collects owner's join_foreign_key values (chain length 1)", () => {
@@ -147,7 +147,7 @@ describe("AssociationScope", () => {
     expect(proxy.allIncludes()).toBeNull();
   });
 
-  it.skip("applies reflection.scope lambda exactly once (no double-apply)", () => {
+  it("applies reflection.scope lambda exactly once (no double-apply)", () => {
     class CountAuthor extends Base {
       static {
         this.attribute("id", "integer");
@@ -182,10 +182,10 @@ describe("AssociationScope", () => {
     // The lambda must run exactly once — _addConstraints applies it via
     // reflection.scope; the loader path must not re-apply options.scope.
     expect(calls).toBe(1);
-    expect(scope.toSql()).toMatch(/"published"\s*=\s*TRUE/i);
+    expect(scope.toSql()).toMatch(/["`]published["`]\s*=\s*(?:TRUE|1)/i);
   });
 
-  it.skip("applies STI type_condition on subclass targets (compensates for our unscoped)", () => {
+  it("applies STI type_condition on subclass targets (compensates for our unscoped)", () => {
     // Rails' klass.unscoped applies STI type_condition via core.rb's
     // relation() override; ours doesn't, so AssociationScope re-adds it.
     class StiOwner extends Base {
@@ -222,10 +222,10 @@ describe("AssociationScope", () => {
       klass: reflection.klass,
     });
 
-    expect(scope.toSql()).toMatch(/"type"\s*=\s*'StiSpecial'/);
+    expect(scope.toSql()).toMatch(/["`]type["`]\s*=\s*'StiSpecial'/);
   });
 
-  it.skip("loadHasMany merges target's scope_for_association (default_scope flows through)", async () => {
+  it("loadHasMany merges target's scope_for_association (default_scope flows through)", async () => {
     // Rails' Association#scope is
     //   AssociationRelation.create(klass, self).merge!(klass.scope_for_association)
     // (associations/association.rb:313). The reflection-backed loader
@@ -261,8 +261,8 @@ describe("AssociationScope", () => {
     }) as any;
     const merged = (DsPost as any).scopeForAssociation().merge(built);
     const sql = merged.toSql();
-    expect(sql).toMatch(/"published"\s*=\s*TRUE/i);
-    expect(sql).toMatch(/"ds_author_id"\s*=\s*1/);
+    expect(sql).toMatch(/["`]published["`]\s*=\s*(?:TRUE|1)/i);
+    expect(sql).toMatch(/["`]ds_author_id["`]\s*=\s*1/);
   });
 
   it("loadHasMany applies caller-supplied options.scope when it differs from reflection.scope", async () => {
@@ -304,7 +304,7 @@ describe("AssociationScope", () => {
     expect((results[0] as any).kind).toBe("published");
   });
 
-  it.skip("invokes 0-arity scope lambda with this=relation (Rails instance_exec semantics)", () => {
+  it("invokes 0-arity scope lambda with this=relation (Rails instance_exec semantics)", () => {
     // Rails: `relation.instance_exec(owner, &scope) || relation`. A
     // 0-arity scope (e.g. `-> { where(active: true) }`) reads `self`
     // as the relation, so we must bind `this` rather than passing the
@@ -338,10 +338,10 @@ describe("AssociationScope", () => {
     const sql = (
       AssociationScope.scope({ owner, reflection, klass: reflection.klass }) as any
     ).toSql();
-    expect(sql).toMatch(/"active"\s*=\s*TRUE/i);
+    expect(sql).toMatch(/["`]active["`]\s*=\s*(?:TRUE|1)/i);
   });
 
-  it.skip("hasMany :as adds the polymorphic type WHERE on the target table", () => {
+  it("hasMany :as adds the polymorphic type WHERE on the target table", () => {
     // For `hasMany :comments, as: :commentable`, Rails' AssociationScope
     // builds `WHERE comments.commentable_id = owner.id AND
     // comments.commentable_type = OwnerClass.name`. The type filter
@@ -368,11 +368,11 @@ describe("AssociationScope", () => {
     const sql = (
       AssociationScope.scope({ owner, reflection, klass: reflection.klass }) as any
     ).toSql();
-    expect(sql).toMatch(/"commentable_id"\s*=\s*7/);
-    expect(sql).toMatch(/"commentable_type"\s*=\s*'AsOwner'/);
+    expect(sql).toMatch(/["`]commentable_id["`]\s*=\s*7/);
+    expect(sql).toMatch(/["`]commentable_type["`]\s*=\s*'AsOwner'/);
   });
 
-  it.skip("hasOne :as adds the polymorphic type WHERE plus LIMIT 1", () => {
+  it("hasOne :as adds the polymorphic type WHERE plus LIMIT 1", () => {
     class AsOneOwner extends Base {
       static {
         this.attribute("id", "integer");
@@ -395,12 +395,12 @@ describe("AssociationScope", () => {
     const sql = (
       AssociationScope.scope({ owner, reflection, klass: reflection.klass }) as any
     ).toSql();
-    expect(sql).toMatch(/"imageable_id"\s*=\s*3/);
-    expect(sql).toMatch(/"imageable_type"\s*=\s*'AsOneOwner'/);
+    expect(sql).toMatch(/["`]imageable_id["`]\s*=\s*3/);
+    expect(sql).toMatch(/["`]imageable_type["`]\s*=\s*'AsOneOwner'/);
     expect(sql).toMatch(/LIMIT\s+1/);
   });
 
-  it.skip("polymorphic belongsTo accepts a runtime-resolved klass via AssociationScopeable", () => {
+  it("polymorphic belongsTo accepts a runtime-resolved klass via AssociationScopeable", () => {
     // Polymorphic belongsTo: target klass is resolved at runtime from
     // owner's <assoc>_type column. Callers (loadBelongsTo) pass the
     // resolved klass via the AssociationScopeable.klass field; the
@@ -426,8 +426,8 @@ describe("AssociationScope", () => {
       AssociationScope.scope({ owner: comment, reflection, klass: PolyTarget }) as any
     ).toSql();
     // Target side: WHERE poly_targets.id = 99 (the FK value), LIMIT 1.
-    expect(sql).toMatch(/"poly_targets"/);
-    expect(sql).toMatch(/"id"\s*=\s*99/);
+    expect(sql).toMatch(/["`]poly_targets["`]/);
+    expect(sql).toMatch(/["`]id["`]\s*=\s*99/);
     expect(sql).toMatch(/LIMIT\s+1/);
   });
 
@@ -461,7 +461,7 @@ describe("AssociationScope", () => {
     ).rejects.toThrow(CompositePrimaryKeyMismatchError);
   });
 
-  it.skip("polymorphic belongsTo uses runtime klass's primary key (non-id PK)", () => {
+  it("polymorphic belongsTo uses runtime klass's primary key (non-id PK)", () => {
     // BelongsToReflection#joinPrimaryKey hard-codes "id" for polymorphic
     // associations because the target klass isn't known at definition
     // time. AssociationScope must route through joinPrimaryKeyFor(klass)
@@ -491,8 +491,8 @@ describe("AssociationScope", () => {
       AssociationScope.scope({ owner: comment, reflection, klass: UuidTarget }) as any
     ).toSql();
     // Must WHERE on uuid (the target's actual PK), NOT id.
-    expect(sql).toMatch(/"uuid"\s*=\s*'abc-123'/);
-    expect(sql).not.toMatch(/"id"\s*=/);
+    expect(sql).toMatch(/["`]uuid["`]\s*=\s*'abc-123'/);
+    expect(sql).not.toMatch(/["`]id["`]\s*=/);
   });
 
   it("static scope() routes through this.INSTANCE (subclass dispatch)", async () => {
@@ -503,7 +503,7 @@ describe("AssociationScope", () => {
     expect(DisableJoinsAssociationScope.INSTANCE).not.toBe(AssociationScope.INSTANCE);
   });
 
-  it.skip("through chain merges scope on the through reflection (chain.reverse_each)", () => {
+  it("through chain merges scope on the through reflection (chain.reverse_each)", () => {
     // Rails' add_constraints walks chain.reverse_each over each
     // reflection's constraints and merges WHERE/ORDER predicates from
     // the scope lambda into the main relation. PR 3b adds this for
@@ -556,9 +556,9 @@ describe("AssociationScope", () => {
         klass: reflection.klass,
       }) as any
     ).toSql();
-    expect(sql).toMatch(/INNER JOIN\s+"?cc_memberships"?/i);
-    expect(sql).toMatch(/"cc_memberships"\."cc_author_id"\s*=\s*1/);
-    expect(sql).toMatch(/"cc_memberships"\."active"\s*=\s*TRUE/i);
+    expect(sql).toMatch(/INNER JOIN\s+["`]?cc_memberships["`]?/i);
+    expect(sql).toMatch(/["`]cc_memberships["`]\.["`]cc_author_id["`]\s*=\s*1/);
+    expect(sql).toMatch(/["`]cc_memberships["`]\.["`]active["`]\s*=\s*(?:TRUE|1)/i);
   });
 
   it("loadHasMany through with sourceType filters by polymorphic source type (PR 3c)", async () => {
@@ -987,7 +987,7 @@ describe("AssociationScope", () => {
     expect(tags.map((t) => t.label).sort()).toEqual(["ruby", "typescript"]);
   });
 
-  it.skip("hasOne :through chain emits a JOIN with LIMIT 1", () => {
+  it("hasOne :through chain emits a JOIN with LIMIT 1", () => {
     class HotUser extends Base {
       static {
         this.attribute("id", "integer");
@@ -1029,8 +1029,8 @@ describe("AssociationScope", () => {
         klass: reflection.klass,
       }) as any
     ).toSql();
-    expect(sql).toMatch(/FROM\s+"hot_settings"/);
-    expect(sql).toMatch(/INNER JOIN\s+"?hot_accounts"?/i);
+    expect(sql).toMatch(/FROM\s+["`]hot_settings["`]/);
+    expect(sql).toMatch(/INNER JOIN\s+["`]?hot_accounts["`]?/i);
     // Pin the ON condition so a regression where the join keys flip
     // (or get dropped) doesn't slip through. PR 3 builds these via
     // _nextChainScope using joinPrimaryKey / joinForeignKey from the
@@ -1042,7 +1042,7 @@ describe("AssociationScope", () => {
     expect(sql).toMatch(/LIMIT\s+1/);
   });
 
-  it.skip("through chain emits a JOIN-based query against the through table", () => {
+  it("through chain emits a JOIN-based query against the through table", () => {
     // PR 3: chain length 2 (a has_many :through). The generated SQL
     // selects from the source table, INNER JOINs the through table, and
     // table-qualifies the owner-FK WHERE on the through.
@@ -1091,8 +1091,8 @@ describe("AssociationScope", () => {
         klass: reflection.klass,
       }) as any
     ).toSql();
-    expect(sql).toMatch(/FROM\s+"through_posts"/);
-    expect(sql).toMatch(/INNER JOIN\s+"?through_memberships"?/i);
+    expect(sql).toMatch(/FROM\s+["`]through_posts["`]/);
+    expect(sql).toMatch(/INNER JOIN\s+["`]?through_memberships["`]?/i);
     expect(sql).toMatch(
       /["`]through_posts["`]\.["`]id["`]\s*=\s*["`]through_memberships["`]\.["`]through_post_id["`]/,
     );
