@@ -20,6 +20,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const RFCS_DIR = process.env.RFCS_DIR ?? join(homedir(), "github", "blazetrailsdev", "rfcs");
 
@@ -412,18 +413,25 @@ export function parseFlags(
 function main(): void {
   const [cmd, ...rest] = process.argv.slice(2);
   const { flags, rest: pos } = parseFlags(rest);
+  // `flags[k] === true` means the user wrote `--k` with no following
+  // value. For value-flags that's a usage error, not a boolean.
+  const valueFlags = ["rfc", "cluster", "status", "max-loc", "pr", "assignee", "reason"];
+  for (const k of valueFlags) if (flags[k] === true) usage();
+
   switch (cmd) {
     case "ready": {
-      const rows = ready(loadIndex(), { rfc: flags.rfc as string | undefined });
+      const rows = ready(loadIndex(), { rfc: stringFlag(flags, "rfc") });
       flags.json ? console.log(JSON.stringify(rows, null, 2)) : fmt(rows);
       break;
     }
     case "next-bundle": {
-      const maxLoc = Number(flags["max-loc"] ?? 250);
+      const maxLocRaw = stringFlag(flags, "max-loc") ?? "250";
+      if (!/^\d+$/.test(maxLocRaw) || Number(maxLocRaw) <= 0) usage();
+      const maxLoc = Number(maxLocRaw);
       const rows = nextBundle(loadIndex(), {
         maxLoc,
-        cluster: flags.cluster as string | undefined,
-        rfc: flags.rfc as string | undefined,
+        cluster: stringFlag(flags, "cluster"),
+        rfc: stringFlag(flags, "rfc"),
       });
       const total = rows.reduce((a, s) => a + (s.est_loc ?? 0), 0);
       if (flags.json) {
@@ -440,9 +448,9 @@ function main(): void {
     }
     case "list": {
       const rows = listFiltered(loadIndex(), {
-        rfc: flags.rfc as string | undefined,
-        status: flags.status as string | undefined,
-        cluster: flags.cluster as string | undefined,
+        rfc: stringFlag(flags, "rfc"),
+        status: stringFlag(flags, "status"),
+        cluster: stringFlag(flags, "cluster"),
       });
       flags.json ? console.log(JSON.stringify(rows, null, 2)) : fmt(rows);
       break;
@@ -500,5 +508,7 @@ Set $RFCS_DIR to override the default ~/github/blazetrailsdev/rfcs.`);
   process.exit(2);
 }
 
-// CLI entry — skipped when imported (e.g. by the smoke test).
-if (process.argv[1] && process.argv[1].endsWith("cli.ts")) main();
+// CLI entry — only runs when this module is the script entrypoint, not
+// when imported (e.g. by the smoke test). Matches the pattern used by
+// scripts/fixtures-compare/compare.ts and scripts/api-compare/lint-deps.ts.
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();
