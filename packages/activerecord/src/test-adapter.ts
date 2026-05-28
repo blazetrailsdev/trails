@@ -140,20 +140,27 @@ export type TestDatabaseAdapter = DatabaseAdapter;
  * auto-schema machinery; F5 removed the TestAdapterFixtures wrapper — the
  * raw pool-leased DatabaseAdapter is returned directly.
  */
-export function createTestAdapter(): DatabaseAdapter {
-  return _pool.leaseConnection() as DatabaseAdapter;
+export function createTestAdapter(): TestDatabaseAdapter {
+  return _pool.leaseConnection() as TestDatabaseAdapter;
 }
 
 /**
- * Adapter shape returned by {@link createSidecarTestAdapter}. The shared
- * real adapter is always one of the concrete `AbstractAdapter` subclasses
- * (SQLite3 / PostgreSQL / Mysql2), so `transactionManager` is guaranteed
- * at runtime. Exposing it on the type lets sidecar callers satisfy
- * {@link TransactionalFixturesAdapter} without casts.
+ * Adapter shape returned by {@link createSidecarTestAdapter}. The concrete
+ * `AbstractAdapter` subclasses (SQLite3 / PostgreSQL / Mysql2) expose these
+ * members at runtime; surfacing them here lets callers reach transaction
+ * lifecycle methods without unsafe casts.
  *
  * @internal
  */
-export type SidecarAdapter = DatabaseAdapter & { transactionManager: TransactionManager };
+export type SidecarAdapter = DatabaseAdapter & {
+  transactionManager: TransactionManager;
+  withinNewTransaction<T>(
+    opts: { isolation?: string | null; joinable?: boolean },
+    fn: (tx?: unknown) => Promise<T> | T,
+  ): Promise<T>;
+  currentTransaction(): unknown;
+  openTransactions: number;
+};
 
 /**
  * Returns a pool-leased {@link DatabaseAdapter}. Callers can issue DB ops

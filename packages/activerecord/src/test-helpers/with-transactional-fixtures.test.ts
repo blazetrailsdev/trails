@@ -314,11 +314,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
     let bObservedCurrentTxJoinable = true;
 
     await Promise.all([
-      (
-        sidecarA as unknown as {
-          withinNewTransaction: (o: object, f: () => Promise<void>) => Promise<void>;
-        }
-      ).withinNewTransaction({ joinable: false }, async () => {
+      sidecarA.withinNewTransaction({ joinable: false }, async () => {
         // Verify chain A genuinely has an open transaction before signalling B,
         // so a vacuous pass (e.g. lazy open) is caught immediately.
         expect(sidecarA.openTransactions).toBeGreaterThan(0);
@@ -331,15 +327,12 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
         // Wait until chain A is inside a live transaction before reading.
         await bReady;
         try {
-          bObservedOpen = sidecarB.openTransactions ?? 0;
+          bObservedOpen = sidecarB.openTransactions;
           bObservedInTransaction = sidecarB.inTransaction;
           // currentTransaction() returns null (current filter) or NullTransaction
           // (pool isolation, post-E2/E3). Both have joinable===false. Asserting on
           // joinable rather than identity keeps this green through E2–E5.
-          const ct =
-            (
-              sidecarB as unknown as { currentTransaction?: () => { joinable?: boolean } | null }
-            ).currentTransaction?.() ?? null;
+          const ct = sidecarB.currentTransaction() as { joinable?: boolean } | null;
           bObservedCurrentTxJoinable = ct?.joinable ?? false;
         } finally {
           // Always unblock chain A so the test fails rather than hangs.
@@ -359,8 +352,6 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
   // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
   it.skip("currentTransaction() returns null for a chain outside any withinNewTransaction", () => {
     const { adapter } = createSidecarTestAdapter();
-    expect(
-      (adapter as unknown as { currentTransaction?: () => unknown }).currentTransaction?.(),
-    ).toBeNull();
+    expect(adapter.currentTransaction()).toBeNull();
   });
 });
