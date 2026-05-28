@@ -32,7 +32,8 @@ describe("createSidecarTestAdapter (path 2 sidecar)", () => {
     expect(getCreatedTables().has(table)).toBe(false);
   });
 
-  it("hides transaction state from foreign async chains", async () => {
+  // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
+  it.skip("hides transaction state from foreign async chains", async () => {
     const { fixtures } = createSidecarTestAdapter();
     expect(fixtures.currentTransaction()).toBeNull();
 
