@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
-import { createTestAdapter } from "../test-adapter.js";
 import { Base } from "../base.js";
 import { currentRole } from "../core.js";
 
@@ -18,14 +17,10 @@ describe("ConnectionHandlersMultiDbTest", () => {
       adapter: "sqlite3",
       database: ":memory:",
     });
-    rwPool = handler.establishConnection(dbConfig, {
-      owner: connectionName,
-      adapterFactory: createTestAdapter,
-    });
+    rwPool = handler.establishConnection(dbConfig, { owner: connectionName });
     roPool = handler.establishConnection(dbConfig, {
       owner: connectionName,
       role: "reading",
-      adapterFactory: createTestAdapter,
     });
   });
 

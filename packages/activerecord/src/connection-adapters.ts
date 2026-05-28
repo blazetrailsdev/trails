@@ -23,6 +23,10 @@ const resolved = new Map<string, Promise<AdapterClass>>();
 // sync entry points (like `connectsTo`) hand the pool a sync
 // `adapterFactory` once async adapter loading has completed at least once.
 const resolvedSyncCache = new Map<string, AdapterClass>();
+// Mirror of resolution rejections. Surfaces from `resolveSyncError` so the
+// sync auto-resolve path can re-throw the original loader error (unknown
+// adapter, failed dynamic import, etc.) instead of a generic "not pre-resolved".
+const resolveErrors = new Map<string, unknown>();
 
 /**
  * Synchronous companion to `resolve(name)`. Returns the adapter class if it
@@ -34,6 +38,19 @@ const resolvedSyncCache = new Map<string, AdapterClass>();
  */
 export function resolveSync(adapterName: string): AdapterClass | null {
   return resolvedSyncCache.get(adapterName) ?? null;
+}
+
+/**
+ * Returns the rejection from a prior `resolve()` call for this adapter
+ * name, or null if no failure was recorded. Lets sync entry points
+ * (`ConnectionPool.newConnection` → `dbConfig.newConnection`) surface the
+ * original failure cause (AdapterNotFound, import error, etc.) instead of
+ * a generic "not pre-resolved" message.
+ *
+ * @internal
+ */
+export function resolveSyncError(adapterName: string): unknown | null {
+  return resolveErrors.get(adapterName) ?? null;
 }
 
 /**
@@ -49,6 +66,7 @@ export function register(name: string, loader: AdapterLoader): void {
   adapters.set(name, loader);
   resolved.delete(name);
   resolvedSyncCache.delete(name);
+  resolveErrors.delete(name);
 }
 
 /**
@@ -63,18 +81,22 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
   const loader = adapters.get(adapterName);
   if (!loader) {
     const available = [...adapters.keys()].sort().join(", ");
-    throw new AdapterNotFound(
+    const err = new AdapterNotFound(
       `Database configuration specifies nonexistent '${adapterName}' adapter. ` +
         `Available adapters are: ${available}.`,
     );
+    resolveErrors.set(adapterName, err);
+    throw err;
   }
   const promise = loader()
     .then((klass) => {
       resolvedSyncCache.set(adapterName, klass);
+      resolveErrors.delete(adapterName);
       return klass;
     })
     .catch((err) => {
       resolved.delete(adapterName);
+      resolveErrors.set(adapterName, err);
       throw err;
     });
   resolved.set(adapterName, promise);

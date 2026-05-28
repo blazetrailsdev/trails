@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
-import { createTestAdapter } from "./test-adapter.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import {
@@ -19,10 +18,7 @@ function setupConnection() {
     pool: 5,
     reapingFrequency: null,
   });
-  Base.connectionHandler.establishConnection(config, {
-    owner: "Base",
-    adapterFactory: createTestAdapter,
-  });
+  Base.connectionHandler.establishConnection(config, { owner: "Base" });
 }
 
 describe("ConnectionHandlingTest", () => {

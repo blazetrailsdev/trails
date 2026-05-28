@@ -133,3 +133,15 @@ if (process.env.PG_TEST_URL) {
 if (process.env.MYSQL_TEST_URL) {
   process.env.MYSQL_TEST_URL = await acquireAdvisorySlotMysql(process.env.MYSQL_TEST_URL);
 }
+
+// Pre-warm the sync adapter-class cache for the active test environment so
+// ConnectionPool.newConnection() can auto-resolve from `dbConfig.adapter`
+// without an explicit `adapterFactory`. Mirrors how Rails' autoload makes
+// adapter classes synchronously available to ConnectionPool#new_connection.
+{
+  const { resolve: resolveAdapter } = await import("./connection-adapters.js");
+  const adapters: string[] = ["sqlite3"];
+  if (process.env.PG_TEST_URL) adapters.push("postgresql");
+  if (process.env.MYSQL_TEST_URL) adapters.push("mysql2");
+  await Promise.all(adapters.map((a) => resolveAdapter(a)));
+}

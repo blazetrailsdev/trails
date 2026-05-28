@@ -6,14 +6,16 @@ import { getFsAsync, getPathAsync, getEnv } from "@blazetrails/activesupport";
 import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
-import {
-  _setAdapterClassResolver,
-  type DatabaseConfig,
-} from "./database-configurations/database-config.js";
+import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import {
   resolve as resolveConnectionAdapter,
   resolveSync as resolveConnectionAdapterSync,
 } from "./connection-adapters.js";
+import {
+  buildAdapterArg,
+  normalizeAdapterName,
+  parseSqliteUrl,
+} from "./connection-adapters/adapter-args.js";
 import {
   AdapterNotFound,
   AdapterNotSpecified,
@@ -115,7 +117,7 @@ export function connectsTo(
                 `await the pool's \`adapterReady\` promise after \`connectsTo\` returns.`,
             );
           }
-          return new AdapterClass(adapterArg);
+          return new AdapterClass(...(adapterArg as unknown[]));
         },
       });
       pool.adapterReady = adapterReady;
@@ -124,44 +126,6 @@ export function connectsTo(
   }
 
   return connections;
-}
-
-/**
- * Build the adapter-constructor argument used by `connectsTo` and
- * `establishConnection`. SQLite expects the database string directly; other
- * adapters take a config hash. Mirrors the inline normalization done by
- * `establishWithConfig`.
- *
- * @internal
- */
-function buildAdapterArg(adapterName: string, configuration: Record<string, unknown>): unknown {
-  const normalized = normalizeAdapterName(adapterName);
-  const url = configuration.url as string | undefined;
-  const database = configuration.database as string | undefined;
-  if (normalized === "sqlite") {
-    // Mirrors establishWithConfig's `url || config?.database || ":memory:"`
-    // precedence so connectsTo and establishConnection normalize SQLite
-    // configs identically. autoConnect already pre-zeroes `url` when the
-    // configuration hash carries a `database`, so the resolved-database-
-    // wins semantic is preserved on the public entrypoint.
-    return parseSqliteUrl(url || database || ":memory:");
-  }
-  // Mirrors establishWithConfig's `else if (url) adapterArg = url` branch:
-  // URL-only configs (e.g. opaque adapter strings like jdbc:...) are passed
-  // through as the raw URL string. Hash-form configs (no url, or url + an
-  // explicit database) get the normalized hash with username/host defaults.
-  if (url && database === undefined) {
-    return url;
-  }
-  const { adapter: _a, url: _u, username, ...rest } = configuration;
-  const adapterConfig: Record<string, unknown> = { ...rest };
-  if (adapterConfig.user === undefined && username !== undefined) {
-    adapterConfig.user = username;
-  }
-  if (adapterConfig.host === undefined) {
-    adapterConfig.host = "localhost";
-  }
-  return adapterConfig;
 }
 
 export function connectedTo<T>(
@@ -646,15 +610,16 @@ async function establishWithConfig(
   // like register("mysql2", ...) aren't shadowed by normalization.
   const AdapterClass = await _loadAdapter(adapterName);
 
-  let adapterArg: unknown;
-  if (normalized === "sqlite") {
-    adapterArg = parseSqliteUrl(url || (config?.database as string) || ":memory:");
-  } else if (url) {
-    adapterArg = url;
-  } else if (config) {
-    adapterArg = buildAdapterArg(adapterName, config);
+  // For SQLite, preserve adapter options (pragmas, strict, readonly, driver,
+  // etc.) by routing through buildAdapterArg whenever a config hash is given;
+  // bare-URL inputs fall through to the simple filename path.
+  let adapterArgs: unknown[];
+  if (config) {
+    adapterArgs = buildAdapterArg(adapterName, config);
+  } else if (normalized === "sqlite") {
+    adapterArgs = [parseSqliteUrl(url || ":memory:")];
   } else {
-    adapterArg = url;
+    adapterArgs = [url];
   }
 
   const dbConfig = new HashConfig(
@@ -685,7 +650,8 @@ async function establishWithConfig(
     owner: modelClass.connectionClassForSelf(),
     role,
     shard,
-    adapterFactory: () => new AdapterClass(adapterArg),
+    adapterFactory: () =>
+      new (AdapterClass as new (...args: unknown[]) => DatabaseAdapter)(...adapterArgs),
   });
 }
 
@@ -830,29 +796,13 @@ async function loadJsonConfig(configPath: string): Promise<RawConfigurations> {
   }
 }
 
-export function normalizeAdapterName(name: string): string {
-  switch (name) {
-    case "postgresql":
-    case "postgres":
-      return "postgresql";
-    case "mysql":
-    case "mysql2":
-      return "mysql";
-    case "sqlite":
-    case "sqlite3":
-      return "sqlite";
-    default:
-      return name;
-  }
-}
-
-export function parseSqliteUrl(url: string): string {
-  if (url.startsWith("sqlite3://") || url.startsWith("sqlite://")) {
-    const stripped = url.replace(/^sqlite3?:\/\//, "");
-    return stripped || ":memory:";
-  }
-  return url;
-}
+// Re-exports for backward compat — these now live in adapter-args.ts so
+// ConnectionPool can use them without back-edging through connection-handling.
+export {
+  normalizeAdapterName,
+  parseSqliteUrl,
+  buildAdapterArg,
+} from "./connection-adapters/adapter-args.js";
 
 export function adapterNameFromUrl(url: string): string {
   if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {
@@ -918,13 +868,6 @@ export const ClassMethods = {
   withRoleAndShard,
   appendToConnectedToStack,
 };
-
-// Register adapter class resolver so DatabaseConfig#adapterClass and
-// #newConnection can resolve adapters (matching Rails'
-// ActiveRecord::ConnectionAdapters.resolve). Pass the adapter name through
-// unchanged — the registry handles canonical names and aliases, so caller
-// overrides like register("mysql2", ...) aren't shadowed by normalization.
-_setAdapterClassResolver(async (adapterName) => _loadAdapter(adapterName));
 
 /**
  * Resolve a config-or-env value through Base.configurations and set the
