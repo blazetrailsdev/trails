@@ -782,9 +782,18 @@ function replaceOnTarget(
  * Unified association-callback dispatch. Mirrors Rails'
  * `CollectionAssociation#callback`: looks up the registered callbacks for
  * `kind` (`beforeAdd`/`afterAdd`/`beforeRemove`/`afterRemove`) and invokes
- * each with `(owner, record)`. Returns `false` if any callback aborts (Rails
- * `throw :abort`, modelled here as a callback returning `false`), so callers
- * can halt the add/remove like Rails' `catch(:abort) ... || return`.
+ * each. Returns `false` if any callback aborts (Rails `throw :abort`,
+ * modelled here as a callback returning `false`), so callers can halt the
+ * add/remove like Rails' `catch(:abort) ... || return`.
+ *
+ * Arity note: Rails procs take `(method, owner, record)` and `callback`
+ * passes the kind through (so the symbol case can `callback.send(method, ...)`).
+ * Here the builder binds the method/symbol at registration time, so the
+ * stored procs take `(owner, record)` — the same 2-arg shape consumed by
+ * `fireAssocCallbacks` on the CollectionProxy add/remove paths, which read
+ * the identical callback array. Keeping the 2-arg convention lets both
+ * dispatch sites share one proc array; passing `kind` here would break the
+ * proxy's `cb(owner, record)` call site.
  * @internal
  */
 function callback(assoc: CollectionAssociation, kind: string, record: Base): boolean {
