@@ -6521,14 +6521,15 @@ describe("RelationTest", () => {
     expect(Post.where({ title: "x" }).unscope("where")).toBeInstanceOf(Relation);
   });
 
-  it.skipIf(adapterType === "sqlite")("locked should not build arel", () => {
+  it("locked should not build arel", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.all().lock().toSql();
-    expect(sql).toContain("FOR UPDATE");
+    const posts = Post.all().lock();
+    expect(posts.isLocked).toBe(true);
+    expect(() => posts.lock(false)).not.toThrow();
   });
 
   it("relation join method", () => {

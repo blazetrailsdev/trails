@@ -1092,6 +1092,15 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * Check if this relation carries a lock clause.
+   *
+   * Mirrors: ActiveRecord::Relation#locked? (`alias :locked? :lock_value`)
+   */
+  get isLocked(): boolean {
+    return this._lockValue !== null;
+  }
+
+  /**
    * Check if this relation has strict loading enabled.
    *
    * Mirrors: ActiveRecord::Relation#strict_loading?
@@ -3034,6 +3043,15 @@ export class Relation<T extends Base> {
    */
   get offsetValue(): number | null {
     return this._offsetValue;
+  }
+
+  /**
+   * Return the lock clause value (the lock string, or null when unlocked).
+   *
+   * Mirrors: ActiveRecord::Relation#lock_value
+   */
+  get lockValue(): string | null {
+    return this._lockValue;
   }
 
   /**
