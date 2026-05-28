@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { SchemaCache, SchemaReflection, FakePool } from "./schema-cache.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { setSchemaCacheIgnoredTables } from "../ar-config.js";
 import { StatementInvalid } from "../errors.js";
+import { SchemaStatements } from "./abstract/schema-statements.js";
+import { TableDefinition } from "./abstract/schema-definitions.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -560,5 +562,148 @@ describe("SchemaReflectionTest", () => {
     } finally {
       SchemaReflection.checkSchemaCacheDumpVersion = origCheck;
     }
+  });
+});
+
+// ── DDL cache-invalidation safety-net tests ──────────────────────────────────
+//
+// Each test seeds the SchemaCache with a known entry, calls a DDL method on a
+// mock adapter, and asserts the entry is gone afterwards.
+//
+// Tests marked .skip are BLOCKED on F2, which will inline
+// schemaCache.clearDataSourceCacheBang() at the missing DDL sites. Once F2
+// lands these are unskipped — the skip rationale names the exact method where
+// the call must be added.
+//
+// Tests that are NOT skipped already pass because the relevant adapter override
+// already calls clearDataSourceCacheBang (dropTable in all three adapters).
+
+function makeMockAdapter(cache: SchemaCache) {
+  return {
+    adapterName: "sqlite" as const,
+    quoteIdentifier: (n: string) => `"${n}"`,
+    quoteTableName: (n: string) => `"${n}"`,
+    executeMutation: vi.fn().mockResolvedValue(0),
+    execute: vi.fn().mockResolvedValue([]),
+    schemaCache: cache,
+    pool: {},
+    quoteDefaultExpression: (_v: unknown) => "",
+    supportsDatetimeWithPrecision: () => false,
+    createTableDefinition: (n: string, opts: Record<string, unknown>) =>
+      new TableDefinition(n, { ...opts, adapterName: "sqlite" }),
+  };
+}
+
+describe("DDL cache-invalidation safety-net", () => {
+  it("dropTable clears schema cache entry", async () => {
+    const cache = new SchemaCache();
+    cache.setColumns("posts", [makeColumn("id", "integer")]);
+    expect(cache.isCached("posts")).toBe(true);
+
+    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
+    await ss.dropTable("posts");
+
+    expect(cache.isCached("posts")).toBe(false);
+  });
+
+  it("dropJoinTable clears schema cache entry (via dropTable)", async () => {
+    const cache = new SchemaCache();
+    cache.setColumns("accounts_people", [makeColumn("account_id", "integer")]);
+    expect(cache.isCached("accounts_people")).toBe(true);
+
+    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
+    await ss.dropJoinTable("accounts", "people");
+
+    expect(cache.isCached("accounts_people")).toBe(false);
+  });
+
+  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // abstract/schema-statements.ts SchemaStatements#renameTable (both old AND new name,
+  // matching Rails PG/MySQL/SQLite adapter overrides which clear both)
+  it.skip("renameTable clears schema cache entry for both old and new name", async () => {
+    const cache = new SchemaCache();
+    cache.setColumns("posts", [makeColumn("id", "integer")]);
+    // Pre-seed new name too (could be stale from a previous run)
+    cache.setColumns("articles", [makeColumn("id", "integer")]);
+
+    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
+    await ss.renameTable("posts", "articles");
+
+    expect(cache.isCached("posts")).toBe(false);
+    expect(cache.isCached("articles")).toBe(false);
+  });
+
+  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // abstract/schema-statements.ts SchemaStatements#createTable (non-force branch,
+  // matching Rails abstract/schema_statements.rb:306)
+  it.skip("createTable clears schema cache entry (non-force branch)", async () => {
+    const cache = new SchemaCache();
+    // Stale entry from a prior create (e.g. after resetTestAdapterState dropped the table)
+    cache.setColumns("posts", [makeColumn("id", "integer")]);
+
+    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
+    await ss.createTable("posts");
+
+    expect(cache.isCached("posts")).toBe(false);
+  });
+
+  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // abstract/schema-statements.ts SchemaStatements#addColumn
+  it.skip("addColumn clears schema cache entry", async () => {
+    const cache = new SchemaCache();
+    cache.setColumns("posts", [makeColumn("id", "integer")]);
+
+    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
+    await ss.addColumn("posts", "title", "string");
+
+    expect(cache.isCached("posts")).toBe(false);
+  });
+
+  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // abstract/schema-statements.ts SchemaStatements#removeColumn
+  it.skip("removeColumn clears schema cache entry", async () => {
+    const cache = new SchemaCache();
+    cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
+
+    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
+    await ss.removeColumn("posts", "title");
+
+    expect(cache.isCached("posts")).toBe(false);
+  });
+
+  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // abstract/schema-statements.ts SchemaStatements#addIndex
+  it.skip("addIndex clears schema cache entry", async () => {
+    const cache = new SchemaCache();
+    cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
+
+    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
+    await ss.addIndex("posts", ["title"]);
+
+    expect(cache.isCached("posts")).toBe(false);
+  });
+
+  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // abstract/schema-statements.ts SchemaStatements#removeIndex
+  it.skip("removeIndex clears schema cache entry", async () => {
+    const cache = new SchemaCache();
+    cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
+
+    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
+    await ss.removeIndex("posts", { name: "index_posts_on_title" });
+
+    expect(cache.isCached("posts")).toBe(false);
+  });
+
+  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // abstract/schema-statements.ts SchemaStatements#changeColumn
+  it.skip("changeColumn clears schema cache entry", async () => {
+    const cache = new SchemaCache();
+    cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
+
+    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
+    await ss.changeColumn("posts", "title", "text");
+
+    expect(cache.isCached("posts")).toBe(false);
   });
 });
