@@ -1078,11 +1078,36 @@ describe("WhereTest", () => {
     const actual = BtnrPost.where({ author: BtnrAuthor.where({ id: [1, 2] }) }).toSql();
     expect(actual).toEqual(expected);
   });
-  it.skip("belongs to nested where", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs belongs_to association with automatic JOIN */
+  it("belongs to nested where", () => {
+    class BnwComment extends Base {
+      static {
+        this._tableName = "bnw_comments";
+        this.attribute("id", "integer");
+        this.attribute("parent_id", "integer");
+        this.attribute("post_id", "integer");
+      }
+    }
+    class BnwPost extends Base {
+      static {
+        this._tableName = "bnw_posts";
+        this.attribute("id", "integer");
+      }
+    }
+    registerModel("BnwComment", BnwComment);
+    registerModel("BnwPost", BnwPost);
+    Associations.belongsTo.call(BnwComment, "parent", {
+      className: "BnwComment",
+      foreignKey: "parent_id",
+    });
+    Associations.hasMany.call(BnwPost, "comments", {
+      className: "BnwComment",
+      foreignKey: "post_id",
+    });
+    const parent = new BnwComment();
+    (parent as any).id = 1;
+    const expected = BnwPost.where({ comments: { parent_id: 1 } }).joins("comments");
+    const actual = BnwPost.where({ comments: { parent: parent } }).joins("comments");
+    expect(actual.toSql()).toEqual(expected.toSql());
   });
   it.skip("belongs to nested where with relation", () => {
     // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
@@ -1216,29 +1241,141 @@ describe("WhereTest", () => {
 
     expect(actual.toSql()).toEqual(expected.toSql());
   });
-  it.skip("polymorphic sti shallow where", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs polymorphic association setup */
+  it("polymorphic sti shallow where", () => {
+    class PssTreasure extends Base {
+      static {
+        this._tableName = "pss_treasures";
+        this.attribute("name", "string");
+      }
+    }
+    class PssHiddenTreasure extends PssTreasure {}
+    class PssPriceEstimate extends Base {
+      static {
+        this._tableName = "pss_price_estimates";
+        this.attribute("estimate_of_type", "string");
+        this.attribute("estimate_of_id", "integer");
+      }
+    }
+    registerModel("PssTreasure", PssTreasure);
+    Associations.belongsTo.call(PssPriceEstimate, "estimateOf", { polymorphic: true });
+
+    const treasure = new PssHiddenTreasure();
+    (treasure as any).id = 1;
+
+    const expected = PssPriceEstimate.where({
+      estimate_of_type: "PssTreasure",
+      estimate_of_id: 1,
+    });
+    const actual = PssPriceEstimate.where({ estimateOf: treasure });
+
+    expect(actual.toSql()).toEqual(expected.toSql());
   });
-  it.skip("polymorphic nested where", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs polymorphic association setup */
+  it("polymorphic nested where", () => {
+    class PnwPost extends Base {
+      static {
+        this._tableName = "pnw_posts";
+        this.attribute("id", "integer");
+      }
+    }
+    class PnwTreasure extends Base {
+      static {
+        this._tableName = "pnw_treasures";
+        this.attribute("name", "string");
+      }
+    }
+    class PnwPriceEstimate extends Base {
+      static {
+        this._tableName = "pnw_price_estimates";
+        this.attribute("thing_type", "string");
+        this.attribute("thing_id", "integer");
+      }
+    }
+    registerModel("PnwPost", PnwPost);
+    registerModel("PnwPriceEstimate", PnwPriceEstimate);
+    Associations.belongsTo.call(PnwPriceEstimate, "thing", { polymorphic: true });
+    Associations.hasMany.call(PnwTreasure, "price_estimates", {
+      className: "PnwPriceEstimate",
+      foreignKey: "thing_id",
+    });
+
+    const thing = new PnwPost();
+    (thing as any).id = 1;
+
+    const expected = PnwTreasure.where({
+      price_estimates: { thing_type: "PnwPost", thing_id: 1 },
+    }).joins("price_estimates");
+    const actual = PnwTreasure.where({ price_estimates: { thing: thing } }).joins(
+      "price_estimates",
+    );
+
+    expect(actual.toSql()).toEqual(expected.toSql());
   });
-  it.skip("polymorphic sti nested where", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs polymorphic association setup */
+  it("polymorphic sti nested where", () => {
+    class PsnTreasure extends Base {
+      static {
+        this._tableName = "psn_treasures";
+        this.attribute("name", "string");
+      }
+    }
+    class PsnHiddenTreasure extends PsnTreasure {}
+    class PsnPriceEstimate extends Base {
+      static {
+        this._tableName = "psn_price_estimates";
+        this.attribute("estimate_of_type", "string");
+        this.attribute("estimate_of_id", "integer");
+      }
+    }
+    registerModel("PsnTreasure", PsnTreasure);
+    registerModel("PsnPriceEstimate", PsnPriceEstimate);
+    Associations.belongsTo.call(PsnPriceEstimate, "estimateOf", { polymorphic: true });
+    Associations.hasMany.call(PsnTreasure, "price_estimates", {
+      className: "PsnPriceEstimate",
+      foreignKey: "estimate_of_id",
+    });
+
+    const treasure = new PsnHiddenTreasure();
+    (treasure as any).id = 1;
+
+    const expected = PsnTreasure.where({
+      price_estimates: { estimate_of_type: "PsnTreasure", estimate_of_id: 1 },
+    }).joins("price_estimates");
+    const actual = PsnTreasure.where({
+      price_estimates: { estimateOf: treasure },
+    }).joins("price_estimates");
+
+    expect(actual.toSql()).toEqual(expected.toSql());
   });
-  it.skip("decorated polymorphic where", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs polymorphic association setup */
+  it("decorated polymorphic where", () => {
+    class DpwTreasure extends Base {
+      static {
+        this._tableName = "dpw_treasures";
+        this.attribute("name", "string");
+      }
+    }
+    class DpwPriceEstimate extends Base {
+      static {
+        this._tableName = "dpw_price_estimates";
+        this.attribute("estimate_of_type", "string");
+        this.attribute("estimate_of_id", "integer");
+      }
+    }
+    registerModel("DpwTreasure", DpwTreasure);
+    Associations.belongsTo.call(DpwPriceEstimate, "estimateOf", { polymorphic: true });
+
+    const treasure = new DpwTreasure();
+    (treasure as any).id = 1;
+    // Rails decorates with a Struct that delegates class/id via method_missing.
+    // The JS analog is a prototype-delegating wrapper: `constructor` and `id`
+    // resolve through to the wrapped record, so polymorphic_name/id read the same.
+    const decoratedTreasure = Object.create(treasure);
+
+    const expected = DpwPriceEstimate.where({
+      estimate_of_type: "DpwTreasure",
+      estimate_of_id: 1,
+    });
+    const actual = DpwPriceEstimate.where({ estimateOf: decoratedTreasure });
+
+    expect(actual.toSql()).toEqual(expected.toSql());
   });
   it("where with empty hash and no foreign key", () => {
     class Post extends Base {
@@ -2086,11 +2223,36 @@ describe("WhereTest", () => {
     /* needs has_many :through */
   });
 
-  it.skip("polymorphic nested array where", async () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs polymorphic association fixture */
+  it("polymorphic nested array where", async () => {
+    class PnaTreasure extends Base {
+      static {
+        this._tableName = "pna_treasures";
+        this.attribute("name", "string");
+      }
+    }
+    class PnaHiddenTreasure extends PnaTreasure {}
+    class PnaPriceEstimate extends Base {
+      static {
+        this._tableName = "pna_price_estimates";
+        this.attribute("estimate_of_type", "string");
+        this.attribute("estimate_of_id", "integer");
+      }
+    }
+    registerModel("PnaTreasure", PnaTreasure);
+    Associations.belongsTo.call(PnaPriceEstimate, "estimateOf", { polymorphic: true });
+
+    const treasure = new PnaTreasure();
+    (treasure as any).id = 1;
+    const hidden = new PnaHiddenTreasure();
+    (hidden as any).id = 2;
+
+    const expected = PnaPriceEstimate.where({
+      estimate_of_type: "PnaTreasure",
+      estimate_of_id: [treasure, hidden],
+    });
+    const actual = PnaPriceEstimate.where({ estimateOf: [treasure, hidden] });
+
+    expect(actual.toSql()).toEqual(expected.toSql());
   });
 });
 
