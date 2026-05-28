@@ -7663,6 +7663,10 @@ describe("PreloaderTest", () => {
       pkb_posts: { pkb_author_id: "integer", title: "string" },
       pkba_authors: { name: "string" },
       pkba_posts: { pkba_author_id: "integer", title: "string" },
+      ptlb_authors: { name: "string" },
+      ptlb_posts: { ptlb_author_id: "integer", title: "string" },
+      ptlc_authors: { name: "string" },
+      ptlc_posts: { ptlc_author_id: "integer", title: "string" },
       pkq_authors: { name: "string" },
       pkq_posts: { pkq_author_id: "integer", title: "string" },
       pl_authors: { name: "string" },
@@ -9387,6 +9391,66 @@ describe("PreloaderTest", () => {
     for (const p of posts) {
       expect((p as any)._preloadedAssociations.has("pkbaAuthor")).toBe(true);
     }
+  });
+
+  it("preload marks belongs_to association loaded on owner", async () => {
+    class PTLBAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class PTLBPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("ptlb_author_id", "integer");
+      }
+    }
+    Associations.belongsTo.call(PTLBPost, "ptlbAuthor", {
+      className: "PTLBAuthor",
+      foreignKey: "ptlb_author_id",
+    });
+    registerModel("PTLBAuthor", PTLBAuthor);
+    registerModel("PTLBPost", PTLBPost);
+
+    const a = await PTLBAuthor.create({ name: "A" });
+    await PTLBPost.create({ title: "P", ptlb_author_id: a.id });
+
+    const posts = await PTLBPost.all().includes("ptlbAuthor").toArray();
+    expect(posts).toHaveLength(1);
+    const assoc = (posts[0] as any).association("ptlbAuthor");
+    expect(assoc.isLoaded()).toBe(true);
+    expect(assoc.target?.name).toBe("A");
+  });
+
+  it("preload sets has_many association target on owner", async () => {
+    class PTLCAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class PTLCPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("ptlc_author_id", "integer");
+      }
+    }
+    Associations.hasMany.call(PTLCAuthor, "ptlcPosts", {
+      className: "PTLCPost",
+      foreignKey: "ptlc_author_id",
+    });
+    registerModel("PTLCAuthor", PTLCAuthor);
+    registerModel("PTLCPost", PTLCPost);
+
+    const a = await PTLCAuthor.create({ name: "A" });
+    await PTLCPost.create({ title: "P1", ptlc_author_id: a.id });
+    await PTLCPost.create({ title: "P2", ptlc_author_id: a.id });
+
+    const authors = await PTLCAuthor.all().includes("ptlcPosts").toArray();
+    const owner = authors.find((x) => x.id === a.id)!;
+    const assoc = (owner as any).association("ptlcPosts");
+    expect(assoc.isLoaded()).toBe(true);
+    const titles = (assoc.target as Base[]).map((r: any) => r.title).sort();
+    expect(titles).toEqual(["P1", "P2"]);
   });
 });
 
