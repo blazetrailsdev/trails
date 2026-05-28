@@ -3,12 +3,12 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base } from "../index.js";
+import { Base, StatementInvalid } from "../index.js";
 
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { quoteColumnName } from "../test-helpers/quote-regex.js";
+import { quoteColumnName, quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
@@ -60,77 +60,153 @@ describe("SelectTest", () => {
     return { Developer };
   }
 
-  it.skip("select with nil argument", () => {
-    // BLOCKED: relation — select(nil) should clear the select list but our impl treats nil as a column name "null"
-    // ROOT-CAUSE: relation.ts#select passes nil through String(nil) producing a "null" column ref
-    // SCOPE: ~5 LOC in relation.ts select(); affects this test only
-    /* Rails: Post.select(nil).select(:title).to_sql starts with SELECT "posts"."title" FROM */
+  function makePost() {
+    class Post extends Base {
+      static _tableName = "posts";
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.attribute("status", "string");
+      }
+    }
+    return { Post };
+  }
+
+  it("select with nil argument", () => {
+    // Rails: Post.select(nil).select(:title).to_sql starts with SELECT "posts"."title" FROM
+    const { Post } = makePost();
+    const sql = Post.select(null as any)
+      .select("title")
+      .toSql();
+    expect(sql).toMatch(new RegExp(`^SELECT ${escapeRegExp(quoteTableName("posts.title"))} FROM`));
   });
 
   it.skip("select with non field values", () => {
-    // BLOCKED: relation — raw SQL expressions in select are quoted as column references instead of raw SQL
-    // ROOT-CAUSE: arelColumns in query-methods.ts table-qualifies all args; "1" and "foo()" become "developers"."1"
-    // SCOPE: ~15 LOC in relation/query-methods.ts arelColumns; affects raw-literal select tests
+    // BLOCKED: relation — bare-string select literals are table-qualified, not passed through.
+    // ROOT-CAUSE: Relation#_buildProjections (relation.ts) does `table.get(c)` for any string
+    //   without `(`, `*`, or whitespace, so `"1"` becomes `"posts"."1"` instead of the raw `1`.
+    //   The Rails path runs `arel_column`, which checks `columns_hash` then falls back to a literal.
+    // SCOPE: route _buildProjections string args through arelColumns — separate from hash-form select.
     /* Rails: Post.select("1", "foo()", :bar).to_sql starts with SELECT 1, foo(), "bar" FROM */
   });
 
-  it.skip("select with non field hash values", () => {
-    // BLOCKED: relation — hash-form select ({ expr => alias }) not implemented
-    // ROOT-CAUSE: relation.ts#select / arelColumns does not handle hash arguments
-    // SCOPE: ~50–100 LOC in relation/query-methods.ts; blocks all hash-form select tests below
+  it("select with non field hash values", () => {
+    // Rails: Post.select("1" => :a, "foo()" => :b, :bar => :c).to_sql
+    //   -> SELECT 1 AS "a", foo() AS "b", "bar" AS "c" FROM
+    const { Post } = makePost();
+    const sql = Post.select({
+      "1": Symbol("a"),
+      "foo()": Symbol("b"),
+      [Symbol("bar")]: Symbol("c"),
+    } as any).toSql();
+    const q = (n: string) => escapeRegExp(quoteTableName(n));
+    expect(sql).toMatch(
+      new RegExp(`^SELECT 1 AS ${q("a")}, foo\\(\\) AS ${q("b")}, ${q("bar")} AS ${q("c")} FROM`),
+    );
   });
 
-  it.skip("select with hash argument", () => {
-    // BLOCKED: relation — hash-form select ({ "UPPER(title)" => :title, posts: { title: :post_title } }) not implemented
-    // ROOT-CAUSE: arelColumns in query-methods.ts does not handle hash arguments
-    // SCOPE: ~50–100 LOC in relation/query-methods.ts; blocks all hash-form select tests
+  it("select with hash argument", async () => {
+    // Rails reads post.title / post.post_title; we expose aliased columns via
+    // readAttribute (no dynamic accessor for undeclared attributes yet).
+    const { Post } = makePost();
+    await Post.create({ title: "Welcome to the weblog", body: "x" });
+    const post: any = await Post.select({
+      "UPPER(title)": Symbol("title"),
+      posts: { title: Symbol("post_title") },
+    }).first();
+    expect(post.readAttribute("title")).toBe("WELCOME TO THE WEBLOG");
+    expect(post.readAttribute("post_title")).toBe("Welcome to the weblog");
   });
 
-  it.skip("select with reserved words aliases", () => {
-    // BLOCKED: relation — hash-form select ({ expr => :from, title: :group }) not implemented
-    // (see "select with non field hash values")
+  it("select with reserved words aliases", async () => {
+    const { Post } = makePost();
+    await Post.create({ title: "Welcome to the weblog", body: "x" });
+    const post: any = await Post.select({
+      "UPPER(title)": Symbol("from"),
+      title: Symbol("group"),
+    }).first();
+    expect(post.readAttribute("from")).toBe("WELCOME TO THE WEBLOG");
+    expect(post.readAttribute("group")).toBe("Welcome to the weblog");
   });
 
-  it.skip("select with one level hash argument", () => {
-    // BLOCKED: relation — hash-form select ({ "UPPER(title)" => :title, title: :post_title }) not implemented
-    // (see "select with non field hash values")
+  it("select with one level hash argument", async () => {
+    const { Post } = makePost();
+    await Post.create({ title: "Welcome to the weblog", body: "x" });
+    const post: any = await Post.select({
+      "UPPER(title)": Symbol("title"),
+      title: Symbol("post_title"),
+    }).first();
+    expect(post.readAttribute("title")).toBe("WELCOME TO THE WEBLOG");
+    expect(post.readAttribute("post_title")).toBe("Welcome to the weblog");
   });
 
-  it.skip("select with not exists field", () => {
-    // BLOCKED: relation — hash-form select ({ foo: :post_title }) not implemented
-    // (see "select with non field hash values")
+  it("select with not exists field", async () => {
+    const { Post } = makePost();
+    const q = (n: string) => escapeRegExp(quoteTableName(n));
+    const sql = Post.select({ [Symbol("foo")]: Symbol("post_title") } as any).toSql();
+    expect(sql).toMatch(new RegExp(`^SELECT ${q("foo")} AS ${q("post_title")} FROM`));
+
+    // Rails guards the raise with `skip if sqlite3_adapter_strict_strings_disabled?`
+    // (select_test.rb:53). That guard only matters when the SQLite adapter is
+    // configured with `strict: false`, which makes a double-quoted unknown
+    // identifier (`"foo"`) parse as a string literal instead of raising. Our
+    // SQLite test adapter has no strict-strings-disabled mode — it always runs
+    // with DQS off (CI confirms the "should this be a string literal in
+    // single-quotes?" error), so `"foo"` always errors. PG/MySQL raise too.
+    // The guard condition is therefore always false here; the throw is safe.
+    await expect(
+      Post.select({ [Symbol("foo")]: Symbol("post_title") } as any).take(),
+    ).rejects.toThrow(StatementInvalid);
   });
 
-  it.skip("select with hash with not exists field", () => {
-    // BLOCKED: relation — hash-form select not implemented
-    // (see "select with non field hash values")
+  it("select with hash with not exists field", async () => {
+    const { Post } = makePost();
+    const q = (n: string) => escapeRegExp(quoteTableName(n));
+    const sql = Post.select({ posts: { bar: Symbol("post_title") } }).toSql();
+    expect(sql).toMatch(new RegExp(`^SELECT ${q("posts.bar")} AS ${q("post_title")} FROM`));
+
+    await expect(Post.select({ posts: { boo: Symbol("post_title") } }).take()).rejects.toThrow(
+      StatementInvalid,
+    );
   });
 
-  it.skip("select with hash array value with not exists field", () => {
-    // BLOCKED: relation — hash-array select ({ posts: [:bar, :id] }) not implemented
-    // Rails: SELECT "posts"."bar", "posts"."id" FROM and then raises StatementInvalid
-    // (see "select with non field hash values")
+  it("select with hash array value with not exists field", async () => {
+    const { Post } = makePost();
+    const q = (n: string) => escapeRegExp(quoteTableName(n));
+    const sql = Post.select({ posts: [Symbol("bar"), Symbol("id")] }).toSql();
+    expect(sql).toMatch(new RegExp(`^SELECT ${q("posts.bar")}, ${q("posts.id")} FROM`));
+
+    await expect(Post.select({ posts: [Symbol("bar"), Symbol("id")] }).take()).rejects.toThrow(
+      StatementInvalid,
+    );
   });
 
   it.skip("select with hash and table alias", () => {
-    // BLOCKED: relation — hash-form select + joins not implemented
-    // (see "select with non field hash values")
+    // BLOCKED: relation — joins(:comments, :comments_with_extend) + per-join table aliasing
+    // not yet supported; this test selects aliased columns across three joined tables.
   });
 
-  it.skip("select with invalid nested field", () => {
-    // BLOCKED: relation — hash-form select not implemented
-    // (see "select with non field hash values")
+  it("select with invalid nested field", async () => {
+    const { Post } = makePost();
+    await expect(
+      Post.select({ posts: { "UPPER(title)": Symbol("post_title") } }).take(),
+    ).rejects.toThrow(StatementInvalid);
+    await expect(Post.select({ posts: ["UPPER(title)"] }).take()).rejects.toThrow(StatementInvalid);
   });
 
-  it.skip("select with hash argument without aliases", () => {
-    // BLOCKED: relation — hash-form select ({ posts: [:title, "title as post_title"] }) not implemented
-    // (see "select with non field hash values")
+  it("select with hash argument without aliases", async () => {
+    const { Post } = makePost();
+    await Post.create({ title: "Welcome to the weblog", body: "x" });
+    const post: any = await Post.select({
+      posts: [Symbol("title"), "title as post_title"],
+    }).first();
+    expect(post.readAttribute("title")).toBe("Welcome to the weblog");
+    expect(post.readAttribute("post_title")).toBe("Welcome to the weblog");
   });
 
   it.skip("select with hash argument with few tables", () => {
-    // BLOCKED: relation — hash-form select across joined tables not implemented
+    // BLOCKED: relation — joins(:comments) + cross-table hash select not yet supported.
     // Rails: Post.joins(:comments).select(:title, posts: { title: :post_title }, comments: { body: :comment_body })
-    // (see "select with non field hash values")
   });
 
   it("reselect", () => {
@@ -141,15 +217,22 @@ describe("SelectTest", () => {
     expect(actual).toBe(expected);
   });
 
-  it.skip("reselect with hash argument", () => {
-    // BLOCKED: relation — hash-form select not implemented
-    // (see "select with non field hash values")
+  it("reselect with hash argument", () => {
+    const { Post } = makePost();
+    const expected = Post.select("title", { posts: { title: Symbol("post_title") } }).toSql();
+    const actual = Post.select("title", "body")
+      .reselect("title", { posts: { title: Symbol("post_title") } })
+      .toSql();
+    expect(actual).toBe(expected);
   });
 
-  it.skip("reselect with one level hash argument", () => {
-    // BLOCKED: relation — hash-form reselect ({ title: :post_title }) not implemented
-    // Rails: Post.select(:title, :body).reselect(:title, title: :post_title).to_sql
-    // (see "select with non field hash values")
+  it("reselect with one level hash argument", () => {
+    const { Post } = makePost();
+    const expected = Post.select("title", { title: Symbol("post_title") }).toSql();
+    const actual = Post.select("title", "body")
+      .reselect("title", { title: Symbol("post_title") })
+      .toSql();
+    expect(actual).toBe(expected);
   });
 
   it("non select columns wont be loaded", async () => {

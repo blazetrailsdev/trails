@@ -1934,6 +1934,10 @@ export function orderColumn(this: QueryMethodsHost, field: string): unknown {
 /** @internal */
 export function processSelectArgs(this: QueryMethodsHost, fields: unknown[]): unknown[] {
   return fields.flatMap((field) => {
+    // Mirror Rails `check_if_method_has_arguments!` → `compact_blank!`: a nil
+    // (null/undefined) select arg is dropped, so `select(null)` clears nothing
+    // instead of projecting a literal "null" column.
+    if (field === null || field === undefined) return [];
     if (isPlainObject(field))
       return arelColumnAliasesFromHash.call(this, field as Record<string, unknown>);
     return [field];

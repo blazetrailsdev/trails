@@ -853,13 +853,13 @@ export class Relation<T extends Base> {
    *   select(record => record.active)   // block form (returns array)
    */
   select(fn: (record: T) => boolean): Promise<T[]>;
-  select(...columns: (string | Nodes.Node)[]): Relation<T>;
+  select(...columns: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T>;
   select(...args: any[]): Relation<T> | Promise<T[]> {
     if (args.length === 1 && typeof args[0] === "function") {
       return this.toArray().then((records) => records.filter(args[0]));
     }
-    const columns = args.map((a: any) => (a instanceof Nodes.Node ? a : String(a)));
-    return this._clone()._selectBang(...columns);
+    const fields = this.processSelectArgs(args);
+    return this._clone()._selectBang(...fields);
   }
 
   /**
@@ -867,8 +867,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#reselect
    */
-  reselect(...columns: (string | Nodes.Node)[]): Relation<T> {
-    return this._clone().reselectBang(...columns);
+  reselect(...columns: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T> {
+    const fields = this.processSelectArgs(columns as unknown[]);
+    return this._clone().reselectBang(...fields);
   }
 
   /**
