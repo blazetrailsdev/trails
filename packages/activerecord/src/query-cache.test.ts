@@ -5,6 +5,53 @@ import { defineSchema } from "./test-helpers/define-schema.js";
 import { QueryCache, QueryCacheAdapter, QueryCacheStore as Store } from "./query-cache.js";
 import { QueryCacheStore as RootQueryCacheStore } from "./index.js";
 import { Store as AbstractStore } from "./connection-adapters/abstract/query-cache.js";
+import {
+  ConnectionPool,
+  withExecutionContext,
+} from "./connection-adapters/abstract/connection-pool.js";
+import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
+import { PoolConfig } from "./connection-adapters/pool-config.js";
+import { HashConfig } from "./database-configurations/hash-config.js";
+import type { DatabaseConfigOptions } from "./database-configurations/database-config.js";
+
+function makeMiddleware(
+  app: () => Promise<void>,
+  adapters: QueryCacheAdapter[],
+): () => Promise<void> {
+  let hook: { run(): void; complete(): void } | null = null;
+  QueryCache.installExecutorHooks(
+    {
+      registerHook: (h) => {
+        hook = h;
+      },
+    },
+    adapters,
+  );
+  return async () => {
+    hook!.run();
+    try {
+      return await app();
+    } finally {
+      hook!.complete();
+    }
+  };
+}
+
+function makePoolWithQCache(
+  queryCache: DatabaseConfigOptions["queryCache"] | undefined,
+): ConnectionPool {
+  const dbConfig = new HashConfig("test", "primary", {
+    adapter: "sqlite3",
+    database: "test.db",
+    pool: 2,
+    reapingFrequency: null,
+    queryCache,
+  });
+  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
+    adapterFactory: createTestAdapter,
+  });
+  return new ConnectionPool(pc);
+}
 
 const TEST_SCHEMA = { tasks: { title: "string" } } as const;
 
@@ -60,35 +107,87 @@ describe("QueryCacheTest", () => {
     expect(cached.cache.empty).toBe(true);
   });
 
-  it.skip("exceptional middleware clears and disables cache on error", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+  it("exceptional middleware clears and disables cache on error", async () => {
+    const { cached, Task } = await setup();
+    expect(cached.cache.enabled).toBe(false);
+    const mw = makeMiddleware(async () => {
+      await Task.create({ title: "row" });
+      await Task.all().toArray();
+      await Task.all().toArray();
+      expect(cached.cache.size).toBeGreaterThan(0);
+      throw new Error("lol borked");
+    }, [cached]);
+    await expect(mw()).rejects.toThrow("lol borked");
+    expect(cached.cache.enabled).toBe(false);
+    expect(cached.cache.empty).toBe(true);
   });
-  it.skip("query cache is applied to all connections", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+
+  it("query cache is applied to all connections", async () => {
+    const inner = createTestAdapter();
+    const a1 = new QueryCacheAdapter(inner);
+    const a2 = new QueryCacheAdapter(inner);
+    const mw = makeMiddleware(async () => {
+      expect(a1.cache.enabled).toBe(true);
+      expect(a2.cache.enabled).toBe(true);
+    }, [a1, a2]);
+    await mw();
   });
-  it.skip("cache is not applied when config is false", () => {
-    // BLOCKED: connection-pool — db_config integration
+
+  it("cache is not applied when config is false", () => {
+    const pool = makePoolWithQCache(false);
+    pool.enableQueryCacheBang();
+    expect(pool.queryCacheEnabled).toBe(false);
+    expect(pool.queryCache.empty).toBe(true);
   });
-  it.skip("cache is applied when config is string", () => {
-    // BLOCKED: connection-pool — db_config integration
+
+  it("cache is applied when config is string", () => {
+    const pool = makePoolWithQCache("enabled");
+    pool.enableQueryCacheBang();
+    expect(pool.queryCacheEnabled).toBe(true);
+    expect(pool.queryCache.empty).toBe(true);
   });
-  it.skip("cache is applied when config is integer", () => {
-    // BLOCKED: connection-pool — db_config integration
+
+  it("cache is applied when config is integer", () => {
+    const pool = makePoolWithQCache(42);
+    pool.enableQueryCacheBang();
+    expect(pool.queryCacheEnabled).toBe(true);
+    const maxSize = (pool.queryCache as unknown as { _maxSize: number })._maxSize;
+    expect(maxSize).toBe(42);
   });
-  it.skip("cache is applied when config is nil", () => {
-    // BLOCKED: connection-pool — db_config integration
+
+  it("cache is applied when config is nil", () => {
+    const pool = makePoolWithQCache(null);
+    pool.enableQueryCacheBang();
+    expect(pool.queryCacheEnabled).toBe(true);
+    expect(pool.queryCache.empty).toBe(true);
   });
+
   it.skip("query cache with forked processes", () => {
     // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
   });
   it.skip("query cache across threads", () => {
     // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
   });
-  it.skip("middleware delegates", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+
+  it("middleware delegates", async () => {
+    const { cached } = await setup();
+    let called = false;
+    const mw = makeMiddleware(async () => {
+      called = true;
+    }, [cached]);
+    await mw();
+    expect(called).toBe(true);
   });
-  it.skip("middleware caches", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+
+  it("middleware caches", async () => {
+    const { cached, Task } = await setup();
+    await Task.create({ title: "row" });
+    const mw = makeMiddleware(async () => {
+      await Task.all().toArray();
+      await Task.all().toArray();
+      expect(cached.cache.size).toBe(1);
+    }, [cached]);
+    await mw();
   });
 
   it("cache enabled during call", async () => {
@@ -348,11 +447,17 @@ describe("QueryCacheTest", () => {
     expect(cached.cache.size).toBe(sizeAfterSelect);
   });
 
-  it.skip("cache is available when connection is connected", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+  it("cache is available when connection is connected", async () => {
+    const { cached, Task } = await setup();
+    await Task.create({ title: "row" });
+    await cached.withCache(async () => {
+      await Task.all().toArray();
+      await Task.all().toArray();
+      expect(cached.cache.size).toBe(1);
+    });
   });
   it.skip("cache is available when using a not connected connection", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+    // BLOCKED: in-memory DB cannot test lazy (not-yet-connected) connections
   });
 
   it("query cache executes new queries within block", async () => {
@@ -382,20 +487,73 @@ describe("QueryCacheTest", () => {
   it.skip("query cached even when types are reset", () => {
     // BLOCKED: query-cache — resetColumnInformation not implemented
   });
-  it.skip("query cache does not establish connection if unconnected", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+
+  it("query cache does not establish connection if unconnected", async () => {
+    await withExecutionContext(async () => {
+      const pool = makePoolWithQCache(undefined);
+      expect(pool.connections).toHaveLength(0);
+      pool.enableQueryCacheBang();
+      expect(pool.connections).toHaveLength(0);
+      pool.disableQueryCacheBang();
+      expect(pool.connections).toHaveLength(0);
+    });
   });
-  it.skip("query cache is enabled on connections established after middleware runs", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+
+  it("query cache is enabled on connections established after middleware runs", async () => {
+    await withExecutionContext(async () => {
+      const pool = makePoolWithQCache(undefined);
+      pool.enableQueryCacheBang();
+      const conn = pool.checkout();
+      expect((conn as unknown as { _queryCache: { enabled: boolean } })._queryCache.enabled).toBe(
+        true,
+      );
+      pool.checkin(conn);
+      pool.disableQueryCacheBang();
+      const conn2 = pool.checkout();
+      expect((conn2 as unknown as { _queryCache: { enabled: boolean } })._queryCache.enabled).toBe(
+        false,
+      );
+      pool.checkin(conn2);
+    });
   });
+
   it.skip("query caching is local to the current thread", () => {
     // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
   });
-  it.skip("query cache is enabled on all connection pools", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+
+  it("query cache is enabled on all connection pools", async () => {
+    await withExecutionContext(async () => {
+      const p1 = makePoolWithQCache(undefined);
+      const p2 = makePoolWithQCache(undefined);
+      [p1, p2].forEach((p) => p.enableQueryCacheBang());
+      for (const pool of [p1, p2]) {
+        expect(pool.queryCacheEnabled).toBe(true);
+        const conn = pool.checkout();
+        expect((conn as unknown as { _queryCache: { enabled: boolean } })._queryCache.enabled).toBe(
+          true,
+        );
+        pool.checkin(conn);
+      }
+      [p1, p2].forEach((p) => p.disableQueryCacheBang());
+    });
   });
-  it.skip("clear query cache is called on all connections", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+
+  it("clear query cache is called on all connections", async () => {
+    await withExecutionContext(async () => {
+      const p1 = makePoolWithQCache(undefined);
+      const p2 = makePoolWithQCache(undefined);
+      [p1, p2].forEach((p) => p.enableQueryCacheBang());
+      const qc1 = p1.queryCache;
+      const qc2 = p2.queryCache;
+      await qc1.computeIfAbsent("SELECT 1", async () => [{ val: 1 }]);
+      await qc2.computeIfAbsent("SELECT 1", async () => [{ val: 1 }]);
+      expect(qc1.size).toBe(1);
+      expect(qc2.size).toBe(1);
+      p1.clearQueryCache();
+      p2.clearQueryCache();
+      expect(qc1.empty).toBe(true);
+      expect(qc2.empty).toBe(true);
+    });
   });
   it.skip("query cache is enabled in threads with shared connection", () => {
     // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
