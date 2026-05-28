@@ -8,6 +8,7 @@
   "include": ["src"],
   "references": [
     { "path": "../actionview" },
+    { "path": "../activerecord" },
     { "path": "../activemodel" },
     { "path": "../activesupport" },
     { "path": "../did-you-mean" },

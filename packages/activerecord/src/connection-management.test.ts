@@ -3,13 +3,10 @@ import "./index.js"; // registers ExecutorHooks.setConnectionHandlerResolver sid
 import { Base } from "./base.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { createTestAdapter } from "./test-adapter.js";
-import {
-  ConnectionManagement,
-  Executor,
-  AsynchronousQueriesTracker,
-} from "./connection-management.js";
+import { Executor, AsynchronousQueriesTracker } from "./connection-management.js";
 import { QueryCache } from "./query-cache.js";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import { BodyProxy } from "@blazetrails/rack";
 
 function setupConnection() {
   const config = new HashConfig("test", "primary", {
@@ -32,6 +29,17 @@ function makeExecutor() {
   return executor;
 }
 
+/** mirrors Rails' private middleware() helper in ConnectionManagementTest */
+function middleware(
+  app: (env: Record<string, unknown>) => [number, Record<string, unknown>, unknown],
+) {
+  const executor = makeExecutor();
+  return function (env: Record<string, unknown>): [number, Record<string, unknown>, BodyProxy] {
+    const [status, headers, body] = executor.wrap(() => app(env));
+    return [status, headers, new BodyProxy(body, () => {})];
+  };
+}
+
 describe("ConnectionManagementTest", () => {
   let env: Record<string, unknown>;
 
@@ -48,7 +56,7 @@ describe("ConnectionManagementTest", () => {
 
   it("app delegation", () => {
     const calls: Record<string, unknown>[][] = [];
-    const mgr = ConnectionManagement((e) => {
+    const mgr = middleware((e) => {
       calls.push([e]);
       return [200, {}, ["hi mom"]];
     });
@@ -57,7 +65,7 @@ describe("ConnectionManagementTest", () => {
   });
 
   it("body responds to each", () => {
-    const management = ConnectionManagement(() => [200, {}, ["hi mom"]]);
+    const management = middleware(() => [200, {}, ["hi mom"]]);
     const [, , body] = management(env);
     const bits: unknown[] = [];
     body.each((bit: unknown) => bits.push(bit));
@@ -65,7 +73,7 @@ describe("ConnectionManagementTest", () => {
   });
 
   it("connections are cleared after body close", () => {
-    const management = ConnectionManagement(() => [200, {}, ["hi mom"]]);
+    const management = middleware(() => [200, {}, ["hi mom"]]);
     const [, , body] = management(env);
     body.close();
     expect(Base.connectionHandler.activeConnectionsQ("all")).toBe(false);
@@ -76,7 +84,7 @@ describe("ConnectionManagementTest", () => {
     try {
       Base.leaseConnection();
       expect(Base.connectionHandler.activeConnectionsQ("all")).toBe(true);
-      const management = ConnectionManagement(() => [200, {}, ["hi mom"]]);
+      const management = middleware(() => [200, {}, ["hi mom"]]);
       const [, , body] = management(env);
       body.close();
       expect(Base.connectionHandler.activeConnectionsQ("all")).toBe(false);
@@ -86,7 +94,7 @@ describe("ConnectionManagementTest", () => {
   });
 
   it("active connections are not cleared on body close during transaction", async () => {
-    const management = ConnectionManagement(() => [200, {}, ["hi mom"]]);
+    const management = middleware(() => [200, {}, ["hi mom"]]);
     await Base.transaction(async () => {
       const [, , body] = management(env);
       body.close();
@@ -95,7 +103,7 @@ describe("ConnectionManagementTest", () => {
   });
 
   it("connections closed if exception", () => {
-    const explosive = ConnectionManagement(() => {
+    const explosive = middleware(() => {
       throw new Error("NotImplementedError");
     });
     expect(() => explosive(env)).toThrow("NotImplementedError");
@@ -103,7 +111,7 @@ describe("ConnectionManagementTest", () => {
   });
 
   it("connections not closed if exception inside transaction", async () => {
-    const explosive = ConnectionManagement(() => {
+    const explosive = middleware(() => {
       throw new Error("RuntimeError");
     });
     await Base.transaction(async () => {
@@ -117,7 +125,7 @@ describe("ConnectionManagementTest", () => {
   });
 
   it("doesn't clear active connections when running in a test case", () => {
-    const management = ConnectionManagement(() => [200, {}, ["hi mom"]]);
+    const management = middleware(() => [200, {}, ["hi mom"]]);
     makeExecutor().wrap(() => {
       management(env);
       expect(Base.connectionHandler.activeConnectionsQ("all")).toBe(true);
@@ -130,7 +138,7 @@ describe("ConnectionManagementTest", () => {
         return "/path";
       },
     });
-    const mgr = ConnectionManagement(() => [200, {}, pathBody]);
+    const mgr = middleware(() => [200, {}, pathBody]);
     const [, , body] = mgr(env);
     expect(body.respondTo("toPath")).toBe(true);
     expect(body.delegate("toPath")).toBe("/path");
@@ -138,7 +146,7 @@ describe("ConnectionManagementTest", () => {
 
   it("doesn't mutate the original response", () => {
     const originalResponse: [number, Record<string, unknown>, string] = [200, {}, "hi"];
-    const mgr = ConnectionManagement(
+    const mgr = middleware(
       () => originalResponse as unknown as [number, Record<string, unknown>, unknown],
     );
     mgr(env);

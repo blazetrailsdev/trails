@@ -357,8 +357,4 @@ export { Session as DatabaseSelectorSession } from "./middleware/database-select
 export { DatabaseSelector } from "./middleware/database-selector.js";
 export { ShardSelector } from "./middleware/shard-selector.js";
 
-export {
-  ConnectionManagement,
-  Executor,
-  AsynchronousQueriesTracker,
-} from "./connection-management.js";
+export { Executor, AsynchronousQueriesTracker } from "./connection-management.js";

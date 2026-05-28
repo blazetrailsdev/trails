@@ -8,8 +8,8 @@
   "include": ["src"],
   "exclude": ["src/type-virtualization/fixtures", "src/tsc-wrapper/__fixtures__"],
   "references": [
-    { "path": "../rack" },
     { "path": "../arel" },
+    { "path": "../rack" },
     { "path": "../activemodel" },
     { "path": "../did-you-mean" },
     { "path": "../globalid" },

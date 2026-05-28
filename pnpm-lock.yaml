@@ -93,6 +93,9 @@ importers:
       '@blazetrails/activemodel':
         specifier: workspace:*
         version: link:../activemodel
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
