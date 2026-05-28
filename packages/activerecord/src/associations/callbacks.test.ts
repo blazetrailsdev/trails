@@ -175,6 +175,32 @@ describe("AssociationCallbacksTest", () => {
     return { Post, Comment };
   }
 
+  function makeHabtmWithCallbacks(callbacks: any) {
+    const idx = ++cbIdx;
+    const devName = `CBDev${idx}`;
+    const projName = `CBProj${idx}`;
+    class Developer extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Project extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    Developer.adapter = adapter;
+    Project.adapter = adapter;
+    registerModel(devName, Developer);
+    registerModel(projName, Project);
+    Associations.hasAndBelongsToMany.call(Project, "developers", {
+      className: devName,
+      joinTable: "cb_developers_projects",
+      ...callbacks,
+    });
+    return { Project, Developer };
+  }
+
   beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
@@ -182,6 +208,11 @@ describe("AssociationCallbacksTest", () => {
       posts: { title: "string" },
       profiles: { bio: "string", user_id: "integer" },
       users: { name: "string" },
+      clients: { name: "string", firm_id: "integer" },
+      firms: { name: "string" },
+      developers: { name: "string" },
+      projects: { name: "string" },
+      cb_developers_projects: { project_id: "integer", developer_id: "integer" },
     });
   });
   withTransactionalFixtures(() => adapter);
@@ -473,36 +504,91 @@ describe("AssociationCallbacksTest", () => {
     expect(all.length).toBe(0);
   });
 
-  it.skip("has many callbacks halt execution when abort is trown when adding to association", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
+  it("has many callbacks halt execution when abort is trown when adding to association", async () => {
+    const { Post, Comment } = makePostWithCallbacks({ beforeAdd: () => false as const });
+    const post = await Post.create({ title: "hello" });
+    const proxy = association(post, "comments");
+    const c = new (Comment as any)({ body: "abc", post_id: post.id });
+    await proxy.push(c);
+    expect((await proxy.toArray()).length).toBe(0);
   });
-  it.skip("has many callbacks halt execution when abort is trown when removing from association", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
+
+  it("has many callbacks halt execution when abort is trown when removing from association", async () => {
+    const { Post, Comment } = makePostWithCallbacks({ beforeRemove: () => false as const });
+    const post = await Post.create({ title: "hello" });
+    const c = await (Comment as any).create({ body: "abc", post_id: post.id });
+    const proxy = association(post, "comments");
+    expect((await proxy.toArray()).length).toBe(1);
+    await proxy.delete(c);
+    expect((await proxy.toArray()).length).toBe(1);
   });
-  it.skip("has many callbacks with create!", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
+
+  it("has many callbacks with create!", async () => {
+    const log: string[] = [];
+    const { Post } = makePostWithCallbacks({
+      beforeAdd: (_owner: any, record: any) => {
+        log.push("before_adding" + (record.id ?? "<new>"));
+      },
+      afterAdd: (_owner: any, record: any) => {
+        log.push("after_adding" + record.id);
+      },
+    });
+    const post = await Post.create({ title: "Post" });
+    const proxy = association(post, "comments");
+    const c = await proxy.createBang({ body: "Hello" });
+    expect(log).toEqual(["before_adding<new>", "after_adding" + c.id]);
   });
-  it.skip("has many callbacks for save on parent", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
+
+  it("has many callbacks for save on parent", async () => {
+    const log: string[] = [];
+    const { Post, Comment } = makePostWithCallbacks({
+      beforeAdd: (_owner: any, record: any) => {
+        log.push("before_adding" + (record.id ?? "<new>"));
+      },
+      afterAdd: (_owner: any, record: any) => {
+        log.push("after_adding" + (record.id ?? "<new>"));
+      },
+    });
+    const post = new (Post as any)({ title: "Jack" });
+    const proxy = association(post, "comments");
+    proxy.build({ body: "Call me back!" });
+    expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
+    expect(await post.save()).toBe(true);
+    expect((await (Comment as any).all().toArray()).length).toBe(1);
+    expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
   });
+
   it.skip("has many callbacks for destroy on parent", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
+    // BLOCKED: dependent: :destroy on the parent does not route child removal
+    // through remove_records, so before_remove/after_remove don't fire on
+    // owner.destroy. Needs the dependent-destroy path to invoke remove_records
+    // (out of scope for the callback-dispatch unification in PR E1).
   });
-  it.skip("has and belongs to many add callback", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
+
+  it("has and belongs to many add callback", async () => {
+    const log: string[] = [];
+    const { Project, Developer } = makeHabtmWithCallbacks({
+      beforeAdd: (_owner: any, record: any) => {
+        log.push("before_adding" + (record.id ?? "<new>"));
+      },
+      afterAdd: (_owner: any, record: any) => {
+        log.push("after_adding" + (record.id ?? "<new>"));
+      },
+    });
+    const ar = await Project.create({ name: "ActiveRecord" });
+    const david = await Developer.create({ name: "David" });
+    const proxy = association(ar, "developers");
+    await proxy.push(david);
+    expect(log).toEqual(["before_adding" + david.id, "after_adding" + david.id]);
+    await proxy.push(david);
+    expect(log).toEqual([
+      "before_adding" + david.id,
+      "after_adding" + david.id,
+      "before_adding" + david.id,
+      "after_adding" + david.id,
+    ]);
   });
+
   it.skip("has and belongs to many before add called before save", () => {
     // BLOCKED: associations — collection/singular feature gap
     // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
@@ -514,10 +600,11 @@ describe("AssociationCallbacksTest", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
   });
   it.skip("has and belongs to many remove callback", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
+    // BLOCKED: HABTM join-row lookup gap — before_remove fires but the join
+    // row isn't found by _deleteThrough, so after_remove never runs. This is
+    // an HABTM delete-path issue, not the callback-dispatch unification of E1.
   });
+
   it.skip("has and belongs to many does not fire callbacks on clear", () => {
     // BLOCKED: associations — collection/singular feature gap
     // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
@@ -528,9 +615,22 @@ describe("AssociationCallbacksTest", () => {
     // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
   });
-  it.skip("dont add if before callback raises exception", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
+  it("dont add if before callback raises exception", async () => {
+    const log: string[] = [];
+    const { Post, Comment } = makePostWithCallbacks({
+      beforeAdd: () => {
+        log.push("before");
+        throw new Error("nope");
+      },
+    });
+    const post = await Post.create({ title: "Post" });
+    const proxy = association(post, "comments");
+    const c = new (Comment as any)({ body: "blocked", post_id: post.id });
+    try {
+      await proxy.push(c);
+    } catch {
+      // swallowed, like Rails' `rescue Exception`
+    }
+    expect((await proxy.toArray()).length).toBe(0);
   });
 });
