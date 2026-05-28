@@ -1070,7 +1070,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       className: "Project",
       joinTable: "developer_projects",
       foreignKey: "developer_id",
-      scope: (r: any) => r.group("approved"),
+      scope: (r: any) => r.group("approved").select("approved"),
     });
     expect(grouped.length).toBe(2);
   });
@@ -1090,7 +1090,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       className: "Project",
       joinTable: "developer_projects",
       foreignKey: "developer_id",
-      scope: (r: any) => r.group("approved").having("count(*) >= 2"),
+      scope: (r: any) => r.group("approved").having("count(*) >= 2").select("approved"),
     });
     expect(groups.length).toBe(1);
   });
