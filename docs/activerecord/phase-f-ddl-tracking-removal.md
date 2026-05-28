@@ -10,7 +10,10 @@ No generic hook.
 Phase F removes the trails-specific DDL tracker and aligns with Rails:
 
 - **F1 (this PR):** Audit + concurrency baseline + schema-cache invalidation
-  safety-net tests (all `.skip`ped until F2 adds the inline calls).
+  safety-net tests. `dropTable` and `dropJoinTable` pass today (already
+  invalidate). The remaining 7 tests are `.skip`ped until F2 adds the inline
+  calls (`createTable`, `renameTable`, `addColumn`, `removeColumn`, `addIndex`,
+  `removeIndex`, `changeColumn`).
 - **F2:** Inline `schemaCache.clearDataSourceCacheBang()` at each DDL method that
   is missing it; unskip the F1 safety-net tests.
 - **F3:** Delete `defineSchema`'s `TestDatabaseAdapter.tables` short-circuit;
@@ -54,12 +57,15 @@ pass as skipped.
 | `dropJoinTable`       | 632  | **Yes** (delegates to `dropTable`) | ✓                                                                                                      |
 
 **Note on addColumn/removeColumn/addIndex/removeIndex/changeColumn:** Rails does
-not inline `clear_data_source_cache!` in these methods in the abstract base. The
-cache is invalidated by column-level lazy-load: the next `columns()` call
-re-fetches from the DB. However, stale cached column data during a migration
-step can cause silent bugs, and F2's safety-net tests will verify the desired
-behavior. The F2 author should decide per-method whether to follow Rails exactly
-(no inline call) or to add it defensively.
+not inline `clear_data_source_cache!` in these methods in the abstract base.
+In Rails, the schema cache is connection-local and rebuilt per-request; stale
+entries are not a concern the way they are in trails' shared-adapter model where
+the cache outlives individual test transactions. Accordingly, the F1 safety-net
+tests are marked skipped to signal these gaps; the F2 author should add
+`clearDataSourceCacheBang` defensively at each site regardless of Rails parity,
+since stale column entries in trails' cache are **not** evicted automatically —
+`SchemaCache.columns()` returns the cached `_columns` entry without hitting the
+DB if it is already present.
 
 **Note on renameTable:** All three adapter overrides (PG `schema_statements.rb:437-438`,
 MySQL `abstract_mysql_adapter.rb:333-334`, SQLite `sqlite3_adapter.rb:332-333`) clear
