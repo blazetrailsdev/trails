@@ -350,7 +350,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
   });
 
   // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
-  it.skip("currentTransaction() reports no open transaction for a chain outside any withinNewTransaction", () => {
+  it.skip("currentTransaction() returns null for a chain outside any withinNewTransaction", () => {
     const { adapter } = createSidecarTestAdapter();
     // Pool-leased adapters return NullTransaction (not null) when no transaction
     // is open — NullTransaction is the Rails-correct sentinel for "no transaction".
