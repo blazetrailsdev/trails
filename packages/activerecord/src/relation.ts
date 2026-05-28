@@ -959,19 +959,25 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#in_order_of
    */
-  inOrderOf(column: string, values: unknown[], filter = true): Relation<T> {
+  inOrderOf(column: string | Nodes.Node, values: unknown[], filter = true): Relation<T> {
     if (values.length === 0) return this.none();
 
-    // Use the model's arelTable so the attribute retains type-casting metadata,
-    // mirroring Rails' order_column which resolves through the model's arel_table.
-    const arelCol = this._modelClass.arelTable.get(column);
+    const rel = this._clone();
+
+    // Mirrors Rails: `column.is_a?(Arel::Nodes::SqlLiteral) ? column : order_column(column.to_s)`.
+    // An Arel expression (e.g. `Arel.sql("id * 2")`) is used verbatim; a string/symbol
+    // resolves through orderColumn, which handles `"table.column"` for joined associations
+    // (and records the reference on the cloned relation).
+    const arelCol =
+      column instanceof Nodes.Node ? column : (_qm.orderColumn.call(rel as any, column) as any);
 
     // Normalize undefined → null so eq(null) emits IS NULL (not the invalid = NULL).
     const normalized = values.map((v) => (v === undefined ? null : v));
 
     // Build CASE WHEN col = v1 THEN 1 ... END ASC (searched form, 1-indexed).
     // Mirrors Rails' build_case_for_value_position: Arel::Nodes::Case.new (no operand)
-    // with column.eq(value) predicates. No ELSE when filter=true (the default).
+    // with column.eq(value) predicates. With filter=false, an ELSE clause places
+    // non-matching rows last instead of dropping them.
     const caseNode = new Nodes.Case();
     normalized.forEach((v, i) => {
       caseNode.when(arelCol.eq(v), new Nodes.Quoted(i + 1));
@@ -985,7 +991,6 @@ export class Relation<T extends Base> {
     // appended in call-order relative to any existing order clauses.
     // _applyOrderToManager detects CASE-style SQL via the "(" heuristic and
     // a /\bcase\b/i check, then emits it as SqlLiteral.
-    const rel = this._clone();
     rel._orderClauses.push(orderNode.toSql());
 
     // Add WHERE col IN (values) filter — mirrors Rails' arel_column.in(values.compact).
