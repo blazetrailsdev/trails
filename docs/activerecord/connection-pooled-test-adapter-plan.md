@@ -1,18 +1,20 @@
 # Connection-pooled test adapter — Rails-parity epic
 
-> **Status (2026-05-26):**
+> **Status (2026-05-28):**
 >
 > - A0 spike, B (#2242), C (#2245): shipped
 > - **D-X driver-pool collapse:** PG (#2279) + MySQL (#2278) — shipped. All three adapters now single-connection per adapter, Rails-shape.
 > - **D-Y central canonical schema:** #2372 shipped. Per-worker preload + additive `defineSchema` fast-path. ~18 sites annotated `D-Y-INCOMPATIBLE`.
-> - **D-1..N bypass elimination (Model.adapter = X):** **8 files remaining** (verified grep 2026-05-27 21:00 UTC). 4 giants merged today: base (#2512), locking (#2500), transactions partial (#2508 — 9 sites left), persistence (#2513). Pending: 3 singles (dirty/migration/tx-instr 1 site each), relations (234, in flight), 3 large association files (associations 407, has-many-associations 443, has-many-through-associations 485), plus the 9-site tail in transactions.
-> - Phase E (delete singleton/AsyncContext filter): gated on D-1..N reaching critical mass.
-> - Phase F (move DDL tracking onto AbstractAdapter): open; bundles with TM Phase 9b-4 absorption.
+> - **D-1..N bypass elimination (Model.adapter = X):** **complete (~97 files cleared).** See Phase D section below.
+> - **Phase E (delete singleton/AsyncContext filter): shipped.** E1 (#2514), E2 (#2527), E3 (#2533), E5 (#2536). E4 (delete-wrapper-class) was absorbed into F5 rather than shipped as a standalone. See [`phase-e-shared-adapter-removal.md`](phase-e-shared-adapter-removal.md).
+> - **Phase F (DDL tracking removal + wrapper deletion): shipped.** F1 (#2537), F2 (#2538), F3 (in main), F4 (in main), F5 (#2545 — bundled F5a + F5b + useTransactionalTests opt-out deletion). See [`phase-f-ddl-tracking-removal.md`](phase-f-ddl-tracking-removal.md).
 > - Phase G (fixture adoption): batch 1 shipped (#2391, 2 files). Tracked separately in [`fixtures-adoption-plan.md`](fixtures-adoption-plan.md).
 >
+> **End state achieved (2026-05-28):** NO `_sharedAdapter`, NO `_txLockStorage`/`_txLockHeld`/`_manualTxDepth`/`_txVisible`, NO `recordDdlTracking`/`_createdTables`/`_createdColumns`/`ddl-tracker.ts`, NO `TestAdapterFixtures`/`SidecarFixtures` wrappers, NO Proxy. `createTestAdapter()` returns the raw pool-leased `DatabaseAdapter`. Full Rails parity.
+>
 > Future-tense narratives below predate the pivot; treat as design
-> reference. Live D-1..N sizing has shifted from "10 batches" to "long
-> tail of bespoke surgery"; see Phase D section below.
+> reference. Phases E and F are now complete — their sections below are
+> archived for archeological reference.
 
 Epic to retire `_sharedAdapter` (the module-level singleton currently
 shared across every test in a worker) in favor of a connection-pool-
@@ -357,9 +359,12 @@ bundle PRs (the current pattern). Each bundle clears 1–4 files at ~250 LOC.
 - **#2512 (base):** clean; lock-generates-for-update SQLite skip is correct (visitor suppresses FOR UPDATE).
 - **#2500 (locking):** clean; 18 pessimistic-locking skips (FOR UPDATE/FOR SHARE/NOWAIT/SKIP LOCKED not ported yet).
 
-### Phase E — Delete `_sharedAdapter`, `AsyncContext` filter, manual TX depth
+### Phase E — Delete `_sharedAdapter`, `AsyncContext` filter, manual TX depth — **shipped**
 
-Final cleanup. After all tests are on the pool:
+> Shipped: E1 (#2514), E2 (#2527), E3 (#2533), E5 (#2536). E4 absorbed into F5.
+> Full plan in [`phase-e-shared-adapter-removal.md`](phase-e-shared-adapter-removal.md).
+
+Final cleanup. After all tests were on the pool:
 
 - Delete `_sharedAdapter` module state
 - Delete `_txLockStorage`/`_txLockHeld`/`_txVisible` from
@@ -370,14 +375,18 @@ Final cleanup. After all tests are on the pool:
 - Update the TM unification plan to retract the "trails patch over
   shared adapter" framing
 
-### Phase F — Delete `recordDdlTracking` (Rails parity)
+### Phase F — Delete `recordDdlTracking` (Rails parity) — **shipped**
+
+> Shipped: F1 (#2537), F2 (#2538), F3 (in main), F4 (in main), F5 (#2545 —
+> bundled F5a + F5b + `useTransactionalTests` opt-out deletion).
+> Full plan in [`phase-f-ddl-tracking-removal.md`](phase-f-ddl-tracking-removal.md).
 
 Rails has neither `onDdl` nor `recordDdlTracking`. DDL side-effects are
 handled inline at each schema-mutating method via
 `schema_cache.clear_data_source_cache!` (see
 `vendor/rails/.../abstract_mysql_adapter.rb:333-355`). No generic hook.
 
-Phase F instead:
+Phase F removed:
 
 - Delete `recordDdlTracking` + `_createdTables` / `_createdColumns` in
   `test-helpers/ddl-tracker.ts`.

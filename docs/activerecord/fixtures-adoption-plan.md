@@ -32,9 +32,9 @@ a separate plan doc"). This is that doc.
 
 ## Prerequisites (must land before Phase B)
 
-1. **Pool epic Phase E.** `createTestAdapter()` returns a pinned pool-
+1. **Pool epic Phase E — shipped (2026-05-28).** `createTestAdapter()` returns a pinned pool-
    checkout; sidecar's `_txLockStorage` / `_manualTxDepth` / `AsyncContext`
-   filter are deleted. Tracked in `connection-pooled-test-adapter-plan.md`.
+   filter were deleted in E2–E3 (#2527, #2533). See [`phase-e-shared-adapter-removal.md`](phase-e-shared-adapter-removal.md).
 2. **Spike S1 — worker-level fixture seed (standalone PR, ~100–150 LOC).**
    Today `useFixtures` seeds per-test (`use-fixtures.test.ts`). Under
    the pool, the seed runs once during worker setup; tests' TX wraps
