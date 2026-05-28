@@ -78,39 +78,51 @@ describe("RelationScopingTest", () => {
     expect(sql).toContain("DESC");
   });
 
-  it.skip("reverse order with arel attribute", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs Arel node input support in order() */
+  it("reverse order with arel attribute", () => {
+    const Developer = makeDeveloper();
+    const expected = Developer.order("id DESC").reverseOrder().toSql();
+    const actual = Developer.order(Developer.arelTable.get("id").desc()).reverseOrder().toSql();
+    expect(actual).toBe(expected);
   });
 
-  it.skip("reverse order with arel attribute as hash", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs Arel node input support in order() */
+  it("reverse order with arel attribute as hash", () => {
+    const Developer = makeDeveloper();
+    const expected = Developer.order("id DESC").reverseOrder().toSql();
+    const actual = Developer.order(new Map([[Developer.arelTable.get("id"), "desc" as const]]))
+      .reverseOrder()
+      .toSql();
+    expect(actual).toBe(expected);
   });
 
-  it.skip("reverse order with arel node as hash", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs Arel node input support in order() */
+  it("reverse order with arel node as hash", () => {
+    const Developer = makeDeveloper();
+    // node = arel_table[:id] + 0 — converts to an Arel grouping node.
+    const node = Developer.arelTable.get("id").add(0);
+    const expected = Developer.order(node.desc()).reverseOrder().toSql();
+    const actual = Developer.order(new Map([[node, "desc" as const]]))
+      .reverseOrder()
+      .toSql();
+    expect(actual).toBe(expected);
   });
 
-  it.skip("reverse order with multiple arel attributes", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs Arel node input support in order() */
+  it("reverse order with multiple arel attributes", () => {
+    const Developer = makeDeveloper();
+    const expected = Developer.order("id DESC").order("name DESC").reverseOrder().toSql();
+    const actual = Developer.order(Developer.arelTable.get("id").desc())
+      .order(Developer.arelTable.get("name").desc())
+      .reverseOrder()
+      .toSql();
+    expect(actual).toBe(expected);
   });
 
-  it.skip("reverse order with arel attributes and strings", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs Arel node input support in order() */
+  it("reverse order with arel attributes and strings", () => {
+    const Developer = makeDeveloper();
+    const expected = Developer.order("id DESC").order("name DESC").reverseOrder().toSql();
+    const actual = Developer.order("id DESC")
+      .order(Developer.arelTable.get("name").desc())
+      .reverseOrder()
+      .toSql();
+    expect(actual).toBe(expected);
   });
 
   it("double reverse order produces original order", () => {
