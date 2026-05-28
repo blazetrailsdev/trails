@@ -79,6 +79,106 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     // save_through_record builds + saves the join row via the through proxy.
     return saveThroughRecord(this, record, validate, raise);
   }
+
+  /**
+   * Mirrors Rails' HasManyThroughAssociation#build_record
+   * (has_many_through_association.rb:90-114):
+   *
+   *   ensure_not_nested
+   *   @through_scope = scope
+   *   record = super
+   *   inverse = source_reflection.polymorphic? ?
+   *     source_reflection.polymorphic_inverse_of(record.class) :
+   *     source_reflection.inverse_of
+   *   if inverse
+   *     if inverse.collection?
+   *       record.send(inverse.name) << build_through_record(record)
+   *     elsif inverse.has_one?
+   *       record.send("#{inverse.name}=", build_through_record(record))
+   *     end
+   *   end
+   *   record
+   * ensure
+   *   @through_scope = nil
+   *
+   * Builds the target via `super`, then — when the source reflection has an
+   * inverse on the built record's class — pre-builds the through join row and
+   * wires it onto that inverse so the join is created alongside the target.
+   */
+  protected override buildRecord(attributes?: Record<string, unknown>): Base | null {
+    ensureNotNested(this);
+    (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope = (
+      this as unknown as { scope?: () => unknown }
+    ).scope?.();
+    try {
+      const record = super.buildRecord(attributes);
+      if (!record) return record;
+      const built = buildThroughInverseFor(this.owner, this.reflection, record);
+      if (built) {
+        const inverseAssoc = (
+          record as unknown as { association?: (n: string) => any }
+        ).association?.(built.inverseName);
+        if (inverseAssoc) {
+          if (built.isCollection) {
+            inverseAssoc.addToTarget?.(built.throughRecord);
+          } else if (built.isHasOne) {
+            inverseAssoc.target = built.throughRecord;
+            inverseAssoc.setInverseInstance?.(built.throughRecord);
+          }
+        }
+      }
+      return record;
+    } finally {
+      (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope = null;
+    }
+  }
+}
+
+/** The pre-built join row and the source reflection's inverse it wires to. */
+export interface BuiltThroughInverse {
+  inverseName: string;
+  isCollection: boolean;
+  isHasOne: boolean;
+  throughRecord: Base;
+}
+
+/**
+ * Mirrors the inverse half of Rails'
+ * `HasManyThroughAssociation#build_record` (has_many_through_association.rb:96-109):
+ * resolve the source reflection's inverse and pre-build the through join row
+ * that pairs `record` with `owner`. Returns null when there's no inverse to
+ * wire (matching Rails, which only touches the join when `inverse` is set).
+ *
+ * Lives here (not in collection-proxy) so the join-building logic stays in the
+ * Rails-mirroring file; the proxy's `build` path calls in via this helper.
+ *
+ * @internal
+ */
+export function buildThroughInverseFor(
+  owner: Base,
+  reflection: AssociationDefinition,
+  record: Base,
+): BuiltThroughInverse | null {
+  const assoc = { owner, reflection } as unknown as HasManyThroughAssociation;
+  const ctor = owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(reflection.name);
+  const sourceRefl = refl?.sourceReflection;
+  if (!sourceRefl) return null;
+
+  const inverse = sourceRefl.isPolymorphic?.()
+    ? sourceRefl.polymorphicInverseOf?.(record.constructor as any)
+    : sourceRefl.inverseOf?.();
+  if (!inverse?.name) return null;
+
+  const throughRecord = buildThroughRecord(assoc, record);
+  if (!throughRecord) return null;
+
+  return {
+    inverseName: inverse.name,
+    isCollection: !!inverse.isCollection?.(),
+    isHasOne: !!inverse.isHasOne?.(),
+    throughRecord,
+  };
 }
 
 /** @internal */

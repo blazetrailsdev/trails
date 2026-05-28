@@ -1582,6 +1582,12 @@ describe("HasManyThroughAssociationsTest", () => {
     Associations.belongsTo.call(BtsReader, "btsPerson", {
       className: "BtsPerson",
       foreignKey: "bts_person_id",
+      inverseOf: "btsReaders",
+    });
+    Associations.hasMany.call(BtsPerson, "btsReaders", {
+      className: "BtsReader",
+      foreignKey: "bts_person_id",
+      inverseOf: "btsPerson",
     });
     registerModel("BtsPost", BtsPost);
     registerModel("BtsReader", BtsReader);
@@ -1590,6 +1596,9 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await BtsPost.create({ title: "Thinking" });
     const proxy = association(post, "btsPeople");
     const person = proxy.build({ first_name: "Bob" });
+    // build_record wires the join row onto the source's collection inverse.
+    const readers = association(person, "btsReaders").target as Base[];
+    expect(readers.length).toBe(1);
     await person.save();
     // After save, person should be persisted
     expect(person.isNewRecord()).toBe(false);

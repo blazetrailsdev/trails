@@ -44,6 +44,7 @@ import {
 } from "../persistence.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
+  association,
   resolveModel,
   resolveAssocClass,
   fireAssocCallbacks,
@@ -53,6 +54,7 @@ import {
   ownerHasUnresolvedThroughKey,
 } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
+import { buildThroughInverseFor } from "./has-many-through-association.js";
 
 // Declaration merging with `class CollectionProxy extends Relation`
 // propagates Relation's method types into this interface. `load()`
@@ -698,6 +700,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const record = new targetModel(attrs);
     this._applyScopeForCreate(record, attrs);
+    // Mirrors the inverse half of Rails' HasManyThroughAssociation#build_record:
+    // pre-build the join row and wire it onto the target's inverse so the join
+    // is created alongside the target on save.
+    const built = buildThroughInverseFor(this._record, this._assocDef, record);
+    if (built?.isCollection) {
+      const invProxy = association(record, built.inverseName) as unknown as CollectionProxy;
+      invProxy._target.push(built.throughRecord);
+    } else if (built?.isHasOne) {
+      const inv = (record as unknown as { association?: (n: string) => any }).association?.(
+        built.inverseName,
+      );
+      if (inv) {
+        inv.target = built.throughRecord;
+        inv.setInverseInstance?.(built.throughRecord);
+      }
+    }
     return record;
   }
 
