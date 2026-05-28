@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { ConnectionUrlResolver } from "./connection-url-resolver.js";
+import { protocolAdapters, setProtocolAdapters } from "../ar-config.js";
 
 describe("ConnectionUrlResolver", () => {
   it("parses a standard postgresql URL", () => {
@@ -79,5 +80,18 @@ describe("ConnectionUrlResolver", () => {
     expect(() => new ConnectionUrlResolver("postgres://user:secret@[invalid]:99/db")).toThrow(
       /\*\*\*@/,
     );
+  });
+
+  describe("protocol adapter mapping", () => {
+    const saved = { ...protocolAdapters };
+    afterEach(() => setProtocolAdapters(saved));
+
+    it("resolves through a mapping replaced via setProtocolAdapters", () => {
+      // Mirrors Rails' `ActiveRecord.protocol_adapters = { ... }` (full assignment
+      // via the module writer) — the resolver must read the replaced mapping.
+      setProtocolAdapters({ custom: "postgresql" });
+      const hash = new ConnectionUrlResolver("custom://localhost/db").toHash();
+      expect(hash.adapter).toBe("postgresql");
+    });
   });
 });

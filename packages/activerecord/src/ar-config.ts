@@ -5,6 +5,28 @@
  * module itself (active_record.rb:321-322).
  */
 
+/**
+ * Provides a mapping between database protocols/DBMSs and the underlying
+ * database adapter to be used. This is used only by the `DATABASE_URL`
+ * environment variable (and `url:` config keys). The protocol names are
+ * arbitrary, so external database adapters can register custom protocols by
+ * mutating this object or replacing it via {@link setProtocolAdapters}.
+ *
+ * Mirrors `ActiveRecord.protocol_adapters` (active_record.rb:490).
+ */
+export let protocolAdapters: Record<string, string> = {
+  postgres: "postgresql",
+  postgresql: "postgresql",
+  mysql: "mysql2",
+  mysql2: "mysql2",
+  sqlite: "sqlite3",
+  sqlite3: "sqlite3",
+};
+
+export function setProtocolAdapters(value: Record<string, string>): void {
+  protocolAdapters = value;
+}
+
 /** @internal */
 export let indexNestedAttributeErrors = false;
 
