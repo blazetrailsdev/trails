@@ -226,7 +226,7 @@ describe("RelationTest", () => {
       expect(posts[0].category).toBe("art");
     });
 
-    it.skip("reorder replaces existing order", async () => {
+    it("reorder replaces existing order", async () => {
       const posts = await Post.all().order("title").reorder({ views: "asc" }).toArray();
       expect(posts[0].views).toBe(10);
     });
@@ -2053,7 +2053,7 @@ describe("RelationTest", () => {
   });
 
   // -- reorder replaces existing order --
-  it.skip("reorder replaces existing order", async () => {
+  it("reorder replaces existing order", async () => {
     const items = await Widget.all().order({ name: "asc" }).reorder({ name: "desc" }).toArray();
     expect(items[0].name).toBe("D");
   });
@@ -4036,12 +4036,13 @@ describe("RelationTest", () => {
 
   // -- reorder --
 
-  it.skip("reorder replaces existing order", () => {
+  it("reorder replaces existing order", () => {
     const rel = Product.all().order("name").reorder({ price: "desc" });
     const sql = rel.toSql();
-    // Should have price DESC, not name ASC
-    expect(sql).toContain('"price" DESC');
-    expect(sql).not.toContain('"name" ASC');
+    // reorder replaces "name" with "price DESC". Quote char varies by adapter
+    // (" on SQLite/PG, ` on MySQL/MariaDB), so match quote-agnostically.
+    expect(sql).toMatch(/price.{0,2}\s+DESC/i);
+    expect(sql).not.toMatch(/name.{0,2}\s+ASC/i);
   });
 
   // -- reverseOrder --
@@ -4796,8 +4797,12 @@ describe("RelationTest", () => {
     await Post.create({ title: "b" });
     // Use Arel SQL node to order, then reverse — verifies the Arel node path
     const sql = Post.order(arelSql("title ASC")).reverseOrder().toSql();
-    // Reversing a plain SQL string reverses "ASC" → "DESC"
+    // Reversing a plain SQL string flips "ASC" → "DESC" (and only once).
     expect(sql).toContain("DESC");
+    expect(sql).not.toContain("ASC");
+    // Comma-separated literal terms each flip, mirroring Rails' String branch.
+    const multi = Post.order(arelSql("title ASC, id ASC")).reverseOrder().toSql();
+    expect(multi).toContain("title DESC, id DESC");
   });
 
   it("reverse order with function", () => {
