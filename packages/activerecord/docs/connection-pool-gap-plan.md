@@ -32,52 +32,13 @@ adapter.test.ts also has 22 fixture-blocked, 10 transaction-blocked,
 
 ## Track 1: Adapter retry & reconnect (unlocks ~18 tests)
 
-### PR P1: `withRawConnection` retry behavior refinement
+### PR P1 ✅ Shipped (#2532, #2542)
 
-**Problem:** `withRawConnection` (`abstract-adapter.ts:1541–1601`) already
-implements `allowRetry`, `connectionRetries`, `retryDeadline`, reconnect
-handling, and retryable-error checks. The skeleton is complete. The skipped
-tests cover specific behavioral gaps on top of this:
+withRawConnection retry/deadline behavior refinement.
 
-- Default `allowRetry: false` must surface `ConnectionFailed` (not swallow)
-- `retryDeadline` expiration must throw `ConnectionFailed` explicitly
-- Idempotent SELECT auto-retry needs integration with `finder-methods.ts`
-  marking idempotent queries as `allowRetry: true`
-- Non-retryable execute raises `ConnectionFailed`; _next_ idempotent query
-  must trigger reconnect (the "reconnect on next use" pattern)
+### PR P2 ✅ Shipped (#2539)
 
-**Files:**
-
-- `connection-adapters/abstract-adapter.ts:1541–1601` — tighten error
-  surfacing and deadline expiration behavior
-- `relation/finder-methods.ts` — propagate `allowRetry: true` on idempotent finds
-
-**Rails ref:** `abstract_adapter.rb` `with_raw_connection` error handling
-
-**Est:** ~100 LOC
-
----
-
-### PR P2: `verify!` / `reconnect!` / `active?` / `clean!` lifecycle
-
-**Problem:** Adapter lifecycle methods are partially stubbed:
-
-- `verify!` doesn't reconnect on failure
-- `reconnect!` after remote disconnect path incomplete
-- `active?` doesn't detect remote disconnection
-- `clean!` should skip verify on recently-used connection and surface
-  `AdapterError`; `@last_activity` backdating not implemented
-- `quoteString` must not trigger verify; subsequent query should reconnect
-- `configureConnection` failure recovery via `pool.new_connection` missing
-
-**Files:**
-
-- `connection-adapters/abstract-adapter.ts` — multiple methods
-
-**Rails ref:** `abstract_adapter.rb` `verify!`, `reconnect!`, `active?`,
-`clean!`, `configure_connection`
-
-**Est:** ~120 LOC
+`verify!` / `reconnect!` / `active?` / `clean!` lifecycle.
 
 ---
 
@@ -103,23 +64,9 @@ propagation
 
 ## Track 2: Database config resolution (unlocks ~20 tests)
 
-### PR P4: URL boolean coercion + env-var `DATABASE_URL`
+### PR P4 ✅ Shipped (#2529)
 
-**Problem:** `DatabaseConfigurations` resolver doesn't coerce URL params
-(`"true"` → `true` for 4 boolean keys: `prepared_statements`, `advisory_locks`,
-`checkout_timeout`, `schema_cache_path`). `DATABASE_URL` env-var fallback
-for unconfigured environments not implemented. SQLite edge-case URL
-parsing (relative paths, `?mode=memory`) incomplete.
-
-**Files:**
-
-- `database-configurations/connection-url-resolver.ts` — URL param coercion
-- `database-configurations.ts` — env-var `DATABASE_URL` fallback
-
-**Rails ref:** `database_configurations.rb`,
-`database_configurations/connection_url_resolver.rb`
-
-**Est:** ~100 LOC
+URL boolean coercion + empty-authority SQLite parsing.
 
 ---
 
@@ -143,21 +90,9 @@ cases in config merging when both `url:` and inline keys are present.
 
 ## Track 3: Pool lifecycle (unlocks ~15 tests)
 
-### PR P6: `removeConnectionForThread` + reap/disconnect
+### PR P6 ✅ Shipped (#2535)
 
-**Problem:** Pool doesn't implement `removeConnectionForThread` (remove a
-connection from the thread-local checkout map without returning it to the
-pool). Schema-cache and visitor aren't set on checkout. Reaper cycle
-doesn't call `flush` on idle connections.
-
-**Files:**
-
-- `connection-adapters/abstract/connection-pool.ts` — `removeConnectionForThread`,
-  checkout hook, reaper flush
-
-**Rails ref:** `connection_pool.rb` `remove`, `flush`, `reap`
-
-**Est:** ~100 LOC
+`removeConnectionForThread` + visitor + schema cache + reaper flush.
 
 ---
 
@@ -181,27 +116,9 @@ are incomplete.
 
 ## Track 4: ConnectionHandler + multi-DB (unlocks ~22 tests)
 
-### PR P8: `establishConnection` role validation + handler edge cases
+### PR P8 ✅ Shipped (#2530)
 
-**Problem:** `ConnectionHandler` already implements `removeConnectionPool`
-(`connection-handler.ts:185–195`) and wraps raw hash configs into
-`HashConfig` in `establishConnection` (lines 88–129). The 11 skipped
-tests cover specific edge cases:
-
-- Role name validation on `establishConnection` (reject invalid roles)
-- Pool-config-override path when re-establishing with different config
-- `connectedTo` multi-DB role lookup failures (role not found → clear error)
-- Handler clearing (`clearAllConnections!`, `flushIdleConnections!`) edge cases
-
-**Files:**
-
-- `connection-adapters/abstract/connection-handler.ts:88–129` —
-  `establishConnection` role validation branch
-
-**Rails ref:** `connection_handler.rb` `establish_connection` (role validation),
-`clear_all_connections!`
-
-**Est:** ~60 LOC
+`establishConnection` deduplication + clobber option.
 
 ---
 
@@ -267,28 +184,9 @@ session/resolver setup, no request/response cycle simulation.
 
 ## Track 6: Query cache per-context (unlocks ~14 tests)
 
-### PR P12: `enableQueryCacheBang` broadcast + pool init from dbConfig
+### PR P12 ✅ Shipped (#2534)
 
-**Problem:** Two concrete pieces:
-
-1. `ConnectionPool#enableQueryCacheBang()` / `disableQueryCacheBang()`
-   broadcast to all checked-out connections — not implemented
-2. Pool constructor doesn't read `dbConfig.queryCache` to set initial
-   cache state
-
-Also missing: `AsyncLocalStorage`-based per-context cache isolation
-(so concurrent requests don't share cache state).
-
-**Files:**
-
-- `connection-adapters/abstract/connection-pool.ts` — add broadcast methods,
-  read `dbConfig.queryCache` in constructor
-- New or existing async-context integration file
-
-**Rails ref:** `connection_pool.rb` `enable_query_cache!`,
-`disable_query_cache!`
-
-**Est:** ~100 LOC
+`enableQueryCacheBang` broadcast + pool init from `dbConfig.queryCache`.
 
 ---
 
@@ -346,57 +244,45 @@ to override per-config `prepared_statements: true` on
 
 ## Dependency graph
 
+P1, P2, P4, P6, P8, P12 shipped. Remaining:
+
 ```
-P1 → P3 (retry classification needs retry knob)
-P6 → P7 (pooled connections needs lifecycle)
-P8 → P9 (multi-DB switching needs handler basics)
-P8 → P11 (DatabaseSelector tests need handler)
+P6 ✓ → P7 (pooled connections needs lifecycle)
+P8 ✓ → P9 (multi-DB switching needs handler basics)
+P8 ✓ → P11 (DatabaseSelector tests need handler)
+P1 ✓ → P3 (retry classification needs retry knob)
 
-P2, P4, P5, P10, P12, P13, P14, P15 — all standalone
+P5, P10, P13, P14, P15 — all standalone
 ```
 
-## Recommended priority
+## Recommended priority (remaining)
 
-Ordered by: (1) no unsatisfied dependencies, (2) tests unlocked per LOC,
-(3) downstream unlock potential.
+### Unblocked (Tier 1/2 dependencies satisfied)
 
-### Tier 1 — high leverage, no dependencies (start here)
+| PR  | Tests | Est LOC | Why next                                                                                      |
+| --- | ----- | ------- | --------------------------------------------------------------------------------------------- |
+| P9  | 18    | ~150    | Multi-DB + nested switching (P8 ✓); largest unblocked unlock                                  |
+| P10 | 11    | ~60     | ConnectionManagement middleware — best tests/LOC; #2531 was closed and needs a fresh approach |
+| P3  | 6     | ~60     | Retryable query classification (P1 ✓)                                                         |
+| P5  | 7     | ~60     | Config edge cases — bundle adjacent to former P4 area                                         |
+| P7  | 3     | ~80     | Pooled connection checkout/checkin (P6 ✓)                                                     |
 
-| PR  | Tests | Est LOC | Why first                                                         |
-| --- | ----- | ------- | ----------------------------------------------------------------- |
-| P4  | 20    | ~100    | Highest unlock; config resolution is foundational for all pools   |
-| P8  | 11    | ~80     | Gates P9 (18 tests) + P11 (16 tests) = 34 downstream tests        |
-| P1  | 12    | ~150    | Retry/reconnect is user-visible reliability; gates P3             |
-| P10 | 11    | ~60     | ConnectionManagement middleware — best tests-per-LOC in this tier |
+### Standalone / lower leverage
 
-### Tier 2 — gated on Tier 1, or moderate standalone
+| PR  | Tests | Est LOC | Why                                                        |
+| --- | ----- | ------- | ---------------------------------------------------------- |
+| P11 | 16    | ~200    | DatabaseSelector test bodies — high LOC, tests only (P8 ✓) |
+| P13 | 4     | ~40     | StandaloneConnection — small, clean scope                  |
+| P14 | 4     | ~60     | Adapter leasing test bodies                                |
+| P15 | 2     | ~30     | Prepared statements toggle — smallest PR                   |
 
-| PR  | Tests | Est LOC | Depends on | Why                                                   |
-| --- | ----- | ------- | ---------- | ----------------------------------------------------- |
-| P9  | 18    | ~150    | P8         | Multi-DB + nested switching — largest gated PR        |
-| P12 | 14    | ~100    | —          | Query cache per-context; also unblocks relation tests |
-| P2  | 6     | ~120    | —          | Adapter lifecycle — correctness fix                   |
-| P6  | 9     | ~100    | —          | Pool lifecycle; gates P7                              |
-| P5  | 7     | ~60     | —          | Config edge cases — can bundle with P4                |
+### Recommended parallel lanes (post-shipped)
 
-### Tier 3 — gated on Tier 2 or low leverage
-
-| PR  | Tests | Est LOC | Depends on | Why                                                 |
-| --- | ----- | ------- | ---------- | --------------------------------------------------- |
-| P11 | 16    | ~200    | P8         | DatabaseSelector test bodies — high LOC, tests only |
-| P3  | 6     | ~60     | P1         | Retryable query classification                      |
-| P7  | 3     | ~80     | P6         | Pooled connection checkout/checkin                  |
-| P13 | 4     | ~40     | —          | StandaloneConnection — small, clean scope           |
-| P14 | 4     | ~60     | —          | Adapter leasing test bodies                         |
-| P15 | 2     | ~30     | —          | Prepared statements toggle — smallest PR            |
-
-### Recommended parallel lanes
-
-- **Lane A:** P8 → P9 → P11 (handler → multi-DB → DatabaseSelector)
-- **Lane B:** P1 → P3 (retry knob → retryable classification)
-- **Lane C:** P4 + P5 (config resolution — can be one PR)
-- **Lane D:** P10 + P12 (middleware + query cache — no overlap)
-- **Lane E:** P6 → P7 (pool lifecycle → pooled connections)
+- **Lane A:** P9 → P11 (multi-DB → DatabaseSelector)
+- **Lane B:** P3 (retryable classification)
+- **Lane C:** P5 (config edge cases)
+- **Lane D:** P10 (middleware — re-attempt after #2531 close)
+- **Lane E:** P7 (pooled connections)
 
 **Coverage:** 162 tests total.
 
