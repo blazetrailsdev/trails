@@ -6,7 +6,10 @@
 
 import type { ConnectionPool } from "./connection-pool.js";
 import { ConnectionDescriptor, type ConnectionOwner } from "./connection-descriptor.js";
-import { DatabaseConfig } from "../../database-configurations/database-config.js";
+import {
+  DatabaseConfig,
+  _setAdapterClassResolver,
+} from "../../database-configurations/database-config.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../../database-configurations.js";
 import { PoolConfig } from "../pool-config.js";
@@ -15,7 +18,22 @@ import type { DatabaseAdapter } from "../../adapter.js";
 import { AdapterNotSpecified, ConnectionNotDefined } from "../../errors.js";
 import type { QueryCachePool } from "./query-cache.js";
 import { Notifications } from "@blazetrails/activesupport";
-import { resolve as resolveConnectionAdapter } from "../../connection-adapters.js";
+import {
+  resolve as resolveConnectionAdapter,
+  resolveSync as resolveConnectionAdapterSync,
+  resolveSyncError as resolveConnectionAdapterSyncError,
+} from "../../connection-adapters.js";
+import { buildAdapterArg } from "../adapter-args.js";
+
+// Register the resolvers/builder so DatabaseConfig#adapterClass and
+// #newConnection work for any consumer that imports ConnectionHandler —
+// even those that don't pull in connection-handling.ts.
+_setAdapterClassResolver(
+  (adapterName) => resolveConnectionAdapter(adapterName),
+  (adapterName) => resolveConnectionAdapterSync(adapterName),
+  (adapterName, configuration) => buildAdapterArg(adapterName, configuration),
+  (adapterName) => resolveConnectionAdapterSyncError(adapterName),
+);
 
 export { ConnectionDescriptor };
 export type { ConnectionOwner };

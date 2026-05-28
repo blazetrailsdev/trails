@@ -5,13 +5,6 @@
  * Concrete subclasses (HashConfig, UrlConfig) implement the accessor methods.
  */
 
-import {
-  resolve as resolveConnectionAdapter,
-  resolveSync as resolveConnectionAdapterSync,
-  resolveSyncError as resolveConnectionAdapterSyncError,
-} from "../connection-adapters.js";
-import { buildAdapterArg } from "../connection-adapters/adapter-args.js";
-
 export interface DatabaseConfigOptions {
   adapter?: string;
   database?: string;
@@ -46,6 +39,34 @@ let _defaultEnvGetter: (() => string) | null = null;
 /** @internal Set by DatabaseConfigurations to break circular dependency */
 export function _setDefaultEnvGetter(fn: () => string): void {
   _defaultEnvGetter = fn;
+}
+
+// Registration-based indirection: avoids a static import edge from
+// database-configurations/* into connection-adapters/*, which (transitively)
+// would re-enter database-configurations.ts before HashConfig finishes
+// extending DatabaseConfig. Registered by abstract/connection-handler.ts so
+// any consumer of `ConnectionHandler` (including those that don't import
+// connection-handling.ts directly) wires up the resolvers.
+type AdapterClassResolver = (adapterName: string) => Promise<new (...args: any[]) => unknown>;
+type AdapterClassResolverSync = (adapterName: string) => (new (...args: any[]) => unknown) | null;
+type AdapterArgBuilder = (adapterName: string, configuration: Record<string, unknown>) => unknown[];
+type LoadErrorLookup = (adapterName: string) => unknown | null;
+let _adapterClassResolver: AdapterClassResolver | null = null;
+let _adapterClassResolverSync: AdapterClassResolverSync | null = null;
+let _buildAdapterArg: AdapterArgBuilder = (_n, c) => [c];
+let _loadAdapterError: LoadErrorLookup | null = null;
+
+/** @internal */
+export function _setAdapterClassResolver(
+  fn: AdapterClassResolver,
+  syncFn: AdapterClassResolverSync,
+  argBuilder: AdapterArgBuilder,
+  errorLookup: LoadErrorLookup,
+): void {
+  _adapterClassResolver = fn;
+  _adapterClassResolverSync = syncFn;
+  _buildAdapterArg = argBuilder;
+  _loadAdapterError = errorLookup;
 }
 
 /**
@@ -128,10 +149,15 @@ export class DatabaseConfig {
    * {@link newConnection} can run sync.
    */
   async adapterClass(): Promise<new (...args: any[]) => unknown> {
+    if (!_adapterClassResolver) {
+      throw new Error(
+        "Adapter class resolver not registered — import ConnectionHandler (or connection-handling) first",
+      );
+    }
     if (!this.adapter) {
       throw new Error(`Database configuration missing adapter: ${this.inspect()}`);
     }
-    return resolveConnectionAdapter(this.adapter);
+    return _adapterClassResolver(this.adapter);
   }
 
   /**
@@ -151,12 +177,17 @@ export class DatabaseConfig {
    * constructors uniformly accept a hash; trails' don't (yet).
    */
   newConnection(): unknown {
+    if (!_adapterClassResolverSync) {
+      throw new Error(
+        "Adapter class resolver not registered — import ConnectionHandler (or connection-handling) first",
+      );
+    }
     if (!this.adapter) {
       throw new Error(`Database configuration missing adapter: ${this.inspect()}`);
     }
-    const Klass = resolveConnectionAdapterSync(this.adapter);
+    const Klass = _adapterClassResolverSync(this.adapter);
     if (!Klass) {
-      const loadError = resolveConnectionAdapterSyncError(this.adapter);
+      const loadError = _loadAdapterError?.(this.adapter) ?? null;
       const remediation = loadError
         ? `loader failed: ${(loadError as Error).message ?? loadError}`
         : `await pool.adapterReady or this.loadAdapter() before calling newConnection`;
@@ -165,7 +196,7 @@ export class DatabaseConfig {
         loadError ? { cause: loadError } : undefined,
       );
     }
-    const args = buildAdapterArg(this.adapter, this.configuration as Record<string, unknown>);
+    const args = _buildAdapterArg(this.adapter, this.configuration as Record<string, unknown>);
     return new (Klass as new (...args: unknown[]) => unknown)(...args);
   }
 
