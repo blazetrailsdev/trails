@@ -1476,6 +1476,13 @@ function checkoutNewConnection(pool: Pool): DatabaseAdapter {
  * from the pool and disconnected, then the error is rethrown so the caller
  * can retry from a fresh slot.
  *
+ * We have no generic `define_callbacks :checkout` dispatcher, but the block
+ * still runs both effects Rails' :checkout chain produces in core AR: the
+ * `clean!` block body (cleanBang) and the only registered :checkout callback,
+ * QueryCache's cache wiring (query_cache.rb:132), ported here as
+ * `_cacheConfig.checkoutAndVerify`. The railties `set_callback(:checkout)` in
+ * console_sandbox.rb is sandbox-only and out of scope.
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_and_verify
  *
  * @internal

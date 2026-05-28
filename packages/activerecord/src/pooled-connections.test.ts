@@ -57,6 +57,11 @@ describe("PooledConnectionsTest", () => {
         const conn = pool.checkout();
         pool.checkin(conn);
         connectionCount += 1;
+        // Rails calls `lease_connection.data_sources` here; the leasing side
+        // effect — not the query — is what the test depends on: a held lease
+        // keeps a second connection out of the pool so `connections` grows to
+        // 2. We omit `data_sources` because exercising it would force an async
+        // round-trip to a real DB, irrelevant to the pool-size assertion.
         pool.leaseConnection();
       } catch (err) {
         if (err instanceof ConnectionTimeoutError) timedOut += 1;
