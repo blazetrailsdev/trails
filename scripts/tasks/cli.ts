@@ -69,16 +69,24 @@ export interface Index {
 
 export function loadIndex(): Index {
   const indexPath = join(RFCS_DIR, "index.json");
-  if (!existsSync(indexPath) || hasStoryNewerThan(indexPath)) {
+  if (!existsSync(indexPath) || isIndexStale(indexPath)) {
     execFileSync("node", ["scripts/build-index.mjs"], { cwd: RFCS_DIR, stdio: "inherit" });
   }
   return JSON.parse(readFileSync(indexPath, "utf8")) as Index;
 }
 
-function hasStoryNewerThan(indexPath: string): boolean {
+function isIndexStale(indexPath: string): boolean {
   const indexMtime = statSync(indexPath).mtimeMs;
   for (const rfcDir of readdirSync(RFCS_DIR)) {
     if (!/^\d{4}-/.test(rfcDir)) continue;
+    // The RFC README's frontmatter feeds the index too (status, clusters,
+    // packages, owner — and clusters drive `deps_rfc` resolution). A
+    // README edit without a story touch must invalidate the cache.
+    try {
+      if (statSync(join(RFCS_DIR, rfcDir, "README.md")).mtimeMs > indexMtime) return true;
+    } catch {
+      /* missing README — validate step will catch */
+    }
     const storiesDir = join(RFCS_DIR, rfcDir, "stories");
     let entries: string[];
     try {
@@ -251,7 +259,16 @@ export function commitAndPush(opts: {
     try {
       git(["push", "--quiet", "origin", "main"], { silent: true });
       return;
-    } catch {
+    } catch (e) {
+      const stderr = String(((e as { stderr?: unknown }).stderr ?? "") || "");
+      // git push prints "[rejected]" / "non-fast-forward" / "fetch first"
+      // on the lost-race case. Anything else (auth, network, branch
+      // protection, pre-receive hook failure) is a real error and must
+      // be surfaced verbatim — not silently reset-and-retried.
+      if (!/rejected|non-fast-forward|fetch first/i.test(stderr)) {
+        console.error(stderr.trim() || "git push failed (no stderr)");
+        process.exit(1);
+      }
       git(["reset", "--hard", "origin/main"], { silent: true });
       if (attempt === 1) {
         console.error(opts.raceMessage);

@@ -257,13 +257,23 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(seen).toEqual(["pull", "add", "commit", "push"]);
   });
 
+  // Mimic execFileSync's failure shape: attach .stderr to the error so
+  // commitAndPush's race-vs-real-failure discriminator can inspect it.
+  function pushError(stderr: string): Error {
+    const e = new Error("Command failed") as Error & { stderr?: string };
+    e.stderr = stderr;
+    return e;
+  }
+
   it("retries once on push failure, succeeds on second attempt", () => {
     const { seen } = setup();
     let push = 0;
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
-      if (label === "push" && push++ === 0) throw new Error("non-fast-forward");
+      if (label === "push" && push++ === 0) {
+        throw pushError("! [rejected]        main -> main (non-fast-forward)");
+      }
       return "" as never;
     });
     let mutatorCalls = 0;
@@ -295,7 +305,7 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
-      if (label === "push") throw new Error("non-fast-forward");
+      if (label === "push") throw pushError("! [rejected] non-fast-forward");
       return "" as never;
     });
     expect(() =>
@@ -311,5 +321,31 @@ describe("commitAndPush (git mutation flow)", () => {
     // Two attempts, each: pull, add, commit, push(throws), reset.
     expect(seen.filter((l) => l === "push").length).toBe(2);
     expect(seen.filter((l) => l === "reset").length).toBe(2);
+  });
+
+  it("surfaces non-race push failures verbatim and exits 1 (no reset, no retry)", () => {
+    const { seen, exit } = setup();
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      seen.push(label);
+      if (label === "push") {
+        throw pushError("fatal: Authentication failed for 'https://...'");
+      }
+      return "" as never;
+    });
+    expect(() =>
+      commitAndPush({
+        message: "test",
+        fileToStage: "/some/file.md",
+        mutator: () => {},
+        raceMessage: "should not be reached",
+        raceExitCode: 3,
+      }),
+    ).toThrow(/exit 1/);
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(seen.filter((l) => l === "push").length).toBe(1);
+    expect(seen.filter((l) => l === "reset").length).toBe(0);
+    expect(errSpy.mock.calls.at(-1)?.[0]).toMatch(/Authentication failed/);
   });
 });
