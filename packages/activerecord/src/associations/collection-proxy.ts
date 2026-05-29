@@ -512,6 +512,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       this._assocName,
       this._assocDef.options,
     )) as T[];
+    this._cascadeStrictLoading(results);
     const unsaved = this._target.filter((r) => r.isNewRecord());
     if (unsaved.length > 0) {
       return [...results, ...unsaved];
@@ -537,6 +538,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       results = await super.toArray();
     } else {
       results = (await loadHasMany(this._record, this._assocName, this._assocDef.options)) as T[];
+      this._cascadeStrictLoading(results);
     }
     // Merge: prefer existing in-memory instances (from push/build) over fresh DB records
     const existingByPk = new Map<string, T>();
@@ -575,6 +577,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         className: this._assocDef.options.className ?? camelize(singularize(this._assocName)),
       });
     }
+  }
+
+  /**
+   * Propagate the owner's strict-loading mode onto each loaded child —
+   * mirrors `Association#set_strict_loading`, which Rails applies in
+   * `find_target` / `exec_queries`. The functional `loadHasMany` path
+   * (the common `await blog.posts` reader) bypasses the OO
+   * `CollectionAssociation.loadTarget` where this cascade lives, so we
+   * route through the OO association here to reuse the exact same logic.
+   */
+  private _cascadeStrictLoading(records: T[]): void {
+    const assoc = this._record.association(this._assocName) as unknown as {
+      setStrictLoading?: (record: Base) => Base;
+    };
+    if (typeof assoc.setStrictLoading !== "function") return;
+    for (const r of records) assoc.setStrictLoading(r);
   }
 
   private _ensureThroughWritable(): void {
