@@ -1045,9 +1045,12 @@ describe("AssociationsJoinModelTest", () => {
       className: "EhsTagging",
     });
     const author = await EhsAuthor.create({ name: "Spell" });
-    await expect(
-      loadHasManyThrough(author, "tags", { through: "taggng", className: "EhsTagging" }),
-    ).rejects.toThrow(/Did you mean\? taggings/);
+    try {
+      await loadHasManyThrough(author, "tags", { through: "taggng", className: "EhsTagging" });
+      expect.unreachable("should have thrown");
+    } catch (e: any) {
+      expect(e.detailedMessage()).toMatch(/Did you mean\? {2}taggings/);
+    }
   });
 
   it("has many through join model with conditions", async () => {
