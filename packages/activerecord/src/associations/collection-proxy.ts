@@ -1698,7 +1698,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // before touching join rows.
     this._ensureThroughWritable();
     return this._withoutStrictLoading(async () => {
-      const records = await this.toArray();
       // Rails' `clear` routes through `delete_all`, which removes the rows in
       // bulk and does NOT run `before_remove`/`after_remove` callbacks (those
       // live in `remove_records`, not the delete path) — unlike per-record
@@ -1728,6 +1727,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         this._invalidateAssociationIds();
         return;
       }
+      // Capture the records to prune BEFORE nullifying — afterwards the nulled
+      // FKs make a reload return nothing. Only the non-through path needs this;
+      // the through branch returns early after a full reset, so its `toArray()`
+      // load is avoided entirely.
+      const records = await this.toArray();
       if (this._relationStateDiverged()) {
         // Plain collections nullify the owner FK. Mirror `deleteAll`'s
         // divergence guard: when in-place proxy mutations (whereBang / ...)
