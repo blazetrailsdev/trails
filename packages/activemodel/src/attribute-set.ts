@@ -196,6 +196,24 @@ export class AttributeSet {
     return attr !== undefined && attr.isInitialized();
   }
 
+  /**
+   * Narrow the set to the given attribute names, resetting every other
+   * attribute to its uninitialized state (type preserved).
+   *
+   * Mirrors the effect of `AttributeSet::Builder#build_from_database` when a
+   * SELECT projects only a subset of columns: unselected columns are absent
+   * from the materialized set, so `has`/`keys` no longer report them.
+   *
+   * @internal Rails-private helper.
+   */
+  narrowTo(names: Iterable<string>): void {
+    this.assertNotFrozen();
+    const keep = names instanceof Set ? names : new Set(names);
+    for (const [name, attr] of this.attributes) {
+      if (!keep.has(name)) this.attributes.set(name, Attribute.uninitialized(name, attr.type));
+    }
+  }
+
   toHash(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const name of this.keys()) {

@@ -66,6 +66,7 @@ import {
   setAbstractClass as _setAbstractClass,
   isBaseClass as _isBaseClass,
   ensureProperType as _ensureProperType,
+  narrowToProjectedColumns,
 } from "./inheritance.js";
 import { NotImplementedError, RecordNotFound, StaleObjectError } from "./errors.js";
 import {
@@ -2224,6 +2225,11 @@ export class Base extends Model {
     for (const [key, value] of Object.entries(row)) {
       record._attributes.writeFromDatabase(key, value);
     }
+    // A SELECT that projects only a subset of columns yields a row with just
+    // those keys, so hasAttribute() must reflect what was loaded rather than
+    // the full schema. Mirrors Rails' attributes_builder narrowing (see
+    // narrowToProjectedColumns). Shared with the STI path in inheritance.ts.
+    narrowToProjectedColumns(this as unknown as typeof Base, record as unknown as Base, row);
     record._newRecord = false;
     (record as any)._dirty.snapshot(record._attributes);
     record.changesApplied();

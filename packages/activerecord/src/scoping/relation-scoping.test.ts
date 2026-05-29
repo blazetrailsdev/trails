@@ -265,14 +265,26 @@ describe("RelationScopingTest", () => {
     });
   });
 
-  it.skip("scoped find select", () => {
-    // BLOCKED: select narrowing of loaded attributes — hasAttribute() does not
-    // reflect the projected column set; depends on attribute-set materialization
-    // from result rows rather than from the schema declaration.
+  it("scoped find select", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "David", salary: 80000 });
+    await Developer.scoping(Developer.select("id, name"), async () => {
+      const developer = await Developer.where("name = 'David'").first();
+      expect(developer!.name).toBe("David");
+      expect(developer!.hasAttribute("salary")).toBe(false);
+    });
   });
 
-  it.skip("scope select concatenates", () => {
-    // BLOCKED: select narrowing of loaded attributes — see "scoped find select".
+  it("scope select concatenates", async () => {
+    const Developer = makeDeveloper();
+    await Developer.create({ name: "David", salary: 80000 });
+    await Developer.scoping(Developer.select("id, name"), async () => {
+      const developer = await Developer.select("salary").where("name = 'David'").first();
+      expect(developer!.salary).toBe(80000);
+      expect(developer!.hasAttribute("id")).toBe(true);
+      expect(developer!.hasAttribute("name")).toBe(true);
+      expect(developer!.hasAttribute("salary")).toBe(true);
+    });
   });
 
   it("scoped count", async () => {

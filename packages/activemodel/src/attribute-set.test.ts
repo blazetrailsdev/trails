@@ -376,4 +376,41 @@ describe("AttributeSetTest", () => {
     expect(a.fetchValue("name")).toBe("Alice");
     expect(a.fetchValue("age")).toBe(30);
   });
+
+  it("#narrowTo keeps only the named attributes initialized", () => {
+    const strType = typeRegistry.lookup("string");
+    const intType = typeRegistry.lookup("integer");
+    const set = new AttributeSet(
+      new Map([
+        ["id", Attribute.fromDatabase("id", 1, intType)],
+        ["name", Attribute.fromDatabase("name", "Alice", strType)],
+        ["salary", Attribute.fromDatabase("salary", 80000, intType)],
+      ]),
+    );
+    set.narrowTo(["id", "name"]);
+    expect(set.has("id")).toBe(true);
+    expect(set.has("name")).toBe(true);
+    expect(set.has("salary")).toBe(false);
+    expect(set.keys().sort()).toEqual(["id", "name"]);
+  });
+
+  it("#narrowTo preserves the type of narrowed attributes", () => {
+    const intType = typeRegistry.lookup("integer");
+    const set = new AttributeSet(
+      new Map([["salary", Attribute.fromDatabase("salary", 80000, intType)]]),
+    );
+    set.narrowTo([]);
+    expect(set.has("salary")).toBe(false);
+    expect(set.getAttribute("salary").type).toBe(intType);
+  });
+
+  it("#narrowTo accepts a Set and is a no-op when all names are kept", () => {
+    const strType = typeRegistry.lookup("string");
+    const set = new AttributeSet(
+      new Map([["name", Attribute.fromDatabase("name", "Alice", strType)]]),
+    );
+    set.narrowTo(new Set(["name"]));
+    expect(set.has("name")).toBe(true);
+    expect(set.fetchValue("name")).toBe("Alice");
+  });
 });
