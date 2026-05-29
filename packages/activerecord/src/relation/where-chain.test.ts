@@ -466,7 +466,7 @@ describe("WhereChainTest", () => {
   // table (Book) differentiated only by an enum scope. Rails aliases the second
   // join; we don't yet, so `_addAssocJoin` throws on the same-table collision.
   // BLOCKED on join table-aliasing (separate from the predicate-builder /
-  // scoped-join enum-cast fix landed here). See relation-gap-plan.md R4 note.
+  // scoped-join enum-cast fix landed here). See docs/activerecord/relation-gap-plan.md R4 note.
   it.skip("missing with enum", () => {
     /* blocked: same-table join aliasing (reading_listing + unread_listing → Book) */
   });
