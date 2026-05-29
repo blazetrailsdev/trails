@@ -110,7 +110,7 @@ P13 (StandaloneConnection — blocked on Rails source refresh)
 ## Post-merge follow-ups
 
 Items surfaced after the shipped batches (#2529, #2530, #2532, #2534, #2535,
-#2539, #2542, #2547, #2553, #2554, #2561, #2570; follow-up PRs #2601, #2603).
+#2539, #2542, #2547, #2553, #2554, #2561, #2570; follow-up PRs #2601, #2603, #2610).
 
 **From #2539 (P2 lifecycle):**
 
@@ -158,10 +158,10 @@ Items surfaced after the shipped batches (#2529, #2530, #2532, #2534, #2535,
 - [ ] ~20-40 LOC (pre-existing, low priority): `fromEnv()` passes `currentEnv = TRAILS_ENV ?? NODE_ENV ?? defaultEnv` into `_buildConfigs`, but `DatabaseConfig#forCurrentEnv` resolves via `DatabaseConfigurations.defaultEnv`. If `TRAILS_ENV` differs from `defaultEnv`, the build-time guard and `forCurrentEnv` can disagree. No test exercises the mismatch; unify env resolution only if it bites.
 - Deviation: the bare-name carve-out is narrower than Rails' `URI::RFC2396_Parser` (which treats ANY scheme-less path as the DB name). Revisit only if a real config surfaces a bare DB name containing a dot.
 
-**From #2561 (P7 pool checkout/checkin):**
+**From #2561 (P7 pool checkout/checkin):** both follow-ups shipped in **#2610** — generic `:checkout`/`:checkin` callback registry on `AbstractAdapter` (`setCallback`/`_runCallbacks`/`_runCheckoutCallbacks`/`_runCheckinCallbacks`) and pinned-connection checkout aligned with Rails (`verifyBang` awaited on the async path). Remaining:
 
-- [ ] ~40 LOC: implement generic `:checkout`/`:checkin` callback registry on the adapter (only if a future feature needs custom callbacks).
-- [ ] ~15 LOC: align pinned-connection checkout branch with Rails — unconditional `verify!`, drop `checkoutAndVerify`/cache call on pinned. Bundle into future pool PR.
+- [ ] ~15 LOC (only if ever needed): per-class clone-on-write for the callback registry — currently a single shared static on `AbstractAdapter`, which exactly matches Rails (all checkout/checkin callbacks live on AbstractAdapter). Only needed if a concrete adapter ever registers its own.
+- Deviation (low risk): the sync `checkout()` pinned branch fire-and-forgets `verifyBang()` (trails' `verifyBang` is async, Rails' `verify!` is sync). Safe today — pinned connections are verified eagerly at pin time and `verifyBang` short-circuits when active; only an edge-case reconnect failure could yield an unhandled rejection.
 
 **From #2570 (P14+P15 bundle):**
 
