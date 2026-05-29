@@ -2,7 +2,13 @@
  * Mirrors Rails activerecord/test/cases/associations/eager_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  registerModel,
+  enableSti,
+  registerSubclass,
+  AssociationNotFoundError,
+} from "../index.js";
 import { Associations, association, loadHasMany, loadHasManyThrough } from "../associations.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -235,6 +241,8 @@ const TEST_SCHEMA: Schema = {
   eager_twice_owners: { name: "string" },
   eager_twice_targets: { label: "string" },
   eager_widgets: { name: "string" },
+  ex_sug_posts: { title: "string" },
+  ex_sug_taggings: { name: "string", ex_sug_post_id: "integer" },
   ej_em_authors: { name: "string" },
   ej_em_posts: { title: "string", ej_em_author_id: "integer" },
   ej_authors: { name: "string" },
@@ -3194,31 +3202,35 @@ describe("EagerAssociationTest", () => {
     );
   });
 
-  it.skip("exceptions have suggestions for fix", async () => {
-    // BLOCKED: associations — top-level eagerLoad/includes of an unknown association does not raise
-    // ROOT-CAUSE: associations/preloader/branch.ts groupedRecords() silently skips missing reflections (line ~161)
-    //   instead of raising AssociationNotFoundError + "Did you mean?" suggestion for top-level
-    //   names (Rails eager_test.rb:878 — Post.all.merge!(includes: :taggingz).find(6) raises with `Did you mean? tagging`).
-    //   Rails nested-through-null behavior (eager_test.rb:380, :386) must stay silent — but note: existing tests at
-    //   eager.test.ts:966 and :979 ("nested loading does not raise...") currently pass a flat top-level string instead
-    //   of Rails' nested-hash form `{ author: :non_existing_association }`; closing this gap must also rework those
-    //   two tests to the nested form so the silent-skip + raise-on-top-level contract is consistent.
-    // SCOPE: ~30 LOC in preloader/branch.ts to raise on unknown top-level association; +~10 LOC rework of the two
-    //   misnamed flat-string tests to nested-hash form per Rails source.
-    class ExSugAuthor extends Base {
+  it("exceptions have suggestions for fix", async () => {
+    class ExSugTagging extends Base {
       static {
         this.attribute("name", "string");
+        this.attribute("ex_sug_post_id", "integer");
       }
     }
-    registerModel(ExSugAuthor);
+    class ExSugPost extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    Associations.hasMany.call(ExSugPost, "tagging", {
+      className: "ExSugTagging",
+      foreignKey: "ex_sug_post_id",
+    });
+    registerModel("ExSugTagging", ExSugTagging);
+    registerModel("ExSugPost", ExSugPost);
+
+    await ExSugPost.create({ title: "P" });
+
     let error: any;
     try {
-      await ExSugAuthor.all().includes("nonexistent_assoc").toArray();
+      await ExSugPost.all().includes("taggingz").toArray();
     } catch (e: any) {
       error = e;
     }
-    expect(error).toBeDefined();
-    expect(error.message).toBeTruthy();
+    expect(error).toBeInstanceOf(AssociationNotFoundError);
+    expect(error.detailedMessage()).toContain("Did you mean?  tagging");
   });
   it("eager has many through with order", async () => {
     class EagerHmtOrdAuthor extends Base {
