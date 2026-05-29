@@ -1132,7 +1132,9 @@ describe("StrictLoadingTest", () => {
 
     // Does not raise when loading the first-level has_many association: the
     // N+1-only mode only guards against cascading lookups, not the root load.
-    const books = (await (author as any).association("npoHmBooks").loadTarget()) as Base[];
+    // Read through the CollectionProxy reader (`developer.projects.to_a`),
+    // which must cascade strict_loading onto each child.
+    const books = (await association(author, "npoHmBooks").toArray()) as Base[];
 
     // strict_loading is enabled for has_many associations
     expect(books.every((b) => b.isStrictLoading())).toBe(true);
@@ -1185,8 +1187,10 @@ describe("StrictLoadingTest", () => {
     const loadedShip = (await (developer as any).association("npoBtShip").loadTarget()) as Base;
     expect(loadedShip.isStrictLoading()).toBe(false);
 
-    // strict_loading is enabled for has_many through a belongs_to
-    const parts = (await (loadedShip as any).association("npoBtParts").loadTarget()) as Base[];
+    // strict_loading is enabled for has_many through a belongs_to. Read
+    // through the CollectionProxy reader (`developer.ship.parts.to_a`),
+    // which must cascade strict_loading onto each child.
+    const parts = (await association(loadedShip, "npoBtParts").toArray()) as Base[];
     expect(parts.every((p) => p.isStrictLoading())).toBe(true);
     await expect((parts[0] as any).association("npoBtShip").loadTarget()).rejects.toThrow(
       StrictLoadingViolationError,

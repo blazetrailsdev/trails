@@ -196,15 +196,27 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
       }
     }
 
-    const ownerFlags = owner as unknown as {
-      _strictLoading?: boolean;
-      isStrictLoadingNPlusOneOnly?: () => boolean;
-    };
-    const nPlusOneOnly =
-      typeof ownerFlags.isStrictLoadingNPlusOneOnly === "function" &&
-      ownerFlags.isStrictLoadingNPlusOneOnly() &&
-      reflection.type === "hasMany";
-    if (nPlusOneOnly || ownerFlags._strictLoading || reflection.options.strictLoading) {
+    // Rails' `exec_queries` calls `set_strict_loading` for EVERY record
+    // unconditionally — it propagates the owner's mode (which may be
+    // "off") onto each child, not just when the owner is strict. Resolve
+    // the OO association off the owner (NOT `this._association`, which is
+    // the JS-Proxy-wrapped CollectionProxy whose unknown-property trap
+    // raises a strict-loading violation) so the n+1-only-vs-mode logic
+    // stays in one place.
+    const ownerAssoc = (
+      owner as unknown as {
+        association?: (name: string) => { setStrictLoading?: (record: unknown) => unknown };
+      }
+    ).association?.(reflection.name);
+    if (ownerAssoc && typeof ownerAssoc.setStrictLoading === "function") {
+      for (const r of records) ownerAssoc.setStrictLoading(r);
+    }
+
+    // A reflection-level `strictLoading: true` opt-in marks the loaded
+    // records strict regardless of the owner's own mode — this is the
+    // reflection's own contract (`violates_strict_loading?` keys on
+    // `reflection.strict_loading?`), layered on top of the owner cascade.
+    if (reflection.options.strictLoading) {
       for (const r of records) {
         (r as unknown as { strictLoadingBang?: () => void }).strictLoadingBang?.();
       }
