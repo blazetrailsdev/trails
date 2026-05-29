@@ -8,7 +8,13 @@ import {
   typeRegistry,
   type Type,
 } from "@blazetrails/activemodel";
-import { isStiSubclass, getStiBase, isBaseClass, baseClass } from "./inheritance.js";
+import {
+  isStiSubclass,
+  getStiBase,
+  isBaseClass,
+  baseClass,
+  getAbstractClass,
+} from "./inheritance.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { isWrappedType } from "./encryption/wrapped-type.js";
 import { FakePool } from "./connection-adapters/schema-cache.js";
@@ -389,7 +395,7 @@ export function resetTableName(this: SchemaHost): string {
   if (this.name === "Base") {
     return "";
   }
-  if (this._abstractClass) {
+  if (getAbstractClass.call(this as any)) {
     const parent = Object.getPrototypeOf(this) as SchemaHost | null;
     if (parent?.tableName != null) {
       this._tableName = parent.tableName;
@@ -816,7 +822,7 @@ function applyColumnsHash(
  * `attribute :foo, :bar` always wins over schema-reflected types.
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
-  if (this._abstractClass) return;
+  if (getAbstractClass.call(this as any)) return;
   // STI subclasses inherit the base's attribute defs — reflect onto the
   // STI base without forking. Use whichever class has the adapter
   // configured (base in normal Rails setup, but tolerate subclass-only
@@ -887,7 +893,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
  * (caller may fall back to attribute-defs-derived metadata).
  */
 function loadSchemaFromCacheSync(host: SchemaHost): boolean {
-  if (host._abstractClass) return false;
+  if (getAbstractClass.call(host as any)) return false;
   // STI subclasses share the base's table and attribute defs. Reflecting
   // on a subclass would fork _attributeDefinitions; instead, apply
   // reflection to the STI base so subclasses inherit it.
