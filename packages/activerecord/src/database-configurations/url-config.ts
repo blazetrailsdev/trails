@@ -84,10 +84,7 @@ function normalizeUrlHash(hash: Record<string, unknown>): void {
 
 // Mirrors: UrlConfig#build_url_hash
 // jdbc:/http:/https: URLs are passed through untouched — they're adapter-specific
-// connection strings, not URIs we should decompose. Strings without a leading
-// scheme (e.g. SQLite ":memory:" or a bare filesystem path) are also passed
-// through — they're not URLs at all, and Rails' URI parser accepts them as
-// opaque but our JS URL parser doesn't.
+// connection strings, not URIs we should decompose.
 /** @internal */
 function buildUrlHash(url: string): DatabaseConfigOptions {
   if (
@@ -97,9 +94,19 @@ function buildUrlHash(url: string): DatabaseConfigOptions {
     url.startsWith("https:") ||
     // Windows drive-letter paths (e.g. "C:\\path\\db.sqlite3") are filesystem
     // paths, not URLs, even though they have a single-letter "scheme".
-    /^[A-Za-z]:[\\/]/.test(url) ||
-    !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)
+    /^[A-Za-z]:[\\/]/.test(url)
   ) {
+    return { url };
+  }
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {
+    // Scheme-less string. Rails' URI parser turns a bare word ("foo", "foo-bar")
+    // into `{ database: "foo" }`, overriding the config's database. Filesystem-style
+    // SQLite connection strings (":memory:", bare paths with "/", "\\" or ".")
+    // are not database names — pass those through as `{ url }` unchanged so the
+    // UrlConfig#database accessor can fall back to the path.
+    if (/^[A-Za-z0-9_-]+$/.test(url)) {
+      return { database: url };
+    }
     return { url };
   }
   return new ConnectionUrlResolver(url).toHash();

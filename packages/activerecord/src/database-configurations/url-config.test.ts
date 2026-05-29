@@ -98,5 +98,12 @@ describe("DatabaseConfigurations", () => {
       const cfg = new UrlConfig("test", "primary", "test/db/primary.sqlite3");
       expect(cfg.database).toBe("test/db/primary.sqlite3");
     });
+
+    it("overrides config database with a scheme-less bare name", () => {
+      // Rails' URI parser turns a bare word (incl. hyphens, e.g. "foo-bar")
+      // into { database: "foo-bar" }, overriding the config's database.
+      const cfg = new UrlConfig("test", "primary", "foo-bar", { database: "not_foo" });
+      expect(cfg.database).toBe("foo-bar");
+    });
   });
 });

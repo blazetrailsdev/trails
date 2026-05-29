@@ -11,31 +11,37 @@ import { protocolAdapters, setProtocolAdapters } from "../ar-config.js";
 
 const DEFAULT_ENV = "default_env";
 
-let savedDatabaseUrl: string | undefined;
-let savedRailsEnv: string | undefined;
-let savedRackEnv: string | undefined;
+// Per-name *_DATABASE_URL vars are cleared too: environment_value_for reads
+// NAME_DATABASE_URL (and PRIMARY_DATABASE_URL for the primary slot) ahead of
+// DATABASE_URL, so an ambient value would otherwise trample the primary config
+// in tests that only set DATABASE_URL.
+const ENV_KEYS = [
+  "DATABASE_URL",
+  "PRIMARY_DATABASE_URL",
+  "ANIMALS_DATABASE_URL",
+  "RAILS_ENV",
+  "RACK_ENV",
+];
+let savedEnv: Record<string, string | undefined>;
 let savedDefaultEnv: string;
 let savedProtocolMapping: Record<string, string>;
 
 beforeEach(() => {
-  savedDatabaseUrl = process.env["DATABASE_URL"];
-  savedRailsEnv = process.env["RAILS_ENV"];
-  savedRackEnv = process.env["RACK_ENV"];
+  savedEnv = {};
+  for (const key of ENV_KEYS) {
+    savedEnv[key] = process.env[key];
+    delete process.env[key];
+  }
   savedDefaultEnv = DatabaseConfigurations.defaultEnv;
   savedProtocolMapping = { ...protocolAdapters };
-  delete process.env["DATABASE_URL"];
-  delete process.env["RAILS_ENV"];
-  delete process.env["RACK_ENV"];
   DatabaseConfigurations.defaultEnv = DEFAULT_ENV;
 });
 
 afterEach(() => {
-  if (savedDatabaseUrl !== undefined) process.env["DATABASE_URL"] = savedDatabaseUrl;
-  else delete process.env["DATABASE_URL"];
-  if (savedRailsEnv !== undefined) process.env["RAILS_ENV"] = savedRailsEnv;
-  else delete process.env["RAILS_ENV"];
-  if (savedRackEnv !== undefined) process.env["RACK_ENV"] = savedRackEnv;
-  else delete process.env["RACK_ENV"];
+  for (const key of ENV_KEYS) {
+    if (savedEnv[key] !== undefined) process.env[key] = savedEnv[key];
+    else delete process.env[key];
+  }
   DatabaseConfigurations.defaultEnv = savedDefaultEnv;
   setProtocolAdapters(savedProtocolMapping);
 });
@@ -151,11 +157,18 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     });
   });
 
-  it.skip("resolver with database uri containing only database name", () => {
-    // FOLLOW-UP (not P5): Rails' URI parser turns a bare "foo" into { database: "foo" },
-    // overriding the config's database. Our buildUrlHash passes scheme-less strings
-    // through as { url } to preserve SQLite `:memory:` / bare-path behavior, so the
-    // override doesn't happen. Reconciling the two needs a dedicated change.
+  it("resolver with database uri containing only database name", () => {
+    process.env["DATABASE_URL"] = "foo";
+    process.env["RAILS_ENV"] = "test";
+    DatabaseConfigurations.defaultEnv = "test";
+
+    const config = { test: { adapter: "postgres", database: "not_foo", host: "localhost" } };
+    const actual = resolveDbConfig("test", config);
+    expect(actual.configurationHash).toEqual({
+      adapter: "postgres",
+      database: "foo",
+      host: "localhost",
+    });
   });
 
   it("jdbc url", () => {
@@ -353,10 +366,26 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     expect(actual).toEqual({ adapter: "abstract", pool: 5 });
   });
 
-  it.skip("separate database env vars", () => {
-    // FOLLOW-UP (not P5): requires per-name env var resolution
-    // (PRIMARY_DATABASE_URL / ANIMALS_DATABASE_URL), which is separate infrastructure
-    // from the protocol-adapter-mapping work in this PR.
+  it("separate database env vars", () => {
+    process.env["DATABASE_URL"] = "postgres://localhost/foo";
+    process.env["PRIMARY_DATABASE_URL"] = "postgres://localhost/primary";
+    process.env["ANIMALS_DATABASE_URL"] = "postgres://localhost/animals";
+
+    const config = {
+      default_env: {
+        primary: { adapter: "abstract", pool: 5 },
+        animals: { adapter: "abstract", pool: 5 },
+      },
+    };
+
+    let configs = DatabaseConfigurations.fromRaw(config);
+    let actual = configs.configsFor({ envName: DEFAULT_ENV, name: "primary" })[0]!
+      .configurationHash;
+    expect(actual.database).toBe("primary");
+
+    configs = DatabaseConfigurations.fromRaw(config);
+    actual = configs.configsFor({ envName: DEFAULT_ENV, name: "animals" })[0]!.configurationHash;
+    expect(actual.database).toBe("animals");
   });
 
   it("does not change other environments", () => {

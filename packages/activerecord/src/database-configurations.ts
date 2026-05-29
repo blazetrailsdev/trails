@@ -95,9 +95,7 @@ export class DatabaseConfigurations {
       // merges DATABASE_URL via environment_url_config + merge_db_environment_variables.
       // Uses DatabaseConfigurations.defaultEnv (set by app bootstrap from RAILS_ENV/RACK_ENV),
       // not NODE_ENV — matching Rails' env resolution semantics.
-      this._configurations = this._buildConfigs(
-        this._mergeDatabaseUrl(configurations, DatabaseConfigurations._defaultEnv),
-      );
+      this._configurations = this._buildConfigs(configurations, DatabaseConfigurations._defaultEnv);
     }
     // Register this instance as the current one for HashConfig.isPrimary lookup
     _currentConfigurations = this;
@@ -113,7 +111,8 @@ export class DatabaseConfigurations {
   static fromRaw(configurations: RawConfigurations = {}): DatabaseConfigurations {
     const instance = new DatabaseConfigurations([]);
     instance._configurations = instance._buildConfigs(
-      instance._mergeDatabaseUrl(configurations, DatabaseConfigurations.defaultEnv),
+      configurations,
+      DatabaseConfigurations.defaultEnv,
     );
     _currentConfigurations = instance;
     return instance;
@@ -248,68 +247,18 @@ export class DatabaseConfigurations {
     // TRAILS_ENV is the canonical runtime env (BC-2); NODE_ENV is the one-release fallback.
     // DATABASE_URL merges into whichever environment is active.
     const env = getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv;
-    instance._configurations = instance._buildConfigs(instance._mergeDatabaseUrl(raw, env));
+    instance._configurations = instance._buildConfigs(raw, env);
     return instance;
   }
 
   /**
-   * Merge DATABASE_URL into the raw configurations.
+   * Mirrors: ActiveRecord::DatabaseConfigurations#build_configs
    *
-   * Mirrors Rails: merge_db_environment_variables — only merges into the
-   * current default env's primary config. If no config exists for the
-   * default env, adds one from the URL.
-   *
-   * Mirrors: ActiveRecord::DatabaseConfigurations#build_url_hash
+   * Builds DatabaseConfig objects from the raw config, adds a primary URL
+   * config for the current env if none matches, then merges the per-name
+   * `*_DATABASE_URL` / `DATABASE_URL` environment variables.
    */
-  private _mergeDatabaseUrl(raw: RawConfigurations, envOverride?: string): RawConfigurations {
-    const databaseUrl = getEnv("DATABASE_URL");
-    if (!databaseUrl) return raw;
-
-    const hasConfigs = Object.keys(raw).length > 0;
-
-    if (!hasConfigs) {
-      const env = envOverride ?? DatabaseConfigurations.defaultEnv;
-      return { [env]: { url: databaseUrl } };
-    }
-
-    const currentEnv = envOverride ?? DatabaseConfigurations.defaultEnv;
-
-    // Check if any config matches the current env
-    const hasDefaultEnvConfig = Object.prototype.hasOwnProperty.call(raw, currentEnv);
-
-    const merged: RawConfigurations = { ...raw };
-
-    if (!hasDefaultEnvConfig) {
-      // Rails: unless db_configs.find(&:for_current_env?) → add URL config for default env
-      merged[currentEnv] = { url: databaseUrl };
-      return merged;
-    }
-
-    const envConfig = raw[currentEnv];
-    if (typeof envConfig !== "object" || envConfig === null) {
-      return merged;
-    }
-
-    if (this._isThreeLevelConfig(envConfig)) {
-      // Three-level: merge URL into the "primary" entry only (don't override existing url:)
-      const nested = { ...(envConfig as Record<string, DatabaseConfigOptions>) };
-      if (nested.primary) {
-        if (!("url" in nested.primary)) nested.primary = { ...nested.primary, url: databaseUrl };
-      } else {
-        nested.primary = { url: databaseUrl };
-      }
-      merged[currentEnv] = nested;
-    } else {
-      const existing = envConfig as DatabaseConfigOptions;
-      // Don't override an explicit url: key in the config (Rails: env-specific url takes precedence)
-      if (!("url" in existing)) {
-        merged[currentEnv] = { ...existing, url: databaseUrl };
-      }
-    }
-    return merged;
-  }
-
-  private _buildConfigs(raw: RawConfigurations): DatabaseConfig[] {
+  private _buildConfigs(raw: RawConfigurations, currentEnv: string): DatabaseConfig[] {
     const configs: DatabaseConfig[] = [];
 
     for (const [envName, envConfig] of Object.entries(raw)) {
@@ -343,7 +292,14 @@ export class DatabaseConfigurations {
       }
     }
 
-    return configs;
+    // Mirrors Rails: unless db_configs.find(&:for_current_env?) → add a primary
+    // URL config built from DATABASE_URL (or PRIMARY_DATABASE_URL) for the env.
+    if (!configs.some((c) => c.envName === currentEnv)) {
+      const urlConfig = this.environmentUrlConfig(currentEnv, "primary", {});
+      if (urlConfig) configs.push(urlConfig);
+    }
+
+    return this.mergeDbEnvironmentVariables(currentEnv, configs);
   }
 
   private _isThreeLevelConfig(config: unknown): boolean {
@@ -372,7 +328,7 @@ export class DatabaseConfigurations {
   /** @internal */
   private buildConfigs(configs: RawConfigurations | DatabaseConfig[]): DatabaseConfig[] {
     if (Array.isArray(configs)) return configs;
-    return this._buildConfigs(this._mergeDatabaseUrl(configs, DatabaseConfigurations.defaultEnv));
+    return this._buildConfigs(configs, DatabaseConfigurations.defaultEnv);
   }
 
   /** @internal */
@@ -452,13 +408,29 @@ export class DatabaseConfigurations {
     throw new InvalidConfigurationError(`No db config handler matched for ${envName}/${name}`);
   }
 
-  /** @internal */
-  private environmentValueFor(name: string): string | undefined {
-    const nameEnvKey = `${name.toUpperCase()}_DATABASE_URL`;
-    return getEnv(nameEnvKey) ?? (name === "primary" ? getEnv("DATABASE_URL") : undefined);
+  /**
+   * Mirrors: DatabaseConfigurations#merge_db_environment_variables
+   *
+   * Replaces each non-URL config in the current env with a UrlConfig built from
+   * its matching `*_DATABASE_URL` env var, when one is set.
+   *
+   * @internal
+   */
+  private mergeDbEnvironmentVariables(
+    currentEnv: string,
+    configs: DatabaseConfig[],
+  ): DatabaseConfig[] {
+    return configs.map((config) => {
+      if (config instanceof UrlConfig || config.envName !== currentEnv) return config;
+      return this.environmentUrlConfig(currentEnv, config.name, config.configurationHash) ?? config;
+    });
   }
 
-  /** @internal */
+  /**
+   * Mirrors: DatabaseConfigurations#environment_url_config
+   *
+   * @internal
+   */
   private environmentUrlConfig(
     env: string,
     name: string,
@@ -469,15 +441,15 @@ export class DatabaseConfigurations {
     return new UrlConfig(env, name, url, config);
   }
 
-  /** @internal */
-  private mergeDbEnvironmentVariables(
-    currentEnv: string,
-    configs: DatabaseConfig[],
-  ): DatabaseConfig[] {
-    return configs.map((config) => {
-      if (config instanceof UrlConfig || config.envName !== currentEnv) return config;
-      return this.environmentUrlConfig(currentEnv, config.name, config.configuration) ?? config;
-    });
+  /**
+   * Mirrors: DatabaseConfigurations#environment_value_for — resolves the per-name
+   * env var (`NAME_DATABASE_URL`), falling back to `DATABASE_URL` for primary.
+   *
+   * @internal
+   */
+  private environmentValueFor(name: string): string | undefined {
+    const nameEnvKey = `${name.toUpperCase()}_DATABASE_URL`;
+    return getEnv(nameEnvKey) ?? (name === "primary" ? getEnv("DATABASE_URL") : undefined);
   }
 }
 
