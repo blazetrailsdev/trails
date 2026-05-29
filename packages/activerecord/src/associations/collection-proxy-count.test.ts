@@ -230,4 +230,44 @@ describe("CollectionProxy#count — non-through fast path", () => {
     expect(observed[0]).toMatch(/SELECT\s+COUNT\b/i);
     expect(observed[0]).not.toMatch(/SELECT\s+\*/i);
   });
+
+  it("_addToTarget dedups a re-fetched record by AR id under a distinct scope", async () => {
+    // Mirrors Ruby `@target.index(record)` inside replace_on_target: equality is
+    // ActiveRecord::Core#== (class + present primary key), not object identity.
+    // A re-fetched instance (same id, different object) must dedup in place
+    // rather than appending a duplicate to the loaded target.
+    Associations.hasMany.call(CpcAuthor, "cpcPostsDedup", {
+      className: "CpcPost",
+      foreignKey: "cpc_author_id",
+      scope: (rel: any) => rel.distinct(),
+    });
+    const author = await CpcAuthor.create({ name: "dedup" });
+    const post = await CpcPost.create({ cpc_author_id: author.id, title: "p1" });
+
+    const proxy = association(author, "cpcPostsDedup") as any;
+    await proxy.load();
+    expect(proxy.target.length).toBe(1);
+
+    const reloaded = await CpcPost.find(post.id);
+    expect(reloaded).not.toBe(post);
+    await proxy.push(reloaded);
+
+    // With JS `===` the re-fetched instance would not match and the target would
+    // grow to 2; AR-id equality keeps it at 1.
+    expect(proxy.target.length).toBe(1);
+  });
+
+  it("foreignKeyPresent on the proxy agrees with the OO association (owner PK present)", async () => {
+    // ForeignAssociation#foreign_key_present? — a new-record owner whose primary
+    // key is already assigned is fetchable; the proxy and the OO association must
+    // not disagree.
+    const newWithPk = CpcAuthor.new({ name: "withpk" });
+    (newWithPk as any)._writeAttribute("id", 999);
+    const newWithoutPk = CpcAuthor.new({ name: "nopk" });
+
+    const withPkProxy = association(newWithPk, "cpcPosts") as any;
+    const withoutPkProxy = association(newWithoutPk, "cpcPosts") as any;
+    expect(withPkProxy._foreignKeyPresent()).toBe(true);
+    expect(withoutPkProxy._foreignKeyPresent()).toBe(false);
+  });
 });

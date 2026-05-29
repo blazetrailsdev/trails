@@ -2,6 +2,9 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { underscore } from "@blazetrails/activesupport";
 import { Association } from "./association.js";
+import { foreignKeyPresentFor } from "./foreign-association.js";
+import { throughForeignKeyPresent } from "./through-association.js";
+import type { AssociationReflection } from "../reflection.js";
 import { RecordNotSaved, Rollback } from "../errors.js";
 
 /**
@@ -465,21 +468,19 @@ export class CollectionAssociation extends Association {
   }
 
   /**
-   * For collection associations, the "foreign key" that matters is the
-   * owner's primary key (since children reference it via their FK).
-   * A new record that already has a PK assigned can still load children.
+   * Whether the target can be fetched for a new-record owner. A has_many :through
+   * routes through a belongs_to (`ThroughAssociation#foreign_key_present?`,
+   * through_association.rb:90); a vanilla has_many requires the owner's
+   * `active_record_primary_key` to be present (`ForeignAssociation#foreign_key_present?`,
+   * foreign_association.rb:5). Mirrors the same dispatch in
+   * `CollectionProxy#_foreignKeyPresent` so the two never disagree.
    */
   protected override foreignKeyPresent(): boolean {
-    const ctor = this.owner.constructor as any;
-    const pk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
-    const keys = Array.isArray(pk) ? pk : [pk];
-    return keys.every((key: string) => {
-      const val =
-        typeof (this.owner as any)._readAttribute === "function"
-          ? (this.owner as any)._readAttribute(key)
-          : (this.owner as any)[key];
-      return val != null;
-    });
+    const reflection = this.reflection as unknown as AssociationReflection;
+    if (this.reflection.options.through) {
+      return throughForeignKeyPresent({ owner: this.owner, reflection });
+    }
+    return foreignKeyPresentFor(reflection, this.owner);
   }
 
   /**
