@@ -155,9 +155,9 @@ The per-PR sections that follow are the detail / rationale for each item.
   #2594.
 - **AF10 — small-fix bundle** (~115 LOC, to ceiling). has_one inverse build
   test (#2557, ~15) + `association.delete` nullify/delete-all else-branch test
-  (#2596, ~30) + delete dead free fns
-  `countRecords`/`deleteOrNullifyAllRecords`/`intersection` in
-  `has-many-association.ts` (#2596, ~10) +
+  (#2596, ~30) + delete dead free fns `countRecords`/`intersection` in
+  `has-many-association.ts` (#2596, ~10; NB: do **not** delete
+  `deleteOrNullifyAllRecords` — AF4 wires it as the #2631 dispatch override) +
   `InverseOfAssociationNotFoundError`/`HasManyThroughAssociationNotFoundError`
   DidYouMean-formatter alignment (#2594) + `InverseOfAssociationRecursiveError`
   class + recursion detection (#2591, ~50).
@@ -422,8 +422,11 @@ for fix`. The corrections plumbing shipped here; the blocker is a
       `dependent: :nullify`/`:delete_all` has_many to cover the currently
       unreachable delete/nullify else-branch of `HasManyAssociation#deleteRecords`.
 - [ ] ~10 LOC cleanup: pre-existing dead free functions `countRecords`,
-      `deleteOrNullifyAllRecords`, `intersection` in `has-many-association.ts`
-      (definition-only, no callers; lint doesn't flag them).
+      `intersection` in `has-many-association.ts` (definition-only, no callers;
+      lint doesn't flag them). NB: the third such free fn,
+      `deleteOrNullifyAllRecords`, is NOT dead-to-delete — AF4 (#2631) wires it
+      as the `protected override deleteOrNullifyAllRecords(method)` dispatch
+      point, so leave it.
 - Composite-PK non-through has_many uses a per-column `IN` over-approximation
   vs Rails' tuple `where(query_constraints => values)`; only matters if such a
   model is ported.

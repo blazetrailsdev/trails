@@ -19,7 +19,7 @@ in **Post-merge follow-ups** below. Only **ConnectionManagement middleware**
 | Adapter retry/reconnect lifecycle      | 18    | ✓ P1/P2/P3 (#2542/#2539/#2553) shipped; `allowRetry` adapter wiring deferred     |
 | Database config resolution             | 20    | ✓ P4/P5 (#2529/#2554) shipped; env-var + bare-name URI follow-ups closed (#2603) |
 | DatabaseSelector middleware            | 16    | ✓ P11 #2548 shipped (test infra delivered)                                       |
-| Query cache (per-context broadcast)    | 14    | ✓ P12 #2534 shipped; minor guard/alias follow-ups                                |
+| Query cache (per-context broadcast)    | 14    | ✓ P12 #2534 shipped; minor guard-move follow-up (PF2)                            |
 | Pool lifecycle (checkout/checkin/reap) | 12    | ✓ P6/P7 (#2535/#2561) shipped                                                    |
 | ConnectionManagement middleware        | 11    | **OPEN** — entire class missing (P10)                                            |
 | ConnectionHandler multi-DB             | 11    | ✓ P8 #2530 shipped; re-audit residual handler skips                              |
