@@ -187,56 +187,59 @@ describe("WhereChainTest", () => {
     expect(sql).not.toMatch(/IS NOT NULL/);
     expect(sql).toContain("ORDER BY");
   });
+  // Assert the FULL id set (not just .first()), so the distractor author — who
+  // owns a non-reading book and would also be "associated" if the enum scope
+  // weren't folded into the JOIN — causes a failure if scope folding regresses.
   it("associated with enum", async () => {
     const readerId = await seedReadingFixture();
-    const result = await WcAuthor.all()
+    const results = await WcAuthor.all()
       .joins("readingListing")
       .where()
       .associated("readingListing")
-      .first();
-    expect((result as any)?.id).toBe(readerId);
+      .toArray();
+    expect(results.map((a: any) => a.id)).toEqual([readerId]);
   });
   it("associated with enum ordered", async () => {
     const readerId = await seedReadingFixture();
-    const result = await WcAuthor.all()
+    const results = await WcAuthor.all()
       .order({ id: "desc" })
       .joins("readingListing")
       .where()
       .associated("readingListing")
-      .first();
-    expect((result as any)?.id).toBe(readerId);
+      .toArray();
+    expect(results.map((a: any) => a.id)).toEqual([readerId]);
   });
   it("associated with enum unscoped", async () => {
     const readerId = await seedReadingFixture();
-    const result = await WcAuthor.all()
+    const results = await WcAuthor.all()
       .unscope("where")
       .joins("readingListing")
       .where()
       .associated("readingListing")
-      .first();
-    expect((result as any)?.id).toBe(readerId);
+      .toArray();
+    expect(results.map((a: any) => a.id)).toEqual([readerId]);
   });
   it("associated with enum extended early", async () => {
     const readerId = await seedReadingFixture();
-    const result = await WcAuthor.all()
+    const results = await WcAuthor.all()
       .extending(NamedExtension)
       .order({ id: "desc" })
       .joins("readingListing")
       .where()
       .associated("readingListing")
-      .first();
-    expect((result as any)?.id).toBe(readerId);
+      .toArray();
+    expect(results.map((a: any) => a.id)).toEqual([readerId]);
   });
   it("associated with enum extended late", async () => {
     const readerId = await seedReadingFixture();
-    const result = await WcAuthor.all()
+    const results = await WcAuthor.all()
       .order({ id: "desc" })
       .joins("readingListing")
       .where()
       .associated("readingListing")
       .extending(NamedExtension)
-      .first();
-    expect((result as any)?.id).toBe(readerId);
+      .toArray();
+    expect(results.map((a: any) => a.id)).toEqual([readerId]);
   });
   it("associated with add joins before", async () => {
     class JbAuthor extends Base {
