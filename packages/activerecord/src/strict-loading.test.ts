@@ -3,7 +3,13 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, StrictLoadingViolationError, registerModel } from "./index.js";
+import { Notifications } from "@blazetrails/activesupport";
+import {
+  Base,
+  StrictLoadingViolationError,
+  registerModel,
+  setActionOnStrictLoadingViolation,
+} from "./index.js";
 import {
   Associations,
   association,
@@ -478,6 +484,14 @@ describe("StrictLoadingTest", () => {
       tooa_mentors: { name: "string" },
       ebts_books: { title: "string", ebts_publisher_id: "integer" },
       ebts_publishers: { name: "string" },
+      slog_authors: { name: "string" },
+      slog_books: { title: "string", author_id: "integer" },
+      clir_authors: { name: "string" },
+      clir_books: { title: "string", author_id: "integer" },
+      npo_hm_authors: { name: "string" },
+      npo_hm_books: { title: "string", author_id: "integer" },
+      npo_bt_authors: { name: "string" },
+      npo_bt_books: { title: "string", author_id: "integer" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -807,11 +821,38 @@ describe("StrictLoadingTest", () => {
     await expect(loadHasMany(author, "slrmBooks", {})).rejects.toThrow(StrictLoadingViolationError);
   });
 
-  it.skip("strict loading violation logs when mode is :log", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
-    /* needs actionOnStrictLoadingViolation = "log" support */
+  it("strict loading violation logs when mode is :log", async () => {
+    class SlogAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlogBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+      }
+    }
+    registerModel("SlogAuthor", SlogAuthor);
+    registerModel("SlogBook", SlogBook);
+    const slogOpts = { className: "SlogBook", foreignKey: "author_id" };
+    Associations.hasMany.call(SlogAuthor, "slog_books", slogOpts);
+    const author = await SlogAuthor.create({ name: "Test" });
+    author.strictLoadingBang();
+
+    setActionOnStrictLoadingViolation("log");
+    let events = 0;
+    const sub = Notifications.subscribe("strict_loading_violation.active_record", () => {
+      events++;
+    });
+    try {
+      // Under :log, a lazy load instruments the violation instead of raising.
+      await expect(loadHasMany(author, "slog_books", slogOpts)).resolves.toBeDefined();
+      expect(events).toBe(1);
+    } finally {
+      Notifications.unsubscribe(sub);
+      setActionOnStrictLoadingViolation("raise");
+    }
   });
   it.skip("strict loading logging mode can be set per model", () => {
     // BLOCKED: relation — StrictLoadingViolation not wired into association loading
@@ -1038,15 +1079,61 @@ describe("StrictLoadingTest", () => {
     author.strictLoadingBang();
     expect(author.isStrictLoading()).toBe(true);
   });
-  it.skip("strict loading n plus one only mode with has many", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("strict loading n plus one only mode with has many", async () => {
+    class NpoHmAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class NpoHmBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+      }
+    }
+    registerModel("NpoHmAuthor", NpoHmAuthor);
+    registerModel("NpoHmBook", NpoHmBook);
+    Associations.hasMany.call(NpoHmAuthor, "npo_hm_books", {
+      className: "NpoHmBook",
+      foreignKey: "author_id",
+    });
+    const author = await NpoHmAuthor.create({ name: "Test" });
+    author.strictLoadingBang(true, { mode: "n_plus_one_only" });
+    expect(author.isStrictLoading()).toBe(true);
+
+    // Does not raise when loading the first-level has_many association: the
+    // N+1-only mode only guards against cascading lookups, not the root load.
+    await expect(
+      loadHasMany(author, "npo_hm_books", { className: "NpoHmBook", foreignKey: "author_id" }),
+    ).resolves.toBeDefined();
   });
-  it.skip("strict loading n plus one only mode with belongs to", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("strict loading n plus one only mode with belongs to", async () => {
+    class NpoBtBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+      }
+    }
+    class NpoBtAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("NpoBtAuthor", NpoBtAuthor);
+    registerModel("NpoBtBook", NpoBtBook);
+    Associations.belongsTo.call(NpoBtBook, "npo_bt_author", {
+      className: "NpoBtAuthor",
+      foreignKey: "author_id",
+    });
+    const author = await NpoBtAuthor.create({ name: "Test" });
+    const book = await NpoBtBook.create({ title: "B", author_id: author.id });
+    book.strictLoadingBang(true, { mode: "n_plus_one_only" });
+    expect(book.isStrictLoading()).toBe(true);
+
+    // First-level belongs_to load is allowed under n_plus_one_only.
+    await expect(
+      loadBelongsTo(book, "npo_bt_author", { className: "NpoBtAuthor", foreignKey: "author_id" }),
+    ).resolves.toBeDefined();
   });
   it("default mode can be changed globally", async () => {
     class GmAuthor extends Base {
@@ -1577,10 +1664,37 @@ describe("StrictLoadingTest", () => {
     // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
     // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
   });
-  it.skip("strict loading violation can log instead of raise", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("strict loading violation can log instead of raise", async () => {
+    class ClirAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class ClirBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+      }
+    }
+    registerModel("ClirAuthor", ClirAuthor);
+    registerModel("ClirBook", ClirBook);
+    const clirOpts = { className: "ClirBook", foreignKey: "author_id" };
+    Associations.hasMany.call(ClirAuthor, "clir_books", clirOpts);
+    const author = await ClirAuthor.create({ name: "Test" });
+    author.strictLoadingBang();
+
+    setActionOnStrictLoadingViolation("log");
+    let logged = false;
+    const sub = Notifications.subscribe("strict_loading_violation.active_record", () => {
+      logged = true;
+    });
+    try {
+      await loadHasMany(author, "clir_books", clirOpts);
+      expect(logged).toBe(true);
+    } finally {
+      Notifications.unsubscribe(sub);
+      setActionOnStrictLoadingViolation("raise");
+    }
   });
   it.skip("strict loading violation logs on polymorphic relation", () => {
     // BLOCKED: relation — StrictLoadingViolation not wired into association loading

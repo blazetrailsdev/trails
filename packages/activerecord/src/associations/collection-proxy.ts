@@ -24,12 +24,8 @@ import { Table as ArelTable } from "@blazetrails/arel";
 import type { Nodes } from "@blazetrails/arel";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { filterScopeForCreate } from "./association.js";
-import {
-  StrictLoadingViolationError,
-  RecordNotSaved,
-  ConfigurationError,
-  AssociationTypeMismatch,
-} from "../errors.js";
+import { RecordNotSaved, ConfigurationError, AssociationTypeMismatch } from "../errors.js";
+import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
 import {
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
@@ -574,7 +570,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private _checkStrictLoading(): void {
     if (_violatesStrictLoading(this._record, this._assocDef.options)) {
-      throw StrictLoadingViolationError.forAssociation(this._record, this._assocName);
+      strictLoadingViolationBang(this._record, this._assocName);
     }
   }
 

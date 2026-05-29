@@ -5,7 +5,8 @@
  */
 
 import { getApplicationRecordClass } from "./inheritance.js";
-import { RecordNotFound } from "./errors.js";
+import { RecordNotFound, StrictLoadingViolationError } from "./errors.js";
+import { actionOnStrictLoadingViolation } from "./ar-config.js";
 import { WRITING_ROLE } from "./roles.js";
 import { Notifications, IsolatedExecutionState, ParameterFilter } from "@blazetrails/activesupport";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
@@ -426,17 +427,25 @@ export function asynchronousQueriesSession(): any {
   return asynchronousQueriesTracker().currentSession;
 }
 
-export function strictLoadingViolationBang(
-  this: CoreHost,
-  owner: string,
-  association: string,
-): never {
-  const message = `${owner} is marked for strict_loading. The ${association} association cannot be lazily loaded.`;
-  Notifications.instrument("strict_loading_violation.active_record", {
-    owner,
-    reflection: association,
-  });
-  throw new Error(message);
+/**
+ * Dispatch a detected strict-loading violation. Under the default
+ * `action_on_strict_loading_violation = "raise"` this throws
+ * `StrictLoadingViolationError`; under `"log"` it instruments
+ * `strict_loading_violation.active_record` and returns so the caller can
+ * continue the (now warned-about) lazy load. `owner` is the violating
+ * record (or its class); `reflection` is the association name.
+ *
+ * Mirrors: ActiveRecord::Core.strict_loading_violation!
+ */
+export function strictLoadingViolationBang(owner: any, reflection: string): void {
+  if (actionOnStrictLoadingViolation === "log") {
+    Notifications.instrument("strict_loading_violation.active_record", {
+      owner: typeof owner === "function" ? owner : owner?.constructor,
+      reflection,
+    });
+    return;
+  }
+  throw StrictLoadingViolationError.forAssociation(owner, reflection);
 }
 
 export function initializeFindByCache(this: CoreHost): void {

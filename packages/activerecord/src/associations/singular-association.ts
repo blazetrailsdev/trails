@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { Association } from "./association.js";
-import { StrictLoadingViolationError } from "../errors.js";
+import { strictLoadingViolationBang } from "../core.js";
 
 /**
  * Base class for has_one and belongs_to associations.
@@ -99,7 +99,7 @@ export class SingularAssociation extends Association {
     // loading; otherwise return the current `target` (null by default)
     // to preserve the legacy silent-null behavior for opt-out users.
     if (this.findTargetNeeded() && this._isStrictOnOwner()) {
-      throw StrictLoadingViolationError.forAssociation(this.owner, this.reflection.name);
+      strictLoadingViolationBang(this.owner, this.reflection.name);
     }
     return this.target;
   }

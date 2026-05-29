@@ -131,6 +131,8 @@ export {
   setProtocolAdapters,
   disablePreparedStatements,
   setDisablePreparedStatements,
+  actionOnStrictLoadingViolation,
+  setActionOnStrictLoadingViolation,
 } from "./ar-config.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export {

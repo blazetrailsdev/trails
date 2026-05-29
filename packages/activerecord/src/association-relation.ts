@@ -2,7 +2,7 @@ import type { Base } from "./base.js";
 import { Relation } from "./relation.js";
 import type { CollectionProxy } from "./associations/collection-proxy.js";
 import { _setAssociationRelationCtor } from "./associations/collection-proxy.js";
-import { StrictLoadingViolationError } from "./errors.js";
+import { strictLoadingViolationBang } from "./core.js";
 
 /**
  * A Relation produced by a collection association (e.g. `blog.posts`,
@@ -144,10 +144,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     if (owner._validationContext != null) return;
     if (this._association.reflection.options.strictLoading === false) return;
     if (owner._strictLoading && !owner.isStrictLoadingNPlusOneOnly?.()) {
-      throw StrictLoadingViolationError.forAssociation(
-        this._association.owner,
-        this._association.associationName,
-      );
+      strictLoadingViolationBang(this._association.owner, this._association.associationName);
     }
   }
 
