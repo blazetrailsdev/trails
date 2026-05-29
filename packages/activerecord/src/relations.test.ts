@@ -3023,7 +3023,7 @@ describe("RelationTest", () => {
 
     const user = await User.create({ name: "Alice" });
     // Update via raw SQL to simulate another process changing the data
-    await (Base.adapter as any).executeMutation(
+    await (Base.connection as any).executeMutation(
       `UPDATE "users" SET "name" = 'Updated' WHERE "id" = ${user.id}`,
     );
 

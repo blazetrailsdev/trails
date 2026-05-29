@@ -1415,7 +1415,7 @@ describe("HasAndBelongsToManyAssociations", () => {
       developers: { name: "string" },
       projects: { name: "string" },
     });
-    await Base.adapter.executeMutation(
+    await Base.connection.executeMutation(
       `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
     );
   });
@@ -1426,10 +1426,10 @@ describe("HasAndBelongsToManyAssociations", () => {
     const p1 = await Project.create({ name: "Rails" });
     const p2 = await Project.create({ name: "Basecamp" });
 
-    await Base.adapter.executeMutation(
+    await Base.connection.executeMutation(
       `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p1.id})`,
     );
-    await Base.adapter.executeMutation(
+    await Base.connection.executeMutation(
       `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p2.id})`,
     );
 
@@ -2178,7 +2178,7 @@ describe("AssociationsTest", () => {
     expect(isMarkedForDestruction(comment)).toBe(true);
   });
   it("loading the association target should load most recent attributes for child records marked for destruction", async () => {
-    const f = createFixtures(Base.adapter);
+    const f = createFixtures(Base.connection);
     const ship = await f.Ship.create({ name: "The good ship Dollypop" });
     const proxy = association(ship, "parts");
     const part = await proxy.create({ name: "Mast" });
@@ -4676,7 +4676,7 @@ describe("HABTM (Rails-guided)", () => {
       developers: { name: "string" },
       projects: { name: "string" },
     });
-    await Base.adapter.executeMutation(
+    await Base.connection.executeMutation(
       `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
     );
   });
@@ -4687,10 +4687,10 @@ describe("HABTM (Rails-guided)", () => {
     const p1 = await HABTMProject.create({ name: "Rails" });
     const p2 = await HABTMProject.create({ name: "Basecamp" });
 
-    await Base.adapter.executeMutation(
+    await Base.connection.executeMutation(
       `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p1.id})`,
     );
-    await Base.adapter.executeMutation(
+    await Base.connection.executeMutation(
       `INSERT INTO "developers_projects" ("developer_id", "project_id") VALUES (${dev.id}, ${p2.id})`,
     );
 

@@ -230,7 +230,7 @@ describe("ExplainTest", () => {
     // Booleans go through the adapter's typeCast: SQLite collapses
     // them to 1/0, PG/MySQL keep them as true/false. So the rendered
     // form differs by backend; assert both halves independently.
-    const rendered = rel._renderExplainBinds(Base.adapter, [
+    const rendered = rel._renderExplainBinds(Base.connection, [
       BigInt(42),
       "str",
       7,
@@ -275,7 +275,7 @@ describe("ExplainTest", () => {
     };
     const buf = Buffer.from("hello world"); // 11 bytes
     const u8 = new Uint8Array([1, 2, 3, 4, 5]); // 5 bytes
-    const rendered = rel._renderExplainBinds(Base.adapter, [buf, u8]);
+    const rendered = rel._renderExplainBinds(Base.connection, [buf, u8]);
     expect(rendered).toBe('["<11 bytes of binary data>", "<5 bytes of binary data>"]');
   });
 

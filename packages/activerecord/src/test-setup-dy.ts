@@ -17,7 +17,7 @@ import { Base } from "./base.js";
 
 await bootstrapTestHandler();
 await defineSchema(TEST_SCHEMA);
-setCanonicalSchemaPreload(Base.adapter);
+setCanonicalSchemaPreload(Base.connection);
 
 // Remove the connection pool from the handler so old-path workers don't
 // inherit an active pool.  isConnectedQ() returns false after this, so

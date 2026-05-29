@@ -49,7 +49,7 @@ describe("handler-resolved adapter (Phase D-0)", () => {
   });
 
   afterAll(async () => {
-    const adapter = Base.adapter;
+    const adapter = Base.connection;
     await dropAllTables(adapter);
     clearAppliedSchemaSignatures(adapter);
   });
