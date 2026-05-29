@@ -116,6 +116,32 @@ describe("CollectionProxy#count — non-through fast path", () => {
     expect(observed.length).toBe(0);
   });
 
+  it("size() returns the cached @association_ids length without querying", async () => {
+    // Mirrors CollectionAssociation#size's `@association_ids` branch: once a
+    // prior ids reader (`record.<assoc>Ids` → idsReader) has cached the ids on
+    // the owner's association instance, size() returns their count, no SQL.
+    const author = await CpcAuthor.create({ name: "ids" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "p1" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "p2" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "p3" });
+
+    // Populate the cache via the real ids reader.
+    const ids = await (author as any).association("cpcPosts").idsReader();
+    expect(ids.length).toBe(3);
+
+    const observed: string[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (event: any) => {
+      if (event?.payload?.name === "SCHEMA") return;
+      if (typeof event?.payload?.sql === "string") observed.push(event.payload.sql);
+    });
+    try {
+      expect(await association(author, "cpcPosts").size()).toBe(3);
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(observed.length).toBe(0);
+  });
+
   it("size() with a GROUP BY loads the target and counts the group rows", async () => {
     // Mirrors a grouped association scope (Rails' `clients_grouped_by_name`,
     // defined `-> { group("name").select("name") }`): size() takes the
