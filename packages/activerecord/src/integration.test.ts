@@ -48,7 +48,7 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Client.adapter, { clients: { name: "string" } });
+    await defineSchema(Client.connection, { clients: { name: "string" } });
     const record = await Client.create({ name: "Alice" });
     expect(typeof record.toParam()).toBe("string");
   });
@@ -83,7 +83,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "text" } });
+    await defineSchema(Firm.connection, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "Flamboyant Software" });
     expect(firm.toParam()).toBe(`${firm.id}-flamboyant-software`);
   });
@@ -96,7 +96,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "text" } });
+    await defineSchema(Firm.connection, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "Flamboyant Software, Inc." });
     expect(firm.toParam()).toBe(`${firm.id}-flamboyant-software`);
   });
@@ -109,7 +109,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "text" } });
+    await defineSchema(Firm.connection, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "Huey, Dewey, & Louie LLC" });
     expect(firm.toParam()).toBe(`${firm.id}-huey-dewey-louie-llc`);
   });
@@ -122,7 +122,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "text" } });
+    await defineSchema(Firm.connection, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "Door-to-Door Wash-n-Fold Service" });
     expect(firm.toParam()).toBe(`${firm.id}-door-to-door-wash-n`);
   });
@@ -135,7 +135,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "text" } });
+    await defineSchema(Firm.connection, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "a ".repeat(100) });
     expect(firm.toParam()).toBe(`${firm.id}-a-a-a-a-a-a-a-a-a-a`);
   });
@@ -148,7 +148,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "text" } });
+    await defineSchema(Firm.connection, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "David HeinemeierHansson" });
     expect(firm.toParam()).toBe(`${firm.id}-david`);
   });
@@ -161,7 +161,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "text" } });
+    await defineSchema(Firm.connection, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "David Heinemeier Hansson" });
     expect(firm.toParam()).toBe(`${firm.id}-david-heinemeier`);
   });
@@ -174,7 +174,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "text" } });
+    await defineSchema(Firm.connection, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "ab \n".repeat(100) });
     expect(firm.toParam()).toBe(`${firm.id}-ab-ab-ab-ab-ab-ab-ab`);
   });
@@ -187,7 +187,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "text" } });
+    await defineSchema(Firm.connection, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "戦場ヶ原 ひたぎ" });
     expect(firm.toParam()).toBe(`${firm.id}`);
   });
@@ -200,7 +200,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "text" } });
+    await defineSchema(Firm.connection, { firms: { name: "text" } });
     const firm = await Firm.create({});
     expect(firm.toParam()).toBe(`${firm.id}`);
     firm.writeAttribute("name", " ");
@@ -299,7 +299,9 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, { developers: { name: "string", updated_at: "string" } });
+    await defineSchema(Developer.connection, {
+      developers: { name: "string", updated_at: "string" },
+    });
     const t = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_at", t);
@@ -316,7 +318,9 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, { developers: { name: "string", updated_at: "string" } });
+    await defineSchema(Developer.connection, {
+      developers: { name: "string", updated_at: "string" },
+    });
     const updatedAt = instant("2024-01-15T10:46:00.123Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_at", updatedAt);
@@ -332,7 +336,7 @@ describe("IntegrationTest", () => {
         this.cacheTimestampFormat = "number";
       }
     }
-    await defineSchema(CachedDeveloper.adapter, {
+    await defineSchema(CachedDeveloper.connection, {
       cached_developers: { name: "string", updated_at: "string" },
     });
     const updatedAt = instant("2024-01-15T10:46:00Z");
@@ -349,7 +353,9 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, { developers: { name: "string", updated_at: "string" } });
+    await defineSchema(Developer.connection, {
+      developers: { name: "string", updated_at: "string" },
+    });
     const t1 = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_at", t1);
@@ -367,7 +373,7 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, {
+    await defineSchema(Developer.connection, {
       developers: { name: "string", updated_at: "string", updated_on: "string" },
     });
     const dev = await Developer.create({ name: "Dev" });
@@ -384,7 +390,9 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, { developers: { name: "string", updated_on: "string" } });
+    await defineSchema(Developer.connection, {
+      developers: { name: "string", updated_on: "string" },
+    });
     const updatedOn = instant("2024-03-20T08:00:00.456Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_on", updatedOn);
@@ -400,7 +408,7 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, {
+    await defineSchema(Developer.connection, {
       developers: { name: "string", updated_at: "string", updated_on: "string" },
     });
     const t1 = instant("2024-01-15T10:00:00.000Z");
@@ -420,7 +428,7 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, {
+    await defineSchema(Developer.connection, {
       developers: { name: "string", updated_at: "string", updated_on: "string" },
     });
     const t1 = instant("2024-01-15T10:00:00.000Z");
@@ -439,7 +447,9 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, { developers: { name: "string", updated_at: "string" } });
+    await defineSchema(Developer.connection, {
+      developers: { name: "string", updated_at: "string" },
+    });
     const t1 = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_at", t1);
@@ -459,7 +469,9 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, { developers: { name: "string", updated_at: "string" } });
+    await defineSchema(Developer.connection, {
+      developers: { name: "string", updated_at: "string" },
+    });
     const t = instant("2024-01-15T10:00:00.123Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_at", t);
@@ -474,7 +486,9 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, { developers: { name: "string", updated_at: "string" } });
+    await defineSchema(Developer.connection, {
+      developers: { name: "string", updated_at: "string" },
+    });
     const t1 = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     withCacheVersioning(Developer, () => {
@@ -496,7 +510,9 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, { developers: { name: "string", updated_at: "string" } });
+    await defineSchema(Developer.connection, {
+      developers: { name: "string", updated_at: "string" },
+    });
     const t = instant("2024-01-15T10:00:00.123Z");
     const dev = await Developer.create({ name: "Dev" });
     withCacheVersioning(Developer, () => {
@@ -513,7 +529,9 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, { developers: { name: "string", updated_at: "string" } });
+    await defineSchema(Developer.connection, {
+      developers: { name: "string", updated_at: "string" },
+    });
     const t1 = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     withCacheVersioning(Developer, () => {
@@ -535,7 +553,9 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, { developers: { name: "string", updated_at: "string" } });
+    await defineSchema(Developer.connection, {
+      developers: { name: "string", updated_at: "string" },
+    });
     const t1 = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     withCacheVersioning(Developer, () => {
@@ -557,7 +577,9 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    await defineSchema(Developer.adapter, { developers: { name: "string", updated_at: "string" } });
+    await defineSchema(Developer.connection, {
+      developers: { name: "string", updated_at: "string" },
+    });
     const t1 = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     withCacheVersioning(Developer, () => {

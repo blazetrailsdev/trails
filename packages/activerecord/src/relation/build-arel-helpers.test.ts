@@ -81,7 +81,7 @@ describe("Relation private build-arel helpers", () => {
     });
 
     it("matches the adapter-quoted table name", () => {
-      const quoted = (Post.adapter as any).quoteTableName("posts");
+      const quoted = (Post.connection as any).quoteTableName("posts");
       expect(relation().isTableNameMatches(quoted)).toBe(true);
     });
 

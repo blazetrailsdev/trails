@@ -593,7 +593,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     });
     const author = new BlankPkAuthor({ name: "Eve" });
     expect(author.author_code).toBeNull();
-    const executeSpy = vi.spyOn(Base.adapter, "execute");
+    const executeSpy = vi.spyOn(Base.connection, "execute");
     const posts = await loadHasMany(author, "blank_pk_posts", {
       className: "BlankPkPost",
       foreignKey: "author_code",

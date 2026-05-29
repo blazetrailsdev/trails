@@ -125,7 +125,7 @@ async function main(): Promise<void> {
   }
 
   await Base.establishConnection(url);
-  const adapter = Base.adapter;
+  const adapter = Base.connection;
 
   const allTables = await introspectTables(adapter);
   const ignoreSet = new Set([...BUILTIN_IGNORE, ...args.ignore]);

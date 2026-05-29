@@ -139,7 +139,7 @@ describe("RelationTest", () => {
 
     it("where with raw SQL string", async () => {
       const sql = Post.where("views > ?", 50).toSql();
-      const a = Post.adapter as unknown as {
+      const a = Post.connection as unknown as {
         castBoundValue(v: unknown): unknown;
         quote(v: unknown): string;
       };
@@ -1360,7 +1360,7 @@ describe("RelationTest", () => {
 
   it("finding with subquery", () => {
     const sql = Item.where("price > ?", 1).toSql();
-    const a = Item.adapter as unknown as {
+    const a = Item.connection as unknown as {
       castBoundValue(v: unknown): unknown;
       quote(v: unknown): string;
     };
@@ -1692,7 +1692,7 @@ describe("RelationTest", () => {
 
   it("finding with subquery with binds", () => {
     const sql = Item.where("price > ? AND price < ?", 0, 5).toSql();
-    const a = Item.adapter as unknown as {
+    const a = Item.connection as unknown as {
       castBoundValue(v: unknown): unknown;
       quote(v: unknown): string;
     };
@@ -3026,7 +3026,7 @@ describe("RelationTest", () => {
 
     const user = await User.create({ name: "Alice" });
     // Update via raw SQL to simulate another process changing the data
-    await (Base.adapter as any).executeMutation(
+    await (Base.connection as any).executeMutation(
       `UPDATE "users" SET "name" = 'Updated' WHERE "id" = ${user.id}`,
     );
 

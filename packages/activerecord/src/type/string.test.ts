@@ -35,7 +35,7 @@ const { authors } = useFixtures(
       },
     ],
   },
-  () => Base.adapter,
+  () => Base.connection,
 );
 
 describe("StringTypeTest", () => {

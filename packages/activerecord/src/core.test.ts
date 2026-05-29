@@ -517,7 +517,7 @@ describe("Base features (Rails-guided) - core", () => {
         this.attribute("name", "string");
       }
     }
-    expect(() => NoAdapter.adapter).toThrow("No connection pool for");
+    expect(() => NoAdapter.connection).toThrow("No connection pool for");
   });
 
   it("arelTable returns Table with correct name", () => {
@@ -875,7 +875,7 @@ describe("Base (extended)", () => {
       // D-Y-INCOMPATIBLE: bootstrapTestHandler() installs Base.connectionHandler at
       // worker startup so subclasses now inherit a pool and never throw.
       class Orphan extends Base {}
-      expect(() => Orphan.adapter).toThrow("No connection pool for");
+      expect(() => Orphan.connection).toThrow("No connection pool for");
     });
   });
 });

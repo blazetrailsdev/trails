@@ -953,7 +953,7 @@ describe("TimestampTest — t.timestamps() end-to-end", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    const ctx = new MigrationContext(Base.adapter);
+    const ctx = new MigrationContext(Base.connection);
     await ctx.createTable("timed_authors", {}, (t) => {
       t.string("name");
       t.timestamps();
@@ -983,7 +983,7 @@ describe("TimestampTest — t.timestamps() end-to-end", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    const ctx = new MigrationContext(Base.adapter);
+    const ctx = new MigrationContext(Base.connection);
     await ctx.createTable("nullable_timed_authors", {}, (t) => {
       t.string("name");
       t.timestamps({ null: true });

@@ -184,7 +184,7 @@ describe("SanitizeTest", () => {
         this.attribute("title", "string");
       }
     }
-    const a = Post.adapter;
+    const a = Post.connection;
     expect(Post.sanitizeSqlArray("name=?", "Bambi")).toBe(`name=${a.quote("Bambi")}`);
     expect(Post.sanitizeSqlArray("name=?", "Bambi\nand\nThumper")).toBe(
       `name=${a.quote("Bambi\nand\nThumper")}`,
@@ -226,7 +226,7 @@ describe("SanitizeTest", () => {
       }
     }
     const sql = Post.sanitizeSqlArray("title = ? AND id = ?", "hello", 1);
-    const a = Post.adapter as unknown as {
+    const a = Post.connection as unknown as {
       castBoundValue(v: unknown): unknown;
       quote(v: unknown): string;
     };
@@ -266,7 +266,7 @@ describe("sanitizeSql", () => {
     class User extends Base {
       static _tableName = "users";
     }
-    const a = User.adapter;
+    const a = User.connection;
     expect(User.sanitizeSqlArray("name = ?", "O'Brien")).toBe(`name = ${a.quote("O'Brien")}`);
   });
 
@@ -282,7 +282,7 @@ describe("sanitizeSql", () => {
     class User extends Base {
       static _tableName = "users";
     }
-    const a = User.adapter as unknown as {
+    const a = User.connection as unknown as {
       castBoundValue(v: unknown): unknown;
       quote(v: unknown): string;
     };
@@ -380,7 +380,7 @@ describe("sanitizeSql", () => {
       class Post extends Base {
         static _tableName = "posts";
       }
-      const qs = (v: unknown) => Post.adapter.quoteString(String(v));
+      const qs = (v: unknown) => Post.connection.quoteString(String(v));
       const result = Post.sanitizeSqlArray("name='%s' and group_id='%s'", "foo'bar", 4);
       expect(result).toBe(`name='${qs("foo'bar")}' and group_id='${qs(4)}'`);
     });
@@ -416,7 +416,7 @@ describe("sanitizeSql", () => {
       class Post extends Base {
         static _tableName = "posts";
       }
-      const a = Post.adapter as unknown as {
+      const a = Post.connection as unknown as {
         castBoundValue(v: unknown): unknown;
         quote(v: unknown): string;
       };
@@ -453,7 +453,7 @@ describe("sanitizeSql", () => {
         static _tableName = "posts";
       }
       const result = Post.sanitizeSqlArray("title = :title", { title: "It's a title" });
-      expect(result).toBe(`title = ${Post.adapter.quote("It's a title")}`);
+      expect(result).toBe(`title = ${Post.connection.quote("It's a title")}`);
     });
 
     it("handles PostgreSQL type casts in named bind variable patterns", () => {
@@ -535,7 +535,7 @@ describe("sanitizeSql", () => {
         static _tableName = "posts";
       }
       const sql = Post.sanitizeSqlArray("active = ?", true);
-      const a = Post.adapter as unknown as {
+      const a = Post.connection as unknown as {
         castBoundValue(v: unknown): unknown;
         quote(v: unknown): string;
       };

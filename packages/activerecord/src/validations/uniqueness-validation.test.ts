@@ -1484,7 +1484,7 @@ describe("UniquenessValidationTest", () => {
   // [object Promise]". Stubbed here so the contract is exercised without
   // requiring a live PG connection.
   it("awaits async adapter.caseInsensitiveComparison without leaking a Promise into where()", async () => {
-    const adp = Base.adapter as any;
+    const adp = Base.connection as any;
     const hadOwn = Object.prototype.hasOwnProperty.call(adp, "caseInsensitiveComparison");
     const orig = adp.caseInsensitiveComparison;
     let wasAwaited = false;

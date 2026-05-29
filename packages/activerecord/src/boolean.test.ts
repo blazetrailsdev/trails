@@ -28,7 +28,7 @@ const { topics } = useFixtures(
       },
     ],
   },
-  () => Base.adapter,
+  () => Base.connection,
 );
 
 describe("BooleanTest", () => {
