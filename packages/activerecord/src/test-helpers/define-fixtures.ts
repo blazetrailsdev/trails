@@ -5,9 +5,14 @@ import {
 import type { DatabaseAdapter } from "../adapter.js";
 import { Base } from "../base.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
+import { currentTimeFromProperTimezone } from "../timestamp.js";
 import { singularize } from "@blazetrails/activesupport";
 
 const FIXTURE_MAX_ID = 2 ** 30 - 1;
+
+// Standard Rails timestamp columns, auto-filled at fixture insert when present and
+// unset (see fill_timestamps below). Mirrors ActiveRecord::Timestamp's create+update sets.
+const TIMESTAMP_COLUMN_NAMES = ["created_at", "created_on", "updated_at", "updated_on"];
 
 // CRC32 lookup table (polynomial 0xedb88320). For ASCII labels this produces values
 // identical to Ruby's Zlib.crc32(label) % MAX_ID, matching Rails' FixtureSet.identify.
@@ -220,6 +225,10 @@ type InsertHost = DatabaseStatementsHost &
  *   when a polymorphic `belongsTo :taggable` reflection exists on the model.
  * - Each call registers `ModelClass` by `tableName` in an internal registry, available via
  *   `resolveModelForTable` for use by HABTM detection and future Phase 2 tooling.
+ * - Timestamps: when the model records timestamps, any existing
+ *   `created_at`/`created_on`/`updated_at`/`updated_on` column the row omits is filled with the
+ *   current time, mirroring Rails' `FixtureSet::TableRow#fill_timestamps` (lets NOT NULL
+ *   timestamp tables seed without each fixture row spelling the columns out).
  */
 export async function defineFixtures<T extends BaseClass, K extends string>(
   adapter: DatabaseAdapter,
@@ -367,18 +376,37 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     rows.push(row);
   }
 
-  // Filter generated (virtual) columns from fixture rows — PG rejects INSERT on those columns.
-  // Mirrors Rails: build_fixture_sql rejects schema_cache.columns_hash entries where column.virtual?
+  // Inspect the live table columns once for two adjustments below.
   // Avoid supportsVirtualColumns() — it requires databaseVersion to be pre-initialized.
   // isVirtual() returns false for non-virtual adapters, so calling columns() is always safe.
   if (typeof (adapter as any).columns === "function") {
     const cols: { name: string; isVirtual(): boolean }[] = await (adapter as any).columns(
       tableName,
     );
+
+    // Filter generated (virtual) columns — PG rejects INSERT on those columns.
+    // Mirrors Rails: build_fixture_sql rejects schema_cache.columns_hash entries where column.virtual?
     const virtualNames = new Set(cols.filter((c) => c.isVirtual()).map((c) => c.name));
     if (virtualNames.size > 0) {
       for (const row of rows) {
         for (const name of virtualNames) delete row[name];
+      }
+    }
+
+    // Auto-stamp timestamp columns the fixture didn't set. Mirrors Rails'
+    // FixtureSet::TableRow#fill_timestamps: when the model records timestamps,
+    // fill every existing created_at/created_on/updated_at/updated_on column that
+    // the row omits with the current time. NOT NULL timestamp tables (people, cars,
+    // toys, …) can't seed without this. A Temporal.Instant is used so the adapter's
+    // quoting renders an engine-safe datetime literal (no tz offset on MySQL).
+    if ((ModelClass as { recordTimestamps?: boolean }).recordTimestamps !== false) {
+      const colNames = new Set(cols.map((c) => c.name));
+      const stampCols = TIMESTAMP_COLUMN_NAMES.filter((c) => colNames.has(c));
+      if (stampCols.length > 0) {
+        const now = currentTimeFromProperTimezone();
+        for (const row of rows) {
+          for (const c of stampCols) if (!(c in row)) row[c] = now;
+        }
       }
     }
   }
