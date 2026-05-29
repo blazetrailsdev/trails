@@ -424,14 +424,11 @@ function throughScopeAttributes(assoc: HasManyThroughAssociation): Record<string
   // Rails: `scope = through_scope || self.scope` (hmt:72). The `_throughScope`
   // ivar is set during `buildRecord` (hmt:93) and cleared after; consult it
   // first so a record built within that window picks up the scope captured at
-  // build time. Rails falls back to `self.scope` (the HMT relation), but
-  // trails' HMT `scope()` is NOT join-aware (see the note at the top of this
-  // class) — its WHERE clause references target-table FK columns that do not
-  // exist on the through table, so `whereValuesHash(throughTable)` on it would
-  // emit `no such column` in the delete path. The through association's own
-  // scope is the correct trails analog for extracting through-table
-  // conditions, so fall back to it.
-  const scope: any = throughScope(assoc) ?? throughAssoc.scope?.();
+  // build time, otherwise fall back to `self.scope` (the HMT relation).
+  // `whereValuesHash(throughTable)` below filters the equality predicates to
+  // the through model's table, so target-table predicates carried by either
+  // relation are dropped rather than leaking into the join row / delete query.
+  const scope: any = throughScope(assoc) ?? (assoc as any).scope?.();
   if (!scope || typeof scope.whereValuesHash !== "function") return {};
   const throughTable = (throughAssoc.klass as any)?.tableName ?? "";
   const attrs = scope.whereValuesHash(throughTable) as Record<string, unknown>;
