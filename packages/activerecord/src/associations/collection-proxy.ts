@@ -53,6 +53,7 @@ import {
 } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 import { buildThroughInverseFor } from "./has-many-through-association.js";
+import { throughForeignKeyPresent } from "./through-association.js";
 
 // Declaration merging with `class CollectionProxy extends Relation`
 // propagates Relation's method types into this interface. `load()`
@@ -1065,15 +1066,69 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#size
    */
   async size(): Promise<number> {
-    if (this._targetLoaded) return this._target.length;
-    // Rails CollectionAssociation#size: when the target holds unsaved records
-    // (e.g. just `build`-ed) but isn't loaded, count them in addition to the
-    // persisted COUNT(*) rather than ignoring them (collection_association.rb:209).
-    if (this._target.length > 0) {
+    // Mirrors CollectionAssociation#size (collection_association.rb) branch
+    // ordering exactly.
+    //
+    // `!find_target? || loaded?` → return the in-memory target size. A loaded
+    // target is authoritative; an unloaded one is only authoritative when the
+    // target can't be fetched (new-record owner without a foreign key).
+    if (this._targetLoaded || !this._findTarget()) {
+      return this._target.length;
+    }
+    // `@association_ids` cached by a prior ids_reader → its length, no query.
+    const cachedIds = this._cachedAssociationIds();
+    if (cachedIds) {
+      return cachedIds.length;
+    }
+    // GROUP BY present → a grouped COUNT(*) returns per-group rows rather than
+    // a scalar, so Rails loads the full target and counts it in memory.
+    if (this.groupValues.length > 0) {
+      return (await this.loadTarget()).length;
+    }
+    // No DISTINCT and unsaved records buffered → add them to the persisted
+    // COUNT(*) rather than ignoring them.
+    if (!this.distinctValue && this._target.length > 0) {
       const unsaved = this._target.filter((r) => r.isNewRecord()).length;
       return unsaved + (await this.count());
     }
     return this.count();
+  }
+
+  /**
+   * Mirrors Association#find_target? — whether the target can be fetched.
+   * False when loaded (the caller short-circuits on `_targetLoaded`) or when
+   * the owner is a new record lacking the foreign key needed to query.
+   * @internal
+   */
+  private _findTarget(): boolean {
+    if (this._targetLoaded) return false;
+    return !this._record.isNewRecord() || this._foreignKeyPresent();
+  }
+
+  /**
+   * Mirrors Association#foreign_key_present? — false for vanilla has_many; a
+   * has_many :through whose through reflection is a belongs_to can load even a
+   * new-record owner once the through FK is set (through_association.rb:90).
+   * @internal
+   */
+  private _foreignKeyPresent(): boolean {
+    if (!this._assocDef.options.through) return false;
+    const ctor = this._record.constructor as typeof Base;
+    const reflection = (ctor as any)._reflectOnAssociation?.(this._assocName);
+    if (!reflection) return false;
+    return throughForeignKeyPresent({ owner: this._record, reflection });
+  }
+
+  /**
+   * Mirrors the `@association_ids` ivar read in CollectionAssociation#size —
+   * the ids cache lives on the owner's association instance (populated by a
+   * prior `collectionIds` reader), not on the proxy. Returns null when unset.
+   * @internal
+   */
+  private _cachedAssociationIds(): unknown[] | null {
+    const assocInstance = (this._record as any)._associationInstances?.get(this._assocName);
+    const ids = assocInstance?._associationIds;
+    return Array.isArray(ids) ? ids : null;
   }
 
   /**

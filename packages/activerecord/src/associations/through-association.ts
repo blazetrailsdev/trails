@@ -177,7 +177,7 @@ export function throughTargetScope(
 }
 
 /** @internal */
-function foreignKeyPresent(assoc: { owner: Base; reflection: any }): boolean {
+export function throughForeignKeyPresent(assoc: { owner: Base; reflection: any }): boolean {
   const tr = throughReflection(assoc) as any;
   if (!tr?.isBelongsTo?.()) return false;
   const fks: string[] = Array.isArray(tr.foreignKey) ? tr.foreignKey : [tr.foreignKey];

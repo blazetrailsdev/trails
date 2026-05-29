@@ -95,6 +95,92 @@ describe("CollectionProxy#count — non-through fast path", () => {
     expect(observed[0]).toMatch(/SELECT\s+COUNT\b/i);
   });
 
+  it("size() on a new-record owner returns the buffered target without querying", async () => {
+    // Mirrors Association#find_target? false for an unsaved owner: size never
+    // hits the DB, it just counts the build-ed records.
+    const author = CpcAuthor.new({ name: "unsaved" });
+    const proxy = association(author, "cpcPosts") as any;
+    proxy.build({ title: "b1" });
+    proxy.build({ title: "b2" });
+
+    const observed: string[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (event: any) => {
+      if (event?.payload?.name === "SCHEMA") return;
+      if (typeof event?.payload?.sql === "string") observed.push(event.payload.sql);
+    });
+    try {
+      expect(await proxy.size()).toBe(2);
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(observed.length).toBe(0);
+  });
+
+  it("size() returns the cached @association_ids length without querying", async () => {
+    // Mirrors CollectionAssociation#size's `@association_ids` branch: once a
+    // prior ids reader (`record.<assoc>Ids` → idsReader) has cached the ids on
+    // the owner's association instance, size() returns their count, no SQL.
+    const author = await CpcAuthor.create({ name: "ids" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "p1" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "p2" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "p3" });
+
+    // Populate the cache via the real ids reader.
+    const ids = await (author as any).association("cpcPosts").idsReader();
+    expect(ids.length).toBe(3);
+
+    const observed: string[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (event: any) => {
+      if (event?.payload?.name === "SCHEMA") return;
+      if (typeof event?.payload?.sql === "string") observed.push(event.payload.sql);
+    });
+    try {
+      expect(await association(author, "cpcPosts").size()).toBe(3);
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(observed.length).toBe(0);
+  });
+
+  it("size() with a GROUP BY loads the target and counts the group rows", async () => {
+    // Mirrors a grouped association scope (Rails' `clients_grouped_by_name`,
+    // defined `-> { group("name").select("name") }`): size() takes the
+    // `!group_values.empty?` branch — load + count rows, not a scalar
+    // COUNT(*). The `.select("title")` pairs with the GROUP BY so the loaded
+    // SELECT is valid SQL (PostgreSQL rejects `SELECT *` under GROUP BY).
+    Associations.hasMany.call(CpcAuthor, "cpcPostsByTitle", {
+      className: "CpcPost",
+      foreignKey: "cpc_author_id",
+      scope: (rel: any) => rel.group("title").select("title"),
+    });
+    const author = await CpcAuthor.create({ name: "g" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "X" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "X" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "Y" });
+
+    const grouped = association(author, "cpcPostsByTitle") as any;
+    expect(grouped.groupValues).toEqual(["title"]);
+    // Two distinct titles → two group rows, not the scalar COUNT(*) of 3.
+    expect(await grouped.size()).toBe(2);
+  });
+
+  it("size() with DISTINCT ignores the unsaved-records shortcut and counts via SQL", async () => {
+    Associations.hasMany.call(CpcAuthor, "cpcPostsDistinct", {
+      className: "CpcPost",
+      foreignKey: "cpc_author_id",
+      scope: (rel: any) => rel.distinct(),
+    });
+    const author = await CpcAuthor.create({ name: "d" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "p1" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "p2" });
+
+    const distinct = association(author, "cpcPostsDistinct") as any;
+    expect(distinct.distinctValue).toBe(true);
+    distinct.build({ title: "buffered" });
+    // distinct_value present → skip the `unsaved + count` branch, count via SQL.
+    expect(await distinct.size()).toBe(2);
+  });
+
   it("single-level through: count() emits a SELECT COUNT(*) (IN-subquery or JOIN form)", async () => {
     class CpcComment extends Base {
       static {
