@@ -1789,3 +1789,78 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(new Set(calls).size).toBe(2);
   });
 });
+
+// ==========================================================================
+// JOIN-based HABTM eager loading with Rails self-join alias naming.
+// Mirrors `test_join_middle_table_alias` / `test_join_table_alias` from
+// has_and_belongs_to_many_associations_test.rb. The deep path
+// (`includes(projects: :developers)`) self-joins the `developers_projects`
+// join table; Rails names the collision `developers_projects_projects_join`
+// (`{plural_name}_{owner_table}_join`) so a WHERE on that alias resolves.
+// ==========================================================================
+describe("HABTM join-table self-join aliasing", () => {
+  let adapter: DatabaseAdapter;
+
+  class Developer extends Base {
+    static {
+      this.attribute("name", "string");
+      this.attribute("salary", "integer");
+    }
+  }
+  class Project extends Base {
+    static {
+      this.attribute("name", "string");
+    }
+  }
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      developers: { name: "string", salary: "integer" },
+      projects: { name: "string" },
+      developers_projects: { developer_id: "integer", project_id: "integer", joined_on: "date" },
+    });
+    for (const m of [Developer, Project]) {
+      m.adapter = adapter;
+      (m as any)._associations = [];
+      (m as any)._reflections = {};
+      registerModel(m);
+    }
+    Developer.hasAndBelongsToMany("projects", {
+      joinTable: "developers_projects",
+      associationForeignKey: "project_id",
+    });
+    Project.hasAndBelongsToMany("developers", { joinTable: "developers_projects" });
+    // Mirrors developers / projects / developers_projects fixtures.
+    await adapter.executeMutation(
+      "INSERT INTO developers (id, name, salary) VALUES (1, 'David', 80000), (2, 'Jamis', 150000), (11, 'Jamis', 9000)",
+    );
+    await adapter.executeMutation(
+      "INSERT INTO projects (id, name) VALUES (1, 'Active Record'), (2, 'Active Controller')",
+    );
+    await adapter.executeMutation(
+      "INSERT INTO developers_projects (developer_id, project_id, joined_on) VALUES (1, 2, '2004-10-10'), (1, 1, '2004-10-10'), (2, 1, NULL), (11, 1, NULL)",
+    );
+  });
+
+  it("test_join_table_alias", async () => {
+    const records = await (Developer as any)
+      .includes({ projects: "developers" })
+      .whereNot({ "developers_projects_projects_join.joined_on": null })
+      .toArray();
+    expect(records.length).toBe(3);
+  });
+
+  it.skip("test_join_middle_table_alias", () => {
+    // CARVE-OUT (follow-up): `Project.includes(:developers_projects)` eager-loads
+    // the auto-generated HABTM join model directly. Two gaps block it, both
+    // outside join-dependency/alias-tracker:
+    //   1. The middle reflection is hidden behind its parent HABTM reflection
+    //      in `normalizedReflections`, so `reflectOnAssociation(Project,
+    //      "developers_projects")` returns null.
+    //   2. JoinDependency#addAssociation bails when the target's primaryKey is
+    //      composite (HABTM join models use `[ownerFk, targetFk]`), so the join
+    //      model can never be the JOIN target.
+    // Tracked in docs/associations-gap-plan.md.
+  });
+});

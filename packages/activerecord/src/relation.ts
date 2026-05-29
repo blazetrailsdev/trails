@@ -41,6 +41,7 @@ import {
   arelColumns as _arelColumns,
   arelColumnWithTable as _arelColumnWithTable,
   arelColumnsFromHash as _arelColumnsFromHash,
+  referencesFromConditions,
   type UnscopeType,
   type AssociationSpec,
 } from "./relation/query-methods.js";
@@ -699,6 +700,9 @@ export class Relation<T extends Base> {
   whereNot(cols: string[], tuples: unknown[][]): Relation<T>;
   whereNot(conditions: Record<string, unknown> | string[], tuples?: unknown[][]): Relation<T> {
     const rel = this._clone();
+    for (const t of referencesFromConditions(conditions)) {
+      if (!rel._referencesValues.includes(t)) rel._referencesValues.push(t);
+    }
     if (Array.isArray(conditions) && conditions.every((c) => typeof c === "string")) {
       // Fast-fail on malformed call: see Relation#where guard for
       // the same reasoning. Without this, a stray

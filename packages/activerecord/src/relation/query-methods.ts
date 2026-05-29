@@ -6,6 +6,7 @@
  */
 import { Nodes, SelectManager, Table as ArelTable, sql as arelSql } from "@blazetrails/arel";
 import { Attribute, ValueType } from "@blazetrails/activemodel";
+import { PredicateBuilder } from "./predicate-builder.js";
 import {
   ActiveRecordError,
   ConfigurationError,
@@ -181,6 +182,22 @@ function referencesBang(this: QueryMethodsHost, ...tables: string[]): any {
     if (t && !this._referencesValues.includes(t)) this._referencesValues.push(t);
   }
   return this;
+}
+
+/**
+ * Table names implied by hash conditions — nested-hash keys and dotted string
+ * keys — as plain strings. Used to auto-add references so
+ * `includes(...).where("joined_table.col": ...)` promotes the matching include
+ * to an eager LEFT OUTER JOIN. Returns `[]` for non-hash opts (string SQL,
+ * Arel nodes, composite-key arrays), mirroring Rails' `when Hash` branch.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#build_where_clause (query_methods.rb:1640)
+ * — `references = PredicateBuilder.references(opts)`.
+ * @internal
+ */
+export function referencesFromConditions(conditions: unknown): string[] {
+  if (!isPlainObject(conditions)) return [];
+  return PredicateBuilder.references(conditions).map((ref) => ref.value);
 }
 
 /** Validate and resolve a CTE name+query into a SQL string. */
@@ -744,6 +761,10 @@ export function buildWhereClause(
   }
 
   if (isPlainObject(opts)) {
+    // Mirrors build_where_clause (query_methods.rb:1640): a hash condition
+    // auto-adds references for its nested-hash / dotted-key tables, so an
+    // includes(...) with a WHERE on the joined table promotes to eager JOIN.
+    referencesBang.call(this, ...referencesFromConditions(opts));
     const mc = (this as any)._modelClass;
     const aliases: Record<string, string> = mc?._attributeAliases ?? {};
     const normalized: Record<string, unknown> = {};
