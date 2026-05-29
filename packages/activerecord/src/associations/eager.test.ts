@@ -4368,9 +4368,10 @@ describe("EagerAssociationTest", () => {
     expect(directDevContracts).toHaveLength(1);
     expect(mentorDevContracts![0].id).toBe(contract.id);
     expect(directDevContracts![0].id).toBe(contract.id);
-    // Rails: projects.last.mentor.developers.first.contracts ==
-    //        projects.last.developers.last.contracts  (same objects)
-    expect(mentorDevContracts![0]).toBe(directDevContracts![0]);
+    // Rails: assert_equal projects.last.mentor.developers.first.contracts,
+    //        projects.last.developers.last.contracts — AR `==` is class+id
+    // equality (not object identity); both branches JOIN the same contract row.
+    expect(mentorDevContracts![0].id).toBe(directDevContracts![0].id);
     expect(mentorDevContracts![0].elmar_developer_id).toBe(
       directDevContracts![0].elmar_developer_id,
     );

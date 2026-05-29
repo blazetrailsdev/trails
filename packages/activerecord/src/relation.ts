@@ -2027,12 +2027,10 @@ export class Relation<T extends Base> {
     if (!this.referencesEagerLoadedTables()) return [];
     const alreadyEagerLoaded = new Set(this._eagerLoadAssociations);
     // Rails promotes ALL includes to eager_load when references points to an
-    // unjoined table. We promote flat string includes here; nested hash specs
-    // are left to the preloader because our JoinDependency does not yet
-    // support recursively joining nested association specs.
-    return this._includesAssociations.filter(
-      (name): name is string => typeof name === "string" && !alreadyEagerLoaded.has(name),
-    );
+    // unjoined table. JoinDependency#addAssociationSpec recursively JOINs
+    // nested hash and dotted-path specs, so we promote every include shape;
+    // any spec it can't JOIN falls back to preload at execution time.
+    return this._includesAssociations.filter((spec) => !alreadyEagerLoaded.has(spec));
   }
 
   /**
@@ -2108,6 +2106,25 @@ export class Relation<T extends Base> {
     return this.limit(2).count() as Promise<number>;
   }
 
+  /**
+   * Adds each eager-load spec to the JoinDependency, routing nested hashes and
+   * dotted paths through JoinDependency#addAssociationSpec (recursive JOINs).
+   * Specs that can't be JOINed (polymorphic, composite key, unjoinable through)
+   * are returned for preload fallback. Mirrors Rails routing eager_load_values
+   * through JoinDependency rather than degrading nested specs to N preloads.
+   * @internal
+   */
+  private _addEagerSpecsToJoinDependency(
+    jd: JoinDependency,
+    specs: AssociationSpec[],
+  ): AssociationSpec[] {
+    const fallbackAssocs: AssociationSpec[] = [];
+    for (const spec of specs) {
+      if (!jd.addAssociationSpec(spec)) fallbackAssocs.push(spec);
+    }
+    return fallbackAssocs;
+  }
+
   private async _executeEagerLoad(eagerAssocs?: AssociationSpec[]): Promise<void> {
     const eagerAssociations = eagerAssocs ?? this._eagerLoadAssociations;
     const basePk = (this._modelClass as any).primaryKey ?? "id";
@@ -2126,21 +2143,7 @@ export class Relation<T extends Base> {
 
     const jd = new JoinDependency(this._modelClass);
 
-    const fallbackAssocs: AssociationSpec[] = [];
-    for (const assocName of eagerAssociations) {
-      if (typeof assocName !== "string") {
-        // Nested hash specs fall back to preload
-        fallbackAssocs.push(assocName);
-        continue;
-      }
-      if (assocName.includes(".")) {
-        // Nested paths fall back to preload until per-level grouping is implemented
-        fallbackAssocs.push(assocName);
-        continue;
-      }
-      const node = jd.addAssociation(assocName);
-      if (!node) fallbackAssocs.push(assocName);
-    }
+    const fallbackAssocs = this._addEagerSpecsToJoinDependency(jd, eagerAssociations);
 
     // If no associations could be JOINed, fall back entirely to preload
     if (jd.nodes.length === 0) {
@@ -3513,10 +3516,7 @@ export class Relation<T extends Base> {
     if (Array.isArray(basePk)) return null;
 
     const jd = new JoinDependency(this._modelClass);
-    for (const assocName of allEager) {
-      if (typeof assocName !== "string") continue;
-      jd.addAssociation(assocName);
-    }
+    this._addEagerSpecsToJoinDependency(jd, allEager);
     if (jd.nodes.length === 0) return null;
 
     const manager = this._buildEagerJoinManager(jd, basePk);

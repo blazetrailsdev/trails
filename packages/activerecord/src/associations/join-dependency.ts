@@ -11,6 +11,7 @@
  */
 
 import type { Base } from "../base.js";
+import type { AssociationSpec } from "../relation/query-methods.js";
 import {
   underscore as _toUnderscore,
   camelize as _camelize,
@@ -321,10 +322,7 @@ export class JoinDependency {
     const parts = path.split(".");
     if (parts.length === 1) return this.addAssociation(parts[0]);
 
-    const snapshotPaths = new Set(this._treeNodesByPath.keys());
-    const snapshotAliases = this._aliases.length;
-    const snapshotNextIndex = this._nextTableIndex;
-    const snapshotTrackerAliases = new Map(this._aliasTracker.aliases);
+    const snapshot = this._snapshotTree();
 
     let currentModel = this._baseModel as any;
     let currentAlias = this._baseAlias;
@@ -332,17 +330,9 @@ export class JoinDependency {
     let parentPath = "";
 
     for (const part of parts) {
-      const node = this.addAssociation(part, {
-        fromModel: currentModel,
-        fromAlias: currentAlias,
-        parentAssocName: parentPath || undefined,
-      });
+      const node = this._addOrReuse(part, currentModel, currentAlias, parentPath);
       if (!node) {
-        this._rollbackTree(snapshotPaths);
-        this._aliases.length = snapshotAliases;
-        this._nextTableIndex = snapshotNextIndex;
-        this._aliasTracker.aliases.clear();
-        for (const [k, v] of snapshotTrackerAliases) this._aliasTracker.aliases.set(k, v);
+        this._restoreTree(snapshot);
         return null;
       }
       lastNode = node;
@@ -354,6 +344,118 @@ export class JoinDependency {
       parentPath = parentPath ? `${parentPath}.${part}` : part;
     }
     return lastNode;
+  }
+
+  /**
+   * Add an arbitrary nested eager-load spec (string, dotted string, array, or
+   * hash like `{ author: "posts" }` / `{ author: ["posts", "comments"] }`).
+   * Shared prefixes are deduplicated against the existing tree, so passing
+   * specs that overlap reuses already-joined nodes instead of double-joining.
+   *
+   * All-or-nothing per call: if any segment can't be JOINed (polymorphic,
+   * composite key, unjoinable through), the whole spec is rolled back and
+   * `false` is returned so the caller can fall back to preloading.
+   *
+   * Mirrors: ActiveRecord::Associations::JoinDependency#build (recursive tree
+   * construction from the eager_load values hash).
+   */
+  addAssociationSpec(spec: AssociationSpec): boolean {
+    const snapshot = this._snapshotTree();
+    if (!this._walkSpec(spec, this._baseModel, this._baseAlias, "")) {
+      this._restoreTree(snapshot);
+      return false;
+    }
+    return true;
+  }
+
+  /** @internal */
+  private _walkSpec(
+    spec: AssociationSpec | AssociationSpec[],
+    model: typeof Base,
+    alias: string,
+    parentPath: string,
+  ): boolean {
+    if (Array.isArray(spec)) {
+      return spec.every((s) => this._walkSpec(s, model, alias, parentPath));
+    }
+    if (typeof spec === "string") {
+      // Dotted strings ("comments.author") are walked segment-by-segment so
+      // each level threads the correct source model/alias.
+      let m = model;
+      let a = alias;
+      let pp = parentPath;
+      for (const part of spec.split(".")) {
+        const node = this._addOrReuse(part, m, a, pp);
+        if (!node) return false;
+        m = node.baseKlass;
+        a = node.effectiveSqlName;
+        pp = pp ? `${pp}.${part}` : part;
+      }
+      return true;
+    }
+    for (const key of Object.keys(spec)) {
+      const node = this._addOrReuse(key, model, alias, parentPath);
+      if (!node) return false;
+      const child = spec[key];
+      const childPath = parentPath ? `${parentPath}.${key}` : key;
+      if (
+        child != null &&
+        !this._walkSpec(child, node.baseKlass, node.effectiveSqlName, childPath)
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Add `assocName` under `parentPath`, reusing an existing tree node when the
+   * same path was already joined (shared-prefix dedup).
+   * @internal
+   */
+  private _addOrReuse(
+    assocName: string,
+    fromModel: typeof Base,
+    fromAlias: string,
+    parentPath: string,
+  ): JoinPart | null {
+    const fullPath = parentPath ? `${parentPath}.${assocName}` : assocName;
+    const existing = this._treeNodesByPath.get(fullPath);
+    if (existing) return existing;
+    return this.addAssociation(assocName, {
+      fromModel,
+      fromAlias,
+      parentAssocName: parentPath || undefined,
+    });
+  }
+
+  /** @internal */
+  private _snapshotTree(): {
+    paths: Set<string>;
+    aliases: number;
+    nextIndex: number;
+    tracker: Map<string, number>;
+  } {
+    return {
+      paths: new Set(this._treeNodesByPath.keys()),
+      aliases: this._aliases.length,
+      nextIndex: this._nextTableIndex,
+      tracker: new Map(this._aliasTracker.aliases),
+    };
+  }
+
+  /** @internal */
+  private _restoreTree(snapshot: {
+    paths: Set<string>;
+    aliases: number;
+    nextIndex: number;
+    tracker: Map<string, number>;
+  }): void {
+    this._rollbackTree(snapshot.paths);
+    this._aliases.length = snapshot.aliases;
+    this._nextTableIndex = snapshot.nextIndex;
+    this._aliasTracker.aliases.clear();
+    for (const [k, v] of snapshot.tracker) this._aliasTracker.aliases.set(k, v);
   }
 
   private _buildSelectArelNodes(): Nodes.As[] {
