@@ -9,7 +9,7 @@ let connected = false;
  * Establish the connection (idempotent within a process).
  *
  * No config lives here — `Base.establishConnection()` with no arguments
- * reads `config/database.json` for the current `NODE_ENV`, exactly like
+ * reads `config/database.ts` for the current `TRAILS_ENV`, exactly like
  * Rails reads `config/database.yml`. To change databases, edit that file.
  */
 export async function connect(): Promise<void> {

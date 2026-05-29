@@ -1,21 +1,16 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+import config from "../config/database.js";
 
 /**
- * Reads `config/database.json` — the single source of connection config
- * (the analog of Rails' `config/database.yml`). Keyed by environment;
- * `NODE_ENV` selects the entry (default "development"). Nothing else in the
- * app hardcodes connection details — `Base.establishConnection()` reads this
- * same file with no arguments.
+ * Connection config helpers for the `db:*` CLI. `config/database.ts` is the
+ * single source of connection settings (the analog of Rails'
+ * `config/database.yml`); `Base.establishConnection()` reads that same file
+ * with no arguments. Nothing else in the app hardcodes connection details.
+ *
+ * The environment is selected by `TRAILS_ENV` (default "development"), with
+ * `NODE_ENV` honored only as a fallback — see the note in `config/database.ts`.
  */
-const ENV = process.env.NODE_ENV ?? "development";
-const CONFIG_PATH = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "config",
-  "database.json",
-);
+const ENV = process.env.TRAILS_ENV ?? process.env.NODE_ENV ?? "development";
 
 interface EnvConfig {
   adapter?: string;
@@ -25,10 +20,9 @@ interface EnvConfig {
 
 /** The config hash for the current environment. */
 export function currentConfig(): EnvConfig {
-  const all = JSON.parse(readFileSync(CONFIG_PATH, "utf8")) as Record<string, EnvConfig>;
-  const cfg = all[ENV];
+  const cfg = (config as Record<string, EnvConfig>)[ENV];
   if (!cfg || typeof cfg !== "object") {
-    throw new Error(`No "${ENV}" entry in config/database.json`);
+    throw new Error(`No "${ENV}" entry in config/database.ts`);
   }
   return cfg;
 }

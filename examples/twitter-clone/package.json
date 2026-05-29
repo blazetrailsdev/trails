@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
-    "smoke": "NODE_ENV=test tsx src/smoke.ts",
+    "smoke": "TRAILS_ENV=test tsx src/smoke.ts",
     "typecheck": "trails-tsc --schema db/schema-columns.json --noEmit -p tsconfig.json",
     "db:create": "tsx src/cli.ts db:create",
     "db:drop": "tsx src/cli.ts db:drop",

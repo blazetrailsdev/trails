@@ -1,6 +1,6 @@
 /**
  * End-to-end smoke test driving the models directly (no HTTP). The `smoke`
- * script sets `NODE_ENV=test`, which `config/database.json` maps to an
+ * script sets `TRAILS_ENV=test`, which `config/database.ts` maps to an
  * in-memory SQLite DB; this migrates it from scratch. Run with `pnpm smoke`.
  */
 import { connect, loadModelSchemas } from "./db.js";
