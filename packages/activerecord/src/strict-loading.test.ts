@@ -469,6 +469,15 @@ describe("StrictLoadingTest", () => {
       slpwp_devs: { name: "string" },
       slpwp_logs: { message: "string", slpwp_dev_id: "integer" },
       slpwp_extras: { note: "string", slpwp_dev_id: "integer" },
+      slthc_devs: { name: "string" },
+      slthc_firms: { name: "string" },
+      slthc_contracts: { slthc_dev_id: "integer", slthc_firm_id: "integer" },
+      slthc_ships: { name: "string", slthc_dev_id: "integer" },
+      urm_devs: { name: "string" },
+      tooa_devs: { name: "string", tooa_mentor_id: "integer" },
+      tooa_mentors: { name: "string" },
+      ebts_books: { title: "string", ebts_publisher_id: "integer" },
+      ebts_publishers: { name: "string" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -1220,24 +1229,95 @@ describe("StrictLoadingTest", () => {
     // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
   });
   it.skip("strict loading has one reload", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+    // FOLLOW-UP: record-level reload + strict-loading lazy-load semantics.
+    // Rails asserts no raise after `developer.reload`; our impl keeps the
+    // owner strict and raises on the subsequent lazy has_one load. Needs the
+    // reload/find_from_target? interaction ported before this can be unskipped.
   });
   it.skip("strict loading with has many", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+    // FOLLOW-UP: depends on the CollectionProxy reader returning unloaded
+    // proxies from `devs.map(&:audit_logs)` without triggering a load, plus
+    // relation-level reload re-preloading. Not yet wired.
   });
   it.skip("strict loading with has many singular association and reload", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+    // FOLLOW-UP: same record-level reload semantics as `strict loading has
+    // one reload` — re-accessing a has_many after reload must not raise.
   });
-  it.skip("strict loading with has many through cascade down to middle records", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("strict loading with has many through cascade down to middle records", async () => {
+    class SlthcDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlthcFirm extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlthcContract extends Base {
+      static {
+        this.attribute("slthc_dev_id", "integer");
+        this.attribute("slthc_firm_id", "integer");
+      }
+    }
+    class SlthcShip extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("slthc_dev_id", "integer");
+      }
+    }
+    registerModel("SlthcDev", SlthcDev);
+    registerModel("SlthcFirm", SlthcFirm);
+    registerModel("SlthcContract", SlthcContract);
+    registerModel("SlthcShip", SlthcShip);
+    Associations.hasMany.call(SlthcDev, "slthcContracts", {
+      className: "SlthcContract",
+      foreignKey: "slthc_dev_id",
+    });
+    Associations.hasMany.call(SlthcDev, "slthcFirms", {
+      through: "slthcContracts",
+      source: "slthcFirm",
+      className: "SlthcFirm",
+    });
+    Associations.hasOne.call(SlthcDev, "slthcShip", {
+      className: "SlthcShip",
+      foreignKey: "slthc_dev_id",
+    });
+    Associations.belongsTo.call(SlthcContract, "slthcFirm", {
+      className: "SlthcFirm",
+      foreignKey: "slthc_firm_id",
+    });
+    Associations.hasMany.call(SlthcFirm, "slthcContracts", {
+      className: "SlthcContract",
+      foreignKey: "slthc_firm_id",
+    });
+
+    const dev = await SlthcDev.create({ name: "Dev" });
+    const firm = await SlthcFirm.create({ name: "NASA" });
+    await SlthcContract.create({ slthc_dev_id: dev.id, slthc_firm_id: firm.id });
+
+    const loaded = await SlthcDev.all().strictLoading().includes("slthcFirms").first();
+    expect(loaded!.isStrictLoading()).toBe(true);
+
+    const firms = (loaded as any)._preloadedAssociations?.get("slthcFirms") ?? [];
+    expect(firms).toHaveLength(1);
+    // The middle records (firms) cascade to strict_loading, so loading their
+    // own associations raises.
+    await expect(
+      loadHasMany(firms[0], "slthcContracts", {
+        className: "SlthcContract",
+        foreignKey: "slthc_firm_id",
+      }),
+    ).rejects.toThrow(StrictLoadingViolationError);
+    await expect(
+      loadHasMany(loaded!, "slthcContracts", {
+        className: "SlthcContract",
+        foreignKey: "slthc_dev_id",
+      }),
+    ).rejects.toThrow(StrictLoadingViolationError);
+    await expect(
+      loadHasOne(loaded!, "slthcShip", { className: "SlthcShip", foreignKey: "slthc_dev_id" }),
+    ).rejects.toThrow(StrictLoadingViolationError);
   });
   it.skip("strict loading with has one through does not prevent creation of association", () => {
     // BLOCKED: relation — StrictLoadingViolation not wired into association loading
@@ -1366,40 +1446,116 @@ describe("StrictLoadingTest", () => {
     // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
     // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
   });
-  it.skip("raises on unloaded relation methods if strict loading", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("raises on unloaded relation methods if strict loading", async () => {
+    class UrmDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class UrmLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("urm_dev_id", "integer");
+      }
+    }
+    registerModel("UrmDev", UrmDev);
+    registerModel("UrmLog", UrmLog);
+    Associations.hasMany.call(UrmDev, "urmLogs", {
+      className: "UrmLog",
+      foreignKey: "urm_dev_id",
+    });
+    const dev = await UrmDev.create({ name: "Dev" });
+    dev.strictLoadingBang();
+    expect(dev.isStrictLoading()).toBe(true);
+    await expect(
+      loadHasMany(dev, "urmLogs", { className: "UrmLog", foreignKey: "urm_dev_id" }),
+    ).rejects.toThrow(StrictLoadingViolationError);
   });
   it.skip("raises on unloaded relation methods if strict loading by default", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+    // FOLLOW-UP: same path as `raises on unloaded relation methods if strict
+    // loading`, with the owner strict via strictLoadingByDefault instead of an
+    // explicit strictLoadingBang(). Trimmed for PR-size ceiling.
   });
-  it.skip("strict loading can be turned off on an association in a model with strict loading on", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("strict loading can be turned off on an association in a model with strict loading on", async () => {
+    class TooaDev extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("tooa_mentor_id", "integer");
+      }
+    }
+    class TooaMentor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("TooaDev", TooaDev);
+    registerModel("TooaMentor", TooaMentor);
+    // strict_loading: false on the reflection turns enforcement off even
+    // though the owning model is strict_loading by default.
+    Associations.belongsTo.call(TooaDev, "tooaOffMentor", {
+      className: "TooaMentor",
+      foreignKey: "tooa_mentor_id",
+      strictLoading: false,
+    });
+    TooaDev.strictLoadingByDefault = true;
+    try {
+      const mentor = await TooaMentor.create({ name: "Mentor" });
+      const created = await TooaDev.create({ name: "Dev", tooa_mentor_id: mentor.id });
+      const dev = await TooaDev.find(created.id);
+      expect(dev.isStrictLoading()).toBe(true);
+      // Drive the loader with the options the reflection preserved, so the
+      // test exercises the reflection-level toggle, not an ad-hoc argument.
+      const refl = TooaDev._reflectOnAssociation("tooaOffMentor")!;
+      expect(refl.options.strictLoading).toBe(false);
+      const loaded = await loadBelongsTo(dev, "tooaOffMentor", refl.options);
+      expect(loaded?.id).toBe(mentor.id);
+    } finally {
+      TooaDev.strictLoadingByDefault = false;
+    }
   });
-  it.skip("does not raise on eager loading a strict loading belongs to relation", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("does not raise on eager loading a strict loading belongs to relation", async () => {
+    class EbtsBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("ebts_publisher_id", "integer");
+      }
+    }
+    class EbtsPublisher extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("EbtsBook", EbtsBook);
+    registerModel("EbtsPublisher", EbtsPublisher);
+    Associations.belongsTo.call(EbtsBook, "ebtsPublisher", {
+      className: "EbtsPublisher",
+      foreignKey: "ebts_publisher_id",
+      strictLoading: true,
+    });
+    const publisher = await EbtsPublisher.create({ name: "Press" });
+    const book = await EbtsBook.create({ title: "Guide", ebts_publisher_id: publisher.id });
+    (book as any)._preloadedAssociations = new Map([["ebtsPublisher", publisher]]);
+    const loaded = await loadBelongsTo(book, "ebtsPublisher", {
+      className: "EbtsPublisher",
+      foreignKey: "ebts_publisher_id",
+      strictLoading: true,
+    });
+    expect(loaded?.id).toBe(publisher.id);
   });
   it.skip("does not raise on eager loading a strict loading has one relation", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+    // FOLLOW-UP: reflection strictLoading:true + preloaded has_one (no-raise).
+    // Same mechanism as the belongs_to variant above (preloaded hit short-
+    // circuits before the strict check). Trimmed for PR-size ceiling.
   });
   it.skip("does not raise on eager loading a has one relation if strict loading by default", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+    // FOLLOW-UP: owner-strict + preloaded has_one (no-raise) — already covered
+    // behaviorally by `preload audit logs are strict loading because parent is
+    // strict loading`. Trimmed for PR-size ceiling.
   });
   it.skip("does not raise on eager loading a has many relation if strict loading by default", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+    // FOLLOW-UP: owner-strict + preloaded has_many (no-raise) — already covered
+    // behaviorally by `preload audit logs are strict loading because parent is
+    // strict loading`. Trimmed for PR-size ceiling.
   });
   it.skip("raises on lazy loading a strict loading habtm relation", () => {
     // BLOCKED: relation — StrictLoadingViolation not wired into association loading

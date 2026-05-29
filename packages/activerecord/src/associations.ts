@@ -799,6 +799,29 @@ function syncToAssociationInstance(record: Base, assocName: string, result: unkn
 }
 
 /**
+ * Whether lazily loading an association on `record` is a strict-loading
+ * violation. Mirrors Rails' `Association#violates_strict_loading?`:
+ *
+ *   return if @skip_strict_loading
+ *   return unless owner.validation_context.nil?
+ *   return reflection.strict_loading? if reflection.options.key?(:strict_loading)
+ *   owner.strict_loading? && !owner.strict_loading_n_plus_one_only?
+ *
+ * A reflection-level `strictLoading` option wins over the owner's flag; the
+ * `n_plus_one_only` clause lets the first level load lazily.
+ *
+ * @internal
+ */
+export function _violatesStrictLoading(record: Base, options: AssociationOptions): boolean {
+  if (record._strictLoadingBypassCount) return false;
+  if (record._validationContext != null) return false;
+  if (Object.prototype.hasOwnProperty.call(options, "strictLoading")) {
+    return options.strictLoading === true;
+  }
+  return record._strictLoading && !record.isStrictLoadingNPlusOneOnly();
+}
+
+/**
  * Load a belongs_to association.
  */
 export async function loadBelongsTo(
@@ -852,7 +875,7 @@ export async function loadBelongsTo(
   }
 
   // Strict loading check: this is a lazy load
-  if (record._strictLoading && !record._strictLoadingBypassCount) {
+  if (_violatesStrictLoading(record, options)) {
     throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
@@ -969,7 +992,7 @@ export async function loadHasOne(
   }
 
   // Strict loading check
-  if (record._strictLoading && !record._strictLoadingBypassCount) {
+  if (_violatesStrictLoading(record, options)) {
     throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
@@ -1167,7 +1190,7 @@ export async function loadHasMany(
   }
 
   // Strict loading check
-  if (record._strictLoading && !record._strictLoadingBypassCount) {
+  if (_violatesStrictLoading(record, options)) {
     throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
@@ -2182,7 +2205,7 @@ function wrapCollectionProxy<T extends Base = Base>(
         return target.target[Number(prop)];
       }
 
-      if (target._record._strictLoading && !target._record._strictLoadingBypassCount) {
+      if (_violatesStrictLoading(target._record, target._assocDef.options)) {
         throw StrictLoadingViolationError.forAssociation(target._record, target._assocName);
       }
 
