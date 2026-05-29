@@ -16,7 +16,7 @@
  *
  * These tests pin the resulting SQL shape (no JOIN) and the
  * record set via Notifications so a regression that re-introduces
- * the gate, or a change to `_getChain` that silently falls back,
+ * the gate, or a change to `getChain` that silently falls back,
  * gets caught.
  */
 import { describe, it, expect, beforeAll, afterEach } from "vitest";

@@ -179,7 +179,7 @@ describe("AssociationScope", () => {
       klass: reflection.klass,
     });
 
-    // The lambda must run exactly once — _addConstraints applies it via
+    // The lambda must run exactly once — addConstraints applies it via
     // reflection.scope; the loader path must not re-apply options.scope.
     expect(calls).toBe(1);
     expect(scope.toSql()).toMatch(/["`]published["`]\s*=\s*(?:TRUE|1)/i);
@@ -1033,7 +1033,7 @@ describe("AssociationScope", () => {
     expect(sql).toMatch(/INNER JOIN\s+["`]?hot_accounts["`]?/i);
     // Pin the ON condition so a regression where the join keys flip
     // (or get dropped) doesn't slip through. PR 3 builds these via
-    // _nextChainScope using joinPrimaryKey / joinForeignKey from the
+    // nextChainScope using joinPrimaryKey / joinForeignKey from the
     // chain's pair.
     expect(sql).toMatch(
       /ON\s+["`]hot_settings["`]\.["`]hot_account_id["`]\s*=\s*["`]hot_accounts["`]\.["`]id["`]/,

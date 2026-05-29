@@ -55,7 +55,7 @@ function readTuple(owner: Base, cols: string[]): unknown[] {
  * isn't known at definition time, but the resolved sourceType class
  * may use a custom PK (`uuid`, a composite, ...). Routing through
  * `joinPrimaryKeyFor(klass)` mirrors the AssociationScope walk
- * (association-scope.ts:_nextChainScope) and Rails'
+ * (association-scope.ts:nextChainScope) and Rails'
  * `join_primary_key_for(klass)` (reflection.rb:968). Falls back to
  * the static `joinPrimaryKey` when the method isn't exposed (e.g.
  * chain entries that aren't Through / BelongsTo shapes).
@@ -116,7 +116,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     // the Relation thenable (`.then` → `toArray`). Build sync, box,
     // return the box.
     return DisableJoinsAssociationRelation.deferred(klass, async () => {
-      const reverseChain = this._getChain(sourceReflection).slice().reverse();
+      const reverseChain = this.getChain(sourceReflection).slice().reverse();
       const [lastReflection, lastOrdered, lastJoinIds] = await this._lastScopeChain(
         reverseChain,
         owner,

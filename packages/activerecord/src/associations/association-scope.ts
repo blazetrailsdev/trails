@@ -2,13 +2,7 @@ import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import type { Base } from "../base.js";
 import type { AssociationReflection, AbstractReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
-import {
-  isStiSubclass,
-  getStiBase,
-  getInheritanceColumn,
-  descendants,
-  polymorphicName,
-} from "../inheritance.js";
+import { polymorphicName } from "../inheritance.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
 
@@ -267,18 +261,9 @@ export class AssociationScope {
     // Rails: `klass.unscoped` (association_scope.rb:23). Rails' unscoped
     // bypasses default_scope but STILL applies the STI `type_condition`
     // because `relation()` adds it for `finder_needs_type_condition?`
-    // classes (`core.rb:431-435`). Our `Base.unscoped` doesn't wire STI
-    // through `relation()` yet, so we re-add the type condition here.
+    // classes (`core.rb:431-435`). `Base.unscoped` now wires STI through
+    // `_buildUnscopedRelation`, so no compensation is needed here.
     let scope: unknown = klass.unscoped();
-    if (isStiSubclass(klass)) {
-      const col = getInheritanceColumn(getStiBase(klass));
-      if (col) {
-        const stiNames = [klass.name, ...descendants(klass).map((d: typeof Base) => d.name)];
-        scope = (scope as { where: (c: Record<string, unknown>) => unknown }).where({
-          [col]: stiNames.length === 1 ? stiNames[0] : stiNames,
-        });
-      }
-    }
     // Per-scope-build AliasTracker. Rails seeds it from
     // `scope.alias_tracker` (associations/association_scope.rb:26);
     // we don't expose one on Relation yet, so create a fresh tracker
@@ -287,16 +272,26 @@ export class AssociationScope {
     // shared across the chain walk within this call so repeated
     // joins to the same table get unique aliases.
     const tracker = AliasTracker.create(null, klass.arelTable.name, [], undefined, quoter);
-    const chain = this._getChain(reflection, tracker);
-    scope = this._addConstraints(scope, owner, chain, klass, quoter);
+    const chain = this.getChain(reflection, tracker);
+    scope = this.addConstraints(scope, owner, chain, klass, quoter);
     if (!reflection.isCollection()) {
       scope = (scope as { limit: (n: number) => unknown }).limit(1);
     }
     return scope;
   }
 
-  private _transformValue<T>(value: T): unknown {
-    return this._valueTransformation(value);
+  /**
+   * The transform lambda passed to the constructor. Rails exposes this as
+   * a private `attr_reader :value_transformation` (association_scope.rb:52).
+   *
+   * @internal
+   */
+  private get valueTransformation(): ValueTransformation {
+    return this._valueTransformation;
+  }
+
+  private transformValue<T>(value: T): unknown {
+    return this.valueTransformation(value);
   }
 
   /**
@@ -309,7 +304,7 @@ export class AssociationScope {
    * Mirrors: ActiveRecord::Associations::AssociationScope#apply_scope
    * (association_scope.rb:161-167).
    */
-  private _applyScope(scope: unknown, table: string | null, key: string, value: unknown): unknown {
+  private applyScope(scope: unknown, table: string | null, key: string, value: unknown): unknown {
     const w = scope as {
       where: (c: Record<string, unknown> | unknown) => unknown;
       _modelClass?: { tableName?: string };
@@ -334,7 +329,7 @@ export class AssociationScope {
    * Mirrors: ActiveRecord::Associations::AssociationScope#last_chain_scope
    * (association_scope.rb:58-75).
    */
-  private _lastChainScope(
+  private lastChainScope(
     scope: unknown,
     reflection: AbstractReflection | ReflectionProxy,
     owner: Base,
@@ -395,14 +390,14 @@ export class AssociationScope {
     }
     for (let i = 0; i < joinPks.length; i++) {
       const rawValue = owner._readAttribute(joinFks[i]);
-      const value = this._transformValue(rawValue);
-      scope = this._applyScope(scope, table, joinPks[i], value);
+      const value = this.transformValue(rawValue);
+      scope = this.applyScope(scope, table, joinPks[i], value);
     }
     if (r.type) {
       // Rails: `owner.class.polymorphic_name` (returns base_class.name
       // for STI subclasses) routed through `transform_value`.
-      const polyName = this._transformValue(polymorphicName(owner.constructor as typeof Base));
-      scope = this._applyScope(scope, table, r.type, polyName);
+      const polyName = this.transformValue(polymorphicName(owner.constructor as typeof Base));
+      scope = this.applyScope(scope, table, r.type, polyName);
     }
     return scope;
   }
@@ -421,7 +416,7 @@ export class AssociationScope {
    * Mirrors: ActiveRecord::Associations::AssociationScope#get_chain
    * (association_scope.rb:112-122).
    */
-  protected _getChain(
+  protected getChain(
     reflection: AssociationReflection,
     tracker?: AliasTracker,
   ): Array<AbstractReflection | ReflectionProxy> {
@@ -460,7 +455,7 @@ export class AssociationScope {
    * Mirrors: ActiveRecord::Associations::AssociationScope#next_chain_scope
    * (association_scope.rb:81-99).
    */
-  private _nextChainScope(
+  private nextChainScope(
     scope: unknown,
     reflection: AbstractReflection | ReflectionProxy,
     nextReflection: AbstractReflection | ReflectionProxy,
@@ -531,7 +526,7 @@ export class AssociationScope {
     // Nodes.SqlLiteral at apply time, so we still produce a string —
     // but the identifiers/values are escape-safe.
     const q = quoter;
-    if (!q) throw new Error("AssociationScope._nextChainScope requires a quoter");
+    if (!q) throw new Error("AssociationScope.nextChainScope requires a quoter");
     const qTable = q.quoteTableName(table);
     const qForeignTable = q.quoteTableName(foreignTable);
     const conditions: string[] = [];
@@ -549,7 +544,7 @@ export class AssociationScope {
       // STI) and the value-transformation lambda.
       const nextKlass = (nextReflection as { klass?: typeof Base }).klass;
       const nextName = nextKlass ? polymorphicName(nextKlass) : "";
-      onClause += ` AND ${qTable}.${q.quoteColumnName(r.type)} = ${q.quote(this._transformValue(nextName))}`;
+      onClause += ` AND ${qTable}.${q.quoteColumnName(r.type)} = ${q.quote(this.transformValue(nextName))}`;
     }
     return (scope as { joins: (table: string, on: string) => unknown }).joins(
       foreignTable,
@@ -565,7 +560,7 @@ export class AssociationScope {
    * Mirrors: ActiveRecord::Associations::AssociationScope#add_constraints
    * (association_scope.rb:124-159).
    */
-  private _addConstraints(
+  private addConstraints(
     scope: unknown,
     owner: Base,
     chain: Array<AbstractReflection | ReflectionProxy>,
@@ -573,12 +568,12 @@ export class AssociationScope {
     quoter?: Quoting,
   ): unknown {
     const last = chain[chain.length - 1];
-    scope = this._lastChainScope(scope, last, owner, klass);
+    scope = this.lastChainScope(scope, last, owner, klass);
     // For multi-step chains, walk pairs and add INNER JOINs — Rails'
     // `chain.each_cons(2) { |r, nr| next_chain_scope(scope, r, nr) }`
     // (association_scope.rb:128-130).
     for (let i = 0; i < chain.length - 1; i++) {
-      scope = this._nextChainScope(scope, chain[i], chain[i + 1], klass, quoter);
+      scope = this.nextChainScope(scope, chain[i], chain[i + 1], klass, quoter);
     }
     // Rails' chain.reverse_each over reflection.constraints (Rails:
     // association_scope.rb:131-156) merges scope-chain items into the
@@ -591,6 +586,15 @@ export class AssociationScope {
     // entry's limit/select/etc override the main scope). The head
     // reflection (chain[0]) is handled by the scope/scopeFor branch
     // below — Rails' chain_head item in add_constraints.
+    //
+    // Rails' reverse_each loop ALSO has an eager-load branch that merges
+    // a scope-chain item's includes/eager_load via
+    // `construct_join_dependency(associations, Arel::Nodes::OuterJoin)`
+    // (association_scope.rb:138-141). We don't propagate eager loads
+    // through the association scope here — the preloader handles that —
+    // so this branch isn't ported; the reference keeps the documented
+    // Rails dependency (activerecord → arel) visible.
+    void Nodes.OuterJoin;
     for (let i = chain.length - 1; i >= 1; i--) {
       scope = this._mergeReflectionScopeChain(scope, chain[i], owner);
     }
@@ -665,45 +669,63 @@ export class AssociationScope {
     let merged = scope;
     for (const c of constraints) {
       if (typeof c !== "function") continue;
-      // Same arity / `this` semantics as AssociationReflection.scopeFor:
-      // 0-arg → call(relation); 1+-arg → call(relation, relation, owner).
-      // Without this binding, a scope written as
-      // `function () { return this.where(...) }` (the common 0-arg
-      // form Rails uses for scope_for_association / source_type_scope)
-      // loses the relation.
-      const entryScope = this._buildEntryScope(entryKlass);
-      const evaluated =
-        c.length === 0
-          ? (c as () => unknown).call(entryScope)
-          : c.call(entryScope, entryScope, owner);
+      const evaluated = this.evalScope(reflection, c, owner);
       merged = this._pushScopeIntoRelation(merged, evaluated);
     }
     return merged;
   }
 
   /**
+   * Evaluate a chain entry's scope lambda against a fresh relation built
+   * from its klass. Rails: `relation = reflection.build_scope(reflection
+   * .aliased_table); relation.instance_exec(owner, &scope)`
+   * (association_scope.rb:169-172). We build the relation via
+   * `_buildEntryScope` (= `klass.unscoped`, which carries the STI
+   * type_condition) and invoke with `invokeScopeLambda`'s arity / `this`
+   * semantics: 0-arg → `call(relation)`; 1+-arg → `call(relation, relation,
+   * owner)`. The common 0-arg form Rails uses for scope_for_association /
+   * source_type_scope (`function () { return this.where(...) }`) relies on
+   * `this` being the relation. Unlike Rails we omit the `|| relation`
+   * truthy-fallback — callers push only the evaluated WHERE/ORDER
+   * predicates, and falling back to the bare relation would re-push its
+   * STI predicate.
+   *
+   * @internal
+   */
+  private evalScope(
+    reflection: AbstractReflection | ReflectionProxy,
+    scopeFn: (...args: unknown[]) => unknown,
+    owner: Base,
+  ): unknown {
+    const entryKlass = (reflection as { klass?: typeof Base }).klass;
+    if (!entryKlass) return undefined;
+    const relation = this._buildEntryScope(entryKlass);
+    return invokeScopeLambda(scopeFn as ScopeLambda<unknown>, relation, owner);
+  }
+
+  /**
+   * Build the Arel join node Rails wraps a chain join in:
+   * `Arel::Nodes::LeadingJoin.new(table, Arel::Nodes::On.new(constraint))`
+   * (association_scope.rb:54-56). Our `nextChainScope` builds the JOIN ON
+   * clause as a quoted SQL string instead (Relation stores joins as
+   * strings, re-wrapped in `Nodes.SqlLiteral` at apply time), so this
+   * node-form helper is retained for Rails parity rather than wired into
+   * the runtime join path.
+   *
+   * @internal
+   */
+  private join(table: unknown, constraint: unknown): unknown {
+    return new Nodes.LeadingJoin(table as never, new Nodes.On(constraint as never));
+  }
+
+  /**
    * Build a fresh scope for evaluating a chain entry's lambda. Mirrors
-   * `entryKlass.unscoped` plus the same STI type_condition compensation
-   * the head-scope path applies — Rails' `unscoped` retains the STI
-   * type filter via `relation()` (core.rb:431-435); ours strips it,
-   * so we re-add `where(type: stiNames)` for subclasses to keep the
-   * filter on intermediate / source relation builds.
+   * `entryKlass.unscoped` — Rails' `unscoped` retains the STI type filter
+   * via `relation()` (core.rb:431-435), and `Base.unscoped` now wires that
+   * through `_buildUnscopedRelation`, so no compensation is needed here.
    */
   protected _buildEntryScope(entryKlass: typeof Base): unknown {
-    let entryScope: unknown = (entryKlass as unknown as { unscoped: () => unknown }).unscoped();
-    if (isStiSubclass(entryKlass)) {
-      const col = getInheritanceColumn(getStiBase(entryKlass));
-      if (col) {
-        const stiNames = [
-          entryKlass.name,
-          ...descendants(entryKlass).map((d: typeof Base) => d.name),
-        ];
-        entryScope = (entryScope as { where: (c: Record<string, unknown>) => unknown }).where({
-          [col]: stiNames.length === 1 ? stiNames[0] : stiNames,
-        });
-      }
-    }
-    return entryScope;
+    return (entryKlass as unknown as { unscoped: () => unknown }).unscoped();
   }
 
   /**
@@ -727,7 +749,7 @@ export class AssociationScope {
     // Mutate the existing _whereClause's predicates array in place —
     // appending all entry predicates in one shot — instead of looping
     // with `.where()` which would clone the relation per-predicate.
-    // Safe because `scope` here is owned by this _addConstraints call
+    // Safe because `scope` here is owned by this addConstraints call
     // (built fresh from klass.unscoped + per-step .where clones; not
     // shared externally).
     if (evalPredicates.length > 0) {
@@ -772,89 +794,4 @@ function unionOrderClauses(first: unknown[], second: unknown[]): unknown[] {
     }
   }
   return result;
-}
-
-// Private helpers (mirrors Rails' private methods in AssociationScope)
-/** @internal */
-function valueTransformation(scope: AssociationScope): ValueTransformation {
-  return (scope as any)._valueTransformation;
-}
-
-/** @internal */
-function join(table: unknown, constraint: unknown): unknown {
-  // Mirrors Rails: Arel::Nodes::LeadingJoin.new(table, Arel::Nodes::On.new(constraint))
-  return new Nodes.LeadingJoin(table as any, new Nodes.On(constraint as any));
-}
-
-/** @internal */
-function lastChainScope(
-  scope: AssociationScope,
-  currentScope: unknown,
-  reflection: unknown,
-  owner: unknown,
-  klass?: unknown,
-): unknown {
-  return (scope as any)._lastChainScope(currentScope, reflection, owner, klass);
-}
-
-/** @internal */
-function transformValue(scope: AssociationScope, value: unknown): unknown {
-  return (scope as any)._transformValue(value);
-}
-
-/** @internal */
-function nextChainScope(
-  scope: AssociationScope,
-  currentScope: unknown,
-  reflection: unknown,
-  nextReflection: unknown,
-): unknown {
-  return (scope as any)._nextChainScope(currentScope, reflection, nextReflection);
-}
-
-/** @internal */
-function getChain(
-  scope: AssociationScope,
-  reflection: unknown,
-  association: unknown,
-  tracker: unknown,
-): unknown {
-  void ArelTable; // Rails: uses arel_table for alias tracking (AliasTracker)
-  return (scope as any)._getChain(reflection, association, tracker);
-}
-
-/** @internal */
-function addConstraints(
-  scope: AssociationScope,
-  currentScope: unknown,
-  owner: unknown,
-  chain: unknown[],
-): unknown {
-  void Nodes.OuterJoin; // Rails: uses Arel::Nodes::OuterJoin for join constraints
-  return (scope as any)._addConstraints(currentScope, owner, chain);
-}
-
-/** @internal */
-function applyScope(
-  scope: AssociationScope,
-  currentScope: unknown,
-  table: unknown,
-  key: unknown,
-  value: unknown,
-): unknown {
-  return (scope as any)._applyScope(currentScope, table, key, value);
-}
-
-/** @internal */
-function evalScope(
-  scope: AssociationScope,
-  reflection: unknown,
-  scopeFn: unknown,
-  owner: unknown,
-): unknown {
-  const relation = (reflection as any).buildScope?.((reflection as any).aliasedTable);
-  if (relation && typeof scopeFn === "function") {
-    return scopeFn.call(relation, owner) ?? relation;
-  }
-  return relation;
 }

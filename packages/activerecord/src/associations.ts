@@ -549,7 +549,7 @@ export function _canRouteThroughViaAssociationScope(
   // Polymorphic has_many / has_one source (rare): the chain walker
   // would need inversion machinery not present in PR 3c. Polymorphic
   // belongsTo source WITH sourceType is routed — AssociationScope's
-  // _nextChainScope now uses ThroughReflection#joinPrimaryKeyFor(klass)
+  // nextChainScope now uses ThroughReflection#joinPrimaryKeyFor(klass)
   // so the resolved sourceType class's PK drives the JOIN.
   if (
     typeof src.isPolymorphic === "function" &&
@@ -580,7 +580,7 @@ export function _canRouteThroughViaAssociationScope(
  * (`has_many :through → has_many :through`) associations (this PR).
  * Rails' DJAS has no routing gate at all and handles each shape via
  * the generic chain walk — `reflection.chain` flattens nested-through
- * into a straight list of reflection steps, and `_getChain` / the
+ * into a straight list of reflection steps, and `getChain` / the
  * reverseChain walk iterate that list uniformly.
  */
 function _canRouteThroughViaDisableJoinsAssociationScope(

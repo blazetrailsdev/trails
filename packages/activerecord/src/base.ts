@@ -1549,13 +1549,31 @@ export class Base extends Model {
   }
 
   /** @internal Build a scope-proxy-wrapped Relation with no default scope
-   *  applied. Used by `unscoped()` in scoping/default.ts. */
+   *  applied. Used by `unscoped()` in scoping/default.ts. Mirrors Rails'
+   *  `relation` (core.rb:431-435): `unscoped` bypasses the default scope but
+   *  STILL applies the STI `type_condition` for `finder_needs_type_condition?`
+   *  classes, so callers like `AssociationScope` get a type-filtered base
+   *  without re-adding the condition themselves. */
   static _buildUnscopedRelation(): any {
     if (!_RelationCtor) {
       throw new Error("Relation not loaded. Import relation.ts first.");
     }
     const rel = new _RelationCtor(this);
-    return _wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel;
+    return this._applyStiTypeCondition(_wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel);
+  }
+
+  /** @internal Re-apply the STI `type_condition` WHERE for subclasses.
+   *  Rails bakes this into `relation()` so both `unscoped` and the
+   *  default-scoped path carry it; we layer it onto the base relation. */
+  private static _applyStiTypeCondition(rel: any): any {
+    if (isStiSubclass(this)) {
+      const col = getInheritanceColumn(getStiBase(this));
+      if (col) {
+        const stiNames = [this.name, ...this.descendants.map((d: typeof Base) => d.name)];
+        return rel.where({ [col]: stiNames.length === 1 ? stiNames[0] : stiNames });
+      }
+    }
+    return rel;
   }
 
   private static _buildDefaultRelation(): any {
@@ -1566,15 +1584,8 @@ export class Base extends Model {
       const r = new _RelationCtor!(this);
       return _wrapWithScopeProxy ? _wrapWithScopeProxy(r) : r;
     };
-    let rel = DefaultScoping.buildDefaultScope(this, buildBase) ?? buildBase();
-    if (isStiSubclass(this)) {
-      const col = getInheritanceColumn(getStiBase(this));
-      if (col) {
-        const stiNames = [this.name, ...this.descendants.map((d: typeof Base) => d.name)];
-        rel = rel.where({ [col]: stiNames.length === 1 ? stiNames[0] : stiNames });
-      }
-    }
-    return rel;
+    const rel = DefaultScoping.buildDefaultScope(this, buildBase) ?? buildBase();
+    return this._applyStiTypeCondition(rel);
   }
 
   // Scope extension methods: scope name -> Record of extra methods
