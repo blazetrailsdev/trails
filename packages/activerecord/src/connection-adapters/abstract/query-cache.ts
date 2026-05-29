@@ -229,10 +229,18 @@ export class ConnectionPoolConfiguration {
   }
 
   enableQueryCacheBang(): void {
-    if (this._queryCacheMaxSize === null) return;
     const qc = this.queryCache;
     qc.enabled = true;
     qc.dirties = true;
+  }
+
+  /**
+   * Whether this pool's query cache is disabled by configuration
+   * (`db_config.query_cache == false`). The authoritative gate now lives in
+   * `QueryCache.run`, mirroring Rails' `next if pool.db_config&.query_cache == false`.
+   */
+  get queryCacheDisabled(): boolean {
+    return this._queryCacheMaxSize === null;
   }
 
   disableQueryCacheBang(): void {

@@ -133,14 +133,14 @@ describe("QueryCacheTest", () => {
 
   it("cache is not applied when config is false", () => {
     const pool = makePoolWithQCache(false);
-    pool.enableQueryCacheBang();
+    QueryCache.run([pool]);
     expect(pool.queryCacheEnabled).toBe(false);
     expect(pool.queryCache.empty).toBe(true);
   });
 
   it("cache is applied when config is string", () => {
     const pool = makePoolWithQCache("unlimited");
-    pool.enableQueryCacheBang();
+    QueryCache.run([pool]);
     expect(pool.queryCacheEnabled).toBe(true);
     expect(pool.queryCache.empty).toBe(true);
     const maxSize = (pool.queryCache as unknown as { _maxSize: number })._maxSize;
@@ -149,7 +149,7 @@ describe("QueryCacheTest", () => {
 
   it("cache is applied when config is integer", () => {
     const pool = makePoolWithQCache(42);
-    pool.enableQueryCacheBang();
+    QueryCache.run([pool]);
     expect(pool.queryCacheEnabled).toBe(true);
     const maxSize = (pool.queryCache as unknown as { _maxSize: number })._maxSize;
     expect(maxSize).toBe(42);
@@ -157,7 +157,7 @@ describe("QueryCacheTest", () => {
 
   it("cache is applied when config is nil", () => {
     const pool = makePoolWithQCache(null);
-    pool.enableQueryCacheBang();
+    QueryCache.run([pool]);
     expect(pool.queryCacheEnabled).toBe(true);
     expect(pool.queryCache.empty).toBe(true);
   });
@@ -820,6 +820,30 @@ describe("QueryCache executor hooks", () => {
     QueryCache.run([a1, a2]);
     expect(a1.cache.enabled).toBe(true);
     expect(a2.cache.enabled).toBe(true);
+  });
+
+  it("run enables query cache on pools, skipping enabled or config-disabled pools", () => {
+    const makePool = (enabled: boolean, disabled: boolean) => {
+      let calls = 0;
+      const pool = {
+        queryCacheEnabled: enabled,
+        queryCacheDisabled: disabled,
+        enableQueryCacheBang() {
+          calls++;
+        },
+        get enableCalls() {
+          return calls;
+        },
+      };
+      return pool;
+    };
+    const fresh = makePool(false, false);
+    const alreadyEnabled = makePool(true, false);
+    const configDisabled = makePool(false, true);
+    QueryCache.run([fresh, alreadyEnabled, configDisabled]);
+    expect(fresh.enableCalls).toBe(1);
+    expect(alreadyEnabled.enableCalls).toBe(0);
+    expect(configDisabled.enableCalls).toBe(0);
   });
 
   it("complete disables and clears query cache", async () => {

@@ -35,16 +35,41 @@ export { QueryCacheStore };
  * at the end. In our JS runtime, callers use these directly or
  * register them with their own request lifecycle.
  */
+/**
+ * A connection pool whose query cache `run` can enable. The guard lives here,
+ * not inside `enableQueryCacheBang`, mirroring Rails' `QueryCache.run`:
+ * pools already enabled, or disabled by config, are skipped.
+ */
+export interface QueryCachePoolTarget {
+  readonly queryCacheEnabled: boolean;
+  readonly queryCacheDisabled: boolean;
+  enableQueryCacheBang(): void;
+}
+
+function isQueryCachePoolTarget(
+  target: QueryCacheAdapter | QueryCachePoolTarget,
+): target is QueryCachePoolTarget {
+  return typeof (target as QueryCachePoolTarget).enableQueryCacheBang === "function";
+}
+
 export class QueryCache {
   /**
-   * Enable query cache on all provided adapters.
+   * Enable query cache on all provided pools/adapters, skipping pools whose
+   * cache is already enabled or disabled by configuration.
    * Called at the start of a request/execution context.
    *
-   * Mirrors: ActiveRecord::QueryCache::ExecutorHooks.run
+   * Mirrors: ActiveRecord::QueryCache.run
+   * (`each_connection_pool.reject(&:query_cache_enabled).each { next if
+   * pool.db_config&.query_cache == false; pool.enable_query_cache! }`)
    */
-  static run(adapters: QueryCacheAdapter[]): void {
-    for (const adapter of adapters) {
-      adapter.enableQueryCache();
+  static run(targets: (QueryCacheAdapter | QueryCachePoolTarget)[]): void {
+    for (const target of targets) {
+      if (isQueryCachePoolTarget(target)) {
+        if (target.queryCacheEnabled || target.queryCacheDisabled) continue;
+        target.enableQueryCacheBang();
+      } else {
+        target.enableQueryCache();
+      }
     }
   }
 
