@@ -105,7 +105,7 @@ import {
 } from "./explain.js";
 import { inspectExplainOption } from "./adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
-import { rubyInspectArray } from "./relation/ruby-inspect.js";
+import { rubyInspectArray, inspectArelValue, inspectOrderClause } from "./relation/ruby-inspect.js";
 import { JoinDependency } from "./associations/join-dependency.js";
 import { invokeScopeLambda } from "./associations/association-scope.js";
 import type { AliasTracker } from "./associations/alias-tracker.js";
@@ -1073,6 +1073,19 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#inspect
    */
   inspect(): string {
+    // Rails loads the records (synchronously) and renders
+    // `#<ClassName [rec.inspect, ...]>`, truncating at 11 with `...`.
+    // When this relation is already loaded its records are available
+    // synchronously, so we reproduce that format faithfully. The unloaded
+    // path can't: Rails performs blocking DB I/O inside `inspect`, which a
+    // synchronous JS method returning a string cannot do — so we fall back
+    // to the query-chain representation below.
+    if (this._loaded) {
+      const max = this._limitValue !== null ? Math.min(this._limitValue, 11) : 11;
+      const entries = this._records.slice(0, max).map((record) => record.inspect());
+      if (entries.length === 11) entries[10] = "...";
+      return `#<${this.constructor.name} [${entries.join(", ")}]>`;
+    }
     const parts: string[] = [];
     parts.push(`${this._modelClass.name}.all`);
     if (!this._whereClause.isEmpty()) {
@@ -1080,7 +1093,8 @@ export class Relation<T extends Base> {
       if (sql) parts.push(`.where(${JSON.stringify(sql)})`);
     }
     if (this._orderClauses.length > 0) {
-      parts.push(`.order(${JSON.stringify(this._orderClauses)})`);
+      const orders = this._orderClauses.map((c) => inspectOrderClause(c));
+      parts.push(`.order(${orders.join(", ")})`);
     }
     if (this._limitValue !== null) {
       parts.push(`.limit(${this._limitValue})`);
@@ -1089,15 +1103,7 @@ export class Relation<T extends Base> {
       parts.push(`.offset(${this._offsetValue})`);
     }
     if (this._selectColumns !== null) {
-      const cols = this._selectColumns.map((c) =>
-        c instanceof Nodes.SqlLiteral
-          ? `sql(${JSON.stringify(c.value)})`
-          : c instanceof Nodes.Node
-            ? `sql(${JSON.stringify(c.toSql())})`
-            : typeof c === "symbol"
-              ? c.description
-              : JSON.stringify(c),
-      );
+      const cols = this._selectColumns.map((c) => inspectArelValue(c));
       parts.push(`.select(${cols.join(", ")})`);
     }
     if (this._isDistinct) {

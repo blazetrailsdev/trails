@@ -1,3 +1,5 @@
+import { Nodes } from "@blazetrails/arel";
+
 /**
  * Small subset of Ruby's `Object#inspect` output — enough for
  * rendering an array of type-cast bind values the way Rails' `inspect`
@@ -52,4 +54,38 @@ export function rubyInspect(value: unknown): string {
 
 export function rubyInspectArray(values: unknown[]): string {
   return `[${values.map(rubyInspect).join(", ")}]`;
+}
+
+/**
+ * Render a single value that may be an Arel Node into its `inspect`
+ * fragment. Arel Nodes are stringified through their visitor (`toSql()`)
+ * rather than coerced with `String()`/`JSON.stringify` — those produce
+ * `[object Object]` / `{}` for a Node and lose the SQL it represents.
+ *
+ * Used by `Relation#inspect` for both `select` and `order` values so a
+ * relation carrying e.g. an `Arel::Nodes::Ascending` order shows the SQL
+ * fragment instead of an opaque object dump.
+ */
+export function inspectArelValue(value: unknown): string {
+  if (value instanceof Nodes.SqlLiteral) return `sql(${JSON.stringify(value.value)})`;
+  if (value instanceof Nodes.Node) return `sql(${JSON.stringify(value.toSql())})`;
+  if (typeof value === "symbol") return value.description ?? value.toString();
+  return JSON.stringify(value);
+}
+
+/**
+ * Render one `Relation#order` clause for `inspect`. Order clauses come in
+ * four shapes: a plain column string, a `[column, direction]` tuple, a
+ * `{ raw }` SQL fragment, or an Arel Node. Tuples render as `"col dir"`;
+ * everything else delegates to {@link inspectArelValue}.
+ */
+export function inspectOrderClause(clause: unknown): string {
+  if (Array.isArray(clause)) {
+    const [col, dir] = clause as [string, "asc" | "desc"];
+    return JSON.stringify(`${col} ${dir}`);
+  }
+  if (clause !== null && typeof clause === "object" && "raw" in clause) {
+    return `sql(${JSON.stringify((clause as { raw: string }).raw)})`;
+  }
+  return inspectArelValue(clause);
 }

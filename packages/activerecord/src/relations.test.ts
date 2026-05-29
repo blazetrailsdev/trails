@@ -6258,8 +6258,11 @@ describe("RelationTest", () => {
     for (let i = 0; i < 15; i++) await Post.create({ title: `post ${i}` });
     const rel = Post.all();
     await rel.toArray(); // load it
-    const str = await rel.inspect();
-    expect(str).toBeDefined();
+    const str = rel.inspect();
+    // Rails renders a loaded relation as `#<ClassName [rec, ...]>`, capping
+    // the entry list at 11 and replacing the 11th with `...`.
+    expect(str.startsWith("#<")).toBe(true);
+    expect(str).toContain(", ...]>");
   });
 
   it("relations don't load all records in #inspect", () => {
