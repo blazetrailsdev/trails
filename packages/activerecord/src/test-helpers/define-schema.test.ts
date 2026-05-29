@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { adapterType, createSidecarTestAdapter, createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { clearAppliedSchemaSignatures, defineSchema, type ColumnSpec } from "./define-schema.js";
+import {
+  clearAppliedSchemaSignatures,
+  defineSchema,
+  seedSchemaSignatures,
+  type ColumnSpec,
+} from "./define-schema.js";
 import { dropAllTables } from "./drop-all-tables.js";
 
 let adapter: DatabaseAdapter;
@@ -385,6 +390,46 @@ describe("defineSchema", () => {
       clearAppliedSchemaSignatures(raw);
 
       await expect(defineSchema(raw, spec)).resolves.toBeUndefined();
+    });
+  });
+
+  describe("seedSchemaSignatures (sqlite template-clone fast path)", () => {
+    // The template-clone path seeds signatures for tables that physically
+    // exist in the cloned worker DB (no DDL run). defineSchema must then
+    // short-circuit, but its dataSourceExists guard must still recreate any
+    // table that a prior file's reset dropped from the shared worker file.
+    it("makes defineSchema a no-op when the seeded table already exists", async () => {
+      const { adapter: raw } = createSidecarTestAdapter();
+      const spec = { widgets: { name: "string" as ColumnSpec } };
+      // Simulate the cloned template: the table exists in the DB, but the
+      // signature cache is empty (fresh module load in a new worker file).
+      await defineSchema(raw, spec);
+      clearAppliedSchemaSignatures(raw);
+
+      seedSchemaSignatures(raw, spec);
+
+      const spy = vi.spyOn(raw, "executeMutation");
+      await defineSchema(raw, spec);
+      const ddl = spy.mock.calls
+        .map((c) => c[0] as string)
+        .filter((sql) => /CREATE TABLE|DROP TABLE/i.test(sql));
+      expect(ddl).toEqual([]);
+    });
+
+    it("still recreates a seeded table that was dropped from the DB", async () => {
+      const { adapter: raw } = createSidecarTestAdapter();
+      const spec = { sprooms: { name: "string" as ColumnSpec } };
+      await defineSchema(raw, spec);
+      // A prior file's reset dropped the table, but the seed (optimistically)
+      // re-adds its signature. dataSourceExists must catch the gap and recreate.
+      await dropAllTables(raw);
+      clearAppliedSchemaSignatures(raw);
+      seedSchemaSignatures(raw, spec);
+
+      await defineSchema(raw, spec);
+      await expect(
+        raw.executeMutation(`INSERT INTO sprooms (name) VALUES ('ok')`),
+      ).resolves.toBeDefined();
     });
   });
 });

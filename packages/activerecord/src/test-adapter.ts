@@ -54,6 +54,11 @@ let _pooledPoolPromise: Promise<
 
 /** Per-worker SQLite shared-cache database name (Phase A0 spike: prefer named form). */
 function _pooledSqliteDatabase(): string {
+  // Phase 0 template-clone: when a per-worker template clone exists, use that
+  // on-disk file as the worker DB (schema pre-built). Falls back to the
+  // shared-cache :memory: form when no template was built.
+  const cloned = process.env.AR_TEST_WORKER_DB;
+  if (cloned) return cloned;
   const workerId = process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? "1";
   return `file:trails_test_${workerId}?mode=memory&cache=shared`;
 }
