@@ -811,10 +811,23 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((projects[0] as any).id).toBe(p2.id);
   });
 
-  it.skip("association with extend option", () => {
-    // BLOCKED: associations — habtm
-    // ROOT-CAUSE: extend: option on hasAndBelongsToMany is not implemented; module methods not mixed into CollectionProxy
-    // SCOPE: associations/builder/has-and-belongs-to-many.ts — extend option wiring
+  it("association with extend option", async () => {
+    // Rails: DeveloperWithExtendOption.create(name: "Eponine").projects.category == "sns".
+    // The `extend:` module's methods are mixed into the CollectionProxy.
+    const NamedExtension = {
+      category(this: unknown): string {
+        return "sns";
+      },
+    };
+    Associations.hasAndBelongsToMany.call(Developer, "extendProjects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      extend: NamedExtension,
+    });
+    const eponine = await Developer.create({ name: "Eponine", salary: 80000 });
+    const proxy = association(eponine, "extendProjects") as any;
+    expect(proxy.category()).toBe("sns");
   });
 
   it("replace with less", async () => {
@@ -1020,22 +1033,66 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(projects.map((p: any) => p.name)).toEqual(["G1", "G2"]);
   });
 
-  it.skip("find grouped", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: find with group: option not supported on collection relation
-    // SCOPE: collection-proxy.ts / query-methods.ts — grouped find path
+  it("find grouped", async () => {
+    // Rails groups HABTM-joined posts by author and counts. Adapted: a plain
+    // load returns every joined project; the same load with a `group:` in the
+    // scope collapses to one row per group (both projects share approved=null).
+    const dev = await Developer.create({ name: "GroupedDev", salary: 80000 });
+    const p1 = await Project.create({ name: "FG1" });
+    const p2 = await Project.create({ name: "FG2" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
+    const allProjects = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+    });
+    expect(allProjects.length).toBe(2);
+    const grouped = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      scope: (r: any) => r.group("approved").select("count(projects.id) as projects_count"),
+    });
+    expect(grouped.length).toBe(1);
   });
 
-  it.skip("find scoped grouped", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: scope + group combination not propagated through collection relation
-    // SCOPE: collection-proxy.ts / query-methods.ts — scope+group composition
+  it("find scoped grouped", async () => {
+    // Rails: categories(:general).posts_grouped_by_title — a named scope that
+    // adds `group:` flows through the collection relation. Adapted: the scope
+    // lambda's group() composes with the habtm join filter.
+    const dev = await Developer.create({ name: "ScopedGroupedDev", salary: 80000 });
+    const p1 = await Project.create({ name: "SG1", approved: true });
+    const p2 = await Project.create({ name: "SG2", approved: false });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
+    const grouped = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      scope: (r: any) => r.group("approved").select("approved"),
+    });
+    expect(grouped.length).toBe(2);
   });
 
-  it.skip("find scoped grouped having", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: having() not supported on scoped collection relation (HAVING clause gap)
-    // SCOPE: query-methods.ts — having() on association scope
+  it("find scoped grouped having", async () => {
+    // Rails: projects(:active_record).well_paid_salary_groups — group + having
+    // chained inside the scope. Adapted: group() + having() compose into the
+    // habtm join query; HAVING filters out groups below the threshold.
+    const dev = await Developer.create({ name: "HavingDev", salary: 80000 });
+    const p1 = await Project.create({ name: "HV1", approved: true });
+    const p2 = await Project.create({ name: "HV2", approved: true });
+    const p3 = await Project.create({ name: "HV3", approved: false });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p3.id });
+    const groups = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      scope: (r: any) => r.group("approved").having("count(*) >= 2").select("approved"),
+    });
+    expect(groups.length).toBe(1);
   });
 
   it("get ids", async () => {
@@ -1130,10 +1187,24 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(idsAfter).toContain(p2.id);
   });
 
-  it.skip("scoped find on through association doesnt return read only records", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: scoped find on through/habtm incorrectly marks results readonly; scope composition gap
-    // SCOPE: collection-proxy.ts / association-scope.ts — readonly flag incorrectly set on scoped through result
+  it("scoped find on through association doesnt return read only records", async () => {
+    // Rails: Post.find(1).tags.find_by_name("General") must return a writable
+    // record (tag.save! raises nothing). HABTM/through loads use a subquery-IN
+    // filter, not a JOIN, so the result must NOT be flagged readonly.
+    const dev = await Developer.create({ name: "RWAccess", salary: 90000 });
+    const proj = await Project.create({ name: "General" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
+    const found = (
+      await loadHabtm(dev, "projects", {
+        className: "Project",
+        joinTable: "developer_projects",
+        foreignKey: "developer_id",
+        scope: (r: any) => r.where({ name: "General" }),
+      })
+    )[0] as any;
+    expect(found.isReadonly()).toBe(false);
+    found.name = "General Renamed";
+    expect(await found.save()).toBe(true);
   });
 
   it.skip("has many through polymorphic has manys works", () => {
