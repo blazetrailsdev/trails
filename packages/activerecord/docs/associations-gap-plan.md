@@ -236,8 +236,8 @@ A4 #2559, B1 #2557, E1 #2567, F1 #2563, H1 #2556).
 
 - [ ] ~120 LOC (B3b): unskip the remaining `join-model.test.ts` deletion
       tests — `deleting by string id from has many through`, `deleting junk
-    from has many through should raise type mismatch`, `delete associate when
-    deleting from has many through with nonstandard id`. Verified passing
+from has many through should raise type mismatch`, `delete associate when
+deleting from has many through with nonstandard id`. Verified passing
       locally; held back only for the 300-LOC ceiling.
 - [ ] ~40 LOC: wire `CollectionAssociation#deleteAll` through
       `deleteOrNullifyAllRecords` (the faithful-but-unwired HMT helper);
@@ -263,7 +263,7 @@ A4 #2559, B1 #2557, E1 #2567, F1 #2563, H1 #2556).
       `test_assign_array_to_new_record_builds_join_records` (watered-down stubs
       today).
 - [ ] ~10 LOC: route `throughScopeAttributes` through `throughScope(assoc) ??
-    scope` so it consults the `_throughScope` ivar set during `buildRecord`.
+scope` so it consults the `_throughScope` ivar set during `buildRecord`.
 
 **From #2583 (E2 CollectionProxy#create):**
 
@@ -285,11 +285,11 @@ A4 #2559, B1 #2557, E1 #2567, F1 #2563, H1 #2556).
       the FK. Matches Rails `association.rb:350-358` `invertible_for?`.
 - [ ] ~50 LOC: unblock the two composite-FK automatic-inverse tests still
       `it.skip` in `inverse-associations.test.ts` (`has many`/`belongs to
-    inverse of derived automatically despite of composite foreign key`).
+inverse of derived automatically despite of composite foreign key`).
       Needs reflection-level `canFindInverseOfAutomatically` to handle
       `queryConstraints` (composite FK), not just scalar `options.foreignKey`.
 - Note: D1's `AssociationTypeMismatch` message can't reproduce Rails'
-  object_id/`record.inspect` in JS; the error _class_ matches (what tests
+  `object_id`/`record.inspect` in JS; the error `class` matches (what tests
   assert).
 
 **From #2591 (C2 + C3 inverse wiring):**
@@ -312,7 +312,7 @@ A4 #2559, B1 #2557, E1 #2567, F1 #2563, H1 #2556).
 **From #2594 (Did You Mean? on AssociationNotFoundError):**
 
 - [ ] ~40 LOC (Track-1): unskip `eager.test.ts` `exceptions have suggestions
-    for fix`. The corrections plumbing shipped here; the blocker is a
+for fix`. The corrections plumbing shipped here; the blocker is a
       separate `preloader/branch.ts` gap — `groupedRecords()` (~line 161)
       silently skips missing reflections for top-level eager loads instead of
       raising `AssociationNotFoundError`. Fix: (a) raise on unknown top-level
@@ -342,16 +342,16 @@ A4 #2559, B1 #2557, E1 #2567, F1 #2563, H1 #2556).
 - [ ] ~200 LOC: JoinDependency AliasTracker self-join alias emission (deferred
       heavy half of H2; the HABTM-through alias variant shipped separately in
       #2608). Unblocks 3 tests: `nested has many through with a table
-    referenced multiple times` (asserts canonical alias
+referenced multiple times` (asserts canonical alias
       `taggings_authors_join`), `nested has many through with scope on
-    polymorphic reflection`, `polymorphic has many through joined different
-    table twice`.
+polymorphic reflection`, `polymorphic has many through joined different
+table twice`.
 - [ ] HABTM-into-polymorphic-source joins + scope — unblocks `has many through
-    polymorphic with scope`.
+polymorphic with scope`.
 - [ ] default_scope query-method injection — unblocks `joins and includes from
-    through models not included in association`.
+through models not included in association`.
 - [ ] shared-source preload reset — unblocks `through association preload
-    doesnt reset source association if already preloaded`.
+doesnt reset source association if already preloaded`.
 - [ ] nested HMT autosave exclusion + new-record HMT readers — unblocks
       `nested has many through should not be autosaved`.
 

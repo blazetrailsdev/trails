@@ -212,7 +212,7 @@ collection polymorphic relation`.
 **From #2582 (R4 fold association scope into joins):**
 
 - [ ] (large, separate track) Join table-aliasing — unblocks the 5 `missing
-    with enum*` tests (two has_one associations to the same target table in
+with enum*` tests (two has_one associations to the same target table in
       one query). Next actionable PR in the WhereChain enum track.
 - [ ] (separate gap) Enum write-casting from string labels is NOT wired:
       `Model.create({ enumCol: "label" })` and `Model.where({ enumCol: "label" })`
