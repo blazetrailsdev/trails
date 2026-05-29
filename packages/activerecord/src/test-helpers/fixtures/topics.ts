@@ -1,6 +1,10 @@
 import { ref } from "../define-fixtures.js";
 
 // activerecord/test/fixtures/topics.yml
+//
+// STI `type` is only set on the Reply rows (second, fourth); base-class
+// Topic rows leave it NULL, matching Rails which omits `type:` entirely
+// for them.
 export const topicFixtureData = {
   first: {
     id: 1,
@@ -13,7 +17,6 @@ export const topicFixtureData = {
     content: "Have a nice day",
     approved: false,
     replies_count: 1,
-    type: "Topic",
   },
   second: {
     id: 2,
@@ -34,7 +37,6 @@ export const topicFixtureData = {
     content: "I'm a troll",
     approved: true,
     replies_count: 1,
-    type: "Topic",
   },
   fourth: {
     id: 4,
@@ -53,6 +55,5 @@ export const topicFixtureData = {
     written_on: "2013-07-13 11:11:00",
     content: "Omakase",
     approved: true,
-    type: "Topic",
   },
 };

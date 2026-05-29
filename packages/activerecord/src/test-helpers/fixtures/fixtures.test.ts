@@ -94,8 +94,10 @@ describe("topicFixtureData", () => {
       title: "The First Topic",
       author_name: "David",
       approved: false,
-      type: "Topic",
+      replies_count: 1,
     });
+    // `first` is an STI base Topic — Rails omits `type:` (NULL discriminator).
+    expect("type" in topicFixtureData.first).toBe(false);
   });
 
   it("second fixture has Mary as author and a cross-ref to first", () => {

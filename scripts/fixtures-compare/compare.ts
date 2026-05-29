@@ -41,9 +41,13 @@ export const ERB_ALLOW_LIST: ReadonlySet<string> = new Set<string>([
 // this table holds explicit overrides for assocs whose FK column doesn't
 // follow it (e.g. a `creator:` shorthand in YAML that targets a `captain_id`
 // column on the TS row). Keys are the YAML association names; values are
-// the materialized FK column on the row. No entries shipped yet —
-// follow-up DIFF-reconcile PRs populate as needed.
-export const FK_OVERRIDES: Readonly<Record<string, Readonly<Record<string, string>>>> = {};
+// the materialized FK column on the row.
+export const FK_OVERRIDES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  // Sponsor `belongs_to :sponsor_club, class_name: "Club", foreign_key: "club_id"`
+  // — the YAML association name (`sponsor_club`) doesn't follow the
+  // `<assoc>_id` convention, so map it to the real FK column `club_id`.
+  sponsors: { sponsor_club: "club_id" },
+};
 
 // Per-table enum-symbol → integer map for `enum :status, [:proposed, …]`
 // columns. Rails YAML carries `status: :published` (or sometimes
@@ -54,9 +58,44 @@ export const FK_OVERRIDES: Readonly<Record<string, Readonly<Record<string, strin
 // (not a DIFF). Maps are intentionally small — populating them is the
 // follow-up DIFF-reconcile PR. Keep this an `enums` registry and not a
 // general "I declare this string equals this number" knob.
+//
+// A value of `null` mirrors a Rails enum member mapped to nil (e.g.
+// `enum :last_read, { …, forgotten: nil }`) — the stored column is NULL,
+// and the TS fixture carries `null` for that row.
 export const ENUM_MAPS: Readonly<
-  Record<string, Readonly<Record<string, Readonly<Record<string, number>>>>>
-> = {};
+  Record<string, Readonly<Record<string, Readonly<Record<string, number | null>>>>>
+> = {
+  // Book — `vendor/rails/activerecord/test/models/book.rb`. Symbol/string
+  // enum members on the Rails side resolve to the integer (or NULL) the TS
+  // fixture stores.
+  books: {
+    status: { proposed: 0, written: 1, published: 2 },
+    last_read: { unread: 0, reading: 2, read: 3, forgotten: null },
+    language: { english: 0, spanish: 1, french: 2 },
+    author_visibility: { visible: 0, invisible: 1 },
+    illustrator_visibility: { visible: 0, invisible: 1 },
+    font_size: { small: 0, medium: 1, large: 2 },
+    difficulty: { easy: 0, medium: 1, hard: 2 },
+    // `boolean_status` is deliberately omitted: its Book enum is
+    // `{ enabled: true, disabled: false }` (a boolean, not an integer), so it
+    // doesn't belong in an integer ENUM_MAPS. The fixture row currently
+    // carries an integer — the known int→bool cross-engine #2572 followup —
+    // so `awdr.boolean_status` stays an honest `enum-unmapped` soft-skip
+    // until that fixture value is corrected to a boolean.
+  },
+};
+
+// Per-table columns intentionally not mirrored in the TS fixture, counted as
+// soft attribute skips rather than DIFFs. Reserved for values that can't be
+// faithfully carried in a static TS literal — binary blobs (`!binary`) and
+// opaque ERB binary helpers (`<%= binary(...) %>`). Tests needing real bytes
+// build them in-test. Keep this narrow: it suppresses an attribute entirely,
+// so anything that *could* be mirrored belongs in the fixture, not here.
+export const SKIP_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = {
+  // binaries.yml `data` is a `!binary` JPEG blob (flowers) and an
+  // `<%= binary(...) %>` helper (binary_helper) — neither is mirrored.
+  binaries: new Set<string>(["data"]),
+};
 
 // prettier-ignore
 interface FileResult { yamlBase: string; tsBase: string | null; status: Status; rowsMatched: number; rowsTotal: number; attrsMatched: number; attrsTotal: number; attrsSkipped: number; schemaPorted: boolean; schemaExtras: number; notes: string[]; }
@@ -322,8 +361,9 @@ function unwrapSerializedYaml(v: unknown): unknown {
   return m ? m[1] : v;
 }
 
-function resolveEnumSymbol(table: string, attr: string, symbol: string): number | undefined {
-  return ENUM_MAPS[table]?.[attr]?.[symbol];
+function resolveEnumSymbol(table: string, attr: string, symbol: string): number | null | undefined {
+  const map = ENUM_MAPS[table]?.[attr];
+  return map && Object.hasOwn(map, symbol) ? map[symbol] : undefined;
 }
 
 // prettier-ignore
@@ -393,6 +433,13 @@ export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, id
   //      leading `:` we can't tell an unmapped enum from a real mismatch
   //      (e.g. `count: 5` vs `count: "five"`), and silent-passing would
   //      mask data drift.
+  // A nil-mapped enum member (`forgotten: nil`) stores NULL — the TS fixture
+  // carries `null`, the Rails side a symbol/string resolving to null.
+  if (tsVal === null && typeof railsVal === "string") {
+    const col = attr.split(".").pop() ?? attr;
+    const sym = SYMBOL_RE.exec(railsVal)?.[1] ?? railsVal;
+    if (/^\w+$/.test(sym) && resolveEnumSymbol(table, col, sym) === null) return true;
+  }
   if (typeof tsVal === "number" && typeof railsVal === "string") {
     const col = attr.split(".").pop() ?? attr;
     const symMatch = SYMBOL_RE.exec(railsVal);
@@ -592,7 +639,12 @@ export async function compareFile(yamlBase: string, yamlByTable: Map<string, Fix
       r.notes.push(`id-divergence: ${rowName} ts=${String(tsRow.id)} rails=${String(railsRow.id)}`);
       anyDiff = true;
     }
+    const skipAttrs = SKIP_ATTRS[snake];
     for (const attr of new Set([...Object.keys(railsRow), ...Object.keys(tsRow)])) {
+      // Intentionally-unmirrored columns (binary blobs) are soft skips, even
+      // when the TS row drops them entirely — so the presence check below
+      // doesn't flag them as missing-in-ts.
+      if (skipAttrs?.has(attr)) { r.attrsSkipped++; continue; } // prettier-ignore
       r.attrsTotal++;
       if (!(attr in tsRow) || !(attr in railsRow)) {
         r.notes.push(`${attr in tsRow ? "extra" : "missing"}-in-ts: ${rowName}.${attr}`);
