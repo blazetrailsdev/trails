@@ -1,9 +1,9 @@
 # Connection-pool gap plan
 
-162 skipped tests across 23 files. This layer is more fragmented than
-associations or relation — the skips span pool lifecycle, multi-DB
-switching, middleware, config parsing, adapter retry/reconnect, and query
-cache. Many files are entirely stub test suites (every test skipped).
+Open work in the connection-pool layer: **P10** (ConnectionManagement
+middleware) and **P13** (StandaloneConnection, blocked on a Rails source
+refresh). Residual edge cases from the already-built clusters are tracked under
+**Post-merge follow-ups** below.
 
 ---
 
@@ -79,9 +79,9 @@ P13 (StandaloneConnection — blocked on Rails source refresh)
 
 ### Unblocked
 
-| PR  | Tests | Est LOC | Why next                                                            |
-| --- | ----- | ------- | ------------------------------------------------------------------- |
-| P10 | 11    | ~60     | ConnectionManagement middleware — #2531 closed; needs fresh attempt |
+| PR  | Tests | Est LOC | Why next                                                |
+| --- | ----- | ------- | ------------------------------------------------------- |
+| P10 | 11    | ~60     | ConnectionManagement middleware — needs a fresh attempt |
 
 ### Blocked
 
