@@ -1695,13 +1695,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._withoutStrictLoading(async () => {
       const records = await this.toArray();
       const persisted = records.filter((r) => !r.isNewRecord());
+      // Rails' `clear` routes through `delete_all`, which removes the rows in
+      // bulk and does NOT run `before_remove`/`after_remove` callbacks (unlike
+      // per-record `delete`). Through/HABTM drop the join rows via SQL; plain
+      // collections nullify the owner FK on the scoped relation.
       if (persisted.length > 0) {
-        await this.delete(...persisted);
+        if (this._isThrough) {
+          await this._deleteThroughAllSql();
+        } else {
+          await this.scope().updateAll(this._buildNullifyUpdates());
+        }
       }
-      const unsaved = this._target.filter((r) => r.isNewRecord());
-      if (unsaved.length > 0) {
-        this._removeFromTarget(unsaved);
-      }
+      this._removeFromTarget(records);
       this._invalidateAssociationIds();
     });
   }

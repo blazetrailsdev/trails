@@ -196,6 +196,8 @@ describe("AssociationCallbacksTest", () => {
     Associations.hasAndBelongsToMany.call(Project, "developers", {
       className: devName,
       joinTable: "cb_developers_projects",
+      foreignKey: "project_id",
+      associationForeignKey: "developer_id",
       ...callbacks,
     });
     return { Project, Developer };
@@ -610,16 +612,52 @@ describe("AssociationCallbacksTest", () => {
     // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
   });
-  it.skip("has and belongs to many remove callback", () => {
-    // BLOCKED: HABTM join-row lookup gap — before_remove fires but the join
-    // row isn't found by _deleteThrough, so after_remove never runs. This is
-    // an HABTM delete-path issue, not the callback-dispatch unification of E1.
+  it("has and belongs to many remove callback", async () => {
+    const log: string[] = [];
+    const { Project, Developer } = makeHabtmWithCallbacks({
+      beforeRemove: (_owner: any, record: any) => {
+        log.push("before_removing" + record.id);
+      },
+      afterRemove: (_owner: any, record: any) => {
+        log.push("after_removing" + record.id);
+      },
+    });
+    const activerecord = await Project.create({ name: "ActiveRecord" });
+    const david = await Developer.create({ name: "David" });
+    const jamis = await Developer.create({ name: "Jamis" });
+    const proxy = association(activerecord, "developers");
+    await proxy.push(david, jamis);
+    expect(log).toEqual([]);
+    await proxy.delete(david);
+    expect(log).toEqual(["before_removing" + david.id, "after_removing" + david.id]);
+
+    await proxy.delete(jamis);
+    expect(log).toEqual([
+      "before_removing" + david.id,
+      "after_removing" + david.id,
+      "before_removing" + jamis.id,
+      "after_removing" + jamis.id,
+    ]);
   });
 
-  it.skip("has and belongs to many does not fire callbacks on clear", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
+  it("has and belongs to many does not fire callbacks on clear", async () => {
+    const log: string[] = [];
+    const { Project, Developer } = makeHabtmWithCallbacks({
+      beforeRemove: (_owner: any, record: any) => {
+        log.push("before_removing" + record.id);
+      },
+      afterRemove: (_owner: any, record: any) => {
+        log.push("after_removing" + record.id);
+      },
+    });
+    const activerecord = await Project.create({ name: "ActiveRecord" });
+    const david = await Developer.create({ name: "David" });
+    const jamis = await Developer.create({ name: "Jamis" });
+    const proxy = association(activerecord, "developers");
+    await proxy.push(david, jamis);
+    log.length = 0;
+    await proxy.clear();
+    expect(log).toEqual([]);
   });
   it.skip("has and belongs to many callbacks for save on parent", () => {
     // BLOCKED: associations — collection/singular feature gap
