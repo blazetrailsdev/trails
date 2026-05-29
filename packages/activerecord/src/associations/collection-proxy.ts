@@ -377,17 +377,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       }
     }
 
-    // Apply extend option — mix methods into this proxy instance
+    // Apply the `extend:` option — mirrors Rails
+    // `CollectionProxy#initialize`, which does `extend(*extensions)` with
+    // `association.extensions` (`reflection.extensions` =
+    // `Array(options[:extend])`). Routing through `extendingBang` (rather
+    // than binding methods directly onto the instance) records the
+    // modules in `_extending`, so extension methods survive every spawned
+    // scope (`owner.things.where(...).fooExtension()`) via the rebinding
+    // in `_copyStateFrom`.
     const ext = assocDef.options.extend;
     if (ext) {
       const extensions = Array.isArray(ext) ? ext : [ext];
-      for (const mod of extensions) {
-        for (const [key, fn] of Object.entries(mod)) {
-          if (typeof fn === "function") {
-            (this as Record<string, unknown>)[key] = fn.bind(this);
-          }
-        }
-      }
+      this.extendingBang(...extensions);
     }
 
     this._installMutationTracker();

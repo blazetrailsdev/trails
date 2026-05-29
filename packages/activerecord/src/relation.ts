@@ -4746,6 +4746,19 @@ export class Relation<T extends Base> {
     this._fromClause = source._fromClause;
     this._createWithAttrs = { ...source._createWithAttrs };
     this._extending = [...source._extending];
+    // Rebind extension-module methods onto this clone. Ruby's `extend`
+    // mutates the singleton class, so a cloned relation keeps the mixed-in
+    // methods; here `_extending` only carries the module objects, so we
+    // re-bind each method to the new instance. Without this, extension
+    // methods applied to a CollectionProxy (or via `extending(...)`) are
+    // lost the moment the relation is spawned (`rel.where(...).fooExt()`).
+    for (const mod of this._extending) {
+      for (const [name, fn] of Object.entries(mod)) {
+        if (typeof fn === "function") {
+          (this as unknown as Record<string, unknown>)[name] = fn.bind(this);
+        }
+      }
+    }
     this._ctes = [...source._ctes];
     this._skipPreloading = source._skipPreloading;
     this._skipQueryCache = source._skipQueryCache;

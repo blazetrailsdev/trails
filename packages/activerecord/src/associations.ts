@@ -112,6 +112,15 @@ export interface AssociationOptions {
     | ((owner: Base, record: Base) => void | false)
     | ((owner: Base, record: Base) => void | false)[];
   afterRemove?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
+  /** Mixes methods into the association's CollectionProxy and every
+   * relation spawned from it, mirroring Rails' `has_many :things,
+   * extend: ModA` / `extend: [ModA, ModB]`. A module is an object whose
+   * function values become callable on `owner.things` (and
+   * `owner.things.where(...)`). Rails always stores extensions as Modules
+   * — `Reflection#extensions` is `Array(options[:extend])`, and even the
+   * block form (`has_many :things do ... end`) is compiled to a Module
+   * via `Module.new(&block)` — so the TS surface is the object-of-methods
+   * form, not a relation-mutating callback. */
   extend?:
     | Record<string, (...args: unknown[]) => unknown>
     | Record<string, (...args: unknown[]) => unknown>[];
