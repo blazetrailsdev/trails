@@ -24,6 +24,7 @@ import {
   NotImplementedError,
 } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { setToSqlVisitor, type Nodes } from "@blazetrails/arel";
 import {
   connectedToStack,
   currentRole as coreCurrentRole,
@@ -39,6 +40,8 @@ import { IsolatedExecutionState } from "@blazetrails/activesupport";
  */
 
 const PROHIBIT_SHARD_SWAPPING_KEY = Symbol.for("ar_prohibit_shard_swapping");
+
+type ToSqlVisitorConstructor = new () => { compile(node: Nodes.Node): string };
 
 // --- ConnectionHandling module methods (mixed into Base as static methods) ---
 
@@ -592,11 +595,29 @@ export async function establishConnection(
 
   if (config === undefined) {
     await autoConnect(modelClass);
-    return;
+  } else {
+    const resolved = resolveConfig(modelClass, config);
+    await establishWithConfig(modelClass, resolved.adapterName, resolved.url, resolved.config);
   }
 
-  const resolved = resolveConfig(modelClass, config);
-  await establishWithConfig(modelClass, resolved.adapterName, resolved.url, resolved.config);
+  await installAdapterVisitor(modelClass);
+}
+
+/** @internal */
+export async function installAdapterVisitor(modelClass: typeof Base): Promise<void> {
+  try {
+    await modelClass.withConnection(
+      (adapter: DatabaseAdapter) => {
+        const visitor = (adapter as { visitor?: object } | null | undefined)?.visitor;
+        if (visitor) {
+          setToSqlVisitor((visitor as object).constructor as ToSqlVisitorConstructor);
+        }
+      },
+      { preventPermanentCheckout: true },
+    );
+  } catch (error) {
+    if (!(error instanceof ConnectionNotEstablished)) throw error;
+  }
 }
 
 async function establishWithConfig(

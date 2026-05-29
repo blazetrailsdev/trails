@@ -162,7 +162,6 @@ export default defineConfig({
           globalSetup: ["./packages/activerecord/src/test-helpers/sqlite-template-global-setup.ts"],
           setupFiles: [
             "./packages/activerecord/src/test-setup-worker-db.ts",
-            "./packages/activerecord/src/test-setup.ts",
             "./packages/activerecord/src/test-setup-ar.ts",
             ...(process.env.MYSQL_TEST_URL
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
@@ -219,7 +218,6 @@ export default defineConfig({
             "vendor/*.test.ts",
           ],
           exclude: ["packages/activerecord/**", ...SHARED_EXCLUDE],
-          setupFiles: ["./packages/activerecord/src/test-setup.ts"],
           poolOptions: { forks: { maxForks: TEST_FORKS } },
         },
       },
