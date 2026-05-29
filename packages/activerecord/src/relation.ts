@@ -105,7 +105,7 @@ import {
 } from "./explain.js";
 import { inspectExplainOption } from "./adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
-import { rubyInspectArray } from "./relation/ruby-inspect.js";
+import { rubyInspectArray, inspectArelValue, inspectOrderClause } from "./relation/ruby-inspect.js";
 import { JoinDependency } from "./associations/join-dependency.js";
 import { invokeScopeLambda } from "./associations/association-scope.js";
 import type { AliasTracker } from "./associations/alias-tracker.js";
@@ -1080,7 +1080,8 @@ export class Relation<T extends Base> {
       if (sql) parts.push(`.where(${JSON.stringify(sql)})`);
     }
     if (this._orderClauses.length > 0) {
-      parts.push(`.order(${JSON.stringify(this._orderClauses)})`);
+      const orders = this._orderClauses.map((c) => inspectOrderClause(c));
+      parts.push(`.order(${orders.join(", ")})`);
     }
     if (this._limitValue !== null) {
       parts.push(`.limit(${this._limitValue})`);
@@ -1089,15 +1090,7 @@ export class Relation<T extends Base> {
       parts.push(`.offset(${this._offsetValue})`);
     }
     if (this._selectColumns !== null) {
-      const cols = this._selectColumns.map((c) =>
-        c instanceof Nodes.SqlLiteral
-          ? `sql(${JSON.stringify(c.value)})`
-          : c instanceof Nodes.Node
-            ? `sql(${JSON.stringify(c.toSql())})`
-            : typeof c === "symbol"
-              ? c.description
-              : JSON.stringify(c),
-      );
+      const cols = this._selectColumns.map((c) => inspectArelValue(c));
       parts.push(`.select(${cols.join(", ")})`);
     }
     if (this._isDistinct) {
