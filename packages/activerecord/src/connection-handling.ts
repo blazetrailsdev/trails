@@ -24,6 +24,7 @@ import {
   NotImplementedError,
 } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { setToSqlVisitor, type Nodes } from "@blazetrails/arel";
 import {
   connectedToStack,
   currentRole as coreCurrentRole,
@@ -592,11 +593,42 @@ export async function establishConnection(
 
   if (config === undefined) {
     await autoConnect(modelClass);
-    return;
+  } else {
+    const resolved = resolveConfig(modelClass, config);
+    await establishWithConfig(modelClass, resolved.adapterName, resolved.url, resolved.config);
   }
 
-  const resolved = resolveConfig(modelClass, config);
-  await establishWithConfig(modelClass, resolved.adapterName, resolved.url, resolved.config);
+  // Mirror Rails: establishing the connection resolves the adapter, which in
+  // turn installs the matching Arel visitor. Lease the connection so the
+  // global toSql visitor reflects the just-established dialect — code paths
+  // that lack adapter context (Node#toSql, TreeManager#toSql) then produce
+  // dialect-correct SQL without a separate `syncHandlerVisitor` step.
+  installAdapterVisitor(modelClass);
+}
+
+/**
+ * Install the global Arel `toSql` visitor to match the model's established
+ * adapter dialect. Leasing the connection is best-effort: if the pool can't
+ * yield a connection (e.g. the configured database can't be opened), the
+ * visitor is left untouched — without a connection there is no SQL to
+ * compile, so the dialect is irrelevant, and the underlying error surfaces on
+ * the first real query rather than from `establishConnection`.
+ *
+ * @internal
+ */
+export function installAdapterVisitor(modelClass: typeof Base): void {
+  let adapter: DatabaseAdapter;
+  try {
+    adapter = modelClass.connection;
+  } catch {
+    return;
+  }
+  const visitor = (adapter as { visitor?: object } | null | undefined)?.visitor;
+  if (visitor) {
+    setToSqlVisitor(
+      (visitor as object).constructor as new () => { compile(node: Nodes.Node): string },
+    );
+  }
 }
 
 async function establishWithConfig(

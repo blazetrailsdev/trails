@@ -3,6 +3,7 @@ import { Base } from "./base.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { Table, Visitors, setToSqlVisitor } from "@blazetrails/arel";
 import {
   connectedToStack,
   currentRole,
@@ -679,5 +680,26 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
     } finally {
       __resetPrimaryAbstractClass();
     }
+  });
+});
+
+describe("establishConnection installs the matching Arel visitor", () => {
+  afterEach(() => {
+    setToSqlVisitor(Visitors.ToSql);
+    Base.connectionHandler.clearAllConnectionsBang();
+    Base._adapter = null;
+  });
+
+  it("routes the global toSql visitor through the established adapter's dialect", async () => {
+    // Start from the generic visitor so any change is attributable to establish.
+    setToSqlVisitor(Visitors.ToSql);
+    const users = new Table("users");
+    const node = users.get("name").isDistinctFrom(null);
+    expect(node.toSql()).toBe(`"users"."name" IS DISTINCT FROM NULL`);
+
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+
+    // SQLite's visitor rewrites IS DISTINCT FROM NULL to IS NOT NULL.
+    expect(node.toSql()).toBe(`"users"."name" IS NOT NULL`);
   });
 });

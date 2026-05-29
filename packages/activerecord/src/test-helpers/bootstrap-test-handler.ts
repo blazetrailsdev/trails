@@ -1,5 +1,4 @@
 import { Base } from "../base.js";
-import { setToSqlVisitor } from "@blazetrails/arel";
 
 /**
  * Bootstrap `Base.connectionHandler` for the current worker so that models
@@ -31,24 +30,7 @@ export async function bootstrapTestHandler(): Promise<void> {
       await Base.establishConnection({ adapter: "sqlite3", database, pool: 1 });
     }
   }
-  syncHandlerVisitor();
-}
-
-/**
- * Re-sync the global Arel `toSql` visitor to match the handler's adapter.
- * Must be called from a `beforeEach` in handler-suite files because
- * `test-setup.ts` resets the global visitor to the default after every test.
- *
- * @internal
- */
-export function syncHandlerVisitor(): void {
-  if (!Base.isConnectedQ()) return;
-  const visitor = (Base.connection as { visitor?: object }).visitor;
-  if (visitor) {
-    setToSqlVisitor(
-      (visitor as object).constructor as new () => {
-        compile(node: import("@blazetrails/arel").Nodes.Node): string;
-      },
-    );
-  }
+  // `establishConnection` installs the matching Arel visitor as a side effect
+  // (connection-handling.ts#installAdapterVisitor), so no separate resync is
+  // needed here or in a `beforeEach`.
 }
