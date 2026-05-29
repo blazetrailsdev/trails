@@ -19,13 +19,16 @@ export function foreignKeyPresentFor(reflection: AssociationReflection, owner: B
     .activeRecordPrimaryKey;
   const keys = Array.isArray(arPk) ? arPk : [arPk ?? "id"];
   const rec = owner as Base & {
+    attributePresent?: (key: string) => boolean;
     _readAttribute?: (key: string) => unknown;
     [key: string]: unknown;
   };
-  return keys.every((key) => {
-    const val = typeof rec._readAttribute === "function" ? rec._readAttribute(key) : rec[key];
-    return val != null;
-  });
+  // Rails calls `owner.attribute_present?` (!nil && !empty), not a bare nil check.
+  return keys.every((key) =>
+    typeof rec.attributePresent === "function"
+      ? rec.attributePresent(key)
+      : (typeof rec._readAttribute === "function" ? rec._readAttribute(key) : rec[key]) != null,
+  );
 }
 
 /**
