@@ -53,6 +53,7 @@ import {
   _canRouteThroughViaAssociationScope,
   ownerHasUnresolvedThroughKey,
   _setCollectionInverseInstance,
+  _violatesStrictLoading,
 } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 import { buildThroughInverseFor } from "./has-many-through-association.js";
@@ -571,7 +572,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private _checkStrictLoading(): void {
-    if (this._record._strictLoading && !this._record._strictLoadingBypassCount) {
+    if (_violatesStrictLoading(this._record, this._assocDef.options)) {
       throw StrictLoadingViolationError.forAssociation(this._record, this._assocName);
     }
   }
