@@ -1700,18 +1700,31 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._withoutStrictLoading(async () => {
       const records = await this.toArray();
       // Rails' `clear` routes through `delete_all`, which removes the rows in
-      // bulk and does NOT run `before_remove`/`after_remove` callbacks (unlike
-      // per-record `delete`). Like `deleteAll`, the bulk removal runs
-      // unconditionally — gating on loaded targets would orphan dangling join
-      // rows whose targets aren't loadable. Through/HABTM drop the join rows
-      // via SQL; plain collections nullify the owner FK. Mirror `deleteAll`'s
-      // divergence guard: when in-place proxy mutations (whereBang / ...) have
-      // run, `scope()` would rebuild the unmutated association scope and
-      // nullify MORE rows than the caller constrained, so go through
-      // `super.updateAll`.
+      // bulk and does NOT run `before_remove`/`after_remove` callbacks (those
+      // live in `remove_records`, not the delete path) — unlike per-record
+      // `delete`.
       if (this._isThrough) {
-        await this._deleteThroughAllSql();
+        // Mirror `delete_or_nullify_all_records` → `delete_records(load_target,
+        // method)` (has_many_through_association.rb:136-175): destroy the join
+        // rows for the loaded target so the join model's `belongsTo`
+        // counter-cache callbacks still fire, without the collection
+        // before/after-remove callbacks. The loaded-target scoping also keeps
+        // a diverged (`whereBang`-constrained) clear from touching rows outside
+        // the caller's scope.
+        const assoc = this._record.association(this._assocName) as unknown as {
+          loadTarget: () => Promise<Base[]>;
+          deleteRecords: (records: Base[], method: string) => Promise<number>;
+        };
+        const target = await assoc.loadTarget();
+        if (target.length > 0) {
+          await assoc.deleteRecords(target, (this._assocDef.options.dependent as string) ?? "");
+        }
       } else if (this._relationStateDiverged()) {
+        // Plain collections nullify the owner FK. Mirror `deleteAll`'s
+        // divergence guard: when in-place proxy mutations (whereBang / ...)
+        // have run, `scope()` would rebuild the unmutated association scope
+        // and nullify MORE rows than the caller constrained, so go through
+        // `super.updateAll`.
         await super.updateAll(this._buildNullifyUpdates());
       } else {
         await this.scope().updateAll(this._buildNullifyUpdates());
