@@ -16,8 +16,11 @@ Verification:
 - `new QueryCacheAdapter(...)` appears only in `query-cache.test.ts`. The pool's
   `checkout` → `checkoutAndVerify` returns the **raw** mixin adapter, unwrapped
   (`connection-adapters/abstract/connection-pool.ts`).
-- The only caller of `Store.computeIfAbsent` (the actual cache lookup) is inside
-  the wrapper, `query-cache.ts` (`this.cache.computeIfAbsent(...)`).
+- The only **reachable** caller of `Store.computeIfAbsent` (the actual cache
+  lookup) is inside the wrapper, `query-cache.ts` (`this.cache.computeIfAbsent(...)`).
+  The mixin's `cacheSql` also calls `computeIfAbsent`
+  (`connection-adapters/abstract/query-cache.ts`), but `cacheSql` itself is
+  unwired (see next point), so that call path is never entered.
 - The mixin's `lookupSqlCache` / `cacheSql` (bundled into the `QueryCache`
   mixin const in `connection-adapters/abstract/query-cache.ts`) have **no
   callers**. The live `selectAll` delegates straight to the database with no
@@ -101,16 +104,20 @@ inner adapter`, the Quoting-forwarder fallback tests) are deleted with the
   `getCurrentUserTransaction`, `cacheKey`).
 - Drop the `QueryCacheAdapter` export from `index.ts` (public API removal — no
   Rails counterpart; note in PR body).
-- Collapse the two `adapter.inner` walks — `relation.ts` `resolveAdapterMatcher`
-  helper and `relation/query-methods.ts` — to a **direct static lookup**
+- Collapse the `adapter.inner` walks to a **direct static lookup**
   (`adapter.constructor.columnNameMatcher?.() ?? abstractColumnNameMatcher()`),
-  matching Rails' `model.adapter_class.column_name_matcher`. This also obsoletes
-  the abandoned column-matcher dedup follow-up in `relation-gap-plan.md`.
+  matching Rails' `model.adapter_class.column_name_matcher`. The walk lives in
+  three resolvers: `resolveColumnNameMatcher` and `resolveColumnNameWithOrderMatcher`
+  in `relation.ts`, and `resolveOrderMatcher` in `relation/query-methods.ts`
+  (which walks `adapter = adapter.inner`). (Note: `resolveAdapterMatcher` was a
+  shared helper introduced only in the closed PR #2639 — it is **not** on main;
+  these three are the real symbols.) This also obsoletes the abandoned
+  column-matcher dedup follow-up in `relation-gap-plan.md`.
 - Remove the stale `QueryCacheAdapter` comment in `relation.ts`.
 
 ## Notes
 
 - The column-matcher dedup (originally a standalone ~30 LOC follow-up, PR #2639,
   closed) is **subsumed by Phase 3**: once there is no wrapper, there is no
-  `.inner` chain to walk, so both matcher resolvers collapse to one-line direct
+  `.inner` chain to walk, so the matcher resolvers collapse to one-line direct
   lookups and the shared helper is unnecessary. Do not reopen it standalone.
