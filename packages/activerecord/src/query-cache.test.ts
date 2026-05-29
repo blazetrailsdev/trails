@@ -139,10 +139,12 @@ describe("QueryCacheTest", () => {
   });
 
   it("cache is applied when config is string", () => {
-    const pool = makePoolWithQCache("enabled");
+    const pool = makePoolWithQCache("unlimited");
     pool.enableQueryCacheBang();
     expect(pool.queryCacheEnabled).toBe(true);
     expect(pool.queryCache.empty).toBe(true);
+    const maxSize = (pool.queryCache as unknown as { _maxSize: number })._maxSize;
+    expect(maxSize).toBe(Number.POSITIVE_INFINITY);
   });
 
   it("cache is applied when config is integer", () => {
