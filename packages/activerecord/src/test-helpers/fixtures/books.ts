@@ -31,6 +31,10 @@ export const bookFixtureData = {
     name: "Domain-Driven Design",
     format: "hardcover",
     status: 2,
+    // Rails YAML carries `last_read: "forgotten"`; the Book enum maps
+    // `forgotten` to nil (`enum :last_read, { …, forgotten: nil }`), so the
+    // stored value is NULL.
+    last_read: null,
   },
   tlg: {
     id: 4,

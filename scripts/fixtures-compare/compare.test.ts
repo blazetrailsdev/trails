@@ -215,6 +215,31 @@ describe("compareFile + schema integration", () => {
     expect(r.status).toBe("DIFF");
     expect(r.notes.some((n) => /^schema-extra-col: .*\.name/.test(n))).toBe(true);
   });
+
+  it("SKIP_ATTRS suppresses a Rails-only column without flagging missing-in-ts, keeping the % accurate", async () => {
+    // `binaries.data` is in SKIP_ATTRS: the `!binary` blob isn't mirrored in
+    // binaries.ts (rows carry only `id`). Even though the Rails side declares
+    // `data`, it must be a soft skip — not `missing-in-ts` — and excluded from
+    // attrsTotal so the percentage stays at the real-column ratio.
+    const railsBinaries = new Map([
+      [
+        "binaries",
+        { flowers: { id: 1, data: "<blob>" }, binary_helper: { id: 2, data: "<blob>" } },
+      ],
+    ]);
+    const r = await compareFile("binaries.yml", railsBinaries, new Map(), undefined, {
+      binaries: { data: "binary" },
+    });
+    // (1) the skipped attr never surfaces as drift…
+    expect(r.notes.some((n) => /-in-ts: \w+\.data/.test(n))).toBe(false);
+    // (2) …it increments attrsSkipped once per row…
+    expect(r.attrsSkipped).toBe(2);
+    // (3) …and attrsTotal counts only the real columns (the two `id`s), so the
+    // ratio is a clean 2/2 MATCH rather than being diluted to 2/4.
+    expect(r.attrsTotal).toBe(2);
+    expect(r.attrsMatched).toBe(2);
+    expect(r.status).toBe("MATCH");
+  });
 });
 
 describe("canonicalizeRailsRow", () => {
@@ -235,6 +260,13 @@ describe("canonicalizeRailsRow", () => {
   });
   it("drops keys whose `_id` form isn't a column (HABTM / unknown assoc)", () => {
     expect(canonicalizeRailsRow({ treasures: "diamond, sapphire" }, {}, cols)).toEqual({});
+  });
+  it("maps an FK_OVERRIDES assoc to its declared column (sponsors.sponsor_club → club_id)", () => {
+    // `sponsor_club` doesn't follow the `<assoc>_id` convention; the override
+    // routes it to the real `club_id` column.
+    expect(canonicalizeRailsRow({ sponsor_club: "moustache_club" }, {}, cols, "sponsors")).toEqual({
+      club_id: "moustache_club",
+    });
   });
   it("falls back to tsRow keys when no schema columns are available, preserving unknown Rails keys", () => {
     // Without schema we can't distinguish HABTM from a column the TS side
@@ -411,12 +443,20 @@ describe("datetime / serialized-YAML tolerance", () => {
 
 describe("enum-symbol comparator", () => {
   it("counts unmapped `:symbol` ↔ integer pairs as a soft skip, not a DIFF", () => {
-    // The ENUM_MAPS registry is empty by default; an unregistered enum-shaped
-    // pair should bump the per-row attrsSkipped counter and return true so
-    // unported enum metadata doesn't gate the strict flip.
+    // An enum-shaped pair on a table/column with no ENUM_MAPS entry should
+    // bump the per-row attrsSkipped counter and return true so unported enum
+    // metadata doesn't gate the strict flip.
     const notes: string[] = [];
     const skip = { n: 0 };
-    const ok = compareValue(2, ":published", "row.status", idIndex, notes, "books", skip);
+    const ok = compareValue(
+      2,
+      ":published",
+      "row.status",
+      idIndex,
+      notes,
+      "unregistered_table",
+      skip,
+    );
     expect(ok).toBe(true);
     expect(skip.n).toBe(1);
     expect(notes[0]).toMatch(/^enum-unmapped: row\.status/);
@@ -439,6 +479,30 @@ describe("enum-symbol comparator", () => {
     expect(ok).toBe(false);
     expect(skip.n).toBe(0);
     expect(notes[0]).toMatch(/^value-differs:/);
+  });
+  it("resolves a registered enum member from both `:symbol` and bare-string form", () => {
+    // ENUM_MAPS["books"].status maps proposed=0/published=2; the Rails side
+    // may carry either `:published` (symbol) or `"proposed"` (bare string).
+    expect(compareValue(2, ":published", "awdr.status", idIndex, [], "books")).toBe(true);
+    expect(compareValue(0, "proposed", "rfr.status", idIndex, [], "books")).toBe(true);
+    // A registered map still rejects a genuinely wrong integer.
+    expect(compareValue(1, ":published", "awdr.status", idIndex, [], "books")).toBe(false);
+  });
+  it("matches a nil-mapped enum member (forgotten) against a TS `null`", () => {
+    // `enum :last_read, { …, forgotten: nil }` stores NULL; the TS fixture
+    // carries `null` and the Rails side the bare string `"forgotten"`.
+    expect(compareValue(null, "forgotten", "ddd.last_read", idIndex, [], "books")).toBe(true);
+    // A nil-mapped member doesn't match a non-null TS value.
+    expect(compareValue(0, "forgotten", "ddd.last_read", idIndex, [], "books")).toBe(false);
+  });
+  it("never resolves an enum member from Object.prototype keys", () => {
+    // `toString`/`constructor` are not declared enum members; the lookup must
+    // treat them as unmapped (soft-skip), not pull off the prototype.
+    const notes: string[] = [];
+    const skip = { n: 0 };
+    expect(compareValue(2, ":toString", "row.status", idIndex, notes, "books", skip)).toBe(true);
+    expect(skip.n).toBe(1);
+    expect(notes[0]).toMatch(/^enum-unmapped:/);
   });
 });
 
