@@ -8,6 +8,7 @@ import {
   enableSti,
   registerSubclass,
   AssociationNotFoundError,
+  EagerLoadPolymorphicError,
 } from "../index.js";
 import { Associations, association, loadHasMany, loadHasManyThrough } from "../associations.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
@@ -262,6 +263,13 @@ const TEST_SCHEMA: Schema = {
   elmar_projects: { name: "string", elmar_mentor_id: "integer" },
   elra_authors: { name: "string" },
   elra_posts: { title: "string", elra_author_id: "integer" },
+  ewc_authors: { name: "string" },
+  ewc_essays: {
+    name: "string",
+    ewc_author_id: "integer",
+    writer_id: "integer",
+    writer_type: "string",
+  },
   enra_authors: { name: "string" },
   enra_posts: { title: "string", enra_author_id: "integer" },
   eoidas_authors: { name: "string" },
@@ -4871,10 +4879,32 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it.skip("eager-loading with a polymorphic association won't work consistently", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("eager-loading with a polymorphic association won't work consistently", async () => {
+    class EwcAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class EwcEssay extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("ewc_author_id", "integer");
+        this.attribute("writer_id", "integer");
+        this.attribute("writer_type", "string");
+      }
+    }
+    registerModel(EwcAuthor);
+    registerModel(EwcEssay);
+    Associations.hasMany.call(EwcAuthor, "essays", { className: "EwcEssay" });
+    Associations.belongsTo.call(EwcEssay, "writer", { polymorphic: true });
+
+    const david = await EwcAuthor.create({ name: "David" });
+    await EwcEssay.create({ name: "A", ewc_author_id: david.id });
+    const essays = EwcEssay.all().where({ ewc_author_id: david.id });
+
+    await expect(essays.eagerLoad("writer").toArray()).rejects.toThrow(EagerLoadPolymorphicError);
+    await expect(essays.eagerLoad("writer").count()).rejects.toThrow(EagerLoadPolymorphicError);
+    await expect(essays.eagerLoad("writer").exists()).rejects.toThrow(EagerLoadPolymorphicError);
   });
   it("preloading has_many_through association avoids calling association.reader", async () => {
     class PhmtAuthor extends Base {

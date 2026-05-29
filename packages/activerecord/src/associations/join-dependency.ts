@@ -167,7 +167,13 @@ export class JoinDependency {
       assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type;
 
     if (assocDef.type === "belongsTo") {
-      if (assocDef.options.polymorphic) return null;
+      // Rails raises for polymorphic eager loads — the join target table is
+      // not known statically (join_dependency.rb#build). This is distinct from
+      // the capability-gap fallbacks below (CPK / unjoinable through), which
+      // return null so the caller degrades to preloading.
+      if (assocDef.options.polymorphic) {
+        throw new EagerLoadPolymorphicError(assocName);
+      }
       foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
       if (Array.isArray(foreignKey)) return null;
       const className = assocDef.options.className ?? _camelize(assocName);

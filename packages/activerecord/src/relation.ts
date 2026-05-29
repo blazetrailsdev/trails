@@ -2564,7 +2564,24 @@ export class Relation<T extends Base> {
   // count, sum, average, minimum, maximum are mixed in via
   // interface merge + prototype assignment (see bottom of file)
 
+  /**
+   * Surface raise-worthy eager-load specs (polymorphic / misspelled) before
+   * building calculation/exists SQL, which never constructs a JoinDependency
+   * of its own. Mirrors Rails, where `count`/`exists?` with `eager_load` still
+   * go through `apply_join_dependency` and raise. Capability-gap specs (CPK,
+   * unjoinable through) return false from addAssociationSpec and don't raise.
+   * @internal
+   */
+  private _checkEagerLoadable(): void {
+    if (this._eagerLoadAssociations.length === 0) return;
+    const basePk = (this._modelClass as any).primaryKey ?? "id";
+    if (Array.isArray(basePk)) return;
+    const jd = new JoinDependency(this._modelClass);
+    for (const spec of this._eagerLoadAssociations) jd.addAssociationSpec(spec);
+  }
+
   private _applyJoinsToManager(manager: SelectManager): void {
+    this._checkEagerLoadable();
     // Mirror Rails build_join_buckets routing (query_methods.rb:1856-1863):
     // When stashed joins exist, non-LeadingJoin nodes go to join_node (appended
     // after), LeadingJoin goes to leading_join (prepended before). Without stashed
