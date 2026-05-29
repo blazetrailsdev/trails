@@ -57,6 +57,7 @@ interface CalculationRelation {
   _applyJoinsToManager(manager: any): void;
   _applyWheresToManager(manager: any, table: any): void;
   _applyOrderToManager(manager: any, table: any): void;
+  _checkEagerLoadable(): void;
   toArray(): Promise<any[]>;
 }
 
@@ -325,6 +326,9 @@ export async function performCount(
 ): Promise<number | Record<string, number>> {
   if (this._limitValue === 0) return 0;
   if (this._isNone) return this._groupColumns.length > 0 ? {} : 0;
+  // Rails count routes through apply_join_dependency when eager loading, which
+  // raises EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
+  this._checkEagerLoadable();
 
   if (this._groupColumns.length > 0) {
     return groupedAggregate(this, "count", column ?? "*", true) as Promise<Record<string, number>>;
@@ -603,6 +607,9 @@ export function performCalculation(
   operation: string,
   columnName: string,
 ): Promise<unknown> {
+  // Rails calculate routes through apply_join_dependency when eager loading,
+  // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
+  rel._checkEagerLoadable();
   if ((rel as any)._groupColumns?.length > 0) {
     return executeGroupedCalculation(rel, operation, columnName, false);
   }

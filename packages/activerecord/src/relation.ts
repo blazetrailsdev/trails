@@ -2567,10 +2567,15 @@ export class Relation<T extends Base> {
   /**
    * Surface raise-worthy eager-load specs (polymorphic) before building
    * calculation/exists SQL, which never constructs a JoinDependency of its own.
-   * Mirrors Rails `apply_join_dependency`, which `count`/`exists?` route through
-   * over `eager_load_values | includes_values` and which raises for polymorphic
-   * associations. Capability-gap specs (CPK, unjoinable through) return false
-   * from addAssociationSpec and don't raise.
+   * Mirrors Rails `apply_join_dependency`, which `count`/`exists?`/`calculate`
+   * route through over `eager_load_values | includes_values` and which raises
+   * for polymorphic associations. Capability-gap specs (CPK, unjoinable through)
+   * return false from addAssociationSpec and don't raise.
+   *
+   * Only the calculation/exists entry points call this — the `toArray` eager
+   * path builds its real JoinDependency in `_executeEagerLoad`/`_buildEagerSql`,
+   * which raises there, so re-checking from the shared `_applyJoinsToManager`
+   * chokepoint would just rebuild a throwaway JoinDependency on every eager load.
    * @internal
    */
   private _checkEagerLoadable(): void {
@@ -2585,7 +2590,6 @@ export class Relation<T extends Base> {
   }
 
   private _applyJoinsToManager(manager: SelectManager): void {
-    this._checkEagerLoadable();
     // Mirror Rails build_join_buckets routing (query_methods.rb:1856-1863):
     // When stashed joins exist, non-LeadingJoin nodes go to join_node (appended
     // after), LeadingJoin goes to leading_join (prepended before). Without stashed
@@ -2645,6 +2649,9 @@ export class Relation<T extends Base> {
    */
   async exists(conditions?: Record<string, unknown> | unknown): Promise<boolean> {
     if (this._isNone) return false;
+    // Rails exists? routes through apply_join_dependency when eager loading,
+    // raising EagerLoadPolymorphicError for polymorphic specs (finder_methods.rb).
+    this._checkEagerLoadable();
     // Rails FinderMethods#exists?: `return false if !conditions` — treats an
     // explicit `false` / `null` argument as "no match possible".
     if (conditions === false || conditions === null) return false;
