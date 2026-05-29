@@ -280,6 +280,9 @@ export class Association {
       } else {
         const result = await this.doAsyncFindTarget();
         if (result !== undefined) {
+          // Rails applies set_strict_loading per record in find_target's DB
+          // execute block — only freshly loaded records, never cached ones.
+          if (result !== null) this.setStrictLoading(result as Base);
           this.target = result;
         }
       }
