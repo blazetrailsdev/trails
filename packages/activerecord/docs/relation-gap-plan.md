@@ -7,131 +7,29 @@
 
 ## Summary by cluster
 
-| Cluster                                                   | Tests | Root cause                                                                                          |
-| --------------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------- |
-| WHERE with associations/polymorphic/CPK                   | 31    | `PredicateBuilder` handles basic case; edge cases missing (nested, CPK nil, cross-table, Arel star) |
-| load_async / FutureResult                                 | 28    | Ruby-thread-only; PERMANENT-SKIP                                                                    |
-| Scoping — Arel nodes in `order()` / `reverseOrder`        | 20    | `orderBang` pre-renders Arel nodes to raw strings; `reverseOrder` can't flip them                   |
-| Scoping — query cache + select narrowing                  | 8     | 6 need query cache (→ P12), 2 need select narrowing (→ R3b)                                         |
-| Query cache                                               | 27    | Blocked on connection-pool (per-thread cache architecture)                                          |
-| Hash-form select                                          | 23    | `arelColumnAliasesFromHash` handles basics; edge cases: raw-SQL keys, nil, reserved aliases         |
-| WhereChain `.associated`/`.missing` with enums            | 12    | Bypasses predicate builder; enum cast never applied                                                 |
-| lock / FOR UPDATE                                         | 7     | Lock clause not propagated to Arel SQL manager                                                      |
-| Standalone relation (joins, eager, race, fixture)         | 8     | Parameterized joins (2), eager_load toSql (3 → assoc A5), race/fixture/Ruby (3)                     |
-| Calculations with associations                            | 12    | Fixture-dependent + grouped association join                                                        |
-| `inOrderOf`                                               | 4     | Implemented in `relation.ts:959`; edge cases: expressions, associations, `filter: false`            |
-| Misc (batches, update-all, delegation, predicate-builder) | ~6    | Scattered single-test gaps                                                                          |
+This table is the original pre-cleanup landscape. Clusters whose PRs have
+since shipped are marked ✓ — their residual edge cases (if any) are tracked
+in **Post-merge follow-ups** below, not as open tracks. Only unmarked rows
+remain open here.
 
----
-
-## Track 1: WHERE — association key expansion (unlocks ~31 tests)
-
-### PR R1: `PredicateBuilder` association-key edge cases
-
-**Problem:** `PredicateBuilder#buildFromHash` already handles the core
-association-key expansion path (`predicate-builder.ts:63–192`) including
-`isAssociatedWith`/`associatedTable`, polymorphic (via `PolymorphicArrayValue`),
-through, and non-polymorphic associations (via `AssociationQueryValue`).
-Basic `where(author: record)` works. The 31 skipped tests cover specific
-sub-cases that the existing expansion doesn't handle:
-
-- Cross-table joins: `where` with table name and target table already joined
-- Non-PK FK: `belongs_to` where with non-primary-key foreign key
-- Default scope propagation: `where` on association with `default_scope`
-- Strong parameters: `where` with `ActionController::Parameters`
-- Arel star: `where` with `Arel.star`
-- CPK nil: `where` with nil composite primary key association
-- Nested belongs_to: `belongs_to` nested where (2+ levels deep)
-- Polymorphic edge cases: nested, decorated, STI, array, collection (12 tests)
-- Type casting: `rational`/`duration` for string columns
-- Through association: `where` with through-association key
-
-**Files:**
-
-- `relation/predicate-builder.ts:63–192` — extend existing `buildFromHashAssociation`
-  for nested, cross-table, non-PK FK, and Arel star cases
-- `relation/predicate-builder/association-query-value.ts` — CPK nil handling,
-  strong params coercion
-
-**Rails ref:** `relation/predicate_builder.rb:34–58`,
-`relation/predicate_builder/association_query_value.rb`,
-`relation/predicate_builder/polymorphic_array_value.rb`
-
-**Est:** ~150 LOC
-
-**Unlocks:** 31 tests in `where.test.ts`
-
----
-
-## Track 2: Hash-form select (unlocks ~23 tests)
-
-### PR R2: `select()` hash argument edge cases
-
-**Problem:** `processSelectArgs` (query-methods.ts:1858) routes hash args
-to `arelColumnAliasesFromHash` (line 1873), which already handles nested
-object `{ table: { col: alias } }`, array `{ table: [col, col] }`, and
-string/symbol alias cases. The 23 skipped tests cover edge cases the
-existing handler doesn't cover:
-
-- Expression-to-alias: `{ "UPPER(title)": "title" }` where the key is
-  raw SQL, not a table name
-- `select(nil)` should clear the select list but `String(nil)` produces
-  the literal column name "null"
-- Reserved-word aliases: `{ expr: :from, title: :group }`
-- Non-existent field errors: `{ foo: :post_title }` should raise
-
-**Files:**
-
-- `relation/query-methods.ts:1873–1900` — `arelColumnAliasesFromHash` — extend
-  for raw-SQL keys and reserved-word aliases
-- `relation/query-methods.ts:1858` — `processSelectArgs` — add nil guard
-
-**Rails ref:** `relation/query_methods.rb` `arel_columns` hash branch
-
-**Est:** ~80 LOC
-
-**Unlocks:** 23 tests in `select.test.ts`
-
----
-
-### PR R2b: `select(nil)` clears the select list
-
-**Problem:** `select(nil)` is treated as `select("null")` — `String(nil)`
-produces the literal column name "null" instead of clearing the select list.
-
-**Files:**
-
-- `relation/query-methods.ts` — `select` / `processSelectArgs` nil guard
-
-**Est:** ~10 LOC (bundle with R2)
+| Cluster                                                   | Tests | Status / root cause                                                                                     |
+| --------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------- |
+| WHERE with associations/polymorphic/CPK                   | 31    | ✓ R1 #2566 shipped (core path); residual nested/polymorphic/CPK edge cases — see follow-ups             |
+| load_async / FutureResult                                 | 28    | Ruby-thread-only; PERMANENT-SKIP                                                                        |
+| Scoping — Arel nodes in `order()` / `reverseOrder`        | 20    | ✓ R3 #2551 shipped; residual reverseOrder `{raw}` double-flip — see follow-ups                          |
+| Scoping — query cache + select narrowing                  | 8     | 6 need query cache (→ P12), 2 need select narrowing (→ R3b)                                             |
+| Query cache                                               | 27    | Blocked on connection-pool (per-thread cache architecture)                                              |
+| Hash-form select                                          | 23    | ✓ R2 #2562 shipped (incl. `select(nil)`); residual raw-SQL keys/table-alias edge cases — see follow-ups |
+| WhereChain `.associated`/`.missing` with enums            | 12    | Bypasses predicate builder; enum cast never applied (R4 — open)                                         |
+| lock / FOR UPDATE                                         | 7     | ✓ R6a #2564 shipped; `lockValue` reader still missing — see follow-ups                                  |
+| Standalone relation (joins, eager, race, fixture)         | 8     | Parameterized joins (2 — R6c deferred), eager_load toSql (3 → assoc A5), race/fixture/Ruby (3)          |
+| Calculations with associations                            | 12    | Fixture-dependent + grouped association join                                                            |
+| `inOrderOf`                                               | 4     | ✓ R5 #2569 shipped; raw-SQL guard / type-cast follow-ups — see follow-ups                               |
+| Misc (batches, update-all, delegation, predicate-builder) | ~6    | Scattered single-test gaps                                                                              |
 
 ---
 
 ## Track 3: Arel nodes in `order()` + `reverseOrder` (unlocks ~28 tests)
-
-### PR R3: Preserve Arel node identity in `orderBang`; flip in `reverseOrder`
-
-**Problem:** `orderBang` (query-methods.ts:354–420) accepts
-`Nodes.Node` but immediately renders to `{ raw: string }` via `.toSql()`.
-This loses the node's type identity — `reverseOrderBang` (line 1054–1088)
-only knows how to flip string clauses and `[col, dir]` tuples, not
-`Ascending`/`Descending` nodes. Rails calls `.reverse` on Arel ordering
-nodes directly.
-
-**Files:**
-
-- `relation/query-methods.ts:382–388` — `orderBang` Arel node branch
-- `relation/query-methods.ts:1054–1088` — `reverseOrderBang`
-
-**Rails ref:** `relation/query_methods.rb` `reverse_sql_order` handles
-`Arel::Nodes::Ordering` subclasses
-
-**Est:** ~80 LOC
-
-**Unlocks:** ~20 tests in `relation-scoping.test.ts` (Arel order + reverse),
-~5 in `relations.test.ts` (reorder)
-
----
 
 ### PR R3b: Scoping — select narrowing + `hasAttribute` from projected columns
 
@@ -171,63 +69,13 @@ to the full `where(assoc => conditions)` path which triggers enum casting.
 **Rails ref:** `query_methods/where_chain.rb:88–104` (`associated`),
 `query_methods/where_chain.rb:50–86` (`missing`)
 
-**Depends on:** PR R1 (association-key expansion must exist first for the
-routing to work)
+**Depends on:** PR R1 ✓ (association-key expansion, shipped #2566)
 
 **Est:** ~60 LOC
 
 ---
 
-## Track 5: `inOrderOf` / field-ordered values (unlocks ~4 tests)
-
-### PR R5: Extend `Relation#inOrderOf` for expressions, associations, `filter: false`
-
-**Problem:** `inOrderOf` is already implemented inline in
-`relation.ts:959–1001` with active tests for basic usage (empty values,
-enums, string columns, composition). The 4 skipped tests cover edge cases:
-
-- Expression form: `inOrderOf(Arel.sql("..."), values)`
-- Association joins: `inOrderOf` on a column from a joined association
-- `filter: false` option: return all records, just reorder (don't filter)
-
-**Files:**
-
-- `relation.ts:959–1001` — extend existing `inOrderOf` for expression
-  input and `filter: false` option
-
-**Rails ref:** `relation/query_methods.rb` `in_order_of`
-
-**Est:** ~40 LOC
-
----
-
 ## Track 6: Standalone relation gaps (unlocks ~20 actionable tests)
-
-### PR R6a: `lock()` / `lock("FOR SHARE")` in toSql
-
-**Problem:** `lock()` not emitting `FOR UPDATE` / custom lock clause in SQL.
-7 tests across `relations.test.ts` cover: `lock()` default FOR UPDATE,
-custom lock clause, `toSql` output, and `locked` preventing arel build.
-
-**Files:**
-
-- `relation/query-methods.ts` or `relation.ts` — lock value propagation to Arel
-
-**Est:** ~40 LOC (7 tests)
-
----
-
-### PR R6b: `having()` hash form
-
-**Problem:** `having({ count: 5 })` doesn't expand to `HAVING "count" = 5`.
-
-**Files:**
-
-- `relation/query-methods.ts` — `having` method hash-argument handling
-
-**Est:** ~30 LOC (1 test)
-
----
 
 ### PR R6c: Parameterized join strings
 
@@ -237,6 +85,11 @@ bind parameters in join string not implemented.
 **Files:**
 
 - `relation/query-methods.ts` — `joins` string-with-binds branch
+
+**Note:** deliberately NOT shipped with the R6 bundle (#2564). Rails
+`joins(*args)` wraps string joins in `Arel.sql` with no bind interpolation,
+so `joins("... WHERE x = ?", value)` is not Rails-faithful. Needs a design
+decision before any implementation (see post-merge follow-ups from #2564).
 
 **Est:** ~40 LOC (2 tests)
 
@@ -259,14 +112,15 @@ bind parameters in join string not implemented.
 
 ## Dependency graph
 
+R1, R2, R2b, R3, R5, R6a, R6b shipped (#2566, #2562, #2551, #2569, #2564).
+Remaining:
+
 ```
-R1 ──→ R4 (WhereChain needs association-key expansion)
+R4 (WhereChain enum — R1 association-key expansion shipped #2566)
 
-R2 + R2b (standalone)
+R3b (select narrowing — same scoping area as shipped R3)
 
-R3 ──→ R3b (select narrowing is tangential but same scoping area)
-
-R5, R6a, R6b, R6c (all standalone)
+R6c (parameterized join strings — deferred, needs design decision)
 ```
 
 ## Recommended priority
@@ -274,41 +128,116 @@ R5, R6a, R6b, R6c (all standalone)
 Ordered by: (1) no unsatisfied dependencies, (2) tests unlocked per LOC,
 (3) downstream unlock potential.
 
-### Tier 1 — high leverage, no dependencies (start here)
-
-All three are independent and can run in parallel.
-
-| PR  | Tests | Est LOC | Why first                                                         |
-| --- | ----- | ------- | ----------------------------------------------------------------- |
-| R1  | 31    | ~150    | Highest unlock; gates R4; `where(author: record)` is table-stakes |
-| R3  | 28    | ~80     | Best tests-per-LOC ratio; Arel order is core query API            |
-| R2  | 23    | ~80     | Hash select is a commonly-hit DX gap                              |
-
 ### Tier 2 — moderate leverage or gated
 
 | PR  | Tests | Est LOC | Depends on | Why                                         |
 | --- | ----- | ------- | ---------- | ------------------------------------------- |
-| R4  | 12    | ~60     | R1         | WhereChain enum — completes the WHERE track |
-| R6a | 7     | ~40     | —          | Lock is a user-visible query API gap        |
-| R5  | 4     | ~80     | —          | `inOrderOf` — standalone, clean scope       |
+| R4  | 12    | ~60     | R1 ✓       | WhereChain enum — completes the WHERE track |
 
 ### Tier 3 — small or low urgency
 
-| PR  | Tests | Est LOC | Depends on | Why                                           |
-| --- | ----- | ------- | ---------- | --------------------------------------------- |
-| R6c | 2     | ~40     | —          | Parameterized join strings                    |
-| R6b | 1     | ~30     | —          | Having hash form — bundle with R6c if desired |
-| R3b | 2     | ~60     | R3         | Select narrowing — niche, low urgency         |
+| PR  | Tests | Est LOC | Depends on | Why                                                  |
+| --- | ----- | ------- | ---------- | ---------------------------------------------------- |
+| R6c | 2     | ~40     | —          | Parameterized join strings — deferred, design needed |
+| R3b | 2     | ~60     | R3 ✓       | Select narrowing — niche, low urgency                |
 
 ### Recommended parallel lanes
 
-- **Lane A:** R1 → R4 (WHERE association expansion → WhereChain enum)
-- **Lane B:** R3 → R3b (Arel order → select narrowing)
-- **Lane C:** R2 + R2b (hash select — standalone)
-- **Lane D:** R6a + R6b + R6c (bundle all three small standalone PRs into one)
+- **Lane A:** R4 (WhereChain enum — R1 association expansion shipped)
+- **Lane B:** R3b (select narrowing — R3 shipped)
 
 **Coverage:** 275 tests total.
 
-- **Actionable here:** ~110 tests across 9 PRs (R1–R6c)
+- **Remaining actionable here:** ~16 tests across 3 PRs (R4, R3b, R6c).
+  The shipped R1/R2/R2b/R3/R5/R6a/R6b work (~94 tests) is no longer counted.
 - **Cross-blocked:** ~47 tests (connection-pool P12, associations A5, Phase G fixtures)
 - **Permanently skipped:** ~36 tests (load_async, GVL/fork, SimpleDelegator)
+
+---
+
+## Post-merge follow-ups
+
+Items surfaced after the shipped batch (R1 #2566, R2 #2562, R3 #2551,
+R5 #2569, R6a+R6b #2564).
+
+**From #2551 (R3 Arel order identity / reverseOrder):**
+
+- [ ] ~10-20 LOC: fix pre-existing double-flip bug in `reverseOrderBang`'s
+      `{raw}` clause branch (`query-methods.ts ~line 1119`). Chained `.replace`
+      flips ASC→DESC then back. Also doesn't split comma-separated terms. Best
+      fix: refactor to delegate to existing `reverseSqlOrder` helper
+      (`query-methods.ts:1432`) which is fully implemented but dead code.
+      Eliminates duplicate logic + divergent error message ("Relation has a
+      non-reversible order" vs Rails' "Order ... cannot be reversed
+      automatically").
+- The 3 `reorder replaces existing order` tests have no verbatim Rails
+  counterpart (Rails names this behavior `test_finding_with_reorder` /
+  `test_reorder_deduplication` in `relations_test.rb`). Pre-existing in our
+  suite. Don't rename in place — instead verify each maps to a real Rails
+  test and, where it does, align body + name to that counterpart so
+  test:compare matches; otherwise document the genuine test:compare gap.
+- `inspect()` at `relation.ts:1026` JSON.stringify's `_orderClauses` which
+  may hold live `Nodes.Node` objects (partial stringify). Cosmetic only.
+
+**From #2562 (R2 hash-form select):**
+
+- [ ] ~15 LOC: route `_buildProjections` string args through `arelColumns`
+      so bare literals (`"1"`, `"foo()"`, symbols) aren't table-qualified.
+      Unskips `select with non field values`. Consider unifying
+      `_buildProjections` with parallel `buildSelect`+`arelColumns` in
+      query-methods.ts.
+- Still skipped (blocked on other features): `select with hash and table
+alias`, `select with hash argument with few tables` (need per-join table
+  aliasing); `reselect with default scope select` (default_scope+select);
+  `select without any arguments` + `select with block without any arguments`
+  (need arity/block-form validation).
+
+**From #2564 (R6 bundle — lock + having-hash):**
+
+- [ ] ~5 LOC: add `Relation#lockValue` reader. Rails exposes `lock_value`
+      (SINGLE_VALUE_METHODS); R6 shipped `isLocked` (mirrors `locked?`) but
+      dropped `lockValue` as scope creep.
+- Pre-existing internal divergence: Rails `lock!` stores `true` for default
+  and lets Arel expand to `FOR UPDATE`; trails `lockBang` stores literal
+  `"FOR UPDATE"` in `_lockValue`. SQL output identical. Strict `lock_value`
+  parity would differ.
+- **R6c (parameterized join strings) deliberately NOT shipped.** Rails
+  `joins(*args)` wraps string joins in `Arel.sql` with no bind
+  interpolation, so `joins("... WHERE x = ?", value)` is not Rails-faithful.
+  Synthetic empty-body test `joins with string sql and string interpolation`
+  (relations.test.ts:~1395) remains `it.skip`. Needs design decision before
+  any implementation.
+
+**From #2566 (R1 polymorphic/nested where):** test-only PR.
+
+- [ ] ~30 LOC: fix `as:` polymorphic inverse FK _id_-column derivation.
+      `has_many ..., as: "estimateOf"` emits correct TYPE constraint but derives
+      FK id column from owner name (`treasure_id`) instead of `estimate_of_id`.
+      Files: `src/associations/builder/has-many.ts` + `src/reflection.ts`.
+- Still skipped (need join+fixture infra): `belongs to nested where with
+relation`, `where not polymorphic id and type as nand`, `where not
+association as nand`, `polymorphic nested array where not`, `type casting
+nested joins`, `where with through association`, `where with relation on
+has many association`, `where with relation on has one association`,
+  `where on association with select relation`, `where on association with
+collection polymorphic relation`.
+- Type-system gaps: `where with rational for string column` (no JS
+  Rational), `where with duration for string column` (ActiveSupport::Duration
+  cast not wired).
+- [ ] Cleanup: the synthetic, non-Rails-named stubs in
+      `src/relation/where.test.ts` (lines ~252–498) are placeholders with no
+      Rails counterpart — they don't mirror `where_test.rb`. Replace each
+      with a properly Rails-mirrored test (verbatim name + body from the
+      real counterpart) so test:compare can match it, or remove the
+      placeholder. This is not a rename of existing Rails-mirrored tests.
+
+**From #2569 (R5 inOrderOf extensions):**
+
+- [ ] ~30-50 LOC: port `column_name_with_order_matcher` and wire
+      `disallow_raw_sql!` guard into `inOrderOf` (and other order-path callers).
+- [ ] ~10-20 LOC: add `type_cast_for_database` value casting in `inOrderOf`
+      once a typed-column caller surfaces the gap.
+- belongsTo accessor returns `null` in minimal inline-model + handler-suite
+  test setups: `await book.author === null` despite valid `author_id`. Join
+  SQL + ordering correct; only accessor broken. Worth own investigation (may
+  affect other association tests).

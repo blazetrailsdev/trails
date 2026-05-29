@@ -1,84 +1,17 @@
 # Associations gap plan
 
-339 skipped tests across 33 files. 20 PRs across 9 tracks, organized
-by unlock potential. Some tests are gated on multiple PRs (noted in
-dependency graph). ~18 permanent-skip (marshal, Ruby-only), ~10
-scattered single-test gaps (Track 9).
+Originally 339 skipped tests across 33 files; 20 PRs across 9 tracks,
+organized by unlock potential. After the cleanup batch, **8 PRs shipped
+(A1–A4, B1, E1, F1, H1)** and **12 remain** (A5, B2, B3, C1–C3, D1, D2,
+E2, F2, G1, H2). Per-track unlock counts in the headers below are the
+original pre-cleanup aggregates; remaining work per track is whatever PRs
+are still listed. Some tests are gated on multiple PRs (noted in dependency
+graph). ~18 permanent-skip (marshal, Ruby-only), ~10 scattered single-test
+gaps (Track 9).
 
 ---
 
-## Track 1: Preloader core (unlocks ~104 eager-loading + ~18 cascaded tests)
-
-### PR A1: Preloader writes to real association target, not shadow map
-
-**Problem:** `_associateRecordsToOwner` and `associateRecordsFromUnscoped`
-write to `_preloadedAssociations` instead of calling
-`owner.association(name).target = records`. The real proxy stays unloaded,
-unpersisted collection members are dropped, and `association.loaded?` is
-false after preloading.
-
-**Files:**
-
-- `associations/preloader/association.ts:228–252` — `_associateRecordsToOwner`
-- `associations/preloader/association.ts:192–222` — `associateRecordsFromUnscoped`
-
-**Rails ref:** `preloader/association.rb:245–256`
-
-**Est:** ~80 LOC
-
----
-
-### PR A2: `_buildScope` parity — `scope_for_association` + `cascade_strict_loading`
-
-**Problem:** `_buildScope` uses `_allForPreload()` instead of
-`klass.scope_for_association` (may miss `default_scope`). The
-`cascadeStrictLoading` helper exists (line 563) but is never called.
-
-**Files:**
-
-- `associations/preloader/association.ts:296–320` — `_buildScope`
-- `associations/preloader/association.ts:563` — dead `cascadeStrictLoading`
-
-**Rails ref:** `preloader/association.rb:295–307`
-
-**Est:** ~60 LOC
-
----
-
-### PR A3: `groupedRecords` polymorphic guard + HABTM-through detection
-
-**Problem:** `groupedRecords` swallows all exceptions via try/catch instead
-of Rails' targeted `polymorphic_parent && !reflection` guard. HABTM-through
-detection uses fragile `_associations` array scan instead of
-`reflection.options.through`.
-
-**Files:**
-
-- `associations/preloader/branch.ts:153–177` — `groupedRecords`
-- `associations/preloader/branch.ts:299–319` — `_preloaderFor`
-
-**Rails ref:** `preloader/branch.rb:80–89`
-
-**Est:** ~60 LOC
-
----
-
-### PR A4: Through-association scope + STI source grouping
-
-**Problem:** `_buildThroughScope` ignores the through reflection's
-`join_scopes` — custom scopes on intermediates are dropped.
-`_getSourcePreloaders` doesn't group by STI class at the source level.
-
-**Files:**
-
-- `associations/preloader/through-association.ts:351–376` — `_buildThroughScope`
-- `associations/preloader/through-association.ts:171–197` — `_getSourcePreloaders`
-
-**Rails ref:** `preloader/through_association.rb`
-
-**Est:** ~100 LOC
-
----
+## Track 1: Preloader core (A1–A4 shipped; A5 remaining — ~20 eager-loading tests)
 
 ### PR A5: `eager_load` nested hash specs → JoinDependency (not preload fallback)
 
@@ -99,22 +32,7 @@ hashes.
 
 ---
 
-## Track 2: has_many :through writes (unlocks ~40 tests)
-
-### PR B1: `buildRecord` override for HMT
-
-**Problem:** No `buildRecord` override — `post.comments.build()` on a HMT
-returns a target record with no join row created and no inverse wired.
-
-**Files:**
-
-- `associations/has-many-through-association.ts` — add `buildRecord` override
-
-**Rails ref:** `has_many_through_association.rb:90–114`
-
-**Est:** ~80 LOC
-
----
+## Track 2: has_many :through writes (B1 shipped; B2 + B3 remaining — ~25 tests)
 
 ### PR B2: `concatRecords` + `@through_records` cache
 
@@ -229,25 +147,7 @@ implementation is largely complete but tests lack data.
 
 ---
 
-## Track 5: Collection callbacks (unlocks ~12 tests)
-
-### PR E1: Unify callback dispatch + abort semantics
-
-**Problem:** `replaceOnTarget` reads `options.beforeAdd` directly;
-`removeRecords` reads from `callbacksFor()`. Two dispatch paths. Neither
-supports abort semantics (Rails `catch(:abort)`). `concatRecords` still
-saves to DB even when `beforeAdd` returns false.
-
-**Files:**
-
-- `associations/collection-association.ts:689–780` — `removeRecords`, `replaceOnTarget`
-- `associations/collection-association.ts:155–158` — `concatRecords`
-
-**Rails ref:** `collection_association.rb` `replace_on_target`, `remove_records`
-
-**Est:** ~100 LOC
-
----
+## Track 5: Collection callbacks (E1 shipped; E2 remaining — ~4 tests)
 
 ### PR E2: `create()` goes through `addToTarget` + dedup tracking
 
@@ -267,29 +167,7 @@ fires callbacks directly, bypassing `addToTarget`. Skips
 
 ---
 
-## Track 6: HABTM (unlocks ~15 tests, 24 total — 4 scope-chain, 2 eager, 3 cross-blocker)
-
-### PR F1: HABTM join-table quoting, aliasing, and timestamps
-
-**Problem:** Multiple small gaps in the HABTM join-table insert/query path:
-
-- String PKs are not quoted in the IN clause
-- Join table is not aliased for disambiguation in self-joins
-- `created_at`/`updated_at` not written on join inserts
-- `partial_inserts: false` config not respected (should INSERT all columns)
-- Duplicate `hasAndBelongsToMany` declarations don't replace prior ones
-
-**Files:**
-
-- `associations/builder/has-and-belongs-to-many.ts` — join insert path
-- `associations/has-and-belongs-to-many-association.ts` — join query path
-
-**Rails ref:** `has_and_belongs_to_many_association.rb` `insert_record`,
-`has_and_belongs_to_many.rb` builder
-
-**Est:** ~120 LOC
-
----
+## Track 6: HABTM (F1 shipped; F2 remaining — ~8 tests: scope-chain + extend:)
 
 ### PR F2: HABTM `extend:` option + scope chain composition
 
@@ -332,26 +210,7 @@ blocked on `disableJoins` scope chain.
 
 ---
 
-## Track 8: AssociationScope + nested-through (unlocks ~25 tests)
-
-### PR H1: `AssociationScope` full scope-building parity
-
-**Problem:** 13 tests in `association-scope.test.ts` cover the core
-scope-building pipeline: hasMany/belongsTo FK constraints, STI
-`type_condition`, polymorphic type WHERE, `scope_for_association`
-(default_scope flow-through), 0-arity scope lambda with `this=relation`,
-and through-chain `reverse_each` scope merging. Test bodies exist but
-the scope builder doesn't fully implement these paths.
-
-**Files:**
-
-- `associations/association-scope.ts` — scope-building pipeline
-
-**Rails ref:** `associations/association_scope.rb` `scope`, `add_constraints`
-
-**Est:** ~150 LOC
-
----
+## Track 8: AssociationScope + nested-through (H1 shipped; H2 remaining — ~12 tests)
 
 ### PR H2: Nested-through edge cases (distinct, STI, polymorphic scope, alias)
 
@@ -365,7 +224,7 @@ multiple times emits wrong aliases).
 - `associations/join-dependency.ts` — AliasTracker alias emission
 - `associations/preloader/through-association.ts` — nested chain walking
 
-**Depends on:** PR A4 (through-association scope), PR A5 (JoinDependency)
+**Depends on:** PR A4 ✓ (through-association scope, shipped #2559), PR A5 (JoinDependency)
 
 **Est:** ~100 LOC
 
@@ -389,27 +248,26 @@ These are individual root causes that don't cluster into a track:
 
 ## Dependency graph
 
-```
-A1 ──┐
-A2   ├── A5 (eager_load JOIN path needs working preloader first)
-A3 ──┤
-A4 ──┘
+A1–A4 shipped (#2550, #2568, #2555, #2559). Remaining:
 
-B1 → B2 → B3 (each builds on prior HMT plumbing)
+```
+A5 (eager_load JOIN path — preloader core now shipped)
+
+B2, B3 (both extend shipped B1 #2557 HMT write plumbing; independent of
+       each other — Rails `delete_records` does not depend on `concat_records`)
 
 C1 → C2 → C3 (inverseName() must work before wiring it into collection/preloader)
 
 D1 (standalone)
 D2 (blocked on Phase G fixtures)
 
-E1 → E2 (unified dispatch before create() can use it)
+E2 (create() dedup; E1 unified dispatch shipped #2567)
 
-F1, F2 (standalone)
+F2 (standalone; F1 shipped #2563)
 
 A5 → G1 (has_one :through eager loading needs nested eager_load)
 
-H1 (standalone)
-A4 + A5 → H2 (nested-through needs through-scope + JoinDependency)
+A4 ✓ + A5 → H2 (nested-through needs through-scope + JoinDependency; H1 shipped #2556)
 ```
 
 ## Recommended priority
@@ -421,40 +279,32 @@ Ordered by: (1) no unsatisfied dependencies, (2) tests unlocked per LOC,
 
 These are independent of each other and can run in parallel.
 
-| PR  | Tests | Est LOC | Why first                                                         |
-| --- | ----- | ------- | ----------------------------------------------------------------- |
-| A1  | ~40   | ~80     | Highest single-PR unlock; fixes the core preloader contract       |
-| C1  | ~15   | ~20     | Smallest change, gates C2+C3; automatic inverse is table-stakes   |
-| A3  | ~20   | ~60     | Polymorphic preload is broken for every polymorphic association   |
-| B1  | ~15   | ~80     | HMT build is a user-visible API gap; gates B2+B3                  |
-| H1  | ~13   | ~150    | AssociationScope is the foundation for scoped eager/preload paths |
+| PR  | Tests | Est LOC | Why first                                                       |
+| --- | ----- | ------- | --------------------------------------------------------------- |
+| C1  | ~15   | ~20     | Smallest change, gates C2+C3; automatic inverse is table-stakes |
 
 ### Tier 2 — high leverage, no dependencies but lower unlock ratio
 
-| PR  | Tests | Est LOC | Why                                                                |
-| --- | ----- | ------- | ------------------------------------------------------------------ |
-| F1  | ~11   | ~120    | HABTM join-table correctness (quoting, aliasing, timestamps)       |
-| A2  | ~10   | ~60     | `scope_for_association` + strict loading; completes preloader core |
-| B3  | ~15   | ~120    | HMT delete/remove — independent of B1 if needed                    |
-| A4  | ~15   | ~100    | Through-scope + STI grouping; gates A5, H2                         |
-| E1  | ~8    | ~100    | Callback abort semantics — correctness fix                         |
+| PR  | Tests | Est LOC | Why                                  |
+| --- | ----- | ------- | ------------------------------------ |
+| B3  | ~15   | ~120    | HMT delete/remove (B1 shipped #2557) |
 
 ### Tier 3 — gated on Tier 1/2
 
-| PR  | Tests | Est LOC | Depends on     | Why                                        |
-| --- | ----- | ------- | -------------- | ------------------------------------------ |
-| C2  | ~5    | ~40     | C1             | Inverse on push — completes inverse track  |
-| B2  | ~10   | ~100    | B1             | HMT concat — completes HMT write track     |
-| F2  | ~8    | ~80     | —              | HABTM extend + scope chain                 |
-| E2  | ~4    | ~80     | E1             | create() dedup — completes callback track  |
-| A5  | ~20   | ~150    | A1, A2, A3, A4 | Nested eager_load — hardest PR in the plan |
+| PR  | Tests | Est LOC | Depends on | Why                                        |
+| --- | ----- | ------- | ---------- | ------------------------------------------ |
+| C2  | ~5    | ~40     | C1         | Inverse on push — completes inverse track  |
+| B2  | ~10   | ~100    | B1 ✓       | HMT concat — completes HMT write track     |
+| F2  | ~8    | ~80     | —          | HABTM extend + scope chain                 |
+| E2  | ~4    | ~80     | E1 ✓       | create() dedup — completes callback track  |
+| A5  | ~20   | ~150    | (A1–A4 ✓)  | Nested eager_load — hardest PR in the plan |
 
 ### Tier 4 — gated on Tier 3 or external blockers
 
 | PR  | Tests | Est LOC | Depends on | Why                                       |
 | --- | ----- | ------- | ---------- | ----------------------------------------- |
 | G1  | ~21   | ~200    | A5         | has_one :through eager loading            |
-| H2  | ~12   | ~100    | A4, A5     | Nested-through edge cases                 |
+| H2  | ~12   | ~100    | A4 ✓, A5   | Nested-through edge cases                 |
 | C3  | ~3    | ~30     | C1         | Preloader inverse wiring                  |
 | D1  | ~3    | ~30     | —          | AssociationTypeMismatch error class       |
 | D2  | ~24   | ~200    | Phase G    | has_one fixture bodies — external blocker |
@@ -463,11 +313,124 @@ These are independent of each other and can run in parallel.
 
 If running multiple agents, these lanes have zero file overlap:
 
-- **Lane A:** A1 → A2 → A5 (preloader core → eager_load)
-- **Lane B:** B1 → B2 → B3 (HMT writes)
+- **Lane A:** A5 (preloader core A1–A4 shipped → eager_load)
+- **Lane B:** B2, B3 (HMT writes; B1 shipped — concat & delete paths independent)
 - **Lane C:** C1 → C2 (inverse_of)
-- **Lane D:** H1 (association scope — standalone)
-- **Lane E:** F1 (HABTM join table — standalone)
+- **Lane E:** F2 (HABTM extend + scope chain — standalone; F1 shipped)
 
 **Coverage:** 339 tests total. ~18 permanent-skip (marshal, Ruby-only),
 ~10 scattered single-test gaps (Track 9). All others accounted for above.
+
+---
+
+## Post-merge follow-ups
+
+Items surfaced after the shipped batch (A1 #2550, A2 #2568, A3 #2555,
+A4 #2559, B1 #2557, E1 #2567, F1 #2563, H1 #2556).
+
+**From #2555 (A3 polymorphic guard):**
+
+- [ ] ~30-50 LOC: implement `exceptions have suggestions for fix` in
+      `eager.test.ts`. Needs "Did you mean?" on `AssociationNotFoundError`
+      (`detailed_message` + DidYouMean). Add corrections field to
+      `associations/errors.ts` and wire into `associations/instance-methods.ts`
+      `association()` throw.
+- Minor (no action unless triggered): `branch.ts`
+  `_normalizeAssociationName` treats only `null`/`undefined` as "no
+  association" — Rails treats `false` as nil too. Unreachable today.
+
+**From #2557 (B1 HMT buildRecord):**
+
+- [ ] ~15 LOC: add test mirroring Rails
+      `test_build_then_save_with_has_one_inverse` (declared has_one inverse).
+      The `inverse.isHasOne` branch is implemented but uncovered.
+- Plan correction: the gap-plan claim that B1 unblocks "~15 tests" was
+  wrong (only an unrelated marshal-dump skip exists). Future B2 still
+  needed for full autosave parity (Rails sets
+  `attributes[source_reflection.name] = record` so the join's belongs_to
+  follows the target PK; plus `@through_records` memoization).
+- Hazard: `Association.buildRecord` vs `CollectionProxy._buildThrough`
+  split is a standing source of duplication/divergence for through
+  associations. Future consolidation PR.
+
+**From #2559 (A4 through-scope + STI grouping):**
+
+- [x] Done (this PR): the original A4 entry's claims were inaccurate. STI
+      source grouping is already handled by `Branch.preloadersForReflection`.
+      The "scope drop" overlaps A5 (JOIN branch). The stale A4 entry was
+      dropped in this cleanup.
+- [ ] ~30 LOC audit: sweep `@internal` marker functions at the bottom of
+      `preloader/association.ts` for references to nonexistent Relation
+      properties (one was fixed by #2559 — `strictLoadingValue` was dead code).
+- Not ported: Rails' `through_scope` `elsif !reflection_scope.where_clause.empty?`
+  JOIN branch was intentionally NOT ported — belongs with PR A5.
+
+**From #2563 (F1 HABTM join-table):** F1 shipped TEST-ONLY (no impl change;
+3 of 5 plan-doc gaps already worked). Follow-ups:
+
+- [ ] ~150-250 LOC: `redefine habtm` — `SubDeveloper < Developer` with
+      swapped FK options. Confirmed broken: subclass HABTM redeclaration writes
+      null/parent-mapped join FKs AND parent middle has_many double-inserts.
+      Files: `associations.ts` (`createHabtmJoinModel` + through insert),
+      `builder/has-and-belongs-to-many.ts` (COW dedup keyed on derived middle
+      name).
+- [ ] F2-sized: `join_middle_table_alias` / `join_table_alias` —
+      `.includes(:developers_projects)` with WHERE on aliased join-table names.
+      Needs JOIN-based eager loading with Rails-compatible self-join alias
+      naming via `associations/join-dependency.ts` + `alias-tracker.ts`
+      (HABTM-through not wired in).
+- Pre-existing orthogonal bug: pushing onto HABTM on a new (unsaved) owner
+  leaves a stray join row with null FKs (filtered out by `loadHabtm` so
+  invisible to reads). Worth its own ticket.
+
+**From #2567 (E1 collection callback abort):**
+
+- [ ] ~50 LOC: `dependent: :destroy` on parent does NOT route child removal
+      through `removeRecords`, so before/after_remove don't fire on
+      `owner.destroy`. Blocks "has many callbacks for destroy on parent".
+- [ ] ~80 LOC: HABTM `_deleteThrough` join-row lookup gap — `before_remove`
+      fires but join row isn't found, so `after_remove` never runs. Blocks
+      "has and belongs to many remove callback" + "does not fire callbacks on
+      clear".
+- [ ] ~40 LOC: HABTM autosave/timing — blocks "has and belongs to many
+      before/after add called before/after save" + "callbacks for save on
+      parent".
+- Loose end: three callback dispatch paths still exist
+  (`collection-association.ts` unified; `collection-proxy.ts`
+  `push`/`delete`/`_deleteThrough`/`create` each call
+  `fireAssocCallbacks` directly). Future PR to fully collapse. Proxy's
+  per-record `continue`-on-abort also diverges from Rails' all-or-nothing
+  `catch(:abort)`.
+
+**From #2568 (A2 preloader scope_for_association):**
+
+- [ ] ~20 LOC: make `scopeForAssociation()` in `scoping/named.ts:55`
+      Rails-faithful for the no-arg case. Currently falls through to `all()`
+      which applies `current_scope`; branch logic diverges from Rails
+      (`current_scope&.empty_scope? ? scope : default_scoped(scope)`). Other
+      callers pass explicit scope so unaffected today; A2 routed `_buildScope`
+      through it and hit a multi-DB regression.
+- [ ] ~30 LOC + 41 tests: strict-loading cascade end-to-end.
+      `_cascadeStrictLoading` wired but no-op until strict-loading preload scope
+      is threaded. Needs `StrictLoadingViolation` wiring + `StrictLoadingScope`
+      sentinel from `Relation#preloadAssociations`. Unblocks empty `it.skip`
+      stubs in `strict-loading.test.ts`.
+
+**From #2556 (H1 AssociationScope parity):** test-only PR.
+
+- [ ] ~30 LOC: wire STI `type_condition` into `Base.unscoped()` /
+      `relation()` so `AssociationScope` can drop both STI compensations
+      (duplicated in `scope()` + `_buildEntryScope()`).
+- [ ] ~20 LOC cleanup: delete or fix vestigial `@internal` module-level
+      helper wrappers at the bottom of `association-scope.ts`
+      (`valueTransformation`, `join`, `lastChainScope`, `transformValue`,
+      `nextChainScope`, `getChain`, `addConstraints`, `applyScope`, `evalScope`).
+      Some delegate with stale arity; `evalScope` references possibly-nonexistent
+      `reflection.buildScope`. Verify api:compare still maps association_scope.rb
+      13/13 after removal.
+- Not ported: `scope()` omits Rails' `scope.extending! reflection.extensions`
+  (`association_scope.rb:27`) — tracked under `extension.test.ts` / F2.
+- Not ported: `_addConstraints` uses granular pushing instead of Rails'
+  `Relation#merge!` with `.except(...)` for chain_head and `.only(...)` for
+  non-head. `eager_load_values`/`includes_values` propagation through chain
+  not implemented.
