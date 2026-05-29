@@ -362,6 +362,20 @@ export function _hmtNotFound(
 
 /**
  * @internal
+ * Builds an AssociationNotFoundError with DidYouMean-style `corrections`
+ * derived from the record's declared association names — mirrors
+ * `ActiveRecord::AssociationNotFoundError#corrections`, which spell-checks
+ * the failing name against `record.class.reflections.keys`.
+ */
+export function _associationNotFound(record: Base, name: string): AssociationNotFoundError {
+  const assocs: AssociationDefinition[] = (record.constructor as typeof Base)._associations ?? [];
+  const dictionary = assocs.map((a) => a.name);
+  const corrections = _correctNames(dictionary, name);
+  return new AssociationNotFoundError(record, name, corrections);
+}
+
+/**
+ * @internal
  * Shared helper for did_you_mean-style name corrections used by the
  * association error call sites (and reflection.ts).
  */

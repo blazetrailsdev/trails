@@ -9,14 +9,27 @@ import { ActiveRecordError, ConfigurationError } from "../errors.js";
 export class AssociationNotFoundError extends ConfigurationError {
   readonly record: any;
   readonly associationName: string;
+  readonly corrections: string[];
 
-  constructor(record: any, associationName: string) {
+  constructor(record: any, associationName: string, corrections: string[] = []) {
     super(
       `Association named '${associationName}' was not found on ${record?.constructor?.name ?? record}; perhaps you misspelled it?`,
     );
     this.name = "AssociationNotFoundError";
     this.record = record;
     this.associationName = associationName;
+    this.corrections = corrections;
+  }
+
+  /**
+   * Mirrors Rails' `DidYouMean::Correctable#detailed_message`: the base
+   * message plus a "Did you mean?" suggestion line built from the closest
+   * declared association names. The suggestion lives here (not in `message`)
+   * to match Rails, where corrections surface only via `detailed_message`.
+   */
+  detailedMessage(): string {
+    if (this.corrections.length === 0) return this.message;
+    return `${this.message}\nDid you mean?  ${this.corrections.join("\n               ")}`;
   }
 }
 
