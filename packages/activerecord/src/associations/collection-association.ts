@@ -189,14 +189,25 @@ export class CollectionAssociation extends Association {
     const effectiveDependent =
       normalized ?? (optionDep === "destroy" || optionDep === "delete" ? "deleteAll" : optionDep);
 
-    if (effectiveDependent === "nullify") {
+    await this.deleteOrNullifyAllRecords(effectiveDependent);
+
+    this.reset();
+    this.loadedBang();
+  }
+
+  /**
+   * Mirrors Rails' `delete_or_nullify_all_records(method)`: the single
+   * dispatch point that `delete_all` routes through, so subclasses
+   * (`HasManyThroughAssociation`) can override the bulk strategy in one
+   * place. The base CollectionAssociation chooses nullify vs. delete by
+   * `method`; anything other than `"nullify"` deletes the rows.
+   */
+  protected async deleteOrNullifyAllRecords(method?: string): Promise<void> {
+    if (method === "nullify") {
       await this.nullifyAllRecords();
     } else {
       await this.deleteAllRecords();
     }
-
-    this.reset();
-    this.loadedBang();
   }
 
   /**
