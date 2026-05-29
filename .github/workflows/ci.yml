@@ -593,6 +593,41 @@ jobs:
       - name: Build docs (typedoc + VitePress)
         run: pnpm --filter @blazetrails/website run docs:build
 
+  pr-attribution:
+    name: PR Attribution Check
+    # Independent of the `changes` gate — it inspects the PR body, not the
+    # diff, so docs_only / per-package gates don't apply. Only meaningful on
+    # PRs (push/schedule have no PR body) and scoped to deanmarano-authored
+    # ones: the project forbids Claude attribution in *his* PR descriptions
+    # (see CLAUDE.md "Do NOT add ... Generated with Claude Code"). Other
+    # contributors are unaffected.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login == 'deanmarano'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Forbid Claude attribution in PR body
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Fetch the *live* body rather than reading the event payload. The
+          # PR triggers don't include `edited`, so a body edit won't re-fire
+          # CI — but a manual job re-run hits the API fresh and will see the
+          # fix. Reading the payload would replay the stale original body and
+          # leave the check permanently red.
+          body=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""')
+          # Case-insensitive scan for Claude/Anthropic attribution markers.
+          if printf '%s' "$body" | grep -qiE 'generated with \[?claude code|co-authored-by:[[:space:]]*claude|noreply@anthropic\.com|🤖 generated with'; then
+            echo "::error::PR body contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines (see CLAUDE.md), then re-run this job."
+            exit 1
+          fi
+          echo "No forbidden Claude attribution found in PR body."
+
   rails-comparison:
     name: Rails API/Test Comparison
     needs: changes
@@ -912,6 +947,7 @@ jobs:
       - postgres-tests
       - mariadb-tests
       - website
+      - pr-attribution
       - rails-comparison
       - schema-parity-rails
       - schema-parity-trails
@@ -968,6 +1004,11 @@ jobs:
               [ "$result" = "skipped" ] || continue
               case "$job" in
                 changes|ci) continue ;;
+                pr-attribution)
+                  # Only runs on deanmarano-authored PRs; skip is always
+                  # legitimate (non-PR events, or any other author).
+                  continue
+                  ;;
                 sqlite-tests|postgres-tests|mariadb-tests)
                   # AR test skip is legitimate when no AR-affecting paths changed.
                   [ "$AR_AFFECTED" = "false" ] && continue
