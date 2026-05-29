@@ -40,6 +40,19 @@ export function setDisablePreparedStatements(value: boolean): void {
   disablePreparedStatements = value;
 }
 
+/**
+ * Controls what happens when a strict-loading violation is detected: either
+ * `"raise"` (the default — throw `StrictLoadingViolationError`) or `"log"`
+ * (instrument `strict_loading_violation.active_record` and continue loading).
+ *
+ * Mirrors `ActiveRecord.action_on_strict_loading_violation` (active_record.rb:362).
+ */
+export let actionOnStrictLoadingViolation: "raise" | "log" = "raise";
+
+export function setActionOnStrictLoadingViolation(value: "raise" | "log"): void {
+  actionOnStrictLoadingViolation = value;
+}
+
 /** @internal */
 export let indexNestedAttributeErrors = false;
 
