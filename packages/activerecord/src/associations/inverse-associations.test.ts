@@ -1275,21 +1275,65 @@ describe("AutomaticInverseFindingTests", () => {
     expect(hasOneRefl?.inverseOf()?.name).toBe("taggable");
   });
 
-  it.skip("has many inverse of derived automatically despite of composite foreign key", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* Composite FK associations use queryConstraints (not options.foreignKey scalar).
-           canFindInverseOfAutomatically currently checks options.foreignKey only, so composite
-           FK associations passed via queryConstraints may still auto-detect. Needs validation
-           that the right path is exercised and inverse detection works correctly for composite FKs. */
+  // Mirrors Rails Cpk::Car has_many :car_reviews, foreign_key: [:car_make, :car_model]
+  // and Cpk::CarReview belongs_to :car, foreign_key: [:car_make, :car_model]. The
+  // composite foreign_key is moved to queryConstraints, so options.foreignKey is unset
+  // and automatic inverse detection proceeds, matching on the composite foreign key.
+  //
+  // The classes are named `Car`/`CarReview`, NOT the shared CpkCar/CpkCarReview
+  // fixtures, on purpose. Rails derives the inverse name via
+  // `underscore(demodulize(active_record.name))` — for `Cpk::Car` that strips the
+  // module to `Car` → `car`, which is what matches `belongs_to :car`. Our demodulize
+  // only strips on `::` (inflector.ts), so `demodulize("CpkCar")` stays "CpkCar" →
+  // "cpk_car" and the derivation would miss. Bare `Car`/`CarReview` reproduce the
+  // post-demodulize names Rails' algorithm actually operates on.
+  function makeCpkCarModels() {
+    class Car extends Base {
+      static {
+        this._tableName = "cpk_cars";
+        this.attribute("make", "string");
+        this.attribute("model", "string");
+        this.primaryKey = ["make", "model"];
+        this.automaticallyInvertPluralAssociations = true;
+      }
+    }
+    class CarReview extends Base {
+      static {
+        this._tableName = "cpk_car_reviews";
+        this.attribute("car_make", "string");
+        this.attribute("car_model", "string");
+        this.attribute("comment", "string");
+        this.attribute("rating", "integer");
+        this.automaticallyInvertPluralAssociations = true;
+      }
+    }
+    Associations.hasMany.call(Car, "carReviews", {
+      className: "CarReview",
+      foreignKey: ["car_make", "car_model"],
+    });
+    Associations.belongsTo.call(CarReview, "car", {
+      className: "Car",
+      foreignKey: ["car_make", "car_model"],
+    });
+    registerModel(Car);
+    registerModel(CarReview);
+    return { Car, CarReview };
+  }
+
+  it("has many inverse of derived automatically despite of composite foreign key", () => {
+    const { Car, CarReview } = makeCpkCarModels();
+    const carReviewReflection = (Car as any).reflectOnAssociation("carReviews");
+
+    expect(carReviewReflection.hasInverse()).toBe(true);
+    expect(carReviewReflection.inverseOf()).toBe((CarReview as any).reflectOnAssociation("car"));
   });
-  it.skip("belongs to inverse of derived automatically despite of composite foreign key", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* Same as above — verify canFindInverseOfAutomatically behavior for queryConstraints vs
-           scalar foreignKey, and that automatic detection works for composite FK associations. */
+
+  it("belongs to inverse of derived automatically despite of composite foreign key", () => {
+    const { Car, CarReview } = makeCpkCarModels();
+    const carReflection = (CarReview as any).reflectOnAssociation("car");
+
+    expect(carReflection.hasInverse()).toBe(true);
+    expect(carReflection.inverseOf()).toBe((Car as any).reflectOnAssociation("carReviews"));
   });
 });
 
