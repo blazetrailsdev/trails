@@ -12,8 +12,15 @@ import {
   buildThroughAssociation,
   createThroughAssociation,
 } from "../associations.js";
-import { HasOneThroughCantAssociateThroughCollection } from "./errors.js";
-import { assertQueriesMatch } from "../testing/query-assertions.js";
+import {
+  HasOneThroughCantAssociateThroughCollection,
+  HasOneAssociationPolymorphicThroughError,
+} from "./errors.js";
+import {
+  assertQueriesMatch,
+  assertQueriesCount,
+  assertNoQueries,
+} from "../testing/query-assertions.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 
 const TEST_SCHEMA = {
@@ -50,6 +57,25 @@ const TEST_SCHEMA = {
   },
   es_members: { name: "string" },
   es_orgs: { name: "string" },
+  np_clubs: { name: "string" },
+  np_sponsors: {
+    sponsorable_id: "integer",
+    sponsorable_type: "string",
+    club_id: "integer",
+  },
+  np_members: { name: "string" },
+  npm_clubs: { name: "string" },
+  npm_sponsors: {
+    sponsorable_id: "integer",
+    sponsorable_type: "string",
+    club_id: "integer",
+  },
+  npm_members: { name: "string" },
+  ce_clubs: { name: "string" },
+  ce_memberships: { member_id: "integer", club_id: "integer", favorite: "boolean" },
+  ce_members: { name: "string" },
+  pa_clubs: { name: "string" },
+  pa_members: { name: "string", admittable_id: "integer", admittable_type: "string" },
   many_members: { name: "string" },
   things: {},
   cpk_clubs3: {
@@ -395,9 +421,80 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(preloaded?.name).toBe("Polymorphic Eager Club");
   });
 
-  it.skip("has one through with conditions eager loading", () => {
-    // BLOCKED: fixture — favorite_club/hairy_club scoped associations (WHERE on through + source) not defined in test suite
-    // BLOCKED: associations — scoped has_one_through (where conditions on through/source) not wired into targetScope chain
+  it("has one through with conditions eager loading", async () => {
+    class CeClub extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class CeMembership extends Base {
+      static {
+        this.attribute("member_id", "integer");
+        this.attribute("club_id", "integer");
+        this.attribute("favorite", "boolean");
+      }
+    }
+    class CeMember extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel(CeClub);
+    registerModel(CeMembership);
+    registerModel(CeMember);
+    Associations.hasOne.call(CeMember, "membership", {
+      className: "CeMembership",
+      foreignKey: "member_id",
+    });
+    Associations.belongsTo.call(CeMembership, "club", {
+      className: "CeClub",
+      foreignKey: "club_id",
+    });
+    // conditions on the through table
+    Associations.hasOne.call(CeMember, "favoriteClub", {
+      className: "CeClub",
+      through: "membership",
+      source: "club",
+      scope: (rel: any) => rel.where({ ce_memberships: { favorite: true } }),
+    });
+    // conditions on the source table
+    Associations.hasOne.call(CeMember, "hairyClub", {
+      className: "CeClub",
+      through: "membership",
+      source: "club",
+      scope: (rel: any) => rel.where({ ce_clubs: { name: "Moustache and Eyebrow Fancier Club" } }),
+    });
+
+    const club = await CeClub.create({ name: "Moustache and Eyebrow Fancier Club" });
+    const member = await CeMember.create({ name: "Groucho" });
+    const membership = await CeMembership.create({
+      member_id: member.id,
+      club_id: club.id,
+      favorite: true,
+    });
+
+    // conditions on the through table — includes().references() promotes the
+    // scoped has_one :through to a JOIN-based eager load (Rails' includes auto-
+    // promotes when the scope references the joined tables).
+    let loaded = await CeMember.all()
+      .includes("favoriteClub")
+      .references("ce_memberships")
+      .toArray();
+    expect((loaded[0] as any).association("favoriteClub").target?.name).toBe(
+      "Moustache and Eyebrow Fancier Club",
+    );
+    await membership.update({ favorite: false });
+    loaded = await CeMember.all().includes("favoriteClub").references("ce_memberships").toArray();
+    expect((loaded[0] as any).association("favoriteClub").target).toBeNull();
+
+    // conditions on the source table
+    loaded = await CeMember.all().includes("hairyClub").references("ce_clubs").toArray();
+    expect((loaded[0] as any).association("hairyClub").target?.name).toBe(
+      "Moustache and Eyebrow Fancier Club",
+    );
+    await club.update({ name: "Association of Clean-Shaven Persons" });
+    loaded = await CeMember.all().includes("hairyClub").references("ce_clubs").toArray();
+    expect((loaded[0] as any).association("hairyClub").target).toBeNull();
   });
 
   it("has one through polymorphic with source type", async () => {
@@ -531,16 +628,152 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(orgClubLoaded._preloadedAssociations?.get("sponsoredMember")).toBeNull();
   });
 
-  it.skip("has one through nonpreload eagerloading", () => {
-    // BLOCKED: associations — non-preload (JOIN-based) eager loading not implemented; requires eager_load path
+  it("has one through nonpreload eagerloading", async () => {
+    Associations.hasOne.call(Member, "membership", {
+      className: "Membership",
+      foreignKey: "member_id",
+    });
+    Associations.hasOne.call(Member, "club", {
+      className: "Club",
+      through: "membership",
+      source: "club",
+    });
+    Associations.belongsTo.call(Membership, "club", { className: "Club", foreignKey: "club_id" });
+    const club = await Club.create({ name: "Eager Club" });
+    const member = await Member.create({ name: "Groucho Marx" });
+    await Membership.create({ member_id: member.id, club_id: club.id });
+    // order references clubs table → forces JOIN-based (non-preload) eager load
+    let members: any[] = [];
+    await assertQueriesCount(1, false, async () => {
+      members = await Member.all()
+        .includes("club")
+        .references("clubs")
+        .where({ name: "Groucho Marx" })
+        .order("clubs.name")
+        .toArray();
+    });
+    expect(members).toHaveLength(1);
+    await assertNoQueries(false, async () => {
+      const loaded = members[0].association("club");
+      expect(loaded.isLoaded()).toBe(true);
+      expect(loaded.target?.name).toBe("Eager Club");
+    });
   });
 
-  it.skip("has one through nonpreload eager loading through polymorphic", () => {
-    // BLOCKED: associations — non-preload (JOIN-based) eager loading not implemented; requires eager_load path
+  it("has one through nonpreload eager loading through polymorphic", async () => {
+    class NpClub extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class NpSponsor extends Base {
+      static {
+        this.attribute("sponsorable_id", "integer");
+        this.attribute("sponsorable_type", "string");
+        this.attribute("club_id", "integer");
+      }
+    }
+    class NpMember extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel(NpClub);
+    registerModel(NpSponsor);
+    registerModel(NpMember);
+    Associations.hasOne.call(NpMember, "sponsor", { className: "NpSponsor", as: "sponsorable" });
+    Associations.hasOne.call(NpMember, "sponsorClub", {
+      through: "sponsor",
+      source: "sponsorClub",
+      className: "NpClub",
+    });
+    Associations.belongsTo.call(NpSponsor, "sponsorClub", {
+      className: "NpClub",
+      foreignKey: "club_id",
+    });
+    const club = await NpClub.create({ name: "Eager Club" });
+    const member = await NpMember.create({ name: "Groucho Marx" });
+    await NpSponsor.create({
+      sponsorable_id: member.id,
+      sponsorable_type: "NpMember",
+      club_id: club.id,
+    });
+    let members: any[] = [];
+    await assertQueriesCount(1, false, async () => {
+      members = await NpMember.all()
+        .includes("sponsorClub")
+        .references("np_clubs")
+        .where({ name: "Groucho Marx" })
+        .order("np_clubs.name")
+        .toArray();
+    });
+    expect(members).toHaveLength(1);
+    await assertNoQueries(false, async () => {
+      const loaded = members[0].association("sponsorClub");
+      expect(loaded.isLoaded()).toBe(true);
+      expect(loaded.target?.name).toBe("Eager Club");
+    });
   });
 
-  it.skip("has one through nonpreload eager loading through polymorphic with more than one through record", () => {
-    // BLOCKED: associations — non-preload (JOIN-based) eager loading not implemented; requires eager_load path
+  it("has one through nonpreload eager loading through polymorphic with more than one through record", async () => {
+    class NpmClub extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class NpmSponsor extends Base {
+      static {
+        this.attribute("sponsorable_id", "integer");
+        this.attribute("sponsorable_type", "string");
+        this.attribute("club_id", "integer");
+      }
+    }
+    class NpmMember extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel(NpmClub);
+    registerModel(NpmSponsor);
+    registerModel(NpmMember);
+    Associations.hasOne.call(NpmMember, "sponsor", { className: "NpmSponsor", as: "sponsorable" });
+    Associations.hasOne.call(NpmMember, "sponsorClub", {
+      through: "sponsor",
+      source: "sponsorClub",
+      className: "NpmClub",
+    });
+    Associations.belongsTo.call(NpmSponsor, "sponsorClub", {
+      className: "NpmClub",
+      foreignKey: "club_id",
+    });
+    const club = await NpmClub.create({ name: "Boring Club" });
+    const outrageous = await NpmClub.create({ name: "Outrageous Club" });
+    const member = await NpmMember.create({ name: "Groucho Marx" });
+    await NpmSponsor.create({
+      sponsorable_id: member.id,
+      sponsorable_type: "NpmMember",
+      club_id: club.id,
+    });
+    await NpmSponsor.create({
+      sponsorable_id: member.id,
+      sponsorable_type: "NpmMember",
+      club_id: outrageous.id,
+    });
+    let members: any[] = [];
+    await assertQueriesCount(1, false, async () => {
+      members = await NpmMember.all()
+        .includes("sponsorClub")
+        .references("npm_clubs")
+        .where({ name: "Groucho Marx" })
+        .order("npm_clubs.name DESC")
+        .toArray();
+    });
+    expect(members).toHaveLength(1);
+    await assertNoQueries(false, async () => {
+      const loaded = members[0].association("sponsorClub");
+      expect(loaded.isLoaded()).toBe(true);
+      expect(loaded.target?.name).toBe("Outrageous Club");
+    });
   });
 
   it("uninitialized has one through should return nil for unsaved record", async () => {
@@ -702,10 +935,30 @@ describe("HasOneThroughAssociationsTest", () => {
     );
   });
 
-  it.skip("has one through polymorphic association", () => {
-    // BLOCKED: reflection — isPolymorphic() checks options.polymorphic but not options.as
-    // ROOT-CAUSE: ThroughReflection.isPolymorphic() needs to recognize has_one :as as polymorphic
-    // SCOPE: ~10 LOC fix in reflection.ts; unblocks HasOneAssociationPolymorphicThroughError guard
+  it("has one through polymorphic association", () => {
+    class PaClub extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class PaMember extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("admittable_id", "integer");
+        this.attribute("admittable_type", "string");
+      }
+    }
+    registerModel(PaClub);
+    registerModel(PaMember);
+    Associations.belongsTo.call(PaMember, "admittable", { polymorphic: true });
+    Associations.hasOne.call(PaMember, "premiumClub", {
+      through: "admittable",
+      className: "PaClub",
+    });
+    const member = new PaMember({ name: "Groucho" });
+    expect(() => member.association("premiumClub")).toThrow(
+      HasOneAssociationPolymorphicThroughError,
+    );
   });
 
   it("has one through belongs to should update when the through foreign key changes", async () => {
