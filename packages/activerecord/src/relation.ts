@@ -14,6 +14,7 @@ import { ConnectionNotEstablished, RecordNotSaved, RecordNotUnique } from "./err
 import { disallowRawSqlBang } from "./sanitization.js";
 import {
   columnNameMatcher as abstractColumnNameMatcher,
+  columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
   defaultSqlTimezone,
 } from "./connection-adapters/abstract/sql-formatting.js";
 import { habtmTargetFk, joinHabtmTableNames, modelRegistry } from "./associations.js";
@@ -253,6 +254,19 @@ function resolveColumnNameMatcher(adapter: any): RegExp {
     a = a.inner;
   }
   return abstractColumnNameMatcher();
+}
+
+function resolveColumnNameWithOrderMatcher(adapter: any): RegExp {
+  // Walk adapter → inner to find a static columnNameWithOrderMatcher on the
+  // concrete adapter class. Order-path matcher additionally permits an
+  // `ASC|DESC` and `NULLS FIRST|LAST` suffix after the column name.
+  let a = adapter;
+  while (a) {
+    const matcher = (a.constructor as any)?.columnNameWithOrderMatcher?.();
+    if (matcher) return matcher;
+    a = a.inner;
+  }
+  return abstractColumnNameWithOrderMatcher();
 }
 
 /**
@@ -983,6 +997,18 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#in_order_of
    */
   inOrderOf(column: string | Nodes.Node, values: unknown[], filter = true): Relation<T> {
+    // Mirrors Rails: reject opaque raw SQL in the order column before doing
+    // anything else. The order-path matcher permits a bare column (optionally
+    // table-prefixed) with an optional ASC|DESC / NULLS FIRST|LAST suffix;
+    // Arel nodes are passed through untouched.
+    let orderMatcher: RegExp | undefined;
+    try {
+      orderMatcher = resolveColumnNameWithOrderMatcher(this._modelClass.connection);
+    } catch {
+      orderMatcher = abstractColumnNameWithOrderMatcher();
+    }
+    disallowRawSqlBang([column], orderMatcher);
+
     if (values.length === 0) return this.none();
 
     const rel = this._clone();

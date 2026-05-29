@@ -193,4 +193,18 @@ describe("FieldOrderedValuesTest", () => {
     expect(ordered.map((p: any) => p.id)).toEqual(order);
     expect(await posts.count()).toBe(4);
   });
+
+  it("in order of rejects raw sql columns", () => {
+    class Post extends Base {
+      static {
+        this.attribute("status", "string");
+      }
+    }
+    // Mirrors Rails: in_order_of guards the order column with
+    // disallow_raw_sql!(permit: column_name_with_order_matcher). Opaque SQL is
+    // rejected; a bare column with an order suffix and Arel.sql() pass through.
+    expect(() => Post.all().inOrderOf("id; DROP TABLE posts", [1, 2])).toThrow();
+    expect(() => Post.all().inOrderOf("status ASC", ["draft"])).not.toThrow();
+    expect(() => Post.all().inOrderOf(arelSql("id * 2"), [2, 4])).not.toThrow();
+  });
 });
