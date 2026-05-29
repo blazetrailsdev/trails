@@ -1708,9 +1708,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         // method)` (has_many_through_association.rb:136-175): destroy the join
         // rows for the loaded target so the join model's `belongsTo`
         // counter-cache callbacks still fire, without the collection
-        // before/after-remove callbacks. The loaded-target scoping also keeps
-        // a diverged (`whereBang`-constrained) clear from touching rows outside
-        // the caller's scope.
+        // before/after-remove callbacks. Like Rails, this follows the
+        // association-layer `load_target` (the full association target), not
+        // the proxy's in-place relation state.
         const assoc = this._record.association(this._assocName) as unknown as {
           loadTarget: () => Promise<Base[]>;
           deleteRecords: (records: Base[], method: string) => Promise<number>;
