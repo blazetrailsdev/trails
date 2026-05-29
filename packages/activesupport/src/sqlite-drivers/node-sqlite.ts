@@ -197,6 +197,24 @@ export const nodeSqliteDriver: SqliteDriver = {
       return false;
     }
   },
+
+  async restoreFromPath(sourcePath: string, destination: string): Promise<void> {
+    if (!nodeSqlite) {
+      throw new Error(
+        "node:sqlite is not available. Node 22.5+ is required. " +
+          "On Node 22.5–22.9 you may also need --experimental-sqlite.",
+      );
+    }
+    // node:sqlite's top-level backup() abstracts sqlite3_backup_*: source
+    // handle → destination path/URI. Open the source read-only to match
+    // better-sqlite3's restore semantics.
+    const source = new nodeSqlite.DatabaseSync(sourcePath, { readOnly: true });
+    try {
+      await nodeSqlite.backup(source, destination);
+    } finally {
+      source.close();
+    }
+  },
 };
 
 registerSqliteDriver(nodeSqliteDriver);

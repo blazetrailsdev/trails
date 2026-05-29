@@ -146,6 +146,16 @@ export interface SqliteDriver {
    * attempt-and-catch.
    */
   databaseExists?(config: SqliteOpenConfig): boolean | Promise<boolean>;
+  /**
+   * Restore the SQLite database file at `sourcePath` into `destination` using
+   * the driver's native online-backup primitive (SQLite's
+   * `sqlite3_backup_*`). `destination` is a path or `file:` URI; when it is a
+   * shared-cache in-memory URI (`file:name?mode=memory&cache=shared`) the
+   * caller MUST hold a connection open to that same URI for the restored DB to
+   * persist past the backup. Optional — drivers without a backup primitive
+   * (e.g. expo-sqlite) omit it and callers fall back to a file clone.
+   */
+  restoreFromPath?(sourcePath: string, destination: string): Promise<void>;
 }
 
 // Stash the registry on globalThis under a Symbol so that module duplication

@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { ColumnInfo, SqliteConnection } from "../sqlite-adapter.js";
+import { getFs } from "../fs-adapter.js";
+import { getOs } from "../os-adapter.js";
 import { betterSqlite3Driver } from "./better-sqlite3.js";
 
 describe("SqliteDriver — better-sqlite3 round-trip", () => {
@@ -109,5 +111,56 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
     expect(betterSqlite3Driver.capabilities.inProcessSync).toBe(true);
     expect(betterSqlite3Driver.capabilities.streaming).toBe(true);
     expect(betterSqlite3Driver.capabilities.foreignKeysOnByDefault).toBe(false);
+  });
+});
+
+describe("SqliteDriver — better-sqlite3 restoreFromPath", () => {
+  const templatePath = `${getOs().tmpdir()}/bs3-restore-template-${process.pid}.sqlite`;
+  const destPath = `${getOs().tmpdir()}/bs3-restore-dest-${process.pid}.sqlite`;
+
+  // All temp DB files this suite touches (main + WAL sidecars), so setup can
+  // pre-clean and teardown can remove every artifact.
+  const tempFiles = [
+    templatePath,
+    `${templatePath}-wal`,
+    `${templatePath}-shm`,
+    destPath,
+    `${destPath}-wal`,
+    `${destPath}-shm`,
+  ];
+  const removeTempFiles = (): void => {
+    for (const p of tempFiles) {
+      try {
+        getFs().unlinkSync(p);
+      } catch {
+        /* best effort */
+      }
+    }
+  };
+
+  beforeAll(async () => {
+    // Pre-clean so a prior interrupted run's leftover template (same pid path)
+    // can't make CREATE TABLE throw "table gadgets already exists".
+    removeTempFiles();
+    const tpl = await betterSqlite3Driver.open({ database: templatePath });
+    await tpl.exec(
+      "CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT);" +
+        "INSERT INTO gadgets (label) VALUES ('alpha'), ('beta');",
+    );
+    await tpl.close();
+  });
+
+  afterAll(removeTempFiles);
+
+  it("restores a template DB into a fresh destination via the backup primitive", async () => {
+    await betterSqlite3Driver.restoreFromPath!(templatePath, destPath);
+
+    // A fresh connection to the restored destination sees the template's rows.
+    const probe = await betterSqlite3Driver.open({ database: destPath });
+    const count = (await (await probe.prepare("SELECT count(*) AS c FROM gadgets")).get()) as {
+      c: number;
+    };
+    expect(count.c).toBe(2);
+    await probe.close();
   });
 });

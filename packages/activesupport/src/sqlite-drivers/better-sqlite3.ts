@@ -170,6 +170,21 @@ export const betterSqlite3Driver: SqliteDriver = {
       return false;
     }
   },
+
+  async restoreFromPath(sourcePath: string, destination: string): Promise<void> {
+    // better-sqlite3's backup() page-copies the source handle into the
+    // destination filename (folding in WAL pages), so the restore is
+    // consistent even from a live/WAL template. NB: this build does not set
+    // SQLITE_OPEN_URI, so `destination` is always a literal filename — a
+    // `file:...?mode=memory` URI would be written as an on-disk file, not a
+    // memory DB. Open the source read-only so a live template isn't blocked.
+    const source = new Database(sourcePath, { readonly: true });
+    try {
+      await source.backup(destination);
+    } finally {
+      source.close();
+    }
+  },
 };
 
 registerSqliteDriver(betterSqlite3Driver);

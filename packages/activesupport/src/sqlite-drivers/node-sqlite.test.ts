@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { SqliteConnection } from "../sqlite-adapter.js";
+import { getFs } from "../fs-adapter.js";
+import { getOs } from "../os-adapter.js";
 import { isNodeSqliteAvailable, nodeSqliteDriver } from "./node-sqlite.js";
 
 describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip", () => {
@@ -138,5 +140,55 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite strict", (
     } finally {
       await conn.close();
     }
+  });
+});
+
+describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite restoreFromPath", () => {
+  const templatePath = `${getOs().tmpdir()}/nodesqlite-restore-template-${process.pid}.sqlite`;
+  const destPath = `${getOs().tmpdir()}/nodesqlite-restore-dest-${process.pid}.sqlite`;
+
+  // All temp DB files this suite touches (main + WAL sidecars), so setup can
+  // pre-clean and teardown can remove every artifact.
+  const tempFiles = [
+    templatePath,
+    `${templatePath}-wal`,
+    `${templatePath}-shm`,
+    destPath,
+    `${destPath}-wal`,
+    `${destPath}-shm`,
+  ];
+  const removeTempFiles = (): void => {
+    for (const p of tempFiles) {
+      try {
+        getFs().unlinkSync(p);
+      } catch {
+        /* best effort */
+      }
+    }
+  };
+
+  beforeAll(async () => {
+    // Pre-clean so a prior interrupted run's leftover template (same pid path)
+    // can't make CREATE TABLE throw "table gadgets already exists".
+    removeTempFiles();
+    const tpl = await nodeSqliteDriver.open({ database: templatePath });
+    await tpl.exec(
+      "CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT);" +
+        "INSERT INTO gadgets (label) VALUES ('alpha'), ('beta');",
+    );
+    await tpl.close();
+  });
+
+  afterAll(removeTempFiles);
+
+  it("restores a template DB into a fresh destination via the backup primitive", async () => {
+    await nodeSqliteDriver.restoreFromPath!(templatePath, destPath);
+
+    const probe = await nodeSqliteDriver.open({ database: destPath });
+    const count = (await (await probe.prepare("SELECT count(*) AS c FROM gadgets")).get()) as {
+      c: number;
+    };
+    expect(count.c).toBe(2);
+    await probe.close();
   });
 });
