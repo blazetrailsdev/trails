@@ -1452,7 +1452,9 @@ export class Relation<T extends Base> {
       if (!targetModel) return null;
       const targetTable = targetModel.tableName;
       const rawPk = assocDef.options.primaryKey ?? sourcePk;
-      const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
+      const foreignKey = assocDef.options.as
+        ? (assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`)
+        : (assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
       const pkArr = Array.isArray(rawPk) ? rawPk : [rawPk];
       const fkArr = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
       if (pkArr.length !== fkArr.length) return null;

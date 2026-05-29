@@ -9,7 +9,7 @@ import { Associations } from "../associations.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import { quoteTableName, quoteColumnName } from "../test-helpers/quote-regex.js";
+import { quoteTableName, quoteColumnName, escapeRegExp } from "../test-helpers/quote-regex.js";
 
 // -- Helpers --
 const woaCols = {
@@ -1348,6 +1348,42 @@ describe("WhereTest", () => {
     }).joins("price_estimates");
 
     expect(actual.toSql()).toEqual(expected.toSql());
+  });
+  it("polymorphic as join derives inverse foreign key id column", () => {
+    // Mirrors Rails `Treasure has_many :price_estimates, as: :estimate_of`.
+    // The polymorphic `as:` inverse derives BOTH columns from the `as:` name:
+    // `estimate_of_type` (already correct) and `estimate_of_id` — not the
+    // owner-derived `<owner>_id` (`pas_treasure_id`). See #2566 (R1) follow-up.
+    class PasTreasure extends Base {
+      static {
+        this._tableName = "pas_treasures";
+        this.attribute("name", "string");
+      }
+    }
+    class PasPriceEstimate extends Base {
+      static {
+        this._tableName = "pas_price_estimates";
+        this.attribute("estimate_of_type", "string");
+        this.attribute("estimate_of_id", "integer");
+      }
+    }
+    registerModel("PasTreasure", PasTreasure);
+    registerModel("PasPriceEstimate", PasPriceEstimate);
+    Associations.hasMany.call(PasTreasure, "price_estimates", {
+      className: "PasPriceEstimate",
+      as: "estimateOf",
+    });
+
+    const sql = PasTreasure.joins("price_estimates").toSql();
+
+    expect(sql).toMatch(
+      new RegExp(
+        `${escapeRegExp(quoteColumnName("estimate_of_id"))} = ` +
+          `${escapeRegExp(quoteTableName("pas_treasures"))}\\.${escapeRegExp(quoteColumnName("id"))}`,
+      ),
+    );
+    expect(sql).toContain(quoteColumnName("estimate_of_type"));
+    expect(sql).not.toContain(quoteColumnName("pas_treasure_id"));
   });
   it("decorated polymorphic where", () => {
     class DpwTreasure extends Base {
