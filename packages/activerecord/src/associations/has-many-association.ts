@@ -4,6 +4,7 @@ import { loadHasMany } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { CollectionAssociation } from "./collection-association.js";
 import { ForeignAssociation } from "./foreign-association.js";
+import { compositeQueryConstraintsList } from "../persistence.js";
 import { underscore } from "@blazetrails/activesupport";
 
 /**
@@ -106,6 +107,39 @@ export class HasManyAssociation extends CollectionAssociation {
   protected override computeNullifiedOwnerAttributes(): Record<string, null> {
     return nullifiedOwnerAttributes(this);
   }
+
+  /**
+   * Delete the given records per the `:dependent` strategy. Reached from
+   * `removeRecords` (after `before_remove` fires), so `dependent: :destroy`
+   * on `owner.destroy` now destroys children through the callback path.
+   *
+   * Mirrors: ActiveRecord::Associations::HasManyAssociation#delete_records —
+   * `:destroy` destroys each record; otherwise a bulk delete/nullify scoped
+   * to the records, decrementing the counter cache by the affected count.
+   * @internal
+   */
+  protected override async deleteRecords(records: Base[], method: string): Promise<number> {
+    if (method === "destroy") {
+      // Rails: records.each(&:destroy!).
+      for (const record of records) await (record as any).destroyBang();
+      // Rails: update_counter(-records.length) unless reflection.inverse_updates_counter_cache?
+      // In trails the owner's counter is decremented through the child's belongs_to
+      // inverse on destroy (CounterCache#destroy_row), so updating here too would
+      // double-count — equivalent to the Rails inverse_updates_counter_cache? guard.
+      return records.length;
+    }
+    // delete_all / nullify (Rails delete_records else-branch). Reached only via the
+    // association-layer `delete` with a dependent strategy; non-through has_many
+    // `delete` is intercepted by the CollectionProxy. Scope to the given records by
+    // their query-constraint columns so we delete/nullify only those rows.
+    const baseScope = (this as any).scope?.();
+    if (!baseScope) return 0;
+    const queryConstraints = compositeQueryConstraintsList.call(this.klass as any);
+    const scope = scopeForRecords(baseScope, queryConstraints, records);
+    const count = await deleteCount(this, method, scope);
+    if (count > 0) await updateCounter(this, -count);
+    return count;
+  }
 }
 
 /** @internal */
@@ -139,9 +173,34 @@ function updateCounterInMemory(assoc: HasManyAssociation, difference: number): v
 }
 
 /** @internal */
-function deleteCount(_assoc: HasManyAssociation, method: string, scope: any): Promise<number> {
+function deleteCount(assoc: HasManyAssociation, method: string, scope: any): Promise<number> {
+  // Rails: delete_all → scope.delete_all; nullify → scope.update_all(nullified_owner_attributes).
   if (method === "deleteAll") return scope.deleteAll?.() ?? Promise.resolve(0);
-  return scope.updateAll?.() ?? Promise.resolve(0);
+  const nullAttrs = (
+    assoc as unknown as {
+      computeNullifiedOwnerAttributes(): Record<string, null>;
+    }
+  ).computeNullifiedOwnerAttributes();
+  return scope.updateAll?.(nullAttrs) ?? Promise.resolve(0);
+}
+
+/**
+ * Restrict an association scope to the given records via their query-constraint
+ * columns. Mirrors Rails' `scope.where(query_constraints => values)` from
+ * `HasManyAssociation#delete_records`. Single-column PKs use a `WHERE id IN (...)`;
+ * composite keys AND a per-column `IN` (an over-approximation only reachable for
+ * the rare composite-PK non-through has_many, which trails does not bulk-delete).
+ * @internal
+ */
+function scopeForRecords(scope: any, queryConstraints: string[], records: Base[]): any {
+  const readCol = (r: Base, col: string): unknown =>
+    typeof (r as any)._readAttribute === "function"
+      ? (r as any)._readAttribute(col)
+      : (r as any)[col];
+  for (const col of queryConstraints) {
+    scope = scope.where({ [col]: records.map((r) => readCol(r, col)) });
+  }
+  return scope;
 }
 
 /** @internal */
@@ -150,11 +209,6 @@ async function deleteOrNullifyAllRecords(assoc: HasManyAssociation, method: stri
   const scope = (assoc as any).scope?.();
   const count = await deleteCount(assoc, method, scope);
   if (count > 0) await updateCounter(assoc, -count);
-}
-
-/** @internal */
-function deleteRecords(assoc: HasManyAssociation, records: Base[], method: string): Promise<void> {
-  return (assoc as any).delete?.(...records) ?? Promise.resolve();
 }
 
 /** @internal */
