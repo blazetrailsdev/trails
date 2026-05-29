@@ -275,9 +275,12 @@ function resolveColumnNameWithOrderMatcher(adapter: any): RegExp {
  * `isStrictLoading` to propagate strictness onto the derived scope, while
  * `isEmptyScope` keeps it from being merged like a real scope.
  *
+ * Rails nests this `:nodoc:` inside `Relation`; kept module-private here.
+ *
  * Mirrors: ActiveRecord::Relation::StrictLoadingScope
+ * @internal
  */
-export const StrictLoadingScope = {
+const StrictLoadingScope = {
   isEmptyScope: true,
   isStrictLoading: true,
 } as const;
