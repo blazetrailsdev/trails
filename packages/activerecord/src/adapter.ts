@@ -61,6 +61,14 @@ export interface DatabaseAdapter {
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
 
   /**
+   * Compile an Arel node/TreeManager to a SQL string via this connection's
+   * visitor (dialect-correct quoting, etc.).
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#to_sql
+   */
+  toSql(arel: unknown, binds?: unknown[]): string;
+
+  /**
    * Begin a transaction.
    */
   beginTransaction(): Promise<void>;

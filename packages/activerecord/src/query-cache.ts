@@ -160,6 +160,10 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     return this.inner.isPreventingWrites();
   }
 
+  toSql(arel: unknown, binds?: unknown[]): string {
+    return this.inner.toSql(arel, binds);
+  }
+
   readonly inner: DatabaseAdapter;
   readonly cache: QueryCacheStore;
   private _queryCount = 0;
