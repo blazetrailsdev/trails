@@ -84,6 +84,22 @@ describe("loadSchemaFromAdapter", () => {
     expect(Model._attributeDefinitions.has("guid")).toBe(false);
   });
 
+  it("reflects on a concrete subclass of an abstract parent", async () => {
+    class ApplicationRecord extends Base {
+      static override _abstractClass = true;
+    }
+    class Post extends ApplicationRecord {
+      static override tableName = "posts";
+    }
+    expect(Object.prototype.hasOwnProperty.call(Post, "_abstractClass")).toBe(false);
+    const adapter = makeAdapter({ guid: { sqlType: "uuid" } }, { uuid: new UuidType() });
+    (Post as unknown as { adapter: unknown }).adapter = adapter;
+
+    await loadSchemaFromAdapter.call(Post as typeof Base);
+
+    expect((Post as typeof Base)._attributeDefinitions.has("guid")).toBe(true);
+  });
+
   it("is a no-op when data source does not exist (explicit false)", async () => {
     const adapter = {
       schemaCache: {
