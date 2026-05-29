@@ -58,7 +58,6 @@ export interface FixtureRegistryEntry {
  * Additional gaps — model imports, but the fixture set does NOT seed against the
  * canonical `TEST_SCHEMA` today (verified by the seed-conformance test). Grouped by
  * the underlying loader gap; each is re-addable once that gap closes:
- * - NOT NULL `created_at`/`updated_at` (no fixture auto-stamp yet): `cars`, `people`, `toys`
  * - string / non-integer declared PK (`resolveDeclaredPk` integer-only): `dashboards`,
  *   `minivans`, `speedometers`, `string-key-objects`, `subscribers`
  * - id-less or custom-PK table while the model defaults to `id`: `bulbs` (PK `ID`),
@@ -83,8 +82,6 @@ export interface FixtureRegistryEntry {
  * by name. Re-addable once the ref'd set becomes registerable (verified by the
  * "refs only loadable tables" conformance test):
  * - `subscriptions` → `books` (books declare ids 1-4; `book_id` would be CRC32)
- * - `readers`, `references` → `people` (people declare explicit ids)
- * - `price-estimates` → `cars` (cars declare explicit ids)
  * - `cpk-order-agreements` → `cpk-orders`, `cpk-reviews` → `cpk-books` (composite-PK targets)
  */
 export const fixtureRegistry = {
@@ -115,6 +112,10 @@ export const fixtureRegistry = {
   cakeDesigners: {
     model: () => import("./models/cake-designer.js").then((m) => m.CakeDesigner),
     data: FixtureData.cakeDesignerFixtureData,
+  },
+  cars: {
+    model: () => import("./models/car.js").then((m) => m.Car),
+    data: FixtureData.carFixtureData,
   },
   categories: {
     model: () => import("./models/category.js").then((m) => m.Category),
@@ -284,6 +285,10 @@ export const fixtureRegistry = {
     model: () => import("./models/paragraph.js").then((m) => m.Paragraph),
     data: FixtureData.paragraphFixtureData,
   },
+  people: {
+    model: () => import("./models/person.js").then((m) => m.Person),
+    data: FixtureData.personFixtureData,
+  },
   pets: {
     model: () => import("./models/pet.js").then((m) => m.Pet),
     data: FixtureData.petFixtureData,
@@ -296,6 +301,10 @@ export const fixtureRegistry = {
     model: () => import("./models/post.js").then((m) => m.Post),
     data: FixtureData.postFixtureData,
   },
+  priceEstimates: {
+    model: () => import("./models/price-estimate.js").then((m) => m.PriceEstimate),
+    data: FixtureData.priceEstimateFixtureData,
+  },
   products: {
     model: () => import("./models/shop.js").then((m) => m.ShopProduct),
     data: FixtureData.productFixtureData,
@@ -307,6 +316,14 @@ export const fixtureRegistry = {
   ratings: {
     model: () => import("./models/rating.js").then((m) => m.Rating),
     data: FixtureData.ratingFixtureData,
+  },
+  readers: {
+    model: () => import("./models/reader.js").then((m) => m.Reader),
+    data: FixtureData.readerFixtureData,
+  },
+  references: {
+    model: () => import("./models/reference.js").then((m) => m.Reference),
+    data: FixtureData.referenceFixtureData,
   },
   shardedBlogPosts: {
     model: () => import("./models/sharded.js").then((m) => m.ShardedBlogPost),
@@ -351,6 +368,10 @@ export const fixtureRegistry = {
   topics: {
     model: () => import("./models/topic.js").then((m) => m.Topic),
     data: FixtureData.topicFixtureData,
+  },
+  toys: {
+    model: () => import("./models/toy.js").then((m) => m.Toy),
+    data: FixtureData.toyFixtureData,
   },
   trafficLights: {
     model: () => import("./models/traffic-light.js").then((m) => m.TrafficLight),

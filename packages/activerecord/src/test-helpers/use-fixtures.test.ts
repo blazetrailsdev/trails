@@ -209,6 +209,32 @@ describe("useFixtures by registry name", () => {
   });
 });
 
+// --- timestamp auto-stamp (Rails' fill_timestamps) ---
+
+describe("useFixtures auto-stamps NOT NULL timestamps", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
+  // people.michael declares neither created_at nor updated_at, but both columns
+  // are NOT NULL — defineFixtures must fill them with the current time, mirroring
+  // Rails' FixtureSet::TableRow#fill_timestamps. Without it the INSERT fails.
+  const { people } = useFixtures(["people"], () => Base.adapter);
+
+  it("fills created_at/updated_at for a row that omits them", async () => {
+    const id = people("michael").id;
+    const [row] = await Base.adapter.execute(
+      `SELECT created_at, updated_at FROM ${Base.adapter.quoteTableName("people")} WHERE id = ${id}`,
+    );
+    const r = row as { created_at: unknown; updated_at: unknown };
+    expect(r.created_at).not.toBeNull();
+    expect(r.created_at).not.toBeUndefined();
+    expect(r.updated_at).not.toBeNull();
+  });
+});
+
 // --- fixture registry conformance ---
 
 describe("fixtureRegistry conformance", () => {
