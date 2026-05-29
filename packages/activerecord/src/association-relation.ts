@@ -2,8 +2,6 @@ import type { Base } from "./base.js";
 import { Relation } from "./relation.js";
 import type { CollectionProxy } from "./associations/collection-proxy.js";
 import { _setAssociationRelationCtor } from "./associations/collection-proxy.js";
-import { strictLoadingViolationBang } from "./core.js";
-import { camelize, singularize } from "@blazetrails/activesupport";
 
 /**
  * A Relation produced by a collection association (e.g. `blog.posts`,
@@ -126,40 +124,8 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 
   /**
-   * Throw for chained association reads (`blog.posts.where(...)`) when the
-   * owner is strict-loading. Honors the same exemptions as the reader's
-   * `violates_strict_loading?` (bypass block, validation context, reflection
-   * `strict_loading: false`, `n_plus_one_only`). Rails' own
-   * `AssociationRelation#exec_queries` doesn't enforce here — it cascades via
-   * `set_strict_loading`; the owner-strict backstop is trails-specific and
-   * full `exec_queries` parity is a follow-up.
-   */
-  private _checkStrictLoading(): void {
-    const owner = this._association.owner as unknown as {
-      _strictLoading?: boolean;
-      _strictLoadingBypassCount?: number;
-      _validationContext?: unknown;
-      isStrictLoadingNPlusOneOnly?: () => boolean;
-    };
-    if (owner._strictLoadingBypassCount) return;
-    if (owner._validationContext != null) return;
-    if (this._association.reflection.options.strictLoading === false) return;
-    if (owner._strictLoading && !owner.isStrictLoadingNPlusOneOnly?.()) {
-      strictLoadingViolationBang(this._association.owner, this._association.associationName, {
-        polymorphic: this._association.reflection.options.polymorphic,
-        // AssociationRelation always wraps a collection association
-        // (`blog.posts` / `blog.posts.where(...)`), so the conventional klass
-        // is the singularized name — matching Rails' `#{klass}`.
-        className:
-          this._association.reflection.options.className ??
-          camelize(singularize(this._association.associationName)),
-      });
-    }
-  }
-
-  /**
-   * Override the load path to enforce owner strict-loading and to
-   * propagate inverse_of / per-record strict-loading onto the fetched
+   * Override the load path to propagate inverse_of / per-record
+   * strict-loading onto the fetched
    * records — mirrors Rails' `AssociationRelation#exec_queries`, which
    * calls `set_inverse_instance_from_queries` and applies
    * `strict_loading!` when the owner or the reflection has it set.
@@ -168,7 +134,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * way back, so accessing the inverse would re-query.
    */
   async toArray(): Promise<T[]> {
-    this._checkStrictLoading();
     const records = await super.toArray();
     const owner = this._association.owner;
     const reflection = this._association.reflection;
@@ -246,76 +211,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     }
 
     return records;
-  }
-
-  // Other SQL-executing entry points — gate on the same strict-loading
-  // check. Rails enforces strict loading uniformly across `CollectionProxy`
-  // reads; with CP now extending Relation, chained AR methods need the
-  // same gate.
-
-  async count(column?: string): Promise<number | Record<string, number>> {
-    this._checkStrictLoading();
-    return (
-      Relation.prototype as unknown as {
-        count: (col?: string) => Promise<number | Record<string, number>>;
-      }
-    ).count.call(this, column);
-  }
-
-  async sum(column?: string): Promise<number | bigint | Record<string, number | bigint>> {
-    this._checkStrictLoading();
-    return (
-      Relation.prototype as unknown as {
-        sum: (col?: string) => Promise<number | bigint | Record<string, number | bigint>>;
-      }
-    ).sum.call(this, column);
-  }
-
-  async average(column: string): Promise<unknown | null | Record<string, unknown>> {
-    this._checkStrictLoading();
-    return (
-      Relation.prototype as unknown as {
-        average: (col: string) => Promise<unknown | null | Record<string, unknown>>;
-      }
-    ).average.call(this, column);
-  }
-
-  async minimum(column: string): Promise<unknown | null | Record<string, unknown>> {
-    this._checkStrictLoading();
-    return (
-      Relation.prototype as unknown as {
-        minimum: (col: string) => Promise<unknown | null | Record<string, unknown>>;
-      }
-    ).minimum.call(this, column);
-  }
-
-  async maximum(column: string): Promise<unknown | null | Record<string, unknown>> {
-    this._checkStrictLoading();
-    return (
-      Relation.prototype as unknown as {
-        maximum: (col: string) => Promise<unknown | null | Record<string, unknown>>;
-      }
-    ).maximum.call(this, column);
-  }
-
-  override pluck(...columns: Parameters<Relation<T>["pluck"]>): Promise<unknown[]> {
-    this._checkStrictLoading();
-    return super.pluck(...columns);
-  }
-
-  override pick(...columns: Parameters<Relation<T>["pick"]>): Promise<unknown> {
-    this._checkStrictLoading();
-    return super.pick(...columns);
-  }
-
-  override updateAll(updates: Record<string, unknown>): Promise<number> {
-    this._checkStrictLoading();
-    return super.updateAll(updates);
-  }
-
-  override deleteAll(): Promise<number> {
-    this._checkStrictLoading();
-    return super.deleteAll();
   }
 }
 
