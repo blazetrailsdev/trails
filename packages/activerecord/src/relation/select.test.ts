@@ -81,13 +81,12 @@ describe("SelectTest", () => {
     expect(sql).toMatch(new RegExp(`^SELECT ${escapeRegExp(quoteTableName("posts.title"))} FROM`));
   });
 
-  it.skip("select with non field values", () => {
-    // BLOCKED: relation — bare-string select literals are table-qualified, not passed through.
-    // ROOT-CAUSE: Relation#_buildProjections (relation.ts) does `table.get(c)` for any string
-    //   without `(`, `*`, or whitespace, so `"1"` becomes `"posts"."1"` instead of the raw `1`.
-    //   The Rails path runs `arel_column`, which checks `columns_hash` then falls back to a literal.
-    // SCOPE: route _buildProjections string args through arelColumns — separate from hash-form select.
-    /* Rails: Post.select("1", "foo()", :bar).to_sql starts with SELECT 1, foo(), "bar" FROM */
+  it("select with non field values", () => {
+    // Rails: Post.select("1", "foo()", :bar).to_sql starts with SELECT 1, foo(), "bar" FROM
+    const { Post } = makePost();
+    const sql = Post.select("1", "foo()", Symbol("bar") as any).toSql();
+    const q = (n: string) => escapeRegExp(quoteTableName(n));
+    expect(sql).toMatch(new RegExp(`^SELECT 1, foo\\(\\), ${q("bar")} FROM`));
   });
 
   it("select with non field hash values", () => {

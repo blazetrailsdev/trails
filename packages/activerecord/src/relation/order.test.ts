@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import { sql } from "@blazetrails/arel";
 import { Base } from "../index.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -50,8 +51,28 @@ describe("OrderTest", () => {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.order("title").reverseOrder().toSql();
-    expect(sql).toContain("DESC");
+    const sqlOut = Post.order("title").reverseOrder().toSql();
+    expect(sqlOut).toContain("DESC");
+  });
+
+  it("reverse order with explicit direction does not double-flip", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    // Regression: chained ASC→DESC then DESC→ASC replaces used to fall through
+    // and append " DESC", producing "id ASC DESC". Should flip to "id DESC".
+    const stringForm = Post.order("id ASC").reverseOrder().toSql();
+    expect(stringForm).toContain("DESC");
+    expect(stringForm).not.toMatch(/ASC\s+DESC/i);
+
+    // Raw Arel.sql order (stored as a { raw } clause) takes the same path.
+    const rawForm = Post.order([sql("id ASC")] as any)
+      .reverseOrder()
+      .toSql();
+    expect(rawForm).toMatch(/ORDER BY id DESC/);
+    expect(rawForm).not.toMatch(/ASC\s+DESC/i);
   });
 
   it("order asc", async () => {
