@@ -27,7 +27,6 @@ import {
 import { Associations, resolveAssocClass } from "./associations.js";
 import { Table } from "@blazetrails/arel";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
 import { UnknownPrimaryKey } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -209,20 +208,13 @@ const TEST_SCHEMA: Schema = {
   users: { name: "string", email: "string" },
 };
 
-// -- Helpers --
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
+beforeAll(async () => {
+  await defineSchema(TEST_SCHEMA);
+});
 
 describe("ReflectionTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-
   function makeModels() {
     class Author extends Base {
       static {
@@ -1157,17 +1149,14 @@ describe("ReflectionTest", () => {
     expect(type.serialize(object)).toBe(object);
   });
   it("reflection klass for nested class name", async () => {
-    const adp = await freshAdapter();
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     class Book extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     registerModel("Library::Book", Book);
@@ -1178,17 +1167,14 @@ describe("ReflectionTest", () => {
     expect(ref!.klass).toBe(Book);
   });
   it("irregular reflection class name", async () => {
-    const adp = await freshAdapter();
     class Person extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     class Address extends Base {
       static {
         this.attribute("street", "string");
-        this.adapter = adp;
       }
     }
     registerModel("Person", Person);
@@ -1198,17 +1184,14 @@ describe("ReflectionTest", () => {
     expect(ref!.klass).toBe(Address);
   });
   it("reflection klass with same demodularized different modularized name", async () => {
-    const adp = await freshAdapter();
     class NestedUser extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     class AdminUser extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     registerModel("Nested::User", NestedUser);
@@ -1218,11 +1201,9 @@ describe("ReflectionTest", () => {
     expect(ref!.klass).toBe(NestedUser);
   });
   it("reflection klass with same modularized name", async () => {
-    const adp = await freshAdapter();
     class NestedNestedUser extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     registerModel("NestedUser", NestedNestedUser);
@@ -2222,17 +2203,14 @@ describe("ReflectionTest", () => {
   });
 
   it("reflection klass with same demodularized name", async () => {
-    const adp = await freshAdapter();
     class Project extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     class Task extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     registerModel("Project", Project);
@@ -2245,17 +2223,14 @@ describe("ReflectionTest", () => {
   it("reflection klass demodulize top-level-first resolution", async () => {
     // Rails _klass: when demodulize(activeRecord.name) == className,
     // top-level ::ClassName is tried before namespace-relative lookup.
-    const adp = await freshAdapter();
     class TopUser extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     class NsAdminUser extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     // Top-level "User" and namespaced "Admin::User" are both in the registry.
@@ -2300,36 +2275,30 @@ describe("ReflectionTest", () => {
   });
 
   it("association reflection in modules", async () => {
-    const adp = await freshAdapter();
     class NsBizFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     class NsBizClient extends Base {
       static {
         this.attribute("name", "string");
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
       }
     }
     class NsBillingAccount extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
       }
     }
     class NsBillingFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     class NsBillingNestedFirm extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     registerModel("MyApplication::Business::Firm", NsBizFirm);
@@ -2696,13 +2665,11 @@ describe("ReflectionTest", () => {
   });
 
   it("reflects on all associations", async () => {
-    const adapter = await freshAdapter();
     class Post extends Base {
       static _tableName = "posts";
     }
     Post.attribute("id", "integer");
     Post.attribute("user_id", "integer");
-    Post.adapter = adapter;
     Associations.belongsTo.call(Post, "user");
     Associations.hasMany.call(Post, "comments");
 
@@ -2716,11 +2683,6 @@ describe("ReflectionTest", () => {
 });
 
 describe("ReflectionTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
   // Rails: test "columns"
   it("columns", () => {
     class Person extends Base {
