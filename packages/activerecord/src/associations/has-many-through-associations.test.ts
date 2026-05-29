@@ -1708,19 +1708,50 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
+    Associations.hasMany.call(HmtWriter, "hmtWriterBooks", {
+      className: "HmtWriterBook",
+      foreignKey: "writer_id",
+    });
+    Associations.hasMany.call(HmtWriter, "hmtWriterBookTitles", {
+      through: "hmtWriterBooks",
+      source: "hmtWriterBookTitle",
+      className: "HmtWriterBookTitle",
+    });
+    Associations.belongsTo.call(HmtWriterBook, "hmtWriter", {
+      className: "HmtWriter",
+      foreignKey: "writer_id",
+      inverseOf: "hmtWriterBooks",
+    });
+    Associations.belongsTo.call(HmtWriterBook, "hmtWriterBookTitle", {
+      className: "HmtWriterBookTitle",
+      foreignKey: "book_id",
+    });
+    Associations.hasMany.call(HmtWriterBookTitle, "hmtWriterBooks", {
+      className: "HmtWriterBook",
+      foreignKey: "book_id",
+      inverseOf: "hmtWriterBookTitle",
+    });
     registerModel("HmtWriter", HmtWriter);
     registerModel("HmtWriterBook", HmtWriterBook);
     registerModel("HmtWriterBookTitle", HmtWriterBookTitle);
 
-    const writer = await HmtWriter.create({ name: "Tolkien" });
-    const book = await HmtWriterBookTitle.create({ title: "LOTR" });
-    const join = await HmtWriterBook.create({
-      writer_id: writer.id,
-      book_id: book.id,
-    });
+    // New (unsaved) owner: concatRecords pre-builds the through join row and
+    // caches it; the owner's save autosaves the join, whose belongsTo follows
+    // each parent's freshly-assigned primary key.
+    const writer = new HmtWriter({ name: "Tolkien" });
+    const book = new HmtWriterBookTitle({ title: "LOTR" });
+    await association(writer, "hmtWriterBookTitles").concat(book);
+    await writer.save();
 
-    expect(join.writer_id).not.toBeNull();
-    expect(join.book_id).not.toBeNull();
+    expect(writer.id).toBeTruthy();
+    expect(book.id).toBeTruthy();
+    const joins = await loadHasMany(writer, "hmtWriterBooks", {
+      className: "HmtWriterBook",
+      foreignKey: "writer_id",
+    });
+    expect(joins).toHaveLength(1);
+    expect(joins[0].writer_id).toBe(writer.id);
+    expect(joins[0].book_id).toBe(book.id);
   });
 
   it("delete association", async () => {

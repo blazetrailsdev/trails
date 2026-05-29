@@ -147,18 +147,27 @@ export class CollectionAssociation extends Association {
     return !!(await (record as any).save?.({ validate }));
   }
 
-  private async concatRecords(records: Base[]): Promise<void> {
+  /**
+   * Mirrors Rails' `CollectionAssociation#concat_records`
+   * (collection_association.rb): add each record to the target, inserting it
+   * when the owner is persisted. Returns `records` so subclasses (HMT) can
+   * post-process the appended set.
+   *
+   * @internal
+   */
+  protected async concatRecords(records: Base[], shouldRaise = false): Promise<Base[]> {
     let result = true;
     for (const record of records) {
       (this as any).raiseOnTypeMismatchBang(record);
       const added = this.addToTarget(record);
       if (!added) continue;
       if (!this.owner.isNewRecord()) {
-        const saved = await this.insertRecord(record, true, false);
+        const saved = await this.insertRecord(record, true, shouldRaise);
         if (!saved) result = false;
       }
     }
     if (!result) throw new Rollback();
+    return records;
   }
 
   /**

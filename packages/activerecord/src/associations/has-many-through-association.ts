@@ -28,6 +28,34 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   /**
+   * Mirrors Rails' `HasManyThroughAssociation#concat_records`
+   * (has_many_through_association.rb:37-49):
+   *
+   *   ensure_not_nested
+   *   records = super(records, true)
+   *   if owner.new_record? && records
+   *     records.flatten.each { |record| build_through_record(record) }
+   *   end
+   *   records
+   *
+   * When the owner is unsaved, `super` only adds the targets to the in-memory
+   * collection (no INSERT). Pre-building the through rows here primes the
+   * `@through_records` cache so the owner's `after_create` autosave creates
+   * the join rows alongside the owner.
+   * @internal
+   */
+  protected override async concatRecords(records: Base[], _shouldRaise = false): Promise<Base[]> {
+    ensureNotNested(this);
+    const added = await super.concatRecords(records, true);
+    if (this.owner.isNewRecord() && added) {
+      for (const record of added.flat() as Base[]) {
+        buildThroughRecord(this, record);
+      }
+    }
+    return added;
+  }
+
+  /**
    * Mirrors Rails' `ThroughAssociation#target_scope` override.
    * @internal
    */
@@ -264,7 +292,24 @@ export function buildThroughInverseFor(
   };
 }
 
-/** @internal */
+/**
+ * Mirrors Rails' `HasManyThroughAssociation#build_through_record`
+ * (has_many_through_association.rb:51-66):
+ *
+ *   @through_records[record] ||= begin
+ *     ensure_mutable
+ *     attributes = through_scope_attributes
+ *     attributes[source_reflection.name] = record
+ *     through_association.build(attributes).tap { ... source_type ... }
+ *   end
+ *
+ * The join row is cached by target-record identity so the same instance is
+ * reused across build → concat → insert. Crucially it sets the source
+ * reflection's *association* (`source_reflection.name`) to `record` rather
+ * than freezing the FK value, so the join's `belongsTo` autosave follows the
+ * target's primary key when both are saved together.
+ * @internal
+ */
 function buildThroughRecord(assoc: HasManyThroughAssociation, record: Base): Base | null {
   // HABTM associations don't expose a sourceReflection chain, so
   // constructJoinAttributes (which keys off source_reflection) can't run.
@@ -273,12 +318,30 @@ function buildThroughRecord(assoc: HasManyThroughAssociation, record: Base): Bas
   if ((assoc.reflection as any).type === "hasAndBelongsToMany") {
     return buildHabtmThroughRecord(assoc, record);
   }
+  const cache = throughRecordsCache(assoc);
+  const cached = cache.get(record);
+  if (cached) return cached;
+
+  ensureMutable(assoc);
+  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  const sourceRefl = refl?.sourceReflection;
   const proxy = throughAssociation(assoc) as {
     build?: (attrs: Record<string, unknown>) => Base;
   } | null;
-  if (!proxy) return null;
-  const attrs = constructJoinAttributes(assoc, record);
-  return typeof proxy.build === "function" ? proxy.build(attrs) : null;
+  if (!proxy || typeof proxy.build !== "function" || !sourceRefl?.name) return null;
+
+  const attributes = throughScopeAttributes(assoc);
+  attributes[sourceRefl.name] = record;
+  const newRecord = proxy.build(attributes);
+  if (assoc.reflection.options.sourceType && sourceRefl.foreignType) {
+    (newRecord as any).writeAttribute?.(
+      sourceRefl.foreignType,
+      assoc.reflection.options.sourceType,
+    );
+  }
+  cache.set(record, newRecord);
+  return newRecord;
 }
 
 /** @internal */
@@ -368,21 +431,52 @@ async function saveThroughRecord(
 ): Promise<boolean> {
   // Mirrors Rails' has_many_through_association#save_through_record: build
   // the join row (via the through proxy for HMT, or via habtm options for
-  // HABTM) and save it when it has pending changes.
-  const joinRecord = buildThroughRecord(assoc, record);
-  if (!joinRecord) return true;
-  const isUnsaved =
-    joinRecord.isNewRecord() ||
-    (typeof (joinRecord as any).hasChangesToSave === "function"
-      ? (joinRecord as any).hasChangesToSave()
-      : true);
-  if (!isUnsaved) return true;
-  const saved = await (joinRecord as any).save({ validate });
-  if (!saved) {
-    if (raise) raiseValidationError(joinRecord);
-    return false;
+  // HABTM) and save it when it has pending changes. The `ensure`-clear evicts
+  // the per-record cache so the same target can be associated again later.
+  try {
+    const joinRecord = buildThroughRecord(assoc, record);
+    if (!joinRecord) return true;
+    const isUnsaved =
+      joinRecord.isNewRecord() ||
+      (typeof (joinRecord as any).hasChangesToSave === "function"
+        ? (joinRecord as any).hasChangesToSave()
+        : true);
+    if (!isUnsaved) return true;
+    const saved = await (joinRecord as any).save({ validate });
+    if (!saved) {
+      if (raise) raiseValidationError(joinRecord);
+      return false;
+    }
+    return true;
+  } finally {
+    throughRecordsCache(assoc).delete(record);
   }
-  return true;
+}
+
+/**
+ * The per-record cache of pre-built through join rows, keyed by target-record
+ * identity. Mirrors Rails' `@through_records = {}.compare_by_identity`: a row
+ * built during `build_record`/`concat_records` is reused by the subsequent
+ * `insert_record`, then evicted once saved.
+ *
+ * Stored on the owner (keyed by reflection name) rather than the association
+ * instance because the build path threads a synthetic `{ owner, reflection }`
+ * stand-in through `buildThroughInverseFor`, while save/insert run on the live
+ * instance — both must observe the same map.
+ *
+ * @internal
+ */
+function throughRecordsCache(assoc: HasManyThroughAssociation): Map<Base, Base> {
+  const owner = assoc.owner as unknown as {
+    _throughRecordsCaches?: Map<string, Map<Base, Base>>;
+  };
+  const store = (owner._throughRecordsCaches ??= new Map<string, Map<Base, Base>>());
+  let cache = store.get(assoc.reflection.name);
+  if (!cache) {
+    cache = new Map<Base, Base>();
+    store.set(assoc.reflection.name, cache);
+  }
+  return cache;
 }
 
 /** @internal */
