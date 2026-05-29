@@ -170,6 +170,19 @@ export const betterSqlite3Driver: SqliteDriver = {
       return false;
     }
   },
+
+  async restoreFromPath(sourcePath: string, destination: string): Promise<void> {
+    // better-sqlite3's backup goes source-handle → destination filename and
+    // interprets `file:` URIs, so a shared-cache memory URI destination lands
+    // in the shared cache (the caller holds it open). Open the source
+    // read-only so a concurrent template never blocks on a write lock.
+    const source = new Database(sourcePath, { readonly: true });
+    try {
+      await source.backup(destination);
+    } finally {
+      source.close();
+    }
+  },
 };
 
 registerSqliteDriver(betterSqlite3Driver);
