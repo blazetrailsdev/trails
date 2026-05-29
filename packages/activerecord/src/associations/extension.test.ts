@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, CollectionProxy, Relation, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
+import { HasMany } from "./builder/has-many.js";
 
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
@@ -64,6 +65,14 @@ describe("AssociationsExtensionsTest", () => {
       findMostRecent: async function (this: Relation<Base>) {
         const all = await this.toArray();
         return all[all.length - 1] ?? null;
+      },
+      // Mirrors Rails `with_content` extension on `Post#comments`
+      // (`self.detect { |c| c.body == content }`): scans the loaded
+      // target — which includes dirty (built but unsaved) records.
+      withContent: async function (this: Relation<Base>, ...args: unknown[]) {
+        const content = args[0] as string;
+        const all = await this.toArray();
+        return all.find((c) => (c as { body?: string }).body === content) ?? null;
       },
     };
     Associations.hasMany.call(ExtPost, "extComments", {
@@ -294,11 +303,17 @@ describe("AssociationsExtensionsTest", () => {
     expect((await proxy.findMostRecent())!.name).toBe("Last");
     expect((await proxy.findLeastRecent())!.name).toBe("First");
   });
-  it.skip("extension with dirty target", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/extension.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in extension.test.ts
-    /* dirty tracking on proxy not implemented */
+  it("extension with dirty target", async () => {
+    const { ExtPost } = setupExtModels();
+    const post = await ExtPost.create({ title: "dirty target" });
+    const proxy = association(post, "extComments");
+    const comment = proxy.build({ body: "New comment" });
+    const found = await (
+      proxy as unknown as {
+        withContent: (content: string) => Promise<{ body: string } | null>;
+      }
+    ).withContent("New comment");
+    expect(found).toBe(comment);
   });
   it.skip("marshalling extensions", () => {
     // BLOCKED: associations — collection/singular feature gap
@@ -312,10 +327,22 @@ describe("AssociationsExtensionsTest", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in extension.test.ts
     /* marshalling not implemented */
   });
-  it.skip("extension name", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/extension.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in extension.test.ts
-    /* extension naming not implemented */
+  it("extension name", () => {
+    // Mirrors Rails `extend!(model)` helper, which calls
+    // `Builder::HasMany.define_extensions(model, :association_name) { }`.
+    // The block triggers a generated extension module named off the
+    // camelized association name, stored as a constant on the model.
+    // The two-model assertion mirrors Rails checking both `Developer`
+    // and the namespaced `MyApplication::Business::Developer`.
+    class Developer extends Base {}
+    class BusinessDeveloper extends Base {}
+    HasMany.defineExtensions(Developer, "associationName", () => {});
+    HasMany.defineExtensions(BusinessDeveloper, "associationName", () => {});
+    expect(
+      (Developer as unknown as Record<string, unknown>).AssociationNameAssociationExtension,
+    ).toBeTruthy();
+    expect(
+      (BusinessDeveloper as unknown as Record<string, unknown>).AssociationNameAssociationExtension,
+    ).toBeTruthy();
   });
 });
