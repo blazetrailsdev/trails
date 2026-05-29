@@ -799,6 +799,24 @@ function syncToAssociationInstance(record: Base, assocName: string, result: unkn
 }
 
 /**
+ * Whether lazily loading `assocName` on `record` is a strict-loading
+ * violation. Mirrors Rails' `Association#violates_strict_loading?`:
+ * a `strictLoading` option declared on the reflection wins over the
+ * owner's flag (so `strict_loading: false` turns enforcement off even
+ * when the owner is strict, and `strict_loading: true` turns it on),
+ * otherwise the owner's `_strictLoading` flag decides.
+ *
+ * @internal
+ */
+function _violatesStrictLoading(record: Base, options: AssociationOptions): boolean {
+  if (record._strictLoadingBypassCount) return false;
+  if (Object.prototype.hasOwnProperty.call(options, "strictLoading")) {
+    return options.strictLoading === true;
+  }
+  return record._strictLoading;
+}
+
+/**
  * Load a belongs_to association.
  */
 export async function loadBelongsTo(
@@ -852,7 +870,7 @@ export async function loadBelongsTo(
   }
 
   // Strict loading check: this is a lazy load
-  if (record._strictLoading && !record._strictLoadingBypassCount) {
+  if (_violatesStrictLoading(record, options)) {
     throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
@@ -969,7 +987,7 @@ export async function loadHasOne(
   }
 
   // Strict loading check
-  if (record._strictLoading && !record._strictLoadingBypassCount) {
+  if (_violatesStrictLoading(record, options)) {
     throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
@@ -1167,7 +1185,7 @@ export async function loadHasMany(
   }
 
   // Strict loading check
-  if (record._strictLoading && !record._strictLoadingBypassCount) {
+  if (_violatesStrictLoading(record, options)) {
     throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
