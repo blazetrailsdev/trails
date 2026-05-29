@@ -432,16 +432,29 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("distinct option prevents duplicate push", async () => {
-    // Verify that loading HABTM doesn't produce duplicates even with multiple join records
-    const dev = await Developer.create({ name: "DupDev", salary: 60000 });
-    const proj = await Project.create({ name: "DupProj" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
+    // Mirrors Rails: `Project.developers` is a `-> { distinct }` HABTM, so
+    // re-pushing an already-added record dedups in place rather than growing
+    // the loaded target. Rails' fixture seeds active_record with 1 developer;
+    // we push three distinct developers to reach the same size of 3.
+    (Project as any)._associations = [];
+    Associations.hasAndBelongsToMany.call(Project, "developers", {
+      className: "Developer",
       joinTable: "developer_projects",
-      foreignKey: "developer_id",
+      scope: (rel: any) => rel.distinct(),
     });
-    expect(projects.length).toBe(1);
+    const project = await Project.create({ name: "active_record" });
+    const jamis = await Developer.create({ name: "Jamis", salary: 60000 });
+    const david = await Developer.create({ name: "David", salary: 60000 });
+    const extra = await Developer.create({ name: "Extra", salary: 60000 });
+
+    await association(project, "developers").push(jamis);
+    await association(project, "developers").push(david);
+    await association(project, "developers").push(extra);
+    expect(await association(project, "developers").size()).toBe(3);
+
+    await association(project, "developers").push(david);
+    await association(project, "developers").push(jamis);
+    expect(await association(project, "developers").size()).toBe(3);
   });
 
   it("distinct when association already loaded", async () => {
