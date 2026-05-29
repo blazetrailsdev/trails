@@ -3456,43 +3456,10 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#arel
    */
-  private _buildProjections(table: Table): any[] {
-    if (this._selectColumns) {
-      // Route through arelColumns (mirrors Rails build_select -> arel_columns):
-      // bare-string literals like "1"/"foo()" and symbols resolve via columns_hash
-      // then fall back to a SqlLiteral, instead of being table-qualified.
-      return this.arelColumns(this._selectColumns) as any[];
-    }
-    if (this._modelClass.ignoredColumns.length > 0) {
-      let cols = this._modelClass.columnNames();
-      const pk = this._modelClass.primaryKey;
-      if (typeof pk === "string" && !cols.includes(pk)) {
-        cols = [pk, ...cols];
-      }
-      return cols.length > 0 ? cols.map((c) => table.get(c)) : [this._defaultProjection(table)];
-    }
-    return [this._defaultProjection(table)];
-  }
-
-  /**
-   * Default projection node when no explicit `select` and no
-   * `ignoredColumns`. Always the target table's qualified star —
-   * mirrors Rails' `Relation#build_select` which projects
-   * `table[Arel.star]` unconditionally
-   * (activerecord/lib/active_record/relation/query_methods.rb:1909).
-   *
-   * Plain `*` collapses same-named columns from joined tables in
-   * the row hash (drivers return one key per name, last write
-   * wins): e.g. `users.id` gets overwritten by a JOIN's
-   * `friendships.id`. Qualifying the projection avoids the trap.
-   *
-   * `from()` note: Rails DOES emit `SELECT "users".* FROM (subq)`
-   * when the user supplies a custom `from()` source — it's the
-   * caller's responsibility to ensure the target table is in
-   * scope, or to override with `.select("*")`. We match.
-   */
-  private _defaultProjection(table: Table): Nodes.Attribute {
-    return table.star;
+  private _buildProjections(_table: Table): any[] {
+    // Delegate to the canonical Rails `build_select` mirror so the legacy
+    // toArel/toSql path and the Arel-manager `buildSelect` path stay in sync.
+    return _qm.buildProjections.call(this as any) as any[];
   }
 
   toArel(): SelectManager {
