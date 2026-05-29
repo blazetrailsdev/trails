@@ -323,6 +323,7 @@ export { UrlConfig } from "./database-configurations/url-config.js";
 export { DatabaseConfigurations } from "./database-configurations.js";
 export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
+export { ConnectionManagement, BodyProxy } from "./connection-adapters/connection-management.js";
 export { DatabaseTasks, DatabaseNotSupported } from "./tasks/database-tasks.js";
 export type { DatabaseTaskHandler, SchemaFormat } from "./tasks/database-tasks.js";
 export { SQLiteDatabaseTasks } from "./tasks/sqlite-database-tasks.js";
