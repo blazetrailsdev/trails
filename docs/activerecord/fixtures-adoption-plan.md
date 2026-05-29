@@ -44,6 +44,14 @@ a separate plan doc"). This is that doc.
    `useFixtures.setupOnce()` API. Spike picks one and ships
    **before** Phase B canary so the canary PR is purely the
    conversion pattern, not pattern+infra mixed.
+   - **Status (2026-05-28):** the Rails-shape `useFixtures(["authors", "posts"])`
+     name-array API + `fixtures-registry.ts` shipped (registry maps 72 fixture
+     sets to canonical models; gaps documented in the registry header). Worker-
+     level seeding (Spike S1 proper) was deferred out of that PR to stay under
+     the LOC ceiling — `use-fixtures.ts` still seeds per-test and carries a
+     `TODO(fixtures-adoption Spike S1)` at the seed `beforeEach`. This is the
+     follow-up: hoist the seed to a once-per-worker `beforeAll` when
+     `useHandlerTransactionalFixtures` is active, per-test fallback otherwise.
 3. **Schema-port wired.** `setup-adapter-suite.ts` loads `test-schema.ts`
    (#2140); 159 AR test files already on `withTransactionalFixtures`.
    No additional work — just a precondition check.
