@@ -52,6 +52,7 @@ import {
   loadHasMany,
   _canRouteThroughViaAssociationScope,
   ownerHasUnresolvedThroughKey,
+  _setCollectionInverseInstance,
 } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 import { buildThroughInverseFor } from "./has-many-through-association.js";
@@ -138,6 +139,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private _assocDef: AssociationDefinition;
   private _target: T[] = [];
   private _targetLoaded = false;
+  // Mirrors Rails' `CollectionAssociation#@replaced_or_added_targets` (a
+  // `Set.new.compare_by_identity`): records that have been added to or
+  // replaced on the in-memory target. `replace_on_target` consults it to
+  // dedup by identity rather than appending the same record twice.
+  private _replacedOrAddedTargets = new Set<T>();
   // Flag flipped by ANY post-ctor bang-style mutation on the inherited
   // Relation state (whereBang / orderBang / reorderBang / regroupBang /
   // reverseOrderBang / rewhereBang / limitBang / offsetBang / ... — all
@@ -685,6 +691,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const record = new targetModel(buildAttrs);
     this._applyScopeForCreate(record, attrs, foreignKey as string | string[]);
+    // Rails wires the inverse inside `initialize_attributes`, before any
+    // build/create block runs — so a block can already see `child.owner`.
+    _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
     return record;
   }
 
@@ -766,6 +775,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /**
    * Build and save a new associated record.
+   *
+   * Rails' `CollectionAssociation#_create_record` routes both regular and
+   * :through associations through `add_to_target` (HasManyThroughAssociation
+   * overrides only `build_record`/`insert_record`, not `_create_record`). Here
+   * only the non-:through path goes through `_addToTarget`; the :through path
+   * keeps its dedicated join-row logic in `_createThrough`. Routing :through
+   * through `_addToTarget` is a follow-up (it overlaps `has-many-through-
+   * association.ts`, owned by a sibling PR).
    */
   async create(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
   async create(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
@@ -786,14 +803,60 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     const record = this._buildRaw(attrs) as T;
     if (block) block(record);
-    if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
-      return record;
+    await this._addToTarget(record, {}, () => record.save());
+    return record;
+  }
+
+  /**
+   * Add `record` to the in-memory target, firing add callbacks, wiring the
+   * inverse instance, and deduping by identity via `_replacedOrAddedTargets`.
+   * Mirrors `ActiveRecord::Associations::CollectionAssociation#replace_on_target`.
+   *
+   * `save`, when supplied, runs between `set_inverse_instance` and the target
+   * mutation (Rails' `yield(record)` inside `replace_on_target`, used by
+   * `create` to `insert_record`). If it resolves false the record is left out
+   * of the target — matching the prior `if (saved)` gate. (Rails pushes
+   * regardless and relies on the surrounding `transaction { ... } / raise
+   * Rollback` to undo the DB write; trails' `create` has no transaction yet —
+   * see `_createThrough` — so we gate the in-memory push on save success.)
+   *
+   * Rails' append branch is gated on `@_was_loaded || !loaded?`. On the create
+   * path `@_was_loaded` is set true before the save and reset to `loaded?`
+   * after, so that gate is always true; with `create` the sole caller it is
+   * collapsed to an unconditional push here.
+   * @internal
+   */
+  private async _addToTarget(
+    record: T,
+    options: { skipCallbacks?: boolean; replace?: boolean } = {},
+    save?: () => Promise<boolean>,
+  ): Promise<T | null> {
+    const { skipCallbacks = false, replace = false } = options;
+    let index = -1;
+    if (replace && (!record.isNewRecord() || this._replacedOrAddedTargets.has(record))) {
+      index = this._target.indexOf(record);
     }
-    const saved = await record.save();
-    if (saved) {
+    if (
+      !skipCallbacks &&
+      !fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)
+    ) {
+      return null;
+    }
+    _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
+    if (save && !(await save())) return record;
+    if (index === -1 && this._replacedOrAddedTargets.has(record)) {
+      index = this._target.indexOf(record);
+    }
+    if (index !== -1 || record.isNewRecord()) {
+      this._replacedOrAddedTargets.add(record);
+    }
+    if (index !== -1) {
+      this._target[index] = record;
+    } else {
       this._target.push(record);
-      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      this._invalidateAssociationIds();
     }
+    if (!skipCallbacks) fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
     return record;
   }
 
@@ -2040,6 +2103,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   async reload(): Promise<Omit<this, "then">> {
     this._targetLoaded = false;
     this._target = [];
+    this._replacedOrAddedTargets.clear();
     await this.load();
     return stripThenable(this);
   }
@@ -2053,6 +2117,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     super.reset();
     this._targetLoaded = false;
     this._target = [];
+    this._replacedOrAddedTargets.clear();
     return this;
   }
 
