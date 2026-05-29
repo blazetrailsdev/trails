@@ -45,19 +45,24 @@ export function scope<T extends typeof Base>(
 interface NamedHost {
   currentScope?: any;
   defaultScopes?: import("./default.js").DefaultScope[];
-  all?(): any;
-  relation?(): any;
+  // Rails' `relation` (core.rb) — a pristine Relation with the STI type
+  // condition but neither current_scope nor default_scope applied. It is the
+  // default `scope` argument for both methods below.
+  _buildUnscopedRelation?(): any;
 }
 
 /**
- * Mirrors: ActiveRecord::Scoping::Named::ClassMethods#scope_for_association
+ * Mirrors: ActiveRecord::Scoping::Named::ClassMethods#scope_for_association —
+ * `current_scope&.empty_scope? ? scope : default_scoped(scope)`. The base
+ * `scope` ignores current_scope; default_scope is applied unless an enclosing
+ * current_scope is itself an empty scope.
  */
 export function scopeForAssociation(this: NamedHost, scope?: any): any {
-  const rel = scope ?? this.relation?.() ?? this.all?.();
-  if (this.currentScope && !this.currentScope.isEmptyScope) {
-    return defaultScoped.call(this, rel);
+  const rel = scope ?? this._buildUnscopedRelation?.();
+  if (this.currentScope?.isEmptyScope) {
+    return rel;
   }
-  return rel;
+  return defaultScoped.call(this, rel);
 }
 
 /**
@@ -69,7 +74,7 @@ export function defaultScoped(
   scope?: any,
   options?: { allQueries?: boolean | null },
 ): any {
-  const rel = scope ?? this.relation?.() ?? this.all?.();
+  const rel = scope ?? this._buildUnscopedRelation?.();
   return Default.buildDefaultScope(this as any, () => rel, options?.allQueries) ?? rel;
 }
 
