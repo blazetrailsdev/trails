@@ -835,12 +835,20 @@ export class AbstractAdapter implements Quoting {
     this._lastActivity = Date.now();
     this._verified = true;
 
-    // On failure, leave the adapter in a consistent unverified state. The catch
+    // On failure, leave the adapter in a consistent unverified state and raise
+    // the translated exception (Rails' `raise translated_exception`). The catch
     // also guards concrete-adapter overrides that call super then throw.
+    //
+    // Rails' `reconnect!` additionally retries transient connection errors
+    // (connection_retries/retry_deadline/backoff) before this cleanup; that
+    // retry loop wraps the raw `reconnect` it drives, so porting it requires
+    // the base to own the raw-reconnect call (a cross-adapter refactor of the
+    // PG/MySQL overrides) — tracked as a follow-up.
     const cleanupOnFailure = (error: unknown): never => {
+      const translated = this.translateExceptionClass(error, null, null);
       this._lastActivity = 0;
       this._verified = false;
-      throw error;
+      throw translated;
     };
 
     try {
