@@ -484,18 +484,24 @@ describe("InverseHasManyTests", () => {
     expect(child.man_id).toBe(m.id);
   });
 
-  it.skip("parent instance should be shared within create block of new child", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs block-style create */
+  it("parent instance should be shared within create block of new child", async () => {
+    const { Man } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    const proxy = association(m, "interests");
+    const interest = await proxy.create({ topic: "music" }, (i) => {
+      expect((i as any)._cachedAssociations?.get("man")).toBe(m);
+    });
+    expect((interest as any)._cachedAssociations?.get("man")).toBe(m);
   });
 
-  it.skip("parent instance should be shared within build block of new child", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs block-style build */
+  it("parent instance should be shared within build block of new child", () => {
+    const { Man } = makeModels();
+    const m = new Man({ name: "Gordon" });
+    const proxy = association(m, "interests");
+    const interest = proxy.build({ topic: "music" }, (i) => {
+      expect((i as any)._cachedAssociations?.get("man")).toBe(m);
+    });
+    expect((interest as any)._cachedAssociations?.get("man")).toBe(m);
   });
 
   it("parent instance should be shared with poked in child", async () => {

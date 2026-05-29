@@ -315,6 +315,26 @@ function _wireInverseAssociation(owner: Base, child: Base, inverseName: string):
 }
 
 /**
+ * Set the inverse association instance on a freshly built/created collection
+ * member, caching the owner on the child under the resolved inverse name.
+ * Mirrors `ActiveRecord::Associations::Association#set_inverse_instance`, called
+ * from `initialize_attributes` (so the inverse is wired before any build/create
+ * block runs) and from `replace_on_target`.
+ *
+ * @internal
+ */
+export function _setCollectionInverseInstance(
+  owner: Base,
+  assocName: string,
+  options: AssociationOptions,
+  record: Base,
+): void {
+  const ownerCtor = owner.constructor as typeof Base;
+  const inverseName = _resolveInverseName(ownerCtor, assocName, options);
+  if (inverseName) _wireInverseAssociation(owner, record, inverseName);
+}
+
+/**
  * @internal
  * Builds a HasManyThroughAssociationNotFoundError with DidYouMean-style
  * `corrections` derived from the owner's existing association names —
