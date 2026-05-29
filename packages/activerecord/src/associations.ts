@@ -112,9 +112,17 @@ export interface AssociationOptions {
     | ((owner: Base, record: Base) => void | false)
     | ((owner: Base, record: Base) => void | false)[];
   afterRemove?: ((owner: Base, record: Base) => void) | ((owner: Base, record: Base) => void)[];
+  /** Mixes methods into the association's CollectionProxy and every
+   * relation spawned from it, mirroring Rails' `has_many :things,
+   * extend: ModA` / `extend: [ModA, ModB]`. A module is an object whose
+   * function values become callable on `owner.things` (and
+   * `owner.things.where(...)`). The proc form — a function receiving the
+   * relation — corresponds to Rails' block-as-module extension
+   * (`has_many :things do ... end`). */
   extend?:
     | Record<string, (...args: unknown[]) => unknown>
-    | Record<string, (...args: unknown[]) => unknown>[];
+    | ((rel: any) => void)
+    | (Record<string, (...args: unknown[]) => unknown> | ((rel: any) => void))[];
   /** Load through associations via multiple queries instead of JOIN.
    * Currently a no-op since through loading already uses multi-query by default.
    * Exists for Rails API parity — Rails uses this to switch between JOIN and

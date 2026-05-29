@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, CollectionProxy, association, registerModel } from "../index.js";
+import { Base, CollectionProxy, Relation, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
@@ -58,7 +58,10 @@ describe("AssociationsExtensionsTest", () => {
       }
     }
     const findMostRecent = {
-      findMostRecent: async function (this: CollectionProxy) {
+      // Typed as the base Relation, not CollectionProxy: this extension is
+      // also invoked on relations spawned off the proxy (e.g. after
+      // `.offset(1)`), which are plain Relations.
+      findMostRecent: async function (this: Relation<Base>) {
         const all = await this.toArray();
         return all[all.length - 1] ?? null;
       },
@@ -90,9 +93,12 @@ describe("AssociationsExtensionsTest", () => {
     const proxy = association(post, "extComments");
     // Mirrors Rails `posts(:welcome).comments.offset(1).find_most_recent`:
     // the extension method must remain callable on a relation spawned off
-    // the proxy via a scope mutation.
+    // the proxy via a scope mutation. Order explicitly by PK so the
+    // offset is deterministic across adapters.
     const recent = await (
-      proxy.offset(1) as unknown as { findMostRecent: () => Promise<{ body: string } | null> }
+      proxy.order({ id: "asc" }).offset(1) as unknown as {
+        findMostRecent: () => Promise<{ body: string } | null>;
+      }
     ).findMostRecent();
     expect(recent).not.toBeNull();
     expect(recent!.body).toBe("b");
