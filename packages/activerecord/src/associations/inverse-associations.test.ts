@@ -151,35 +151,98 @@ describe("InverseBelongsToTests", () => {
     expect((interest as any).topic).toBe("Eating cheese with a spoon");
   });
 
-  it.skip("with has many inversing should have single record when setting record through attribute in build method", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs has_many inversing push */
+  function makeInversingModels() {
+    class Human extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Interest extends Base {
+      static {
+        this.attribute("topic", "string");
+        this.attribute("human_id", "integer");
+      }
+    }
+    Associations.hasMany.call(Human, "interests", { inverseOf: "human", foreignKey: "human_id" });
+    Associations.belongsTo.call(Interest, "human", {
+      inverseOf: "interests",
+      foreignKey: "human_id",
+    });
+    registerModel(Human);
+    registerModel(Interest);
+    Human.hasManyInversing = true;
+    return { Human, Interest };
+  }
+
+  it("with has many inversing should have single record when setting record through attribute in build method", async () => {
+    const { Human } = makeInversingModels();
+    const human = await Human.create({ name: "Gordon" });
+    const proxy = association(human, "interests");
+    proxy.build({ topic: "Trainspotting" });
+    expect(await proxy.size()).toBe(1);
+    await human.save();
+    expect(await proxy.size()).toBe(1);
   });
-  it.skip("with has many inversing does not trigger association callbacks on set when the inverse is a has many", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs callback tracking */
+  it("with has many inversing does not trigger association callbacks on set when the inverse is a has many", async () => {
+    let addCalled = false;
+    class Human extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Interest extends Base {
+      static {
+        this.attribute("topic", "string");
+        this.attribute("human_id", "integer");
+      }
+    }
+    Associations.hasMany.call(Human, "interests", {
+      inverseOf: "human",
+      foreignKey: "human_id",
+      afterAdd: () => {
+        addCalled = true;
+      },
+    });
+    Associations.belongsTo.call(Interest, "human", {
+      inverseOf: "interests",
+      foreignKey: "human_id",
+    });
+    registerModel(Human);
+    registerModel(Interest);
+    Human.hasManyInversing = true;
+    const human = await Human.create({ name: "Gordon" });
+    const interest = await Interest.create({ topic: "Trainspotting", human_id: human.id });
+    // Wiring the inverse has_many on belongs_to load must not fire add callbacks.
+    await loadBelongsTo(interest, "human", { inverseOf: "interests" });
+    expect(addCalled).toBe(false);
   });
-  it.skip("with has many inversing does not add duplicate associated objects", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs has_many inversing */
+  it("with has many inversing does not add duplicate associated objects", async () => {
+    const { Human, Interest } = makeInversingModels();
+    const human = new Human({ name: "Gordon" });
+    const interest = new Interest({ topic: "Trainspotting" });
+    setBelongsTo(interest, "human", human, { inverseOf: "interests" });
+    const proxy = association(human, "interests");
+    await proxy.push(interest);
+    expect(await proxy.size()).toBe(1);
   });
-  it.skip("with has many inversing does not add unsaved duplicate records when collection is loaded", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs collection tracking */
+  it("with has many inversing does not add unsaved duplicate records when collection is loaded", async () => {
+    const { Human, Interest } = makeInversingModels();
+    const human = await Human.create({ name: "Gordon" });
+    const proxy = association(human, "interests");
+    await proxy.load();
+    const interest = new Interest({ topic: "Trainspotting" });
+    setBelongsTo(interest, "human", human, { inverseOf: "interests" });
+    await proxy.push(interest);
+    expect(await proxy.size()).toBe(1);
   });
-  it.skip("with has many inversing does not add saved duplicate records when collection is loaded", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs collection tracking */
+  it("with has many inversing does not add saved duplicate records when collection is loaded", async () => {
+    const { Human, Interest } = makeInversingModels();
+    const human = await Human.create({ name: "Gordon" });
+    const proxy = association(human, "interests");
+    await proxy.load();
+    const interest = await Interest.create({ topic: "Trainspotting", human_id: human.id });
+    await proxy.push(interest);
+    expect(await proxy.size()).toBe(1);
   });
 
   it("recursive model has many inversing", async () => {
@@ -457,6 +520,33 @@ describe("InverseHasManyTests", () => {
       const cachedMan = (i as any)._cachedAssociations?.get("man");
       expect(cachedMan).toBe(men[0]);
     }
+  });
+
+  it("eager loaded children get inverse wired via automatic inverse_of detection", async () => {
+    // No explicit inverseOf on either side — the preloader must resolve the
+    // inverse name via reflection.inverseName() (automatic detection), not just
+    // options.inverseOf. Mirrors Preloader::Association#associate_records_to_owner.
+    class Man extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Interest extends Base {
+      static {
+        this.attribute("topic", "string");
+        this.attribute("man_id", "integer");
+      }
+    }
+    Associations.hasMany.call(Man, "interests", {});
+    Associations.belongsTo.call(Interest, "man", {});
+    registerModel(Man);
+    registerModel(Interest);
+    const m = await Man.create({ name: "Gordon" });
+    await Interest.create({ topic: "stamps", man_id: m.id });
+    const men = await Man.all().includes("interests").toArray();
+    const preloaded = (men[0] as any)._preloadedAssociations?.get("interests") ?? [];
+    expect(preloaded.length).toBe(1);
+    expect((preloaded[0] as any)._cachedAssociations?.get("man")).toBe(men[0]);
   });
 
   it("parent instance should be shared with newly block style built child", async () => {
@@ -1328,17 +1418,45 @@ describe("InversePolymorphicBelongsToTests", () => {
     expect((parent as any)._cachedAssociations).toBeUndefined();
   });
 
-  it.skip("with has many inversing should try to set inverse instances when the inverse is a has many", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs has_many inversing */
+  it("with has many inversing should try to set inverse instances when the inverse is a has many", async () => {
+    const { Man, Tag } = makeModels();
+    Man.hasManyInversing = true;
+    const m = await Man.create({ name: "Gordon" });
+    const tag = await Tag.create({ name: "cool", taggable_id: m.id, taggable_type: "Man" });
+    const parent = await loadBelongsTo(tag, "taggable", { polymorphic: true, inverseOf: "tags" });
+    expect(parent).not.toBeNull();
+    const cached = (parent as any)._cachedAssociations?.get("tags") as Base[];
+    expect(cached).toEqual([tag]);
   });
-  it.skip("with has many inversing does not trigger association callbacks on set when the inverse is a has many", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs callback tracking */
+  it("with has many inversing does not trigger association callbacks on set when the inverse is a has many", async () => {
+    let addCalled = false;
+    class Man extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Tag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
+      }
+    }
+    Associations.hasMany.call(Man, "tags", {
+      as: "taggable",
+      afterAdd: () => {
+        addCalled = true;
+      },
+    });
+    Associations.belongsTo.call(Tag, "taggable", { polymorphic: true });
+    registerModel(Man);
+    registerModel(Tag);
+    Man.hasManyInversing = true;
+    const m = await Man.create({ name: "Gordon" });
+    const tag = await Tag.create({ name: "cool", taggable_id: m.id, taggable_type: "Man" });
+    // Wiring the inverse has_many on belongs_to load must not fire add callbacks.
+    await loadBelongsTo(tag, "taggable", { polymorphic: true, inverseOf: "tags" });
+    expect(addCalled).toBe(false);
   });
 
   it("trying to access inverses that dont exist shouldnt raise an error", async () => {

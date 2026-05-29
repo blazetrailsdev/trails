@@ -293,12 +293,14 @@ function _wireInverseAssociation(owner: Base, child: Base, inverseName: string):
     // them in sync (otherwise a later `_cachedAssociations` read could return
     // a partial array). Promote stray scalars from legacy pre-flag writes.
     const proxy = child._collectionProxies?.get(inverseName) as
-      | { loaded?: boolean; target?: Base[] }
+      | { loaded?: boolean; target?: Base[]; _replacedOrAddedTargets?: Set<Base> }
       | undefined;
     const existing = child._cachedAssociations.get(inverseName);
     let collection: Base[];
+    let onLoadedProxy = false;
     if (proxy?.loaded && Array.isArray(proxy.target)) {
       collection = proxy.target;
+      onLoadedProxy = true;
     } else if (Array.isArray(existing)) {
       collection = existing as Base[];
     } else if (existing != null) {
@@ -306,7 +308,14 @@ function _wireInverseAssociation(owner: Base, child: Base, inverseName: string):
     } else {
       collection = [];
     }
-    if (!collection.includes(owner)) collection.push(owner);
+    if (!collection.includes(owner)) {
+      collection.push(owner);
+      // Mirror Rails `replace_on_target(..., inversing: true)`, which records the
+      // record in `@replaced_or_added_targets`. A later `<<`/`push` of the same
+      // record then finds it via that set and replaces in place instead of
+      // appending a duplicate (collection_association.rb:472-476).
+      if (onLoadedProxy) proxy?._replacedOrAddedTargets?.add(owner);
+    }
     child._cachedAssociations.set(inverseName, collection);
     return;
   }

@@ -1068,6 +1068,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   async size(): Promise<number> {
     if (this._targetLoaded) return this._target.length;
+    // Rails CollectionAssociation#size: when the target holds unsaved records
+    // (e.g. just `build`-ed) but isn't loaded, count them in addition to the
+    // persisted COUNT(*) rather than ignoring them (collection_association.rb:209).
+    if (this._target.length > 0) {
+      const unsaved = this._target.filter((r) => r.isNewRecord()).length;
+      return unsaved + (await this.count());
+    }
     return this.count();
   }
 
@@ -1111,8 +1118,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
           : `${underscore(ctor.name)}_id`));
     const typeCol = asName ? `${underscore(asName)}_type` : null;
-    for (const record of records) {
-      if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) continue;
+    // insert_record: assign the owner's FK/type onto the record, then save.
+    // Mirrors Rails' `CollectionAssociation#insert_record` →
+    // `set_owner_attributes` + `record.save`.
+    const insertRecord = (record: T): Promise<boolean> => {
       if (Array.isArray(foreignKey)) {
         if (!Array.isArray(primaryKey) || primaryKey.length !== foreignKey.length) {
           throw new Error(
@@ -1135,12 +1144,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         record._writeAttribute(foreignKey as string, pkValue);
       }
       if (typeCol) record._writeAttribute(typeCol, ctor.name);
-      const saved = await record.save();
-      if (saved) {
-        this._target.push(record);
-        this._invalidateAssociationIds();
-        fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
-      }
+      return record.save();
+    };
+    for (const record of records) {
+      // Route through replace_on_target (via _addToTarget) so set_inverse_instance
+      // and @replaced_or_added_targets dedup tracking run on push/<<, mirroring
+      // Rails' concat_records → add_to_target(record) { insert_record }. A record
+      // already wired into the loaded target by inverse-of setting is replaced in
+      // place rather than appended twice.
+      await this._addToTarget(record, {}, () => insertRecord(record));
     }
   }
 

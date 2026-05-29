@@ -249,10 +249,15 @@ export class Association {
     }
     (owner as any)._preloadedAssociations.set(this.reflection.name, value);
 
+    // Route through `reflection.inverseName()` so automatic inverse detection
+    // (via `automaticInverseOf()`, made functional by C1) fires for non-rich
+    // reflections too — not just when `inverseOf` is explicitly configured.
+    // Mirrors Rails' `Preloader::Association#associate_records_to_owner`, which
+    // consults `reflection.inverse_of` (→ `inverse_name`).
     let inverseName: string | undefined;
     try {
       inverseName =
-        (this.reflection as any).inverseOf?.()?.name ?? (this.reflection as any).options?.inverseOf;
+        (this.reflection as any).inverseName?.() ?? (this.reflection as any).options?.inverseOf;
     } catch {
       inverseName = (this.reflection as any).options?.inverseOf;
     }
