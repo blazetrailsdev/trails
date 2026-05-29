@@ -2,7 +2,14 @@
  * Mirrors Rails activerecord/test/cases/associations/join_model_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel, association, enableSti, registerSubclass } from "../index.js";
+import {
+  Base,
+  registerModel,
+  association,
+  enableSti,
+  registerSubclass,
+  AssociationTypeMismatch,
+} from "../index.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
@@ -125,6 +132,14 @@ const TEST_SCHEMA: Schema = {
   iid_posts: { title: "string" },
   iid_taggings: { tag_id: "integer", post_id: "integer" },
   iid_tags: { name: "string" },
+  sid_posts: { title: "string" },
+  sid_taggings: { tag_id: "integer", post_id: "integer" },
+  sid_tags: { name: "string" },
+  junk_posts: { title: "string" },
+  junk_taggings: { tag_id: "integer", post_id: "integer" },
+  junk_tags: { name: "string" },
+  nsi_books: { name: "string" },
+  nsi_citations: { book1_id: "integer", book2_id: "integer" },
 };
 
 // ==========================================================================
@@ -1775,11 +1790,45 @@ describe("AssociationsJoinModelTest", () => {
     // Requires << return value
   });
 
-  it.skip("delete associate when deleting from has many through with nonstandard id", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires non-standard id delete
+  it("delete associate when deleting from has many through with nonstandard id", async () => {
+    class NsiBook extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class NsiCitation extends Base {
+      static {
+        this.attribute("book1_id", "integer");
+        this.attribute("book2_id", "integer");
+      }
+    }
+    registerModel(NsiBook);
+    registerModel(NsiCitation);
+    Associations.hasMany.call(NsiBook, "citations", {
+      className: "NsiCitation",
+      foreignKey: "book1_id",
+    });
+    Associations.belongsTo.call(NsiCitation, "reference_of", {
+      className: "NsiBook",
+      foreignKey: "book2_id",
+    });
+    Associations.hasMany.call(NsiBook, "references", {
+      through: "citations",
+      className: "NsiBook",
+      source: "reference_of",
+    });
+    const book = await NsiBook.create({ name: "awdr" });
+    const reference = await NsiBook.create({ name: "Getting Real" });
+    await NsiCitation.create({ book1_id: book.id, book2_id: reference.id });
+    const proxy = association(book, "references");
+    expect(await proxy.count()).toBe(1);
+    await proxy.delete(reference);
+    expect(await proxy.count()).toBe(0);
+    const citations = await loadHasMany(book, "citations", {
+      className: "NsiCitation",
+      foreignKey: "book1_id",
+    });
+    expect(citations).toHaveLength(0);
   });
 
   it("delete associate when deleting from has many through", async () => {
@@ -1883,11 +1932,39 @@ describe("AssociationsJoinModelTest", () => {
     expect(remaining[0].name).toBe("keeper");
   });
 
-  it.skip("deleting junk from has many through should raise type mismatch", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires type check on delete
+  it("deleting junk from has many through should raise type mismatch", async () => {
+    class JunkPost extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    class JunkTagging extends Base {
+      static {
+        this.attribute("tag_id", "integer");
+        this.attribute("post_id", "integer");
+      }
+    }
+    class JunkTag extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel(JunkPost);
+    registerModel(JunkTagging);
+    registerModel(JunkTag);
+    Associations.hasMany.call(JunkPost, "taggings", {
+      className: "JunkTagging",
+      foreignKey: "post_id",
+    });
+    Associations.belongsTo.call(JunkTagging, "tag", { className: "JunkTag", foreignKey: "tag_id" });
+    Associations.hasMany.call(JunkPost, "tags", {
+      through: "taggings",
+      className: "JunkTag",
+      source: "tag",
+    });
+    const post = await JunkPost.create({ title: "T" });
+    const proxy = association(post, "tags");
+    await expect(proxy.delete({} as never)).rejects.toThrow(AssociationTypeMismatch);
   });
 
   it("deleting by integer id from has many through", async () => {
@@ -1930,11 +2007,44 @@ describe("AssociationsJoinModelTest", () => {
     expect(await proxy.count()).toBe(0);
   });
 
-  it.skip("deleting by string id from has many through", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires delete by string id
+  it("deleting by string id from has many through", async () => {
+    class SidPost extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    class SidTagging extends Base {
+      static {
+        this.attribute("tag_id", "integer");
+        this.attribute("post_id", "integer");
+      }
+    }
+    class SidTag extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel(SidPost);
+    registerModel(SidTagging);
+    registerModel(SidTag);
+    Associations.hasMany.call(SidPost, "taggings", {
+      className: "SidTagging",
+      foreignKey: "post_id",
+    });
+    Associations.belongsTo.call(SidTagging, "tag", { className: "SidTag", foreignKey: "tag_id" });
+    Associations.hasMany.call(SidPost, "tags", {
+      through: "taggings",
+      className: "SidTag",
+      source: "tag",
+    });
+    const post = await SidPost.create({ title: "T" });
+    const tag = await SidTag.create({ name: "general" });
+    await SidTagging.create({ tag_id: tag.id, post_id: post.id });
+    const proxy = association(post, "tags");
+    expect(await proxy.count()).toBe(1);
+    const deleted = await proxy.delete(String(tag.id));
+    expect(deleted).toHaveLength(1);
+    expect(await proxy.count()).toBe(0);
   });
 
   it.skip("has many through sum uses calculations", () => {
