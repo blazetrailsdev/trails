@@ -103,6 +103,9 @@ Detail/rationale in the per-PR sections below.
 - **PF2 — query-cache guard move** (~20 LOC). Move the guard from
   `enableQueryCacheBang` to `QueryCache.run` (requires `run()` to accept pools
   or a discriminated union; low priority). Files: query-cache. Source: #2534.
+  **Subsumed by `query-cache-mixin-plan.md` Phase 2** — making `QueryCache.run`
+  pool-based is exactly this guard move. See that plan; the live mixin cache is
+  unwired (the wrapper holds the only working impl), which is the bigger issue.
 - **PF3 — P10 ConnectionManagement middleware** (~60 LOC). Create
   `connection-management.ts` (Rails clears active connections after each
   request). Unblocks ~11 tests. Source: Track 5 / P10.
