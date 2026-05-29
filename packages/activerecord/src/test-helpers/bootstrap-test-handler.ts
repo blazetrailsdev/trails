@@ -25,7 +25,10 @@ export async function bootstrapTestHandler(): Promise<void> {
     } else if (mysqlUrl) {
       await Base.establishConnection(mysqlUrl);
     } else {
-      await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+      // Phase 0 template-clone: open the per-worker file clone (canonical
+      // schema pre-built) when one exists; otherwise fall back to :memory:.
+      const database = process.env.AR_TEST_WORKER_DB ?? ":memory:";
+      await Base.establishConnection({ adapter: "sqlite3", database, pool: 1 });
     }
   }
   syncHandlerVisitor();

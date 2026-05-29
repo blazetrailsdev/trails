@@ -469,6 +469,24 @@ function tableSignature(table: TableSchema): string {
   return JSON.stringify({ columns: sortedCols, primaryKey: pk ?? null });
 }
 
+/**
+ * Pre-populate the signature cache for `schema` against `adapter` WITHOUT
+ * issuing any DDL. Used by the sqlite template-clone path (Phase 0 spike):
+ * the worker DB is a file copy of a pre-built template, so the canonical
+ * tables already exist physically. Seeding their signatures converts the
+ * per-file `defineSchema(TEST_SCHEMA)` into a cache-hit (no CREATEs), while
+ * `defineSchema`'s `dataSourceExists` guard still recreates any table a
+ * prior file's `dropAllTables` removed from the shared worker file.
+ *
+ * @internal
+ */
+export function seedSchemaSignatures(adapter: DatabaseAdapter, schema: Schema): void {
+  const cache = getCache(adapter);
+  for (const [table, raw] of Object.entries(schema)) {
+    cache.set(table, tableSignature(raw));
+  }
+}
+
 export async function defineSchema(schema: Schema, opts?: DefineSchemaOpts): Promise<void>;
 export async function defineSchema(
   adapter: DatabaseAdapter,

@@ -20,6 +20,7 @@
 
 import pg from "pg";
 import mysql from "mysql2/promise";
+import { WORKER_DB_ENV, ensureWorkerClone } from "./test-helpers/sqlite-template.js";
 
 // Shared by all evaluations of this module within the same worker process.
 const g = globalThis as typeof globalThis & {
@@ -132,6 +133,16 @@ if (process.env.PG_TEST_URL) {
 }
 if (process.env.MYSQL_TEST_URL) {
   process.env.MYSQL_TEST_URL = await acquireAdvisorySlotMysql(process.env.MYSQL_TEST_URL);
+}
+
+// Phase 0 sqlite template-clone: when globalSetup built a canonical template,
+// copy it to a private per-worker file and point the worker DB at it. The
+// canonical schema arrives pre-built, so per-file defineSchema(TEST_SCHEMA)
+// short-circuits to a cache-hit instead of re-issuing the DDL. No-op when no
+// template was built (PG/MySQL runs, or globalSetup disabled).
+{
+  const workerDb = await ensureWorkerClone();
+  if (workerDb) process.env[WORKER_DB_ENV] = workerDb;
 }
 
 // Pre-warm the sync adapter-class cache for the active test environment so
