@@ -3638,6 +3638,11 @@ export class Relation<T extends Base> {
         // Only emit bare when the alias is a safe identifier; fall back to quoted
         // for names that would produce invalid SQL or risk injection.
         fromExpr = `(${subSql}) ${_safeAlias(name)}`;
+        // The subquery compiles through its own collector (raw.toSql above),
+        // capturing its retryability in raw._lastSelectRetryable. Rails folds
+        // the whole arel through one collector, so AND it into ours: a raw SQL
+        // fragment inside the subquery must lower the outer classification.
+        this._lastSelectRetryable &&= raw._lastSelectRetryable;
       } else if (raw instanceof Nodes.Node) {
         // Compile via the same visitor _compileSelectSql uses so identifier
         // quoting stays dialect-consistent across the whole SELECT.

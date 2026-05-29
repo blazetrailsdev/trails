@@ -19,7 +19,9 @@ export async function findBySql<T extends typeof Base>(
   this: T,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
-  opts: { allowRetry?: boolean } | ((record: InstanceType<T>) => void) = {},
+  // Rails' allow_retry: keyword defaults false, so a nil/absent value is the
+  // default. We accept null/undefined for the same reason and coalesce below.
+  opts: { allowRetry?: boolean } | ((record: InstanceType<T>) => void) | null = {},
   block?: (record: InstanceType<T>) => void,
 ): Promise<InstanceType<T>[]> {
   const resolvedOpts = typeof opts === "function" ? {} : (opts ?? {});
@@ -40,7 +42,7 @@ export async function asyncFindBySql<T extends typeof Base>(
   this: T,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
-  opts: { allowRetry?: boolean } | ((record: InstanceType<T>) => void) = {},
+  opts: { allowRetry?: boolean } | ((record: InstanceType<T>) => void) | null = {},
   block?: (record: InstanceType<T>) => void,
 ): Promise<InstanceType<T>[]> {
   return findBySql.call<T, Parameters<typeof findBySql<T>>, Promise<InstanceType<T>[]>>(

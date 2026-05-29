@@ -464,15 +464,19 @@ describe("AdapterConnectionTest", () => {
     const rawFromNode = new Nodes.SqlLiteral("posts");
     await PostForRetryTest.where({ id: 1 }).from(rawFromNode).limit(1).toArray();
     expect(adapter.capturedAllowRetry).toBe(false);
+
+    // from(Relation) compiles its subquery separately too — a non-retryable
+    // fragment inside the subquery must lower the outer classification.
+    const rawSubquery = PostForRetryTest.where("1 = 1");
+    await PostForRetryTest.where({ id: 1 }).from(rawSubquery, "sub").limit(1).toArray();
+    expect(adapter.capturedAllowRetry).toBe(false);
   });
   it("findBySql tolerates a null opts argument without throwing", async () => {
     const adapter = new QueryTestAdapter();
     adapter.simulateConnect();
     PostForRetryTest.adapter = adapter as any;
 
-    await expect(
-      (PostForRetryTest as any).findBySql("SELECT * FROM posts", [], null),
-    ).resolves.toEqual([]);
+    await expect(PostForRetryTest.findBySql("SELECT * FROM posts", [], null)).resolves.toEqual([]);
   });
   it("execQuery options type accepts allowRetry alongside prepare", () => {
     const opts: NonNullable<Parameters<DatabaseAdapter["execQuery"]>[3]> = {
