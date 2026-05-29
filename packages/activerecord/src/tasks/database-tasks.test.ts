@@ -1335,6 +1335,11 @@ describe("DatabaseTasks _appendSchemaInformation adapter quoting", () => {
       adapterName,
       quoteTableName: (name: string) =>
         isMySQL ? mysqlQuoteTableName(name) : abstractQuoteTableName(name),
+      // SchemaMigration's read path compiles its SelectManager via
+      // adapter.toSql; a real adapter compiles through its visitor. The stub
+      // only needs to yield a SELECT string the execute() matcher recognizes.
+      toSql: (arel: { toSql?: () => string }) =>
+        typeof arel?.toSql === "function" ? arel.toSql() : String(arel),
       execute: async (sql: string) => {
         // Both tableExists() and versions() funnel through execute().
         // Return one row to claim the table exists; for the versions

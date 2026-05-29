@@ -320,6 +320,11 @@ export interface AbstractAdapter {
   dataSources(): Promise<string[]>;
   isDataSourceExists(name: string): Promise<boolean>;
   // --- DatabaseStatements ---
+  /**
+   * Compile an Arel node/TreeManager to a SQL string via this connection's
+   * visitor. Mirrors `DatabaseStatements#to_sql`.
+   */
+  toSql(arel: unknown, binds?: unknown[]): string;
   selectAll(
     sql: string,
     name?: string | null,
