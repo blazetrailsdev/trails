@@ -43,6 +43,13 @@ const TEST_SCHEMA: Schema = {
     type: "string",
   },
   sti_thr_members: { name: "string" },
+  sti_n_posts: { title: "string" },
+  sti_n_comments: { sti_n_post_id: "integer", type: "string", body: "string" },
+  sti_n_ratings: { sti_n_comment_id: "integer", value: "integer" },
+  sti_n_taggings: { sti_n_rating_id: "integer" },
+  rsr_categories: { name: "string" },
+  rsr_posts: { rsr_category_id: "integer", title: "string" },
+  rsr_comments: { rsr_post_id: "integer", body: "string" },
   nwr_authors: { name: "string" },
   nwr_posts: { nwr_author_id: "integer", title: "string" },
   nwr_taggings: { nwr_post_id: "integer", nwr_tag_id: "integer" },
@@ -1174,9 +1181,9 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("joins and includes from through models not included in association", () => {
-    // BLOCKED: associations — nested-through edge case
-    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
-    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
+    // BLOCKED: requires `default_scope` with a proc calling
+    // includes/preload/joins/eager_load on the model. Default-scope
+    // query-method injection is not yet ported. Tracked as a follow-up.
   });
 
   it("has one through has one through with belongs to source reflection preload", async () => {
@@ -1259,10 +1266,39 @@ describe("NestedThroughAssociationsTest", () => {
     expect(preloadedTags.every((t: any) => t.name === "general")).toBe(true);
   });
 
-  it.skip("distinct has many through a has many through association on through reflection", () => {
-    // BLOCKED: associations — nested-through edge case
-    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
-    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
+  it("distinct has many through a has many through association on through reflection", async () => {
+    // Mirrors Rails distinct_subscribers: the through reflection (postTaggings)
+    // is itself a nested has_many :through, and a `distinct` scope on the final
+    // association deduplicates records reached via multiple through rows.
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+    Associations.hasMany.call(Author, "postTaggings", {
+      className: "Tagging",
+      through: "posts",
+      source: "taggings",
+    });
+    Associations.hasMany.call(Author, "distinctTags", {
+      className: "Tag",
+      through: "postTaggings",
+      source: "tag",
+      scope: (rel: any) => rel.distinct(),
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
+    const author = await Author.create({ name: "David" });
+    const post1 = await Post.create({ author_id: author.id, title: "P1", body: "B" });
+    const post2 = await Post.create({ author_id: author.id, title: "P2", body: "B" });
+    const tag = await Tag.create({ name: "general" });
+    // Same tag reached via two taggings on two posts.
+    await Tagging.create({ tag_id: tag.id, taggable_id: post1.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: tag.id, taggable_id: post2.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload("distinctTags").toArray();
+    const preloadedTags = (authors[0] as any)._preloadedAssociations?.get("distinctTags") ?? [];
+    expect(preloadedTags).toHaveLength(1);
+    expect(preloadedTags[0].name).toBe("general");
   });
 
   // Mirrors Rails test_nested_has_many_through_with_a_table_referenced_multiple_times
@@ -1553,10 +1589,82 @@ describe("NestedThroughAssociationsTest", () => {
     expect(members[0].name).toBe("Alice");
   });
 
-  it.skip("has many through with sti on nested through reflection", () => {
-    // BLOCKED: associations — nested-through edge case
-    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
-    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
+  it("has many through with sti on nested through reflection", async () => {
+    // Mirrors Rails Post#special_comments_ratings_taggings: the nested through
+    // reflection (specialCommentsRatings) walks through an STI association
+    // (specialComments → StiNSpecialComment only). Plain comments and their
+    // rating/tagging chains must be excluded by the STI type filter.
+    class StiNPost extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    class StiNComment extends Base {
+      static {
+        this.attribute("sti_n_post_id", "integer");
+        this.attribute("type", "string");
+        this.attribute("body", "string");
+        this._tableName = "sti_n_comments";
+        enableSti(StiNComment);
+      }
+    }
+    class StiNSpecialComment extends StiNComment {
+      static {
+        registerModel(StiNSpecialComment);
+        registerSubclass(StiNSpecialComment);
+      }
+    }
+    class StiNRating extends Base {
+      static {
+        this.attribute("sti_n_comment_id", "integer");
+        this.attribute("value", "integer");
+      }
+    }
+    class StiNTagging extends Base {
+      static {
+        this.attribute("sti_n_rating_id", "integer");
+      }
+    }
+    Associations.hasMany.call(StiNPost, "specialComments", {
+      className: "StiNSpecialComment",
+      foreignKey: "sti_n_post_id",
+    });
+    Associations.hasMany.call(StiNSpecialComment, "ratings", {
+      className: "StiNRating",
+      foreignKey: "sti_n_comment_id",
+    });
+    Associations.hasMany.call(StiNRating, "taggings", {
+      className: "StiNTagging",
+      foreignKey: "sti_n_rating_id",
+    });
+    Associations.hasMany.call(StiNPost, "specialCommentsRatings", {
+      className: "StiNRating",
+      through: "specialComments",
+      source: "ratings",
+    });
+    Associations.hasMany.call(StiNPost, "specialCommentsRatingsTaggings", {
+      className: "StiNTagging",
+      through: "specialCommentsRatings",
+      source: "taggings",
+    });
+    registerModel("StiNPost", StiNPost);
+    registerModel("StiNComment", StiNComment);
+    registerModel("StiNRating", StiNRating);
+    registerModel("StiNTagging", StiNTagging);
+
+    const post = await StiNPost.create({ title: "sti_comments" });
+    const special = await StiNSpecialComment.create({ sti_n_post_id: post.id, body: "S" });
+    const plain = await StiNComment.create({ sti_n_post_id: post.id, body: "P" });
+    const specialRating = await StiNRating.create({ sti_n_comment_id: special.id, value: 1 });
+    const plainRating = await StiNRating.create({ sti_n_comment_id: plain.id, value: 2 });
+    const specialTagging = await StiNTagging.create({ sti_n_rating_id: specialRating.id });
+    await StiNTagging.create({ sti_n_rating_id: plainRating.id });
+
+    const posts = await StiNPost.all().preload("specialCommentsRatingsTaggings").toArray();
+    const taggings =
+      (posts[0] as any)._preloadedAssociations?.get("specialCommentsRatingsTaggings") ?? [];
+    expect(taggings).toHaveLength(1);
+    expect(taggings[0].id).toBe(specialTagging.id);
   });
 
   it("nested has many through writers should raise error", async () => {
@@ -1765,10 +1873,38 @@ describe("NestedThroughAssociationsTest", () => {
     expect(preloadedTags[0].name).toBe("blue");
   });
 
-  it.skip("nested has many through with conditions on through associations preload via joins", () => {
-    // BLOCKED: associations — nested-through edge case
-    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
-    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
+  it("nested has many through with conditions on through associations preload via joins", async () => {
+    // Same chain as the preload variant above, but loaded via a single-query
+    // JOIN (eagerLoad). The scope's WHERE must filter the JOINed target table.
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+    Associations.hasMany.call(Author, "blueThroughTags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+      scope: (rel: any) => rel.where({ name: "blue" }),
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
+    const author = await Author.create({ name: "Bob" });
+    const post = await Post.create({ author_id: author.id, title: "Misc", body: "B" });
+    const blueTag = await Tag.create({ name: "blue" });
+    const redTag = await Tag.create({ name: "red" });
+    await Tagging.create({ tag_id: blueTag.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: redTag.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().eagerLoad("blueThroughTags").toArray();
+    expect(authors).toHaveLength(1);
+    const loadedTags = (authors[0] as any)._preloadedAssociations?.get("blueThroughTags") ?? [];
+    expect(loadedTags).toHaveLength(1);
+    expect(loadedTags[0].name).toBe("blue");
   });
 
   it("nested has many through with conditions on source associations", async () => {
@@ -1839,15 +1975,43 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("through association preload doesnt reset source association if already preloaded", () => {
-    // BLOCKED: associations — nested-through edge case
-    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
-    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
+    // BLOCKED: requires nested-hash preload of two associations sharing a
+    // source, where preloading the second must NOT reset the source already
+    // preloaded by the first. Not yet handled by the preloader. Follow-up.
   });
 
-  it.skip("nested has many through with conditions on source associations preload via joins", () => {
-    // BLOCKED: associations — nested-through edge case
-    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
-    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
+  it("nested has many through with conditions on source associations preload via joins", async () => {
+    // Same chain as the source-conditions preload variant above, loaded via a
+    // single-query JOIN (eagerLoad) rather than the multi-query preloader.
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+    Associations.hasMany.call(Author, "blueTags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+      scope: (rel: any) => rel.where({ name: "blue" }),
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
+    const author = await Author.create({ name: "Bob" });
+    const post = await Post.create({ author_id: author.id, title: "P1", body: "B" });
+    const blueTag = await Tag.create({ name: "blue" });
+    const redTag = await Tag.create({ name: "red" });
+    await Tagging.create({ tag_id: blueTag.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: redTag.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().eagerLoad("blueTags").toArray();
+    expect(authors).toHaveLength(1);
+    const loadedTags = (authors[0] as any)._preloadedAssociations?.get("blueTags") ?? [];
+    expect(loadedTags).toHaveLength(1);
+    expect(loadedTags[0].name).toBe("blue");
   });
 
   it("nested has many through with foreign key option on the source reflection through reflection", async () => {
@@ -1916,9 +2080,9 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("nested has many through should not be autosaved", () => {
-    // BLOCKED: associations — nested-through edge case
-    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
-    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
+    // BLOCKED: requires reading a nested HMT on an unsaved owner (through an
+    // in-memory belongs_to) and asserting `owner.save` does not autosave/clear
+    // it. Needs HMT readers on new records + autosave exclusion. Follow-up.
   });
 
   it("polymorphic has many through when through association has not loaded", async () => {
@@ -2106,21 +2270,80 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("polymorphic has many through joined different table twice", () => {
-    // BLOCKED: associations — nested-through edge case
-    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
-    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
+    // BLOCKED: `Hotel.joins(:cake_designers, :drink_designers)` joins the same
+    // polymorphic `chefs` table twice in one query. Requires JoinDependency
+    // AliasTracker self-join alias emission (same root cause as "table
+    // referenced multiple times" above). Tracked as a follow-up.
   });
 
   it.skip("has many through polymorphic with scope", () => {
-    // BLOCKED: associations — nested-through edge case
-    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
-    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
+    // BLOCKED: `Post.joins(:authors_of_essays_named_bob)` joins through a HABTM
+    // into a polymorphic source (source_type "Author") with a scope. Requires
+    // HABTM-into-polymorphic-source joins in JoinDependency. Follow-up.
   });
 
-  it.skip("has many through reset source reflection after loading is complete", () => {
-    // BLOCKED: associations — nested-through edge case
-    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
-    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
+  it("has many through reset source reflection after loading is complete", async () => {
+    // Mirrors Rails Category#ordered_post_comments: preloading a HMT across
+    // multiple owners must not leave the source reflection in a mutated state
+    // that corrupts a subsequent non-preloaded read on a different owner.
+    class RsrCategory extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class RsrPost extends Base {
+      static {
+        this.attribute("rsr_category_id", "integer");
+        this.attribute("title", "string");
+      }
+    }
+    class RsrComment extends Base {
+      static {
+        this.attribute("rsr_post_id", "integer");
+        this.attribute("body", "string");
+      }
+    }
+    Associations.hasMany.call(RsrCategory, "rsrPosts", {
+      className: "RsrPost",
+      foreignKey: "rsr_category_id",
+    });
+    Associations.hasMany.call(RsrPost, "rsrComments", {
+      className: "RsrComment",
+      foreignKey: "rsr_post_id",
+    });
+    Associations.hasMany.call(RsrCategory, "orderedPostComments", {
+      className: "RsrComment",
+      through: "rsrPosts",
+      source: "rsrComments",
+      scope: (rel: any) => rel.order({ id: "desc" }),
+    });
+    registerModel("RsrCategory", RsrCategory);
+    registerModel("RsrPost", RsrPost);
+    registerModel("RsrComment", RsrComment);
+
+    const cat1 = await RsrCategory.create({ name: "C1" });
+    const cat2 = await RsrCategory.create({ name: "C2" });
+    const post1 = await RsrPost.create({ rsr_category_id: cat1.id, title: "P1" });
+    const post2 = await RsrPost.create({ rsr_category_id: cat2.id, title: "P2" });
+    await RsrComment.create({ rsr_post_id: post1.id, body: "c1a" });
+    await RsrComment.create({ rsr_post_id: post2.id, body: "c2a" });
+    await RsrComment.create({ rsr_post_id: post2.id, body: "c2b" });
+
+    const preloaded = await RsrCategory.all().preload("orderedPostComments").toArray();
+    const preloadedCat2 = preloaded.find((c) => (c as any).id === cat2.id)!;
+    const preloadedIds = (
+      (preloadedCat2 as any)._preloadedAssociations?.get("orderedPostComments") ?? []
+    ).map((c: any) => c.id);
+
+    const original = await loadHasManyThrough(cat2, "orderedPostComments", {
+      className: "RsrComment",
+      through: "rsrPosts",
+      source: "rsrComments",
+      scope: (rel: any) => rel.order({ id: "desc" }),
+    });
+    const originalIds = original.map((c: any) => c.id);
+    expect(preloadedIds).toEqual(originalIds);
+    expect(preloadedIds).toEqual([...originalIds].sort((a, b) => b - a));
   });
 });
 
