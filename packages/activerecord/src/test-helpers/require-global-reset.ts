@@ -55,11 +55,22 @@ export function shouldRunGlobalReset(): boolean {
  * @internal
  */
 export function useGlobalReset(): void {
+  // Guard the decrement so a schema `beforeAll` that throws before this
+  // helper's `beforeAll` increments can't drive the depth negative on the
+  // afterAll path (Vitest still runs afterAll after a failed beforeAll).
+  let incremented = false;
   beforeAll(() => {
     pushRequireGlobalReset();
+    incremented = true;
   });
   afterAll(async () => {
-    popRequireGlobalReset();
-    await resetTestAdapterState();
+    // Only the outermost scope (depth back to zero) runs the final reset, so
+    // an inner nested describe / second suite that opts in doesn't drop the
+    // shared DB while an outer scope is still active. Mirrors Rails
+    // ConnectionPool#unpin_connection! finalizing at depth zero
+    // (connection_pool.rb:347).
+    if (!incremented) return;
+    incremented = false;
+    if (popRequireGlobalReset() === 0) await resetTestAdapterState();
   });
 }

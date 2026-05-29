@@ -147,9 +147,15 @@ export function withTransactionalFixtures(
   // discarding signatures for any `defineSchema(...)` that ran inside the
   // `it()` body (whose DDL was rolled back at the DB).
   let outerSig: Map<string, string> | null = null;
+  // Guard the decrement so a schema `beforeAll` registered before this helper
+  // that throws (Vitest still runs afterAll cleanup) can't decrement a count
+  // this scope never incremented, which would drive the module-global depth
+  // negative and make a later file skip its depth-zero final reset.
+  let incremented = false;
 
   beforeAll(() => {
     _txnFixtureDepth += 1;
+    incremented = true;
   });
 
   afterAll(async () => {
@@ -158,6 +164,8 @@ export function withTransactionalFixtures(
     // transactional-fixtures scope exits so leftover tables/data don't bleed
     // into the next file, mirroring Rails ConnectionPool#unpin_connection!
     // finalizing at depth zero (connection_pool.rb:347).
+    if (!incremented) return;
+    incremented = false;
     _txnFixtureDepth -= 1;
     if (_txnFixtureDepth === 0) await resetTestAdapterState();
   });
