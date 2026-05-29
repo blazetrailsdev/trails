@@ -470,6 +470,14 @@ describe("AdapterConnectionTest", () => {
     const rawSubquery = PostForRetryTest.where("1 = 1");
     await PostForRetryTest.where({ id: 1 }).from(rawSubquery, "sub").limit(1).toArray();
     expect(adapter.capturedAllowRetry).toBe(false);
+
+    // A set-operation subquery compiles each side separately, so its captured
+    // flag reflects only one side; treat it as non-retryable like toArray does.
+    const setOpSubquery = PostForRetryTest.where({ id: 1 }).union(
+      PostForRetryTest.where({ id: 2 }),
+    );
+    await PostForRetryTest.where({ id: 1 }).from(setOpSubquery, "sub").limit(1).toArray();
+    expect(adapter.capturedAllowRetry).toBe(false);
   });
   it("findBySql tolerates a null opts argument without throwing", async () => {
     const adapter = new QueryTestAdapter();

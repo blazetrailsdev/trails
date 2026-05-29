@@ -3642,7 +3642,10 @@ export class Relation<T extends Base> {
         // capturing its retryability in raw._lastSelectRetryable. Rails folds
         // the whole arel through one collector, so AND it into ours: a raw SQL
         // fragment inside the subquery must lower the outer classification.
-        this._lastSelectRetryable &&= raw._lastSelectRetryable;
+        // A set-operation subquery compiles each side separately, so
+        // raw._lastSelectRetryable only reflects the last side — treat it as
+        // non-retryable, matching how toArray() classifies set operations.
+        this._lastSelectRetryable &&= raw._setOperation ? false : raw._lastSelectRetryable;
       } else if (raw instanceof Nodes.Node) {
         // Compile via the same visitor _compileSelectSql uses so identifier
         // quoting stays dialect-consistent across the whole SELECT.
