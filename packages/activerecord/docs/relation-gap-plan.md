@@ -20,7 +20,7 @@ remain open here.
 | Scoping — query cache + select narrowing                  | 8     | 6 need query cache (→ P12), 2 need select narrowing (→ R3b)                                             |
 | Query cache                                               | 27    | Blocked on connection-pool (per-thread cache architecture)                                              |
 | Hash-form select                                          | 23    | ✓ R2 #2562 shipped (incl. `select(nil)`); residual raw-SQL keys/table-alias edge cases — see follow-ups |
-| WhereChain `.associated`/`.missing` with enums            | 12    | Bypasses predicate builder; enum cast never applied (R4 — open)                                         |
+| WhereChain `.associated`/`.missing` with enums            | 12    | R4 shipped scoped-join enum cast (6 unskipped); 5 `missing with enum*` blocked on join table-aliasing   |
 | lock / FOR UPDATE                                         | 7     | ✓ R6a #2564 shipped; `lockValue` reader still missing — see follow-ups                                  |
 | Standalone relation (joins, eager, race, fixture)         | 8     | Parameterized joins (2 — R6c deferred), eager_load toSql (3 → assoc A5), race/fixture/Ruby (3)          |
 | Calculations with associations                            | 12    | Fixture-dependent + grouped association join                                                            |
@@ -53,25 +53,39 @@ columns; `has_attribute?` reads from the result set.
 
 ## Track 4: WhereChain `.associated`/`.missing` with enums (unlocks ~12 tests)
 
-### PR R4: Route `.associated`/`.missing` through predicate builder
+### PR R4: enum casting on `.associated`/`.missing` (scoped joins) — partially shipped
 
-**Problem:** `WhereChain#associated` (query-methods.ts:415–445) manually
-adds a join and pushes an `IS NOT NULL` predicate, bypassing the predicate
-builder entirely. When the association FK is an enum column, the integer
-mapping is never applied. Rails passes the association name as a hash key
-to the full `where(assoc => conditions)` path which triggers enum casting.
+**Refined diagnosis:** the original "bypasses predicate builder" framing was
+slightly off. `where.associated`/`where.missing` always condition on a NULL
+(`Array(association_primary_key).index_with(nil)`), so the _condition value_
+never needs enum casting. The enum integer mapping that the Rails tests
+exercise comes from the association's macro-time **scope** (e.g.
+`has_one :reading_listing, -> { reading }, foreign_key: :last_read`): Rails'
+`joins(:assoc)` folds that scope into the JOIN ON, and the scope's
+`where(last_read: :reading)` casts `:reading → 2`. Our `_resolveAssociationJoin`
+(the builder behind `joins(assoc)` and `where.associated`/`missing`) dropped
+the scope entirely, so `last_read = 2` never reached the SQL.
 
-**Files:**
+**Shipped:** `Relation#_appendAssociationScope` now folds the reflection
+`scope:` lambda into the belongsTo / hasOne / hasMany JOIN ON, mirroring
+`JoinDependency` (join-dependency.ts:272–282). This unskips the 5
+`associated with enum*` tests + `missing with composite primary key`.
 
-- `relation/query-methods.ts:415–445` — `WhereChain#associated`
-- `relation/query-methods.ts:447–480` — `WhereChain#missing`
+**Still blocked (follow-up):** the 5 `missing with enum*` tests join
+`reading_listing` (inner) AND left-join `unread_listing` — two has_one
+associations on the SAME target table (Book) differentiated only by enum
+scope. Rails aliases the second join; `_addAssocJoin` throws on the
+same-table collision because join table-aliasing isn't implemented. These
+remain `it.skip` with that root-cause note; they need the join-aliasing
+feature, not a predicate-builder change.
+
+**Files:** `relation.ts` (`_appendAssociationScope` + 2 call sites in
+`_resolveAssociationJoin`).
 
 **Rails ref:** `query_methods/where_chain.rb:88–104` (`associated`),
-`query_methods/where_chain.rb:50–86` (`missing`)
+`query_methods/where_chain.rb:50–86` (`missing`); `author.rb:175–176`.
 
 **Depends on:** PR R1 ✓ (association-key expansion, shipped #2566)
-
-**Est:** ~60 LOC
 
 ---
 

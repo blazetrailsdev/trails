@@ -105,6 +105,7 @@ import { inspectExplainOption } from "./adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import { JoinDependency } from "./associations/join-dependency.js";
+import { invokeScopeLambda } from "./associations/association-scope.js";
 import type { AliasTracker } from "./associations/alias-tracker.js";
 
 /**
@@ -1351,6 +1352,43 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * Append a macro-time association `scope:` lambda to a JOIN's ON
+   * predicates, mirroring JoinDependency's scope handling
+   * (associations/join-dependency.ts:272-282) and Rails' `joins(:assoc)`,
+   * which folds the reflection scope into the join constraint. Routing the
+   * scope's conditions through the target model's `where()` casts enum FK
+   * values (e.g. `where(last_read: :reading)` → `last_read = 2`), so
+   * `where.associated`/`where.missing` see the integer mapping that the
+   * raw column-to-column ON would otherwise skip.
+   *
+   * Invoked via `invokeScopeLambda` so 0-arity `this`-bound scopes
+   * (`function () { return this.where(...) }`) and arrow scopes
+   * (`(rel) => rel.where(...)`, `(rel, owner) => ...`) are all evaluated, with
+   * the Rails `instance_exec(owner) || relation` falsy-fallback. A bare join
+   * has no owner instance, so the scope runs with `owner === undefined`.
+   *
+   * The scope is invoked unconditionally via `invokeScopeLambda`, mirroring
+   * JoinDependency (join-dependency.ts:272-282), which neither pre-skips by
+   * arity nor rescues scope-evaluation errors. A bare join has no owner, so
+   * the scope runs with `owner === undefined` (Rails passes nil in join
+   * contexts); owner-parameter scopes that tolerate a nil owner still fold in,
+   * and a scope that genuinely requires the owner throws — the same outcome
+   * JoinDependency produces. `invokeScopeLambda` (not a raw `scope(rel)` call)
+   * is used so 0-arity `this`-bound scopes bind `this` to the relation.
+   *
+   * @internal
+   */
+  private _appendAssociationScope(predicates: Nodes.Node[], assocDef: any, targetModel: any): void {
+    const scope = assocDef.options.scope;
+    if (typeof scope !== "function") return;
+    const baseRel = (targetModel as any)._allForPreload();
+    const scopeRel = invokeScopeLambda(scope, baseRel, undefined as unknown as Base) || baseRel;
+    if (scopeRel?._whereClause && !scopeRel._whereClause.isEmpty()) {
+      predicates.push(scopeRel._whereClause.ast);
+    }
+  }
+
+  /**
    * Resolve an association name to one or more JOIN table/ON pairs.
    * Returns null if the name is not a recognized association.
    *
@@ -1392,6 +1430,7 @@ export class Relation<T extends Base> {
         predicates.push(tgt.get(inheritanceCol).in(stiNames));
       }
 
+      this._appendAssociationScope(predicates, assocDef, targetModel);
       return {
         table: targetTable,
         on: this._arelVisitor().compile(
@@ -1437,6 +1476,7 @@ export class Relation<T extends Base> {
         predicates.push(tgt.get(inheritanceCol).in(stiNames));
       }
 
+      this._appendAssociationScope(predicates, assocDef, targetModel);
       return {
         table: targetTable,
         on: this._arelVisitor().compile(
