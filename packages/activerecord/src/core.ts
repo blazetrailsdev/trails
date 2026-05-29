@@ -8,7 +8,13 @@ import { getApplicationRecordClass } from "./inheritance.js";
 import { RecordNotFound, StrictLoadingViolationError } from "./errors.js";
 import { actionOnStrictLoadingViolation } from "./ar-config.js";
 import { WRITING_ROLE } from "./roles.js";
-import { Notifications, IsolatedExecutionState, ParameterFilter } from "@blazetrails/activesupport";
+import {
+  Notifications,
+  IsolatedExecutionState,
+  ParameterFilter,
+  camelize,
+} from "@blazetrails/activesupport";
+import { strictLoadingViolationMessage } from "./reflection.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { argumentError } from "./relation/query-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
@@ -437,15 +443,32 @@ export function asynchronousQueriesSession(): any {
  *
  * Mirrors: ActiveRecord::Core.strict_loading_violation!
  */
-export function strictLoadingViolationBang(owner: any, reflection: string): void {
+export function strictLoadingViolationBang(
+  owner: any,
+  reflection: string,
+  options: { polymorphic?: boolean; className?: string } = {},
+): void {
+  const reflectionLike = {
+    name: reflection,
+    strictLoadingViolationMessage(ownerArg: unknown): string {
+      return strictLoadingViolationMessage(ownerArg, {
+        name: reflection,
+        polymorphic: options.polymorphic === true,
+        className: options.className ?? camelize(reflection),
+      });
+    },
+  };
+  // Rails passes `owner.class` (Notifications payload + message subject); the
+  // message builder stringifies it to the class name, matching Ruby's `#{owner}`.
+  const ownerClass = typeof owner === "function" ? owner : owner?.constructor;
   if (actionOnStrictLoadingViolation === "log") {
     Notifications.instrument("strict_loading_violation.active_record", {
-      owner: typeof owner === "function" ? owner : owner?.constructor,
-      reflection,
+      owner: ownerClass,
+      reflection: reflectionLike,
     });
     return;
   }
-  throw StrictLoadingViolationError.forAssociation(owner, reflection);
+  throw new StrictLoadingViolationError(reflectionLike.strictLoadingViolationMessage(ownerClass));
 }
 
 export function initializeFindByCache(this: CoreHost): void {

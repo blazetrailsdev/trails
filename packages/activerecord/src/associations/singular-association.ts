@@ -99,7 +99,10 @@ export class SingularAssociation extends Association {
     // loading; otherwise return the current `target` (null by default)
     // to preserve the legacy silent-null behavior for opt-out users.
     if (this.findTargetNeeded() && this._isStrictOnOwner()) {
-      strictLoadingViolationBang(this.owner, this.reflection.name);
+      strictLoadingViolationBang(this.owner, this.reflection.name, {
+        polymorphic: this.reflection.options?.polymorphic,
+        className: this.reflection.options?.className,
+      });
     }
     return this.target;
   }

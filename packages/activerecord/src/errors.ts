@@ -591,13 +591,6 @@ export class StrictLoadingViolationError extends ActiveRecordError {
     super(message, options);
     this.name = "StrictLoadingViolationError";
   }
-
-  static forAssociation(record: any, associationName: string): StrictLoadingViolationError {
-    const model = record?.constructor?.name ?? "Record";
-    return new StrictLoadingViolationError(
-      `${model} is marked for strict_loading. The ${associationName} association cannot be lazily loaded.`,
-    );
-  }
 }
 
 export class Rollback extends ActiveRecordError {

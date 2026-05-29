@@ -571,7 +571,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private _checkStrictLoading(): void {
     if (_violatesStrictLoading(this._record, this._assocDef.options)) {
-      strictLoadingViolationBang(this._record, this._assocName);
+      strictLoadingViolationBang(this._record, this._assocName, {
+        className: this._assocDef.options.className ?? camelize(singularize(this._assocName)),
+      });
     }
   }
 

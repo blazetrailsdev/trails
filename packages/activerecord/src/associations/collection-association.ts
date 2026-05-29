@@ -426,6 +426,9 @@ export class CollectionAssociation extends Association {
       } else {
         const found = await this.doAsyncFindTarget();
         if (found !== undefined && found !== null && Array.isArray(found)) {
+          // Rails applies set_strict_loading per record in find_target's DB
+          // execute block — only freshly loaded records, never cached ones.
+          for (const record of found) this.setStrictLoading(record);
           this.target = this.mergeTargetLists(found, this.target);
         }
       }

@@ -167,16 +167,16 @@ export class Association {
    */
   setStrictLoading(record: Base): Base {
     const recordAny = record as any;
-    if (typeof recordAny.strictLoadingBang === "function") {
-      if (
-        typeof this.owner.isStrictLoadingNPlusOneOnly === "function" &&
-        (this.owner as any).isStrictLoadingNPlusOneOnly() &&
-        this.reflection.type === "hasMany"
-      ) {
-        recordAny.strictLoadingBang();
-      } else if ((this.owner as any)._strictLoading) {
-        recordAny.strictLoadingBang();
-      }
+    if (typeof recordAny.strictLoadingBang !== "function") return record;
+    const ownerAny = this.owner as any;
+    if (
+      typeof ownerAny.isStrictLoadingNPlusOneOnly === "function" &&
+      ownerAny.isStrictLoadingNPlusOneOnly() &&
+      this.reflection.type === "hasMany"
+    ) {
+      recordAny.strictLoadingBang();
+    } else {
+      recordAny.strictLoadingBang(false, { mode: ownerAny.strictLoadingMode?.() ?? undefined });
     }
     return record;
   }
@@ -280,6 +280,9 @@ export class Association {
       } else {
         const result = await this.doAsyncFindTarget();
         if (result !== undefined) {
+          // Rails applies set_strict_loading per record in find_target's DB
+          // execute block — only freshly loaded records, never cached ones.
+          if (result !== null) this.setStrictLoading(result as Base);
           this.target = result;
         }
       }

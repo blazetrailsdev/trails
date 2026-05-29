@@ -3,6 +3,7 @@ import { Relation } from "./relation.js";
 import type { CollectionProxy } from "./associations/collection-proxy.js";
 import { _setAssociationRelationCtor } from "./associations/collection-proxy.js";
 import { strictLoadingViolationBang } from "./core.js";
+import { camelize, singularize } from "@blazetrails/activesupport";
 
 /**
  * A Relation produced by a collection association (e.g. `blog.posts`,
@@ -144,7 +145,15 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     if (owner._validationContext != null) return;
     if (this._association.reflection.options.strictLoading === false) return;
     if (owner._strictLoading && !owner.isStrictLoadingNPlusOneOnly?.()) {
-      strictLoadingViolationBang(this._association.owner, this._association.associationName);
+      strictLoadingViolationBang(this._association.owner, this._association.associationName, {
+        polymorphic: this._association.reflection.options.polymorphic,
+        // AssociationRelation always wraps a collection association
+        // (`blog.posts` / `blog.posts.where(...)`), so the conventional klass
+        // is the singularized name — matching Rails' `#{klass}`.
+        className:
+          this._association.reflection.options.className ??
+          camelize(singularize(this._association.associationName)),
+      });
     }
   }
 

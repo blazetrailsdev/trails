@@ -59,6 +59,11 @@ describe("StrictLoadingTest", () => {
     author.strictLoadingBang();
 
     await expect(loadHasMany(author, "books", {})).rejects.toThrow(StrictLoadingViolationError);
+    // The message names the singular associated klass (Rails' `#{klass}`),
+    // not the pluralized association name.
+    await expect(loadHasMany(author, "books", {})).rejects.toThrow(
+      "The Book association named `:books` cannot be lazily loaded.",
+    );
   });
 
   // Rails: test_raises_on_lazy_loading_a_strict_loading_belongs_to_relation
@@ -303,7 +308,8 @@ describe("StrictLoadingTest", () => {
     tag.strictLoadingBang();
 
     await expect(loadBelongsTo(tag, "taggable", { polymorphic: true })).rejects.toThrow(
-      StrictLoadingViolationError,
+      "`Tag` is marked for strict_loading. " +
+        "The polymorphic association named `:taggable` cannot be lazily loaded.",
     );
   });
 
@@ -488,10 +494,13 @@ describe("StrictLoadingTest", () => {
       slog_books: { title: "string", author_id: "integer" },
       clir_authors: { name: "string" },
       clir_books: { title: "string", author_id: "integer" },
+      clp_tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+      clp_pirates: { catchphrase: "string" },
       npo_hm_authors: { name: "string" },
       npo_hm_books: { title: "string", author_id: "integer" },
-      npo_bt_authors: { name: "string" },
-      npo_bt_books: { title: "string", author_id: "integer" },
+      npo_bt_developers: { name: "string", ship_id: "integer" },
+      npo_bt_ships: { name: "string" },
+      npo_bt_parts: { name: "string", ship_id: "integer" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -1093,47 +1102,80 @@ describe("StrictLoadingTest", () => {
     }
     registerModel("NpoHmAuthor", NpoHmAuthor);
     registerModel("NpoHmBook", NpoHmBook);
-    Associations.hasMany.call(NpoHmAuthor, "npo_hm_books", {
+    Associations.hasMany.call(NpoHmAuthor, "npoHmBooks", {
       className: "NpoHmBook",
       foreignKey: "author_id",
     });
+    Associations.belongsTo.call(NpoHmBook, "npoHmAuthor", {
+      className: "NpoHmAuthor",
+      foreignKey: "author_id",
+    });
     const author = await NpoHmAuthor.create({ name: "Test" });
+    await NpoHmBook.create({ title: "B", author_id: author.id });
     author.strictLoadingBang(true, { mode: "n_plus_one_only" });
     expect(author.isStrictLoading()).toBe(true);
 
     // Does not raise when loading the first-level has_many association: the
     // N+1-only mode only guards against cascading lookups, not the root load.
-    await expect(
-      loadHasMany(author, "npo_hm_books", { className: "NpoHmBook", foreignKey: "author_id" }),
-    ).resolves.toBeDefined();
+    const books = (await (author as any).association("npoHmBooks").loadTarget()) as Base[];
+
+    // strict_loading is enabled for has_many associations
+    expect(books.every((b) => b.isStrictLoading())).toBe(true);
+    // ...so the nested (N+1) load off a child raises.
+    await expect((books[0] as any).association("npoHmAuthor").loadTarget()).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
   });
   it("strict loading n plus one only mode with belongs to", async () => {
-    class NpoBtBook extends Base {
+    class NpoBtDeveloper extends Base {
       static {
-        this.attribute("title", "string");
-        this.attribute("author_id", "integer");
+        this.attribute("name", "string");
+        this.attribute("ship_id", "integer");
       }
     }
-    class NpoBtAuthor extends Base {
+    class NpoBtShip extends Base {
       static {
         this.attribute("name", "string");
       }
     }
-    registerModel("NpoBtAuthor", NpoBtAuthor);
-    registerModel("NpoBtBook", NpoBtBook);
-    Associations.belongsTo.call(NpoBtBook, "npo_bt_author", {
-      className: "NpoBtAuthor",
-      foreignKey: "author_id",
+    class NpoBtPart extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("ship_id", "integer");
+      }
+    }
+    registerModel("NpoBtDeveloper", NpoBtDeveloper);
+    registerModel("NpoBtShip", NpoBtShip);
+    registerModel("NpoBtPart", NpoBtPart);
+    Associations.belongsTo.call(NpoBtDeveloper, "npoBtShip", {
+      className: "NpoBtShip",
+      foreignKey: "ship_id",
     });
-    const author = await NpoBtAuthor.create({ name: "Test" });
-    const book = await NpoBtBook.create({ title: "B", author_id: author.id });
-    book.strictLoadingBang(true, { mode: "n_plus_one_only" });
-    expect(book.isStrictLoading()).toBe(true);
+    Associations.hasMany.call(NpoBtShip, "npoBtParts", {
+      className: "NpoBtPart",
+      foreignKey: "ship_id",
+    });
+    Associations.belongsTo.call(NpoBtPart, "npoBtShip", {
+      className: "NpoBtShip",
+      foreignKey: "ship_id",
+    });
+    const ship = await NpoBtShip.create({ name: "S" });
+    await NpoBtPart.create({ name: "Stern", ship_id: ship.id });
+    const developer = await NpoBtDeveloper.create({ name: "Dev", ship_id: ship.id });
+    developer.strictLoadingBang(true, { mode: "n_plus_one_only" });
+    expect(developer.isStrictLoading()).toBe(true);
 
-    // First-level belongs_to load is allowed under n_plus_one_only.
-    await expect(
-      loadBelongsTo(book, "npo_bt_author", { className: "NpoBtAuthor", foreignKey: "author_id" }),
-    ).resolves.toBeDefined();
+    // Does not raise when a belongs_to association (:ship) loads its
+    // has_many association (:parts). The belongs_to target is not strict.
+    const loadedShip = (await (developer as any).association("npoBtShip").loadTarget()) as Base;
+    expect(loadedShip.isStrictLoading()).toBe(false);
+
+    // strict_loading is enabled for has_many through a belongs_to
+    const parts = (await (loadedShip as any).association("npoBtParts").loadTarget()) as Base[];
+    expect(parts.every((p) => p.isStrictLoading())).toBe(true);
+    await expect((parts[0] as any).association("npoBtShip").loadTarget()).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
   });
   it("default mode can be changed globally", async () => {
     class GmAuthor extends Base {
@@ -1696,10 +1738,46 @@ describe("StrictLoadingTest", () => {
       setActionOnStrictLoadingViolation("raise");
     }
   });
-  it.skip("strict loading violation logs on polymorphic relation", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("strict loading violation logs on polymorphic relation", async () => {
+    class ClpPirate extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+      }
+    }
+    class ClpTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
+      }
+    }
+    registerModel("ClpPirate", ClpPirate);
+    registerModel("ClpTag", ClpTag);
+    const pirate = await ClpPirate.create({ catchphrase: "Arrr!" });
+    const tag = await ClpTag.create({
+      name: "ruby",
+      taggable_id: pirate.id,
+      taggable_type: "ClpPirate",
+    });
+    tag.strictLoadingBang();
+
+    setActionOnStrictLoadingViolation("log");
+    let logged: string | null = null;
+    const sub = Notifications.subscribe("strict_loading_violation.active_record", (event: any) => {
+      // Mirrors LogSubscriber#strictLoadingViolation: passes payload.owner
+      // (the class) straight into the message builder.
+      logged = event.payload.reflection.strictLoadingViolationMessage(event.payload.owner);
+    });
+    try {
+      await loadBelongsTo(tag, "taggable", { polymorphic: true });
+      expect(logged).toBe(
+        "`ClpTag` is marked for strict_loading. " +
+          "The polymorphic association named `:taggable` cannot be lazily loaded.",
+      );
+    } finally {
+      Notifications.unsubscribe(sub);
+      setActionOnStrictLoadingViolation("raise");
+    }
   });
 });
 

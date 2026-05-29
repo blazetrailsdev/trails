@@ -886,7 +886,10 @@ export async function loadBelongsTo(
 
   // Strict loading check: this is a lazy load
   if (_violatesStrictLoading(record, options)) {
-    strictLoadingViolationBang(record, assocName);
+    strictLoadingViolationBang(record, assocName, {
+      polymorphic: options.polymorphic,
+      className: options.className,
+    });
   }
 
   const ctor = record.constructor as typeof Base;
@@ -1003,7 +1006,7 @@ export async function loadHasOne(
 
   // Strict loading check
   if (_violatesStrictLoading(record, options)) {
-    strictLoadingViolationBang(record, assocName);
+    strictLoadingViolationBang(record, assocName, { className: options.className });
   }
 
   // Handle has_one :through. Same routing rules as loadHasMany —
@@ -1201,7 +1204,9 @@ export async function loadHasMany(
 
   // Strict loading check
   if (_violatesStrictLoading(record, options)) {
-    strictLoadingViolationBang(record, assocName);
+    strictLoadingViolationBang(record, assocName, {
+      className: options.className ?? camelize(singularize(assocName)),
+    });
   }
 
   // Handle through associations. Routes through AssociationScope's
@@ -2216,7 +2221,9 @@ function wrapCollectionProxy<T extends Base = Base>(
       }
 
       if (_violatesStrictLoading(target._record, target._assocDef.options)) {
-        strictLoadingViolationBang(target._record, target._assocName);
+        strictLoadingViolationBang(target._record, target._assocName, {
+          className: target._assocDef.options.className ?? camelize(singularize(target._assocName)),
+        });
       }
 
       const scope = target.scope();
