@@ -1,9 +1,9 @@
 import { afterEach, describe, it, expect, beforeAll, vi } from "vitest";
-import { createTestAdapter } from "../test-adapter.js";
+import { Base } from "../base.js";
+import { setupHandlerSuite } from "./setup-handler-suite.js";
 import { dropAllTables } from "./drop-all-tables.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-// Bypass SchemaAdapter.setup() by using the raw inner adapter directly.
 let adapter: DatabaseAdapter;
 
 async function tableCount(a: DatabaseAdapter): Promise<number> {
@@ -28,10 +28,10 @@ async function tableCount(a: DatabaseAdapter): Promise<number> {
   }
 }
 
-beforeAll(() => {
-  const sa = createTestAdapter();
+setupHandlerSuite();
 
-  adapter = (sa as any).inner ?? sa;
+beforeAll(() => {
+  adapter = Base.adapter;
 });
 
 describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
