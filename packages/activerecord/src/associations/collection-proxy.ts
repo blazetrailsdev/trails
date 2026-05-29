@@ -1414,13 +1414,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   different operations: Relation#delete removes by PK; CP#delete removes
   //   by record reference (association semantics). Intentional permanent
   //   divergence — renaming either would break the Rails API surface.
-  async delete(...records: T[]): Promise<void> {
+  //   Accepts Integer/String keys too, mirroring Rails' delete_or_destroy.
+  async delete(...records: Array<T | number | string | bigint>): Promise<Base[]> {
     this._ensureThroughWritable();
-    // Through association (including HABTM): delete the join records
+    // Through (incl. HABTM): delegate to the association-layer delete_records.
     if (this._assocDef.options.through) {
-      await this._deleteThrough(records);
-      return;
+      const assoc = this._record.association(this._assocName) as unknown as {
+        delete: (...r: Array<Base | number | string | bigint>) => Promise<Base[]>;
+      };
+      const removed = await assoc.delete(...records);
+      this._removeFromTarget(removed);
+      return removed;
     }
+    // Coerce id args via the scoped `find` (Rails delete_or_destroy).
+    const modelRecords = records.every((r) => typeof r === "object")
+      ? (records as T[])
+      : ([await this.find(...(records as unknown[]))].flat().filter(Boolean) as T[]);
 
     const ctor = this._record.constructor as typeof Base;
     const asName = this._assocDef.options.as;
@@ -1434,7 +1443,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           : `${underscore(ctor.name)}_id`));
     const typeCol = asName ? `${underscore(asName)}_type` : null;
     const removed: Base[] = [];
-    for (const record of records) {
+    for (const record of modelRecords) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
       if (Array.isArray(foreignKey)) {
         for (const fk of foreignKey) {
@@ -1451,6 +1460,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       }
     }
     this._removeFromTarget(removed);
+    return removed;
   }
 
   private _removeFromTarget(records: Base[]): void {

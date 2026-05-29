@@ -208,16 +208,16 @@ export class CollectionAssociation extends Association {
    * Remove specific records from the association using the :dependent
    * strategy. Calls before_remove/after_remove callbacks.
    */
-  async delete(...records: Base[]): Promise<void> {
-    await this.deleteOrDestroy(records.flat(), this.reflection.options.dependent);
+  async delete(...records: Array<Base | number | string | bigint>): Promise<Base[]> {
+    return this.deleteOrDestroy(records.flat(), this.reflection.options.dependent);
   }
 
   /**
    * Destroy specific records, ignoring the :dependent option.
    * Calls before_remove/after_remove + before_destroy/after_destroy callbacks.
    */
-  async destroy(...records: Base[]): Promise<void> {
-    await this.deleteOrDestroy(records.flat(), "destroy");
+  async destroy(...records: Array<Base | number | string | bigint>): Promise<Base[]> {
+    return this.deleteOrDestroy(records.flat(), "destroy");
   }
 
   get size(): number {
@@ -512,15 +512,88 @@ export class CollectionAssociation extends Association {
     return this.foreignKeyColumns()[0];
   }
 
-  private async deleteOrDestroy(records: Base[], method?: string): Promise<void> {
-    if (records.length === 0) return;
-    for (const record of records) (this as any).raiseOnTypeMismatchBang(record);
-    const existingRecords = records.filter((r) => !r.isNewRecord());
+  protected async deleteOrDestroy(
+    records: Array<Base | number | string | bigint>,
+    method?: string,
+  ): Promise<Base[]> {
+    // Rails delete_or_destroy: coerce id args to records, then type-check.
+    const resolved = await this.coerceToRecords(records.flat());
+    if (resolved.length === 0) return resolved;
+    for (const record of resolved) (this as any).raiseOnTypeMismatchBang(record);
+    const existingRecords = resolved.filter((r) => !r.isNewRecord());
+    // A `before_remove` abort halts removal (removeRecords returns false); like
+    // Rails, leave the target untouched and report no removed records.
+    let removed = false;
     if (existingRecords.length === 0) {
-      await removeRecords(this, existingRecords, records, method ?? "");
+      removed = await this.removeRecords(existingRecords, resolved, method ?? "");
     } else {
-      await transaction(this, () => removeRecords(this, existingRecords, records, method ?? ""));
+      await transaction(this, async () => {
+        removed = await this.removeRecords(existingRecords, resolved, method ?? "");
+      });
     }
+    return removed ? resolved : [];
+  }
+
+  /**
+   * Mirrors Rails' `delete_or_destroy` id-coercion: resolve Integer/String
+   * keys to records *within the association* (Rails' scoped `find`, never
+   * `klass.find`). Through associations resolve against the join-aware loaded
+   * target — trails' through `scope()`-based `find` can't query across the
+   * join (see HMT `idsReader`).
+   * @internal
+   */
+  private async coerceToRecords(records: Array<Base | number | string | bigint>): Promise<Base[]> {
+    const isId = (r: Base | number | string | bigint): r is number | string | bigint =>
+      typeof r === "number" || typeof r === "string" || typeof r === "bigint";
+    if (!records.some(isId)) return records as Base[];
+    const ids = records.map((r) => (isId(r) ? r : this.primaryKeyValue(r)));
+    if (this.reflection.options.through) {
+      const target = await this.loadTarget();
+      return ids.map((id) => {
+        const found = target.find((r) => String(this.primaryKeyValue(r)) === String(id));
+        if (!found) throw new Error(`Couldn't find ${this.klass.name} with ID ${String(id)}`);
+        return found;
+      });
+    }
+    const found = await this.find(...ids);
+    return Array.isArray(found) ? found : found ? [found] : [];
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::CollectionAssociation#remove_records —
+   * before/after-remove callbacks, `deleteRecords`, in-memory target prune.
+   * @internal
+   */
+  protected async removeRecords(
+    existingRecords: Base[],
+    records: Base[],
+    method: string,
+  ): Promise<boolean> {
+    // Rails remove_records: catch(:abort) { each before_remove } || return —
+    // an aborted before_remove halts removal (target untouched); returns false.
+    for (const record of records) {
+      if (!callback(this, "beforeRemove", record)) return false;
+    }
+    if (existingRecords.length > 0) {
+      await this.deleteRecords(existingRecords, method);
+    }
+    for (const record of records) {
+      const idx = (this.target as Base[]).indexOf(record);
+      if (idx !== -1) (this.target as Base[]).splice(idx, 1);
+      this.removeInverseInstance(record);
+    }
+    this._associationIds = null;
+    for (const record of records) callback(this, "afterRemove", record);
+    return true;
+  }
+
+  /**
+   * Abstract in the base; subclasses override per strategy. Mirrors Rails'
+   * `CollectionAssociation#delete_records` (raises NotImplementedError).
+   * @internal
+   */
+  protected async deleteRecords(_records: Base[], _method: string): Promise<number> {
+    throw new Error(`deleteRecords must be implemented by ${this.constructor.name}`);
   }
 
   /**
@@ -674,37 +747,6 @@ function transaction(assoc: CollectionAssociation, block: () => Promise<void>): 
     return (klass as any).transaction(block);
   }
   return block();
-}
-
-/** @internal */
-/** @internal */
-async function removeRecords(
-  assoc: CollectionAssociation,
-  existingRecords: Base[],
-  records: Base[],
-  method: string,
-): Promise<void> {
-  // Rails remove_records: catch(:abort) { each before_remove } || return —
-  // a single aborted before_remove halts the whole removal (no record is
-  // deleted or removed from the target).
-  for (const record of records) {
-    if (!callback(assoc, "beforeRemove", record)) return;
-  }
-  if (existingRecords.length > 0) {
-    await Promise.resolve(deleteRecords(assoc, existingRecords, method));
-  }
-  for (const record of records) {
-    const idx = (assoc.target as Base[]).indexOf(record);
-    if (idx !== -1) (assoc.target as Base[]).splice(idx, 1);
-    assoc.removeInverseInstance(record);
-  }
-  (assoc as any)._associationIds = null;
-  for (const record of records) callback(assoc, "afterRemove", record);
-}
-
-/** @internal */
-function deleteRecords(assoc: CollectionAssociation, records: Base[], method: string): void {
-  throw new Error(`deleteRecords must be implemented by ${assoc.constructor.name}`);
 }
 
 /** @internal */

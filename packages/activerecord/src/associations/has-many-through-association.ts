@@ -132,6 +132,89 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope = null;
     }
   }
+
+  /**
+   * Mirrors Rails' `HasManyThroughAssociation#remove_records`
+   * (has_many_through_association.rb:116-119): generic removal via `super`,
+   * then drop the matching join rows from the through target.
+   * @internal
+   */
+  protected override async removeRecords(
+    existingRecords: Base[],
+    records: Base[],
+    method: string,
+  ): Promise<boolean> {
+    const removed = await super.removeRecords(existingRecords, records, method);
+    await deleteThroughRecords(this, records);
+    return removed;
+  }
+
+  /**
+   * Mirrors Rails' `HasManyThroughAssociation#delete_records`
+   * (has_many_through_association.rb:140-175): scope the through association to
+   * the join rows pairing `owner` with `records`, then destroy/nullify/delete
+   * per `method`, and prune the in-memory through target.
+   * @internal
+   */
+  protected override async deleteRecords(records: Base[], method: string): Promise<number> {
+    ensureNotNested(this);
+    const throughName = this.reflection.options.through as string | undefined;
+    const owner = this.owner as unknown as { association?: (n: string) => any };
+    const throughAssoc = throughName ? (owner.association?.(throughName) ?? null) : null;
+    if (!throughAssoc) return 0;
+
+    let scope: any = throughAssoc.scope();
+    scope = scope.where(constructJoinAttributes(this, ...records));
+    const extra = throughScopeAttributes(this);
+    if (Object.keys(extra).length > 0) scope = scope.where(extra);
+
+    let count = 0;
+    if (method === "nullify") {
+      count = await scope.updateAll({ [sourceForeignKey(this)]: null });
+    } else if ((scope.model as typeof Base | undefined)?.primaryKey) {
+      // Destroy (not Rails' bulk delete_all) so the join model's belongs_to
+      // counter caches and before_destroy guards fire — trails keys through
+      // counter caches off that callback. See PR notes.
+      const destroyed = (await scope.destroyAll()) as Base[];
+      count = destroyed.filter((r) => (r as any).isDestroyed?.()).length;
+    } else {
+      const recs = (await scope.toArray()) as Base[];
+      for (const r of recs) await (r as any)._runDestroyCallbacks?.();
+      count = await scope.deleteAll();
+    }
+
+    await deleteThroughRecords(this, records);
+    return count;
+  }
+}
+
+/**
+ * Mirrors Rails' `HasManyThroughAssociation#delete_or_nullify_all_records`
+ * (has_many_through_association.rb:136-138): `delete_records(load_target, method)`.
+ * @internal
+ */
+async function deleteOrNullifyAllRecords(
+  assoc: HasManyThroughAssociation,
+  method: string,
+): Promise<number> {
+  const a = assoc as unknown as {
+    loadTarget(): Promise<Base[]>;
+    deleteRecords(r: Base[], m: string): Promise<number>;
+  };
+  return a.deleteRecords(await a.loadTarget(), method);
+}
+
+/**
+ * Resolve the source reflection's foreign key — the join-table column that
+ * points at the target — for `nullify` updates.
+ *
+ * @internal
+ */
+function sourceForeignKey(assoc: HasManyThroughAssociation): string {
+  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  const sourceRefl = refl?.sourceReflection;
+  return sourceRefl?.foreignKey ?? `${underscore(singularize(assoc.reflection.name))}_id`;
 }
 
 /** The pre-built join row and the source reflection's inverse it wires to. */
@@ -303,16 +386,6 @@ async function saveThroughRecord(
 }
 
 /** @internal */
-function removeRecords(
-  assoc: HasManyThroughAssociation,
-  _existingRecords: Base[],
-  records: Base[],
-  _method: string,
-): Promise<void> {
-  return (assoc as any).delete?.(...records) ?? Promise.resolve();
-}
-
-/** @internal */
 function isTargetReflectionHasAssociatedRecord(assoc: HasManyThroughAssociation): boolean {
   const throughRefl = assoc.reflection.options.through;
   if (!throughRefl) return false;
@@ -326,23 +399,6 @@ function isTargetReflectionHasAssociatedRecord(assoc: HasManyThroughAssociation)
 /** @internal */
 function isUpdateThroughCounter(assoc: HasManyThroughAssociation, method: string): boolean {
   return method !== "destroy" && (assoc as any)._isUpdateThroughCounter?.(method) !== false;
-}
-
-/** @internal */
-function deleteOrNullifyAllRecords(
-  assoc: HasManyThroughAssociation,
-  method: string,
-): Promise<void> {
-  return (assoc as any).deleteAll?.(method) ?? Promise.resolve();
-}
-
-/** @internal */
-function deleteRecords(
-  assoc: HasManyThroughAssociation,
-  records: Base[],
-  method: string,
-): Promise<void> {
-  return (assoc as any).delete?.(...records) ?? Promise.resolve();
 }
 
 /** @internal */

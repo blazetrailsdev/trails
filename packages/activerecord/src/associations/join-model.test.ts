@@ -122,6 +122,9 @@ const TEST_SCHEMA: Schema = {
   phm_posts: { title: "string" },
   phm_taggings: { tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
   phm_tags: { name: "string" },
+  iid_posts: { title: "string" },
+  iid_taggings: { tag_id: "integer", post_id: "integer" },
+  iid_tags: { name: "string" },
 };
 
 // ==========================================================================
@@ -1887,11 +1890,44 @@ describe("AssociationsJoinModelTest", () => {
     // Requires type check on delete
   });
 
-  it.skip("deleting by integer id from has many through", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires delete by integer id
+  it("deleting by integer id from has many through", async () => {
+    class IidPost extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    class IidTagging extends Base {
+      static {
+        this.attribute("tag_id", "integer");
+        this.attribute("post_id", "integer");
+      }
+    }
+    class IidTag extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel(IidPost);
+    registerModel(IidTagging);
+    registerModel(IidTag);
+    Associations.hasMany.call(IidPost, "taggings", {
+      className: "IidTagging",
+      foreignKey: "post_id",
+    });
+    Associations.belongsTo.call(IidTagging, "tag", { className: "IidTag", foreignKey: "tag_id" });
+    Associations.hasMany.call(IidPost, "tags", {
+      through: "taggings",
+      className: "IidTag",
+      source: "tag",
+    });
+    const post = await IidPost.create({ title: "T" });
+    const tag = await IidTag.create({ name: "general" });
+    await IidTagging.create({ tag_id: tag.id, post_id: post.id });
+    const proxy = association(post, "tags");
+    expect(await proxy.count()).toBe(1);
+    const deleted = await proxy.delete(Number(tag.id));
+    expect(deleted).toHaveLength(1);
+    expect(await proxy.count()).toBe(0);
   });
 
   it.skip("deleting by string id from has many through", () => {
