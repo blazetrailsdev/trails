@@ -49,7 +49,10 @@ export type UseFixturesByNameResult<N extends FixtureName> = {
  * with now-deleted instances. Rails loads multiple same-table fixture files by
  * deleting each table once and inserting all sets together; that combined path
  * needs a `defineFixtures` change (build rows per model, delete the shared table
- * once) and is deferred — until then, request same-table sets in separate calls.
+ * once) and is deferred. Until then, load only ONE of the same-table sets in a
+ * given test/scope — separate `useFixtures` calls don't help, since each
+ * registers its own `beforeEach` loader and the later loader's delete still
+ * clobbers the earlier set on every test.
  *
  * @internal
  */
@@ -71,7 +74,9 @@ export async function resolveFixtureNames(names: readonly FixtureName[]): Promis
       throw new Error(
         `useFixtures: "${name}" and "${prior}" both map to table "${model.tableName}"; ` +
           `combined same-table loading isn't supported yet (defineFixtures deletes the ` +
-          `table per set). Request them in separate useFixtures calls.`,
+          `table per set). Load only one of them in this test/scope — splitting across ` +
+          `separate useFixtures calls does not help, since the later loader's delete still ` +
+          `clobbers the earlier set on every test.`,
       );
     }
     tableToName.set(model.tableName, name);
