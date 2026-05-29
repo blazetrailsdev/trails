@@ -207,10 +207,12 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(node).not.toBeNull();
 
     const effectiveNames = jd.nodes.map((n) => n.effectiveSqlName);
-    // The first occurrence of each twice-visited table is self-join aliased.
+    // A twice-visited table keeps its real name on first encounter and is
+    // self-join aliased only on the colliding second encounter
+    // (_addThroughViaJoinAssociation: `chainTables.some(...)` detects the
+    // repeat), so exactly one aliased + one real-named join exists for each.
     expect(effectiveNames).toContain("posts_authors_join");
     expect(effectiveNames).toContain("taggings_authors_join");
-    // The second occurrence keeps the real table name (no further collision).
     expect(effectiveNames.filter((n) => n === "taggings").length).toBe(1);
     expect(effectiveNames.filter((n) => n === "posts").length).toBe(1);
 
