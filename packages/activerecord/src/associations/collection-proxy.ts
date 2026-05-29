@@ -776,11 +776,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Rails' `CollectionAssociation#_create_record` routes both regular and
    * :through associations through `add_to_target` (HasManyThroughAssociation
-   * overrides only `build_record`/`insert_record`, not `_create_record`). Here
-   * only the non-:through path goes through `_addToTarget`; the :through path
-   * keeps its dedicated join-row logic in `_createThrough`. Routing :through
-   * through `_addToTarget` is a follow-up (it overlaps `has-many-through-
-   * association.ts`, owned by a sibling PR).
+   * overrides only `build_record`/`insert_record`, not `_create_record`). The
+   * non-:through path goes through `_addToTarget` directly; the :through path
+   * builds + saves the target in `_createThrough`, then hands the in-memory
+   * mutation to `_pushThrough`, which now also routes through `_addToTarget`
+   * (shared set_inverse_instance + `@replaced_or_added_targets` dedup).
    */
   async create(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
   async create(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
@@ -1364,76 +1364,58 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const sourceFk = `${underscore(sourceName)}_id`;
 
     for (const record of records) {
-      if (
-        !skipCallbacks &&
-        !fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)
-      )
-        continue;
-      // Owner not yet persisted: defer the join insert. Mirrors Rails'
-      // CollectionAssociation#concat_records, which only calls insert_record
-      // when `!owner.new_record?` — otherwise it just adds the target to the
-      // in-memory collection and lets the owner's after_create autosave create
-      // the join row with the resolved owner FK. Inserting now would write a
-      // null owner FK (the owner has no id yet) and double-insert once the
-      // autosave runs.
-      if (this._record.isNewRecord()) {
-        // Wire the inverse before firing after_add, mirroring Rails'
-        // replace_on_target → set_inverse_instance(record) (which runs before
-        // the after_add callback) so user code observing the collection before
-        // save sees the inverse-of relationship.
-        _setCollectionInverseInstance(
-          this._record,
-          this._assocName,
-          this._assocDef.options,
-          record,
-        );
-        this._target.push(record);
-        this._invalidateAssociationIds();
-        if (!skipCallbacks) {
-          fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      // Route the in-memory mutation through `_addToTarget` (Rails'
+      // `replace_on_target`) so the through/HABTM branch shares the same
+      // set_inverse_instance + `@replaced_or_added_targets` dedup tracking +
+      // before/after_add callback handling as the non-through `push`/`<<`
+      // path. The `save` callback carries the through-specific join-row work
+      // (Rails' `HasManyThroughAssociation#insert_record`); when it resolves
+      // false (`record.save` failed, or the join row didn't persist) the
+      // record is left out of the target, matching the prior gating.
+      const insertJoinRecord = async (): Promise<boolean> => {
+        // Owner not yet persisted: defer the join insert. Mirrors Rails'
+        // CollectionAssociation#concat_records, which only calls insert_record
+        // when `!owner.new_record?` — otherwise it just adds the target to the
+        // in-memory collection and lets the owner's after_create autosave
+        // create the join row with the resolved owner FK. Inserting now would
+        // write a null owner FK (the owner has no id yet) and double-insert
+        // once the autosave runs.
+        if (this._record.isNewRecord()) return true;
+        // Save the target record if it's new
+        if (record.isNewRecord()) {
+          if (bang) {
+            await record.saveBang(); // raises RecordInvalid if invalid
+          } else if (!(await record.save())) {
+            return false;
+          }
         }
-        continue;
-      }
-      // Save the target record if it's new
-      if (record.isNewRecord()) {
+        // Create the join record
+        const targetPk = (record.constructor as typeof Base).primaryKey;
+        if (Array.isArray(targetPk)) {
+          throw new ConfigurationError(
+            `Through association "${this._assocName}" does not support a composite primary key on the target model "${(record.constructor as typeof Base).name}" — the join row needs a single source FK column.`,
+          );
+        }
+        const joinAttrs: Record<string, unknown> = {
+          ...ownerJoinAttrs,
+          [sourceFk]: record._readAttribute(targetPk),
+        };
+        // Polymorphic through: ownerJoinAttrs already has the polymorphic
+        // _id column from _throughOwnerPolymorphic; just add the _type.
+        if (throughAssoc.options.as) {
+          joinAttrs[`${underscore(throughAssoc.options.as)}_type`] = ctor.name;
+        }
+        let joinRecord: Base;
         if (bang) {
-          await record.saveBang(); // raises RecordInvalid if invalid
+          // Bang form: raise RecordInvalid if join record is invalid (mirrors Rails' save!)
+          joinRecord = new throughModel(joinAttrs);
+          await joinRecord.saveBang();
         } else {
-          const saved = await record.save();
-          if (!saved) continue;
+          joinRecord = await throughModel.create(joinAttrs);
         }
-      }
-      // Create the join record
-      const targetPk = (record.constructor as typeof Base).primaryKey;
-      if (Array.isArray(targetPk)) {
-        throw new ConfigurationError(
-          `Through association "${this._assocName}" does not support a composite primary key on the target model "${(record.constructor as typeof Base).name}" — the join row needs a single source FK column.`,
-        );
-      }
-      const joinAttrs: Record<string, unknown> = {
-        ...ownerJoinAttrs,
-        [sourceFk]: record._readAttribute(targetPk),
+        return joinRecord.isPersisted();
       };
-      // Polymorphic through: ownerJoinAttrs already has the polymorphic
-      // _id column from _throughOwnerPolymorphic; just add the _type.
-      if (throughAssoc.options.as) {
-        joinAttrs[`${underscore(throughAssoc.options.as)}_type`] = ctor.name;
-      }
-      let joinRecord: Base;
-      if (bang) {
-        // Bang form: raise RecordInvalid if join record is invalid (mirrors Rails' save!)
-        joinRecord = new throughModel(joinAttrs);
-        await joinRecord.saveBang();
-      } else {
-        joinRecord = await throughModel.create(joinAttrs);
-      }
-      if (joinRecord.isPersisted()) {
-        this._target.push(record);
-        this._invalidateAssociationIds();
-        if (!skipCallbacks) {
-          fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
-        }
-      }
+      await this._addToTarget(record, { skipCallbacks }, insertJoinRecord);
     }
   }
 
