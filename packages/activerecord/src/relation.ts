@@ -2220,9 +2220,12 @@ export class Relation<T extends Base> {
   /**
    * Adds each eager-load spec to the JoinDependency, routing nested hashes and
    * dotted paths through JoinDependency#addAssociationSpec (recursive JOINs).
-   * Specs that can't be JOINed (polymorphic, composite key, unjoinable through)
-   * are returned for preload fallback. Mirrors Rails routing eager_load_values
-   * through JoinDependency rather than degrading nested specs to N preloads.
+   * Polymorphic specs raise `EagerLoadPolymorphicError` (propagated from
+   * addAssociationSpec, matching Rails), so they never reach the fallback list.
+   * Capability-gap specs (composite key, unjoinable through) return `false` and
+   * are collected here for preload fallback. Mirrors Rails routing
+   * eager_load_values through JoinDependency rather than degrading nested specs
+   * to N preloads.
    * @internal
    */
   private _addEagerSpecsToJoinDependency(
@@ -2576,9 +2579,13 @@ export class Relation<T extends Base> {
    * path builds its real JoinDependency in `_executeEagerLoad`/`_buildEagerSql`,
    * which raises there, so re-checking from the shared `_applyJoinsToManager`
    * chokepoint would just rebuild a throwaway JoinDependency on every eager load.
+   *
+   * Public (not `private`) because the calculation mixins in
+   * `relation/calculations.ts` call it cross-module; declaring it private would
+   * force a structural-typing workaround and break under `#private` fields.
    * @internal
    */
-  private _checkEagerLoadable(): void {
+  _checkEagerLoadable(): void {
     const specs = [
       ...new Set([...this._eagerLoadAssociations, ...this._includesToPromoteFromReferences()]),
     ];

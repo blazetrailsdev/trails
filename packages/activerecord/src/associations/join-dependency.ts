@@ -358,9 +358,15 @@ export class JoinDependency {
    * Shared prefixes are deduplicated against the existing tree, so passing
    * specs that overlap reuses already-joined nodes instead of double-joining.
    *
-   * All-or-nothing per call: if any segment can't be JOINed (polymorphic,
-   * composite key, unjoinable through), the whole spec is rolled back and
-   * `false` is returned so the caller can fall back to preloading.
+   * All-or-nothing per call. Two distinct outcomes when a segment can't be
+   * JOINed (mirrors Rails JoinDependency#build, which raises for the former):
+   *   - **Raise-worthy** (polymorphic): `addAssociation` throws
+   *     `EagerLoadPolymorphicError`, which propagates out of this method
+   *     uncaught — eager-loading a polymorphic association is an error, not a
+   *     fallback.
+   *   - **Capability gap** (composite key, unjoinable through): the whole spec
+   *     is rolled back and `false` is returned so the caller degrades to
+   *     preloading.
    *
    * Mirrors: ActiveRecord::Associations::JoinDependency#build (recursive tree
    * construction from the eager_load values hash).
