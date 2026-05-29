@@ -1930,12 +1930,6 @@ export class AbstractAdapter implements Quoting {
 }
 
 // Rails: `include DatabaseStatements` inside the class body.
-// Rails: `set_callback :checkin, :after, :enable_lazy_transactions!`
-// (abstract_adapter.rb:53), registered in the class body ahead of the
-// QueryCache include — so its `:after` hook runs after unset_query_cache!.
-AbstractAdapter.setCallback("checkin", "after", function () {
-  this.enableLazyTransactionsBang();
-});
 include(AbstractAdapter, DatabaseStatements);
 // Rails: `include SchemaStatements` inside the class body.
 include(AbstractAdapter, SchemaStatements);
@@ -1948,6 +1942,13 @@ include(AbstractAdapter, QueryCacheMixin);
 // include site instead.
 AbstractAdapter.setCallback("checkin", "after", function () {
   (this as unknown as { unsetQueryCacheBang(): void }).unsetQueryCacheBang();
+});
+// Rails: `set_callback :checkin, :after, :enable_lazy_transactions!`
+// (abstract_adapter.rb:53), registered after the QueryCache include — so as an
+// `:after` callback (run in reverse registration order) it fires *before*
+// unset_query_cache!.
+AbstractAdapter.setCallback("checkin", "after", function () {
+  this.enableLazyTransactionsBang();
 });
 // Rails: `include Savepoints` inside the class body.
 include(AbstractAdapter, SavepointsMixin);
