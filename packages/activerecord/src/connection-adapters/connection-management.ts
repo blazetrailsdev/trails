@@ -77,7 +77,7 @@ export class BodyProxy {
         return typeof value === "function" ? value.bind(body) : value;
       },
       has(proxyTarget, prop) {
-        return prop in proxyTarget || prop in ((body as object) ?? {});
+        return prop in proxyTarget || prop in Object(body);
       },
     });
   }
@@ -87,7 +87,9 @@ export class BodyProxy {
   }
 
   respondTo(name: string): boolean {
-    return name in this || name in ((this.body as object) ?? {});
+    // `Object(body)` so the membership check never throws on a primitive body
+    // (e.g. a string response body) — Ruby's `respond_to?` is total here.
+    return name in this || name in Object(this.body);
   }
 
   each(callback: (bit: unknown) => void): void {
@@ -100,6 +102,10 @@ export class BodyProxy {
   }
 
   close(): void {
+    // Idempotent, matching `Rack::BodyProxy#close` (`return if @closed`) — the
+    // proxy current Rails wraps response bodies in. Guards the clear callback
+    // and the underlying close from running more than once.
+    if (this._closed) return;
     this._closed = true;
     try {
       const body = this.body as { close?: () => void };
