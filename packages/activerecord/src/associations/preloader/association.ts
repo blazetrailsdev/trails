@@ -314,11 +314,11 @@ export class Association {
   }
 
   private _buildScope(): any {
-    // Mirror Rails' build_scope `scope = klass.scope_for_association`:
-    // _allForPreload() applies the target model's default_scope while skipping
-    // any enclosing current_scope (e.g. inside `scoping {}`), matching
-    // scope_for_association's "default_scoped, ignoring current_scope" semantics.
-    let scope = (this.klass as any)._allForPreload();
+    // Mirror Rails' build_scope `scope = klass.scope_for_association`. It bases
+    // on the pristine relation (ignoring any enclosing current_scope) and
+    // applies the target model's default_scope unless current_scope is itself
+    // an empty scope.
+    let scope = (this.klass as any).scopeForAssociation();
 
     const type = (this.reflection as any).type;
     if (type && !(this.reflection as any).isThroughReflection?.()) {
@@ -570,13 +570,22 @@ function convertKey(assoc: Association, key: unknown): unknown {
 }
 
 /** @internal */
-function associationKeyType(assoc: Association): string {
-  return (assoc as any)._associationKeyType?.() ?? "string";
+function associationKeyType(assoc: Association): string | null {
+  // Rails: `@klass.type_for_attribute(association_key_name).type`. We reuse the
+  // class's attribute-type lookup; for composite keys mirror Rails by inspecting
+  // the first key name.
+  const key = assoc.associationKeyName;
+  return (assoc as any)._attributeTypeName(assoc.klass, Array.isArray(key) ? key[0] : key);
 }
 
 /** @internal */
-function ownerKeyType(assoc: Association): string {
-  return (assoc as any)._ownerKeyType?.() ?? "string";
+function ownerKeyType(assoc: Association): string | null {
+  // Rails: `@model.type_for_attribute(owner_key_name).type`.
+  const key = (assoc as any)._ownerKeyName;
+  return (assoc as any)._attributeTypeName(
+    (assoc as any)._model,
+    Array.isArray(key) ? key[0] : key,
+  );
 }
 
 /** @internal */
