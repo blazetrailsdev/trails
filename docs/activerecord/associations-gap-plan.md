@@ -1,21 +1,13 @@
 # Associations gap plan
 
-Originally 339 skipped tests across 33 files; 20 PRs across 9 tracks,
-organized by unlock potential. After two cleanup rounds, **19 of 20 PRs
-shipped** (A1–A5, B1–B3, C1–C3, D1, E1, E2, F1, F2, G1, H1, H2) and only
-**D2 remains** (has_one fixture bodies, blocked on Phase G). The residual
-edge cases surfaced after each shipped PR are tracked under **Post-merge
-follow-ups** below, not as open tracks. ~18 permanent-skip (marshal,
-Ruby-only), ~10 scattered single-test gaps (Track 9).
-
-Round-2 shipped (since the prior cleanup #2576): A5 #2571, B2 #2581,
-B3 #2575, C1+D1 #2584, C2+C3 #2591, E2 #2583, F2 #2574, G1 #2586, H2 #2585,
-plus follow-up PRs #2594, #2596, #2598, #2599, #2602, #2604, #2606, #2608,
-#2611, #2613, #2615.
+Open work in the associations layer: **D2** (has_one fixture bodies, blocked on
+Phase G) and ~10 scattered single-test gaps (Track 9). ~18 tests are
+permanent-skip (marshal, Ruby-only). Edge cases that need follow-up work are
+tracked under **Post-merge follow-ups** below.
 
 ---
 
-## Track 4: has_one (D1 shipped #2584; D2 remaining — ~24 fixture-gated tests)
+## Track 4: has_one — D2 remaining (~24 fixture-gated tests)
 
 ### PR D2: has_one fixture bodies
 
@@ -32,21 +24,20 @@ implementation is largely complete but tests lack data.
 
 These are individual root causes that don't cluster into a track:
 
-| Test file                             | Gap                                                                                                                                                 | Est           |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| `has-many-associations.test.ts`       | Counter cache updates in memory after create/push/empty (3 tests)                                                                                   | ~40 LOC       |
-| `belongs-to-associations.test.ts`     | `readonly` check on save (1 test)                                                                                                                   | ~10 LOC       |
-| `nested-error.test.ts`                | Nested attributes error semantics (4 tests) — blocked on `accepts_nested_attributes_for`                                                            | Phase G       |
-| `extension.test.ts`                   | `:extend` hooking shipped (#2613); 4 skips remain, each blocked on a named feature: dirty-target, Marshal (×2), module naming (see #2574 follow-up) | feature-gated |
-| `required.test.ts`                    | `belongsToRequiredByDefault` config (1 test)                                                                                                        | ~10 LOC       |
-| `left-outer-join-association.test.ts` | Arel join node in left outer join (3 tests)                                                                                                         | ~30 LOC       |
-| `inner-join-association.test.ts`      | Inner join edge cases (2 tests)                                                                                                                     | ~20 LOC       |
+| Test file                             | Gap                                                                                      | Est       |
+| ------------------------------------- | ---------------------------------------------------------------------------------------- | --------- |
+| `has-many-associations.test.ts`       | Counter cache updates in memory after create/push/empty (3 tests)                        | ~40 LOC   |
+| `belongs-to-associations.test.ts`     | `readonly` check on save (1 test)                                                        | ~10 LOC   |
+| `nested-error.test.ts`                | Nested attributes error semantics (4 tests) — blocked on `accepts_nested_attributes_for` | Phase G   |
+| `extension.test.ts`                   | only the 2 Marshal tests remain — no TS equivalent (permanent-skip)                      | permanent |
+| `required.test.ts`                    | `belongsToRequiredByDefault` config (1 test)                                             | ~10 LOC   |
+| `left-outer-join-association.test.ts` | Arel join node in left outer join (3 tests)                                              | ~30 LOC   |
+| `inner-join-association.test.ts`      | Inner join edge cases (2 tests)                                                          | ~20 LOC   |
 
 ---
 
 ## Dependency graph
 
-A1–A5, B1–B3, C1–C3, D1, E1, E2, F1, F2, G1, H1, H2 all shipped.
 Remaining:
 
 ```
@@ -61,21 +52,18 @@ Track 9 scattered single-test gaps (mostly standalone)
 | Track 9 | ~10   | ~10–40 each | —          | Counter-cache, readonly, join-node edges  |
 | D2      | ~24   | ~200        | Phase G    | has_one fixture bodies — external blocker |
 
-The deeper edge-case work that surfaced from the shipped batch (eager_load
-raise semantics, store unification, alias-tracker self-joins, etc.) is
-itemized under **Post-merge follow-ups** below — sized and ready to lift
-into new track entries when prioritized.
+The deeper edge-case work (eager_load raise semantics, store unification,
+alias-tracker self-joins, etc.) is itemized under **Post-merge follow-ups**
+below — sized and ready to lift into new track entries when prioritized.
 
-**Coverage:** 339 tests total. ~18 permanent-skip (marshal, Ruby-only),
-~10 scattered single-test gaps (Track 9), ~24 fixture-gated (D2). All others
-shipped.
+**Remaining coverage:** ~18 permanent-skip (marshal, Ruby-only), ~10 scattered
+single-test gaps (Track 9), ~24 fixture-gated (D2).
 
 ---
 
 ## Post-merge follow-ups
 
-Items surfaced after the shipped batch (A1 #2550, A2 #2568, A3 #2555,
-A4 #2559, B1 #2557, E1 #2567, F1 #2563, H1 #2556).
+Forward-looking items needing follow-up work, grouped into PR-sized work units.
 
 ### Actionable PR queue
 
@@ -91,13 +79,12 @@ The per-PR sections that follow are the detail / rationale for each item.
   Files: `associations/association.ts`, `reflection.ts`,
   `inverse-associations.test.ts`. Unblocks the 2 composite-FK
   automatic-inverse tests. Source: #2584.
-- **AF2 — CollectionProxy add-path unification** (~110–150 LOC). Route
-  `push`/`<<` (and the through/HABTM `_pushThrough` branch) through
-  `_addToTarget`, and finish the `CollectionProxy#size` port (`!find_target?`,
-  `@association_ids`, `group_values`, `distinct_value` guards). Files:
-  `associations/collection-proxy.ts`, `associations/collection-association.ts`,
-  `inverse-associations.test.ts`. Unblocks 4 has-many-inversing dedup tests.
-  Source: #2583, #2591.
+- **AF2 — CollectionProxy#size port** (~30 LOC). Finish the
+  `CollectionProxy#size` port: add the `!find_target?` (new-record →
+  `target.size`), `@association_ids`, `group_values`, and `distinct_value`
+  guards (only the `!distinct_value && !target.empty?` branch exists today).
+  Files: `associations/collection-proxy.ts`,
+  `associations/collection-association.ts`. Source: #2591.
 - **AF3 — HMT array-assignment build** (~90–160 LOC). Route new-owner
   `CollectionAssociation#replace` through `replace_records → concat` so
   `post.people = [..]` / `Category.new(authors: [..])` build through-rows in
@@ -106,13 +93,17 @@ The per-PR sections that follow are the detail / rationale for each item.
   `associations/has-many-through-association.ts`. Unblocks
   `test_both_parent_ids_set_when_saving_new`,
   `test_assign_array_to_new_record_builds_join_records`. Source: #2581.
-- **AF4 — HMT delete completion** (~160 LOC). Unskip the 3 `join-model.test.ts`
-  deletion tests (string-id / type-mismatch / nonstandard-id) and wire
-  `CollectionAssociation#deleteAll` through `deleteOrNullifyAllRecords`; also
-  route the through `deleteAll()` branch through `deleteRecords` so the join
-  model's counter-cache callbacks fire. Files: `join-model.test.ts`,
-  `associations/collection-association.ts`,
-  `associations/has-many-through-association.ts`. Source: #2575, #2602.
+- **AF4 — HMT delete override wiring** (~40 LOC). Wire the faithful-but-unwired
+  standalone helpers in `has-many-association.ts:207` /
+  `has-many-through-association.ts:224` as actual `protected override
+deleteOrNullifyAllRecords(method)` methods of the `CollectionAssociation`
+  base dispatch (currently dead code). The HMT override
+  (`deleteRecords(loadTarget, method)`) routes HMT `delete_all` through join-row
+  deletion with counter-cache callbacks (`has_many_through_association.rb:136-138`)
+  instead of base bulk `scope.deleteAll`. Fold in the nil-method semantics fix
+  (base treats `nil` method as DELETE; Rails `HasMany#delete_count` nullifies).
+  Files: `associations/has-many-association.ts`,
+  `associations/has-many-through-association.ts`. Source: #2575, #2602, #2631.
 - **AF5 — eager_load raise semantics** (~150 LOC, new track entry).
   Distinguish raise-worthy specs (polymorphic / misspelled →
   `EagerLoadPolymorphicError` / `ConfigurationError`) from capability-gap
@@ -141,12 +132,41 @@ The per-PR sections that follow are the detail / rationale for each item.
   #2594.
 - **AF10 — small-fix bundle** (~115 LOC, to ceiling). has_one inverse build
   test (#2557, ~15) + `association.delete` nullify/delete-all else-branch test
-  (#2596, ~30) + delete dead free fns
-  `countRecords`/`deleteOrNullifyAllRecords`/`intersection` in
-  `has-many-association.ts` (#2596, ~10) +
+  (#2596, ~30) + delete dead free fns `countRecords`/`intersection` in
+  `has-many-association.ts` (#2596, ~10; NB: do **not** delete
+  `deleteOrNullifyAllRecords` — AF4 wires it as the dispatch override) +
   `InverseOfAssociationNotFoundError`/`HasManyThroughAssociationNotFoundError`
   DidYouMean-formatter alignment (#2594) + `InverseOfAssociationRecursiveError`
   class + recursion detection (#2591, ~50).
+
+**Round-3 follow-ups (named, PR-sized):**
+
+### follow-up: strict-loading message + n+1 test fidelity (~70 LOC)
+
+Files: `core.ts`, `reflection.ts`, `associations/association.ts`,
+`strict-loading.test.ts`. Source: #2619.
+
+- ~30 LOC: route the `strictLoadingViolationBang` dispatch message through
+  `reflection.strictLoadingViolationMessage` so it picks up the polymorphic
+  variant ("The polymorphic association named `:x` cannot be lazily loaded.").
+  Unskips `strict loading violation logs on polymorphic relation` + the
+  `:raise` polymorphic test. The reflection method already exists
+  (`reflection.ts:260`).
+- ~40 LOC: tighten the unskipped `:n_plus_one_only` tests to Rails fidelity —
+  assert (a) loaded children ARE `strict_loading?` and (b) nested access on a
+  child RAISES. The functional `loadHasMany`/`loadBelongsTo` helpers don't
+  cascade strict_loading; only the OO `Association#setStrictLoading` path does
+  (`association.ts:168-182`), so port these two through the OO
+  `association()` / collection-proxy path.
+
+### follow-up: `_addToTarget` distinct_value dedup (~10 LOC)
+
+Files: `associations/collection-proxy.ts`. Source: #2629. Rails'
+`add_to_target` computes `replace: replace || association_scope.distinct_value`
+so a `distinct` association scope dedups on append. Both the non-through `push`
+path and the new `_pushThrough` pass `{}` (replace=false), ignoring
+`distinct_value`. Wire it into the `replace` option once a Rails test exercises
+it.
 
 **Gated (sequence after the listed PR):**
 
@@ -199,40 +219,15 @@ The per-PR sections that follow are the detail / rationale for each item.
 
 **From #2559 (A4 through-scope + STI grouping):**
 
-- [x] Done (#2559): the original A4 entry's claims were inaccurate. STI
-      source grouping is already handled by `Branch.preloadersForReflection`.
-- [x] Done (#2606): the `@internal` marker audit at the bottom of
-      `preloader/association.ts` (fixed an `associationKeyType`/`ownerKeyType`
-      wrong-property bug). New finding: those markers exist solely for
-      api:compare and are never called — fragile dead-code pattern; consider
-      whether api:compare could map private class methods directly instead.
+- Note: the `@internal` markers at the bottom of `preloader/association.ts`
+  exist solely for api:compare and are never called — fragile dead-code
+  pattern; consider whether api:compare could map private class methods
+  directly instead.
 - Not ported: Rails' `through_scope` `elsif !reflection_scope.where_clause.empty?`
   JOIN branch was intentionally NOT ported — belongs with PR A5.
 
-**From #2563 (F1 HABTM join-table):** F1 shipped TEST-ONLY (no impl change;
-3 of 5 plan-doc gaps already worked). Follow-ups:
+**From #2563 (F1 HABTM join-table):**
 
-- [x] `redefine habtm` — Done (#2604). The original COW-double-insert
-      hypothesis (subclass HABTM redeclaration with swapped FK options) did NOT
-      reproduce against current `vendor/rails` (`SubDeveloper` inherits the
-      HABTM rather than redeclaring it). The actual fault was the eager
-      push-time join insert on a new owner; fixed by deferring the
-      `_pushThrough` insert until `owner.after_create` autosave. No
-      `builder/has-and-belongs-to-many.ts` COW-dedup change was needed.
-      Follow-up (~30–60 LOC): persisted-owner HABTM source-FK governance in
-      `collection-proxy.ts` `_pushThrough` derives `sourceFk` as
-      `${underscore(sourceName)}_id`, ignoring the join model's declared
-      right-side `belongsTo` FK (`associationForeignKey`); a persisted-owner
-      push of a target declaring `associationForeignKey` writes the wrong
-      column → silently dropped. Rails-faithful fix prototyped then reverted
-      (broke `callbacks.test.ts`'s internally-inconsistent
-      `makeHabtmWithCallbacks` schema — fix that test first).
-- [x] `join_table_alias` — `Developer.includes(projects: :developers)` with
-      WHERE on the self-joined `developers_projects_projects_join` alias. Done:
-      `_addThroughViaJoinAssociation` now names colliding chain tables via the
-      Rails `{plural_name}_{owner_table}[_join]` scheme (`AliasTracker#aliasNameFor`)
-      instead of `tN`; `where`/`whereNot` auto-add references from dotted hash
-      keys (`PredicateBuilder.references`) so the include promotes to eager JOIN.
 - [ ] FOLLOW-UP: `join_middle_table_alias` — `Project.includes(:developers_projects)`
       eager-loads the auto-generated HABTM join model directly. Blocked by two
       gaps outside join-dependency/alias-tracker: (1) the middle reflection is
@@ -248,20 +243,6 @@ The per-PR sections that follow are the detail / rationale for each item.
 
 **From #2567 (E1 collection callback abort):**
 
-- [x] `dependent: :destroy` child removal now routes through `removeRecords`
-      (Done #2596) — `before/after_remove` fire on `owner.destroy`.
-- [x] HABTM remove/clear callbacks — `clear()` rewritten to mirror Rails
-      `clear → delete_all` and route through/HABTM through `deleteRecords`
-      (Done #2602). Unblocked "has and belongs to many remove callback" +
-      "does not fire callbacks on clear".
-- [x] HABTM autosave/timing — unblocked the "has and belongs to many
-      before/after add called before/after save" + "callbacks for save on
-      parent" tests. No impl change needed: the autosave path (afterCreate/
-      afterUpdate via `aroundSaveCollectionAssociation`) was already
-      Rails-faithful after the E1 follow-ups (#2602, #2604) — push on a
-      persisted owner saves the new child (before_add fires while new,
-      after_add after save) and build on a new owner defers join-row insert
-      to `owner.save` without re-firing add callbacks. Tests unskipped only.
 - Loose end: three callback dispatch paths still exist
   (`collection-association.ts` unified; `collection-proxy.ts`
   `push`/`delete`/`_deleteThrough`/`create` each call
@@ -269,52 +250,37 @@ The per-PR sections that follow are the detail / rationale for each item.
   per-record `continue`-on-abort also diverges from Rails' all-or-nothing
   `catch(:abort)`.
 
-**From #2568 (A2 preloader scope_for_association):**
+**From #2568 (A2 preloader scope_for_association):** remaining
+`strict-loading.test.ts` stubs depend on separate features:
 
-- [x] `scopeForAssociation()` no-arg case made Rails-faithful (Done #2606) —
-      now applies `default_scope` when there is no `current_scope` for all
-      no-arg callers. Note: `_buildUnscopedRelation()` still omits Rails'
-      `create_with!(inheritance_column => sti_name)`; only matters if an STI
-      subclass uses `scopeForAssociation` to BUILD (vs query) records — no test
-      exercises this today (~10 LOC if it surfaces).
-- [x] Strict-loading cascade end-to-end (Done #2598, extended #2615) —
-      `StrictLoadingScope` sentinel threaded through
-      `_preloadAssociationsForRecords` (#2598); #2615 added `strictLoadingBang`
-      cascade + the `violatesStrictLoading?` reflection toggle. Remaining
-      `strict-loading.test.ts` stubs (8) depend on separate features:
-  - [ ] ~30–60 LOC: AssociationRelation `exec_queries` parity — drop the
-        trails-specific owner-strict backstop in `association-relation.ts`
-        `_checkStrictLoading` (Rails doesn't enforce strict-loading there, only
-        cascades via `set_strict_loading`); delete the method + 10 call sites +
-        9 vestigial pass-through aggregate overrides (~100 LOC, blew this PR's
-        ceiling).
-  - [ ] ~30 LOC + 2 tests: record-level `reload` + strict-loading (`strict
+- [ ] ~30–60 LOC: AssociationRelation `exec_queries` parity — drop the
+      trails-specific owner-strict backstop in `association-relation.ts`
+      `_checkStrictLoading` (Rails doesn't enforce strict-loading there, only
+      cascades via `set_strict_loading`); delete the method + 10 call sites +
+      9 vestigial pass-through aggregate overrides (~100 LOC).
+- [ ] ~30 LOC + 2 tests: record-level `reload` + strict-loading (`strict
 loading has one reload`, `... has many singular association and
 reload`) — needs the reload / `find_from_target?` interaction.
-  - [ ] ~15 LOC + 1 test: CollectionProxy unloaded-reader lazy-proxy semantics
-        (`strict loading with has many`).
-  - [ ] ~20 LOC + 2 tests: validation-context association tests (guard exists;
-        needs a child model whose validation loads a strict owner's assoc).
-  - [ ] ~25 LOC + 1 test: eager has_one reflection opt-in (`does not raise on
+- [ ] ~15 LOC + 1 test: CollectionProxy unloaded-reader lazy-proxy semantics
+      (`strict loading with has many`).
+- [ ] ~20 LOC + 2 tests: validation-context association tests (guard exists;
+      needs a child model whose validation loads a strict owner's assoc).
+- [ ] ~25 LOC + 1 test: eager has_one reflection opt-in (`does not raise on
 eager loading a strict loading has one relation`).
-  - Still gated externally: `n_plus_one_only` mode, `actionOnStrictLoadingViolation
-= "log"`, habtm strict-loading. `StrictLoadingScope` is exported as a
-    top-level const (Rails nests it `:nodoc:`); consider module-private.
+- Still gated externally: habtm strict-loading, HMT cascade-to-middle.
 
-**From #2556 (H1 AssociationScope parity):** test-only PR.
+**From #2556 (H1 AssociationScope parity):**
 
-- [x] STI `type_condition` wired into `Base.relation()`/`unscoped()` (Done
-      #2599) so `AssociationScope` drops the duplicated STI compensations.
-- [x] Vestigial `@internal` `association-scope.ts` wrappers cleaned up (Done
-      #2599). Two remain intentionally: `join` (faithful but unused — can't be
-      deleted without dropping `Arel::Table#join`/`SelectManager#join` in
-      api:compare) and `addConstraints`' eager-load branch (not ported; a
-      `Nodes.OuterJoin` marker documents the dependency). New follow-up
-      (~30–60 LOC): wire `join` into `nextChainScope` — rework the JOIN ON onto
+- [ ] ~30–60 LOC: wire `join` into `nextChainScope` — rework the JOIN ON onto
       Arel constraint nodes and move the polymorphic `_type` filter to a WHERE
       via `applyScope`, matching Rails `next_chain_scope`. Validate against the
       full through/polymorphic/disable-joins suite. Also audit `scope()` for
-      `scope.extending! reflection.extensions` (may be missing).
+      `scope.extending! reflection.extensions` (may be missing). (Two
+      `@internal` `association-scope.ts` wrappers remain intentionally: `join`
+      — faithful but unused, can't be deleted without dropping
+      `Arel::Table#join`/`SelectManager#join` in api:compare — and
+      `addConstraints`' eager-load branch, where a `Nodes.OuterJoin` marker
+      documents the dependency.)
 - Not ported: `scope()` omits Rails' `scope.extending! reflection.extensions`
   (`association_scope.rb:27`) — tracked under `extension.test.ts` / F2.
 - Not ported: `_addConstraints` uses granular pushing instead of Rails'
@@ -338,16 +304,10 @@ eager loading a strict loading has one relation`).
   `eager.test.ts` stubs route through the preloader (`includes` without
   `references`) or need that harness, not the A5 JOIN path.
 
-**From #2574 (F2 HABTM extend — test-only):**
+**From #2574 (F2 HABTM extend):**
 
-- [x] Collection `:extend` module hooking shipped (Done #2613) — association
-      `extend:` (module-object form) now propagates across clones via
-      `relation.ts` `_copyStateFrom` rebinding `_extending`. The remaining
-      `extension.test.ts` skips are each blocked on a SEPARATE named feature,
-      NOT on `:extend` hooking: `extension with dirty target` (dirty-target
-      tracking), `marshalling extensions` / `marshalling named extensions`
-      (Marshal support), `extension name` (module naming / `const_set`
-      equivalent).
+- The 2 `marshalling extensions` / `marshalling named extensions` tests remain
+  skipped — Ruby `Marshal` has no TS equivalent (permanent-skip).
 - Deviation: `Relation#extending(fn)` function form does NOT propagate across
   clones (Rails `extending!` converts a block to a define-once Module; trails'
   `(rel) => void` is an immediate mutator not recorded in `_extending`).
@@ -359,19 +319,13 @@ eager loading a strict loading has one relation`).
 
 **From #2575 (B3 HMT delete/remove):**
 
-- [ ] ~120 LOC (B3b): unskip the remaining `join-model.test.ts` deletion
-      tests — `deleting by string id from has many through`, `deleting junk
-from has many through should raise type mismatch`, `delete associate when
-deleting from has many through with nonstandard id`. Verified passing
-      locally; held back only for the 300-LOC ceiling.
-- [ ] ~40 LOC: wire `CollectionAssociation#deleteAll` through
-      `deleteOrNullifyAllRecords` (the faithful-but-unwired HMT helper);
-      `deleteAll` currently calls `nullifyAllRecords`/`deleteAllRecords`
-      directly. Watch `dependent: destroy/nullify/delete` regressions + the
-      `rails-file-structure-method-order` lint. (Related: #2602 notes the
-      through `deleteAll()` branch uses bulk SQL that skips the join model's
-      counter-cache destroy callbacks, leaving counters stale — route it
-      through `deleteRecords` like `clear()` now does, or add `update_counter`.)
+- [ ] ~40 LOC (grouped above — _AF4 HMT delete override wiring_): wire the
+      standalone `deleteOrNullifyAllRecords` helpers in `has-many-association.ts`
+      / `has-many-through-association.ts` as `protected override`s of the #2631
+      base dispatch, so the HMT `delete_all` routes through join-row deletion
+      with counter-cache callbacks instead of base bulk `scope.deleteAll`. Watch
+      `dependent: destroy/nullify/delete` regressions + the
+      `rails-file-structure-method-order` lint.
 - Audit: `collection-proxy.ts` `_deleteThrough`/`_deleteThroughAllSql` now
   partly dead for the delete path (proxy `delete` delegates to the association
   layer); `destroy`/`clear()` still use them. Candidate for retiring the
@@ -389,17 +343,6 @@ deleting from has many through with nonstandard id`. Verified passing
       today).
 - [ ] ~10 LOC: route `throughScopeAttributes` through `throughScope(assoc) ??
 scope` so it consults the `_throughScope` ivar set during `buildRecord`.
-
-**From #2583 (E2 CollectionProxy#create):**
-
-- [ ] ~80–120 LOC: route `push`/`<<` through `_addToTarget` (the new dedup
-      infra). Unblocks 4 `inverse-associations.test.ts` has-many-inversing
-      dedup tests (`does not add duplicate associated objects`, and the
-      loaded-collection saved/unsaved-duplicate + build-method variants).
-      Note: the through/HABTM proxy branch (`_pushThrough`) also still skips
-      `_addToTarget` (so set_inverse_instance + dedup don't run there).
-- [ ] ~40–60 LOC: route `_createThrough` through `_addToTarget` (closes the
-      through-create deviation; overlaps B2 territory, sequence after B2).
 
 **From #2584 (C1 + D1):**
 
@@ -437,8 +380,7 @@ inverse of derived automatically despite of composite foreign key`).
 **From #2594 (Did You Mean? on AssociationNotFoundError):**
 
 - [ ] ~40 LOC (Track-1): unskip `eager.test.ts` `exceptions have suggestions
-for fix`. The corrections plumbing shipped here; the blocker is a
-      separate `preloader/branch.ts` gap — `groupedRecords()` (~line 161)
+for fix`. The blocker is a `preloader/branch.ts` gap — `groupedRecords()` (~line 161)
       silently skips missing reflections for top-level eager loads instead of
       raising `AssociationNotFoundError`. Fix: (a) raise on unknown top-level
       association, (b) keep nested-through-null cases silent
@@ -456,17 +398,20 @@ for fix`. The corrections plumbing shipped here; the blocker is a
       `dependent: :nullify`/`:delete_all` has_many to cover the currently
       unreachable delete/nullify else-branch of `HasManyAssociation#deleteRecords`.
 - [ ] ~10 LOC cleanup: pre-existing dead free functions `countRecords`,
-      `deleteOrNullifyAllRecords`, `intersection` in `has-many-association.ts`
-      (definition-only, no callers; lint doesn't flag them).
+      `intersection` in `has-many-association.ts` (definition-only, no callers;
+      lint doesn't flag them). NB: the third such free fn,
+      `deleteOrNullifyAllRecords`, is NOT dead-to-delete — AF4 wires it as the
+      `protected override deleteOrNullifyAllRecords(method)` dispatch point, so
+      leave it.
 - Composite-PK non-through has_many uses a per-column `IN` over-approximation
   vs Rails' tuple `where(query_constraints => values)`; only matters if such a
   model is ported.
 
 **From #2585 (H2 nested-through edge cases — test-only):**
 
-- [ ] ~200 LOC: JoinDependency AliasTracker self-join alias emission (deferred
-      heavy half of H2; the HABTM-through alias variant shipped separately in
-      #2608). Unblocks 3 tests: `nested has many through with a table
+- [ ] ~200 LOC: JoinDependency AliasTracker self-join alias emission (the
+      heavy half of H2; the HABTM-through alias variant is handled separately).
+      Unblocks 3 tests: `nested has many through with a table
 referenced multiple times` (asserts canonical alias
       `taggings_authors_join`), `nested has many through with scope on
 polymorphic reflection`, `polymorphic has many through joined different
@@ -494,3 +439,49 @@ doesnt reset source association if already preloaded`.
 - Disproven: `ThroughReflection.isPolymorphic()` recognizing `has_one :as` was
   a false skip rationale — Rails' `polymorphic?` is just `options[:polymorphic]`
   and our port already matches. Don't reintroduce an `:as` clause here.
+
+**From #2619 (strict_loading :n_plus_one_only + :log):**
+
+- [ ] (grouped above — _strict-loading message + n+1 test fidelity_) polymorphic
+      violation-message routing + n_plus_one_only children-are-strict/nested-raise
+      assertions.
+- [ ] per-model strict_loading mode config — `strictLoadingMode` is global only;
+      needed to unskip `strict loading logging mode can be set per model`.
+- Deviation: `:log` on the singular SYNC reader (`singular-association.ts`
+  `get reader()`) instruments then returns the (null) target rather than
+  performing the lazy DB load — the sync reader has no `await`. Collection /
+  async paths continue the load correctly. Acceptable given the sync constraint;
+  a sync-reader `:log` fidelity test would expose it.
+
+**From #2629 (route \_pushThrough/\_createThrough through \_addToTarget):**
+
+- [ ] (grouped above — _`_addToTarget` distinct_value dedup_) wire
+      `distinct_value` into the `replace` option.
+- Pre-existing: Rails `concat` for a new-record owner does
+  `skip_strict_loading { load_target }` before `concat_records`; trails defers
+  the join but doesn't pre-load the target. No failing test observed.
+
+**From #2620 (StrictLoadingScope module-private):**
+
+- [ ] ~2 LOC: fix the STALE `inheritance.ts` `initializeInternalsCallback` JSDoc
+      that says "integrating it into Base's init flow is a follow-up" — it IS
+      already wired into the `Base` ctor (`base.ts:2331`, `base.ts:2375`).
+
+**From #2630 (B3b HMT deletion tests):**
+
+- [ ] ~50–150 LOC: fix self-referential `belongsTo`-source push for
+      has_many :through so `collection << record` persists a join row with the
+      nonstandard FK (e.g. `book2_id`) set — currently the count stays 0 after
+      push (real impl gap), so the nonstandard-id test direct-seeds via
+      `NsiCitation.create()` instead of `proxy.push()`. Likely lives in
+      `associations/collection-proxy.ts` or the HMT insert path. Once fixed, the
+      test can switch back to `push()` for full Rails fidelity.
+
+**From #2631 (deleteAll → deleteOrNullifyAllRecords dispatch):**
+
+- [ ] (grouped above — _AF4 HMT delete override wiring_) wire the
+      `has-many-association.ts` / `has-many-through-association.ts` overrides;
+      fold in the nil-method semantics fix (base `deleteOrNullifyAllRecords`
+      treats `nil` method as DELETE, but Rails `HasMany#delete_count` nullifies,
+      so `collection.deleteAll()` on a plain has_many with no `:dependent`
+      diverges — not exercised by current tests).
