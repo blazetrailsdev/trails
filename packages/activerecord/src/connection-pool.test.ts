@@ -56,6 +56,12 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   isNoDatabaseError(_error: unknown): boolean {
     return false;
   }
+  // This double has no real raw connection; report active so checkout's
+  // verify! is a no-op (mirroring Rails, where the pinned connection is
+  // active and verify! returns without reconnecting).
+  override get active(): boolean {
+    return true;
+  }
   readonly inTransaction = false;
 
   async execute(

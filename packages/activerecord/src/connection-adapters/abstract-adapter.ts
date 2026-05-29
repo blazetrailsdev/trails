@@ -321,6 +321,18 @@ export interface AbstractAdapter {
   isDataSourceExists(name: string): Promise<boolean>;
   // --- DatabaseStatements ---
   /**
+   * Reset the transaction manager, discarding any open transactions. With a
+   * callback, reconfigures the connection in a fresh transaction context and
+   * (when `restore`) swaps the restorable manager back in afterwards.
+   * Mirrors `DatabaseStatements#reset_transaction`.
+   */
+  resetTransaction(): void;
+  resetTransaction(options: { restore: true }): Promise<void>;
+  resetTransaction(
+    options: { restore?: boolean },
+    callback: () => Promise<unknown>,
+  ): Promise<unknown>;
+  /**
    * Compile an Arel node/TreeManager to a SQL string via this connection's
    * visitor. Mirrors `DatabaseStatements#to_sql`.
    */
@@ -447,6 +459,19 @@ export class AbstractAdapter implements Quoting {
   private _idleSince = Date.now();
   protected _lastActivity = 0;
   protected _verified = false;
+  // Mirrors Rails @unconfigured_connection: a connection handle that has been
+  // opened but not yet run through configure_connection. verifyBang() promotes
+  // it (into `_connection`) via attemptConfigureConnection() before marking the
+  // adapter verified. Typed `AbstractAdapter | null` to match `_connection`'s
+  // surface, since trails routes raw-connection access through the adapter.
+  //
+  // In Rails the only writer is the soft-deprecated `initialize` path that
+  // accepts a pre-opened connection instead of a config hash
+  // (abstract_adapter.rb:141); trails has not ported that constructor overload,
+  // so today this is set only in tests. The verifyBang() read-side is ported
+  // here to keep `verify!` faithful — wiring the deprecated constructor writer
+  // is a tracked follow-up.
+  protected _unconfiguredConnection: AbstractAdapter | null = null;
   // Mirrors Rails @raw_connection_dirty. Setters land with the per-adapter
   // exec paths (PR 25b) and reconnect-with-restore (Wave 6 follow-up);
   // the default-false here matches Rails' fresh-adapter state.
@@ -806,14 +831,64 @@ export class AbstractAdapter implements Quoting {
     return this._connection !== null;
   }
 
-  reconnectBang(): void {
-    // Base implementation clears caches and marks the connection as verified.
-    // Concrete adapters (SQLite3, PostgreSQL, MySQL) override to
-    // actually close and reopen the raw connection, then call super.
-    this.clearCacheBang();
+  // Returns `void | Promise<void>` rather than `Promise<void>` because some
+  // concrete adapters (PostgreSQL, MySQL2) fully override this synchronously
+  // and return void; the base implementation always resolves asynchronously.
+  // (A unified async signature would require restructuring those adapters'
+  // reconnect — part of the retry-loop follow-up noted below.)
+  reconnectBang(opts: { restoreTransactions?: boolean } = {}): void | Promise<void> {
+    // Mirrors Rails' `reconnect!` (abstract_adapter.rb): re-enable lazy
+    // transactions, mark verified, then reset the transaction manager and
+    // reconfigure the connection (clearing the statement cache) with no
+    // transaction state in the way. With `restoreTransactions`, any restorable
+    // transaction stack is swapped back in once the connection is fully
+    // reconfigured.
+    //
+    // Adapters that can reuse this base lifecycle override to close and reopen
+    // the raw connection and then call `super.reconnectBang(opts)` (returning
+    // its Promise). PostgreSQL and MySQL2 instead fully override and manage
+    // their own reconnect without calling super.
+    this.enableLazyTransactionsBang();
     this._rawConnectionDirty = false;
     this._lastActivity = Date.now();
     this._verified = true;
+
+    // On failure, leave the adapter in a consistent unverified state and raise
+    // the translated exception (Rails' `raise translated_exception`). This is
+    // wired to both the synchronous throw from resetTransaction's prefix (the
+    // try/catch below) and the async reconfigure rejection (the `.then` reject
+    // handler) — it does not cover an overriding method that throws *after*
+    // awaiting `super.reconnectBang(...)`; that is the override's concern.
+    //
+    // Rails' `reconnect!` additionally retries transient connection errors
+    // (connection_retries/retry_deadline/backoff) before this cleanup; that
+    // retry loop wraps the raw `reconnect` it drives, so porting it requires
+    // the base to own the raw-reconnect call (a cross-adapter refactor of the
+    // PG/MySQL overrides) — tracked as a follow-up.
+    const cleanupOnFailure = (error: unknown): never => {
+      const translated = this.translateExceptionClass(error, undefined, undefined);
+      this._lastActivity = 0;
+      this._verified = false;
+      throw translated;
+    };
+
+    try {
+      // The callback form of resetTransaction always resolves asynchronously;
+      // wrap in Promise.resolve so cleanupOnFailure is wired unconditionally
+      // (rather than gated on an `instanceof Promise` check). The surrounding
+      // try/catch still covers a synchronous throw from resetTransaction's
+      // pre-callback prefix.
+      const result = this.resetTransaction(
+        { restore: opts.restoreTransactions ?? false },
+        async () => {
+          this.clearCacheBang();
+          await this.attemptConfigureConnection();
+        },
+      );
+      return Promise.resolve(result).then(() => {}, cleanupOnFailure);
+    } catch (error) {
+      cleanupOnFailure(error);
+    }
   }
 
   disconnectBang(): void {
@@ -823,7 +898,20 @@ export class AbstractAdapter implements Quoting {
 
   async verifyBang(): Promise<void> {
     if (!this.active) {
-      this.reconnectBang();
+      // Mirrors Rails' `verify!` (abstract_adapter.rb): an unconfigured raw
+      // connection (opened by the pool but never run through
+      // configure_connection) is promoted here rather than reconnected. If
+      // configure_connection fails, attemptConfigureConnection disconnects so
+      // the next verify takes the reconnect path.
+      if (this._unconfiguredConnection) {
+        this._connection = this._unconfiguredConnection;
+        this._unconfiguredConnection = null;
+        await this.attemptConfigureConnection();
+        this._lastActivity = Date.now();
+        this._verified = true;
+        return;
+      }
+      await this.reconnectBang({ restoreTransactions: true });
     }
     // Mirrors Rails: `connect_with_retry` calls `verified!` after a
     // successful (re)connect; verifyBang is the abstract-side entry
@@ -1054,8 +1142,8 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
-  reconnect(): void {
-    this.reconnectBang();
+  reconnect(): void | Promise<void> {
+    return this.reconnectBang();
   }
 
   disconnect(): void {
@@ -1064,20 +1152,6 @@ export class AbstractAdapter implements Quoting {
 
   clearCache(): void {
     this.clearCacheBang();
-  }
-
-  resetTransaction(): void;
-  resetTransaction(options: { restore: true }): Promise<void>;
-  resetTransaction(options?: { restore?: boolean }): void | Promise<void> {
-    if (options?.restore) {
-      if (this._transactionManager?.isRestorable()) {
-        return this._transactionManager.restoreTransactions().then(() => {});
-      }
-      this._transactionManager = new TransactionManager(this as any);
-      return Promise.resolve();
-    }
-
-    this._transactionManager = new TransactionManager(this as any);
   }
 
   get transactionManager(): TransactionManager {
@@ -1678,7 +1752,7 @@ export class AbstractAdapter implements Quoting {
               continue;
             }
             if (reconnectable && this.isRetryableConnectionError(err)) {
-              this.reconnectBang();
+              await this.reconnectBang({ restoreTransactions: true });
               reconnectable = false;
               continue;
             }

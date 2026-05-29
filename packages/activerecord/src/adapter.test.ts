@@ -12,7 +12,7 @@ class LifecycleTestAdapter extends AbstractAdapter {
 
   simulateConnect(): void {
     this._connected = true;
-    this._connection = this as any;
+    this._connection = this;
     this.verifiedBang();
   }
 
@@ -24,10 +24,13 @@ class LifecycleTestAdapter extends AbstractAdapter {
     return this._connected;
   }
 
-  override reconnectBang(): void {
+  override reconnectBang(opts: { restoreTransactions?: boolean } = {}): void | Promise<void> {
     this._connected = true;
-    this._connection = this as any;
-    super.reconnectBang();
+    this._connection = this;
+    // Base reconnectBang resolves asynchronously (it runs the reconfigure
+    // lifecycle); return its Promise so awaiting callers see reconfiguration
+    // complete before proceeding.
+    return super.reconnectBang(opts);
   }
 }
 
@@ -299,8 +302,11 @@ describe("AdapterConnectionTest", () => {
   });
   it.skip("materialized transaction state can be restored after a reconnect", () => {
     // BLOCKED: transactions
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#reconnect!: restoreTransactions: true option not implemented
-    // SCOPE: ~25 LOC; affects ~2 tests
+    // ROOT-CAUSE: reconnectBang restoreTransactions lifecycle is now in place
+    // (see "AbstractAdapter reconnect/verify lifecycle" tests); this Rails test
+    // additionally needs a non-in-memory adapter with raw-connection reopen on
+    // reconnect! (Rails gates the whole suite `unless in_memory_db?`).
+    // SCOPE: adapter raw-reconnect wiring; affects ~2 tests
   });
   it.skip("materialized transaction state is reset after a disconnect", () => {
     // BLOCKED: transactions
@@ -314,8 +320,11 @@ describe("AdapterConnectionTest", () => {
   });
   it.skip("unmaterialized transaction state can be restored after a reconnect", () => {
     // BLOCKED: transactions
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#reconnect!: restoreTransactions: true for unmaterialized state
-    // SCOPE: ~15 LOC; affects ~2 tests
+    // ROOT-CAUSE: reconnectBang restoreTransactions lifecycle is now in place
+    // (see "AbstractAdapter reconnect/verify lifecycle" tests); this Rails test
+    // additionally needs a non-in-memory adapter with raw-connection reopen on
+    // reconnect! (Rails gates the whole suite `unless in_memory_db?`).
+    // SCOPE: adapter raw-reconnect wiring; affects ~2 tests
   });
   it.skip("unmaterialized transaction state is reset after a disconnect", () => {
     // BLOCKED: transactions
@@ -552,8 +561,110 @@ describe("AdapterConnectionTest", () => {
   });
   it.skip("disconnect and recover on #configure_connection failure", () => {
     // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#configureConnection: failure recovery via pool.new_connection
-    // SCOPE: ~25 LOC; affects ~1 test
+    // ROOT-CAUSE: attemptConfigureConnection disconnect-on-failure and the
+    // verifyBang unconfigured fast-path are now in place (see "AbstractAdapter
+    // reconnect/verify lifecycle" tests). The full Rails flow additionally
+    // needs reconnect!'s retry loop (connection_retries) driving a
+    // base-controlled raw reconnect, plus pool.new_connection wiring.
+    // SCOPE: reconnect! retry loop; affects ~1 test
+  });
+});
+
+// Drives AbstractAdapter#reconnectBang / #verifyBang lifecycle directly,
+// independent of a concrete adapter's raw-connection wiring. Mirrors the
+// observable effects of Rails' `reconnect!` / `verify!` / `configure_connection`
+// chain (abstract_adapter.rb) — the integration-level Rails tests in
+// AdapterConnectionTest additionally need a base-controlled reconnect retry
+// loop and non-in-memory adapter, so they stay skipped.
+class ReconnectLifecycleAdapter extends AbstractAdapter {
+  configureCalls = 0;
+  clearCacheCalls = 0;
+  disconnectCalls = 0;
+  failConfigure = false;
+
+  override configureConnection(): void {
+    this.configureCalls++;
+    if (this.failConfigure) throw new ConnectionFailed("configure_connection failed");
+  }
+  override clearCacheBang(): void {
+    this.clearCacheCalls++;
+  }
+  override disconnectBang(): void {
+    this.disconnectCalls++;
+    super.disconnectBang();
+  }
+  attachRawConnection(): void {
+    this._connection = this;
+  }
+}
+
+describe("AbstractAdapter reconnect/verify lifecycle", () => {
+  it("reconnectBang re-enables lazy transactions, clears the cache, and reconfigures", async () => {
+    const a = new ReconnectLifecycleAdapter();
+    a.attachRawConnection();
+    await a.transactionManager.disableLazyTransactionsBang();
+    expect(a.transactionManager.isLazyTransactionsEnabled()).toBe(false);
+
+    await a.reconnectBang();
+
+    expect(a.transactionManager.isLazyTransactionsEnabled()).toBe(true);
+    expect(a.clearCacheCalls).toBe(1);
+    expect(a.configureCalls).toBe(1);
+    expect((a as any)._verified).toBe(true);
+    expect((a as any)._rawConnectionDirty).toBe(false);
+  });
+
+  it("reconnectBang with restoreTransactions keeps an open transaction open", async () => {
+    const a = new ReconnectLifecycleAdapter();
+    a.attachRawConnection();
+    await a.transactionManager.beginTransaction();
+    expect(a.isTransactionOpen()).toBe(true);
+
+    await a.reconnectBang({ restoreTransactions: true });
+    expect(a.isTransactionOpen()).toBe(true);
+  });
+
+  it("reconnectBang without restoreTransactions discards open transactions", async () => {
+    const a = new ReconnectLifecycleAdapter();
+    a.attachRawConnection();
+    await a.transactionManager.beginTransaction();
+    expect(a.isTransactionOpen()).toBe(true);
+
+    await a.reconnectBang();
+    expect(a.isTransactionOpen()).toBe(false);
+  });
+
+  it("reconnectBang clears verified/last-activity state when reconfigure fails", async () => {
+    const a = new ReconnectLifecycleAdapter();
+    a.attachRawConnection();
+    a.failConfigure = true;
+
+    await expect(a.reconnectBang()).rejects.toBeInstanceOf(ConnectionFailed);
+    expect((a as any)._verified).toBe(false);
+    expect((a as any)._lastActivity).toBe(0);
+  });
+
+  it("verifyBang promotes an unconfigured connection instead of reconnecting", async () => {
+    const a = new ReconnectLifecycleAdapter();
+    const raw = {} as any;
+    (a as any)._unconfiguredConnection = raw;
+
+    await a.verifyBang();
+
+    expect((a as any)._connection).toBe(raw);
+    expect((a as any)._unconfiguredConnection).toBeNull();
+    expect(a.configureCalls).toBe(1);
+    expect((a as any)._verified).toBe(true);
+  });
+
+  it("verifyBang disconnects and raises when configuring an unconfigured connection fails", async () => {
+    const a = new ReconnectLifecycleAdapter();
+    (a as any)._unconfiguredConnection = {} as any;
+    a.failConfigure = true;
+
+    await expect(a.verifyBang()).rejects.toBeInstanceOf(ConnectionFailed);
+    expect(a.disconnectCalls).toBe(1);
+    expect((a as any)._verified).toBe(false);
   });
 });
 

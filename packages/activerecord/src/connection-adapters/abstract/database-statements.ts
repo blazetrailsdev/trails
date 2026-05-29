@@ -761,14 +761,15 @@ export function resetTransaction(
         : null;
     self._transactionManager = new TransactionManager(self);
     return (async () => {
-      try {
-        return await callback();
-      } finally {
-        if (oldState) {
-          self._transactionManager = oldState;
-          await self._transactionManager.restoreTransactions();
-        }
+      // Reconfigure the connection without any transaction state in the way.
+      // Mirrors Rails: the old state is swapped back only after the block
+      // succeeds (no `ensure`); if it raises, the fresh manager stays in place.
+      const result = await callback();
+      if (oldState) {
+        self._transactionManager = oldState;
+        await self._transactionManager.restoreTransactions();
       }
+      return result;
     })();
   }
   if (options?.restore) {
