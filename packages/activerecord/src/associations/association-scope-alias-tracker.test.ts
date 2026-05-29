@@ -122,4 +122,23 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
     // `children.grandchildren` the alias is `children_grandchildren`.
     expect(aliasedName).toBe("children_grandchildren");
   });
+
+  it("emits the repeat at_users visit as a real table aliased in the JOIN, not a bare alias", () => {
+    // Regression pin: the chain tail's ReflectionProxy holds an Arel
+    // TableAlias (`at_users` aliased to `children_grandchildren`).
+    // nextChainScope must render the JOIN as `INNER JOIN "at_users"
+    // "children_grandchildren"` and qualify the ON columns with the
+    // alias — NOT flatten the TableAlias to `INNER JOIN
+    // "children_grandchildren"`, which references a non-existent table.
+    const refl = (AtUser as any)._reflectOnAssociation("grandchildren");
+    const owner = new AtUser({ parent_id: 3 });
+    (owner as any).id = 3;
+    const sql = (
+      AssociationScope.scope({ owner, reflection: refl, klass: refl.klass }) as any
+    ).toSql();
+    // Real table preserved as the join target, with the alias following it.
+    expect(sql).toMatch(/INNER JOIN\s+["`]at_users["`]\s+["`]children_grandchildren["`]/i);
+    // ON-clause columns qualified by the alias, not a bare "at_users".
+    expect(sql).toMatch(/["`]children_grandchildren["`]\.["`]parent_id["`]/);
+  });
 });
