@@ -1719,7 +1719,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         if (target.length > 0) {
           await assoc.deleteRecords(target, (this._assocDef.options.dependent as string) ?? "");
         }
-      } else if (this._relationStateDiverged()) {
+        // The whole association target was cleared (load_target, not the
+        // diverged proxy scope), so reset the full in-memory target the way
+        // `deleteAll` does — pruning only the pre-clear `toArray()` subset
+        // would leave stale records for `size()`/`isEmpty()` to read.
+        this._target = [];
+        this._targetLoaded = true;
+        this._invalidateAssociationIds();
+        return;
+      }
+      if (this._relationStateDiverged()) {
         // Plain collections nullify the owner FK. Mirror `deleteAll`'s
         // divergence guard: when in-place proxy mutations (whereBang / ...)
         // have run, `scope()` would rebuild the unmutated association scope
