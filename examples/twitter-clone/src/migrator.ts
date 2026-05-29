@@ -20,7 +20,9 @@ export async function loadMigrations(): Promise<Migration[]> {
 
   const migrations: Migration[] = [];
   for (const file of files) {
-    const version = MIGRATION_FILE.exec(file)![1];
+    const match = MIGRATION_FILE.exec(file);
+    if (!match) continue; // unreachable after the filter above; keeps the type checker happy
+    const version = match[1];
     const mod = (await import(join(MIGRATE_DIR, file))) as { default?: new () => Migration };
     if (!mod.default) throw new Error(`${file} must \`export default\` a Migration subclass`);
     (mod.default as unknown as { version: string }).version = version;

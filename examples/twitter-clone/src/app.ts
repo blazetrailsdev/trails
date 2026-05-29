@@ -20,11 +20,12 @@ export function buildApp() {
   app.post(
     "/users",
     wrap(async (req, res) => {
-      const user = await User.createBang({
-        handle: req.body.handle,
-        display_name: req.body.display_name,
-        bio: req.body.bio,
-      });
+      const { handle, display_name, bio } = req.body as {
+        handle?: string;
+        display_name?: string;
+        bio?: string;
+      };
+      const user = await User.createBang({ handle, display_name, bio });
       res.status(201).json(user.attributes);
     }),
   );
@@ -47,8 +48,9 @@ export function buildApp() {
     "/users/:handle/tweets",
     wrap(async (req, res) => {
       const user = await User.findByBang({ handle: req.params.handle });
+      const { body } = req.body as { body?: string };
       // `user.tweets.createBang` sets user_id automatically.
-      const tweet = await user.tweets.createBang({ body: req.body.body });
+      const tweet = await user.tweets.createBang({ body });
       res.status(201).json(tweet.attributes);
     }),
   );
@@ -105,7 +107,8 @@ export function buildApp() {
     "/tweets/:id/like",
     wrap(async (req, res) => {
       const tweet = await Tweet.find(Number(req.params.id));
-      const user = await User.findByBang({ handle: req.body.handle });
+      const { handle } = req.body as { handle?: string };
+      const user = await User.findByBang({ handle });
       const like = await Like.createBang({ user_id: user.id, tweet_id: tweet.id });
       res.status(201).json({ ...like.attributes, likes: await tweet.likes.count() });
     }),

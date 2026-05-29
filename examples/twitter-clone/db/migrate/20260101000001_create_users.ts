@@ -7,6 +7,9 @@ export default class CreateUsers extends Migration {
       t.string("display_name");
       t.string("bio");
       t.timestamps();
+      // Back the model's `validatesUniqueness("handle")` with a DB-level
+      // guarantee so concurrent creates can't race in duplicate handles.
+      t.index("handle", { unique: true });
     });
   }
 }
