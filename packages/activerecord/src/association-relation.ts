@@ -125,26 +125,29 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 
   /**
-   * Throw `StrictLoadingViolationError` if the owning record has
-   * strict-loading on and isn't inside a bypass block. Called from
-   * every AR query-executing entry point (toArray, count, pluck,
-   * pick, calculate, updateAll, deleteAll). Centralized here because
-   * with `CP extends Relation`, chained queries (blog.posts.where
-   * (...)) bypass the old `wrapCollectionProxy` `get` trap that used
-   * to enforce this.
+   * Throw for chained association reads (`blog.posts.where(...)`) when the
+   * owner is strict-loading. Honors the same exemptions as the reader's
+   * `violates_strict_loading?` (bypass block, validation context, reflection
+   * `strict_loading: false`, `n_plus_one_only`). Rails' own
+   * `AssociationRelation#exec_queries` doesn't enforce here — it cascades via
+   * `set_strict_loading`; the owner-strict backstop is trails-specific and
+   * full `exec_queries` parity is a follow-up.
    */
   private _checkStrictLoading(): void {
-    // Rails' AssociationRelation#exec_queries does NOT raise — it cascades via
-    // set_strict_loading (see the toArray tail). The reflection toggle's
-    // enforcement point is the association reader (find_target / collection
-    // proxy), not chained relation reads, so we keep the owner-only guard.
-    const owner = this._association.owner;
-    const ownerAny = owner as unknown as {
+    const owner = this._association.owner as unknown as {
       _strictLoading?: boolean;
       _strictLoadingBypassCount?: number;
+      _validationContext?: unknown;
+      isStrictLoadingNPlusOneOnly?: () => boolean;
     };
-    if (ownerAny._strictLoading && !ownerAny._strictLoadingBypassCount) {
-      throw StrictLoadingViolationError.forAssociation(owner, this._association.associationName);
+    if (owner._strictLoadingBypassCount) return;
+    if (owner._validationContext != null) return;
+    if (this._association.reflection.options.strictLoading === false) return;
+    if (owner._strictLoading && !owner.isStrictLoadingNPlusOneOnly?.()) {
+      throw StrictLoadingViolationError.forAssociation(
+        this._association.owner,
+        this._association.associationName,
+      );
     }
   }
 

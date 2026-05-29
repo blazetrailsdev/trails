@@ -807,12 +807,8 @@ function syncToAssociationInstance(record: Base, assocName: string, result: unkn
  *   return reflection.strict_loading? if reflection.options.key?(:strict_loading)
  *   owner.strict_loading? && !owner.strict_loading_n_plus_one_only?
  *
- * i.e. nothing is enforced inside a bypass block or a validation context; a
- * `strictLoading` option declared on the reflection then wins over the owner's
- * flag (`strict_loading: false` turns enforcement off even when the owner is
- * strict, `strict_loading: true` turns it on); otherwise the owner's flag
- * decides, except in `n_plus_one_only` mode where lazily loading the first
- * level is allowed.
+ * A reflection-level `strictLoading` option wins over the owner's flag; the
+ * `n_plus_one_only` clause lets the first level load lazily.
  *
  * @internal
  */

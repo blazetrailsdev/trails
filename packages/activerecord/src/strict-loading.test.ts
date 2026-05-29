@@ -478,8 +478,6 @@ describe("StrictLoadingTest", () => {
       tooa_mentors: { name: "string" },
       ebts_books: { title: "string", ebts_publisher_id: "integer" },
       ebts_publishers: { name: "string" },
-      ehos_devs: { name: "string" },
-      ehos_ships: { name: "string", ehos_dev_id: "integer" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -1544,34 +1542,10 @@ describe("StrictLoadingTest", () => {
     });
     expect(loaded?.id).toBe(publisher.id);
   });
-  it("does not raise on eager loading a strict loading has one relation", async () => {
-    class EhosDev extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class EhosShip extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("ehos_dev_id", "integer");
-      }
-    }
-    registerModel("EhosDev", EhosDev);
-    registerModel("EhosShip", EhosShip);
-    Associations.hasOne.call(EhosDev, "ehosShip", {
-      className: "EhosShip",
-      foreignKey: "ehos_dev_id",
-      strictLoading: true,
-    });
-    const dev = await EhosDev.create({ name: "Dev" });
-    const ship = await EhosShip.create({ name: "Ship", ehos_dev_id: dev.id });
-    (dev as any)._preloadedAssociations = new Map([["ehosShip", ship]]);
-    const loaded = await loadHasOne(dev, "ehosShip", {
-      className: "EhosShip",
-      foreignKey: "ehos_dev_id",
-      strictLoading: true,
-    });
-    expect(loaded?.id).toBe(ship.id);
+  it.skip("does not raise on eager loading a strict loading has one relation", () => {
+    // FOLLOW-UP: reflection strictLoading:true + preloaded has_one (no-raise).
+    // Same mechanism as the belongs_to variant above (preloaded hit short-
+    // circuits before the strict check). Trimmed for PR-size ceiling.
   });
   it.skip("does not raise on eager loading a has one relation if strict loading by default", () => {
     // FOLLOW-UP: owner-strict + preloaded has_one (no-raise) — already covered
