@@ -77,7 +77,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(throughTable.tableAlias).toBeNull();
   });
 
-  it("falls back to tN alias when the target real name collides", () => {
+  it("uses the Rails alias_candidate when the target real name collides", () => {
     const jd = new JoinDependency(JdtAuthor);
     Associations.hasMany.call(JdtAuthor, "directComments", {
       className: "JdtComment",
@@ -86,12 +86,13 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     jd.addAssociation("directComments");
     const node = jd.addAssociation("jdtComments");
     expect(node).not.toBeNull();
-    expect(node!.effectiveSqlName).toMatch(/^t\d+$/);
+    // Rails names the collision `{plural_name}_{owner_table}` (root link, no _join).
+    expect(node!.effectiveSqlName).toBe("jdtComments_jdt_authors");
 
     // Target aliased
     const targetTable = (node!.arelJoin as Nodes.OuterJoin).left as Table;
     expect(targetTable.name).toBe("jdt_comments");
-    expect(targetTable.tableAlias).toMatch(/^t\d+$/);
+    expect(targetTable.tableAlias).toBe("jdtComments_jdt_authors");
 
     // Through still uses real name
     const throughNode = jd.nodes.find(
@@ -120,21 +121,22 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(targetChild.tableName).toBe("jdt_comments");
   });
 
-  it("falls back to tN alias when the through real name collides", () => {
+  it("uses the Rails alias_candidate with _join when the through real name collides", () => {
     const jd = new JoinDependency(JdtAuthor);
     jd.addAssociation("jdtPosts");
     const node = jd.addAssociation("jdtComments");
     expect(node).not.toBeNull();
 
-    // Through table aliased because jdt_posts already used
+    // Through table aliased because jdt_posts already used. Non-root chain
+    // links get the `_join` suffix (join_dependency.rb:206).
     const throughNode = jd.nodes.find(
       (n) => n.tableName === "jdt_posts" && n.assocName.includes("_through_"),
     );
     expect(throughNode).toBeDefined();
-    expect(throughNode!.effectiveSqlName).toMatch(/^t\d+$/);
+    expect(throughNode!.effectiveSqlName).toBe("jdtPosts_jdt_authors_join");
     const throughTable = (throughNode!.arelJoin as Nodes.OuterJoin).left as Table;
     expect(throughTable.name).toBe("jdt_posts");
-    expect(throughTable.tableAlias).toMatch(/^t\d+$/);
+    expect(throughTable.tableAlias).toBe("jdtPosts_jdt_authors_join");
 
     // Target uses real name (first use)
     const targetTable = (node!.arelJoin as Nodes.OuterJoin).left as Table;

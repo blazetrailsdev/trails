@@ -374,11 +374,21 @@ A4 #2559, B1 #2557, E1 #2567, F1 #2563, H1 #2556).
       Files: `associations.ts` (`createHabtmJoinModel` + through insert),
       `builder/has-and-belongs-to-many.ts` (COW dedup keyed on derived middle
       name).
-- [ ] F2-sized: `join_middle_table_alias` / `join_table_alias` —
-      `.includes(:developers_projects)` with WHERE on aliased join-table names.
-      Needs JOIN-based eager loading with Rails-compatible self-join alias
-      naming via `associations/join-dependency.ts` + `alias-tracker.ts`
-      (HABTM-through not wired in).
+- [x] `join_table_alias` — `Developer.includes(projects: :developers)` with
+      WHERE on the self-joined `developers_projects_projects_join` alias. Done:
+      `_addThroughViaJoinAssociation` now names colliding chain tables via the
+      Rails `{plural_name}_{owner_table}[_join]` scheme (`AliasTracker#aliasNameFor`)
+      instead of `tN`; `where`/`whereNot` auto-add references from dotted hash
+      keys (`PredicateBuilder.references`) so the include promotes to eager JOIN.
+- [ ] FOLLOW-UP: `join_middle_table_alias` — `Project.includes(:developers_projects)`
+      eager-loads the auto-generated HABTM join model directly. Blocked by two
+      gaps outside join-dependency/alias-tracker: (1) the middle reflection is
+      hidden behind its parent HABTM reflection in `normalizedReflections`, so
+      `reflectOnAssociation(Project, "developers_projects")` returns null; and
+      (2) `JoinDependency#addAssociation` bails when the target's primaryKey is
+      composite (HABTM join models use `[ownerFk, targetFk]`), so the join model
+      can never be a JOIN target. Test is `it.skip`-ped in
+      `has-and-belongs-to-many-associations.test.ts`.
 - Pre-existing orthogonal bug: pushing onto HABTM on a new (unsaved) owner
   leaves a stray join row with null FKs (filtered out by `loadHabtm` so
   invisible to reads). Worth its own ticket.

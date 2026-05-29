@@ -183,6 +183,34 @@ function referencesBang(this: QueryMethodsHost, ...tables: string[]): any {
   return this;
 }
 
+/**
+ * Table names implied by hash conditions: a nested-hash key names its table,
+ * and a dotted string key names the table before the dot. Used to auto-add
+ * references so `includes(...).where("joined_table.col": ...)` promotes the
+ * matching include to an eager LEFT OUTER JOIN.
+ *
+ * Mirrors: ActiveRecord::PredicateBuilder.references
+ * @internal
+ */
+export function referencesFromConditions(conditions: unknown): string[] {
+  if (!conditions || typeof conditions !== "object" || Array.isArray(conditions)) return [];
+  if (conditions instanceof Nodes.Node) return [];
+  const refs: string[] = [];
+  for (const [key, value] of Object.entries(conditions as Record<string, unknown>)) {
+    if (
+      value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      !(value instanceof Nodes.Node)
+    ) {
+      refs.push(key);
+    } else if (key.includes(".")) {
+      refs.push(key.split(".")[0]);
+    }
+  }
+  return refs;
+}
+
 /** Validate and resolve a CTE name+query into a SQL string. */
 function resolveCteEntry(name: string, query: unknown): string {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
@@ -764,6 +792,7 @@ export function buildWhereClause(
 
 function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
   if (opts == null) return this;
+  referencesBang.call(this, ...referencesFromConditions(opts));
   const clause = buildWhereClause.call(this, opts, rest);
   this._whereClause.predicates.push(...clause.predicates);
   return this;

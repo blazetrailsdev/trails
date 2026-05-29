@@ -109,6 +109,22 @@ export class AliasTracker {
     return typeof arelTable.alias === "function" ? arelTable.alias(finalName) : arelTable;
   }
 
+  /**
+   * Compute a non-colliding SQL alias for `candidate`, bumping its count so
+   * repeat candidates get a numeric suffix. Mirrors the aliased-name branch
+   * of `aliased_table_for` (alias_tracker.rb) without needing an Arel table —
+   * used by JoinDependency to name self-joined HABTM-through tables with the
+   * Rails `{plural_name}_{owner_table}_join` scheme.
+   *
+   * @internal
+   */
+  aliasNameFor(candidate: string): string {
+    const aliasedName = this.tableAliasFor(candidate);
+    const count = this._getCount(aliasedName) + 1;
+    this.aliases.set(aliasedName, count);
+    return count > 1 ? `${this.truncate(aliasedName)}_${count}` : aliasedName;
+  }
+
   aliasFor(tableName: string): string {
     const count = this._getCount(tableName);
     if (count === 0) {
