@@ -124,8 +124,17 @@ R5 #2569, R6a+R6b #2564).
   suite. Don't rename in place — instead verify each maps to a real Rails
   test and, where it does, align body + name to that counterpart so
   test:compare matches; otherwise document the genuine test:compare gap.
-- `inspect()` at `relation.ts:1026` JSON.stringify's `_orderClauses` which
-  may hold live `Nodes.Node` objects (partial stringify). Cosmetic only.
+- [x] `inspect()` Arel-node stringification fixed (Done #2617) — `inspect()`
+      now stringifies live `Nodes.Node` objects in `_orderClauses`, and the
+      loaded path renders Rails' `#<Class [records...]>` format (11-cap, `...`
+      truncation). New follow-up (needs a design decision, not a quick fix):
+      the UNLOADED `inspect()` path is fundamentally divergent — Rails does
+      synchronous blocking DB I/O (`annotate("loading for inspect").take(n)`),
+      which JS can't do in a string-returning method, so trails falls back to a
+      query-chain representation. 4 `relations_test.rb` `#inspect` tests + 3
+      `#pretty_print` tests stay on weakened (typeof / load-first) assertions
+      with Rails-verbatim names; closing the gap likely needs an async inspect
+      API.
 
 **From #2562 (R2 hash-form select):**
 

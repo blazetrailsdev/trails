@@ -11,7 +11,7 @@ Ruby-only), ~10 scattered single-test gaps (Track 9).
 Round-2 shipped (since the prior cleanup #2576): A5 #2571, B2 #2581,
 B3 #2575, C1+D1 #2584, C2+C3 #2591, E2 #2583, F2 #2574, G1 #2586, H2 #2585,
 plus follow-up PRs #2594, #2596, #2598, #2599, #2602, #2604, #2606, #2608,
-#2611.
+#2611, #2613, #2615.
 
 ---
 
@@ -32,15 +32,15 @@ implementation is largely complete but tests lack data.
 
 These are individual root causes that don't cluster into a track:
 
-| Test file                             | Gap                                                                                                                 | Est     |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------- |
-| `has-many-associations.test.ts`       | Counter cache updates in memory after create/push/empty (3 tests)                                                   | ~40 LOC |
-| `belongs-to-associations.test.ts`     | `readonly` check on save (1 test)                                                                                   | ~10 LOC |
-| `nested-error.test.ts`                | Nested attributes error semantics (4 tests) — blocked on `accepts_nested_attributes_for`                            | Phase G |
-| `extension.test.ts`                   | `extension name` / `extension with dirty target` likely portable; 2 marshalling tests blocked (see #2574 follow-up) | ~30 LOC |
-| `required.test.ts`                    | `belongsToRequiredByDefault` config (1 test)                                                                        | ~10 LOC |
-| `left-outer-join-association.test.ts` | Arel join node in left outer join (3 tests)                                                                         | ~30 LOC |
-| `inner-join-association.test.ts`      | Inner join edge cases (2 tests)                                                                                     | ~20 LOC |
+| Test file                             | Gap                                                                                                                                                 | Est           |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| `has-many-associations.test.ts`       | Counter cache updates in memory after create/push/empty (3 tests)                                                                                   | ~40 LOC       |
+| `belongs-to-associations.test.ts`     | `readonly` check on save (1 test)                                                                                                                   | ~10 LOC       |
+| `nested-error.test.ts`                | Nested attributes error semantics (4 tests) — blocked on `accepts_nested_attributes_for`                                                            | Phase G       |
+| `extension.test.ts`                   | `:extend` hooking shipped (#2613); 4 skips remain, each blocked on a named feature: dirty-target, Marshal (×2), module naming (see #2574 follow-up) | feature-gated |
+| `required.test.ts`                    | `belongsToRequiredByDefault` config (1 test)                                                                                                        | ~10 LOC       |
+| `left-outer-join-association.test.ts` | Arel join node in left outer join (3 tests)                                                                                                         | ~30 LOC       |
+| `inner-join-association.test.ts`      | Inner join edge cases (2 tests)                                                                                                                     | ~20 LOC       |
 
 ---
 
@@ -177,14 +177,29 @@ A4 #2559, B1 #2557, E1 #2567, F1 #2563, H1 #2556).
       `create_with!(inheritance_column => sti_name)`; only matters if an STI
       subclass uses `scopeForAssociation` to BUILD (vs query) records — no test
       exercises this today (~10 LOC if it surfaces).
-- [x] Strict-loading cascade end-to-end (Done #2598) — `StrictLoadingScope`
-      sentinel threaded through `_preloadAssociationsForRecords`. Remaining
-      `strict-loading.test.ts` stubs depend on separate unbuilt features
-      (`n_plus_one_only` mode, `actionOnStrictLoadingViolation = "log"`,
-      validation-context bypass, habtm strict-loading, HMT cascade-to-middle +
-      has-one reload). `StrictLoadingScope` is exported as a top-level const
-      (Rails nests it `:nodoc:`); consider module-private for surface
-      minimalism.
+- [x] Strict-loading cascade end-to-end (Done #2598, extended #2615) —
+      `StrictLoadingScope` sentinel threaded through
+      `_preloadAssociationsForRecords` (#2598); #2615 added `strictLoadingBang`
+      cascade + the `violatesStrictLoading?` reflection toggle. Remaining
+      `strict-loading.test.ts` stubs (8) depend on separate features:
+  - [ ] ~30–60 LOC: AssociationRelation `exec_queries` parity — drop the
+        trails-specific owner-strict backstop in `association-relation.ts`
+        `_checkStrictLoading` (Rails doesn't enforce strict-loading there, only
+        cascades via `set_strict_loading`); delete the method + 10 call sites +
+        9 vestigial pass-through aggregate overrides (~100 LOC, blew this PR's
+        ceiling).
+  - [ ] ~30 LOC + 2 tests: record-level `reload` + strict-loading (`strict
+loading has one reload`, `... has many singular association and
+reload`) — needs the reload / `find_from_target?` interaction.
+  - [ ] ~15 LOC + 1 test: CollectionProxy unloaded-reader lazy-proxy semantics
+        (`strict loading with has many`).
+  - [ ] ~20 LOC + 2 tests: validation-context association tests (guard exists;
+        needs a child model whose validation loads a strict owner's assoc).
+  - [ ] ~25 LOC + 1 test: eager has_one reflection opt-in (`does not raise on
+eager loading a strict loading has one relation`).
+  - Still gated externally: `n_plus_one_only` mode, `actionOnStrictLoadingViolation
+= "log"`, habtm strict-loading. `StrictLoadingScope` is exported as a
+    top-level const (Rails nests it `:nodoc:`); consider module-private.
 
 **From #2556 (H1 AssociationScope parity):** test-only PR.
 
@@ -225,9 +240,19 @@ A4 #2559, B1 #2557, E1 #2567, F1 #2563, H1 #2556).
 
 **From #2574 (F2 HABTM extend — test-only):**
 
-- [ ] ~30 LOC: `extension.test.ts` still skips `extension name` and
-      `extension with dirty target` (likely portable). The two marshalling
-      extension tests are blocked (no marshalling support).
+- [x] Collection `:extend` module hooking shipped (Done #2613) — association
+      `extend:` (module-object form) now propagates across clones via
+      `relation.ts` `_copyStateFrom` rebinding `_extending`. The remaining
+      `extension.test.ts` skips are each blocked on a SEPARATE named feature,
+      NOT on `:extend` hooking: `extension with dirty target` (dirty-target
+      tracking), `marshalling extensions` / `marshalling named extensions`
+      (Marshal support), `extension name` (module naming / `const_set`
+      equivalent).
+- Deviation: `Relation#extending(fn)` function form does NOT propagate across
+  clones (Rails `extending!` converts a block to a define-once Module; trails'
+  `(rel) => void` is an immediate mutator not recorded in `_extending`).
+  Module-object form is unaffected. No TS call path yet for block-as-module
+  association extensions (`has_many :x do…end`).
 - Gotcha: grouped HABTM finds must pair `group(col)` with `select(col)` or PG
   raises 42803; SQLite tolerates `SELECT *`. SQLite-only local runs won't catch
   it — remember for future grouped-association tests.
