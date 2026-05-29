@@ -775,6 +775,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /**
    * Build and save a new associated record.
+   *
+   * Rails' `CollectionAssociation#_create_record` routes both regular and
+   * :through associations through `add_to_target` (HasManyThroughAssociation
+   * overrides only `build_record`/`insert_record`, not `_create_record`). Here
+   * only the non-:through path goes through `_addToTarget`; the :through path
+   * keeps its dedicated join-row logic in `_createThrough`. Routing :through
+   * through `_addToTarget` is a follow-up (it overlaps `has-many-through-
+   * association.ts`, owned by a sibling PR).
    */
   async create(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
   async create(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
