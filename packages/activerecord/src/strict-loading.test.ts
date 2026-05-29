@@ -460,6 +460,15 @@ describe("StrictLoadingTest", () => {
       elsl_logs: { message: "string", elsl_dev_id: "integer" },
       elslhm_devs: { name: "string" },
       elslhm_logs: { message: "string", elslhm_dev_id: "integer" },
+      slppl_devs: { name: "string" },
+      slppl_logs: { message: "string", slppl_dev_id: "integer" },
+      slpbd_devs: { name: "string" },
+      slpbd_logs: { message: "string", slpbd_dev_id: "integer" },
+      slpnt_devs: { name: "string" },
+      slpnt_logs: { message: "string", slpnt_dev_id: "integer" },
+      slpwp_devs: { name: "string" },
+      slpwp_logs: { message: "string", slpwp_dev_id: "integer" },
+      slpwp_extras: { note: "string", slpwp_dev_id: "integer" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -703,10 +712,49 @@ describe("StrictLoadingTest", () => {
     // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
     // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
   });
-  it.skip("strict loading with preload prevents lazy loading", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("strict loading with preload prevents lazy loading", async () => {
+    class SlpwpDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlpwpLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("slpwp_dev_id", "integer");
+      }
+    }
+    class SlpwpExtra extends Base {
+      static {
+        this.attribute("note", "string");
+        this.attribute("slpwp_dev_id", "integer");
+      }
+    }
+    Associations.hasMany.call(SlpwpDev, "slpwpLogs", {
+      className: "SlpwpLog",
+      foreignKey: "slpwp_dev_id",
+    });
+    Associations.hasMany.call(SlpwpDev, "slpwpExtras", {
+      className: "SlpwpExtra",
+      foreignKey: "slpwp_dev_id",
+    });
+    registerModel("SlpwpDev", SlpwpDev);
+    registerModel("SlpwpLog", SlpwpLog);
+    registerModel("SlpwpExtra", SlpwpExtra);
+    const created = await SlpwpDev.create({ name: "D" });
+    await SlpwpLog.create({ message: "M", slpwp_dev_id: created.id });
+    await SlpwpExtra.create({ note: "N", slpwp_dev_id: created.id });
+    // Preload one association on a strict-loading relation: the preloaded
+    // association is reachable, but lazy-loading a different, non-preloaded
+    // association on the (now strict) parent must raise.
+    const devs = await SlpwpDev.all().includes("slpwpLogs").strictLoading().toArray();
+    const dev = devs[0];
+    expect(dev.isStrictLoading()).toBe(true);
+    const preloaded = (dev as any)._preloadedAssociations?.get("slpwpLogs") ?? [];
+    expect(preloaded).toHaveLength(1);
+    await expect(
+      loadHasMany(dev, "slpwpExtras", { className: "SlpwpExtra", foreignKey: "slpwp_dev_id" }),
+    ).rejects.toThrow(StrictLoadingViolationError);
   });
   it("strict loading by default can be toggled", () => {
     class Author extends Base {
@@ -786,10 +834,34 @@ describe("StrictLoadingTest", () => {
       loadHasMany(author, "sl_all_books", { className: "SlAllBook", foreignKey: "author_id" }),
     ).rejects.toThrow(StrictLoadingViolationError);
   });
-  it.skip("preload does not trigger strict loading", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("preload does not trigger strict loading", async () => {
+    class SlpntDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlpntLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("slpnt_dev_id", "integer");
+      }
+    }
+    Associations.hasMany.call(SlpntDev, "slpntLogs", {
+      className: "SlpntLog",
+      foreignKey: "slpnt_dev_id",
+    });
+    registerModel("SlpntDev", SlpntDev);
+    registerModel("SlpntLog", SlpntLog);
+    const created = await SlpntDev.create({ name: "D" });
+    await SlpntLog.create({ message: "M", slpnt_dev_id: created.id });
+    // A plain preload (no strict_loading) neither marks the parent strict nor
+    // cascades strictness to the preloaded records.
+    const devs = await SlpntDev.all().includes("slpntLogs").toArray();
+    const dev = devs[0];
+    expect(dev.isStrictLoading()).toBe(false);
+    const logs = (dev as any)._preloadedAssociations?.get("slpntLogs") ?? [];
+    expect(logs).toHaveLength(1);
+    expect(logs.some((l: any) => l._strictLoading)).toBe(false);
   });
   it.skip("strict loading with select on relation", () => {
     // BLOCKED: relation — StrictLoadingViolation not wired into association loading
@@ -1172,15 +1244,68 @@ describe("StrictLoadingTest", () => {
     // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
     // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
   });
-  it.skip("preload audit logs are strict loading because parent is strict loading", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("preload audit logs are strict loading because parent is strict loading", async () => {
+    class SlpplDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlpplLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("slppl_dev_id", "integer");
+      }
+    }
+    Associations.hasMany.call(SlpplDev, "slpplLogs", {
+      className: "SlpplLog",
+      foreignKey: "slppl_dev_id",
+    });
+    registerModel("SlpplDev", SlpplDev);
+    registerModel("SlpplLog", SlpplLog);
+    const developer = await SlpplDev.create({ name: "D" });
+    for (let i = 0; i < 3; i++) {
+      await SlpplLog.create({ message: "I am message", slppl_dev_id: developer.id });
+    }
+    const devs = await SlpplDev.all().includes("slpplLogs").strictLoading().toArray();
+    const dev = devs[0];
+    expect(dev.isStrictLoading()).toBe(true);
+    const logs = (dev as any)._preloadedAssociations?.get("slpplLogs") ?? [];
+    expect(logs).toHaveLength(3);
+    expect(logs.every((l: any) => l._strictLoading)).toBe(true);
   });
-  it.skip("preload audit logs are strict loading because it is strict loading by default", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("preload audit logs are strict loading because it is strict loading by default", async () => {
+    class SlpbdDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlpbdLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("slpbd_dev_id", "integer");
+      }
+    }
+    Associations.hasMany.call(SlpbdDev, "slpbdLogs", {
+      className: "SlpbdLog",
+      foreignKey: "slpbd_dev_id",
+    });
+    registerModel("SlpbdDev", SlpbdDev);
+    registerModel("SlpbdLog", SlpbdLog);
+    SlpbdLog.strictLoadingByDefault = true;
+    try {
+      const developer = await SlpbdDev.create({ name: "D" });
+      for (let i = 0; i < 3; i++) {
+        await SlpbdLog.create({ message: "I am message", slpbd_dev_id: developer.id });
+      }
+      const devs = await SlpbdDev.all().includes("slpbdLogs").toArray();
+      const dev = devs[0];
+      expect(dev.isStrictLoading()).toBe(false);
+      const logs = (dev as any)._preloadedAssociations?.get("slpbdLogs") ?? [];
+      expect(logs).toHaveLength(3);
+      expect(logs.every((l: any) => l._strictLoading)).toBe(true);
+    } finally {
+      SlpbdLog.strictLoadingByDefault = false;
+    }
   });
   it("eager load audit logs are strict loading because parent is strict loading in hm relation", async () => {
     class ElslhmDev extends Base {

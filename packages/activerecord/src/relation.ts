@@ -254,6 +254,19 @@ function resolveColumnNameMatcher(adapter: any): RegExp {
   return abstractColumnNameMatcher();
 }
 
+/**
+ * Sentinel preload scope threaded into the preloader when the parent relation
+ * is strict-loading. The preloader's `cascade_strict_loading` reads
+ * `isStrictLoading` to propagate strictness onto the derived scope, while
+ * `isEmptyScope` keeps it from being merged like a real scope.
+ *
+ * Mirrors: ActiveRecord::Relation::StrictLoadingScope
+ */
+export const StrictLoadingScope = {
+  isEmptyScope: true,
+  isStrictLoading: true,
+} as const;
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base> {
   private _modelClass: typeof Base;
@@ -3941,6 +3954,7 @@ export class Relation<T extends Base> {
     const preloader = new Preloader({
       records: records as unknown as import("./base.js").Base[],
       associations: assocNames,
+      scope: this._isStrictLoading ? StrictLoadingScope : undefined,
     });
     await preloader.call();
   }
