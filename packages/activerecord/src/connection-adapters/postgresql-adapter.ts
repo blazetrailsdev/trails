@@ -2009,9 +2009,19 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * `ConnectionPool` on checkout) actually reconnects the PG
    * connection rather than just clearing the statement cache.
    *
+   * Unlike MySQL2, PostgreSQL does NOT yet delegate to the base
+   * `reconnectBang` lifecycle + retry loop: its `configureConnection`
+   * takes an explicit `pg.Client` (the base lifecycle calls it with no
+   * argument, configuring lazily on the next acquire instead), and
+   * `reconnect()` itself resets the transaction manager — so running the
+   * base lifecycle's restore-aware `resetTransaction` on top would clear
+   * the restorable stack first. Inheriting the loop here is a tracked
+   * follow-up (configure-with-no-client tolerance + moving the tx reset
+   * out of `reconnect()`).
+   *
    * @internal
    */
-  override reconnectBang(): void {
+  override async reconnectBang(): Promise<void> {
     this.reconnect();
   }
 

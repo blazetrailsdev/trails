@@ -24,12 +24,15 @@ class LifecycleTestAdapter extends AbstractAdapter {
     return this._connected;
   }
 
-  override reconnectBang(opts: { restoreTransactions?: boolean } = {}): void | Promise<void> {
+  override reconnectBang(opts: { restoreTransactions?: boolean } = {}): Promise<void> {
     this._connected = true;
     this._connection = this;
     // Base reconnectBang resolves asynchronously (it runs the reconfigure
     // lifecycle); return its Promise so awaiting callers see reconfiguration
-    // complete before proceeding.
+    // complete before proceeding. Setting `_connected` here (rather than in a
+    // `reconnect()` override) keeps the synchronous `reconnectBang()` call in
+    // "reconnect! restores after remote disconnection" observing `active`
+    // immediately, matching Rails' synchronous `reconnect!`.
     return super.reconnectBang(opts);
   }
 }
@@ -581,6 +584,19 @@ class ReconnectLifecycleAdapter extends AbstractAdapter {
   clearCacheCalls = 0;
   disconnectCalls = 0;
   failConfigure = false;
+  reconnectCalls = 0;
+  // Number of leading reconnect() calls that should throw before succeeding.
+  reconnectFailures = 0;
+  // Error thrown by the failing reconnect() attempts.
+  reconnectError: () => Error = () => new ConnectionFailed("connection reset");
+
+  override reconnect(): void {
+    this.reconnectCalls++;
+    if (this.reconnectFailures > 0) {
+      this.reconnectFailures--;
+      throw this.reconnectError();
+    }
+  }
 
   override configureConnection(): void {
     this.configureCalls++;
@@ -642,6 +658,47 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
     await expect(a.reconnectBang()).rejects.toBeInstanceOf(ConnectionFailed);
     expect((a as any)._verified).toBe(false);
     expect((a as any)._lastActivity).toBe(0);
+  });
+
+  it("reconnect! retries a transient connection failure and succeeds", async () => {
+    const a = new ReconnectLifecycleAdapter();
+    a.attachRawConnection();
+    (a as any)._config.connectionRetries = 2;
+    (a as any).backoff = () => Promise.resolve();
+    a.reconnectFailures = 1;
+
+    await a.reconnectBang();
+
+    expect(a.reconnectCalls).toBe(2);
+    expect((a as any)._verified).toBe(true);
+    expect(a.configureCalls).toBe(1);
+  });
+
+  it("reconnect! gives up after exhausting connection retries", async () => {
+    const a = new ReconnectLifecycleAdapter();
+    a.attachRawConnection();
+    (a as any)._config.connectionRetries = 2;
+    (a as any).backoff = () => Promise.resolve();
+    a.reconnectFailures = 99;
+
+    await expect(a.reconnectBang()).rejects.toBeInstanceOf(ConnectionFailed);
+    // Initial attempt plus connectionRetries (2) retries.
+    expect(a.reconnectCalls).toBe(3);
+    expect((a as any)._verified).toBe(false);
+    expect((a as any)._lastActivity).toBe(0);
+  });
+
+  it("reconnect! does not retry a non-retryable error", async () => {
+    const a = new ReconnectLifecycleAdapter();
+    a.attachRawConnection();
+    (a as any)._config.connectionRetries = 3;
+    (a as any).backoff = () => Promise.resolve();
+    a.reconnectFailures = 1;
+    a.reconnectError = () => new AdapterError("syntax error");
+
+    await expect(a.reconnectBang()).rejects.toBeInstanceOf(AdapterError);
+    expect(a.reconnectCalls).toBe(1);
+    expect((a as any)._verified).toBe(false);
   });
 
   it("verifyBang promotes an unconfigured connection instead of reconnecting", async () => {

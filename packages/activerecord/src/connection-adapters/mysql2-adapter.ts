@@ -1363,7 +1363,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // intentionally empty — single connection is established lazily
   }
 
-  override reconnectBang(): void {
+  /**
+   * Raw reconnect: close the live connection and re-establish it. Mirrors
+   * Rails' private `Mysql2Adapter#reconnect` (mysql2_adapter.rb:150 —
+   * `@raw_connection&.close; @raw_connection = nil; connect`). Driven by the
+   * inherited `AbstractAdapter#reconnectBang`, which wraps this in the
+   * `connectionRetries` / `retryDeadline` retry loop and runs the
+   * re-enable-lazy-transactions / reconfigure lifecycle.
+   *
+   * @internal
+   */
+  override reconnect(): void {
     if (this._permanentlyClosed) throw new Error("Mysql2Adapter: client is permanently closed");
     this.disconnectBang();
     this._activeState = true;
@@ -1916,14 +1926,6 @@ function isMysql2ConnectionError(e: unknown): boolean {
     code === "EHOSTUNREACH" ||
     code === "ENETUNREACH" ||
     code === "EPIPE"
-  );
-}
-
-/** @internal */
-function reconnect(): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql2_adapter.rb:150 cluster=mysql-mysql2-adapter
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::Mysql2Adapter#reconnect is not implemented",
   );
 }
 
