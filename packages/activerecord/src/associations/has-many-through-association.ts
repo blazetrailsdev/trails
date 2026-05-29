@@ -56,6 +56,20 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   /**
+   * Mirrors the `build_through_record` loop that
+   * `HasManyThroughAssociation#concat_records` runs for a new owner. Reached
+   * from `CollectionAssociation#replace` so array-assignment forms
+   * (`category.authors = [author]`, `Category.new(authors: [...])`) build the
+   * through join rows in memory before the owner is saved.
+   * @internal
+   */
+  protected override buildThroughRecordsInMemory(records: Base[]): void {
+    for (const record of records) {
+      buildThroughRecord(this, record);
+    }
+  }
+
+  /**
    * Mirrors Rails' `ThroughAssociation#target_scope` override.
    * @internal
    */

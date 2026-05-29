@@ -171,6 +171,15 @@ export class CollectionAssociation extends Association {
   }
 
   /**
+   * Build any in-memory join rows for `records` on a new (unsaved) owner.
+   * No-op for non-through collections; HMT overrides it to pre-build the
+   * through-rows (mirrors the `build_through_record` loop reached via
+   * `concat_records` on a new owner).
+   * @internal
+   */
+  protected buildThroughRecordsInMemory(_records: Base[]): void {}
+
+  /**
    * Removes all records from the association. Honors the :dependent
    * option. If :dependent is :destroy, uses :delete_all strategy instead.
    */
@@ -277,8 +286,25 @@ export class CollectionAssociation extends Association {
     const originalTarget = [...this.target];
     replaceCommonRecordsInMemory(this, otherArray, originalTarget);
     if (this.owner.isNewRecord()) {
-      this.target = [...otherArray];
+      // Rails routes a new-owner replace through replace_records → concat →
+      // concat_records (collection_association.rb), so the build path runs:
+      // for HMT this constructs through-rows in memory that the owner's save
+      // autosaves alongside it. Mirror that here rather than setting _target
+      // directly, which would skip the through-row build.
+      for (const r of [...this.target]) {
+        if (!otherArray.includes(r)) {
+          const idx = this.target.indexOf(r);
+          if (idx !== -1) this.target.splice(idx, 1);
+        }
+      }
+      for (const r of otherArray) {
+        if (!this.target.includes(r)) {
+          this.setOwnerAttributes(r);
+          this.addToTarget(r);
+        }
+      }
       this.loadedBang();
+      this.buildThroughRecordsInMemory(otherArray);
     } else if (!wasLoaded || !arraysEqual(otherArray, originalTarget)) {
       for (const r of originalTarget) {
         if (!otherArray.includes(r)) {
