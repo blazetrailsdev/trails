@@ -465,9 +465,11 @@ export class CollectionAssociation extends Association {
   }
 
   /**
-   * For collection associations, the "foreign key" that matters is the
-   * owner's primary key (since children reference it via their FK).
-   * A new record that already has a PK assigned can still load children.
+   * Mirrors `ForeignAssociation#foreign_key_present?` (foreign_association.rb:5),
+   * included by has_many: the owner's primary key (`active_record_primary_key`)
+   * must be present for children — which carry the FK referencing it — to be
+   * fetchable. A new record that already has a PK assigned can still load.
+   * Kept in sync with `CollectionProxy#_foreignKeyPresent`.
    */
   protected override foreignKeyPresent(): boolean {
     const ctor = this.owner.constructor as any;

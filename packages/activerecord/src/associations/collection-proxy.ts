@@ -837,7 +837,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const { skipCallbacks = false, replace = false } = options;
     let index = -1;
     if (replace && (!record.isNewRecord() || this._replacedOrAddedTargets.has(record))) {
-      index = this._target.indexOf(record);
+      index = this._indexInTarget(record);
     }
     if (
       !skipCallbacks &&
@@ -848,7 +848,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
     if (save && !(await save())) return record;
     if (index === -1 && this._replacedOrAddedTargets.has(record)) {
-      index = this._target.indexOf(record);
+      index = this._indexInTarget(record);
     }
     if (index !== -1 || record.isNewRecord()) {
       this._replacedOrAddedTargets.add(record);
@@ -861,6 +861,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     if (!skipCallbacks) fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
     return record;
+  }
+
+  /**
+   * Locate `record` in `_target` using ActiveRecord equality (`Core#==`) rather
+   * than JS reference identity, mirroring Ruby's `@target.index(record)` inside
+   * `replace_on_target`. Two distinct object instances of the same class with
+   * the same present primary key compare equal, so a re-fetched persisted record
+   * dedups against the buffered target under a `distinct` scope; new records,
+   * whose `==` falls back to identity, only match the same instance.
+   * @internal
+   */
+  private _indexInTarget(record: T): number {
+    return this._target.findIndex((r) => r === record || r.isEqual(record));
   }
 
   // NOTE: If _pushThrough fails after the target is saved, the target record
@@ -1110,17 +1123,31 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Mirrors Association#foreign_key_present? — false for vanilla has_many; a
-   * has_many :through whose through reflection is a belongs_to can load even a
-   * new-record owner once the through FK is set (through_association.rb:90).
+   * Mirrors `ForeignAssociation#foreign_key_present?` (foreign_association.rb:5),
+   * which has_many includes: the owner's primary key (`active_record_primary_key`)
+   * must be present for the target to be fetchable, since the children carry the
+   * FK referencing it. A new-record owner with a PK already assigned can still
+   * load. A has_many :through routes through a belongs_to instead
+   * (through_association.rb:90). This matches `CollectionAssociation#foreignKeyPresent`
+   * so the proxy and the OO association never disagree.
    * @internal
    */
   private _foreignKeyPresent(): boolean {
-    if (!this._assocDef.options.through) return false;
+    if (this._assocDef.options.through) {
+      const ctor = this._record.constructor as typeof Base;
+      const reflection = (ctor as any)._reflectOnAssociation?.(this._assocName);
+      if (!reflection) return false;
+      return throughForeignKeyPresent({ owner: this._record, reflection });
+    }
     const ctor = this._record.constructor as typeof Base;
-    const reflection = (ctor as any)._reflectOnAssociation?.(this._assocName);
-    if (!reflection) return false;
-    return throughForeignKeyPresent({ owner: this._record, reflection });
+    const pk = this._assocDef.options.primaryKey ?? (ctor as any).primaryKey ?? "id";
+    const keys = Array.isArray(pk) ? pk : [pk];
+    return keys.every((key: string) => {
+      const owner = this._record as any;
+      const val =
+        typeof owner._readAttribute === "function" ? owner._readAttribute(key) : owner[key];
+      return val != null;
+    });
   }
 
   /**
