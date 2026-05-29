@@ -558,11 +558,22 @@ describe("AssociationCallbacksTest", () => {
     expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
   });
 
-  it.skip("has many callbacks for destroy on parent", () => {
-    // BLOCKED: dependent: :destroy on the parent does not route child removal
-    // through remove_records, so before_remove/after_remove don't fire on
-    // owner.destroy. Needs the dependent-destroy path to invoke remove_records
-    // (out of scope for the callback-dispatch unification in PR E1).
+  it("has many callbacks for destroy on parent", async () => {
+    const log: string[] = [];
+    const { Post, Comment } = makePostWithCallbacks({
+      dependent: "destroy",
+      beforeRemove: (_owner: any, record: any) => {
+        log.push("before_remove" + record.id);
+      },
+      afterRemove: (_owner: any, record: any) => {
+        log.push("after_remove" + record.id);
+      },
+    });
+    const post = await Post.create({ title: "Firm" });
+    const comment = await (Comment as any).create({ body: "Client", post_id: post.id });
+    await post.destroy();
+
+    expect(log).toEqual(["before_remove" + comment.id, "after_remove" + comment.id]);
   });
 
   it("has and belongs to many add callback", async () => {

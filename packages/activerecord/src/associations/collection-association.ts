@@ -201,14 +201,15 @@ export class CollectionAssociation extends Association {
 
   /**
    * Destroy all records from this association, calling destroy callbacks.
+   *
+   * Mirrors Rails' `CollectionAssociation#destroy_all`: routes the loaded
+   * target through `destroy` (→ `remove_records`) so `before_remove` /
+   * `after_remove` fire — not a direct `record.destroy` loop, which would
+   * bypass the collection callbacks on `owner.destroy` (`dependent: :destroy`).
    */
   async destroyAll(): Promise<void> {
     const records = await this.loadTarget();
-    for (const record of records) {
-      if (typeof (record as any).destroy === "function") {
-        await (record as any).destroy();
-      }
-    }
+    await this.destroy(...records);
     this.reset();
     this.loadedBang();
   }

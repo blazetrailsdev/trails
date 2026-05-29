@@ -106,6 +106,32 @@ export class HasManyAssociation extends CollectionAssociation {
   protected override computeNullifiedOwnerAttributes(): Record<string, null> {
     return nullifiedOwnerAttributes(this);
   }
+
+  /**
+   * Delete the given records per the `:dependent` strategy. Reached from
+   * `removeRecords` (after `before_remove` fires), so `dependent: :destroy`
+   * on `owner.destroy` now destroys children through the callback path.
+   *
+   * Mirrors: ActiveRecord::Associations::HasManyAssociation#delete_records —
+   * `:destroy` destroys each record; otherwise a bulk delete/nullify scoped
+   * to the records, decrementing the counter cache by the affected count.
+   * @internal
+   */
+  protected override async deleteRecords(records: Base[], method: string): Promise<number> {
+    if (method === "destroy") {
+      for (const record of records) {
+        if (typeof (record as any).destroy === "function") await (record as any).destroy();
+      }
+      return records.length;
+    }
+    // delete_all / nullify only reach here via the association-layer `delete`
+    // with a dependent strategy; non-through has_many `delete` is intercepted
+    // by the CollectionProxy. Mirror Rails' bulk delete_records branch.
+    const scope = (this as any).scope?.();
+    const count = scope ? await deleteCount(this, method, scope) : 0;
+    if (count > 0) await updateCounter(this, -count);
+    return count;
+  }
 }
 
 /** @internal */
@@ -150,11 +176,6 @@ async function deleteOrNullifyAllRecords(assoc: HasManyAssociation, method: stri
   const scope = (assoc as any).scope?.();
   const count = await deleteCount(assoc, method, scope);
   if (count > 0) await updateCounter(assoc, -count);
-}
-
-/** @internal */
-function deleteRecords(assoc: HasManyAssociation, records: Base[], method: string): Promise<void> {
-  return (assoc as any).delete?.(...records) ?? Promise.resolve();
 }
 
 /** @internal */
