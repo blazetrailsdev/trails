@@ -150,13 +150,14 @@ boot:
   a drop-in `tsc` replacement, reads `db/schema-columns.json` (the
   `--schema` flag in the `typecheck` script) and injects a `declare` member
   per column, plus association proxies (`user.tweets`), scope readers
-  (`Tweet.recent()`), and target imports. Regenerate the JSON with
-  `pnpm dump-schema` after any schema change. In a real app you'd instead run
+  (`Tweet.recent()`), and target imports. `pnpm db:migrate` regenerates the
+  JSON automatically (or run `pnpm db:schema:dump`), just as Rails rewrites
+  `schema.rb` after migrating. In a real app you'd instead run
   `trails-schema-dump --out db/schema-columns.json` against your live DB.
-- **Runtime:** `db.ts` calls `Model.loadSchema()` for each model after
-  migrating, reflecting the columns off the live database into the model.
-  (Rails does this lazily on first use; we warm it eagerly so the first
-  request is ready.)
+- **Runtime:** `loadModelSchemas()` (in `src/db.ts`) calls `Model.loadSchema()`
+  for each model after connecting, reflecting the columns off the live
+  database. (Rails does this lazily on first use; we warm it eagerly so the
+  first request is ready.)
 
 Plain `tsc` **cannot** type these files — every attribute, association, and
 scope comes back as `unknown`. That's the whole point: try
