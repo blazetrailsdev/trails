@@ -124,7 +124,7 @@ export class ConnectionManagement {
   constructor(private readonly app: RackApp) {}
 
   call(env: Record<string, unknown>): RackResponse {
-    const testing = Object.prototype.hasOwnProperty.call(env, "rack.test");
+    const testing = Boolean(env["rack.test"]);
     try {
       const [status, headers, body] = this.app.call(env);
       const proxy = BodyProxy.wrap(testing ? null : clearActiveConnections, body);
