@@ -863,11 +863,26 @@ describe("StrictLoadingTest", () => {
       setActionOnStrictLoadingViolation("raise");
     }
   });
-  it.skip("strict loading logging mode can be set per model", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
-    /* needs per-model strict loading mode configuration */
+  it("strict loading logging mode can be set per model", () => {
+    class SlmAllModel extends Base {
+      static {
+        this.attribute("name", "string");
+        this.strictLoadingMode = "all";
+      }
+    }
+    class SlmNPlusOneModel extends Base {
+      static {
+        this.attribute("name", "string");
+        this.strictLoadingMode = "n_plus_one_only";
+      }
+    }
+    const allRecord = new SlmAllModel({ name: "A" });
+    const nPlusOneRecord = new SlmNPlusOneModel({ name: "B" });
+    expect(allRecord.isStrictLoadingAll()).toBe(true);
+    expect(allRecord.isStrictLoadingNPlusOneOnly()).toBe(false);
+    expect(nPlusOneRecord.isStrictLoadingNPlusOneOnly()).toBe(true);
+    expect(nPlusOneRecord.isStrictLoadingAll()).toBe(false);
+    expect(nPlusOneRecord.strictLoadingMode()).toBe("n_plus_one_only");
   });
   it("strict loading all prevents lazy loading", async () => {
     class SlAllAuthor extends Base {

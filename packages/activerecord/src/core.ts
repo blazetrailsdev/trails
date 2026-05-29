@@ -37,7 +37,7 @@ export interface Core {
   readonlyBang(): this;
   isStrictLoading(): boolean;
   strictLoadingBang(value?: boolean, options?: { mode?: StrictLoadingMode }): this;
-  strictLoadingMode(): StrictLoadingMode | null;
+  strictLoadingMode(): StrictLoadingMode;
   isStrictLoadingAll(): boolean;
   isStrictLoadingNPlusOneOnly(): boolean;
   isFrozen(): boolean;
@@ -227,22 +227,31 @@ export function initAttributes(
   }
 }
 
-export function strictLoadingMode(
-  this: CoreRecord & { _strictLoadingMode?: StrictLoadingMode },
-): StrictLoadingMode | null {
-  return this._strictLoadingMode ?? null;
+type StrictLoadingModeHost = CoreRecord & { _strictLoadingMode?: StrictLoadingMode };
+
+/**
+ * Resolve the effective strict-loading mode for this record: the
+ * per-instance override if set (via `strictLoadingBang`), otherwise the
+ * per-model class attribute (`Model.strictLoadingMode`, default "all").
+ *
+ * Mirrors Rails `init_internals`: `@strict_loading_mode = klass.strict_loading_mode`.
+ */
+function effectiveStrictLoadingMode(record: StrictLoadingModeHost): StrictLoadingMode {
+  const classMode = (record.constructor as { strictLoadingMode?: StrictLoadingMode })
+    .strictLoadingMode;
+  return record._strictLoadingMode ?? classMode ?? "all";
 }
 
-export function isStrictLoadingNPlusOneOnly(
-  this: CoreRecord & { _strictLoadingMode?: StrictLoadingMode },
-): boolean {
-  return this._strictLoadingMode === "n_plus_one_only";
+export function strictLoadingMode(this: StrictLoadingModeHost): StrictLoadingMode {
+  return effectiveStrictLoadingMode(this);
 }
 
-export function isStrictLoadingAll(
-  this: CoreRecord & { _strictLoadingMode?: StrictLoadingMode },
-): boolean {
-  return this._strictLoadingMode === "all";
+export function isStrictLoadingNPlusOneOnly(this: StrictLoadingModeHost): boolean {
+  return effectiveStrictLoadingMode(this) === "n_plus_one_only";
+}
+
+export function isStrictLoadingAll(this: StrictLoadingModeHost): boolean {
+  return effectiveStrictLoadingMode(this) === "all";
 }
 
 export function fullInspect(this: CoreRecord): string {

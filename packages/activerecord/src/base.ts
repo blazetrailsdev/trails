@@ -3050,6 +3050,27 @@ export class Base extends Model {
     this._strictLoadingByDefault = value;
   }
 
+  // -- Strict loading mode (per-model) --
+  //
+  // Selects strictness when strict loading is on: "all" (default, raises on
+  // any lazily-loaded association) or "n_plus_one_only" (raises only on
+  // associations that would lead to N+1 queries). Set per-class with
+  // `Post.strictLoadingMode = "n_plus_one_only"`; subclasses inherit via JS
+  // prototype lookup and may override.
+  //
+  // Mirrors: ActiveRecord::Base — `class_attribute :strict_loading_mode,
+  // instance_accessor: false, default: :all` in core.rb.
+  static _strictLoadingMode: _Core.StrictLoadingMode = "all";
+
+  /** Mirrors: ActiveRecord::Base.strict_loading_mode */
+  static get strictLoadingMode(): _Core.StrictLoadingMode {
+    return this._strictLoadingMode;
+  }
+
+  static set strictLoadingMode(value: _Core.StrictLoadingMode) {
+    this._strictLoadingMode = value;
+  }
+
   /**
    * Generate a signed ID for this record using HMAC-SHA256 via MessageVerifier.
    * The purpose parameter scopes the signed ID. expiresIn is in seconds.
