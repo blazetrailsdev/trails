@@ -728,8 +728,11 @@ export class ConnectionPool implements ReapablePool {
       const expireBlock = () => c.expire?.();
       if (typeof c._runCheckinCallbacks === "function") c._runCheckinCallbacks(expireBlock);
       else {
-        QueryCache.unsetQueryCacheBang.call(conn as unknown as QueryCacheHost);
+        // Defensive fallback for a connection without the callback runner.
+        // Mirror the registry order: block (expire) first, then the `:after`
+        // unset_query_cache! teardown.
         expireBlock();
+        QueryCache.unsetQueryCacheBang.call(conn as unknown as QueryCacheHost);
       }
       this._available?.add(conn);
       this._lastCheckinAt.set(conn, Date.now());
