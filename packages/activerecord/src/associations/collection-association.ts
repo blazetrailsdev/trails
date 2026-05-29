@@ -208,14 +208,16 @@ export class CollectionAssociation extends Association {
    * Mirrors Rails' `delete_or_nullify_all_records(method)`: the single
    * dispatch point that `delete_all` routes through, so subclasses
    * (`HasManyThroughAssociation`) can override the bulk strategy in one
-   * place. The base CollectionAssociation chooses nullify vs. delete by
-   * `method`; anything other than `"nullify"` deletes the rows.
+   * place. The base CollectionAssociation chooses delete vs. nullify by
+   * `method`, mirroring Rails' `delete_count`: only an explicit `"deleteAll"`
+   * deletes the rows; every other method (including the `nil`/`undefined`
+   * default from `delete_all` with no `:dependent`) nullifies the FK.
    */
   protected async deleteOrNullifyAllRecords(method?: string): Promise<void> {
-    if (method === "nullify") {
-      await this.nullifyAllRecords();
-    } else {
+    if (method === "deleteAll") {
       await this.deleteAllRecords();
+    } else {
+      await this.nullifyAllRecords();
     }
   }
 

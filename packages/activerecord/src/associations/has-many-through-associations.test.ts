@@ -26,6 +26,9 @@ const TEST_SCHEMA: Schema = {
   ae_people: { first_name: "string" },
   ae_posts: { title: "string" },
   ae_readers: { ae_person_id: "integer", ae_post_id: "integer" },
+  af4_items: { label: "string" },
+  af4_refs: { af4_owner_id: "integer", af4_item_id: "integer" },
+  af4_owners: { name: "string" },
   anb_people: { first_name: "string" },
   anb_posts: { title: "string", body: "string" },
   anb_readers: { anb_person_id: "integer", anb_post_id: "integer" },
@@ -2060,6 +2063,64 @@ describe("HasManyThroughAssociationsTest", () => {
       className: "HmtDaClrItem",
     });
     expect(items).toHaveLength(0);
+  });
+  // Mirrors Rails' test_delete_all_for_with_dependent_option_delete_all /
+  // _nullify: the CollectionAssociation `delete_all` dispatch routes through
+  // HasManyThroughAssociation#delete_or_nullify_all_records →
+  // delete_records(load_target, method), removing the join rows (or nulling the
+  // source FK) while leaving the target records untouched.
+  const setupAf4 = async (method: "delete_all" | "nullify") => {
+    class Af4Owner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Af4Ref extends Base {
+      static {
+        this.attribute("af4_owner_id", "integer");
+        this.attribute("af4_item_id", "integer");
+      }
+    }
+    class Af4Item extends Base {
+      static {
+        this.attribute("label", "string");
+      }
+    }
+    Associations.hasMany.call(Af4Owner, `af4Refs_${method}`, {
+      className: "Af4Ref",
+      foreignKey: "af4_owner_id",
+    });
+    Associations.hasMany.call(Af4Owner, `af4Items_${method}`, {
+      through: `af4Refs_${method}`,
+      source: "af4Item",
+      className: "Af4Item",
+      dependent: method === "delete_all" ? "delete" : "nullify",
+    });
+    Associations.belongsTo.call(Af4Ref, "af4Item", {
+      className: "Af4Item",
+      foreignKey: "af4_item_id",
+    });
+    registerModel("Af4Owner", Af4Owner);
+    registerModel("Af4Ref", Af4Ref);
+    registerModel("Af4Item", Af4Item);
+    const owner = await Af4Owner.create({ name: "O" });
+    const item = await Af4Item.create({ label: "I" });
+    await Af4Ref.create({ af4_owner_id: owner.id, af4_item_id: item.id });
+    return { owner, item, Af4Ref, Af4Item };
+  };
+  it("delete_all for with dependent option delete_all", async () => {
+    const { owner, item, Af4Ref, Af4Item } = await setupAf4("delete_all");
+    await (owner as any).association("af4Items_delete_all").deleteAll();
+    expect(await Af4Ref.all().toArray()).toHaveLength(0);
+    expect(await Af4Item.find(item.id)).not.toBeNull();
+  });
+  it("delete_all for with dependent option nullify", async () => {
+    const { owner, item, Af4Ref, Af4Item } = await setupAf4("nullify");
+    await (owner as any).association("af4Items_nullify").deleteAll();
+    const refs = await Af4Ref.all().toArray();
+    expect(refs).toHaveLength(1);
+    expect(refs[0].af4_item_id).toBeNull();
+    expect(await Af4Item.find(item.id)).not.toBeNull();
   });
   it("destroy on association clears scope", async () => {
     class HmtDstClrOwner extends Base {

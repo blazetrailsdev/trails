@@ -109,6 +109,21 @@ export class HasManyAssociation extends CollectionAssociation {
   }
 
   /**
+   * Mirrors Rails' `HasManyAssociation#delete_or_nullify_all_records`
+   * (via `delete_count` + `update_counter`, has_many_association.rb): the
+   * `delete_all` dispatch point. Deletes the scoped rows for `"deleteAll"`,
+   * otherwise (including the `nil`/`undefined` default) nullifies their FK —
+   * then decrements the counter cache by the affected count.
+   * @internal
+   */
+  protected override async deleteOrNullifyAllRecords(method?: string): Promise<void> {
+    const scope = (this as any).scope?.();
+    if (!scope) return;
+    const count = await deleteCount(this, method ?? "", scope);
+    if (count > 0) await updateCounter(this, -count);
+  }
+
+  /**
    * Delete the given records per the `:dependent` strategy. Reached from
    * `removeRecords` (after `before_remove` fires), so `dependent: :destroy`
    * on `owner.destroy` now destroys children through the callback path.
@@ -201,14 +216,6 @@ function scopeForRecords(scope: any, queryConstraints: string[], records: Base[]
     scope = scope.where({ [col]: records.map((r) => readCol(r, col)) });
   }
   return scope;
-}
-
-/** @internal */
-async function deleteOrNullifyAllRecords(assoc: HasManyAssociation, method: string): Promise<void> {
-  // Rails: count = delete_count(method, scope); update_counter(-count)
-  const scope = (assoc as any).scope?.();
-  const count = await deleteCount(assoc, method, scope);
-  if (count > 0) await updateCounter(assoc, -count);
 }
 
 /** @internal */

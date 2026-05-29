@@ -240,22 +240,18 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     await deleteThroughRecords(this, records);
     return count;
   }
-}
 
-/**
- * Mirrors Rails' `HasManyThroughAssociation#delete_or_nullify_all_records`
- * (has_many_through_association.rb:136-138): `delete_records(load_target, method)`.
- * @internal
- */
-async function deleteOrNullifyAllRecords(
-  assoc: HasManyThroughAssociation,
-  method: string,
-): Promise<number> {
-  const a = assoc as unknown as {
-    loadTarget(): Promise<Base[]>;
-    deleteRecords(r: Base[], m: string): Promise<number>;
-  };
-  return a.deleteRecords(await a.loadTarget(), method);
+  /**
+   * Mirrors Rails' `HasManyThroughAssociation#delete_or_nullify_all_records`
+   * (has_many_through_association.rb:136-138): `delete_records(load_target,
+   * method)`. Routes the `delete_all` dispatch through join-row deletion (with
+   * the counter-cache callbacks that `deleteRecords` fires) instead of the base
+   * bulk `scope.deleteAll`, which can't reach the join table.
+   * @internal
+   */
+  protected override async deleteOrNullifyAllRecords(method?: string): Promise<void> {
+    await this.deleteRecords(await this.loadTarget(), method ?? "");
+  }
 }
 
 /**
