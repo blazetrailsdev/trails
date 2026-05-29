@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import {
   Base,
   transaction,
@@ -12,10 +12,7 @@ import {
   registerModel,
 } from "./index.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
@@ -395,25 +392,17 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { topics: { title: "string" } });
-  });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
+    await defineSchema({ topics: { title: "string" } });
   });
 
   it("trigger once on multiple deletion within transaction 2", async () => {
-    const adp = adapter;
     const log: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.afterDestroy(function () {
           log.push("destroyed");
         });
@@ -427,12 +416,10 @@ describe("CallbacksTest", () => {
   });
 
   it("trigger once on multiple deletions 2", async () => {
-    const adp = adapter;
     const log: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.afterDestroy(function () {
           log.push("destroyed");
         });
@@ -446,12 +433,10 @@ describe("CallbacksTest", () => {
   });
 
   it("trigger once on multiple deletions in a transaction 2", async () => {
-    const adp = adapter;
     const log: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.afterDestroy(function () {
           log.push("destroyed");
         });
@@ -467,11 +452,9 @@ describe("CallbacksTest", () => {
   });
 
   it("rollback on multiple deletions 2", async () => {
-    const adp = adapter;
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -489,12 +472,10 @@ describe("CallbacksTest", () => {
   });
 
   it("trigger on update where row was deleted 2", async () => {
-    const adp = adapter;
     const log: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.afterDestroy(function () {
           log.push("destroyed");
         });
@@ -507,25 +488,17 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: TestDatabaseAdapter;
-
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, { topics: { title: "string" } });
-  });
-  withTransactionalFixtures(() => adapter);
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
+    await defineSchema({ topics: { title: "string" } });
   });
 
   it("created callback called on last to save of separate instances in a transaction 2", async () => {
-    const adp = adapter;
     const log: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.afterCreate((record: any) => {
           log.push("created:" + record.title);
         });
@@ -539,12 +512,10 @@ describe("CallbacksTest", () => {
   });
 
   it("created callback called on first to save in transaction with old configuration 2", async () => {
-    const adp = adapter;
     const log: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
         this.afterCreate((record: any) => {
           log.push("created:" + record.title);
         });
@@ -558,11 +529,9 @@ describe("CallbacksTest", () => {
   });
 
   it("updated callback called on last to save of separate instances in a transaction 2", async () => {
-    const adp = adapter;
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -579,11 +548,9 @@ describe("CallbacksTest", () => {
   });
 
   it("updated callback called on first to save in transaction with old configuration 2", async () => {
-    const adp = adapter;
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -600,11 +567,9 @@ describe("CallbacksTest", () => {
   });
 
   it("destroyed callback called on destroyed instance when preceded in transaction by save from separate instance 2", async () => {
-    const adp = adapter;
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const t1 = await Topic.create({ title: "a" });
@@ -625,11 +590,9 @@ describe("CallbacksTest", () => {
   });
 
   it("destroyed callbacks called on destroyed instance even when followed by update from separate instances in a transaction 2", async () => {
-    const adp = adapter;
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
     const t1 = await Topic.create({ title: "a" });

@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -51,13 +50,6 @@ const TEST_SCHEMA: Schema = {
     primaryKey: ["thing_id"],
   },
 };
-
-// -- Helpers --
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
 
 describe("PrimaryKeysTest", () => {
   setupHandlerSuite();
@@ -335,23 +327,24 @@ describe("PrimaryKeysTest", () => {
 });
 
 describe("PrimaryKeyIntegerTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("primary key column type with serial/integer", async () => {
-    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     const w = await Widget.create({ name: "gear" });
     expect(typeof w.id).toBe("number");
   });
   it("primary key with serial/integer are automatically numbered", async () => {
-    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     const w1 = await Widget.create({ name: "a" });
@@ -359,11 +352,9 @@ describe("PrimaryKeyIntegerTest", () => {
     expect(w2.id as number).toBeGreaterThan(w1.id as number);
   });
   it("schema dump primary key with serial/integer", async () => {
-    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     const w = await Widget.create({ name: "test" });
@@ -371,22 +362,18 @@ describe("PrimaryKeyIntegerTest", () => {
     expect(typeof w.id).toBe("number");
   });
   it("primary key column type with options", async () => {
-    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     const w = await Widget.create({ name: "test" });
     expect(w.id).not.toBeNull();
   });
   it("bigint primary key with unsigned", async () => {
-    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     const w = await Widget.create({ name: "big" });
@@ -395,12 +382,15 @@ describe("PrimaryKeyIntegerTest", () => {
 });
 
 describe("PrimaryKeyAnyTypeTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("any type primary key", async () => {
-    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     const w = await Widget.create({ name: "test" });
@@ -408,22 +398,18 @@ describe("PrimaryKeyAnyTypeTest", () => {
     expect(w.id).not.toBeNull();
   });
   it("schema dump primary key includes type and options", async () => {
-    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adp;
       }
     }
     const w = await Widget.create({ label: "x" });
     expect(w.id).toBeDefined();
   });
   it("schema typed primary key column", async () => {
-    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     const w = await Widget.create({ name: "typed" });
@@ -433,12 +419,15 @@ describe("PrimaryKeyAnyTypeTest", () => {
 });
 
 describe("PrimaryKeyWithAutoIncrementTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
   it("primary key with integer", async () => {
-    const adp = await freshAdapter();
     class AutoItem extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     const a = await AutoItem.create({ name: "first" });
@@ -447,11 +436,9 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
     expect(b.id as number).toBe((a.id as number) + 1);
   });
   it("primary key with bigint", async () => {
-    const adp = await freshAdapter();
     class BigItem extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
       }
     }
     const a = await BigItem.create({ name: "big1" });
