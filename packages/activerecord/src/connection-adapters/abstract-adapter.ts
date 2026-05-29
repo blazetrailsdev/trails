@@ -420,6 +420,15 @@ export interface AbstractAdapter {
   /** @internal */
   createAlterTable?(name: string): AlterTable;
 }
+/** @internal */
+export type ConnectionCallbackPhase = "checkout" | "checkin";
+/** @internal */
+export type ConnectionCallbackKind = "before" | "after";
+interface ConnectionCallback {
+  kind: ConnectionCallbackKind;
+  method: (this: AbstractAdapter) => void;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractAdapter implements Quoting {
   static readonly Version = Version;
@@ -715,6 +724,52 @@ export class AbstractAdapter implements Quoting {
     this._inUse = false;
     this._owner = null;
     this._idleSince = Date.now();
+  }
+
+  // --- Checkout / Checkin callbacks ---
+  //
+  // Mirrors Rails' `define_callbacks :checkout, :checkin` (abstract_adapter.rb:33).
+  // A deliberately minimal registry: each phase keeps an ordered list of named
+  // callbacks tagged `before`/`after`, so callers (the pool, the QueryCache
+  // mixin) register checkout/checkin hooks through one generic API instead of
+  // the pool hard-coding the effects inline.
+  private static _connectionCallbacks: Record<ConnectionCallbackPhase, ConnectionCallback[]> = {
+    checkout: [],
+    checkin: [],
+  };
+
+  /**
+   * Register a `:checkout`/`:checkin` callback. Mirrors Rails'
+   * `set_callback(phase, kind, method)`.
+   *
+   * @internal
+   */
+  static setCallback(
+    phase: ConnectionCallbackPhase,
+    kind: ConnectionCallbackKind,
+    method: (this: AbstractAdapter) => void,
+  ): void {
+    this._connectionCallbacks[phase].push({ kind, method });
+  }
+
+  private _runCallbacks(phase: ConnectionCallbackPhase, block: () => void): void {
+    const callbacks = AbstractAdapter._connectionCallbacks[phase];
+    for (const cb of callbacks) if (cb.kind === "before") cb.method.call(this);
+    block();
+    // Rails runs `:after` callbacks in reverse registration order.
+    for (let i = callbacks.length - 1; i >= 0; i--) {
+      if (callbacks[i].kind === "after") callbacks[i].method.call(this);
+    }
+  }
+
+  /** @internal */
+  _runCheckoutCallbacks(block: () => void): void {
+    this._runCallbacks("checkout", block);
+  }
+
+  /** @internal */
+  _runCheckinCallbacks(block: () => void): void {
+    this._runCallbacks("checkin", block);
   }
 
   get adapterName(): string {
@@ -1887,6 +1942,19 @@ include(AbstractAdapter, SchemaStatements);
 include(AbstractAdapter, QuotingMixin);
 // Rails: `include QueryCache` inside the class body.
 include(AbstractAdapter, QueryCacheMixin);
+// Rails: `QueryCache.included` runs `set_callback :checkin, :after, :unset_query_cache!`
+// (query_cache.rb:17). We have no `included` hook, so register it here at the
+// include site instead.
+AbstractAdapter.setCallback("checkin", "after", function () {
+  (this as unknown as { unsetQueryCacheBang(): void }).unsetQueryCacheBang();
+});
+// Rails: `set_callback :checkin, :after, :enable_lazy_transactions!`
+// (abstract_adapter.rb:53), registered after the QueryCache include — so as an
+// `:after` callback (run in reverse registration order) it fires *before*
+// unset_query_cache!.
+AbstractAdapter.setCallback("checkin", "after", function () {
+  this.enableLazyTransactionsBang();
+});
 // Rails: `include Savepoints` inside the class body.
 include(AbstractAdapter, SavepointsMixin);
 // Rails: `include DatabaseLimits` inside the class body.

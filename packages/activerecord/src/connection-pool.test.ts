@@ -1460,6 +1460,9 @@ describe("ConnectionPoolConfiguration query cache", () => {
         get currentTransaction() {
           return { open: false };
         },
+        // The error-path checkin runs Rails' `:checkin :after enable_lazy_transactions!`
+        // callback, which delegates here — a real transaction manager always has it.
+        enableLazyTransactionsBang() {},
       };
 
       const pinnedCount = () =>
@@ -1566,5 +1569,57 @@ describe("ConnectionPoolConfiguration query cache", () => {
       expect(seenSize).toBeGreaterThan(0);
       expect(registry._caches.size).toBe(0);
     });
+  });
+});
+
+describe("checkout/checkin callbacks", () => {
+  it("pinned checkout calls verifyBang unconditionally and skips query-cache wiring", async () => {
+    const pool = makeTransactionAwarePool(5);
+    await pool.pinConnectionBang();
+    const pinned = pool.checkout() as TransactionAwareTestAdapter;
+    const spy = vi.spyOn(pinned, "verifyBang");
+    try {
+      const again = pool.checkout();
+      expect(again).toBe(pinned);
+      expect(spy).toHaveBeenCalledTimes(1);
+      // Rails' pinned branch (connection_pool.rb:553-559) does not run
+      // checkout_and_verify, so no Store is attached on the pinned path.
+      expect((pinned as unknown as { _queryCache: Store | null })._queryCache).toBeNull();
+    } finally {
+      // Always unpin so an early assertion failure can't leak the pinned
+      // connection into the rest of this file's run.
+      await pool.unpinConnectionBang();
+    }
+  });
+
+  it("checkin runs the registered :checkin :after callbacks (unset_query_cache!, enable_lazy_transactions!)", () => {
+    const pool = makeTransactionAwarePool(1);
+    const conn = pool.checkout() as TransactionAwareTestAdapter;
+    expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeInstanceOf(Store);
+
+    const lazySpy = vi.spyOn(conn, "enableLazyTransactionsBang");
+    pool.checkin(conn);
+
+    expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeNull();
+    expect(lazySpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("setCallback registers a custom :checkout callback that runs on checkout", () => {
+    const calls: string[] = [];
+    AbstractAdapter.setCallback("checkout", "after", function () {
+      calls.push(this.adapterName);
+    });
+    try {
+      const pool = makeTransactionAwarePool(1);
+      pool.checkout();
+      expect(calls).toEqual(["sqlite"]);
+    } finally {
+      // Drop the test-registered callback so it can't leak into sibling tests.
+      (
+        AbstractAdapter as unknown as {
+          _connectionCallbacks: { checkout: unknown[] };
+        }
+      )._connectionCallbacks.checkout.pop();
+    }
   });
 });

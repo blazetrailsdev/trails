@@ -625,13 +625,13 @@ export class ConnectionPool implements ReapablePool {
   checkout(): DatabaseAdapter {
     const pinned = this._resolvePinnedConnection();
     if (pinned) {
-      if (isTransactionAware(pinned)) {
-        pinned.verifyBang();
-      }
+      // Mirrors Rails' pinned branch (connection_pool.rb:553-559): verify!
+      // unconditionally, ensure membership in @connections, and return — no
+      // checkout_and_verify / QueryCache wiring on the pinned connection.
+      (pinned as unknown as { verifyBang(): void }).verifyBang();
       if (this._connections && !this._connections.includes(pinned)) {
         this._connections.push(pinned);
       }
-      this._cacheConfig.checkoutAndVerify(pinned as unknown as QueryCacheHost);
       return pinned;
     }
     const conn = this._acquireConnection();
@@ -641,13 +641,16 @@ export class ConnectionPool implements ReapablePool {
   async checkoutAsync(timeout?: number): Promise<DatabaseAdapter> {
     const pinned = this._resolvePinnedConnection();
     if (pinned) {
-      if (isTransactionAware(pinned)) {
-        pinned.verifyBang();
-      }
+      // Mirrors Rails' pinned branch (connection_pool.rb:553-559): verify!
+      // unconditionally, ensure membership in @connections, and return — no
+      // checkout_and_verify / QueryCache wiring on the pinned connection.
+      // verifyBang is async in trails (Rails' verify! is sync); await it on the
+      // async path so verification completes before the connection is handed out
+      // and a rejection surfaces here rather than as an unhandled rejection.
+      await (pinned as unknown as { verifyBang(): void | Promise<void> }).verifyBang();
       if (this._connections && !this._connections.includes(pinned)) {
         this._connections.push(pinned);
       }
-      this._cacheConfig.checkoutAndVerify(pinned as unknown as QueryCacheHost);
       return pinned;
     }
     const conn = this._tryAcquire();
@@ -718,9 +721,22 @@ export class ConnectionPool implements ReapablePool {
     if (this._isConnectionPinned(conn)) return;
     this._connectionLease().clear(conn);
     if (this._checkedOut.has(conn)) {
-      QueryCache.unsetQueryCacheBang.call(conn as unknown as QueryCacheHost);
       this._checkedOut.delete(conn);
-      (conn as unknown as PoolManagedConnection).expire?.();
+      // Mirrors `conn._run_checkin_callbacks { conn.expire }`: expire is the
+      // block; the `:after` callbacks (unset_query_cache!, enable_lazy_transactions!)
+      // fire afterwards via the registry.
+      const c = conn as unknown as PoolManagedConnection & {
+        _runCheckinCallbacks?: (block: () => void) => void;
+      };
+      const expireBlock = () => c.expire?.();
+      if (typeof c._runCheckinCallbacks === "function") c._runCheckinCallbacks(expireBlock);
+      else {
+        // Defensive fallback for a connection without the callback runner.
+        // Mirror the registry order: block (expire) first, then the `:after`
+        // unset_query_cache! teardown.
+        expireBlock();
+        QueryCache.unsetQueryCacheBang.call(conn as unknown as QueryCacheHost);
+      }
       this._available?.add(conn);
       this._lastCheckinAt.set(conn, Date.now());
     }
@@ -1492,9 +1508,21 @@ function checkoutNewConnection(pool: Pool): DatabaseAdapter {
  */
 function checkoutAndVerify(pool: Pool, c: DatabaseAdapter): DatabaseAdapter {
   try {
-    const cleanable = c as unknown as { cleanBang?: () => void; clean?: () => void };
-    if (typeof cleanable.cleanBang === "function") cleanable.cleanBang();
-    else cleanable.clean?.();
+    const conn = c as unknown as {
+      cleanBang?: () => void;
+      clean?: () => void;
+      _runCheckoutCallbacks?: (block: () => void) => void;
+    };
+    // Mirrors `c._run_checkout_callbacks { c.clean! }`: clean! is the block body;
+    // core AR registers no `:checkout` callbacks on the connection.
+    const cleanBlock = () => {
+      if (typeof conn.cleanBang === "function") conn.cleanBang();
+      else conn.clean?.();
+    };
+    if (typeof conn._runCheckoutCallbacks === "function") conn._runCheckoutCallbacks(cleanBlock);
+    else cleanBlock();
+    // Pool-level QueryCache wiring (Rails: QueryCache::ConnectionPoolConfiguration
+    // #checkout_and_verify), not a connection `:checkout` callback.
     pool._cacheConfig.checkoutAndVerify(c as unknown as QueryCacheHost);
     return c;
   } catch (err) {
