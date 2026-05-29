@@ -1279,6 +1279,14 @@ describe("AutomaticInverseFindingTests", () => {
   // and Cpk::CarReview belongs_to :car, foreign_key: [:car_make, :car_model]. The
   // composite foreign_key is moved to queryConstraints, so options.foreignKey is unset
   // and automatic inverse detection proceeds, matching on the composite foreign key.
+  //
+  // The classes are named `Car`/`CarReview`, NOT the shared CpkCar/CpkCarReview
+  // fixtures, on purpose. Rails derives the inverse name via
+  // `underscore(demodulize(active_record.name))` — for `Cpk::Car` that strips the
+  // module to `Car` → `car`, which is what matches `belongs_to :car`. Our demodulize
+  // only strips on `::` (inflector.ts), so `demodulize("CpkCar")` stays "CpkCar" →
+  // "cpk_car" and the derivation would miss. Bare `Car`/`CarReview` reproduce the
+  // post-demodulize names Rails' algorithm actually operates on.
   function makeCpkCarModels() {
     class Car extends Base {
       static {
