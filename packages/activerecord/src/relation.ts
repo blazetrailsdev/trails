@@ -2649,12 +2649,14 @@ export class Relation<T extends Base> {
    */
   async exists(conditions?: Record<string, unknown> | unknown): Promise<boolean> {
     if (this._isNone) return false;
-    // Rails exists? routes through apply_join_dependency when eager loading,
-    // raising EagerLoadPolymorphicError for polymorphic specs (finder_methods.rb).
-    this._checkEagerLoadable();
     // Rails FinderMethods#exists?: `return false if !conditions` — treats an
-    // explicit `false` / `null` argument as "no match possible".
+    // explicit `false` / `null` argument as "no match possible". This precedes
+    // the `if eager_loading?` branch, so it short-circuits before the
+    // eager-load validation below (finder_methods.rb:367-369).
     if (conditions === false || conditions === null) return false;
+    // Rails exists? then routes through apply_join_dependency when eager
+    // loading, raising EagerLoadPolymorphicError for polymorphic specs.
+    this._checkEagerLoadable();
     let rel: Relation<T> = this;
     if (conditions !== undefined) {
       // Mirrors Rails' FinderMethods#exists? argument handling

@@ -4905,6 +4905,9 @@ describe("EagerAssociationTest", () => {
     await expect(essays.eagerLoad("writer").toArray()).rejects.toThrow(EagerLoadPolymorphicError);
     await expect(essays.eagerLoad("writer").count()).rejects.toThrow(EagerLoadPolymorphicError);
     await expect(essays.eagerLoad("writer").exists()).rejects.toThrow(EagerLoadPolymorphicError);
+    // Rails `exists?` short-circuits on a falsey condition before the
+    // eager_loading? raise (finder_methods.rb:367-369).
+    expect(await essays.eagerLoad("writer").exists(false)).toBe(false);
   });
   it("preloading has_many_through association avoids calling association.reader", async () => {
     class PhmtAuthor extends Base {
