@@ -121,6 +121,109 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(targetChild.tableName).toBe("jdt_comments");
   });
 
+  it("emits canonical self-join aliases when a nested-through chain references a table multiple times", () => {
+    // Mirrors the alias-emission slice of Rails
+    // test_nested_has_many_through_with_a_table_referenced_multiple_times
+    // (nested_through_associations_test.rb:437): Author.similar_posts walks
+    // Author -> tags -> tagged_posts so the chain visits `posts` and `taggings`
+    // twice. AliasTracker names the colliding self-joins
+    // `{plural_name}_{owner_table}_join` (join_dependency.rb:204-206), giving
+    // `posts_authors_join` / `taggings_authors_join`.
+    class StjAuthor extends Base {
+      static {
+        this.tableName = "authors";
+        this.attribute("name", "string");
+      }
+    }
+    class StjPost extends Base {
+      static {
+        this.tableName = "posts";
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+      }
+    }
+    class StjTagging extends Base {
+      static {
+        this.tableName = "taggings";
+        this.attribute("tag_id", "integer");
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
+      }
+    }
+    class StjTag extends Base {
+      static {
+        this.tableName = "tags";
+        this.attribute("name", "string");
+      }
+    }
+    const adapter = createTestAdapter();
+    for (const m of [StjAuthor, StjPost, StjTagging, StjTag]) {
+      m.adapter = adapter;
+      (m as any)._associations = [];
+      registerModel(m);
+    }
+    Associations.hasMany.call(StjAuthor, "posts", {
+      className: "StjPost",
+      foreignKey: "author_id",
+    });
+    Associations.hasMany.call(StjPost, "taggings", {
+      className: "StjTagging",
+      foreignKey: "taggable_id",
+      as: "taggable",
+    });
+    Associations.hasMany.call(StjAuthor, "taggings", {
+      className: "StjTagging",
+      through: "posts",
+      source: "taggings",
+    });
+    Associations.belongsTo.call(StjTagging, "tag", { className: "StjTag", foreignKey: "tag_id" });
+    Associations.hasMany.call(StjAuthor, "tags", {
+      className: "StjTag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.hasMany.call(StjTag, "taggings", {
+      className: "StjTagging",
+      foreignKey: "tag_id",
+    });
+    Associations.belongsTo.call(StjTagging, "taggable", {
+      polymorphic: true,
+      foreignKey: "taggable_id",
+    });
+    Associations.hasMany.call(StjTag, "taggedPosts", {
+      className: "StjPost",
+      through: "taggings",
+      source: "taggable",
+      sourceType: "StjPost",
+    });
+    Associations.hasMany.call(StjAuthor, "similarPosts", {
+      className: "StjPost",
+      through: "tags",
+      source: "taggedPosts",
+    });
+
+    const jd = new JoinDependency(StjAuthor);
+    const node = jd.addAssociation("similarPosts");
+    expect(node).not.toBeNull();
+
+    const effectiveNames = jd.nodes.map((n) => n.effectiveSqlName);
+    // A twice-visited table keeps its real name on first encounter and is
+    // self-join aliased only on the colliding second encounter
+    // (_addThroughViaJoinAssociation: `chainTables.some(...)` detects the
+    // repeat), so exactly one aliased + one real-named join exists for each.
+    expect(effectiveNames).toContain("posts_authors_join");
+    expect(effectiveNames).toContain("taggings_authors_join");
+    expect(effectiveNames.filter((n) => n === "taggings").length).toBe(1);
+    expect(effectiveNames.filter((n) => n === "posts").length).toBe(1);
+
+    // The canonical alias is addressable in the emitted SQL. Match either
+    // quote style (PG/SQLite double-quote, MySQL backtick) so the assertion
+    // isn't tied to the test adapter's quoting.
+    const sql = (StjAuthor as any).all().leftJoins("similarPosts").toSql();
+    expect(sql).toMatch(/["`]taggings["`]\s+["`]taggings_authors_join["`]/);
+    expect(sql).toMatch(/["`]posts["`]\s+["`]posts_authors_join["`]/);
+  });
+
   it("uses the Rails alias_candidate with _join when the through real name collides", () => {
     const jd = new JoinDependency(JdtAuthor);
     jd.addAssociation("jdtPosts");
