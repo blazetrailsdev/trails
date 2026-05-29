@@ -113,7 +113,7 @@ Source: #2633, #2643.
   `_addToTarget` (Rails' `@target.index(record)`) instead of JS `===`
   (`indexOf`). Only then is the `distinct_value` wiring from #2643 observable
   in-memory (currently behaviorally inert — `_replacedOrAddedTargets` identity
-  - DB-side DISTINCT already dedup).
+  plus DB-side DISTINCT already dedup).
 - ~20 LOC each: route `build` (`collection-proxy.ts:628`) and `createBang`
   (~2452) through `_addToTarget` so they hit the `set_inverse_instance` /
   replaced-or-added dedup + before/after_add callback funnel (Rails' `build`
