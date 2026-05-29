@@ -38,6 +38,8 @@ import {
   disableQueryCacheBang as disableQueryCacheBangMixin,
   clearQueryCache as clearQueryCacheMixin,
   checkVersion as checkVersionMixin,
+  makeCachedSelectAll,
+  dirtiesQueryCache,
   type QueryCacheHost,
   QueryCache as QueryCacheMixin,
 } from "./abstract/query-cache.js";
@@ -2038,3 +2040,43 @@ include(AbstractAdapter, {
   indexNameLength,
   bindParamsLength,
 });
+
+// Rails' `QueryCache#select_all` overrides the base `select_all` and calls
+// `super` for the uncached path (query_cache.rb:236). The base `selectAll`
+// was just mixed in from DatabaseStatements above; capture it and reinstall a
+// cache-aware wrapper that delegates back to it. We do this here, after the
+// includes, rather than letting `include()` carry a `selectAll` — `include()`
+// never replaces a method the class already has, so the wrapping must be
+// explicit. Concrete adapters don't override `selectAll` (only `execQuery` /
+// `execute`), so every adapter shares this cached entry point.
+{
+  const baseSelectAll = AbstractAdapter.prototype.selectAll;
+  Object.defineProperty(AbstractAdapter.prototype, "selectAll", {
+    value: makeCachedSelectAll(baseSelectAll as never),
+    writable: true,
+    configurable: true,
+    enumerable: false,
+  });
+}
+
+// Rails: `QueryCache.included` runs `dirties_query_cache base, :exec_query,
+// :execute, :create, :insert, :update, :delete, ...` (query_cache.rb:13).
+// trails' writes don't funnel through `execQuery` (that's the read path); they
+// go through the `exec{Insert,Update,Delete}` / `insert`/`update`/`delete`
+// methods mixed in from DatabaseStatements, plus rollback paths. Wrapping
+// those clears the cache on every write while leaving reads untouched.
+dirtiesQueryCache(
+  AbstractAdapter,
+  "execInsert",
+  "execUpdate",
+  "execDelete",
+  "execInsertAll",
+  "insert",
+  "update",
+  "delete",
+  "truncate",
+  "truncateTables",
+  "rollbackDbTransaction",
+  "rollbackToSavepoint",
+  "restartDbTransaction",
+);
