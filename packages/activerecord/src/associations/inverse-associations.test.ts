@@ -1044,13 +1044,13 @@ describe("AutomaticInverseFindingTests", () => {
         this.attribute("name", "string");
       }
     }
-    Associations.hasOne.call(Man, "face", { inverseOf: "man" });
-    Associations.belongsTo.call(Face, "man", { inverseOf: "face" });
+    Associations.hasOne.call(Man, "face");
+    Associations.belongsTo.call(Face, "man");
     registerModel(Man);
     registerModel(Face);
     const m = await Man.create({ name: "Gordon" });
     await Face.create({ description: "handsome", man_id: m.id });
-    const face = await loadHasOne(m, "face", { inverseOf: "man" });
+    const face = await loadHasOne(m, "face", {});
     expect(face).not.toBeNull();
     expect((face as any)._cachedAssociations?.get("man")).toBe(m);
   });
@@ -1067,13 +1067,13 @@ describe("AutomaticInverseFindingTests", () => {
         this.attribute("body", "string");
       }
     }
-    Associations.hasMany.call(Comment, "ratings", { inverseOf: "comment" });
-    Associations.belongsTo.call(Rating, "comment", { inverseOf: "ratings" });
+    Associations.hasMany.call(Comment, "ratings");
+    Associations.belongsTo.call(Rating, "comment");
     registerModel(Comment);
     registerModel(Rating);
     const c = await Comment.create({ body: "great" });
     await Rating.create({ score: 5, comment_id: c.id });
-    const ratings = await loadHasMany(c, "ratings", { inverseOf: "comment" });
+    const ratings = await loadHasMany(c, "ratings", {});
     expect(ratings.length).toBe(1);
     expect((ratings[0] as any)._cachedAssociations?.get("comment")).toBe(c);
   });
@@ -1090,13 +1090,13 @@ describe("AutomaticInverseFindingTests", () => {
         this.attribute("title", "string");
       }
     }
-    Associations.hasMany.call(Post, "comments", { inverseOf: "post" });
-    Associations.belongsTo.call(Comment, "post", { inverseOf: "comments" });
+    Associations.hasMany.call(Post, "comments");
+    Associations.belongsTo.call(Comment, "post");
     registerModel(Post);
     registerModel(Comment);
     const p = await Post.create({ title: "hello" });
     await Comment.create({ body: "nice", post_id: p.id });
-    const comments = await loadHasMany(p, "comments", { inverseOf: "post" });
+    const comments = await loadHasMany(p, "comments", {});
     expect(comments.length).toBe(1);
     expect((comments[0] as any)._cachedAssociations?.get("post")).toBe(p);
   });

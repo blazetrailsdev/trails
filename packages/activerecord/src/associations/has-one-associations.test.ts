@@ -21,6 +21,7 @@ import {
   enableSti,
   registerSubclass,
   SubclassNotFound,
+  AssociationTypeMismatch,
 } from "../index.js";
 import {
   Associations,
@@ -183,11 +184,30 @@ describe("HasOneAssociationsTest", () => {
     }).not.toThrow();
   });
 
-  it.skip("type mismatch", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires AssociationTypeMismatch error
+  it("type mismatch", async () => {
+    class TmFirm extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class TmProject extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    Associations.hasOne.call(TmFirm, "account", {
+      className: "Account",
+      foreignKey: "firm_id",
+    });
+    registerModel("TmFirm", TmFirm);
+    registerModel("TmProject", TmProject);
+
+    const firm = new TmFirm({ name: "First Firm" });
+    const project = new TmProject({ name: "Active Record" });
+    expect(() => (firm.association("account") as any).writer(1)).toThrow(AssociationTypeMismatch);
+    expect(() => (firm.association("account") as any).writer(project)).toThrow(
+      AssociationTypeMismatch,
+    );
   });
 
   it("natural assignment", async () => {

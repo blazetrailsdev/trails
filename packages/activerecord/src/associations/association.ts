@@ -4,6 +4,7 @@ import { resolveModel, buildHasManyRelation } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { validateThroughReflection } from "./validate-through-reflection.js";
 import { camelize, singularize, underscore } from "@blazetrails/activesupport";
+import { AssociationTypeMismatch } from "../errors.js";
 
 /**
  * Base class for all association proxies. An Association wraps a single
@@ -428,7 +429,19 @@ export class Association {
       if (!inv) return null;
       inverseName = typeof inv === "string" ? inv : (inv.name ?? null);
     } else {
-      inverseName = (this.reflection.options.inverseOf as string | undefined) ?? null;
+      // Route through `reflection.inverseName()` rather than reading
+      // `options.inverseOf` directly, so automatic inverse detection
+      // (via `automaticInverseOf()`) fires when `inverseOf` is not
+      // explicitly set. Mirrors Rails' `inverse_reflection_for`, which
+      // returns `reflection.inverse_of` (reflection.rb:258 → inverse_name).
+      const ctor = this.owner.constructor as {
+        _reflectOnAssociation?: (n: string) => { inverseName?: () => string | null } | null;
+      };
+      const richReflection = ctor._reflectOnAssociation?.(this.reflection.name);
+      inverseName =
+        richReflection?.inverseName?.() ??
+        (this.reflection.options.inverseOf as string | undefined) ??
+        null;
     }
     if (!inverseName) return null;
     const recordAny = record as any;
@@ -506,7 +519,7 @@ export class Association {
         (this.reflection as any).className ??
         this.reflection.name;
       const actualType = record.constructor.name;
-      throw new Error(`${expectedType} expected, got an instance of ${actualType}`);
+      throw new AssociationTypeMismatch(expectedType, `an instance of ${actualType}`);
     }
   }
 
