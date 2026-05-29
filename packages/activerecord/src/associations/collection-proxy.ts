@@ -383,14 +383,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // than binding methods directly onto the instance) records the
     // modules in `_extending`, so extension methods survive every spawned
     // scope (`owner.things.where(...).fooExtension()`) via the rebinding
-    // in `_copyStateFrom`. It also accepts the proc form (a function that
-    // receives the relation), matching Rails' block-as-module extensions.
+    // in `_copyStateFrom`.
     const ext = assocDef.options.extend;
     if (ext) {
       const extensions = Array.isArray(ext) ? ext : [ext];
-      (this as unknown as { extendingBang: (...m: unknown[]) => void }).extendingBang(
-        ...extensions,
-      );
+      this.extendingBang(...extensions);
     }
 
     this._installMutationTracker();

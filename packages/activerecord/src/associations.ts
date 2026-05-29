@@ -116,13 +116,14 @@ export interface AssociationOptions {
    * relation spawned from it, mirroring Rails' `has_many :things,
    * extend: ModA` / `extend: [ModA, ModB]`. A module is an object whose
    * function values become callable on `owner.things` (and
-   * `owner.things.where(...)`). The proc form — a function receiving the
-   * relation — corresponds to Rails' block-as-module extension
-   * (`has_many :things do ... end`). */
+   * `owner.things.where(...)`). Rails always stores extensions as Modules
+   * — `Reflection#extensions` is `Array(options[:extend])`, and even the
+   * block form (`has_many :things do ... end`) is compiled to a Module
+   * via `Module.new(&block)` — so the TS surface is the object-of-methods
+   * form, not a relation-mutating callback. */
   extend?:
     | Record<string, (...args: unknown[]) => unknown>
-    | ((rel: any) => void)
-    | (Record<string, (...args: unknown[]) => unknown> | ((rel: any) => void))[];
+    | Record<string, (...args: unknown[]) => unknown>[];
   /** Load through associations via multiple queries instead of JOIN.
    * Currently a no-op since through loading already uses multi-query by default.
    * Exists for Rails API parity — Rails uses this to switch between JOIN and
