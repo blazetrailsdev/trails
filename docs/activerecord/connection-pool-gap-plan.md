@@ -103,6 +103,9 @@ Detail/rationale in the per-PR sections below.
 - **PF2 — query-cache guard move** (~20 LOC). Move the guard from
   `enableQueryCacheBang` to `QueryCache.run` (requires `run()` to accept pools
   or a discriminated union; low priority). Files: query-cache. Source: #2534.
+  **Subsumed by `query-cache-mixin-plan.md` Phase 2** — making `QueryCache.run`
+  pool-based is exactly this guard move. See that plan; the live mixin cache is
+  unwired (the wrapper holds the only working impl), which is the bigger issue.
 - **PF3 — P10 ConnectionManagement middleware** (~60 LOC). Create
   `connection-management.ts` (Rails clears active connections after each
   request). Unblocks ~11 tests. Source: Track 5 / P10.
@@ -162,7 +165,7 @@ reopen — Rails gates the suite `unless in_memory_db?`).
 
 **From #2534 (P12 query cache):**
 
-- [ ] ~20 LOC: move guard from `enableQueryCacheBang` to `QueryCache.run`; requires `run()` to accept pools or a discriminated union. Low priority.
+- [ ] ~20 LOC: move guard from `enableQueryCacheBang` to `QueryCache.run`; requires `run()` to accept pools or a discriminated union. Low priority. **Subsumed by `query-cache-mixin-plan.md` Phase 2** (pool-based `QueryCache.run`) — track there, not here.
 - [ ] decide whether to port "cache is available when using a not connected connection" (not present in the ported suite). Note: there is no `test/unported-files.ts` — unported notes are inline `it.skip` in `query-cache.test.ts`, where "query cache with forked processes" already lives.
 
 **From #2542 (P1 unit-test unskip):**

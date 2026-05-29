@@ -185,7 +185,12 @@ collection polymorphic relation`.
 **From #2569 (R5 inOrderOf extensions):**
 
 - Minor: `resolveColumnNameMatcher` vs `resolveColumnNameWithOrderMatcher` in
-  `relation.ts` are near-duplicates — candidate for a shared helper.
+  `relation.ts` are near-duplicates — candidate for a shared helper. **Subsumed
+  by `query-cache-mixin-plan.md` Phase 3**: once the `QueryCacheAdapter` wrapper
+  is removed there is no `adapter.inner` chain to walk, so both resolvers (plus
+  `resolveOrderMatcher` in `relation/query-methods.ts`) collapse to one-line
+  direct static lookups — no shared helper needed. (A standalone dedup, PR #2639,
+  was opened and closed for this reason.) Track in that plan, not here.
 - [ ] ~10-20 LOC: add `type_cast_for_database` value casting in `inOrderOf`
       once a typed-column caller surfaces the gap.
 - belongsTo accessor returns `null` in minimal inline-model + handler-suite
