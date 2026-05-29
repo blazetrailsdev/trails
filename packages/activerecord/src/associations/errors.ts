@@ -6,6 +6,20 @@
  */
 import { ActiveRecordError, ConfigurationError } from "../errors.js";
 
+/**
+ * Mirrors Rails' `DidYouMean::Correctable#detailed_message`: the base message
+ * plus a "Did you mean?" suggestion line built from the closest names, each on
+ * its own line indented to align under the first correction. Shared by every
+ * association error that mixes in `DidYouMean::Correctable` so they all format
+ * suggestions identically.
+ *
+ * @internal
+ */
+function withCorrections(message: string, corrections: string[]): string {
+  if (corrections.length === 0) return message;
+  return `${message}\nDid you mean?  ${corrections.join("\n               ")}`;
+}
+
 export class AssociationNotFoundError extends ConfigurationError {
   readonly record: any;
   readonly associationName: string;
@@ -28,8 +42,7 @@ export class AssociationNotFoundError extends ConfigurationError {
    * to match Rails, where corrections surface only via `detailed_message`.
    */
   detailedMessage(): string {
-    if (this.corrections.length === 0) return this.message;
-    return `${this.message}\nDid you mean?  ${this.corrections.join("\n               ")}`;
+    return withCorrections(this.message, this.corrections);
   }
 }
 
@@ -45,10 +58,7 @@ export class InverseOfAssociationNotFoundError extends ActiveRecordError {
     corrections: string[] = [],
     associatedClass: string | null = null,
   ) {
-    const suggestion = corrections.length > 0 ? `\nDid you mean? ${corrections.join(", ")}` : "";
-    super(
-      `Could not find the inverse association for ${reflection} (inverse_of: :${inverseOf}).${suggestion}`,
-    );
+    super(`Could not find the inverse association for ${reflection} (inverse_of: :${inverseOf}).`);
     this.name = "InverseOfAssociationNotFoundError";
     this.reflection = reflection;
     this.inverseOf = inverseOf;
@@ -57,7 +67,7 @@ export class InverseOfAssociationNotFoundError extends ActiveRecordError {
   }
 
   detailedMessage(): string {
-    return this.message;
+    return withCorrections(this.message, this.corrections);
   }
 }
 
@@ -86,12 +96,15 @@ export class HasManyThroughAssociationNotFoundError extends ActiveRecordError {
     reflection: string = through,
     corrections: string[] = [],
   ) {
-    const suggestion = corrections.length > 0 ? `\nDid you mean? ${corrections.join(", ")}` : "";
-    super(`Could not find the association :${through} in model ${owner}${suggestion}`);
+    super(`Could not find the association :${through} in model ${owner}`);
     this.name = "HasManyThroughAssociationNotFoundError";
     this.ownerClass = owner;
     this.reflection = reflection;
     this.corrections = corrections;
+  }
+
+  detailedMessage(): string {
+    return withCorrections(this.message, this.corrections);
   }
 }
 
