@@ -4979,14 +4979,14 @@ describe("CalculationsTest", () => {
       }
 
       const existing = await User.create({ name: "Claim" });
-      await Base.adapter.executeMutation(`CREATE UNIQUE INDEX users_name_idx ON users (name)`);
+      await Base.connection.executeMutation(`CREATE UNIQUE INDEX users_name_idx ON users (name)`);
       try {
         const retried = await User.createOrFindBy({ name: "Claim" });
         expect(retried.id).toBe(existing.id);
         expect(await User.all().count()).toBe(1);
       } finally {
         try {
-          const a = Base.adapter;
+          const a = Base.connection;
           const ss = a.schemaStatements ? a.schemaStatements() : null;
           if (ss) await ss.removeIndex("users", { name: "users_name_idx" });
         } catch {
@@ -5008,7 +5008,7 @@ describe("CalculationsTest", () => {
     }
 
     const account = await Account.create({ balance: 100 });
-    await Base.adapter.executeMutation(
+    await Base.connection.executeMutation(
       `UPDATE "accounts" SET "balance" = 200 WHERE "id" = ${account.id}`,
     );
 
@@ -5641,11 +5641,11 @@ describe("CalculationsTest", () => {
       }
     }
 
-    const adapterAny = User.adapter as unknown as { castBoundValue?(v: unknown): unknown };
+    const adapterAny = User.connection as unknown as { castBoundValue?(v: unknown): unknown };
     const cast = (v: unknown) =>
       typeof adapterAny.castBoundValue === "function" ? adapterAny.castBoundValue(v) : v;
-    const quotedName = User.adapter.quote(cast("O'Brien"));
-    const quoted25 = User.adapter.quote(cast(25));
+    const quotedName = User.connection.quote(cast("O'Brien"));
+    const quoted25 = User.connection.quote(cast(25));
     expect(User.sanitizeSqlArray("name = ? AND age > ?", "O'Brien", 25)).toBe(
       `name = ${quotedName} AND age > ${quoted25}`,
     );

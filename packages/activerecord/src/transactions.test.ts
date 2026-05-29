@@ -227,9 +227,9 @@ describe("TransactionTest", () => {
     });
   });
   beforeEach(async () => {
-    await Base.adapter.executeMutation("DELETE FROM posts");
-    await Base.adapter.executeMutation("DELETE FROM topics");
-    await Base.adapter.executeMutation("DELETE FROM tx_posts");
+    await Base.connection.executeMutation("DELETE FROM posts");
+    await Base.connection.executeMutation("DELETE FROM topics");
+    await Base.connection.executeMutation("DELETE FROM tx_posts");
   });
 
   it("successful", async () => {
@@ -1545,7 +1545,7 @@ describe("TransactionTest", () => {
     await defineSchema({ posts: { title: "string", approved: "boolean", content: "string" } });
   });
   beforeEach(async () => {
-    await Base.adapter.executeMutation("DELETE FROM posts");
+    await Base.connection.executeMutation("DELETE FROM posts");
   });
 
   it("rolling back in a callback rollbacks before save", async () => {
@@ -2074,7 +2074,7 @@ describe("TransactionTest", () => {
     await defineSchema({ accounts: { name: "string", balance: "integer" } });
   });
   beforeEach(async () => {
-    await Base.adapter.executeMutation("DELETE FROM accounts");
+    await Base.connection.executeMutation("DELETE FROM accounts");
   });
 
   it("successful", async () => {

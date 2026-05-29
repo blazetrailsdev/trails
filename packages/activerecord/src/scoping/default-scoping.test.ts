@@ -1773,7 +1773,7 @@ describe("DefaultScopingTest", () => {
       }
     }
     const dev = await Dev.create({ name: "Eileen", mentor_id: 1 });
-    const spy = vi.spyOn(Base.adapter as any, "executeMutation");
+    const spy = vi.spyOn(Base.connection as any, "executeMutation");
     let updateSql: string | undefined;
     try {
       await dev.update({ name: "Not Eileen" });
@@ -1793,7 +1793,7 @@ describe("DefaultScopingTest", () => {
       }
     }
     const dev = await Dev2.create({ name: "Eileen", mentor_id: 1 });
-    const spy = vi.spyOn(Base.adapter as any, "executeMutation");
+    const spy = vi.spyOn(Base.connection as any, "executeMutation");
     let deleteSql: string | undefined;
     try {
       await dev.destroy();

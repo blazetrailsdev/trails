@@ -130,7 +130,7 @@ describe("Base.establishConnection with config file", () => {
   it("connects from DATABASE_URL", async () => {
     process.env.DATABASE_URL = ":memory:";
     await Base.establishConnection();
-    expect(Base.adapter).toBeInstanceOf(SQLite3Adapter);
+    expect(Base.connection).toBeInstanceOf(SQLite3Adapter);
   });
 
   it("connects from config/database.json", async () => {
@@ -147,7 +147,7 @@ describe("Base.establishConnection with config file", () => {
     );
 
     await Base.establishConnection();
-    expect(Base.adapter).toBeInstanceOf(SQLite3Adapter);
+    expect(Base.connection).toBeInstanceOf(SQLite3Adapter);
   });
 
   it("uses NODE_ENV to select the environment from config", async () => {
@@ -168,7 +168,7 @@ describe("Base.establishConnection with config file", () => {
     );
 
     await Base.establishConnection();
-    expect(Base.adapter).toBeInstanceOf(PostgreSQLAdapter);
+    expect(Base.connection).toBeInstanceOf(PostgreSQLAdapter);
   });
 
   it("DATABASE_URL overrides url in config file", async () => {
@@ -185,7 +185,7 @@ describe("Base.establishConnection with config file", () => {
     );
 
     await Base.establishConnection();
-    expect(Base.adapter).toBeInstanceOf(PostgreSQLAdapter);
+    expect(Base.connection).toBeInstanceOf(PostgreSQLAdapter);
   });
 
   it("throws when no config file and no DATABASE_URL", async () => {
@@ -196,7 +196,7 @@ describe("Base.establishConnection with config file", () => {
   it("connection goes through ConnectionHandler pool", async () => {
     process.env.DATABASE_URL = ":memory:";
     await Base.establishConnection();
-    void Base.adapter; // trigger pool checkout
+    void Base.connection; // trigger pool checkout
     expect(Base.connectionHandler.connectionPools.length).toBe(1);
   });
 });
@@ -242,7 +242,7 @@ describe("Base.establishConnection with JS config file", () => {
     );
 
     await Base.establishConnection();
-    expect(Base.adapter).toBeInstanceOf(SQLite3Adapter);
+    expect(Base.connection).toBeInstanceOf(SQLite3Adapter);
   });
 });
 
@@ -252,6 +252,6 @@ describe("Base.adapter without establishConnection", () => {
 
   it("throws when no connection is established", () => {
     delete process.env.DATABASE_URL;
-    expect(() => Base.adapter).toThrow(/No database connection defined/);
+    expect(() => Base.connection).toThrow(/No database connection defined/);
   });
 });

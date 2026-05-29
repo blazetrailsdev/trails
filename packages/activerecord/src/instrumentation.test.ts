@@ -279,7 +279,7 @@ describe("InstrumentationTest", () => {
         this.attribute("name", "string");
       }
     }
-    const connection = Base.adapter;
+    const connection = Base.connection;
     let capturedConnection: unknown;
     Notifications.subscribe("sql.active_record", (event: any) => {
       capturedConnection = event.payload.connection;

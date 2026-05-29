@@ -35,5 +35,5 @@ import {
  * @internal
  */
 export function useHandlerTransactionalFixtures(): void {
-  withTransactionalFixtures(() => Base.adapter as TransactionalFixturesAdapter);
+  withTransactionalFixtures(() => Base.connection as TransactionalFixturesAdapter);
 }

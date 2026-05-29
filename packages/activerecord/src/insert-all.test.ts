@@ -1043,7 +1043,7 @@ describe("InsertAll async uniqueIndexes regression", () => {
       pkgs: { name: "string", sha: "string" },
       flags: { key: "string", active: "boolean" },
     });
-    const ss = new SchemaStatements(Base.adapter);
+    const ss = new SchemaStatements(Base.connection);
     await ss.addIndex("pkgs", ["sha", "name"], { unique: true, name: "idx_pkgs_sha_name" });
     // WHERE "active" works on both SQLite (1=true) and PG (boolean column).
     // Avoid '"active" = 1' which PG rejects (boolean ≠ integer).
@@ -1067,7 +1067,7 @@ describe("InsertAll async uniqueIndexes regression", () => {
       }
 
       // Clear the cache to simulate a returning DB where migrateDb skipped createTable.
-      Base.adapter.schemaCache?.clear();
+      Base.connection.schemaCache?.clear();
 
       // Should succeed — async _uniqueIndexes() fetches from the live DB.
       await expect(
@@ -1091,7 +1091,7 @@ describe("InsertAll async uniqueIndexes regression", () => {
       // vi.spyOn passes through to the original by default and records calls;
       // mockRestore in finally guarantees the patched method is restored even
       // if the upsert throws, so the adapter never leaks a spied method.
-      const spy = vi.spyOn(Base.adapter, "executeMutation");
+      const spy = vi.spyOn(Base.connection, "executeMutation");
       let upsertSql: string | undefined;
       try {
         await Flag.upsertAll([{ key: "feature_x", active: true }], { uniqueBy: "key" });

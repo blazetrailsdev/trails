@@ -1654,9 +1654,9 @@ describe("where with raw SQL", () => {
     await User.create({ name: "Charlie", age: 30 });
 
     const sql = User.where('"users"."age" > ?', 18).toSql();
-    const a = Base.adapter as unknown as { castBoundValue?(v: unknown): unknown };
+    const a = Base.connection as unknown as { castBoundValue?(v: unknown): unknown };
     const cast18 = typeof a.castBoundValue === "function" ? a.castBoundValue(18) : 18;
-    expect(sql).toContain(`"users"."age" > ${Base.adapter.quote(cast18)}`);
+    expect(sql).toContain(`"users"."age" > ${Base.connection.quote(cast18)}`);
   });
 
   it("rewhere replaces specific where conditions", async () => {
@@ -2019,9 +2019,9 @@ describe("Raw SQL Where (Rails-guided)", () => {
     await Person.create({ name: "Charlie", age: 30 });
 
     const sql = Person.where('"people"."age" > ?', 18).toSql();
-    const a = Base.adapter as unknown as { castBoundValue?(v: unknown): unknown };
+    const a = Base.connection as unknown as { castBoundValue?(v: unknown): unknown };
     const cast18 = typeof a.castBoundValue === "function" ? a.castBoundValue(18) : 18;
-    expect(sql).toContain(`"people"."age" > ${Base.adapter.quote(cast18)}`);
+    expect(sql).toContain(`"people"."age" > ${Base.connection.quote(cast18)}`);
   });
 
   // Rails: test "where with string bind for LIKE"

@@ -49,7 +49,7 @@ describe("handler-resolved adapter (Phase D-0)", () => {
   });
 
   afterAll(async () => {
-    const adapter = Base.adapter;
+    const adapter = Base.connection;
     await dropAllTables(adapter);
     clearAppliedSchemaSignatures(adapter);
   });
@@ -77,6 +77,6 @@ describe("handler-resolved adapter (Phase D-0)", () => {
   it("model resolves adapter via handler — no static { this.adapter = X } needed", async () => {
     expect(Object.prototype.hasOwnProperty.call(HandlerResolvedPost, "_adapter")).toBe(false);
     // The adapter is still accessible (via handler → pool → Base._adapter cache)
-    expect(() => HandlerResolvedPost.adapter).not.toThrow();
+    expect(() => HandlerResolvedPost.connection).not.toThrow();
   });
 });

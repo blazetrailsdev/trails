@@ -72,7 +72,7 @@ async function main(): Promise<void> {
   }
 
   await Base.establishConnection(url);
-  const adapter = Base.adapter;
+  const adapter = Base.connection;
   const dump = await dumpSchemaColumns(adapter, { ignoreTables: args.ignore });
   const json = JSON.stringify(dump, null, 2) + "\n";
 

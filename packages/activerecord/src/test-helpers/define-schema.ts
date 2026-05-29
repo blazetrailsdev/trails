@@ -496,7 +496,7 @@ export async function defineSchema(
     resolvedOpts = opts;
   } else {
     const { Base } = await import("../base.js");
-    adapter = Base.adapter;
+    adapter = Base.connection;
     schema = adapterOrSchema as Schema;
     resolvedOpts = schemaOrOpts as DefineSchemaOpts | undefined;
   }
