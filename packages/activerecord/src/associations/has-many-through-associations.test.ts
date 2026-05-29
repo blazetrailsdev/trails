@@ -1735,12 +1735,13 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("HmtWriterBook", HmtWriterBook);
     registerModel("HmtWriterBookTitle", HmtWriterBookTitle);
 
-    // New (unsaved) owner: concatRecords pre-builds the through join row and
-    // caches it; the owner's save autosaves the join, whose belongsTo follows
-    // each parent's freshly-assigned primary key.
+    // Rails: post.people = [person] on a new owner. Array-assignment routes
+    // through replace_records → concat → concat_records, pre-building the
+    // through join row; the owner's save autosaves the join, whose belongsTo
+    // follows each parent's freshly-assigned primary key.
     const writer = new HmtWriter({ name: "Tolkien" });
     const book = new HmtWriterBookTitle({ title: "LOTR" });
-    await association(writer, "hmtWriterBookTitles").concat(book);
+    (writer as any).association("hmtWriterBookTitles").writer([book]);
     await writer.save();
 
     expect(writer.id).toBeTruthy();
@@ -5719,33 +5720,23 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("HmtArrJoin", HmtArrJoin);
     registerModel("HmtArrItem", HmtArrItem);
 
-    const owner = await HmtArrOwner.create({ name: "O" });
-    const item1 = await HmtArrItem.create({ label: "I1" });
-    const item2 = await HmtArrItem.create({ label: "I2" });
-    const item3 = await HmtArrItem.create({ label: "I3" });
+    // Rails: c = Category.new(name: "Fishing", authors: [Author.first])
+    //        assert_equal 1, c.categorizations.size
+    // Array-assignment on a NEW owner routes through replace_records → concat →
+    // concat_records, building the through join row in memory before save.
+    const item = await HmtArrItem.create({ label: "I1" });
+    const owner = new HmtArrOwner({ name: "O", hmtArrItems: [item] });
 
-    // Manually build join records for each item
-    await HmtArrJoin.create({
-      hmt_arr_owner_id: owner.id,
-      hmt_arr_item_id: item1.id,
-    });
-    await HmtArrJoin.create({
-      hmt_arr_owner_id: owner.id,
-      hmt_arr_item_id: item2.id,
-    });
-    await HmtArrJoin.create({
-      hmt_arr_owner_id: owner.id,
-      hmt_arr_item_id: item3.id,
-    });
+    expect((owner as any).association("hmtArrJoins").target).toHaveLength(1);
 
+    await owner.save();
     const items = await loadHasManyThrough(owner, "hmtArrItems", {
       through: "hmtArrJoins",
       source: "hmtArrItem",
       className: "HmtArrItem",
     });
-    expect(items).toHaveLength(3);
-    const labels = items.map((i: any) => i.label).sort();
-    expect(labels).toEqual(["I1", "I2", "I3"]);
+    expect(items).toHaveLength(1);
+    expect(items[0].label).toBe("I1");
   });
   it("create bang should raise exception when join record has errors", async () => {
     // Rails: Categorization.validate { errors.add(:base, ...) }

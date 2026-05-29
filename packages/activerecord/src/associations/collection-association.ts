@@ -171,6 +171,15 @@ export class CollectionAssociation extends Association {
   }
 
   /**
+   * Build any in-memory join rows for `records` on a new (unsaved) owner.
+   * No-op for non-through collections; HMT overrides it to pre-build the
+   * through-rows (mirrors the `build_through_record` loop reached via
+   * `concat_records` on a new owner).
+   * @internal
+   */
+  protected buildThroughRecordsInMemory(_records: Base[]): void {}
+
+  /**
    * Removes all records from the association. Honors the :dependent
    * option. If :dependent is :destroy, uses :delete_all strategy instead.
    */
@@ -286,35 +295,81 @@ export class CollectionAssociation extends Association {
     for (const val of otherArray) (this as any).raiseOnTypeMismatchBang(val);
     const wasLoaded = this.isLoaded();
     const originalTarget = [...this.target];
-    replaceCommonRecordsInMemory(this, otherArray, originalTarget);
     if (this.owner.isNewRecord()) {
-      this.target = [...otherArray];
-      this.loadedBang();
-    } else if (!wasLoaded || !arraysEqual(otherArray, originalTarget)) {
-      for (const r of originalTarget) {
-        if (!otherArray.includes(r)) {
+      // Rails routes a new-owner replace through replace_records → concat →
+      // concat_records (collection_association.rb): delete(difference(target,
+      // new_target)) then concat(difference(new_target, target)). The concat
+      // runs the build path — for HMT it constructs through-rows in memory that
+      // the owner's save autosaves alongside it. Mirror that here rather than
+      // setting _target directly, which would skip the through-row build.
+      //
+      // delete(difference(...)) → delete_or_destroy → remove_records: fire
+      // before_remove (an abort halts removal), prune the target and clear the
+      // inverse, then after_remove. delete_records (the DB delete) is skipped —
+      // a new owner has no persisted join rows yet, so existing_records is
+      // empty (the owner's save is what creates them).
+      const toRemove = (this.target as Base[]).filter((r) => !otherArray.includes(r));
+      let removable = true;
+      for (const r of toRemove) {
+        if (!callback(this, "beforeRemove", r)) {
+          removable = false;
+          break;
+        }
+      }
+      if (removable) {
+        for (const r of toRemove) {
           const idx = this.target.indexOf(r);
           if (idx !== -1) this.target.splice(idx, 1);
+          this.removeInverseInstance(r);
         }
+        for (const r of toRemove) callback(this, "afterRemove", r);
       }
+      // concat(difference(new_target, target)): add_to_target per record.
+      // `added` is that difference — Rails' concat_records returns the full
+      // input array (before_add aborts affect @target membership but not the
+      // returned set), and HMT#concat_records builds a through-row for each, so
+      // we build for the whole difference rather than filtering on addToTarget.
+      const added: Base[] = [];
       for (const r of otherArray) {
         if (!this.target.includes(r)) {
-          this.setOwnerAttributes(r);
           this.addToTarget(r);
+          added.push(r);
         }
       }
       this.loadedBang();
-      // Preserve the first originalTarget (what's in the DB) across multiple
-      // replace() calls before save(). Only update newTarget so the final flush
-      // diffs against the real persisted state, not an intermediate in-memory one.
-      if (this._pendingReplace) {
-        if (wasLoaded && arraysEqual(otherArray, this._pendingReplace.originalTarget)) {
-          this._pendingReplace = null; // reverted to DB state — nothing to flush
-        } else {
-          this._pendingReplace.newTarget = [...otherArray];
+      this.buildThroughRecordsInMemory(added);
+    } else {
+      // Persisted owner: Rails calls replace_common_records_in_memory before
+      // diffing (collection_association.rb). For a new owner Rails skips it —
+      // replace_records leaves common records in place untouched — so it lives
+      // here, not above the branch.
+      replaceCommonRecordsInMemory(this, otherArray, originalTarget);
+      if (!wasLoaded || !arraysEqual(otherArray, originalTarget)) {
+        for (const r of originalTarget) {
+          if (!otherArray.includes(r)) {
+            const idx = this.target.indexOf(r);
+            if (idx !== -1) this.target.splice(idx, 1);
+          }
         }
-      } else {
-        this._pendingReplace = { newTarget: [...otherArray], originalTarget, wasLoaded };
+        for (const r of otherArray) {
+          if (!this.target.includes(r)) {
+            this.setOwnerAttributes(r);
+            this.addToTarget(r);
+          }
+        }
+        this.loadedBang();
+        // Preserve the first originalTarget (what's in the DB) across multiple
+        // replace() calls before save(). Only update newTarget so the final flush
+        // diffs against the real persisted state, not an intermediate in-memory one.
+        if (this._pendingReplace) {
+          if (wasLoaded && arraysEqual(otherArray, this._pendingReplace.originalTarget)) {
+            this._pendingReplace = null; // reverted to DB state — nothing to flush
+          } else {
+            this._pendingReplace.newTarget = [...otherArray];
+          }
+        } else {
+          this._pendingReplace = { newTarget: [...otherArray], originalTarget, wasLoaded };
+        }
       }
     }
   }
