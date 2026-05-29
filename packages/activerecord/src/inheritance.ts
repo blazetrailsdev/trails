@@ -289,9 +289,6 @@ export function findStiClass(baseClass: typeof Base, typeName: string): typeof B
 }
 
 /**
- * Directly instantiate a record without STI delegation (avoids recursion).
- */
-/**
  * Narrow a freshly-hydrated record's attribute set to the columns actually
  * returned by the query, so `hasAttribute()` reflects a projected SELECT.
  *
@@ -301,6 +298,14 @@ export function findStiClass(baseClass: typeof Base, typeName: string): typeof B
  * defaults — every other unselected column is left uninitialized. Applied in
  * both the direct and STI instantiation paths, matching Rails'
  * `instantiate_instance_of`, which narrows before discriminating the class.
+ *
+ * `column_names` is the right narrowing set here: in trails every declared
+ * attribute is a real DB column (an `attribute()` with no backing column fails
+ * on INSERT), and the confirmation/acceptance validators don't register
+ * attribute definitions — so unlike Rails there are no in-set virtual
+ * attributes to wrongly uninitialize. On a full `SELECT *` every declared
+ * column is in the row, so `narrowable` is empty and the hot path returns
+ * early.
  *
  * @internal Rails-private helper.
  */
@@ -326,6 +331,9 @@ export function narrowToProjectedColumns(klass: typeof Base, record: Base, row: 
   attrs.narrowTo(keep);
 }
 
+/**
+ * Directly instantiate a record without STI delegation (avoids recursion).
+ */
 function directInstantiate(klass: typeof Base, row: Record<string, unknown>): Base {
   (klass as any)._skipEncryption = true;
   const hadOwnSuppress = Object.prototype.hasOwnProperty.call(klass, "_suppressInitializeCallback");
