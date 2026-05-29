@@ -239,7 +239,9 @@ export class BelongsToAssociation extends SingularAssociation {
    * Unlike the base, belongs_to does NOT require the record to carry the
    * foreign key (the FK lives on the owner). It instead requires the inverse
    * reflection to be present and to be either a has_one inverse or a has_many
-   * whose declaring class (the record's class) enables `has_many_inversing`.
+   * whose `klass` enables `has_many_inversing`. Note `inverse.klass` is the
+   * class the inverse collection holds — i.e. the owner (child) class — NOT
+   * the record's class.
    * @internal
    */
   protected override isInvertibleFor(record: Base): boolean {
@@ -247,7 +249,8 @@ export class BelongsToAssociation extends SingularAssociation {
     if (!inverse) return false;
     const isHasOne =
       typeof inverse.isHasOne === "function" ? inverse.isHasOne() : inverse.macro === "hasOne";
-    return isHasOne || !!(record.constructor as typeof Base).hasManyInversing;
+    const inverseKlass = inverse.klass as typeof Base | undefined;
+    return isHasOne || !!inverseKlass?.hasManyInversing;
   }
 
   /**
@@ -258,10 +261,16 @@ export class BelongsToAssociation extends SingularAssociation {
    * detection) off the owner's reflection, then looks it up on the record.
    * @internal
    */
-  private inverseReflectionOn(record: Base): { macro?: string; isHasOne?: () => boolean } | null {
+  private inverseReflectionOn(
+    record: Base,
+  ): { macro?: string; isHasOne?: () => boolean; klass?: typeof Base } | null {
     if ((this.reflection.options as { polymorphic?: boolean }).polymorphic) {
       return (
-        (this.inverseReflectionFor(record) as { macro?: string; isHasOne?: () => boolean }) ?? null
+        (this.inverseReflectionFor(record) as {
+          macro?: string;
+          isHasOne?: () => boolean;
+          klass?: typeof Base;
+        }) ?? null
       );
     }
     const ownerCtor = this.owner.constructor as {
@@ -273,7 +282,9 @@ export class BelongsToAssociation extends SingularAssociation {
       null;
     if (!inverseName) return null;
     const recordCtor = record.constructor as {
-      _reflectOnAssociation?: (n: string) => { macro?: string; isHasOne?: () => boolean } | null;
+      _reflectOnAssociation?: (
+        n: string,
+      ) => { macro?: string; isHasOne?: () => boolean; klass?: typeof Base } | null;
     };
     return recordCtor._reflectOnAssociation?.(inverseName) ?? null;
   }

@@ -424,8 +424,9 @@ function throughScopeAttributes(assoc: HasManyThroughAssociation): Record<string
   // Rails: `scope = through_scope || self.scope` (hmt:72). The `_throughScope`
   // ivar is set during `buildRecord` (hmt:93) and cleared after; consult it
   // first so a record built within that window picks up the scope captured at
-  // build time, falling back to the live through scope otherwise.
-  const scope: any = throughScope(assoc) ?? throughAssoc.scope?.();
+  // build time, falling back to `self.scope` — the has_many :through
+  // association's own scope, NOT the through association's.
+  const scope: any = throughScope(assoc) ?? (assoc as any).scope?.();
   if (!scope || typeof scope.whereValuesHash !== "function") return {};
   const throughTable = (throughAssoc.klass as any)?.tableName ?? "";
   const attrs = scope.whereValuesHash(throughTable) as Record<string, unknown>;
