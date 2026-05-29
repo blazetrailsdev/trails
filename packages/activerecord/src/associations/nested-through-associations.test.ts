@@ -1317,29 +1317,30 @@ describe("NestedThroughAssociationsTest", () => {
   // Rails' AliasTracker emits the canonical alias `taggings_authors_join`
   // for the second occurrence, which the test depends on.
   it.skip("nested has many through with a table referenced multiple times", () => {
-    // BLOCKED: AliasTracker integration into JoinDependency — see batch 28b
-    // follow-up. ROOT-CAUSE: `_addThroughAssociation` emits `tN` aliases for
-    // collided table names instead of Rails-canonical `${table}_${parent}_join`.
-    // SCOPE: ~200 LOC rewire of throughAlias/effectiveName plus 30+ existing
-    // nested-through tests whose SQL snapshots may drift.
+    // BLOCKED on the INNER `joins()` nested-through resolver, NOT on alias
+    // emission. AF6 shipped the JoinDependency self-join aliasing: the
+    // LEFT-OUTER (eager-load) path already emits the canonical
+    // `taggings_authors_join` / `posts_authors_join` aliases for this exact
+    // similar_posts chain — see
+    // join-dependency-through-aliasing.test.ts ("emits canonical self-join
+    // aliases when a nested-through chain references a table multiple times").
+    //
+    // The remaining blocker is `Relation#_resolveThroughJoin` (relation.ts):
+    // the INNER `joins(...)` path only resolves a single source -> through ->
+    // target hop and cannot walk a through whose source is itself a through
+    // (here `tags.tagged_posts`), so it mis-joins `tags.author_id`. Routing
+    // INNER nested-through joins through JoinDependency is a relation.ts change
+    // outside AF6's file scope (follow-up). The `author.similar_posts` read
+    // additionally needs nested-through-with-through-source preload support.
     //
     // Rails body (ported/translated to TS):
-    //   const bob = await Author.find_by({ name: "bob" });
-    //   const similar = (await bob.similarPosts.toArray()).sort((a, b) => a.id - b.id);
-    //   expect(similar.map((p) => p.title)).toEqual([
-    //     "misc_by_bob", "misc_by_mary", "other_by_bob", "other_by_mary",
-    //   ]);
-    //
-    // Mary and Bob both have posts in misc:
-    //   const misc = await Author.joins("similar_posts")
+    //   const authors = await Author.joins("similarPosts")
     //     .where({ "posts.id": miscByBobId }).distinct().toArray();
-    //   expect(misc.map((a) => a.name).sort()).toEqual(["bob", "mary"]);
-    //
-    // Polymorphism preserved across both joins of taggings:
-    //   const a1 = await Author.joins("similar_posts")
+    //   expect(authors.map((a) => a.name).sort()).toEqual(["bob", "mary"]);
+    //   const a1 = await Author.joins("similarPosts")
     //     .where({ "taggings.taggable_type": "FakeModel" }).toArray();
     //   expect(a1).toEqual([]);
-    //   const a2 = await Author.joins("similar_posts")
+    //   const a2 = await Author.joins("similarPosts")
     //     .where({ "taggings_authors_join.taggable_type": "FakeModel" }).toArray();
     //   expect(a2).toEqual([]);
   });
@@ -1361,10 +1362,11 @@ describe("NestedThroughAssociationsTest", () => {
   // The polymorphic source on `ordered_taggings` (a scoped through) must
   // emit `taggable_type='Post'` on the canonical-aliased `taggings` join.
   it.skip("nested has many through with scope on polymorphic reflection", () => {
-    // BLOCKED: AliasTracker integration into JoinDependency — see batch 28b
-    // follow-up. ROOT-CAUSE: same as the sibling test above —
-    // `_addThroughAssociation` emits `tN` aliases for collided table names
-    // instead of Rails-canonical `${table}_${parent}_join`. This case also
+    // BLOCKED on the same INNER `joins()` nested-through resolver gap as the
+    // sibling test above — NOT on alias emission, which AF6 shipped (the
+    // LEFT-OUTER path emits the canonical `taggings_authors_join` alias). The
+    // INNER `Relation#_resolveThroughJoin` can't walk a through whose source is
+    // itself a through (`ordered_tags.tagged_posts`). This case additionally
     // exercises a scoped through (`-> { order("taggings.id DESC") }`).
     // SCOPE: subsumed by the sibling test's ~200 LOC rewire; no extra LOC.
     //
@@ -2270,10 +2272,12 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("polymorphic has many through joined different table twice", () => {
-    // BLOCKED: `Hotel.joins(:cake_designers, :drink_designers)` joins the same
-    // polymorphic `chefs` table twice in one query. Requires JoinDependency
-    // AliasTracker self-join alias emission (same root cause as "table
-    // referenced multiple times" above). Tracked as a follow-up.
+    // BLOCKED on the INNER `joins()` nested-through resolver, NOT on alias
+    // emission (AF6 shipped JoinDependency self-join aliasing; the LEFT-OUTER
+    // path emits the `{table}_{owner}_join` aliases). `Hotel.joins(:cake_designers,
+    // :drink_designers)` joins the same polymorphic `chefs` table twice in one
+    // INNER query; routing this through JoinDependency is a relation.ts
+    // follow-up outside AF6's file scope.
   });
 
   it.skip("has many through polymorphic with scope", () => {
