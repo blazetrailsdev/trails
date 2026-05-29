@@ -80,9 +80,21 @@ a `Base` subclass, so the #2580 codemod correctly skipped it.
 
 - **Class:** `MigrationRunner` (no `extends`)
 - **Sites:** 25
-- **Verdict:** **legit class field (leave alone)**
+- **Verdict:** **legit class field (leave alone)** — for _this_ bypass audit.
 - **Rationale:** `private adapter: DatabaseAdapter` is a constructor-bound
   reference on a standalone migration runner, not a `Base` subclass bypass.
+- **Out-of-scope fidelity note (separate follow-up):** Rails' `Migrator`
+  (`migration.rb:1405`) takes **no** adapter — it threads a `connection_pool`
+  into `SchemaMigration`/`InternalMetadata` and resolves the live connection
+  lazily per-call via `private def connection; DatabaseTasks.migration_connection; end`.
+  trails already has the faithful port at `migration.ts` (`class Migrator`
+  L2427 + `class MigrationContext` L1623, routing through
+  `DatabaseTasks.migrationConnectionPool`). `MigrationRunner` is a redundant,
+  non-Rails class (Rails has no `MigrationRunner`) that caches an adapter where
+  Rails routes through the handler; the Rails-faithful fix is to consolidate
+  callers onto `migration.ts`'s `Migrator`/`MigrationContext` and retire
+  `MigrationRunner` — **not** to migrate its adapter field. Tracked separately
+  from the 27 bypass-survivor sites.
 
 ### 6. `packages/activerecord/src/connection-adapters/abstract/schema-creation.ts`
 
