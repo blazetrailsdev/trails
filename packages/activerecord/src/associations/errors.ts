@@ -58,7 +58,11 @@ export class InverseOfAssociationNotFoundError extends ActiveRecordError {
     corrections: string[] = [],
     associatedClass: string | null = null,
   ) {
-    super(`Could not find the inverse association for ${reflection} (inverse_of: :${inverseOf}).`);
+    super(
+      `Could not find the inverse association for ${reflection} (:${inverseOf}${
+        associatedClass ? ` in ${associatedClass}` : ""
+      })`,
+    );
     this.name = "InverseOfAssociationNotFoundError";
     this.reflection = reflection;
     this.inverseOf = inverseOf;
@@ -75,9 +79,11 @@ export class InverseOfAssociationRecursiveError extends ActiveRecordError {
   readonly reflection: string;
   readonly inverseOf: string;
 
-  constructor(reflection: string, inverseOf: string) {
+  constructor(reflection: string, inverseOf: string, associatedClass: string | null = null) {
     super(
-      `Inverse association ${inverseOf} for ${reflection} is recursive. The inverse association must not be ${reflection}.`,
+      `Inverse association ${reflection} (:${inverseOf}${
+        associatedClass ? ` in ${associatedClass}` : ""
+      }) is recursive.`,
     );
     this.name = "InverseOfAssociationRecursiveError";
     this.reflection = reflection;

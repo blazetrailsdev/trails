@@ -217,13 +217,25 @@ export class AbstractReflection {
       const inverse = this.inverseOf();
       if (inverse == null) {
         const inverseOf = this.inverseName()!;
-        throw new InverseOfAssociationNotFoundError((this as any).name, inverseOf);
+        // Rails passes the reflection; with no explicit associated_class the
+        // message falls back to `reflection.class_name` (errors.rb). Thread the
+        // target class name so the `in <class>` clause is always present.
+        throw new InverseOfAssociationNotFoundError(
+          (this as any).name,
+          inverseOf,
+          [],
+          (this as any).className,
+        );
       }
       if (
         (inverse as any).name === (this as any).name &&
         (inverse as any).activeRecord === (this as any).activeRecord
       ) {
-        throw new InverseOfAssociationRecursiveError((this as any).name, (inverse as any).name);
+        throw new InverseOfAssociationRecursiveError(
+          (this as any).name,
+          (inverse as any).name,
+          (this as any).className,
+        );
       }
     }
   }

@@ -343,8 +343,16 @@ export function isAttributeMethod(this: AttributeMethodsHost, name: string): boo
   return this._attributeDefinitions.has(name);
 }
 
-export function _hasAttribute(this: AttributeMethodsHost, attrName: string): boolean {
-  return this._attributeDefinitions.has(attrName);
+/**
+ * Mirrors ActiveRecord::AttributeMethods#_has_attribute? (instance method):
+ * a bare `@attributes.key?(attr_name)` with no alias resolution. Wired onto
+ * the prototype as an instance method, so `this` is a record and reads its
+ * attribute set — not `_attributeDefinitions`, which lives on the class.
+ *
+ * @internal
+ */
+export function _hasAttribute(this: InstanceMethodHost, attrName: string): boolean {
+  return this._attributes?.has(attrName) ?? false;
 }
 
 // ---------------------------------------------------------------------------
