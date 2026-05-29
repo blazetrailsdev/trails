@@ -1717,16 +1717,66 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#clear
    */
   async clear(): Promise<void> {
+    // Rails' `clear` → `delete_all` → through `delete_records` runs through
+    // `ensure_mutable` / the nested-through readonly check; mirror `deleteAll`
+    // and the prior per-record `delete` path by enforcing the same guard
+    // before touching join rows.
+    this._ensureThroughWritable();
     return this._withoutStrictLoading(async () => {
+      // Rails' `clear` routes through `delete_all`, which removes the rows in
+      // bulk and does NOT run `before_remove`/`after_remove` callbacks (those
+      // live in `remove_records`, not the delete path) — unlike per-record
+      // `delete`.
+      if (this._isThrough) {
+        // Mirror `delete_or_nullify_all_records` → `delete_records(load_target,
+        // method)` (has_many_through_association.rb:136-175): destroy the join
+        // rows for the loaded target so the join model's `belongsTo`
+        // counter-cache callbacks still fire, without the collection
+        // before/after-remove callbacks. Like Rails, this follows the
+        // association-layer `load_target` (the full association target), not
+        // the proxy's in-place relation state.
+        const assoc = this._record.association(this._assocName) as unknown as {
+          loadTarget: () => Promise<Base[]>;
+          deleteRecords: (records: Base[], method: string) => Promise<number>;
+        };
+        const target = await assoc.loadTarget();
+        if (target.length > 0) {
+          await assoc.deleteRecords(target, (this._assocDef.options.dependent as string) ?? "");
+        }
+        // The whole association target was cleared (load_target, not the
+        // diverged proxy scope), so reset the full in-memory target the way
+        // `deleteAll` does — pruning only the pre-clear `toArray()` subset
+        // would leave stale records for `size()`/`isEmpty()` to read.
+        this._target = [];
+        this._targetLoaded = true;
+        this._invalidateAssociationIds();
+        return;
+      }
+      // Capture the records to prune BEFORE removing — afterwards a delete /
+      // nullified FK makes a reload return nothing. Only the non-through path
+      // needs this; the through branch returns early after a full reset, so its
+      // `toArray()` load is avoided entirely.
       const records = await this.toArray();
-      const persisted = records.filter((r) => !r.isNewRecord());
-      if (persisted.length > 0) {
-        await this.delete(...persisted);
+      // Honor the association's `:dependent` like Rails `delete_all` (nil arg):
+      // `dependent == :destroy` collapses to `:delete_all`, so
+      // destroy/delete/delete_all bulk-DELETE the child rows while
+      // nullify/default nullify the owner FK — all without per-record remove
+      // callbacks (collection_association.rb:150-167 + has_many_association.rb:112-118).
+      const dep = this._assocDef.options.dependent as string | undefined;
+      const deleteRows =
+        dep === "destroy" || dep === "delete" || dep === "delete_all" || dep === "deleteAll";
+      // Mirror `deleteAll`'s divergence guard: when in-place proxy mutations
+      // (whereBang / ...) have run, `scope()` would rebuild the unmutated
+      // association scope and remove MORE rows than the caller constrained, so
+      // go through `super.*`.
+      const diverged = this._relationStateDiverged();
+      if (deleteRows) {
+        await (diverged ? super.deleteAll() : this.scope().deleteAll());
+      } else {
+        const nullUpdates = this._buildNullifyUpdates();
+        await (diverged ? super.updateAll(nullUpdates) : this.scope().updateAll(nullUpdates));
       }
-      const unsaved = this._target.filter((r) => r.isNewRecord());
-      if (unsaved.length > 0) {
-        this._removeFromTarget(unsaved);
-      }
+      this._removeFromTarget(records);
       this._invalidateAssociationIds();
     });
   }
