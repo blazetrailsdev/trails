@@ -222,7 +222,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("habtm table name with schema", async () => {
-      const { Song, Album, cleanup } = makeSongAlbumModels(adapter);
+      const { Song, Album, cleanup } = makeSongAlbumModels();
       try {
         await (Song as any).loadSchema();
         await (Album as any).loadSchema();
@@ -328,7 +328,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("where with qualified schema name", async () => {
-      const { Thing1 } = await makeThingModels(adapter);
+      const { Thing1 } = await makeThingModels();
       await (Thing1 as any).create({ id: 1, name: "thing1", email: "thing1@localhost" });
       const names = (
         await (Thing1 as any).where({ "test_schema.things.name": "thing1" }).toArray()
@@ -336,13 +336,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(names).toEqual(["thing1"]);
     });
     it("pluck with qualified schema name", async () => {
-      const { Thing1 } = await makeThingModels(adapter);
+      const { Thing1 } = await makeThingModels();
       await (Thing1 as any).create({ id: 1, name: "thing1", email: "thing1@localhost" });
       const names = await (Thing1 as any).pluck("test_schema.things.name");
       expect(names).toEqual(["thing1"]);
     });
     it("classes with qualified schema name", async () => {
-      const { Thing1, Thing2, Thing3, Thing4 } = await makeThingModels(adapter);
+      const { Thing1, Thing2, Thing3, Thing4 } = await makeThingModels();
       expect(await (Thing1 as any).count()).toBe(0);
       expect(await (Thing2 as any).count()).toBe(0);
       expect(await (Thing3 as any).count()).toBe(0);
@@ -517,7 +517,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("prepared statements with multiple schemas", async () => {
-      const Thing5 = makeThing5Model(adapter);
+      const Thing5 = makeThing5Model();
       // Load schema within a transaction to pin all queries to one connection.
       // Without this, the pool may route `columns("things")` to a fresh
       // connection without the search path set, returning 0 columns and causing

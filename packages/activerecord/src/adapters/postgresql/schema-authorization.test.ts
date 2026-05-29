@@ -2,20 +2,28 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/schema_authorization_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { StatementInvalid } from "../../errors.js";
 import { makeSchemaThingModel } from "./schema-ar-models.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { Base } from "../../index.js";
 
 const TABLE_NAME = "schema_things";
 const COLUMNS = "id serial primary key, name character varying(50)";
 const USERS = ["rails_pg_schema_user1", "rails_pg_schema_user2"];
+
+setupHandlerSuite();
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
   describe("SchemaAuthorizationTest", () => {
     beforeEach(async () => {
-      adapter = new PostgreSQLAdapter(PG_TEST_URL);
+      // D-1: SchemaThing resolves its adapter through the handler chain, so the
+      // session-auth dance must run on the same connection the model uses —
+      // Base.connection. (Mirrors schema.test.ts, where search_path set on
+      // Base.connection persists across ops, proving a single stable connection.)
+      adapter = Base.connection as PostgreSQLAdapter;
       await adapter.execute(`SET search_path TO '$user',public`);
       await adapter.sessionAuth("default");
       for (const u of USERS) {
@@ -41,7 +49,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           await adapter.execute(`DROP USER IF EXISTS ${u}`);
         } catch {}
       }
-      await adapter.close();
+      // Do not close: `adapter` is the shared pooled Base.connection now.
     });
 
     it("schema invisible", async () => {
@@ -80,7 +88,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("sequence schema caching", async () => {
-      const SchemaThing = makeSchemaThingModel(adapter);
+      const SchemaThing = makeSchemaThingModel();
       // Load schema once via user1's session (where schema_things is visible)
       await adapter.sessionAuth(USERS[0]);
       await SchemaThing.loadSchema();
