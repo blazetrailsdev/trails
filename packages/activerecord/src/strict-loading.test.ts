@@ -59,6 +59,11 @@ describe("StrictLoadingTest", () => {
     author.strictLoadingBang();
 
     await expect(loadHasMany(author, "books", {})).rejects.toThrow(StrictLoadingViolationError);
+    // The message names the singular associated klass (Rails' `#{klass}`),
+    // not the pluralized association name.
+    await expect(loadHasMany(author, "books", {})).rejects.toThrow(
+      "The Book association named `:books` cannot be lazily loaded.",
+    );
   });
 
   // Rails: test_raises_on_lazy_loading_a_strict_loading_belongs_to_relation
@@ -1759,7 +1764,9 @@ describe("StrictLoadingTest", () => {
     setActionOnStrictLoadingViolation("log");
     let logged: string | null = null;
     const sub = Notifications.subscribe("strict_loading_violation.active_record", (event: any) => {
-      logged = event.payload.reflection.strictLoadingViolationMessage(event.payload.owner.name);
+      // Mirrors LogSubscriber#strictLoadingViolation: passes payload.owner
+      // (the class) straight into the message builder.
+      logged = event.payload.reflection.strictLoadingViolationMessage(event.payload.owner);
     });
     try {
       await loadBelongsTo(tag, "taggable", { polymorphic: true });

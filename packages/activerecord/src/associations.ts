@@ -1204,7 +1204,9 @@ export async function loadHasMany(
 
   // Strict loading check
   if (_violatesStrictLoading(record, options)) {
-    strictLoadingViolationBang(record, assocName, { className: options.className });
+    strictLoadingViolationBang(record, assocName, {
+      className: options.className ?? camelize(singularize(assocName)),
+    });
   }
 
   // Handle through associations. Routes through AssociationScope's
@@ -2220,7 +2222,7 @@ function wrapCollectionProxy<T extends Base = Base>(
 
       if (_violatesStrictLoading(target._record, target._assocDef.options)) {
         strictLoadingViolationBang(target._record, target._assocName, {
-          className: target._assocDef.options.className,
+          className: target._assocDef.options.className ?? camelize(singularize(target._assocName)),
         });
       }
 
