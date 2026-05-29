@@ -3140,9 +3140,14 @@ export class Relation<T extends Base> {
    * Return the where values hash for inspection.
    *
    * Mirrors: ActiveRecord::Relation#where_values_hash
+   * (`where_values_hash(relation_table_name = model.table_name)`): the
+   * table name defaults to the relation's own model table but can be
+   * overridden to extract equality predicates scoped to a different table
+   * (e.g. `HasManyThroughAssociation#through_scope_attributes` passing the
+   * through model's table).
    */
-  whereValuesHash(): Record<string, unknown> {
-    return this._whereClause.toH(this._modelClass.tableName);
+  whereValuesHash(relationTableName: string = this._modelClass.tableName): Record<string, unknown> {
+    return this._whereClause.toH(relationTableName);
   }
 
   // -- Value accessors (for introspection) --

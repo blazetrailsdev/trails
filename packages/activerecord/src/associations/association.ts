@@ -444,6 +444,15 @@ export class Association {
         null;
     }
     if (!inverseName) return null;
+    // Rails gates `inverse_association_for` on `invertible_for?` (association.rb
+    // :350-367). For the base (has_many / has_one) direction that requires
+    // `foreign_key_for?(record)` — the record must actually carry the FK —
+    // without which an inverse can wire onto a record that lacks the FK column.
+    // `isInvertibleFor` is overridden by `BelongsToAssociation` (no FK check)
+    // and `HasManyThroughAssociation` (always false), mirroring their Rails
+    // overrides. The inverse-reflection-present half is already covered by the
+    // `inverseName` resolution above.
+    if (!this.isInvertibleFor(record)) return null;
     const recordAny = record as any;
     if (typeof recordAny.association === "function") {
       try {
@@ -527,14 +536,39 @@ export class Association {
     return (this.reflection as any).inverseOf ?? null;
   }
 
-  private isInvertibleFor(record: Base): boolean {
-    return !!(this.isForeignKeyFor(record) && this.inverseReflectionFor(record));
+  /**
+   * Mirrors Rails' `Association#invertible_for?` (association.rb:365-367):
+   * `foreign_key_for?(record) && inverse_reflection_for(record)`. The
+   * inverse-reflection-present half is checked by the caller
+   * (`inverseAssociationFor` resolves the inverse name first), so here we
+   * gate on the foreign-key half. Overridden by `BelongsToAssociation` and
+   * `HasManyThroughAssociation`.
+   * @internal
+   */
+  protected isInvertibleFor(record: Base): boolean {
+    return this.isForeignKeyFor(record);
   }
 
-  private isForeignKeyFor(record: Base): boolean {
-    const fk = (this.reflection.options as any).foreignKey;
+  protected isForeignKeyFor(record: Base): boolean {
+    // Rails: `Array(reflection.foreign_key).all? { |key| record._has_attribute?(key) }`
+    // (association.rb:370-373), where `_has_attribute?` checks the record's
+    // attribute SET (`@attributes.key?`). Resolve the computed foreign key
+    // from the rich reflection (the lightweight `options.foreignKey` is unset
+    // when the FK is derived rather than explicit), then probe the record's
+    // `_attributes` set.
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | null;
+    };
+    const fk =
+      ctor._reflectOnAssociation?.(this.reflection.name)?.foreignKey ??
+      (this.reflection.options as any).foreignKey;
     const fkArr = Array.isArray(fk) ? fk : [fk];
-    return fkArr.every((key) => (record as any)._hasAttribute?.(key) ?? key in record);
+    const attrs = (record as any)._attributes as { has?: (k: string) => boolean } | undefined;
+    return fkArr.every((key) => {
+      if (key == null) return false;
+      const name = String(key);
+      return typeof attrs?.has === "function" ? attrs.has(name) : name in record;
+    });
   }
 
   private isSkipStatementCache(scope: any): boolean {

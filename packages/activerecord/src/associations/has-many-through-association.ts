@@ -176,6 +176,18 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   /**
+   * Mirrors Rails' `HasManyThroughAssociation#invertible_for?`
+   * (has_many_through_association.rb:232-234): through associations never wire
+   * an inverse via `inverse_association_for` ("NOTE - not sure that we can
+   * actually cope with inverses here"). The join-row inverse wiring HMT does
+   * need happens in `buildRecord` via `buildThroughInverseFor`, not here.
+   * @internal
+   */
+  protected override isInvertibleFor(_record: Base): boolean {
+    return false;
+  }
+
+  /**
    * Mirrors Rails' `HasManyThroughAssociation#remove_records`
    * (has_many_through_association.rb:116-119): generic removal via `super`,
    * then drop the matching join rows from the through target.
@@ -423,7 +435,18 @@ function throughScopeAttributes(assoc: HasManyThroughAssociation): Record<string
   if (!throughName) return {};
   const throughAssoc = (assoc.owner as any).association?.(throughName);
   if (!throughAssoc) return {};
-  const scope: any = throughAssoc.scope?.();
+  // Rails: `scope = through_scope || self.scope` (hmt:72). The `_throughScope`
+  // ivar is set during `buildRecord` (hmt:93) and cleared after; consult it
+  // first so a record built within that window picks up the scope captured at
+  // build time, then fall back to `self.scope` (the HMT relation). The last
+  // fallback to the through association's own scope covers the lightweight
+  // `{ owner, reflection }` stand-in used by `buildThroughInverseFor` (called
+  // from `buildRecord` and `CollectionProxy._buildThrough`), which has no
+  // `scope()` of its own. `whereValuesHash(throughTable)` below filters the
+  // equality predicates to the through model's table, so target-table
+  // predicates carried by any of these relations are dropped rather than
+  // leaking into the join row / delete query.
+  const scope: any = throughScope(assoc) ?? (assoc as any).scope?.() ?? throughAssoc.scope?.();
   if (!scope || typeof scope.whereValuesHash !== "function") return {};
   const throughTable = (throughAssoc.klass as any)?.tableName ?? "";
   const attrs = scope.whereValuesHash(throughTable) as Record<string, unknown>;

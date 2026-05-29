@@ -229,6 +229,66 @@ export class BelongsToAssociation extends SingularAssociation {
     return !this.isLoaded() && this.foreignKeyPresent();
   }
 
+  /**
+   * Mirrors Rails' `BelongsToAssociation#invertible_for?`
+   * (belongs_to_association.rb:158-161):
+   *
+   *   inverse = inverse_reflection_for(record)
+   *   inverse && (inverse.has_one? || inverse.klass.has_many_inversing)
+   *
+   * Unlike the base, belongs_to does NOT require the record to carry the
+   * foreign key (the FK lives on the owner). It instead requires the inverse
+   * reflection to be present and to be either a has_one inverse or a has_many
+   * whose `klass` enables `has_many_inversing`. Note `inverse.klass` is the
+   * class the inverse collection holds — i.e. the owner (child) class — NOT
+   * the record's class.
+   * @internal
+   */
+  protected override isInvertibleFor(record: Base): boolean {
+    const inverse = this.inverseReflectionOn(record);
+    if (!inverse) return false;
+    const isHasOne =
+      typeof inverse.isHasOne === "function" ? inverse.isHasOne() : inverse.macro === "hasOne";
+    const inverseKlass = inverse.klass as typeof Base | undefined;
+    return isHasOne || !!inverseKlass?.hasManyInversing;
+  }
+
+  /**
+   * Resolve the rich inverse reflection on `record`'s class — Rails'
+   * `inverse_reflection_for(record)`. The polymorphic subclass routes through
+   * `polymorphicInverseOf` (which raises when the configured inverse is
+   * missing); the vanilla path resolves the inverse name (including automatic
+   * detection) off the owner's reflection, then looks it up on the record.
+   * @internal
+   */
+  private inverseReflectionOn(
+    record: Base,
+  ): { macro?: string; isHasOne?: () => boolean; klass?: typeof Base } | null {
+    if ((this.reflection.options as { polymorphic?: boolean }).polymorphic) {
+      return (
+        (this.inverseReflectionFor(record) as {
+          macro?: string;
+          isHasOne?: () => boolean;
+          klass?: typeof Base;
+        }) ?? null
+      );
+    }
+    const ownerCtor = this.owner.constructor as {
+      _reflectOnAssociation?: (n: string) => { inverseName?: () => string | null } | null;
+    };
+    const inverseName =
+      ownerCtor._reflectOnAssociation?.(this.reflection.name)?.inverseName?.() ??
+      (this.reflection.options.inverseOf as string | undefined) ??
+      null;
+    if (!inverseName) return null;
+    const recordCtor = record.constructor as {
+      _reflectOnAssociation?: (
+        n: string,
+      ) => { macro?: string; isHasOne?: () => boolean; klass?: typeof Base } | null;
+    };
+    return recordCtor._reflectOnAssociation?.(inverseName) ?? null;
+  }
+
   protected override foreignKeyPresent(): boolean {
     return this.foreignKeyNames().every((fk) => {
       const value =
