@@ -81,7 +81,14 @@ export interface Index {
 export function loadIndex(): Index {
   const indexPath = join(TASKS_DIR, "index.json");
   if (!existsSync(indexPath) || isIndexStale(indexPath)) {
-    execFileSync("node", ["scripts/build-index.mjs"], { cwd: TASKS_DIR, stdio: "inherit" });
+    // Use `process.execPath` (absolute path to the running Node binary)
+    // rather than a bare "node": under pnpm/tsx the spawned environment's
+    // PATH may not include `node`, which made the stale-index rebuild fail
+    // with `spawnSync node ENOENT`.
+    execFileSync(process.execPath, ["scripts/build-index.mjs"], {
+      cwd: TASKS_DIR,
+      stdio: "inherit",
+    });
   }
   return JSON.parse(readFileSync(indexPath, "utf8")) as Index;
 }
