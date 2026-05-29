@@ -295,6 +295,7 @@ function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
   const flat = columns.flat(Infinity);
   const normalized = flat.map((c: any) => {
     if (c instanceof Nodes.Node) return c;
+    if (typeof c === "symbol") return c;
     if (typeof c === "object" && c !== null && "value" in c)
       return new Nodes.SqlLiteral((c as { value: string }).value);
     return String(c);
@@ -316,14 +317,16 @@ function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
   };
   for (const existing of this._selectColumns) {
     if (typeof existing === "string") seenStrings.add(existing);
+    else if (typeof existing === "symbol") seenStrings.add(symbolToName(existing));
     else if (existing instanceof Nodes.Node) addNodeToSeen(existing);
     else seenStrings.add((existing as { value: string }).value);
   }
   for (const col of normalized) {
-    if (typeof col === "string") {
-      if (!seenStrings.has(col)) {
+    if (typeof col === "string" || typeof col === "symbol") {
+      const key = typeof col === "symbol" ? symbolToName(col) : col;
+      if (!seenStrings.has(key)) {
         this._selectColumns.push(col);
-        seenStrings.add(col);
+        seenStrings.add(key);
       }
     } else if (col instanceof Nodes.Node) {
       if (!nodeIsDuplicate(col)) {
@@ -1131,18 +1134,11 @@ function reverseOrderBang(this: QueryMethodsHost): any {
       return clause;
     }
     if (typeof clause === "object" && !Array.isArray(clause) && "raw" in clause) {
-      // Mirrors Rails reverse_sql_order string case: flip trailing ASC↔DESC,
-      // or append DESC if no direction present.
+      // Delegate to reverseSqlOrder's String branch (splits comma-separated
+      // terms, flips trailing ASC↔DESC, appends DESC otherwise) and re-wrap.
       const raw = (clause as { raw: string }).raw.trim();
-      if (isDoesNotSupportReverse(raw)) {
-        throw new IrreversibleOrderError(
-          `Relation has a non-reversible order and cannot be reversed: ${raw}`,
-        );
-      }
-      const flipped = raw.replace(/\s+ASC$/i, " DESC").replace(/\s+DESC$/i, " ASC");
-      if (flipped !== raw) return { raw: flipped };
-      // No direction suffix — append DESC (matches Rails `s << " DESC"` fallback)
-      return { raw: `${raw} DESC` };
+      const reversed = reverseSqlOrder.call(this, [raw]) as string[];
+      return { raw: reversed.join(", ") };
     }
     if (typeof clause === "string") {
       const match = clause.match(/^([\w.]+)\s+(ASC|DESC)$/i);

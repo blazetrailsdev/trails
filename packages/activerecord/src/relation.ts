@@ -265,7 +265,7 @@ export class Relation<T extends Base> {
   private _reordering = false;
   private _limitValue: number | null = null;
   private _offsetValue: number | null = null;
-  private _selectColumns: (string | Nodes.Node)[] | null = null;
+  private _selectColumns: (string | symbol | Nodes.Node)[] | null = null;
   private _isDistinct = false;
   private _distinctOnColumns: string[] = [];
   private _groupColumns: string[] = [];
@@ -1046,7 +1046,9 @@ export class Relation<T extends Base> {
           ? `sql(${JSON.stringify(c.value)})`
           : c instanceof Nodes.Node
             ? `sql(${JSON.stringify(c.toSql())})`
-            : JSON.stringify(c),
+            : typeof c === "symbol"
+              ? c.description
+              : JSON.stringify(c),
       );
       parts.push(`.select(${cols.join(", ")})`);
     }
@@ -1105,6 +1107,15 @@ export class Relation<T extends Base> {
    */
   get isLocked(): boolean {
     return this._lockValue !== null;
+  }
+
+  /**
+   * The relation's lock clause, or null when unlocked.
+   *
+   * Mirrors: ActiveRecord::Relation#lock_value (SINGLE_VALUE_METHODS).
+   */
+  get lockValue(): string | null {
+    return this._lockValue;
   }
 
   /**
@@ -3101,7 +3112,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#select_values
    */
-  get selectValues(): (string | Nodes.Node)[] {
+  get selectValues(): (string | symbol | Nodes.Node)[] {
     return this._selectColumns ?? [];
   }
 
@@ -3392,11 +3403,10 @@ export class Relation<T extends Base> {
    */
   private _buildProjections(table: Table): any[] {
     if (this._selectColumns) {
-      return this._selectColumns.map((c) => {
-        if (c instanceof Nodes.Node) return c;
-        if (/[(*\s]/.test(c)) return new Nodes.SqlLiteral(c);
-        return table.get(c);
-      });
+      // Route through arelColumns (mirrors Rails build_select -> arel_columns):
+      // bare-string literals like "1"/"foo()" and symbols resolve via columns_hash
+      // then fall back to a SqlLiteral, instead of being table-qualified.
+      return this.arelColumns(this._selectColumns) as any[];
     }
     if (this._modelClass.ignoredColumns.length > 0) {
       let cols = this._modelClass.columnNames();
