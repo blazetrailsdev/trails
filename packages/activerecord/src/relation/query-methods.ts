@@ -2027,30 +2027,25 @@ export function buildFrom(this: QueryMethodsHost): unknown {
 }
 
 /**
- * Assemble the select-list projection nodes, mirroring Rails'
- * `Relation#build_select` / `arel_columns`. Single source of truth shared by
- * both `buildSelect` (the Arel-manager path) and `Relation#_buildProjections`
- * (the legacy `toArel`/`toSql` path):
+ * Explicit select-list columns, or `null` to signal the default table-star
+ * fallback. Shared by `buildSelect` and `buildProjections`; mirrors the
+ * non-star branches of Rails' `build_select` / `arel_columns`:
  *
  *  - explicit `select` values route through `arelColumns`, so bare literals
  *    (`"1"`, `"foo()"`) emit verbatim, symbols are table-qualified, and
  *    hash/alias forms expand correctly;
  *  - `ignoredColumns` / `enumerateColumnsInSelectStatements` project the
  *    explicit column list (the primary key is prepended when it would
- *    otherwise be dropped, so instantiation can still identify rows);
- *  - otherwise the qualified table star (`"users".*`). Qualifying avoids the
- *    join-collision trap where a JOIN's same-named column overwrites the
- *    target row hash (drivers keep one key per name, last write wins).
+ *    otherwise be dropped, so instantiation can still identify rows).
  *
  * @internal
  */
-export function buildProjections(this: QueryMethodsHost): unknown[] {
-  const selectCols = (this as any)._selectColumns;
+function selectListColumns(host: QueryMethodsHost): unknown[] | null {
+  const selectCols = (host as any)._selectColumns;
   if (selectCols && selectCols.length > 0) {
-    return arelColumns.call(this, selectCols);
+    return arelColumns.call(host, selectCols);
   }
-  const modelClass: any = (this as any)._modelClass;
-  const table: any = modelClass?.arelTable;
+  const modelClass: any = (host as any)._modelClass;
   if (
     (modelClass?.ignoredColumns?.length ?? 0) > 0 ||
     modelClass?.enumerateColumnsInSelectStatements
@@ -2061,15 +2056,42 @@ export function buildProjections(this: QueryMethodsHost): unknown[] {
       cols = [pk, ...cols];
     }
     if (cols.length > 0) {
+      const table: any = modelClass?.arelTable;
       return cols.map((f: string) => table?.get(f) ?? arelSql(f));
     }
   }
+  return null;
+}
+
+/**
+ * Projection nodes for the legacy `toArel`/`toSql` path. Returns the explicit
+ * select list, or the qualified table star (`"users".*`) — qualifying avoids
+ * the join-collision trap where a JOIN's same-named column overwrites the
+ * target row hash (drivers keep one key per name, last write wins).
+ *
+ * @internal
+ */
+export function buildProjections(this: QueryMethodsHost): unknown[] {
+  const cols = selectListColumns(this);
+  if (cols) return cols;
+  const table: any = (this as any)._modelClass?.arelTable;
   return [table ? table.star : arelSql("*")];
 }
 
-/** @internal */
+/**
+ * Mirror of Rails `Relation#build_select`: project the select list onto the
+ * given Arel manager, defaulting to the qualified table star.
+ *
+ * @internal
+ */
 export function buildSelect(this: QueryMethodsHost, arel: any): void {
-  arel.project(...buildProjections.call(this));
+  const cols = selectListColumns(this);
+  if (cols) {
+    arel.project(...cols);
+    return;
+  }
+  const table: any = (this as any)._modelClass?.arelTable;
+  arel.project(table ? table.star : arelSql("*"));
 }
 
 /** @internal */
