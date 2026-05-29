@@ -802,7 +802,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     const record = this._buildRaw(attrs) as T;
     if (block) block(record);
-    await this._addToTarget(record, {}, () => record.save());
+    // Rails' add_to_target computes `replace: replace || association_scope.distinct_value`,
+    // so a `distinct` association scope dedups in place rather than appending twice.
+    await this._addToTarget(record, { replace: this.distinctValue }, () => record.save());
     return record;
   }
 
