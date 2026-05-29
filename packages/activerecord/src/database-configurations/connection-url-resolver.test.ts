@@ -64,6 +64,17 @@ describe("ConnectionUrlResolver", () => {
     expect(hash.pool).toBe("5");
   });
 
+  it("lets opaque-URI structural fields win over query params", () => {
+    // Rails: raw_config opaque branch is query_hash.merge(adapter:, database:),
+    // so structural fields override any same-named query params.
+    const hash = new ConnectionUrlResolver(
+      "sqlite3:foo.db?database=ignored&adapter=ignored&pool=5",
+    ).toHash();
+    expect(hash.adapter).toBe("sqlite3");
+    expect(hash.database).toBe("foo.db");
+    expect(hash.pool).toBe("5");
+  });
+
   it("omits blank values from the hash", () => {
     const hash = new ConnectionUrlResolver("postgres://localhost/db").toHash();
     expect(hash.username).toBeUndefined();

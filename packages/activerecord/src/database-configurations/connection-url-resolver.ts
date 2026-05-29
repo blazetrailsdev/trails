@@ -74,11 +74,13 @@ export class ConnectionUrlResolver {
 
   /**
    * Mirrors: ConnectionUrlResolver#to_hash
+   *
+   * Merge precedence lives in {@link rawConfig}: hierarchical URIs let query
+   * params win (Rails `reverse_merge`); opaque URIs let structural fields win
+   * (Rails `merge`).
    */
   toHash(): DatabaseConfigOptions {
-    // Mirrors Rails: query_hash.reverse_merge(...) — query params take precedence
-    // over structural fields (adapter, host, etc.) from the URL authority.
-    const config: Record<string, unknown> = { ...this.rawConfig(), ...this.queryHash() };
+    const config: Record<string, unknown> = this.rawConfig();
 
     // Remove null/undefined/empty values (Rails: compact_blank)
     for (const key of Object.keys(config)) {
@@ -138,8 +140,10 @@ export class ConnectionUrlResolver {
   /** @internal */
   private rawConfig(): Record<string, unknown> {
     if (this._opaque !== null) {
-      // Opaque URI: adapter + database (from opaque part)
+      // Opaque URI (Rails: query_hash.merge(adapter:, database:)) — structural
+      // fields win over query params, so they are spread last.
       return {
+        ...this.queryHash(),
         adapter: this._adapter,
         database: this._opaque,
       };
@@ -149,6 +153,8 @@ export class ConnectionUrlResolver {
     // When we used a placeholder host to work around WHATWG's empty-authority
     // misparse (http:///path), the hostname is "placeholder" — discard it.
     const hostname = this._emptyAuthority ? "" : parsed.hostname;
+    // Hierarchical URI (Rails: query_hash.reverse_merge(...)) — query params win
+    // over structural fields, so they are spread last.
     return {
       adapter: this._adapter,
       username: parsed.username || undefined,
@@ -157,6 +163,7 @@ export class ConnectionUrlResolver {
       database: this.databaseFromPath(parsed.pathname),
       // URL API wraps IPv6 addresses in brackets; strip them to match Rails behavior
       host: hostname ? hostname.replace(/^\[(.+)\]$/, "$1") : undefined,
+      ...this.queryHash(),
     };
   }
 
