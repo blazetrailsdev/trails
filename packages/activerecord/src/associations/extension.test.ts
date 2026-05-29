@@ -57,9 +57,16 @@ describe("AssociationsExtensionsTest", () => {
         this.adapter = extAdapter;
       }
     }
+    const findMostRecent = {
+      findMostRecent: async function (this: CollectionProxy) {
+        const all = await this.toArray();
+        return all[all.length - 1] ?? null;
+      },
+    };
     Associations.hasMany.call(ExtPost, "extComments", {
       foreignKey: "ext_post_id",
       className: "ExtComment",
+      extend: findMostRecent,
     });
     registerModel("ExtPost", ExtPost);
     registerModel("ExtComment", ExtComment);
@@ -81,9 +88,14 @@ describe("AssociationsExtensionsTest", () => {
     await ExtComment.create({ body: "a", ext_post_id: post.id });
     await ExtComment.create({ body: "b", ext_post_id: post.id });
     const proxy = association(post, "extComments");
-    const filtered = await proxy.where({ body: "a" });
-    expect(filtered.length).toBe(1);
-    expect(filtered[0].body).toBe("a");
+    // Mirrors Rails `posts(:welcome).comments.offset(1).find_most_recent`:
+    // the extension method must remain callable on a relation spawned off
+    // the proxy via a scope mutation.
+    const recent = await (
+      proxy.offset(1) as unknown as { findMostRecent: () => Promise<{ body: string } | null> }
+    ).findMostRecent();
+    expect(recent).not.toBeNull();
+    expect(recent!.body).toBe("b");
   });
 
   it("association with default scope", async () => {
