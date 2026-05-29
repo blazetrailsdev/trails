@@ -11,22 +11,20 @@
  */
 import { Base, registerModel, acceptsNestedAttributesFor } from "./index.js";
 import { Associations } from "./associations.js";
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
 
 /**
- * Creates a fresh set of test model classes with their own adapter.
- * Each call returns new model classes with a fresh adapter so tests
- * don't share database state. Note: models are registered in the global
- * model registry (registerModel), so later calls overwrite earlier ones.
- * Since associations resolve className via the registry at runtime, the
- * most recently created fixture set's classes will be used for lookups.
- * This works correctly when tests run sequentially (each beforeEach
+ * Creates a fresh set of test model classes. Models resolve their adapter
+ * via `Base.connection` (the handler chain) rather than holding a bound
+ * adapter — callers must bootstrap a handler connection (e.g.
+ * `setupHandlerSuite()`) before instantiating. Note: models are registered
+ * in the global model registry (registerModel), so later calls overwrite
+ * earlier ones. Since associations resolve className via the registry at
+ * runtime, the most recently created fixture set's classes will be used for
+ * lookups. This works correctly when tests run sequentially (each beforeEach
  * creates a fresh set), but concurrent tests sharing a worker should
  * each call createFixtures() to ensure they get the latest classes.
  */
 export interface TestFixtures {
-  adapter: DatabaseAdapter;
   Author: typeof Base;
   AuthorAddress: typeof Base;
   Post: typeof Base;
@@ -48,12 +46,10 @@ export interface TestFixtures {
   Topic: typeof Base;
   Book: typeof Base;
   Person: typeof Base;
-  [key: string]: typeof Base | DatabaseAdapter;
+  [key: string]: typeof Base;
 }
 
-export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures {
-  const adapter = existingAdapter || createTestAdapter();
-
+export function createFixtures(): TestFixtures {
   // ── Author ──────────────────────────────────────────────────────────
   class Author extends Base {
     static {
@@ -63,7 +59,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("author_address_extra_id", "integer");
       this.attribute("owned_essay_id", "integer");
       this.attribute("organization_id", "string");
-      this.adapter = adapter;
     }
   }
 
@@ -71,7 +66,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
   class AuthorAddress extends Base {
     static {
       this._tableName = "author_addresses";
-      this.adapter = adapter;
     }
   }
 
@@ -85,7 +79,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("author_id", "integer");
       this.attribute("legacy_comments_count", "integer", { default: 0 });
       this.attribute("tags_count", "integer", { default: 0 });
-      this.adapter = adapter;
     }
   }
 
@@ -99,7 +92,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("parent_id", "integer");
       this.attribute("company_id", "integer");
       this.attribute("children_count", "integer", { default: 0 });
-      this.adapter = adapter;
     }
   }
 
@@ -108,7 +100,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
     static {
       this._tableName = "tags";
       this.attribute("name", "string");
-      this.adapter = adapter;
     }
   }
 
@@ -120,7 +111,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("post_id", "integer");
       this.attribute("taggable_id", "integer");
       this.attribute("taggable_type", "string");
-      this.adapter = adapter;
     }
   }
 
@@ -130,7 +120,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this._tableName = "categories";
       this.attribute("name", "string");
       this.attribute("type", "string");
-      this.adapter = adapter;
     }
   }
 
@@ -140,7 +129,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this._tableName = "pirates";
       this.attribute("catchphrase", "string");
       this.attribute("parrot_id", "integer");
-      this.adapter = adapter;
     }
   }
 
@@ -151,7 +139,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("name", "string");
       this.attribute("pirate_id", "integer");
       this.attribute("treasures_count", "integer", { default: 0 });
-      this.adapter = adapter;
       this.validates("name", { presence: true });
     }
   }
@@ -162,7 +149,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this._tableName = "ship_parts";
       this.attribute("name", "string");
       this.attribute("ship_id", "integer");
-      this.adapter = adapter;
     }
   }
 
@@ -172,7 +158,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this._tableName = "treasures";
       this.attribute("name", "string");
       this.attribute("pirate_id", "integer");
-      this.adapter = adapter;
     }
   }
 
@@ -182,7 +167,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this._tableName = "birds";
       this.attribute("name", "string");
       this.attribute("pirate_id", "integer");
-      this.adapter = adapter;
       this.validates("name", { presence: true });
     }
   }
@@ -192,7 +176,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
     static {
       this._tableName = "parrots";
       this.attribute("name", "string");
-      this.adapter = adapter;
     }
   }
 
@@ -203,7 +186,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("name", "string");
       this.attribute("salary", "integer", { default: 70000 });
       this.attribute("shared_computers", "string");
-      this.adapter = adapter;
     }
   }
 
@@ -212,7 +194,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
     static {
       this._tableName = "projects";
       this.attribute("name", "string");
-      this.adapter = adapter;
     }
   }
 
@@ -229,7 +210,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("project_id", "integer");
       this.attribute("joined_on", "date");
       this.attribute("access_level", "integer", { default: 1 });
-      this.adapter = adapter;
     }
   }
 
@@ -246,7 +226,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("description", "string");
       this.attribute("account_id", "integer");
       this.attribute("status", "integer");
-      this.adapter = adapter;
     }
   }
 
@@ -260,7 +239,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("author_name", "string");
       this.attribute("parent_id", "integer");
       this.attribute("replies_count", "integer", { default: 0 });
-      this.adapter = adapter;
     }
   }
 
@@ -280,7 +258,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("difficulty", "integer");
       this.attribute("boolean_status", "integer");
       this.attribute("cover", "string");
-      this.adapter = adapter;
     }
   }
 
@@ -290,7 +267,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this._tableName = "people";
       this.attribute("first_name", "string");
       this.attribute("lock_version", "integer", { default: 0 });
-      this.adapter = adapter;
     }
   }
 
@@ -304,7 +280,6 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("status", "string");
       this.attribute("transactions_count", "integer");
       this.attribute("updated_at", "datetime");
-      this.adapter = adapter;
     }
   }
 
@@ -481,5 +456,5 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
   acceptsNestedAttributesFor(Ship, "parts", { allowDestroy: true });
   acceptsNestedAttributesFor(Ship, "pirate", { allowDestroy: true });
 
-  return { adapter, ...models };
+  return { ...models };
 }

@@ -2178,7 +2178,7 @@ describe("AssociationsTest", () => {
     expect(isMarkedForDestruction(comment)).toBe(true);
   });
   it("loading the association target should load most recent attributes for child records marked for destruction", async () => {
-    const f = createFixtures(Base.connection);
+    const f = createFixtures();
     const ship = await f.Ship.create({ name: "The good ship Dollypop" });
     const proxy = association(ship, "parts");
     const part = await proxy.create({ name: "Mast" });
