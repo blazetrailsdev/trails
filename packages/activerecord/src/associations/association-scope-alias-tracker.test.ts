@@ -3,7 +3,7 @@
  *
  * Rails' `AssociationScope#scope` threads an `AliasTracker` through
  * `get_chain` so repeated visits to the same table get distinct
- * aliases. Before this change our `_getChain` stored bare `tableName`
+ * aliases. Before this change our `getChain` stored bare `tableName`
  * strings on each `ReflectionProxy`; a chain whose tail visited the
  * owner's own table would collide with the base-table reference in
  * the emitted JOIN / WHERE.
@@ -52,7 +52,7 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
 
     // Self-referential chain whose tail visits the same `at_users`
     // table the owning klass seeds the tracker with — the branch
-    // `_getChain` needs in order to trigger `aliasedTableFor`'s
+    // `getChain` needs in order to trigger `aliasedTableFor`'s
     // repeat-visit alias path.
     Associations.hasMany.call(AtUser, "children", {
       className: "AtUser",
@@ -98,14 +98,14 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
 
     // Build the scope and inspect the second chain entry's aliased
     // table directly via a subclassed AssociationScope that exposes
-    // `_getChain`. Going through the private is the only way to
+    // `getChain`. Going through the private is the only way to
     // observe this without end-to-end query execution (whose
     // correctness depends on orthogonal chain-expansion work —
     // task #21).
     class TestScope extends AssociationScope {
       public runGetChain(reflection: any) {
         const tracker = AliasTracker.create(null, (reflection as any).klass.arelTable.name, []);
-        return this._getChain(reflection, tracker);
+        return this.getChain(reflection, tracker);
       }
     }
     const builtChain = new TestScope(() => null).runGetChain(refl);
