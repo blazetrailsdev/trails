@@ -45,7 +45,7 @@ a separate plan doc"). This is that doc.
    **before** Phase B canary so the canary PR is purely the
    conversion pattern, not pattern+infra mixed.
    - **Status (2026-05-28):** the Rails-shape `useFixtures(["authors", "posts"])`
-     name-array API + `fixtures-registry.ts` shipped (registry maps 103 fixture
+     name-array API + `fixtures-registry.ts` shipped (registry maps 102 fixture
      sets to canonical models; gaps documented in the registry header). Worker-
      level seeding (Spike S1 proper) was deferred out of that PR to stay under
      the LOC ceiling — `use-fixtures.ts` still seeds per-test and carries a

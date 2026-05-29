@@ -223,6 +223,12 @@ describe("fixtureRegistry conformance", () => {
       expect(ModelClass.tableName.length, `${name}: tableName must be non-empty`).toBeGreaterThan(
         0,
       );
+      // defineFixtures() throws on composite primary keys, so a registered entry
+      // with one is a name-based API that always fails at seed time — reject it.
+      expect(
+        Array.isArray((ModelClass as { primaryKey: unknown }).primaryKey),
+        `${name}: composite primary key is not seedable by defineFixtures — move to the gap list`,
+      ).toBe(false);
 
       const data = (entry as { data: Record<string, unknown> }).data;
       const labels = Object.keys(data);

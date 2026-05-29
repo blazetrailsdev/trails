@@ -36,6 +36,9 @@ export interface FixtureRegistryEntry {
  *   eagerly rejects the polymorphic `employable` belongs_to, whereas Rails
  *   (chef.rb: `accepts_nested_attributes_for :employable`) defers that check to
  *   build time. Pre-existing model-port divergence; re-add once chef.ts imports cleanly.
+ * - `cpk-orders` — `CpkOrder` has a composite primary key (`["shop_id", "id"]`);
+ *   `defineFixtures` throws on composite PKs, so the entry would always fail at
+ *   seed time. Re-add once composite-PK fixture seeding is supported.
  * - `developers-projects` — HABTM join table, no model class
  * - `encrypted-book-that-ignores-cases` — same encryption add-on requirement
  * - `encrypted-books` — model requires the `@blazetrails/activerecord/encryption` add-on loaded at import time
@@ -160,10 +163,6 @@ export const fixtureRegistry = {
   cpkOrderTags: {
     model: () => import("./models/cpk.js").then((m) => m.CpkOrderTag),
     data: FixtureData.cpkOrderTagFixtureData,
-  },
-  cpkOrders: {
-    model: () => import("./models/cpk.js").then((m) => m.CpkOrder),
-    data: FixtureData.cpkOrderFixtureData,
   },
   cpkReviews: {
     model: () => import("./models/cpk.js").then((m) => m.CpkReview),
