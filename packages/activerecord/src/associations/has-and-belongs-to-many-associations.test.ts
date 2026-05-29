@@ -1443,20 +1443,32 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // SCOPE: associations/builder/has-and-belongs-to-many.ts — cross-namespace className resolution
   });
 
-  it.skip("redefine habtm", () => {
-    // BLOCKED: associations — habtm subclass redeclaration
-    // Rails' test_redefine_habtm (test file:81-87) has SubDeveloper < Developer
-    // re-declare `:special_projects` over the same join table with the FK
-    // options SWAPPED (foreign_key: project_id, association_foreign_key:
-    // developer_id) vs Developer's declaration, and asserts the subclass's
-    // version governs the join on `child.special_projects << ...; child.save`.
-    // ROOT-CAUSE: the has_many :through insert path does not honor a subclass's
-    // re-declared HABTM FKs — pushing on the subclass writes null/parent-mapped
-    // join FKs, and the COW-inherited parent middle `has_many` (whose derived
-    // name differs from the subclass's) is not suppressed, so it double-inserts.
-    // SCOPE: through-insert FK governance + orphaned-middle suppression for
-    // subclass HABTM redeclaration — a separate feature from the F1 insert/
-    // query gaps; tracked as a follow-up.
+  it("redefine habtm", async () => {
+    // Mirrors Rails: SubDeveloper < Developer inherits Developer's
+    // `special_projects` HABTM. Pushing a target on a subclass instance and
+    // saving must insert exactly one join row whose owner FK is mapped from
+    // the subclass instance's id (not double-inserted via the eager
+    // through-push path while the owner is still a new record). The target's
+    // className resolves to Project here, so a Project is pushed — Rails'
+    // `special_projects` points at SpecialProject, but this describe block's
+    // schema only declares Developer/Project.
+    Associations.hasAndBelongsToMany.call(Developer, "specialProjects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      associationForeignKey: "project_id",
+    });
+    class SubDeveloper extends Developer {}
+    registerModel(SubDeveloper);
+    SubDeveloper.adapter = adapter;
+
+    const child = new SubDeveloper({ name: "Aredridel" });
+    await association(child, "specialProjects").push(new Project({ name: "Special Project" }));
+    expect(await child.save()).toBe(true);
+
+    const joins = await DeveloperProject.all();
+    expect(joins.length).toBe(1);
+    expect((joins[0] as any).developer_id).toBe((child as any).id);
+    expect((joins[0] as any).project_id).not.toBeNull();
   });
 
   it.skip("habtm with reflection using class name and fixtures", () => {

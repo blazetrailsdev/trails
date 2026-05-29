@@ -1371,6 +1371,31 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         !fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)
       )
         continue;
+      // Owner not yet persisted: defer the join insert. Mirrors Rails'
+      // CollectionAssociation#concat_records, which only calls insert_record
+      // when `!owner.new_record?` — otherwise it just adds the target to the
+      // in-memory collection and lets the owner's after_create autosave create
+      // the join row with the resolved owner FK. Inserting now would write a
+      // null owner FK (the owner has no id yet) and double-insert once the
+      // autosave runs.
+      if (this._record.isNewRecord()) {
+        // Wire the inverse before firing after_add, mirroring Rails'
+        // replace_on_target → set_inverse_instance(record) (which runs before
+        // the after_add callback) so user code observing the collection before
+        // save sees the inverse-of relationship.
+        _setCollectionInverseInstance(
+          this._record,
+          this._assocName,
+          this._assocDef.options,
+          record,
+        );
+        this._target.push(record);
+        this._invalidateAssociationIds();
+        if (!skipCallbacks) {
+          fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+        }
+        continue;
+      }
       // Save the target record if it's new
       if (record.isNewRecord()) {
         if (bang) {
