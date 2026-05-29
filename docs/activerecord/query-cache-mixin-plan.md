@@ -128,3 +128,47 @@ inner adapter`, the Quoting-forwarder fallback tests) are deleted with the
   closed) is **subsumed by Phase 3**: once there is no wrapper, there is no
   `.inner` chain to walk, so the matcher resolvers collapse to one-line direct
   lookups and the shared helper is unnecessary. Do not reopen it standalone.
+
+## Post-merge follow-ups
+
+Forward-looking items needing follow-up work, grouped into PR-sized work units.
+
+### Actionable PR queue
+
+**Ready now:**
+
+- **Phase 1 — wire the mixin cache into the live query path** (~feature; see
+  §"Phase 1" above). The real missing piece. **Must land first** — Phases 2/3
+  depend on the mixin actually caching. Correction from #2651 to fold in:
+  the framing "`lookupSqlCache`/`cacheSql` have no callers" is imprecise — the
+  unwired `selectAll(original)` **factory** in
+  `connection-adapters/abstract/query-cache.ts` returns a `cachedSelectAll`
+  closure that already calls those helpers; it's the factory that's never
+  installed onto `AbstractAdapter`. Files: `abstract/query-cache.ts`,
+  `abstract-adapter.ts`.
+
+**Gated (sequence after Phase 1):**
+
+- **Phase 2 — pool-based `ActiveRecord::QueryCache`** (~refactor,
+  parity-preserving). Relocate `cache`/`uncached` off the wrapper, make
+  `run`/`complete` pool-based. Keeps `query_cache.rb` api:compare at 5/5.
+  Subsumes connection-pool-gap-plan PF2 (the guard move shipped partially in
+  #2654, but the pool-based `run()` remains). File: `query-cache.ts`.
+- **Phase 3 — migrate tests, delete the wrapper, collapse `.inner` walks**
+  (~cleanup). Names verbatim; use live `pnpm test:compare` for the baseline
+  (NOT the stale `activerecord-test-compare-100.md` snapshot). Subsumes the
+  closed PR #2639.
+
+**From #2654 (PF2 query-cache guard move — partial):**
+
+- The named guard move (`enableQueryCacheBang` → `QueryCache.run`) shipped, but
+  the residual PF2 items live in `connection-pool-gap-plan.md` "From #2654":
+  block-form `enableQueryCache` guard removal (~10–20 LOC), zero-arg `run()`
+  overload (~5 LOC), `complete()` pool symmetry (~10 LOC). The pool-based
+  `QueryCache.run` modeling is Phase 2 here.
+
+**From #2651 (this plan):**
+
+- `activerecord-test-compare-100.md` is a stale snapshot (dated 2026-05-18)
+  whose `query_cache_test.rb` row disagrees with the live tool; worth
+  regenerating independently of this work.

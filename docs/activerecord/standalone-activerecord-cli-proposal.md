@@ -325,3 +325,57 @@ timestamped `db/migrate/`, a `db:*` CLI (`src/cli.ts` + `src/migrator.ts`),
 `config/database.ts` (`TRAILS_ENV`-keyed), a generated-style `models/index.ts`, schema-driven
 zero-attribute models typed via `trails-tsc --schema db/schema-columns.json`.
 It is what `activerecord-cli` should make unnecessary to write by hand.
+
+## Post-merge follow-ups
+
+Forward-looking items needing follow-up work, grouped into PR-sized work units.
+This doc is a proposal — nothing implemented yet beyond the `examples/twitter-clone`
+reference (#2638).
+
+### Actionable PR queue
+
+**Ready now:**
+
+- **§6.2 `_abstractClass` own-property fix** (~10 LOC, high value, core bug).
+  `model-schema.ts` reads `this._abstractClass` un-guarded at ~819, ~890, ~392,
+  so concrete models under `ApplicationRecord` inherit the abstract flag via the
+  prototype chain and skip schema reflection → `INSERT … DEFAULT VALUES`. Rails'
+  `abstract_class?` is per-class (own-property only); `inheritance.ts`
+  `getAbstractClass` already guards with `hasOwnProperty`. Fix: own-property
+  check at those 3 sites. Unblocks the common `class X extends ApplicationRecord`
+  pattern the example had to avoid. Source: #2638. Orthogonal to the packaging
+  work — ship standalone.
+
+**Larger / multi-PR:**
+
+- **`@blazetrails/activerecord-cli` package** (the proposal's core deliverable).
+  New package owning generators, migrator, `init`, the `db:*` CLI, and the
+  pending-migration check, plus relocating the AR `tsc-wrapper`/bins into it so
+  `activerecord` becomes pure runtime. Multi-PR effort per the proposal's own
+  A/B/C split (§4). Not implemented (docs + example only). Source: #2638.
+- **§6.1 lazy async schema reflection** (roadmap). Make the query/persistence
+  path `await` a one-shot `ensureSchemaLoaded()` so consumers no longer call
+  `loadSchema()` explicitly (the async reflection path already works; only the
+  sync path deadlocks on in-memory/pool-1). Deletes the explicit `loadSchema`
+  step from every consumer. Source: #2638.
+
+**Optional / deferred:**
+
+- **CI examples job.** `examples/` is classified as `docs_only` in `ci.yml`
+  (deliberate, per repo owner — examples should not run in CI most of the time).
+  If signal is ever wanted, add a lightweight `examples/**`-gated job running
+  `pnpm -C examples/twitter-clone typecheck && smoke` with
+  `install --frozen-lockfile`, without the full package matrix. Source: #2638.
+
+### Notes / gotchas (from #2638)
+
+- Examples should **inherit workspace dep versions** (omit `@types/node` /
+  `typescript` pins) rather than re-pin: a divergent `@types/node ^22` pin in an
+  example pulled a second `@types/node` into the lockfile and broke `trails-tsc`'s
+  typecheck across the whole matrix (`FSWatcher.on` error) — looked like a flake
+  for many review rounds.
+- The example deliberately keeps `NODE_ENV` as a _fallback_ DB-env selector
+  (`TRAILS_ENV ?? NODE_ENV ?? "development"`) to stay in sync with core's own
+  resolution in `connection-handling.ts` / `database-configurations.ts` (§4.6
+  recommends standardizing the bare-AR path on `TRAILS_ENV`-keyed config; the
+  fallback is the pragmatic interim).

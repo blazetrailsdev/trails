@@ -1,42 +1,22 @@
 # Connection-pool gap plan
 
-Open work in the connection-pool layer: **P10** (ConnectionManagement
-middleware) and **P13** (StandaloneConnection, blocked on a Rails source
-refresh). Residual edge cases from the already-built clusters are tracked under
-**Post-merge follow-ups** below.
+Open work in the connection-pool layer: **P13** (StandaloneConnection, blocked
+on a Rails source refresh). Residual edge cases from the already-built clusters
+are tracked under **Post-merge follow-ups** below. (P10 ConnectionManagement
+middleware shipped in #2653.)
 
 ---
 
 ## Remaining open clusters
 
-| Cluster                         | Tests | Status                                                        |
-| ------------------------------- | ----- | ------------------------------------------------------------- |
-| ConnectionManagement middleware | 11    | **OPEN** — entire class missing (P10)                         |
-| Standalone connection           | 4     | **BLOCKED** — class missing (P13; needs Rails source refresh) |
+| Cluster               | Tests | Status                                                        |
+| --------------------- | ----- | ------------------------------------------------------------- |
+| Standalone connection | 4     | **BLOCKED** — class missing (P13; needs Rails source refresh) |
 
 Residual edge cases from the other clusters are tracked under **Post-merge
 follow-ups** below. `adapter.test.ts` also carries 22 fixture-blocked, 10
 transaction-blocked, and 8 schema-blocked tests — those belong to their
 respective plans, not this one.
-
----
-
-## Track 5: Middleware (unlocks ~27 tests)
-
-### PR P10: `ConnectionManagement` middleware
-
-**Problem:** Entire class missing. Rails' `ConnectionManagement` calls
-`ActiveRecord::Base.connection_handler.clear_active_connections!` after
-each request to return connections to the pool.
-
-**Files:**
-
-- Create `connection-management.ts`
-
-**Rails ref:** `middleware/database_manager.rb`,
-`connection_adapters/abstract/connection_handler.rb` `clear_active_connections!`
-
-**Est:** ~60 LOC
 
 ---
 
@@ -71,17 +51,10 @@ before implementation.
 Remaining:
 
 ```
-P10 (ConnectionManagement middleware — standalone)
 P13 (StandaloneConnection — blocked on Rails source refresh)
 ```
 
 ## Recommended priority (remaining)
-
-### Unblocked
-
-| PR  | Tests | Est LOC | Why next                                                |
-| --- | ----- | ------- | ------------------------------------------------------- |
-| P10 | 11    | ~60     | ConnectionManagement middleware — needs a fresh attempt |
 
 ### Blocked
 
@@ -100,41 +73,42 @@ Detail/rationale in the per-PR sections below.
 
 **Ready now:**
 
-- **PF2 — query-cache guard move** (~20 LOC). Move the guard from
-  `enableQueryCacheBang` to `QueryCache.run` (requires `run()` to accept pools
-  or a discriminated union; low priority). Files: query-cache. Source: #2534.
-  **Subsumed by `query-cache-mixin-plan.md` Phase 2** — making `QueryCache.run`
-  pool-based is exactly this guard move. See that plan; the live mixin cache is
-  unwired (the wrapper holds the only working impl), which is the bigger issue.
-- **PF3 — P10 ConnectionManagement middleware** (~60 LOC). Create
-  `connection-management.ts` (Rails clears active connections after each
-  request). Unblocks ~11 tests. Source: Track 5 / P10.
 - **PF5 — connection-handler skip re-audit** (triage, then sized). Re-check the
   11 still-skipped `connection-handler.test.ts` tests now that nested
   `connectedTo` switching is in place — some may already unblock; the rest split
   by blocker (process-fork = permanent, schema-cache = not-yet-impl). Files:
   `connection-handler.test.ts`. Source: #2530, #2547.
 
-**Round-3 follow-ups (named, PR-sized):**
+**Round-4 follow-ups (named, PR-sized):**
 
-### follow-up: reconnect! retry loop + raw-connection ownership (~120 LOC, cross-adapter)
+### follow-up: PG reconnect! loop inheritance + raw-connection initialize (~60–100 LOC)
 
-Files: `connection-adapters/abstract-adapter.ts`,
-`connection-adapters/postgresql-adapter.ts`,
-`connection-adapters/mysql2-adapter.ts`. Source: #2625. The post-reconnect
-lifecycle is in place; Rails' `reconnect!` retry loop
-(connection_retries / retry_deadline / backoff) is not yet ported. Faithful porting needs the base
-to own a raw, non-recursive `reconnect()` so the loop can re-drive it — today
-base `reconnect()` aliases `reconnectBang()` (recursion) and PG/MySQL2 override
-`reconnectBang()` with their own raw reconnect WITHOUT `super`. Make base
-`reconnectBang` own the raw `reconnect()` + retry loop; convert PG/MySQL2 to
-override raw `reconnect()` and call `super.reconnectBang(opts)`. Also port the
-deprecated raw-connection `initialize` overload (`abstract_adapter.rb:141`) that
-stashes a pre-opened connection in `@unconfigured_connection` — the only
-production writer of `_unconfiguredConnection` (until it lands the verifyBang
-fast-path is test-only). Unblocks the skipped `AdapterConnectionTest`
-integration tests (also gated on a non-`:memory:` adapter with raw-connection
-reopen — Rails gates the suite `unless in_memory_db?`).
+Files: `connection-adapters/postgresql-adapter.ts`,
+`connection-adapters/abstract-adapter.ts`. Source: #2646. The base
+`reconnectBang` retry loop (connection_retries / retry_deadline / backoff) +
+raw-connection ownership shipped in #2646; MySQL2 inherits it via a raw
+`reconnect()` override. **PostgreSQL still keeps its own `reconnectBang`
+override** (zero behavior change) and does NOT yet get the retry loop, blocked
+on two things: (a) `PostgreSQLAdapter#configureConnection(client)` takes an
+explicit client while the base lifecycle calls `configureConnection()` argless —
+needs a configure-with-no-client-tolerant (lazy-configure-on-next-acquire) path;
+(b) `PostgreSQLAdapter#reconnect()` calls `this.resetTransaction()` itself (a
+trails-ism — Rails' private PG `reconnect` does NOT reset the tx), which would
+clobber the base lifecycle's restore-aware `resetTransaction`. Move the tx reset
+out of `reconnect()` and audit its direct callers
+(`_doAcquire`/exec error paths/`verifyBang`) first.
+
+### follow-up: deprecated raw-connection initialize overload (~larger)
+
+Source: #2646. Port the deprecated raw-connection `initialize` overload
+(`abstract_adapter.rb:141`) that stashes a pre-opened connection in
+`@unconfigured_connection` — the only production writer of
+`_unconfiguredConnection`; until it lands the `verifyBang` fast-path is
+test-only. Trails' base constructor takes no config argument and config flows in
+separately, so this is a constructor restructure across PG/MySQL2. Also gates
+the skipped `AdapterConnectionTest` integration tests (additionally gated on a
+non-`:memory:` adapter with raw-connection reopen — Rails gates the suite
+`unless in_memory_db?`).
 
 **Gated / deferred (external blocker or design decision):**
 
@@ -156,7 +130,64 @@ reopen — Rails gates the suite `unless in_memory_db?`).
 
 **From #2539 (P2 lifecycle):**
 
-- Pre-existing: `SQLite3Adapter` does not override `reconnectBang()` to close+reopen its driver — base `reconnectBang` only runs the lifecycle, so sqlite "reconnect" is incomplete. Follow-up only if sqlite reconnect fidelity is needed. (The materialized/unmaterialized integration tests stay skipped — see the _reconnect! retry loop_ follow-up above.)
+- Pre-existing: `SQLite3Adapter` does not override `reconnectBang()` (Rails'
+  SQLite3Adapter defines a private `reconnect` that close+reopens the driver) —
+  base `reconnectBang` only runs the lifecycle, so sqlite "reconnect" is
+  incomplete. Follow-up only if sqlite reconnect fidelity is needed. (The
+  materialized/unmaterialized integration tests stay skipped — see the _PG
+  reconnect! loop inheritance_ / _raw-connection initialize overload_ follow-ups
+  above.) Source: #2539, #2646.
+
+**From #2653 (PF3 ConnectionManagement middleware):**
+
+- 2 tests kept skipped, both blocked on un-ported infra: "connections are
+  cleared even if inside a non-joinable transaction" needs
+  `pinConnectionBang`/`unpinConnectionBang` (Phase 6 pin_connection blocker);
+  "cancel asynchronous queries if an exception is raised" needs async queries
+  (`select_all async:`) / FutureResult in the abstract adapter.
+- Deviation: vendored Rails no longer has a standalone `ConnectionManagement`
+  class (replaced by executor hooks + the `clear_active_connections`
+  initializer). #2653 reconstructed the historical class + `BodyProxy` shape
+  because PF3 mandated it and the test names map to it — so `connection-management.ts`
+  has NO Rails counterpart in api:compare. When an `Executor` is eventually
+  ported, the middleware's clear step could delegate to `ExecutorHooks.complete()`
+  and drop the ~6 lines of duplicated release-unless-open-joinable-txn rule.
+
+**From #2654 (PF2 query-cache guard move):**
+
+- [ ] ~10–20 LOC (low priority): remove the block-form `enableQueryCache`
+      `_queryCacheMaxSize === null` early-return for full `enable_query_cache`
+      fidelity; resolve the maxSize-0-vs-nil modeling difference at the same time
+      (trails maps config-false to Store maxSize 0; Rails maps to nil/unbounded
+      and gates via `QueryCache.run`, but `Base.cache {}` bypasses that gate).
+- [ ] ~5 LOC (when global handler iteration is wired): add a zero-arg `run()`
+      overload iterating `connection_handler.each_connection_pool` to fully
+      mirror Rails' arg-less `QueryCache.run`.
+- [ ] ~10 LOC (when pool-based executor wiring lands): extend `complete()` to
+      accept pool targets symmetrically with `run()` (currently only handles the
+      adapter path).
+
+**From #2640 (bootstrap PR 0 — establishConnection installs Arel visitor):**
+
+- Cross-test behavior change: `test-setup.ts` (deleted) used to reset the global
+  Arel visitor after every test in both the `activerecord` and `other` vitest
+  projects. A dialect visitor set by one test now persists. If any arel/other
+  test starts failing with unexpected dialect SQL, `installAdapterVisitor`
+  (`connection-handling.ts`) and its eager-checkout / error-swallowing boundary
+  are the first place to look. (Wider bootstrap→DatabaseTasks sequencing lives
+  in `docs/activerecord/bootstrap-to-databasetasks-plan.md`, not this doc.)
+
+**From #2636 (SqliteDriver.restoreFromPath backup primitive):**
+
+- Test-infra spike, no connection-pool behavior change. Key finding already in
+  memory (`project_better_sqlite3_no_uri_shared_cache`): better-sqlite3 does NOT
+  set `SQLITE_OPEN_URI`, so `file:…?mode=memory&cache=shared` opens as a literal
+  on-disk file. Sized follow-ups: ~30 LOC enable `SQLITE_OPEN_URI` in the
+  better-sqlite3 open path (if the binding allows) to make shared-cache
+  `:memory:` genuinely in-memory; ~10 LOC gitignore/clean the stray
+  `file:…?mode=memory&cache=shared` artifacts the current fallback leaves in cwd;
+  node:sqlite `restoreFromPath` is implemented but UNVERIFIED (needs a Node 22.5+
+  CI lane).
 
 **From #2529 (P4 URL coercion):**
 
@@ -165,7 +196,6 @@ reopen — Rails gates the suite `unless in_memory_db?`).
 
 **From #2534 (P12 query cache):**
 
-- [ ] ~20 LOC: move guard from `enableQueryCacheBang` to `QueryCache.run`; requires `run()` to accept pools or a discriminated union. Low priority. **Subsumed by `query-cache-mixin-plan.md` Phase 2** (pool-based `QueryCache.run`) — track there, not here.
 - [ ] decide whether to port "cache is available when using a not connected connection" (not present in the ported suite). Note: there is no `test/unported-files.ts` — unported notes are inline `it.skip` in `query-cache.test.ts`, where "query cache with forked processes" already lives.
 
 **From #2542 (P1 unit-test unskip):**
