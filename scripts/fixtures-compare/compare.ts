@@ -76,7 +76,12 @@ export const ENUM_MAPS: Readonly<
     illustrator_visibility: { visible: 0, invisible: 1 },
     font_size: { small: 0, medium: 1, large: 2 },
     difficulty: { easy: 0, medium: 1, hard: 2 },
-    boolean_status: { enabled: 1, disabled: 0 },
+    // `boolean_status` is deliberately omitted: its Book enum is
+    // `{ enabled: true, disabled: false }` (a boolean, not an integer), so it
+    // doesn't belong in an integer ENUM_MAPS. The fixture row currently
+    // carries an integer — the known int→bool cross-engine #2572 followup —
+    // so `awdr.boolean_status` stays an honest `enum-unmapped` soft-skip
+    // until that fixture value is corrected to a boolean.
   },
 };
 
