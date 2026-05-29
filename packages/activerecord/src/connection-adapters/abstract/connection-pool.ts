@@ -1121,13 +1121,17 @@ export class ConnectionPool implements ReapablePool {
 /**
  * Map `DatabaseConfig#queryCache` to the shape ConnectionPoolConfiguration
  * expects. Rails' initializer case-matches on `0/false/Integer/nil`; trails'
- * public config type also accepts the documented "enabled"/"disabled"
- * strings, which Rails would never see as raw values. Normalize them so a
- * pool configured with `queryCache: "disabled"` actually disables storage
- * instead of falling through to DEFAULT_MAX_SIZE.
+ * public config type also accepts the documented "enabled"/"disabled"/
+ * "unlimited" strings, which Rails would never see as raw values. Normalize
+ * them so a pool configured with `queryCache: "disabled"` actually disables
+ * storage instead of falling through to DEFAULT_MAX_SIZE. `"unlimited"` maps
+ * to `Infinity` — a max size the Store never reaches, so it never evicts. That
+ * mirrors Rails `query_cache: "unlimited"`, which (matching no `0/false/
+ * Integer/nil` case) falls through to a `nil` (unbounded) max size.
  */
 function normalizeQueryCacheConfig(raw: unknown): number | false | null | undefined {
   if (raw === "disabled" || raw === false || raw === 0) return false;
+  if (raw === "unlimited") return Number.POSITIVE_INFINITY;
   if (raw === "enabled" || raw === true || raw == null) return raw as null | undefined;
   if (typeof raw === "number") return raw;
   return undefined;
