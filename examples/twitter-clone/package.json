@@ -1,0 +1,32 @@
+{
+  "name": "@blazetrails/example-twitter-clone",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A tiny Twitter clone built on Express + @blazetrails/activerecord",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "smoke": "TRAILS_ENV=test tsx src/smoke.ts",
+    "typecheck": "trails-tsc --schema db/schema-columns.json --noEmit -p tsconfig.json",
+    "db:create": "tsx src/cli.ts db:create",
+    "db:drop": "tsx src/cli.ts db:drop",
+    "db:migrate": "tsx src/cli.ts db:migrate",
+    "db:rollback": "tsx src/cli.ts db:rollback",
+    "db:migrate:status": "tsx src/cli.ts db:migrate:status",
+    "db:seed": "tsx src/cli.ts db:seed",
+    "db:schema:dump": "tsx src/cli.ts db:schema:dump",
+    "db:setup": "tsx src/cli.ts db:setup",
+    "db:prepare": "tsx src/cli.ts db:prepare",
+    "db:reset": "tsx src/cli.ts db:reset"
+  },
+  "dependencies": {
+    "@blazetrails/activerecord": "workspace:*",
+    "better-sqlite3": "^12.6.2",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "tsx": "^4.21.0"
+  }
+}

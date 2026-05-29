@@ -1,0 +1,94 @@
+{
+  "follows": {
+    "created_at": {
+      "type": "datetime",
+      "null": false
+    },
+    "followee_id": {
+      "type": "integer",
+      "null": true
+    },
+    "follower_id": {
+      "type": "integer",
+      "null": true
+    },
+    "id": {
+      "type": "integer",
+      "null": true
+    },
+    "updated_at": {
+      "type": "datetime",
+      "null": false
+    }
+  },
+  "likes": {
+    "created_at": {
+      "type": "datetime",
+      "null": false
+    },
+    "id": {
+      "type": "integer",
+      "null": true
+    },
+    "tweet_id": {
+      "type": "integer",
+      "null": true
+    },
+    "updated_at": {
+      "type": "datetime",
+      "null": false
+    },
+    "user_id": {
+      "type": "integer",
+      "null": true
+    }
+  },
+  "tweets": {
+    "body": {
+      "type": "text",
+      "null": true
+    },
+    "created_at": {
+      "type": "datetime",
+      "null": false
+    },
+    "id": {
+      "type": "integer",
+      "null": true
+    },
+    "updated_at": {
+      "type": "datetime",
+      "null": false
+    },
+    "user_id": {
+      "type": "integer",
+      "null": true
+    }
+  },
+  "users": {
+    "bio": {
+      "type": "string",
+      "null": true
+    },
+    "created_at": {
+      "type": "datetime",
+      "null": false
+    },
+    "display_name": {
+      "type": "string",
+      "null": true
+    },
+    "handle": {
+      "type": "string",
+      "null": true
+    },
+    "id": {
+      "type": "integer",
+      "null": true
+    },
+    "updated_at": {
+      "type": "datetime",
+      "null": false
+    }
+  }
+}

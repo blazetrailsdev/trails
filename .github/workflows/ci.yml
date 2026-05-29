@@ -165,13 +165,15 @@ jobs:
           else
             echo "Changed files:"
             echo "$files"
-            # docs_only: any line NOT under `docs/` and not the top-level
-            # `README.md` flips the switch. README is markdown-only and
-            # only ever runs through prettier, so it doesn't need the
-            # full matrix.
+            # docs_only: any line NOT under `docs/`, `examples/`, and not the
+            # top-level `README.md` flips the switch. README is markdown-only
+            # and only ever runs through prettier; `examples/` are standalone
+            # apps not built, type-checked, or tested by any CI job (the root
+            # `tsc --build` doesn't reference them and they have no `test`
+            # script) — so neither needs the full matrix.
             if [ -z "$files" ]; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            elif echo "$files" | grep -qvE '^docs/|^README\.md$|^CLAUDE\.md$'; then
+            elif echo "$files" | grep -qvE '^docs/|^examples/|^README\.md$|^CLAUDE\.md$'; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
             else
               echo "docs_only=true" >> "$GITHUB_OUTPUT"
