@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Attribute, ValueType } from "@blazetrails/activemodel";
+import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import {
   StatementCache,
   Substitute,
@@ -97,6 +98,30 @@ describe("StatementCacheTest", () => {
     expect(parts[0]).toBe("SELECT * FROM users WHERE id = ");
     expect(parts[1]).toBeInstanceOf(Substitute);
     expect(binds).toEqual([42]);
+  });
+
+  it("PartialQueryCollector starts retryable", () => {
+    // Mirrors Arel's SQLString/Composite collectors: retryable until a
+    // non-retryable node flips it false during compilation.
+    expect(new PartialQueryCollector().retryable).toBe(true);
+  });
+
+  it("cacheableQuery propagates the compiled tree's retryable flag", () => {
+    const table = new ArelTable("books");
+
+    const retryableArel = table.project(table.get("name"));
+    const [retryableQuery] = (adapter as any).cacheableQuery(StatementCache, retryableArel) as [
+      Query,
+      unknown[],
+    ];
+    expect(retryableQuery.retryable).toBe(true);
+
+    const rawArel = table.project(table.get("name")).where(new Nodes.SqlLiteral("1 = 1"));
+    const [rawQuery] = (adapter as any).cacheableQuery(StatementCache, rawArel) as [
+      Query,
+      unknown[],
+    ];
+    expect(rawQuery.retryable).toBe(false);
   });
 
   it("unsupportedValue rejects null, arrays, ranges", () => {

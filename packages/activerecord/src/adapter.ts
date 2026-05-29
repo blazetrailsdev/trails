@@ -286,7 +286,7 @@ export interface DatabaseAdapter {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result>;
   execInsert(
     sql: string,

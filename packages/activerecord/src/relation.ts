@@ -320,6 +320,11 @@ export class Relation<T extends Base> {
   // committing stale records/loaded state.
   private _loadToken = 0;
 
+  // Retryability of the most recently compiled SELECT, captured in
+  // _compileSelectSql before any FROM-clause recompile can reset the shared
+  // visitor's collector. Read by toArray() to set allowRetry.
+  private _lastSelectRetryable = false;
+
   private _table: Table | null = null;
 
   constructor(modelClass: typeof Base, table?: Table, predicateBuilder?: PredicateBuilder) {
@@ -2042,10 +2047,11 @@ export class Relation<T extends Base> {
       this.loadRecords(loadedRecords);
     } else {
       const sql = this._toSql();
-      // After _toSql(), the visitor's collector.retryable reflects whether every
-      // node in the compiled Arel tree is retryable. Raw SQL fragments set it false.
-      const v = this._setOperation ? null : this._selectVisitor();
-      const allowRetry = v ? ((v as any).collector?.retryable ?? false) : false;
+      // _compileSelectSql captures the SELECT's retryability into
+      // _lastSelectRetryable at compile time. Reading the visitor's collector
+      // here would be wrong: from(ArelNode) recompiles and resets it, and set
+      // operations compile each side separately.
+      const allowRetry = this._setOperation ? false : this._lastSelectRetryable;
       const result = await this._modelClass.connection.selectAll(
         sql,
         `${this._modelClass.name} Load`,
@@ -3645,11 +3651,26 @@ export class Relation<T extends Base> {
         // Only emit bare when the alias is a safe identifier; fall back to quoted
         // for names that would produce invalid SQL or risk injection.
         fromExpr = `(${subSql}) ${_safeAlias(name)}`;
+        // The subquery compiles through its own collector (raw.toSql above),
+        // capturing its retryability in raw._lastSelectRetryable. Rails folds
+        // the whole arel through one collector, so AND it into ours: a raw SQL
+        // fragment inside the subquery must lower the outer classification.
+        // A set-operation subquery compiles each side separately, so
+        // raw._lastSelectRetryable only reflects the last side — treat it as
+        // non-retryable, matching how toArray() classifies set operations.
+        this._lastSelectRetryable &&= raw._setOperation ? false : raw._lastSelectRetryable;
       } else if (raw instanceof Nodes.Node) {
         // Compile via the same visitor _compileSelectSql uses so identifier
         // quoting stays dialect-consistent across the whole SELECT.
         const sv = this._selectVisitor();
         fromExpr = sv ? sv.compile(raw) : raw.toSql();
+        // Rails compiles the whole arel (including the FROM clause) through a
+        // single collector, so a non-retryable FROM node lowers the overall
+        // classification. We compile it separately, so AND its retryability
+        // into the captured SELECT flag rather than letting it clobber.
+        if (sv) {
+          this._lastSelectRetryable &&= (sv as any).collector?.retryable ?? false;
+        }
       } else if (alias) {
         fromExpr = `${raw} ${_safeAlias(alias)}`;
       } else {
@@ -3733,7 +3754,13 @@ export class Relation<T extends Base> {
    */
   private _compileSelectSql(manager: { ast: Nodes.Node; toSql(): string }): string {
     const v = this._selectVisitor();
-    return v ? v.compile(manager.ast) : manager.toSql();
+    const sql = v ? v.compile(manager.ast) : manager.toSql();
+    // Capture the SELECT's retryability immediately after compilation. The
+    // shared adapter visitor's collector is reset on every compile() call, and
+    // _toSqlWithoutSetOp may compile again for from(ArelNode) FROM clauses —
+    // which would clobber the flag before toArray() reads it.
+    this._lastSelectRetryable = v ? ((v as any).collector?.retryable ?? false) : false;
+    return sql;
   }
 
   private _compileArelNode(node: Nodes.Node): string {

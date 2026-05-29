@@ -77,7 +77,9 @@ export class PartialQuery extends Query {
  */
 export class PartialQueryCollector {
   preparable = false;
-  retryable = false;
+  // Starts true and is flipped false when the visitor encounters a
+  // non-retryable node, matching Arel's SQLString/Composite collectors.
+  retryable = true;
   private _parts: unknown[] = [];
   private _binds: unknown[] = [];
 
