@@ -2565,19 +2565,23 @@ export class Relation<T extends Base> {
   // interface merge + prototype assignment (see bottom of file)
 
   /**
-   * Surface raise-worthy eager-load specs (polymorphic / misspelled) before
-   * building calculation/exists SQL, which never constructs a JoinDependency
-   * of its own. Mirrors Rails, where `count`/`exists?` with `eager_load` still
-   * go through `apply_join_dependency` and raise. Capability-gap specs (CPK,
-   * unjoinable through) return false from addAssociationSpec and don't raise.
+   * Surface raise-worthy eager-load specs (polymorphic) before building
+   * calculation/exists SQL, which never constructs a JoinDependency of its own.
+   * Mirrors Rails `apply_join_dependency`, which `count`/`exists?` route through
+   * over `eager_load_values | includes_values` and which raises for polymorphic
+   * associations. Capability-gap specs (CPK, unjoinable through) return false
+   * from addAssociationSpec and don't raise.
    * @internal
    */
   private _checkEagerLoadable(): void {
-    if (this._eagerLoadAssociations.length === 0) return;
+    const specs = [
+      ...new Set([...this._eagerLoadAssociations, ...this._includesToPromoteFromReferences()]),
+    ];
+    if (specs.length === 0) return;
     const basePk = (this._modelClass as any).primaryKey ?? "id";
     if (Array.isArray(basePk)) return;
     const jd = new JoinDependency(this._modelClass);
-    for (const spec of this._eagerLoadAssociations) jd.addAssociationSpec(spec);
+    for (const spec of specs) jd.addAssociationSpec(spec);
   }
 
   private _applyJoinsToManager(manager: SelectManager): void {
