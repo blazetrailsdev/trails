@@ -557,8 +557,8 @@ export class Association {
     // (association.rb:370-373), where `_has_attribute?` checks the record's
     // attribute SET (`@attributes.key?`). Resolve the computed foreign key
     // from the rich reflection (the lightweight `options.foreignKey` is unset
-    // when the FK is derived rather than explicit), then probe the record's
-    // `_attributes` set.
+    // when the FK is derived rather than explicit), then probe the record via
+    // its `_has_attribute?` instance method.
     const ctor = this.owner.constructor as typeof Base & {
       _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | null;
     };
@@ -566,11 +566,10 @@ export class Association {
       ctor._reflectOnAssociation?.(this.reflection.name)?.foreignKey ??
       (this.reflection.options as any).foreignKey;
     const fkArr = Array.isArray(fk) ? fk : [fk];
-    const attrs = (record as any)._attributes as { has?: (k: string) => boolean } | undefined;
+    const hasAttr = (record as any)._hasAttribute as ((k: string) => boolean) | undefined;
     return fkArr.every((key) => {
       if (key == null) return false;
-      const name = String(key);
-      return typeof attrs?.has === "function" ? attrs.has(name) : name in record;
+      return typeof hasAttr === "function" ? hasAttr.call(record, String(key)) : false;
     });
   }
 
