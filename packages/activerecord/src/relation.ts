@@ -245,28 +245,34 @@ function hasTopLevelComma(s: string): boolean {
   return false;
 }
 
-function resolveColumnNameMatcher(adapter: any): RegExp {
-  // Walk adapter → inner to find a static columnNameMatcher on the concrete adapter class.
+// Walk adapter → inner to find a static matcher (named `method`) on the
+// concrete adapter class, falling back to the abstract default. Shared by both
+// column-name matchers; the order-path matcher additionally permits an
+// `ASC|DESC` and `NULLS FIRST|LAST` suffix after the column name.
+function resolveAdapterMatcher(
+  adapter: any,
+  method: "columnNameMatcher" | "columnNameWithOrderMatcher",
+  fallback: () => RegExp,
+): RegExp {
   let a = adapter;
   while (a) {
-    const matcher = (a.constructor as any)?.columnNameMatcher?.();
+    const matcher = (a.constructor as any)?.[method]?.();
     if (matcher) return matcher;
     a = a.inner;
   }
-  return abstractColumnNameMatcher();
+  return fallback();
+}
+
+function resolveColumnNameMatcher(adapter: any): RegExp {
+  return resolveAdapterMatcher(adapter, "columnNameMatcher", abstractColumnNameMatcher);
 }
 
 function resolveColumnNameWithOrderMatcher(adapter: any): RegExp {
-  // Walk adapter → inner to find a static columnNameWithOrderMatcher on the
-  // concrete adapter class. Order-path matcher additionally permits an
-  // `ASC|DESC` and `NULLS FIRST|LAST` suffix after the column name.
-  let a = adapter;
-  while (a) {
-    const matcher = (a.constructor as any)?.columnNameWithOrderMatcher?.();
-    if (matcher) return matcher;
-    a = a.inner;
-  }
-  return abstractColumnNameWithOrderMatcher();
+  return resolveAdapterMatcher(
+    adapter,
+    "columnNameWithOrderMatcher",
+    abstractColumnNameWithOrderMatcher,
+  );
 }
 
 /**
