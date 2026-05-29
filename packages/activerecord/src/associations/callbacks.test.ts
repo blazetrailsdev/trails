@@ -602,15 +602,42 @@ describe("AssociationCallbacksTest", () => {
     ]);
   });
 
-  it.skip("has and belongs to many before add called before save", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
+  it("has and belongs to many before add called before save", async () => {
+    let dev: any = null;
+    let newDev: boolean | undefined;
+    const { Project, Developer } = makeHabtmWithCallbacks({
+      beforeAdd: (_o: any, r: any) => {
+        dev = r;
+        newDev = r.isNewRecord();
+      },
+    });
+    const rec = await Project.create({ name: "ActiveRecord" });
+    const alice = new (Developer as any)({ name: "alice" });
+    await association(rec, "developers").push(alice);
+    expect(dev).toBe(alice);
+    expect(newDev).toBe(true);
+    expect(alice.isNewRecord()).toBe(false);
   });
-  it.skip("has and belongs to many after add called after save", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
+
+  it("has and belongs to many after add called after save", async () => {
+    const log: string[] = [];
+    const { Project, Developer } = makeHabtmWithCallbacks({
+      afterAdd: (_o: any, r: any) => {
+        log.push("after_adding" + (r.id ?? "<new>"));
+      },
+    });
+    const ar = await Project.create({ name: "ActiveRecord" });
+    const proxy = association(ar, "developers");
+
+    const alice = new (Developer as any)({ name: "alice" });
+    await proxy.push(alice);
+    expect(log[log.length - 1]).toBe("after_adding" + alice.id);
+
+    const bob = await proxy.create({ name: "bob" });
+    expect(log[log.length - 1]).toBe("after_adding" + bob.id);
+
+    proxy.build({ name: "charlie" });
+    expect(log[log.length - 1]).toBe("after_adding<new>");
   });
   it("has and belongs to many remove callback", async () => {
     const log: string[] = [];
@@ -659,10 +686,25 @@ describe("AssociationCallbacksTest", () => {
     await proxy.clear();
     expect(log).toEqual([]);
   });
-  it.skip("has and belongs to many callbacks for save on parent", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/callbacks.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in callbacks.test.ts
+  it("has and belongs to many callbacks for save on parent", async () => {
+    const log: string[] = [];
+    const { Project } = makeHabtmWithCallbacks({
+      beforeAdd: (_o: any, r: any) => {
+        log.push("before_adding" + (r.id ?? "<new>"));
+      },
+      afterAdd: (_o: any, r: any) => {
+        log.push("after_adding" + (r.id ?? "<new>"));
+      },
+    });
+    const project = new (Project as any)({ name: "Callbacks" });
+    const proxy = association(project, "developers");
+    proxy.build({ name: "Jack" });
+
+    const callbackLog = ["before_adding<new>", "after_adding<new>"];
+    expect(log).toEqual(callbackLog);
+    expect(await project.save()).toBe(true);
+    expect((await proxy.toArray()).length).toBe(1);
+    expect(log).toEqual(callbackLog);
   });
   it("dont add if before callback raises exception", async () => {
     const log: string[] = [];

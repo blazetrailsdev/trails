@@ -402,9 +402,14 @@ A4 #2559, B1 #2557, E1 #2567, F1 #2563, H1 #2556).
       fires but join row isn't found, so `after_remove` never runs. Blocks
       "has and belongs to many remove callback" + "does not fire callbacks on
       clear".
-- [ ] ~40 LOC: HABTM autosave/timing — blocks "has and belongs to many
+- [x] HABTM autosave/timing — unblocked the "has and belongs to many
       before/after add called before/after save" + "callbacks for save on
-      parent".
+      parent" tests. No impl change needed: the autosave path (afterCreate/
+      afterUpdate via `aroundSaveCollectionAssociation`) was already
+      Rails-faithful after the E1 follow-ups (#2602, #2604) — push on a
+      persisted owner saves the new child (before_add fires while new,
+      after_add after save) and build on a new owner defers join-row insert
+      to `owner.save` without re-firing add callbacks. Tests unskipped only.
 - Loose end: three callback dispatch paths still exist
   (`collection-association.ts` unified; `collection-proxy.ts`
   `push`/`delete`/`_deleteThrough`/`create` each call
