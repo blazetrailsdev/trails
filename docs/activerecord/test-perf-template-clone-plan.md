@@ -68,9 +68,9 @@ no test regressions.
 2. **Workers clone instead of `CREATE`.** In `test-setup-dy.ts` (or a helper
    it calls), when `AR_TEST_TEMPLATE_PATH` is set and the adapter is sqlite,
    **copy the template file** to a per-worker path and open _that_ as the
-   worker DB, rather than `establishConnection({ database: ":memory:" }) +
-defineSchema(TEST_SCHEMA)`. File copy is async-fs. The schema arrives
-   pre-built; `schemaCache` warms on first `dataSourceExists` as today.
+   worker DB, rather than re-running the `:memory:` establish-connection plus
+   `defineSchema(TEST_SCHEMA)` preload. File copy is async-fs. The schema
+   arrives pre-built; `schemaCache` warms on first `dataSourceExists` as today.
    - Open question: keep per-worker DB **on disk** (simplest, clone = file
      copy) vs restore into `:memory:` via the sqlite backup API. Disk is the
      spike default; measure whether `:memory:` is worth the extra plumbing.
