@@ -1073,6 +1073,19 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#inspect
    */
   inspect(): string {
+    // Rails loads the records (synchronously) and renders
+    // `#<ClassName [rec.inspect, ...]>`, truncating at 11 with `...`.
+    // When this relation is already loaded its records are available
+    // synchronously, so we reproduce that format faithfully. The unloaded
+    // path can't: Rails performs blocking DB I/O inside `inspect`, which a
+    // synchronous JS method returning a string cannot do — so we fall back
+    // to the query-chain representation below.
+    if (this._loaded) {
+      const max = this._limitValue !== null ? Math.min(this._limitValue, 11) : 11;
+      const entries = this._records.slice(0, max).map((record) => record.inspect());
+      if (entries.length === 11) entries[10] = "...";
+      return `#<${this.constructor.name} [${entries.join(", ")}]>`;
+    }
     const parts: string[] = [];
     parts.push(`${this._modelClass.name}.all`);
     if (!this._whereClause.isEmpty()) {
