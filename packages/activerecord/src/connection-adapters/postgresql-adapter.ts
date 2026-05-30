@@ -57,6 +57,7 @@ import {
   SQLWarning,
 } from "../errors.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
+import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
 import type { SchemaStatements, JoinTableOptions } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
@@ -5418,6 +5419,12 @@ const FORMAT_TYPE_ALIASES: Record<string, string> = {
   "time with time zone": "timetz",
   boolean: "bool",
 };
+
+// `executeMutation` is this adapter's write/DDL primitive (reads go through the
+// overridden `execQuery`), so dirtying it clears the query cache on writes and
+// schema changes — the trails analogue of Rails' `dirties_query_cache base,
+// :execute` for the write side.
+dirtiesQueryCache(PostgreSQLAdapter, "executeMutation");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_postgresqladapter, self)`
 // at the bottom of Rails' postgresql_adapter.rb — lets railtie initializers

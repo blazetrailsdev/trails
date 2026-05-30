@@ -1353,6 +1353,8 @@ export { deleteStatement as remove };
 interface DatabaseStatementsDefaultsHost {
   execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]>;
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
+  selectAll(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  selectRows(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
   execQuery(
     sql: string,
     name?: string | null,
@@ -1377,14 +1379,16 @@ export const DatabaseStatements = {
     return this.execQuery(sql, name, binds, { allowRetry: opts?.allowRetry ?? false });
   },
 
+  // select_one/value/values/rows delegate to select_all so the QueryCache
+  // mixin's cached `selectAll` override is the single cached entry point —
+  // mirroring Rails, where these all funnel through `select_all`.
   async selectOne(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
     name?: string | null,
     binds?: unknown[],
   ): Promise<Record<string, unknown> | undefined> {
-    const rows = await this.execute(sql, binds, name ?? "SQL");
-    return rows[0];
+    return (await this.selectAll(sql, name, binds)).first();
   },
 
   async selectValue(
@@ -1393,10 +1397,8 @@ export const DatabaseStatements = {
     name?: string | null,
     binds?: unknown[],
   ): Promise<unknown> {
-    const rows = await this.execute(sql, binds, name ?? "SQL");
-    if (rows.length === 0) return undefined;
-    const keys = Object.keys(rows[0]);
-    return keys.length > 0 ? rows[0][keys[0]] : undefined;
+    const rows = await this.selectRows(sql, name, binds);
+    return rows.length > 0 ? rows[0][0] : undefined;
   },
 
   async selectValues(
@@ -1405,11 +1407,8 @@ export const DatabaseStatements = {
     name?: string | null,
     binds?: unknown[],
   ): Promise<unknown[]> {
-    const rows = await this.execute(sql, binds, name ?? "SQL");
-    if (rows.length === 0) return [];
-    const firstKey = Object.keys(rows[0])[0];
-    if (firstKey === undefined) return rows.map(() => undefined);
-    return rows.map((row) => row[firstKey]);
+    const rows = await this.selectRows(sql, name, binds);
+    return rows.map((row) => row[0]);
   },
 
   async selectRows(
@@ -1418,10 +1417,7 @@ export const DatabaseStatements = {
     name?: string | null,
     binds?: unknown[],
   ): Promise<unknown[][]> {
-    const rows = await this.execute(sql, binds, name ?? "SQL");
-    if (rows.length === 0) return [];
-    const keys = Object.keys(rows[0]);
-    return rows.map((row) => keys.map((key) => row[key]));
+    return (await this.selectAll(sql, name, binds)).rows;
   },
 
   async execQuery(

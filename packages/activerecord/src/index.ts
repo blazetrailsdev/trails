@@ -171,7 +171,7 @@ export {
   IndifferentHashAccessor,
   StringKeyedHashAccessor,
 } from "./store.js";
-export { QueryCache, QueryCacheAdapter } from "./query-cache.js";
+export { QueryCache } from "./query-cache.js";
 // `QueryCache::Store` in Rails; exported under a qualified TS name
 // so the package-level surface isn't shadowed by the generic `Store`.
 export { Store as QueryCacheStore } from "./connection-adapters/abstract/query-cache.js";

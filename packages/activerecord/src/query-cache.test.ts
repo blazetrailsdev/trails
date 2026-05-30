@@ -1,10 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./index.js";
-import { adapterType, createTestAdapter } from "./test-adapter.js";
+import { adapterType, newRawTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { QueryCache, QueryCacheAdapter, QueryCacheStore as Store } from "./query-cache.js";
+import {
+  QueryCache,
+  QueryCacheStore as Store,
+  type QueryCacheRunTarget,
+  type QueryCacheCompleteTarget,
+} from "./query-cache.js";
 import { QueryCacheStore as RootQueryCacheStore } from "./index.js";
 import { Store as AbstractStore } from "./connection-adapters/abstract/query-cache.js";
+import { Notifications } from "@blazetrails/activesupport";
 import {
   ConnectionPool,
   withExecutionContext,
@@ -14,9 +20,52 @@ import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import type { DatabaseConfigOptions } from "./database-configurations/database-config.js";
 
+// Raw adapters and Notification subscriptions created per test are tracked here
+// and torn down in afterEach, so the suite doesn't leak `sql.active_record`
+// subscribers or (on PG/MySQL) live driver connections across tests.
+const trackedAdapters: { disconnect?(): void }[] = [];
+const trackedSubs: unknown[] = [];
+
+function rawAdapter(): any {
+  const a = newRawTestAdapter() as any;
+  trackedAdapters.push(a);
+  return a;
+}
+
+afterEach(() => {
+  for (const sub of trackedSubs.splice(0)) Notifications.unsubscribe(sub as never);
+  for (const a of trackedAdapters.splice(0)) {
+    try {
+      a.disconnect?.();
+    } catch {
+      // best-effort teardown; a failed disconnect must not fail the suite
+    }
+  }
+});
+
+// Counts `sql.active_record` cache-hit events (`cached: true`) for one adapter,
+// replacing the retired wrapper's `cacheHits` counter. The live mixin emits the
+// hit notification from `lookupSqlCache`, so a cache hit on `selectAll` (the
+// single cached entry point) bumps the count.
+function trackHits(adapter: unknown): { count: number; reset(): void } {
+  const hits = {
+    count: 0,
+    reset() {
+      this.count = 0;
+    },
+  };
+  trackedSubs.push(
+    Notifications.subscribe("sql.active_record", (e: unknown) => {
+      const payload = (e as { payload?: { cached?: boolean; connection?: unknown } })?.payload;
+      if (payload?.cached === true && payload.connection === adapter) hits.count++;
+    }),
+  );
+  return hits;
+}
+
 function makeMiddleware(
   app: () => Promise<void>,
-  adapters: QueryCacheAdapter[],
+  targets: (QueryCacheRunTarget & QueryCacheCompleteTarget)[],
 ): () => Promise<void> {
   let hook: { run(): void; complete(): void } | null = null;
   QueryCache.installExecutorHooks(
@@ -25,7 +74,7 @@ function makeMiddleware(
         hook = h;
       },
     },
-    adapters,
+    targets,
   );
   return async () => {
     hook!.run();
@@ -54,9 +103,13 @@ function makePoolWithQCache(
 const TEST_SCHEMA = { tasks: { title: "string" } } as const;
 
 async function setup() {
-  const inner = createTestAdapter();
-  await defineSchema(inner, TEST_SCHEMA);
-  const cached = new QueryCacheAdapter(inner);
+  // A raw (non-pooled) adapter has no `pool`, so the connection-level
+  // QueryCache mixin (`cache`/`enableQueryCacheBang`/`selectAll`) operates
+  // directly on its own `_queryCache` Store — the standalone behavior the
+  // retired QueryCacheAdapter wrapper used to provide.
+  const cached = rawAdapter();
+  await defineSchema(cached, TEST_SCHEMA);
+  cached._queryCache = new Store();
 
   class Task extends Base {
     static {
@@ -64,69 +117,71 @@ async function setup() {
       this.adapter = cached;
     }
   }
-  return { inner, cached, Task };
+  const hits = trackHits(cached);
+  return { cached, hits, Task };
 }
 
 describe("QueryCacheTest", () => {
   it("execute clear cache", async () => {
     const { cached, Task } = await setup();
-    cached.enableQueryCache();
+    cached.enableQueryCacheBang();
     await Task.create({ title: "first" });
-    expect(cached.cache.empty).toBe(true);
+    expect(cached.queryCache.empty).toBe(true);
   });
 
   it("exec query clear cache", async () => {
     const { cached, Task } = await setup();
-    cached.enableQueryCache();
+    cached.enableQueryCacheBang();
     await Task.create({ title: "first" });
     await Task.all().toArray();
-    expect(cached.cache.size).toBeGreaterThan(0);
+    expect(cached.queryCache.size).toBeGreaterThan(0);
     await Task.create({ title: "second" });
-    expect(cached.cache.empty).toBe(true);
+    expect(cached.queryCache.empty).toBe(true);
   });
 
   it("writes should always clear cache", async () => {
     const { cached, Task } = await setup();
-    cached.enableQueryCache();
+    cached.enableQueryCacheBang();
     await Task.create({ title: "first" });
     await Task.all().toArray();
-    expect(cached.cache.size).toBeGreaterThan(0);
+    expect(cached.queryCache.size).toBeGreaterThan(0);
     const t = await Task.first();
     (t as any).title = "updated";
     await (t as any).save();
-    expect(cached.cache.empty).toBe(true);
+    expect(cached.queryCache.empty).toBe(true);
   });
 
   it("reads dont clear disabled cache", async () => {
     const { cached, Task } = await setup();
-    cached.disableQueryCache();
+    cached.disableQueryCacheBang();
     await Task.create({ title: "first" });
     await Task.all().toArray();
-    expect(cached.cache.empty).toBe(true);
+    expect(cached.queryCache.empty).toBe(true);
   });
 
   it("exceptional middleware clears and disables cache on error", async () => {
     const { cached, Task } = await setup();
-    expect(cached.cache.enabled).toBe(false);
+    expect(cached.queryCache.enabled).toBe(false);
     const mw = makeMiddleware(async () => {
       await Task.create({ title: "row" });
       await Task.all().toArray();
       await Task.all().toArray();
-      expect(cached.cache.size).toBeGreaterThan(0);
+      expect(cached.queryCache.size).toBeGreaterThan(0);
       throw new Error("lol borked");
     }, [cached]);
     await expect(mw()).rejects.toThrow("lol borked");
-    expect(cached.cache.enabled).toBe(false);
-    expect(cached.cache.empty).toBe(true);
+    expect(cached.queryCache.enabled).toBe(false);
+    expect(cached.queryCache.empty).toBe(true);
   });
 
   it("query cache is applied to all connections", async () => {
-    const inner = createTestAdapter();
-    const a1 = new QueryCacheAdapter(inner);
-    const a2 = new QueryCacheAdapter(inner);
+    const a1 = rawAdapter();
+    const a2 = rawAdapter();
+    a1._queryCache = new Store();
+    a2._queryCache = new Store();
     const mw = makeMiddleware(async () => {
-      expect(a1.cache.enabled).toBe(true);
-      expect(a2.cache.enabled).toBe(true);
+      expect(a1.queryCache.enabled).toBe(true);
+      expect(a2.queryCache.enabled).toBe(true);
     }, [a1, a2]);
     await mw();
   });
@@ -185,24 +240,24 @@ describe("QueryCacheTest", () => {
     const mw = makeMiddleware(async () => {
       await Task.all().toArray();
       await Task.all().toArray();
-      expect(cached.cache.size).toBe(1);
+      expect(cached.queryCache.size).toBe(1);
     }, [cached]);
     await mw();
   });
 
   it("cache enabled during call", async () => {
-    const { cached, Task } = await setup();
-    expect(cached.cache.enabled).toBe(false);
-    await cached.withCache(async () => {
-      expect(cached.cache.enabled).toBe(true);
+    const { cached } = await setup();
+    expect(cached.queryCache.enabled).toBe(false);
+    await cached.cache(async () => {
+      expect(cached.queryCache.enabled).toBe(true);
     });
-    expect(cached.cache.enabled).toBe(false);
+    expect(cached.queryCache.enabled).toBe(false);
   });
 
   it("cache passing a relation", async () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "cached" });
-    await cached.withCache(async () => {
+    await cached.cache(async () => {
       const r1 = await Task.all().toArray();
       const r2 = await Task.all().toArray();
       expect(r1).toHaveLength(1);
@@ -213,24 +268,23 @@ describe("QueryCacheTest", () => {
   it("find queries", async () => {
     const { cached, Task } = await setup();
     const t = await Task.create({ title: "findme" });
-    cached.resetCounters();
-    cached.enableQueryCache();
+    cached.enableQueryCacheBang();
     await Task.find(t.id);
     await Task.find(t.id);
-    expect(cached.cache.size).toBeGreaterThan(0);
+    expect(cached.queryCache.size).toBeGreaterThan(0);
   });
 
   it("find queries with cache", async () => {
-    const { cached, Task } = await setup();
+    const { cached, hits, Task } = await setup();
     const t = await Task.create({ title: "test" });
-    await cached.withCache(async () => {
-      cached.resetCounters();
+    await cached.cache(async () => {
+      hits.reset();
       const r1 = await Task.find(t.id);
-      const hitsAfterFirst = cached.cacheHits;
+      const hitsAfterFirst = hits.count;
       const r2 = await Task.find(t.id);
       expect(r1.title).toBe("test");
       expect(r2.title).toBe("test");
-      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst);
+      expect(hits.count).toBeGreaterThan(hitsAfterFirst);
     });
   });
 
@@ -238,7 +292,7 @@ describe("QueryCacheTest", () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "a" });
     await Task.create({ title: "b" });
-    await cached.withCache(async () => {
+    await cached.cache(async () => {
       const r1 = await Task.all().toArray();
       const r2 = await Task.all().toArray();
       expect(r1).toHaveLength(2);
@@ -249,10 +303,10 @@ describe("QueryCacheTest", () => {
   it("find queries with multi cache blocks", async () => {
     const { cached, Task } = await setup();
     const t = await Task.create({ title: "test" });
-    await cached.withCache(async () => {
+    await cached.cache(async () => {
       await Task.find(t.id);
     });
-    await cached.withCache(async () => {
+    await cached.cache(async () => {
       await Task.find(t.id);
     });
   });
@@ -260,7 +314,7 @@ describe("QueryCacheTest", () => {
   it("count queries with cache", async () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "a" });
-    await cached.withCache(async () => {
+    await cached.cache(async () => {
       const c1 = await Task.count();
       const c2 = await Task.count();
       expect(c1).toBe(1);
@@ -271,7 +325,7 @@ describe("QueryCacheTest", () => {
   it("exists queries with cache", async () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "a" });
-    await cached.withCache(async () => {
+    await cached.cache(async () => {
       const e1 = await Task.exists();
       const e2 = await Task.exists();
       expect(e1).toBe(true);
@@ -280,85 +334,85 @@ describe("QueryCacheTest", () => {
   });
 
   it("select all with cache", async () => {
-    const { cached, Task } = await setup();
+    const { cached, hits, Task } = await setup();
     await Task.create({ title: "all" });
-    await cached.withCache(async () => {
-      cached.resetCounters();
+    await cached.cache(async () => {
+      hits.reset();
       await Task.all().toArray();
-      const hitsAfterFirst = cached.cacheHits;
+      const hitsAfterFirst = hits.count;
       await Task.all().toArray();
-      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst);
+      expect(hits.count).toBeGreaterThan(hitsAfterFirst);
     });
   });
 
   it("select one with cache", async () => {
-    const { cached } = await setup();
+    const { cached, hits } = await setup();
     await cached.executeMutation("INSERT INTO tasks (title) VALUES ('sel_one')");
-    await cached.withCache(async () => {
-      cached.resetCounters();
+    await cached.cache(async () => {
+      hits.reset();
       const sql = 'SELECT * FROM "tasks" LIMIT 1';
       const r1 = await cached.selectOne(sql);
-      const hitsAfterFirst = cached.cacheHits;
+      const hitsAfterFirst = hits.count;
       const r2 = await cached.selectOne(sql);
       expect(r1).toBeDefined();
       expect(r2).toBeDefined();
-      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst);
+      expect(hits.count).toBeGreaterThan(hitsAfterFirst);
     });
   });
 
   it("select value with cache", async () => {
-    const { cached } = await setup();
+    const { cached, hits } = await setup();
     await cached.executeMutation("INSERT INTO tasks (title) VALUES ('sel_val')");
-    await cached.withCache(async () => {
-      cached.resetCounters();
+    await cached.cache(async () => {
+      hits.reset();
       const sql = 'SELECT title FROM "tasks" LIMIT 1';
       const v1 = await cached.selectValue(sql);
-      const hitsAfterFirst = cached.cacheHits;
+      const hitsAfterFirst = hits.count;
       const v2 = await cached.selectValue(sql);
       expect(v1).toBe("sel_val");
       expect(v2).toBe("sel_val");
-      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst);
+      expect(hits.count).toBeGreaterThan(hitsAfterFirst);
     });
   });
 
   it("select values with cache", async () => {
-    const { cached } = await setup();
+    const { cached, hits } = await setup();
     await cached.executeMutation("INSERT INTO tasks (title) VALUES ('a')");
     await cached.executeMutation("INSERT INTO tasks (title) VALUES ('b')");
-    await cached.withCache(async () => {
-      cached.resetCounters();
+    await cached.cache(async () => {
+      hits.reset();
       const sql = 'SELECT title FROM "tasks" ORDER BY title';
       const v1 = await cached.selectValues(sql);
-      const hitsAfterFirst = cached.cacheHits;
+      const hitsAfterFirst = hits.count;
       const v2 = await cached.selectValues(sql);
       expect(v1).toEqual(["a", "b"]);
       expect(v2).toEqual(["a", "b"]);
-      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst);
+      expect(hits.count).toBeGreaterThan(hitsAfterFirst);
     });
   });
 
   it("select rows with cache", async () => {
-    const { cached } = await setup();
+    const { cached, hits } = await setup();
     await cached.executeMutation("INSERT INTO tasks (title) VALUES ('row1')");
-    await cached.withCache(async () => {
-      cached.resetCounters();
+    await cached.cache(async () => {
+      hits.reset();
       const sql = 'SELECT * FROM "tasks" LIMIT 1';
       const r1 = await cached.selectRows(sql);
-      const hitsAfterFirst = cached.cacheHits;
+      const hitsAfterFirst = hits.count;
       const r2 = await cached.selectRows(sql);
       expect(Array.isArray(r1[0])).toBe(true);
       expect(r1).toEqual(r2);
-      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst);
+      expect(hits.count).toBeGreaterThan(hitsAfterFirst);
     });
   });
 
   it("query cache dups results correctly", async () => {
     const { cached } = await setup();
-    cached.enableQueryCache();
+    cached.enableQueryCacheBang();
     await cached.executeMutation("INSERT INTO tasks (title) VALUES ('dup')");
     const sql = 'SELECT * FROM "tasks"';
-    const r1 = await cached.execute(sql);
-    const r2 = await cached.execute(sql);
+    const r1 = (await cached.selectAll(sql)).toArray();
+    const r2 = (await cached.selectAll(sql)).toArray();
     expect(r1[0]).not.toBe(r2[0]);
     expect(r1[0]).toEqual(r2[0]);
   });
@@ -369,13 +423,12 @@ describe("QueryCacheTest", () => {
     const { cached } = await setup();
     await cached.executeMutation("INSERT INTO tasks (title) VALUES ('notif')");
     const events: unknown[] = [];
-    const { Notifications } = await import("@blazetrails/activesupport");
     const sub = Notifications.subscribe("sql.active_record", (event) => {
       events.push(event);
     });
     const sql = 'SELECT * FROM "tasks"';
     try {
-      await cached.withCache(async () => {
+      await cached.cache(async () => {
         await cached.selectAll(sql);
         await cached.selectAll(sql); // second call → cache hit
       });
@@ -393,34 +446,34 @@ describe("QueryCacheTest", () => {
 
   it("cache does not raise exceptions", async () => {
     const { cached, Task } = await setup();
-    cached.enableQueryCache();
+    cached.enableQueryCacheBang();
     await expect(Task.all().toArray()).resolves.toBeDefined();
   });
 
   it("cache works with prepended sql comments", async () => {
-    const { cached } = await setup();
-    cached.enableQueryCache();
+    const { cached, hits } = await setup();
+    cached.enableQueryCacheBang();
     const sql = "/*app:MyApp*/ SELECT 1 AS val";
-    await cached.execute(sql);
-    expect(cached.cache.size).toBeGreaterThan(0);
-    cached.resetCounters();
-    await cached.execute(sql);
-    expect(cached.cacheHits).toBe(1);
+    await cached.selectAll(sql);
+    expect(cached.queryCache.size).toBeGreaterThan(0);
+    hits.reset();
+    await cached.selectAll(sql);
+    expect(hits.count).toBe(1);
   });
 
   it("query cache does not allow sql key mutation", async () => {
     const { cached } = await setup();
-    cached.enableQueryCache();
+    cached.enableQueryCacheBang();
     const sql = "SELECT 1 AS val";
-    await cached.execute(sql);
-    const r = await cached.execute(sql);
+    await cached.selectAll(sql);
+    const r = await cached.selectAll(sql);
     expect(r).toBeDefined();
   });
 
   it("cache is flat", async () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "flat" });
-    await cached.withCache(async () => {
+    await cached.cache(async () => {
       const results = await Task.all().toArray();
       expect(Array.isArray(results)).toBe(true);
       expect(results[0]).not.toBeInstanceOf(Array);
@@ -430,7 +483,7 @@ describe("QueryCacheTest", () => {
   it("cache does not wrap results in arrays", async () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "nowrap" });
-    await cached.withCache(async () => {
+    await cached.cache(async () => {
       const results = await Task.all().toArray();
       expect(Array.isArray(results)).toBe(true);
     });
@@ -438,22 +491,22 @@ describe("QueryCacheTest", () => {
 
   it.skip("cache is ignored for locked relations", async () => {
     const { cached } = await setup();
-    cached.enableQueryCache();
-    await cached.execute("SELECT 1 AS val");
-    const sizeAfterSelect = cached.cache.size;
+    cached.enableQueryCacheBang();
+    await cached.selectAll("SELECT 1 AS val");
+    const sizeAfterSelect = cached.queryCache.size;
     expect(sizeAfterSelect).toBeGreaterThan(0);
     const forUpdateSql = 'SELECT 1 AS val FROM "tasks" FOR UPDATE';
-    await cached.execute(forUpdateSql);
-    expect(cached.cache.size).toBe(sizeAfterSelect);
+    await cached.selectAll(forUpdateSql);
+    expect(cached.queryCache.size).toBe(sizeAfterSelect);
   });
 
   it("cache is available when connection is connected", async () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "row" });
-    await cached.withCache(async () => {
+    await cached.cache(async () => {
       await Task.all().toArray();
       await Task.all().toArray();
-      expect(cached.cache.size).toBe(1);
+      expect(cached.queryCache.size).toBe(1);
     });
   });
   it.skip("cache is available when using a not connected connection", () => {
@@ -463,7 +516,7 @@ describe("QueryCacheTest", () => {
   it("query cache executes new queries within block", async () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "a" });
-    await cached.withCache(async () => {
+    await cached.cache(async () => {
       const r1 = await Task.all().toArray();
       expect(r1).toHaveLength(1);
       await Task.create({ title: "b" });
@@ -475,7 +528,7 @@ describe("QueryCacheTest", () => {
   it("query cache doesnt leak cached results of rolled back queries", async () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "before" });
-    cached.enableQueryCache();
+    cached.enableQueryCacheBang();
     await cached.beginTransaction();
     await Task.create({ title: "during" });
     await cached.rollback();
@@ -565,36 +618,36 @@ describe("QueryCacheTest", () => {
   it("query cache uncached dirties", async () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "a" });
-    cached.enableQueryCache();
+    cached.enableQueryCacheBang();
     await Task.all().toArray();
-    expect(cached.cache.size).toBeGreaterThan(0);
+    expect(cached.queryCache.size).toBeGreaterThan(0);
     await cached.uncached(async () => {
-      expect(cached.cache.enabled).toBe(false);
+      expect(cached.queryCache.enabled).toBe(false);
     });
-    expect(cached.cache.enabled).toBe(true);
+    expect(cached.queryCache.enabled).toBe(true);
   });
 
   it("query cache connection uncached dirties", async () => {
     const { cached } = await setup();
-    cached.enableQueryCache();
+    cached.enableQueryCacheBang();
     await cached.uncached(async () => {
-      expect(cached.cache.enabled).toBe(false);
+      expect(cached.queryCache.enabled).toBe(false);
     });
-    expect(cached.cache.enabled).toBe(true);
+    expect(cached.queryCache.enabled).toBe(true);
   });
 
   it("query cache uncached dirties disabled with nested cache", async () => {
     const { cached, Task } = await setup();
     await Task.create({ title: "nested" });
-    cached.enableQueryCache();
+    cached.enableQueryCacheBang();
     await cached.uncached(async () => {
-      expect(cached.cache.enabled).toBe(false);
-      await cached.withCache(async () => {
-        expect(cached.cache.enabled).toBe(true);
+      expect(cached.queryCache.enabled).toBe(false);
+      await cached.cache(async () => {
+        expect(cached.queryCache.enabled).toBe(true);
       });
-      expect(cached.cache.enabled).toBe(false);
+      expect(cached.queryCache.enabled).toBe(false);
     });
-    expect(cached.cache.enabled).toBe(true);
+    expect(cached.queryCache.enabled).toBe(true);
   });
 });
 
@@ -613,30 +666,30 @@ describe("QueryCacheMutableParamTest", () => {
   it("query cache handles mutated binds", async () => {
     // Rails: mutating a bind array after a query is cached must not corrupt the
     // cached result or produce wrong results on later calls.
-    const { cached } = await setup();
+    const { cached, hits } = await setup();
     await cached.executeMutation("INSERT INTO tasks (title) VALUES ('bind_task')");
-    await cached.withCache(async () => {
-      cached.resetCounters();
+    await cached.cache(async () => {
+      hits.reset();
       const binds = ["bind_task"];
       const sql = 'SELECT * FROM "tasks" WHERE title = ?';
-      const r1 = await cached.execute(sql, binds);
+      const r1 = (await cached.selectAll(sql, null, binds)).toArray();
       expect(r1).toHaveLength(1);
-      const hitsAfterFirst = cached.cacheHits;
+      const hitsAfterFirst = hits.count;
 
       // Mutate the original array — this changes the cache key, so the next call
       // must not find a cache hit and must return 0 rows (the mutated value does not exist).
       binds[0] = "nonexistent";
-      const r2 = await cached.execute(sql, binds);
+      const r2 = (await cached.selectAll(sql, null, binds)).toArray();
       expect(r2).toHaveLength(0);
-      expect(cached.cacheHits).toBe(hitsAfterFirst); // no hit — different key
+      expect(hits.count).toBe(hitsAfterFirst); // no hit — different key
 
       // Re-query with the original bind value — the previously cached entry must
       // still be intact (mutation did not corrupt it).
-      const hitsAfterMutated = cached.cacheHits;
-      const r3 = await cached.execute(sql, ["bind_task"]);
+      const hitsAfterMutated = hits.count;
+      const r3 = (await cached.selectAll(sql, null, ["bind_task"])).toArray();
       expect(r3).toHaveLength(1);
       expect(r1[0]).toEqual(r3[0]);
-      expect(cached.cacheHits).toBeGreaterThan(hitsAfterMutated); // cache hit restored
+      expect(hits.count).toBeGreaterThan(hitsAfterMutated); // cache hit restored
     });
   });
 });
@@ -647,18 +700,18 @@ describe("QuerySerializedParamTest", () => {
     // produce a cache hit and return identical results. (Rails supports passing
     // an AR record directly via id_for_database; here we use the primitive id,
     // which is the value the ORM ultimately binds for both cases.)
-    const { cached, Task } = await setup();
+    const { cached, hits, Task } = await setup();
     const t = await Task.create({ title: "serialized_ar" });
-    await cached.withCache(async () => {
-      cached.resetCounters();
+    await cached.cache(async () => {
+      hits.reset();
       const r1 = await Task.where({ id: t.id }).toArray();
       expect(r1).toHaveLength(1);
       expect(r1[0]?.id).toBe(t.id);
-      const hitsAfterFirst = cached.cacheHits;
+      const hitsAfterFirst = hits.count;
       const r2 = await Task.where({ id: t.id }).toArray();
       expect(r2).toHaveLength(1);
       expect(r2[0]?.id).toBe(t.id);
-      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst); // cache hit
+      expect(hits.count).toBeGreaterThan(hitsAfterFirst); // cache hit
     });
   });
 
@@ -666,28 +719,28 @@ describe("QuerySerializedParamTest", () => {
     // Verifies that identical string bind values produce identical cache keys —
     // the cache key is derived from value equality, so two separate but equal
     // strings hit the same cache entry.
-    const { cached } = await setup();
+    const { cached, hits } = await setup();
     await cached.executeMutation("INSERT INTO tasks (title) VALUES ('str_serial')");
-    await cached.withCache(async () => {
-      cached.resetCounters();
+    await cached.cache(async () => {
+      hits.reset();
       const sql = 'SELECT * FROM "tasks" WHERE title = ?';
       // Two separately constructed string values with the same content must share a cache key.
       const bind1 = "str_serial";
       const bind2 = `${"str"}_serial`; // constructed separately, same value
-      const r1 = await cached.execute(sql, [bind1]);
+      const r1 = (await cached.selectAll(sql, null, [bind1])).toArray();
       expect(r1).toHaveLength(1);
-      const hitsAfterFirst = cached.cacheHits;
-      const r2 = await cached.execute(sql, [bind2]);
+      const hitsAfterFirst = hits.count;
+      const r2 = (await cached.selectAll(sql, null, [bind2])).toArray();
       expect(r2).toHaveLength(1);
-      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst); // value equality → cache hit
+      expect(hits.count).toBeGreaterThan(hitsAfterFirst); // value equality → cache hit
     });
   });
 });
 
 describe("QueryCacheExpiryTest", () => {
   it.skipIf(adapterType === "sqlite")("cache gets cleared after migration", async () => {
-    const inner = createTestAdapter();
-    const cached = new QueryCacheAdapter(inner);
+    const cached = rawAdapter();
+    cached._queryCache = new Store();
     const { Migration } = await import("./migration.js");
     class SetupMig extends Migration {
       async up() {
@@ -698,9 +751,9 @@ describe("QueryCacheExpiryTest", () => {
       async down() {}
     }
     await new SetupMig().run(cached, "up");
-    cached.enableQueryCache();
-    await cached.execute(`SELECT * FROM ${cached.quoteTableName("qc_mig_tasks")}`);
-    expect(cached.cache.size).toBeGreaterThan(0);
+    cached.enableQueryCacheBang();
+    await cached.selectAll(`SELECT * FROM ${cached.quoteTableName("qc_mig_tasks")}`);
+    expect(cached.queryCache.size).toBeGreaterThan(0);
     class ChangeMig extends Migration {
       async up() {
         await this.changeColumn("qc_mig_tasks", "title", "text");
@@ -708,7 +761,7 @@ describe("QueryCacheExpiryTest", () => {
       async down() {}
     }
     await new ChangeMig().run(cached, "up");
-    expect(cached.cache.empty).toBe(true);
+    expect(cached.queryCache.empty).toBe(true);
   });
 
   it("enable disable", async () => {
@@ -767,14 +820,13 @@ describe("QueryCacheExpiryTest", () => {
 describe("TransactionInCachedSqlActiveRecordPayloadTest", () => {
   it("payload without open transaction", async () => {
     const { cached } = await setup();
-    cached.enableQueryCache();
+    cached.enableQueryCacheBang();
     const sql = "SELECT 1 AS val";
     const events: unknown[] = [];
-    const { Notifications } = await import("@blazetrails/activesupport");
     const sub = Notifications.subscribe("sql.active_record", (e) => events.push(e));
     try {
-      await cached.execute(sql);
-      await cached.execute(sql); // cache hit
+      await cached.selectAll(sql);
+      await cached.selectAll(sql); // cache hit
     } finally {
       Notifications.unsubscribe(sub);
     }
@@ -788,15 +840,14 @@ describe("TransactionInCachedSqlActiveRecordPayloadTest", () => {
 
   it("payload with open transaction", async () => {
     const { cached } = await setup();
-    cached.enableQueryCache();
+    cached.enableQueryCacheBang();
     const sql = "SELECT 1 AS val";
     const events: unknown[] = [];
-    const { Notifications } = await import("@blazetrails/activesupport");
     const sub = Notifications.subscribe("sql.active_record", (e) => events.push(e));
     try {
       await cached.beginTransaction();
-      await cached.execute(sql);
-      await cached.execute(sql); // cache hit
+      await cached.selectAll(sql);
+      await cached.selectAll(sql); // cache hit
       await cached.commit();
     } finally {
       Notifications.unsubscribe(sub);
@@ -812,14 +863,15 @@ describe("TransactionInCachedSqlActiveRecordPayloadTest", () => {
 
 describe("QueryCache executor hooks", () => {
   it("run enables query cache on all adapters", () => {
-    const inner = createTestAdapter();
-    const a1 = new QueryCacheAdapter(inner);
-    const a2 = new QueryCacheAdapter(inner);
-    expect(a1.cache.enabled).toBe(false);
-    expect(a2.cache.enabled).toBe(false);
+    const a1 = rawAdapter();
+    const a2 = rawAdapter();
+    a1._queryCache = new Store();
+    a2._queryCache = new Store();
+    expect(a1.queryCache.enabled).toBe(false);
+    expect(a2.queryCache.enabled).toBe(false);
     QueryCache.run([a1, a2]);
-    expect(a1.cache.enabled).toBe(true);
-    expect(a2.cache.enabled).toBe(true);
+    expect(a1.queryCache.enabled).toBe(true);
+    expect(a2.queryCache.enabled).toBe(true);
   });
 
   it("run enables query cache on pools, skipping enabled or config-disabled pools", () => {
@@ -847,84 +899,18 @@ describe("QueryCache executor hooks", () => {
   });
 
   it("complete disables and clears query cache", async () => {
-    const inner = createTestAdapter();
-    const adapter = new QueryCacheAdapter(inner);
-    adapter.enableQueryCache();
-    await adapter.cache.computeIfAbsent("SELECT 1", async () => [{ id: 1 }]);
-    expect(adapter.cache.size).toBe(1);
+    const adapter = rawAdapter();
+    adapter.enableQueryCacheBang();
+    await adapter.queryCache.computeIfAbsent("SELECT 1", async () => [{ id: 1 }]);
+    expect(adapter.queryCache.size).toBe(1);
     QueryCache.complete([adapter]);
-    expect(adapter.cache.enabled).toBe(false);
-    expect(adapter.cache.size).toBe(0);
-  });
-
-  it("forwards Quoting methods to inner adapter", () => {
-    const inner = createTestAdapter();
-    const adapter = new QueryCacheAdapter(inner);
-    expect(adapter.quoteIdentifier("users")).toBe(
-      (inner as unknown as { quoteIdentifier(n: string): string }).quoteIdentifier("users"),
-    );
-    expect(adapter.quoteTableName("public.users")).toBe(
-      (inner as unknown as { quoteTableName(n: string): string }).quoteTableName("public.users"),
-    );
-    expect(adapter.quoteColumnName("id")).toBe(
-      (inner as unknown as { quoteColumnName(n: string): string }).quoteColumnName("id"),
-    );
-    expect(adapter.quoteDefaultExpression("foo")).toBe(
-      (inner as unknown as { quoteDefaultExpression(v: unknown): string }).quoteDefaultExpression(
-        "foo",
-      ),
-    );
-    expect(adapter.quoteTableNameForAssignment("posts", "title")).toBe(
-      (
-        inner as unknown as {
-          quoteTableNameForAssignment(t: string, a: string): string;
-        }
-      ).quoteTableNameForAssignment("posts", "title"),
-    );
-    expect(adapter.castBoundValue(42)).toBe(
-      (inner as unknown as { castBoundValue(v: unknown): unknown }).castBoundValue(42),
-    );
-    expect(adapter.sanitizeAsSqlComment("/* hello */")).toBe(
-      (inner as unknown as { sanitizeAsSqlComment(v: unknown): string }).sanitizeAsSqlComment(
-        "/* hello */",
-      ),
-    );
-  });
-
-  it("Quoting forwarders throw a descriptive error when inner does not implement them", () => {
-    const stub = { adapterName: "stub" } as unknown as ConstructorParameters<
-      typeof QueryCacheAdapter
-    >[0];
-    const adapter = new QueryCacheAdapter(stub);
-    expect(() => adapter.quoteIdentifier("x")).toThrow(/quoteIdentifier/);
-    expect(() => adapter.quoteTableName("x")).toThrow(/quoteTableName/);
-    expect(() => adapter.quoteColumnName("x")).toThrow(/quoteColumnName/);
-    expect(() => adapter.quoteDefaultExpression("x")).toThrow(/quoteDefaultExpression/);
-  });
-
-  it("new Quoting forwarders use Rails-default fallbacks when inner lacks them", () => {
-    const stub = {
-      adapterName: "stub",
-      quoteTableName: (n: string) => `"${n}"`,
-      quoteColumnName: (n: string) => `"${n}"`,
-    } as unknown as ConstructorParameters<typeof QueryCacheAdapter>[0];
-    const adapter = new QueryCacheAdapter(stub);
-    // castBoundValue: abstract Rails default is identity
-    expect(adapter.castBoundValue(99)).toBe(99);
-    expect(adapter.castBoundValue("hello")).toBe("hello");
-    expect(adapter.castBoundValue(null)).toBeNull();
-    // quoteTableNameForAssignment: abstract Rails default is quoteTableName("table.attr")
-    // The stub's quoteTableName wraps the full string, yielding "posts.title"
-    expect(adapter.quoteTableNameForAssignment("posts", "title")).toBe('"posts.title"');
-    // sanitizeAsSqlComment: strips surrounding comment markers, escapes internal ones
-    expect(adapter.sanitizeAsSqlComment("/* hint */")).toBe("hint");
-    expect(adapter.sanitizeAsSqlComment("safe comment")).toBe("safe comment");
-    expect(adapter.sanitizeAsSqlComment("a */ b")).toBe("a * / b");
+    expect(adapter.queryCache.enabled).toBe(false);
+    expect(adapter.queryCache.size).toBe(0);
   });
 
   it("installExecutorHooks wires run/complete to executor", () => {
-    const inner = createTestAdapter();
-    const adapter = new QueryCacheAdapter(inner);
+    const adapter = rawAdapter();
+    adapter._queryCache = new Store();
     let hook: { run(): void; complete(): void } | null = null;
     const executor = {
       registerHook(h: { run(): void; complete(): void }) {
@@ -934,9 +920,9 @@ describe("QueryCache executor hooks", () => {
     QueryCache.installExecutorHooks(executor, [adapter]);
     expect(hook).not.toBeNull();
     hook!.run();
-    expect(adapter.cache.enabled).toBe(true);
+    expect(adapter.queryCache.enabled).toBe(true);
     hook!.complete();
-    expect(adapter.cache.enabled).toBe(false);
+    expect(adapter.queryCache.enabled).toBe(false);
   });
 });
 

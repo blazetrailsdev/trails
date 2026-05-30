@@ -11,6 +11,7 @@ import type { AdapterName } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { SQLite3AdapterOptions } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
+import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   ReadOnlyError,
@@ -2322,6 +2323,12 @@ function translateException(
   }
   return new StatementInvalid(message, { sql, binds, cause: exception });
 }
+
+// `executeMutation` is this adapter's write/DDL primitive (reads go through
+// `execute`/`execQuery`), so dirtying it clears the query cache on writes and
+// schema changes — the trails analogue of Rails' `dirties_query_cache base,
+// :execute` for the write side.
+dirtiesQueryCache(SQLite3Adapter, "executeMutation");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, self)`
 // at the bottom of Rails' sqlite3_adapter.rb — lets railtie initializers

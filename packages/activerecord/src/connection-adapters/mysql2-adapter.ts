@@ -10,6 +10,7 @@ import {
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
 import { Version } from "./abstract-adapter.js";
+import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import {
   AdapterTimeout,
   ConnectionFailed,
@@ -1936,3 +1937,9 @@ function initializeTypeMap(m: any): never {
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#initialize_type_map is not implemented",
   );
 }
+
+// `executeMutation` is this adapter's write/DDL primitive (reads go through the
+// overridden `execQuery`), so dirtying it clears the query cache on writes and
+// schema changes — the trails analogue of Rails' `dirties_query_cache base,
+// :execute` for the write side.
+dirtiesQueryCache(Mysql2Adapter, "executeMutation");

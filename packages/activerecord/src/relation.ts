@@ -248,27 +248,19 @@ function hasTopLevelComma(s: string): boolean {
 }
 
 function resolveColumnNameMatcher(adapter: any): RegExp {
-  // Walk adapter → inner to find a static columnNameMatcher on the concrete adapter class.
-  let a = adapter;
-  while (a) {
-    const matcher = (a.constructor as any)?.columnNameMatcher?.();
-    if (matcher) return matcher;
-    a = a.inner;
-  }
-  return abstractColumnNameMatcher();
+  // Mirrors Rails' `model.adapter_class.column_name_matcher` — a direct static
+  // lookup on the concrete adapter class.
+  return (adapter?.constructor as any)?.columnNameMatcher?.() ?? abstractColumnNameMatcher();
 }
 
 function resolveColumnNameWithOrderMatcher(adapter: any): RegExp {
-  // Walk adapter → inner to find a static columnNameWithOrderMatcher on the
-  // concrete adapter class. Order-path matcher additionally permits an
-  // `ASC|DESC` and `NULLS FIRST|LAST` suffix after the column name.
-  let a = adapter;
-  while (a) {
-    const matcher = (a.constructor as any)?.columnNameWithOrderMatcher?.();
-    if (matcher) return matcher;
-    a = a.inner;
-  }
-  return abstractColumnNameWithOrderMatcher();
+  // Order-path matcher additionally permits an `ASC|DESC` and `NULLS
+  // FIRST|LAST` suffix after the column name. Mirrors Rails'
+  // `model.adapter_class.column_name_with_order_matcher`.
+  return (
+    (adapter?.constructor as any)?.columnNameWithOrderMatcher?.() ??
+    abstractColumnNameWithOrderMatcher()
+  );
 }
 
 /**
@@ -2461,7 +2453,7 @@ export class Relation<T extends Base> {
       const binaryBytes = this._binaryByteLength(b);
       if (binaryBytes !== null) return `<${binaryBytes} bytes of binary data>`;
       if (typeof adapter.typeCast !== "function") {
-        // Match the "throw loudly" contract the QueryCacheAdapter wrapper uses — a silent fallback would
+        // Throw loudly — a silent fallback would
         // make EXPLAIN output depend on whether the adapter
         // happens to implement `typeCast`, and nothing we ship does
         // without it.
