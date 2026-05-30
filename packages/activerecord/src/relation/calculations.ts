@@ -57,6 +57,7 @@ interface CalculationRelation {
   _applyJoinsToManager(manager: any): void;
   _applyWheresToManager(manager: any, table: any): void;
   _applyOrderToManager(manager: any, table: any): void;
+  _checkEagerLoadable(): void;
   toArray(): Promise<any[]>;
 }
 
@@ -250,6 +251,9 @@ async function singleAggregate(
   column: string,
   coerceNumeric: boolean = true,
 ): Promise<unknown | null> {
+  // Rails routes aggregates through apply_join_dependency when eager loading,
+  // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
+  rel._checkEagerLoadable();
   const table = rel._modelClass.arelTable;
   const aggNode = buildAggNode(table, fn, column, rel._isDistinct);
   const projection = aggNode.as("val");
@@ -280,6 +284,7 @@ async function groupedAggregate(
   column: string,
   coerceNumeric: boolean = true,
 ): Promise<Record<string, unknown>> {
+  rel._checkEagerLoadable();
   const table = rel._modelClass.arelTable;
   const groupCol = rel._groupColumns[0];
   const groupNode = groupColumnToArel(groupCol, table);
@@ -329,6 +334,11 @@ export async function performCount(
   if (this._groupColumns.length > 0) {
     return groupedAggregate(this, "count", column ?? "*", true) as Promise<Record<string, number>>;
   }
+  // Non-grouped count builds SQL inline (the grouped path delegates to
+  // groupedAggregate, which runs the check itself). Rails count routes through
+  // apply_join_dependency when eager loading, raising EagerLoadPolymorphicError
+  // for polymorphic specs (calculations.rb).
+  this._checkEagerLoadable();
 
   if (this._limitValue !== null || this._offsetValue !== null) {
     // Rails: build_count_subquery — wraps the limited relation as a subquery

@@ -2220,9 +2220,12 @@ export class Relation<T extends Base> {
   /**
    * Adds each eager-load spec to the JoinDependency, routing nested hashes and
    * dotted paths through JoinDependency#addAssociationSpec (recursive JOINs).
-   * Specs that can't be JOINed (polymorphic, composite key, unjoinable through)
-   * are returned for preload fallback. Mirrors Rails routing eager_load_values
-   * through JoinDependency rather than degrading nested specs to N preloads.
+   * Polymorphic specs raise `EagerLoadPolymorphicError` (propagated from
+   * addAssociationSpec, matching Rails), so they never reach the fallback list.
+   * Capability-gap specs (composite key, unjoinable through) return `false` and
+   * are collected here for preload fallback. Mirrors Rails routing
+   * eager_load_values through JoinDependency rather than degrading nested specs
+   * to N preloads.
    * @internal
    */
   private _addEagerSpecsToJoinDependency(
@@ -2239,12 +2242,7 @@ export class Relation<T extends Base> {
   private async _executeEagerLoad(eagerAssocs?: AssociationSpec[]): Promise<void> {
     const eagerAssociations = eagerAssocs ?? this._eagerLoadAssociations;
     const basePk = (this._modelClass as any).primaryKey ?? "id";
-    if (
-      Array.isArray(basePk) ||
-      this._ctes.length > 0 ||
-      this._setOperation ||
-      !this._fromClause.isEmpty()
-    ) {
+    if (this._eagerLoadBypassesJoinDependency()) {
       const sql = this._toSql();
       const result = await this._modelClass.connection.selectAll(sql, "Eager Load");
       this._records = this._instrumentInstantiation(result.toArray());
@@ -2564,6 +2562,62 @@ export class Relation<T extends Base> {
   // count, sum, average, minimum, maximum are mixed in via
   // interface merge + prototype assignment (see bottom of file)
 
+  /**
+   * Whether an eager-load query degrades to plain SQL + preloading instead of
+   * building a JoinDependency. trails can't emit the aliased eager JOIN under a
+   * composite PK, CTEs, a set operation, or a FROM override, so eager specs are
+   * preloaded in those cases (a capability gap — Rails always JOINs). Kept in
+   * one place so the `toArray` builder (`_executeEagerLoad`), the `toSql`
+   * builder (`_buildEagerSql`), and the calculation/exists raise-check
+   * (`_checkEagerLoadable`) agree on exactly when a JoinDependency is built.
+   * @internal
+   */
+  private _eagerLoadBypassesJoinDependency(): boolean {
+    const basePk = (this._modelClass as any).primaryKey ?? "id";
+    return (
+      Array.isArray(basePk) ||
+      this._ctes.length > 0 ||
+      !!this._setOperation ||
+      !this._fromClause.isEmpty()
+    );
+  }
+
+  /**
+   * Surface raise-worthy eager-load specs before building calculation/exists
+   * SQL, which never constructs a JoinDependency of its own. Mirrors Rails
+   * `apply_join_dependency`, which `count`/`exists?`/`calculate` route through
+   * over `eager_load_values | includes_values` and which raises (via
+   * `construct_join_dependency` → `build`) for both misspelled names
+   * (`ConfigurationError`) and polymorphic associations
+   * (`EagerLoadPolymorphicError`). Capability-gap specs that Rails joins fine
+   * (composite-key belongsTo, unjoinable through) do NOT raise — trails degrades
+   * them to preloading, so the calculation paths stay silent like `toArray`.
+   *
+   * Skips entirely when the query bypasses the JoinDependency (CTEs, set ops,
+   * FROM overrides, composite PK): there `toArray` degrades to preloading
+   * without raising, so the calculation/exists paths must stay consistent and
+   * not raise either.
+   *
+   * Only the calculation/exists entry points call this — the `toArray` eager
+   * path builds its real JoinDependency in `_executeEagerLoad`/`_buildEagerSql`,
+   * which raises there, so re-checking from the shared `_applyJoinsToManager`
+   * chokepoint would just rebuild a throwaway JoinDependency on every eager load.
+   *
+   * Public (not `private`) because the calculation mixins in
+   * `relation/calculations.ts` call it cross-module; declaring it private would
+   * force a structural-typing workaround and break under `#private` fields.
+   * @internal
+   */
+  _checkEagerLoadable(): void {
+    if (this._eagerLoadBypassesJoinDependency()) return;
+    const specs = [
+      ...new Set([...this._eagerLoadAssociations, ...this._includesToPromoteFromReferences()]),
+    ];
+    if (specs.length === 0) return;
+    const jd = new JoinDependency(this._modelClass);
+    for (const spec of specs) jd.validateEagerLoadSpec(spec);
+  }
+
   private _applyJoinsToManager(manager: SelectManager): void {
     // Mirror Rails build_join_buckets routing (query_methods.rb:1856-1863):
     // When stashed joins exist, non-LeadingJoin nodes go to join_node (appended
@@ -2625,8 +2679,13 @@ export class Relation<T extends Base> {
   async exists(conditions?: Record<string, unknown> | unknown): Promise<boolean> {
     if (this._isNone) return false;
     // Rails FinderMethods#exists?: `return false if !conditions` — treats an
-    // explicit `false` / `null` argument as "no match possible".
+    // explicit `false` / `null` argument as "no match possible". This precedes
+    // the `if eager_loading?` branch, so it short-circuits before the
+    // eager-load validation below (finder_methods.rb:367-369).
     if (conditions === false || conditions === null) return false;
+    // Rails exists? then routes through apply_join_dependency when eager
+    // loading, raising EagerLoadPolymorphicError for polymorphic specs.
+    this._checkEagerLoadable();
     let rel: Relation<T> = this;
     if (conditions !== undefined) {
       // Mirrors Rails' FinderMethods#exists? argument handling
@@ -3587,7 +3646,7 @@ export class Relation<T extends Base> {
   // JoinDependency SQL synchronously for toSql()/parity runner use.
   // Returns null if no eager associations could be joined (fall back to plain SQL).
   private _buildEagerSql(): string | null {
-    if (this._setOperation || !this._fromClause.isEmpty() || this._ctes.length > 0) return null;
+    if (this._eagerLoadBypassesJoinDependency()) return null;
 
     const allEager = [
       ...new Set([...this._eagerLoadAssociations, ...this._includesToPromoteFromReferences()]),
@@ -3595,7 +3654,6 @@ export class Relation<T extends Base> {
     if (allEager.length === 0) return null;
 
     const basePk = (this._modelClass as any).primaryKey ?? "id";
-    if (Array.isArray(basePk)) return null;
 
     const jd = new JoinDependency(this._modelClass);
     this._addEagerSpecsToJoinDependency(jd, allEager);

@@ -167,7 +167,13 @@ export class JoinDependency {
       assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type;
 
     if (assocDef.type === "belongsTo") {
-      if (assocDef.options.polymorphic) return null;
+      // Rails raises for polymorphic eager loads — the join target table is
+      // not known statically (join_dependency.rb#build). This is distinct from
+      // the capability-gap fallbacks below (CPK / unjoinable through), which
+      // return null so the caller degrades to preloading.
+      if (assocDef.options.polymorphic) {
+        throw new EagerLoadPolymorphicError(assocName);
+      }
       foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
       if (Array.isArray(foreignKey)) return null;
       const className = assocDef.options.className ?? _camelize(assocName);
@@ -329,19 +335,27 @@ export class JoinDependency {
     let lastNode: JoinPart | null = null;
     let parentPath = "";
 
-    for (const part of parts) {
-      const node = this._addOrReuse(part, currentModel, currentAlias, parentPath);
-      if (!node) {
-        this._restoreTree(snapshot);
-        return null;
+    try {
+      for (const part of parts) {
+        const node = this._addOrReuse(part, currentModel, currentAlias, parentPath);
+        if (!node) {
+          this._restoreTree(snapshot);
+          return null;
+        }
+        lastNode = node;
+        currentModel = node.baseKlass;
+        // Use effectiveSqlName, not tableAlias: the JOIN SQL references the
+        // effective name (real table name or tN alias), so the next level's ON
+        // clause must use the same name as the source of the join.
+        currentAlias = node.effectiveSqlName;
+        parentPath = parentPath ? `${parentPath}.${part}` : part;
       }
-      lastNode = node;
-      currentModel = node.baseKlass;
-      // Use effectiveSqlName, not tableAlias: the JOIN SQL references the
-      // effective name (real table name or tN alias), so the next level's ON
-      // clause must use the same name as the source of the join.
-      currentAlias = node.effectiveSqlName;
-      parentPath = parentPath ? `${parentPath}.${part}` : part;
+    } catch (e) {
+      // addAssociation mutates _nextTableIndex/aliasTracker before the
+      // polymorphic check throws; restore so a mid-walk throw leaves the
+      // instance unchanged before propagating (e.g. EagerLoadPolymorphicError).
+      this._restoreTree(snapshot);
+      throw e;
     }
     return lastNode;
   }
@@ -352,20 +366,54 @@ export class JoinDependency {
    * Shared prefixes are deduplicated against the existing tree, so passing
    * specs that overlap reuses already-joined nodes instead of double-joining.
    *
-   * All-or-nothing per call: if any segment can't be JOINed (polymorphic,
-   * composite key, unjoinable through), the whole spec is rolled back and
-   * `false` is returned so the caller can fall back to preloading.
+   * All-or-nothing per call. Two distinct outcomes when a segment can't be
+   * JOINed (mirrors Rails JoinDependency#build, which raises for the former):
+   *   - **Raise-worthy** (polymorphic): `addAssociation` throws
+   *     `EagerLoadPolymorphicError`, which propagates out of this method
+   *     uncaught — eager-loading a polymorphic association is an error, not a
+   *     fallback.
+   *   - **Capability gap** (composite key, unjoinable through): the whole spec
+   *     is rolled back and `false` is returned so the caller degrades to
+   *     preloading.
    *
    * Mirrors: ActiveRecord::Associations::JoinDependency#build (recursive tree
    * construction from the eager_load values hash).
    */
   addAssociationSpec(spec: AssociationSpec): boolean {
     const snapshot = this._snapshotTree();
-    if (!this._walkSpec(spec, this._baseModel, this._baseAlias, "")) {
+    try {
+      if (!this._walkSpec(spec, this._baseModel, this._baseAlias, "")) {
+        this._restoreTree(snapshot);
+        return false;
+      }
+    } catch (e) {
+      // addAssociation mutates _nextTableIndex/aliasTracker before the
+      // polymorphic check throws. Restore so the instance is left unchanged
+      // (all-or-nothing) before propagating EagerLoadPolymorphicError.
       this._restoreTree(snapshot);
-      return false;
+      throw e;
     }
     return true;
+  }
+
+  /**
+   * Rails-faithful eager-load validation: walk the spec tree and raise the same
+   * errors `construct_join_dependency` does before any SQL is built —
+   * `ConfigurationError` for a misspelled/unknown name (via `findReflection`,
+   * mirroring Rails `find_reflection`) and `EagerLoadPolymorphicError` for a
+   * polymorphic association. Valid-but-unjoinable specs (composite-key
+   * belongsTo, through associations trails can't alias) do NOT raise — Rails
+   * joins them and trails degrades them to preloading separately.
+   *
+   * Used by the calculation/exists paths (`Relation#_checkEagerLoadable`), which
+   * never build the real join tree but must still surface these errors. Unlike
+   * `addAssociationSpec` this only validates — it doesn't mutate the tree —
+   * so there's nothing to roll back.
+   *
+   * Mirrors: ActiveRecord::Associations::JoinDependency#build.
+   */
+  validateEagerLoadSpec(spec: AssociationSpec): void {
+    this.build(eagerSpecToTree(spec), this._baseModel);
   }
 
   /** @internal */
@@ -1286,6 +1334,33 @@ export class JoinDependency {
 
     return targetNode;
   }
+}
+
+/**
+ * Convert an eager-load spec (string, dotted string, array, or nested hash)
+ * into the nested-hash tree `JoinDependency#build` consumes. Unlike
+ * `JoinDependency.makeTree`, dotted strings ("comments.author") are split into
+ * nested levels, matching how `_walkSpec` walks them segment-by-segment.
+ */
+function eagerSpecToTree(
+  spec: AssociationSpec | AssociationSpec[],
+  hash: Record<PropertyKey, any> = Object.create(null),
+): Record<PropertyKey, any> {
+  if (typeof spec === "string") {
+    let cur = hash;
+    for (const part of spec.split(".")) {
+      cur = cur[part] ??= Object.create(null);
+    }
+  } else if (Array.isArray(spec)) {
+    for (const s of spec) eagerSpecToTree(s, hash);
+  } else if (spec && typeof spec === "object") {
+    for (const key of Reflect.ownKeys(spec)) {
+      const child = (spec as any)[key];
+      const sub = (hash[key] ??= Object.create(null));
+      if (child != null) eagerSpecToTree(child, sub);
+    }
+  }
+  return hash;
 }
 
 function rebindTableReferences(
