@@ -2,7 +2,7 @@ import type { Base } from "./base.js";
 import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
-import { getFsAsync, getPathAsync, getEnv } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
@@ -643,15 +643,11 @@ async function establishWithConfig(
     adapterArgs = [url];
   }
 
-  const dbConfig = new HashConfig(
-    getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv,
-    "primary",
-    {
-      adapter: adapterName,
-      url,
-      ...config,
-    },
-  );
+  const dbConfig = new HashConfig(DatabaseConfigurations.currentEnv(), "primary", {
+    adapter: adapterName,
+    url,
+    ...config,
+  });
 
   // Mirror Rails: establish_connection makes the receiver its own connection
   // class so it gets an independent pool entry under its own name instead of
@@ -695,7 +691,7 @@ async function autoConnect(modelClass: typeof Base): Promise<void> {
     const raw = await loadConfigFile(modelClass);
     configs = DatabaseConfigurations.fromEnv(raw);
   }
-  const env = getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv;
+  const env = DatabaseConfigurations.currentEnv();
   const primaryConfigs = configs.configsFor({ envName: env, name: "primary" });
   const dbConfig = primaryConfigs[0] ?? configs.findDbConfig(env);
 

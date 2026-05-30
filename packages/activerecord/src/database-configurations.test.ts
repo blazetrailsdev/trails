@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 
@@ -135,6 +135,40 @@ describe("DatabaseConfigurationsTest", () => {
     });
     const resolved = configs.resolve("primary");
     expect(resolved.database).toBe("dev.db");
+  });
+
+  describe("currentEnv resolution", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("currentEnv prefers TRAILS_ENV over NODE_ENV", () => {
+      DatabaseConfigurations.defaultEnv = "development";
+      vi.stubEnv("TRAILS_ENV", "production");
+      vi.stubEnv("NODE_ENV", "test");
+      expect(DatabaseConfigurations.currentEnv()).toBe("production");
+    });
+
+    it("currentEnv falls back to NODE_ENV, then defaultEnv", () => {
+      DatabaseConfigurations.defaultEnv = "development";
+      vi.stubEnv("NODE_ENV", "staging");
+      expect(DatabaseConfigurations.currentEnv()).toBe("staging");
+
+      vi.stubEnv("NODE_ENV", undefined as unknown as string);
+      expect(DatabaseConfigurations.currentEnv()).toBe("development");
+    });
+
+    it("fromEnv builds the synthesized DATABASE_URL config under currentEnv", () => {
+      // The build env must equal currentEnv() so the runtime selectors in
+      // connection-handling find the synthesized config under the same env.
+      vi.stubEnv("TRAILS_ENV", "production");
+      vi.stubEnv("DATABASE_URL", "sqlite3:db/prod.sqlite3");
+      const configs = DatabaseConfigurations.fromEnv({});
+      const env = DatabaseConfigurations.currentEnv();
+      const synthesized = configs.configsFor({ envName: env, name: "primary" });
+      expect(env).toBe("production");
+      expect(synthesized).toHaveLength(1);
+    });
   });
 
   it("configs for with include hidden", () => {

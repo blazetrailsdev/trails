@@ -69,6 +69,24 @@ export class DatabaseConfigurations {
   }
 
   /**
+   * The active environment resolved from the process, mirroring Rails'
+   * `ConnectionHandling::DEFAULT_ENV` / `RAILS_ENV` lambdas:
+   * `RAILS_ENV` → `RACK_ENV` → the configured default. Here `TRAILS_ENV` is
+   * the canonical runtime env (BC-2), `NODE_ENV` is the one-release fallback,
+   * and `defaultEnv` (the app-bootstrap / test override) is the terminal value.
+   *
+   * Single source of truth for "what env are we building/connecting for" —
+   * `fromEnv` (which builds the configs) and the runtime config selectors in
+   * `connection-handling` must resolve it identically, or the synthesized
+   * `DATABASE_URL` config can be built for one env and looked up under another.
+   *
+   * @internal
+   */
+  static currentEnv(): string {
+    return getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv;
+  }
+
+  /**
    * The DatabaseConfigurations instance most recently registered (via
    * constructor or explicit set). `HashConfig.isPrimary` consults it,
    * matching Rails' `Base.configurations.primary?(name)`.
@@ -244,10 +262,11 @@ export class DatabaseConfigurations {
    */
   static fromEnv(raw: RawConfigurations = {}): DatabaseConfigurations {
     const instance = new DatabaseConfigurations([]);
-    // TRAILS_ENV is the canonical runtime env (BC-2); NODE_ENV is the one-release fallback.
-    // DATABASE_URL merges into whichever environment is active.
-    const env = getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv;
-    instance._configurations = instance._buildConfigs(raw, env);
+    // Build for the active env resolved by `currentEnv()` — the same method the
+    // runtime config selectors in `connection-handling` use, so the synthesized
+    // `DATABASE_URL` config is built under exactly the env it's later looked up
+    // by. DATABASE_URL merges into whichever environment is active.
+    instance._configurations = instance._buildConfigs(raw, DatabaseConfigurations.currentEnv());
     return instance;
   }
 
