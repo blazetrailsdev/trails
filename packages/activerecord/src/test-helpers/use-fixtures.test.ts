@@ -1,5 +1,5 @@
 import { describe, it, expect, expectTypeOf, vi, beforeAll } from "vitest";
-import { useFixtures, resolveFixtureNames } from "./use-fixtures.js";
+import { useFixtures, resolveFixtureNames, deriveFixtureSchema } from "./use-fixtures.js";
 import { fixtureRegistry } from "./fixtures-registry.js";
 import { FixtureSet } from "./fixture-set.js";
 import { Base } from "../base.js";
@@ -206,6 +206,42 @@ describe("useFixtures by registry name", () => {
     expectTypeOf<Parameters<typeof authors>[0]>().toEqualTypeOf<"david" | "mary" | "bob">();
     expectTypeOf<ReturnType<typeof authors>>().toEqualTypeOf<Author>();
     expectTypeOf<ReturnType<typeof posts.all>>().toEqualTypeOf<Post[]>();
+  });
+});
+
+// --- useFixtures schema auto-derivation ({ schema } option) ---
+
+describe("useFixtures { schema } auto-derivation", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  // No manual `beforeAll(() => defineSchema(...))`: passing the full TEST_SCHEMA lets
+  // useFixtures create just the tables these sets touch (authorAddresses → posts).
+  const { authors } = useFixtures(["authorAddresses", "authors", "posts"], () => Base.adapter, {
+    schema: TEST_SCHEMA,
+  });
+
+  it("creates the needed tables and seeds without a manual defineSchema call", async () => {
+    const david = authors("david");
+    expect(david.id).toBe(1);
+    const [row] = await Base.adapter.execute(
+      `SELECT name FROM ${Base.adapter.quoteTableName(Author.tableName)} WHERE id = 1`,
+    );
+    expect((row as { name: string }).name).toBe("David");
+  });
+});
+
+describe("deriveFixtureSchema", () => {
+  it("slices only the requested sets' tables out of the full schema", async () => {
+    const sub = await deriveFixtureSchema(["authors", "posts"], TEST_SCHEMA);
+    expect(Object.keys(sub).sort()).toEqual([Author.tableName, Post.tableName].sort());
+    // The slice carries the real column spec, not a placeholder.
+    expect(sub[Author.tableName]).toBe(TEST_SCHEMA[Author.tableName]);
+  });
+
+  it("omits a requested set whose table is absent from the schema", async () => {
+    const sub = await deriveFixtureSchema(["authors"], { other_table: { name: "string" } });
+    expect(sub).toEqual({});
   });
 });
 

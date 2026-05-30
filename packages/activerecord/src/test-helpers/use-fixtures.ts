@@ -1,5 +1,6 @@
-import { afterEach, beforeEach } from "vitest";
+import { afterEach, beforeAll, beforeEach } from "vitest";
 import { defineFixtures } from "./define-fixtures.js";
+import { defineSchema, type Schema } from "./define-schema.js";
 import {
   fixtureRegistry,
   type FixtureName,
@@ -37,6 +38,16 @@ export type UseFixturesResult<M extends FixtureMap> = {
 export type UseFixturesByNameResult<N extends FixtureName> = {
   [K in N]: FixtureAccessor<RegistryModel<K>, Extract<keyof RegistryData<K>, string>>;
 };
+
+export interface UseFixturesOpts {
+  /**
+   * When set, `useFixtures` derives the minimal sub-schema for the requested sets
+   * from this schema (via {@link deriveFixtureSchema}) and creates those tables in a
+   * `beforeAll` — replacing a manual `defineSchema({ ...slice })` call. Pass the full
+   * canonical schema (e.g. `TEST_SCHEMA`); only the tables the fixtures touch are created.
+   */
+  schema?: Schema;
+}
 
 /**
  * Resolves fixture-set names through the registry into the `[Model, data]` map shape.
@@ -85,6 +96,38 @@ export async function resolveFixtureNames(names: readonly FixtureName[]): Promis
   return map;
 }
 
+/**
+ * Slices the minimal sub-schema needed to seed the requested fixture sets out of a
+ * full schema: each set's table (resolved through the registry), keyed by the model's
+ * own `tableName`. Lets a caller hand `useFixtures` the whole canonical `TEST_SCHEMA`
+ * and have it pick out only the tables it touches — no hand-maintained
+ * `defineSchema({ customers: TEST_SCHEMA.customers })` slice that drifts when the
+ * fixture set's columns change.
+ *
+ * A requested set whose table is absent from `fullSchema` is silently skipped here —
+ * the seed-time `defineFixtures` call then surfaces a precise "no such table" error,
+ * which is a better signal than an opaque schema-derivation failure. Column-level
+ * `references:` targets are intentionally NOT pulled in: `defineSchema` treats them
+ * as creation-ordering hints only (never emitted as FK constraints) and skips any
+ * target missing from the schema, so a per-table slice creates valid DDL on its own.
+ */
+export async function deriveFixtureSchema(
+  names: readonly FixtureName[],
+  fullSchema: Schema,
+): Promise<Schema> {
+  return sliceSchema(await resolveFixtureNames(names), fullSchema);
+}
+
+/** Picks each resolved set's table out of `fullSchema`, keyed by the model's `tableName`. */
+function sliceSchema(fixtures: FixtureMap, fullSchema: Schema): Schema {
+  const sub: Schema = {};
+  for (const [, [model]] of Object.entries(fixtures)) {
+    const table = model.tableName;
+    if (table in fullSchema) sub[table] = fullSchema[table]!;
+  }
+  return sub;
+}
+
 /** Returns true for "table/relation does not exist" errors from any adapter. */
 function isTableMissingError(e: unknown): boolean {
   const msg = e instanceof Error ? e.message : String(e);
@@ -114,18 +157,32 @@ function isTableMissingError(e: unknown): boolean {
  * const { authors, posts } = useFixtures(["authors", "posts"], () => adapter);
  * authors("david"); // → Author instance
  * ```
+ *
+ * Pass `{ schema }` to skip the manual `defineSchema` step: `useFixtures` derives the
+ * minimal sub-schema for the requested sets (see {@link deriveFixtureSchema}) and
+ * creates those tables in a `beforeAll`. Hand it the whole `TEST_SCHEMA` and it picks
+ * out only what it needs:
+ *
+ * ```ts
+ * setupHandlerSuite();
+ * useHandlerTransactionalFixtures();
+ * const { customers } = useFixtures(["customers"], () => Base.connection, { schema: TEST_SCHEMA });
+ * ```
  */
 export function useFixtures<M extends FixtureMap>(
   fixtures: M,
   getAdapter: () => DatabaseAdapter,
+  opts?: UseFixturesOpts,
 ): UseFixturesResult<M>;
 export function useFixtures<const N extends FixtureName>(
   names: readonly N[],
   getAdapter: () => DatabaseAdapter,
+  opts?: UseFixturesOpts,
 ): UseFixturesByNameResult<N>;
 export function useFixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[],
   getAdapter: () => DatabaseAdapter,
+  opts?: UseFixturesOpts,
 ): Record<string, unknown> {
   const isNameArray = Array.isArray(fixturesOrNames);
   // Keys are known synchronously (the names, or the map's own keys) so accessors
@@ -141,6 +198,18 @@ export function useFixtures(
 
   // Per-test mutable state: populated in beforeEach, cleared in afterEach.
   const store: Record<string, Record<string, unknown>> = {};
+
+  // Schema auto-derivation (opt-in via opts.schema): create just the tables these
+  // fixture sets touch, sliced from the supplied schema. Registered as a beforeAll so
+  // it runs once before the per-test seeding beforeEach below — and after any handler
+  // suite's setup (registered earlier in the describe body), so getAdapter() is live.
+  if (opts?.schema) {
+    const fullSchema = opts.schema;
+    beforeAll(async () => {
+      if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
+      await defineSchema(getAdapter(), sliceSchema(fixtures, fullSchema));
+    });
+  }
 
   // TODO(fixtures-adoption Spike S1): seed once per worker in a global beforeAll
   // (before the pinned transaction opens) when useHandlerTransactionalFixtures is
