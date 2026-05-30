@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "ar": "./dist/bin.js"
+    "ar": "./bin/ar.js"
   },
   "exports": {
     ".": {
@@ -18,7 +18,8 @@
     "build": "tsc"
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "license": "MIT",
   "dependencies": {
