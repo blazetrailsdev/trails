@@ -31,7 +31,8 @@
     { "path": "packages/globalid" },
     { "path": "packages/did-you-mean" },
     { "path": "packages/html-sanitizer" },
-    { "path": "packages/nokogiri" }
+    { "path": "packages/nokogiri" },
+    { "path": "packages/activerecord-cli" }
   ],
   "exclude": ["node_modules", "dist"]
 }

@@ -185,6 +185,12 @@ importers:
         specifier: '>=5.0.0'
         version: 5.9.3
 
+  packages/activerecord-cli:
+    dependencies:
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
+
   packages/activesupport:
     dependencies:
       '@js-temporal/polyfill':
@@ -355,6 +361,9 @@ importers:
       '@blazetrails/activerecord':
         specifier: workspace:*
         version: link:../../packages/activerecord
+      '@blazetrails/activerecord-cli':
+        specifier: workspace:*
+        version: link:../../packages/activerecord-cli
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../../packages/activesupport
