@@ -92,6 +92,8 @@ import * as _sm from "./relation/spawn-methods.js";
 import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
 import { TableMetadata } from "./table-metadata.js";
+import { Map as TypeCasterMap } from "./type-caster/map.js";
+import { getEnumDefinitions } from "./enum.js";
 import {
   WhereClause,
   getWrappedSqlPredicates as predicatesWithWrappedSqlLiterals,
@@ -1023,8 +1025,21 @@ export class Relation<T extends Base> {
     const arelCol =
       column instanceof Nodes.Node ? column : (_qm.orderColumn.call(rel as any, column) as any);
 
+    // Mirrors Rails: `values.map { |v| model.type_caster.type_cast_for_database(column, v) }`.
+    // Cast each value to its database form so the CASE/IN predicates match a typed
+    // column (e.g. enum integer mappings, date/time serialization) instead of the
+    // JS-native string/number form. column.to_s drives the type lookup; an Arel node
+    // (SqlLiteral) finds no attribute type and falls through to ValueType (no-op cast).
+    const typeCaster = new TypeCasterMap(this._modelClass);
+    const columnName = typeof column === "string" ? column : String(column);
+    // Enum attributes aren't yet registered in the model's type caster, so resolve
+    // their EnumType directly — Rails' type_caster returns it, mapping keys → integers.
+    const enumType = getEnumDefinitions(this._modelClass).get(columnName)?.type;
     // Normalize undefined → null so eq(null) emits IS NULL (not the invalid = NULL).
-    const normalized = values.map((v) => (v === undefined ? null : v));
+    const normalized = values.map((v) => {
+      if (v === undefined || v === null) return null;
+      return enumType ? enumType.serialize(v) : typeCaster.typeCastForDatabase(columnName, v);
+    });
 
     // Build CASE WHEN col = v1 THEN 1 ... END ASC (searched form, 1-indexed).
     // Mirrors Rails' build_case_for_value_position: Arel::Nodes::Case.new (no operand)
@@ -1046,9 +1061,8 @@ export class Relation<T extends Base> {
     rel._orderClauses.push(orderNode.toSql());
 
     // Add WHERE col IN (values) filter — mirrors Rails' arel_column.in(values.compact).
-    // Attribute#in uses buildQuoted (no type-caster context), matching Rails which
-    // pre-casts values via type_cast_for_database before calling in(). Callers
-    // should pre-cast for typed columns (e.g. enum integer mappings).
+    // Attribute#in uses buildQuoted (no type-caster context); the values were already
+    // database-cast above via type_cast_for_database, matching Rails.
     if (filter) {
       const hasNull = normalized.includes(null);
       const nonNull = normalized.filter((v) => v !== null);

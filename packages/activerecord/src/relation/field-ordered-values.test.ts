@@ -66,7 +66,16 @@ describe("FieldOrderedValuesTest", () => {
     defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
     const sql = Post.all().inOrderOf("status", ["draft", "published", "archived"]).toSql();
     expect(sql).toContain("CASE");
-    expect(sql).toContain("draft");
+    // Rails casts enum keys to their database integer via type_cast_for_database,
+    // so the CASE branches compare against the mapped integers 0/1/2 rather than the
+    // raw string labels. Assert the full branch predicates (not bare substrings,
+    // which the 1-indexed THEN positions would trivially satisfy). Strip identifier
+    // quoting so the check holds across adapters (ANSI "" vs MariaDB ``).
+    const bare = sql.replace(/["`]/g, "");
+    expect(bare).not.toContain("draft");
+    expect(bare).toContain("posts.status = 0");
+    expect(bare).toContain("posts.status = 1");
+    expect(bare).toContain("posts.status = 2");
   });
 
   it("in order of with string column", () => {
