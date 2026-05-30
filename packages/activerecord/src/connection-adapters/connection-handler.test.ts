@@ -112,10 +112,11 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("symbolized configurations assignment", () => {
-    // The Symbol-vs-String distinction Rails asserts on config keys does not
-    // exist in TS (object keys are always strings); the rest of the test —
-    // that symbol-style nested config normalizes to HashConfig instances with
-    // String envName/name — translates directly.
+    // Rails asserts each config-hash key is a Symbol; the raw config here is
+    // string-keyed and DatabaseConfigurations normalizes via Object.entries,
+    // so that key-type assertion has no TS analogue. The rest of the test —
+    // that nested config normalizes to HashConfig instances with String
+    // envName/name — translates directly.
     const config = {
       development: {
         primary: { adapter: "sqlite3", database: "test/storage/development.sqlite3" },
