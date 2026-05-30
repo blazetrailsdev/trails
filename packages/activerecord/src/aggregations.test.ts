@@ -471,12 +471,9 @@ describe("AggregationsTest", () => {
 describe("AggregationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    // Only the customers table is needed; the customers fixture carries no ref().
-    await defineSchema({ customers: TEST_SCHEMA.customers });
-  });
-
-  const { customers } = useFixtures(["customers"], () => Base.connection);
+  // { schema } lets useFixtures derive + create only the tables these sets touch —
+  // no manual defineSchema slice to keep in sync with the fixture's columns.
+  const { customers } = useFixtures(["customers"], () => Base.connection, { schema: TEST_SCHEMA });
 
   // Rails: test_find_single_value_object
   it("find single value object", () => {
