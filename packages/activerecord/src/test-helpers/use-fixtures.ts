@@ -1,11 +1,13 @@
 import { afterEach, beforeAll, beforeEach } from "vitest";
-import { defineFixtures } from "./define-fixtures.js";
+import { defineFixtures, defineJoinTableFixtures } from "./define-fixtures.js";
 import { defineSchema, type Schema } from "./define-schema.js";
 import {
   fixtureRegistry,
+  isJoinTableEntry,
   type FixtureName,
   type RegistryModel,
   type RegistryData,
+  type IsJoinTableName,
 } from "./fixtures-registry.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import type { Base } from "../base.js";
@@ -17,9 +19,27 @@ type FixtureAttrs = Record<string, unknown>;
 
 type FixtureMap = Record<string, [BaseClass, Record<string, FixtureAttrs>]>;
 
+/**
+ * Internally-resolved fixture set. `model === null` marks a HABTM join-table set
+ * (seeded via {@link defineJoinTableFixtures}); otherwise it's a model-backed set.
+ * `table` is the DB table to seed/clean and to slice the schema by.
+ */
+type ResolvedFixtureSet = {
+  table: string;
+  model: BaseClass | null;
+  data: Record<string, FixtureAttrs>;
+};
+type ResolvedFixtureMap = Record<string, ResolvedFixtureSet>;
+
 type FixtureAccessor<T extends BaseClass, K extends string> = {
   (name: K): InstanceType<T>;
   all(): InstanceType<T>[];
+};
+
+/** Accessor for a HABTM join-table set: rows are plain resolved-attribute objects (no model instance). */
+type JoinTableAccessor<K extends string> = {
+  (name: K): Record<string, unknown>;
+  all(): Record<string, unknown>[];
 };
 
 export type UseFixturesResult<M extends FixtureMap> = {
@@ -36,7 +56,9 @@ export type UseFixturesResult<M extends FixtureMap> = {
  * with the label union pulled from the registry entry's data keys.
  */
 export type UseFixturesByNameResult<N extends FixtureName> = {
-  [K in N]: FixtureAccessor<RegistryModel<K>, Extract<keyof RegistryData<K>, string>>;
+  [K in N]: IsJoinTableName<K> extends true
+    ? JoinTableAccessor<Extract<keyof RegistryData<K>, string>>
+    : FixtureAccessor<RegistryModel<K>, Extract<keyof RegistryData<K>, string>>;
 };
 
 export interface UseFixturesOpts {
@@ -67,31 +89,36 @@ export interface UseFixturesOpts {
  *
  * @internal
  */
-export async function resolveFixtureNames(names: readonly FixtureName[]): Promise<FixtureMap> {
-  const map: FixtureMap = {};
+export async function resolveFixtureNames(
+  names: readonly FixtureName[],
+): Promise<ResolvedFixtureMap> {
+  const map: ResolvedFixtureMap = {};
   const tableToName = new Map<string, string>();
   for (const name of names) {
     const entry = fixtureRegistry[name as FixtureName] as
-      | { model: () => Promise<BaseClass>; data: Record<string, FixtureAttrs> }
+      | (typeof fixtureRegistry)[FixtureName]
       | undefined;
     if (!entry) {
       throw new Error(
         `useFixtures: no fixture set named "${name}" in the registry — add it to fixtures-registry.ts`,
       );
     }
-    const model = await entry.model();
-    const prior = tableToName.get(model.tableName);
+    // Join-table sets have no model class — resolve straight to the literal table.
+    const { table, model } = isJoinTableEntry(entry)
+      ? { table: entry.joinTable, model: null as BaseClass | null }
+      : await entry.model().then((m) => ({ table: m.tableName, model: m as BaseClass | null }));
+    const prior = tableToName.get(table);
     if (prior !== undefined) {
       throw new Error(
-        `useFixtures: "${name}" and "${prior}" both map to table "${model.tableName}"; ` +
+        `useFixtures: "${name}" and "${prior}" both map to table "${table}"; ` +
           `combined same-table loading isn't supported yet (defineFixtures deletes the ` +
           `table per set). Load only one of them in this test/scope — splitting across ` +
           `separate useFixtures calls does not help, since the later loader's delete still ` +
           `clobbers the earlier set on every test.`,
       );
     }
-    tableToName.set(model.tableName, name);
-    map[name] = [model, entry.data];
+    tableToName.set(table, name);
+    map[name] = { table, model, data: entry.data };
   }
   return map;
 }
@@ -118,11 +145,10 @@ export async function deriveFixtureSchema(
   return sliceSchema(await resolveFixtureNames(names), fullSchema);
 }
 
-/** Picks each resolved set's table out of `fullSchema`, keyed by the model's `tableName`. */
-function sliceSchema(fixtures: FixtureMap, fullSchema: Schema): Schema {
+/** Picks each resolved set's table out of `fullSchema`. */
+function sliceSchema(fixtures: ResolvedFixtureMap, fullSchema: Schema): Schema {
   const sub: Schema = {};
-  for (const [, [model]] of Object.entries(fixtures)) {
-    const table = model.tableName;
+  for (const { table } of Object.values(fixtures)) {
     if (table in fullSchema) sub[table] = fullSchema[table]!;
   }
   return sub;
@@ -191,10 +217,18 @@ export function useFixtures(
     ? (fixturesOrNames as readonly string[]).slice()
     : Object.keys(fixturesOrNames as FixtureMap);
 
-  // The resolved `[Model, data]` map. For the object-map overload it's known
-  // up front; for the name-array overload it's filled in beforeEach once the
-  // model thunks resolve (dynamic imports must stay lazy — see fixtures-registry).
-  let fixtures: FixtureMap | undefined = isNameArray ? undefined : (fixturesOrNames as FixtureMap);
+  // The resolved set map. For the object-map overload it's known up front (each
+  // `[Model, data]` tuple maps to a model-backed set); for the name-array overload
+  // it's filled in beforeEach once the model thunks resolve (dynamic imports must
+  // stay lazy — see fixtures-registry).
+  let fixtures: ResolvedFixtureMap | undefined = isNameArray
+    ? undefined
+    : Object.fromEntries(
+        Object.entries(fixturesOrNames as FixtureMap).map(([key, [model, data]]) => [
+          key,
+          { table: model.tableName, model, data },
+        ]),
+      );
 
   // Per-test mutable state: populated in beforeEach, cleared in afterEach.
   const store: Record<string, Record<string, unknown>> = {};
@@ -221,8 +255,11 @@ export function useFixtures(
     // different set than the accessors built below from `keys`.
     if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
     const adapter = getAdapter();
-    for (const [key, [ModelClass, data]] of Object.entries(fixtures)) {
-      const result = await defineFixtures(adapter, ModelClass, data);
+    for (const [key, { table, model, data }] of Object.entries(fixtures)) {
+      const result =
+        model === null
+          ? await defineJoinTableFixtures(adapter, table, data)
+          : await defineFixtures(adapter, model, data);
       store[key] = result as Record<string, unknown>;
     }
   });
@@ -231,11 +268,9 @@ export function useFixtures(
     if (!fixtures) return;
     const adapter = getAdapter();
     // Delete in reverse insertion order to respect FK constraints.
-    for (const [, [ModelClass]] of Object.entries(fixtures).reverse()) {
+    for (const { table } of Object.values(fixtures).reverse()) {
       try {
-        await adapter.executeMutation(
-          `DELETE FROM ${adapter.quoteTableName(ModelClass.tableName)}`,
-        );
+        await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
       } catch (e) {
         if (!isTableMissingError(e)) throw e;
       }

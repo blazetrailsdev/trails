@@ -542,3 +542,58 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   }
   return result;
 }
+
+/**
+ * Seeds a HABTM join table that has no model class. Rails handles these via
+ * `FixtureSet::TableRow`'s tableless path (e.g. `categories_posts`,
+ * `developers_projects`): the join table has rows of FK pairs (plus optional
+ * scalar columns like `joined_on`) but no `ActiveRecord::Base` subclass to
+ * register against. Option A from the followup spec — seed rows directly against
+ * the schema's columns, skipping the Model requirement rather than synthesising a
+ * fake `Base` subclass.
+ *
+ * `ref()` values resolve through the same adapter-scoped declared-id registry as
+ * model fixtures, so explicit Rails ids on the target set win over the CRC32
+ * fallback — load the referenced model sets BEFORE the join set (see {@link ref}).
+ * Returns the resolved row attributes keyed by label (no reload: there is no model
+ * to cast through, and a join table has no single PK to look rows up by).
+ */
+export async function defineJoinTableFixtures(
+  adapter: DatabaseAdapter,
+  tableName: string,
+  fixtures: Record<string, FixtureAttrs>,
+): Promise<Record<string, FixtureAttrs>> {
+  // Read the live schema columns so a fixture row referencing a column the join
+  // table doesn't have fails loudly here, not as an opaque INSERT error.
+  let columnNames: Set<string> | null = null;
+  if (typeof (adapter as any).columns === "function") {
+    const cols: { name: string }[] = await (adapter as any).columns(tableName);
+    columnNames = new Set(cols.map((c) => c.name));
+  }
+
+  const rows: FixtureAttrs[] = [];
+  const resolved: Record<string, FixtureAttrs> = {};
+  for (const [label, attrs] of Object.entries(fixtures)) {
+    const row: FixtureAttrs = {};
+    for (const [col, val] of Object.entries(attrs)) {
+      if (columnNames && !columnNames.has(col)) {
+        throw new Error(
+          `defineJoinTableFixtures: ${tableName}.${label} references unknown column "${col}" — not present in the table schema`,
+        );
+      }
+      // ref() resolves to the target row's PK (single-PK and composite-PK targets
+      // both surface a scalar id here); scalar columns pass through verbatim.
+      row[col] = isFixtureRef(val)
+        ? resolveFixtureId(adapter, val.tableName, val.fixtureName)
+        : val;
+    }
+    rows.push(row);
+    resolved[label] = row;
+  }
+
+  // Mirrors Rails: pass tableName as tablesToDelete so rows are replaced, not appended.
+  await insertFixturesSet.call(adapter as unknown as InsertHost, { [tableName]: rows }, [
+    tableName,
+  ]);
+  return resolved;
+}

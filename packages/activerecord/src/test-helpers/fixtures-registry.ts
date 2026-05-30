@@ -6,16 +6,34 @@ type BaseClass = typeof Base;
 type FixtureAttrs = Record<string, unknown>;
 
 /**
- * A single fixture-set entry. The model is resolved lazily through a dynamic
+ * A model-backed fixture-set entry. The model is resolved lazily through a dynamic
  * import so the registry can enumerate every fixture set without eagerly
  * importing every model module — several canonical models run import-time side
  * effects (`encrypts()`, `acceptsNestedAttributesFor` on polymorphic refs) that
  * throw unless their add-on/handler is already bootstrapped. Deferring the import
  * to seed time means a test only loads the models for the fixtures it requests.
  */
-export interface FixtureRegistryEntry {
+export interface FixtureModelEntry {
   readonly model: () => Promise<BaseClass>;
   readonly data: Record<string, FixtureAttrs>;
+}
+
+/**
+ * A HABTM join-table fixture-set entry. These tables (e.g. `categories_posts`)
+ * have no `ActiveRecord::Base` model in Rails — they're plain join tables of FK
+ * pairs. `joinTable` is the literal DB table name; seeding goes through
+ * {@link defineJoinTableFixtures} rather than {@link defineFixtures}.
+ */
+export interface FixtureJoinTableEntry {
+  readonly joinTable: string;
+  readonly data: Record<string, FixtureAttrs>;
+}
+
+export type FixtureRegistryEntry = FixtureModelEntry | FixtureJoinTableEntry;
+
+/** @internal Narrows a registry entry to the join-table variant. */
+export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTableEntry {
+  return "joinTable" in e;
 }
 
 /**
@@ -31,12 +49,10 @@ export interface FixtureRegistryEntry {
  * Known gaps — fixture data WITHOUT a registered model (intentionally omitted):
  * - `bad-posts` — no canonical model (arunit2 alt-connection fixture)
  * - `categories-ordered` — no dedicated model (alternate ordering fixture for categories)
- * - `categories-posts` — HABTM join table, no model class
  * - `chefs` — `chef.ts` throws at import: trails' `acceptsNestedAttributesFor`
  *   eagerly rejects the polymorphic `employable` belongs_to, whereas Rails
  *   (chef.rb: `accepts_nested_attributes_for :employable`) defers that check to
  *   build time. Pre-existing model-port divergence; re-add once chef.ts imports cleanly.
- * - `developers-projects` — HABTM join table, no model class
  * - `encrypted-book-that-ignores-cases` — same encryption add-on requirement
  * - `encrypted-books` — model requires the `@blazetrails/activerecord/encryption` add-on loaded at import time
  * - `fk-object-to-point-to` — no canonical model
@@ -47,8 +63,6 @@ export interface FixtureRegistryEntry {
  * - `other-comments` — no canonical model (arunit2 alt-connection fixture)
  * - `other-posts` — no canonical model (arunit2 alt-connection fixture)
  * - `other-topics` — no canonical model (arunit2 alt-connection fixture)
- * - `parrots-pirates` — HABTM join table, no model class
- * - `peoples-treasures` — HABTM join table, no model class
  * - `randomly-named-a9` — ambiguous — model uses table randomly_named_table1, not this set
  * - `virtual-columns` — no canonical VirtualColumn model
  *
@@ -83,6 +97,11 @@ export interface FixtureRegistryEntry {
  *   which isn't registerable yet — `Vertex` has no `tableName` override so it mis-inflects
  *   to `vertexes` (the table is `vertices`). Re-add `edges` once `Vertex.tableName` is fixed
  *   and `vertices` is registered.
+ * - `developers-projects` — HABTM join table (`developers_projects`); seeds fine via the
+ *   join-table loader, but `ref()`s `developers`, which isn't registerable yet (the
+ *   `developers` set has a `shared_computers` non-column gap, listed above). Re-add once
+ *   `developers` is registerable. The other three HABTM join sets (`categories-posts`,
+ *   `parrots-pirates`, `peoples-treasures`) ref only loadable model sets and ARE registered.
  */
 export const fixtureRegistry = {
   accounts: {
@@ -124,6 +143,10 @@ export const fixtureRegistry = {
   categories: {
     model: () => import("./models/category.js").then((m) => m.Category),
     data: FixtureData.categoryFixtureData,
+  },
+  categoriesPosts: {
+    joinTable: "categories_posts",
+    data: FixtureData.categoriesPostsFixtureData,
   },
   categorizations: {
     model: () => import("./models/categorization.js").then((m) => m.Categorization),
@@ -321,9 +344,17 @@ export const fixtureRegistry = {
     model: () => import("./models/paragraph.js").then((m) => m.Paragraph),
     data: FixtureData.paragraphFixtureData,
   },
+  parrotsPirates: {
+    joinTable: "parrots_pirates",
+    data: FixtureData.parrotsPiratesFixtureData,
+  },
   people: {
     model: () => import("./models/person.js").then((m) => m.Person),
     data: FixtureData.personFixtureData,
+  },
+  peoplesTreasures: {
+    joinTable: "peoples_treasures",
+    data: FixtureData.peoplesTreasuresFixtureData,
   },
   pets: {
     model: () => import("./models/pet.js").then((m) => m.Pet),
@@ -461,10 +492,19 @@ void _registryConforms;
 /** Union of all registered fixture-set names. */
 export type FixtureName = keyof typeof fixtureRegistry;
 
-/** The canonical model class registered for fixture-set `N`. */
-export type RegistryModel<N extends FixtureName> = Awaited<
-  ReturnType<(typeof fixtureRegistry)[N]["model"]>
->;
+/** The canonical model class registered for fixture-set `N` (never for join-table sets). */
+export type RegistryModel<N extends FixtureName> = (typeof fixtureRegistry)[N] extends {
+  model: () => Promise<infer M extends BaseClass>;
+}
+  ? M
+  : never;
+
+/** True for join-table fixture-set names (no model class). */
+export type IsJoinTableName<N extends FixtureName> = (typeof fixtureRegistry)[N] extends {
+  joinTable: string;
+}
+  ? true
+  : false;
 
 /** The fixture-data object registered for fixture-set `N`. */
 export type RegistryData<N extends FixtureName> = (typeof fixtureRegistry)[N]["data"];

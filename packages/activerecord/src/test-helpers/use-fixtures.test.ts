@@ -1,10 +1,15 @@
 import { describe, it, expect, expectTypeOf, vi, beforeAll } from "vitest";
 import { useFixtures, resolveFixtureNames, deriveFixtureSchema } from "./use-fixtures.js";
-import { fixtureRegistry } from "./fixtures-registry.js";
+import { fixtureRegistry, isJoinTableEntry } from "./fixtures-registry.js";
 import { FixtureSet } from "./fixture-set.js";
 import { Base } from "../base.js";
 import "../relation.js"; // registers the Relation ctor so Model.findBy/.all/.count work
-import { fixtureId, defineFixtures, isFixtureRef } from "./define-fixtures.js";
+import {
+  fixtureId,
+  defineFixtures,
+  defineJoinTableFixtures,
+  isFixtureRef,
+} from "./define-fixtures.js";
 import { defineSchema } from "./define-schema.js";
 import { createTestAdapter } from "../test-adapter.js";
 import { setupHandlerSuite } from "./setup-handler-suite.js";
@@ -209,6 +214,68 @@ describe("useFixtures by registry name", () => {
   });
 });
 
+describe("useFixtures seeds HABTM join tables (no model class)", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
+  // categories + posts declare explicit ids, so they load BEFORE the join set —
+  // categoriesPosts' category_id/post_id ref()s then resolve to those declared ids.
+  const { categories, posts, categoriesPosts } = useFixtures(
+    ["categories", "posts", "categoriesPosts"],
+    () => Base.adapter,
+  );
+
+  it("resolves each join row's FK pair to the referenced rows' ids", () => {
+    const row = categoriesPosts("general_welcome");
+    expect(row.category_id).toBe(categories("general").readAttribute("id"));
+    expect(row.post_id).toBe(posts("welcome").readAttribute("id"));
+  });
+
+  it("seeds every label-less join row (HABTM rows carry no id/label column)", async () => {
+    expect(categoriesPosts.all().length).toBe(8);
+    const [{ n }] = (await Base.adapter.execute(
+      `SELECT COUNT(*) AS n FROM ${Base.adapter.quoteTableName("categories_posts")}`,
+    )) as [{ n: number }];
+    expect(Number(n)).toBe(8);
+  });
+
+  it("persists FK pairs that match a real Category and Post", async () => {
+    for (const row of categoriesPosts.all()) {
+      const r = row as { category_id: number; post_id: number };
+      const [cat] = await Base.adapter.execute(
+        `SELECT id FROM ${Base.adapter.quoteTableName("categories")} WHERE id = ${r.category_id}`,
+      );
+      const [post] = await Base.adapter.execute(
+        `SELECT id FROM ${Base.adapter.quoteTableName("posts")} WHERE id = ${r.post_id}`,
+      );
+      expect(cat, `category_id ${r.category_id} must reference a real Category`).toBeDefined();
+      expect(post, `post_id ${r.post_id} must reference a real Post`).toBeDefined();
+    }
+  });
+});
+
+describe("useFixtures seeds a single-row HABTM join table", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
+  const { people, treasures, peoplesTreasures } = useFixtures(
+    ["people", "treasures", "peoplesTreasures"],
+    () => Base.adapter,
+  );
+
+  it("resolves rich_person_id/treasure_id to the referenced rows", () => {
+    const row = peoplesTreasures("michael_diamond");
+    expect(row.rich_person_id).toBe(people("michael").readAttribute("id"));
+    expect(row.treasure_id).toBe(treasures("diamond").readAttribute("id"));
+  });
+});
+
 // --- useFixtures schema auto-derivation ({ schema } option) ---
 
 describe("useFixtures { schema } auto-derivation", () => {
@@ -401,15 +468,25 @@ describe("useFixtures seeds composite-primary-key tables", () => {
 describe("fixtureRegistry conformance", () => {
   it("every entry resolves to a Base subclass with a table name and non-empty data", async () => {
     for (const [name, entry] of Object.entries(fixtureRegistry)) {
-      const ModelClass = await (entry as { model: () => Promise<typeof Base> }).model();
-      expect(typeof ModelClass, `${name}: model thunk must resolve to a class`).toBe("function");
-      expect(ModelClass.prototype instanceof Base, `${name}: resolved model must extend Base`).toBe(
-        true,
-      );
-      expect(typeof ModelClass.tableName, `${name}: model must declare a tableName`).toBe("string");
-      expect(ModelClass.tableName.length, `${name}: tableName must be non-empty`).toBeGreaterThan(
-        0,
-      );
+      if (isJoinTableEntry(entry)) {
+        expect(typeof entry.joinTable, `${name}: join-table entry must declare a joinTable`).toBe(
+          "string",
+        );
+        expect(entry.joinTable.length, `${name}: joinTable must be non-empty`).toBeGreaterThan(0);
+      } else {
+        const ModelClass = await (entry as { model: () => Promise<typeof Base> }).model();
+        expect(typeof ModelClass, `${name}: model thunk must resolve to a class`).toBe("function");
+        expect(
+          ModelClass.prototype instanceof Base,
+          `${name}: resolved model must extend Base`,
+        ).toBe(true);
+        expect(typeof ModelClass.tableName, `${name}: model must declare a tableName`).toBe(
+          "string",
+        );
+        expect(ModelClass.tableName.length, `${name}: tableName must be non-empty`).toBeGreaterThan(
+          0,
+        );
+      }
       // Composite primary keys are seedable now (the seed-conformance describe
       // below proves each entry actually inserts), so a composite `primaryKey` is
       // no longer disqualifying — the model PK is reconciled against the schema.
@@ -437,8 +514,12 @@ describe("fixtureRegistry ref targets", () => {
     // target can't be loaded by name to populate the declared-id registry.
     const loadable = new Set<string>();
     for (const entry of Object.values(fixtureRegistry)) {
-      const M = await (entry as { model: () => Promise<typeof Base> }).model();
-      loadable.add(M.tableName);
+      if (isJoinTableEntry(entry)) {
+        loadable.add(entry.joinTable);
+      } else {
+        const M = await (entry as { model: () => Promise<typeof Base> }).model();
+        loadable.add(M.tableName);
+      }
     }
     const offenders: string[] = [];
     for (const [name, entry] of Object.entries(fixtureRegistry)) {
@@ -494,12 +575,13 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
     const failures: string[] = [];
     for (const [name, entry] of Object.entries(fixtureRegistry)) {
       try {
-        const ModelClass = await (entry as { model: () => Promise<typeof Base> }).model();
-        await defineFixtures(
-          Base.adapter,
-          ModelClass,
-          (entry as { data: Record<string, Record<string, unknown>> }).data,
-        );
+        const data = (entry as { data: Record<string, Record<string, unknown>> }).data;
+        if (isJoinTableEntry(entry)) {
+          await defineJoinTableFixtures(Base.adapter, entry.joinTable, data);
+        } else {
+          const ModelClass = await (entry as { model: () => Promise<typeof Base> }).model();
+          await defineFixtures(Base.adapter, ModelClass, data);
+        }
       } catch (e) {
         failures.push(`${name}: ${(e as Error).message.split("\n")[0]}`);
       }
