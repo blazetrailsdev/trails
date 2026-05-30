@@ -297,13 +297,15 @@ export class DatabaseTasks {
     import("../adapter.js").DatabaseAdapter | null
   > {
     if (this._adapterInstance) return this._adapterInstance;
-    try {
-      const { Base } = await import("../base.js");
-      if (typeof Base.isConnectedQ === "function" && Base.isConnectedQ()) {
-        return Base.leaseConnection();
-      }
-    } catch {
-      // No pool established for the migration class — fall through to null.
+    const { Base } = await import("../base.js");
+    // Rails: `migration_connection == migration_class.lease_connection`.
+    // `isConnectedQ()` returns false (never throws) when no pool is
+    // established, so the no-pool case yields null and the caller reports
+    // "No adapter configured". A *present* but failing pool (discarded /
+    // exhausted) must surface its real `leaseConnection` error rather than be
+    // masked as "no adapter" — so this is deliberately not wrapped in a catch.
+    if (typeof Base.isConnectedQ === "function" && Base.isConnectedQ()) {
+      return Base.leaseConnection();
     }
     return null;
   }
