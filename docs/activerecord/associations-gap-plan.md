@@ -74,40 +74,29 @@ The per-PR sections that follow are the detail / rationale for each item.
 
 **Ready now (no unmerged dependency):**
 
-- **AF11 — strict-loading test unblocks** (~90 LOC + 6 tests; AF7 dep now
-  satisfied by #2645). Record-level `reload` interaction (2 tests),
-  CollectionProxy unloaded-reader lazy proxy (1), validation-context association
-  tests (2), eager has_one reflection opt-in (1). Files: `persistence.ts`,
-  association loaders, `strict-loading.test.ts`. Source: #2615.
-- **AF12 — G1b preload through-WHERE placement** (~30–50 LOC; AF6 dep now
-  satisfied by #2652). Fix the `includes`-only path that mis-places a
-  through-table WHERE onto the SOURCE query (`no such column:
-ce_memberships.favorite`). Rails copies `reflection_scope.where_clause` onto the
-  THROUGH query. Files: `associations/preloader/through-association.ts`
-  (`_buildThroughScope` / source-scope application, ~lines 180-193 and 362-396).
-  Source: #2586.
+- _(none — AF11 and AF12 shipped; the open `[ ]` items below under the per-PR
+  follow-up headings are the next candidates once their dependencies clear.)_
 
 _Shipped since round 3: AF1 (#2632 + #2642), AF2 (#2633), AF3 (#2634),
 AF4 (#2649), AF5 (#2658), AF6 (#2652), AF7 (#2645), AF8 (#2648), AF9 (#2647),
-AF10 (#2650)._
+AF10 (#2650), AF11 (#2688), AF12 (#2689)._
 
 **Round-4 follow-ups (named, PR-sized):**
 
 ### follow-up: collection-size / count_records port (~30–50 LOC)
 
 Files: `associations/collection-proxy.ts`, `associations/collection-association.ts`.
-Source: #2633, #2643, #2660, #2677.
+Source: #2633, #2643, #2660, #2677, #2685.
 
-The foreign-key-present reconciliation, AR-id-based `_target` equality, and the
-`build`/`createBang` → `_addToTarget` routing all shipped (#2660 made both
-`foreign_key_present?` impls faithful via a shared `foreignKeyPresentFor`
-helper; #2660 ported AR-id equality into `_addToTarget`; #2677 routed `build`
-and `createBang` through the `replace_on_target` funnel). One item remains:
-
-- Faithful `count_records` port — Rails applies counter_cache, the
-  `[limit_value, count].min` clamp, and the
-  `count==0 → target.select!(new_record); loaded!` side-effect; the proxy's
-  `size()` delegates to `count()` which may not implement all of these.
+The foreign-key-present reconciliation, AR-id-based `_target` equality, the
+`build`/`createBang` → `_addToTarget` routing, and the faithful `count_records`
+port all shipped (#2660 made both `foreign_key_present?` impls faithful via a
+shared `foreignKeyPresentFor` helper; #2660 ported AR-id equality into
+`_addToTarget`; #2677 routed `build` and `createBang` through the
+`replace_on_target` funnel; #2685 ported `countRecords` with counter_cache, the
+`[limit_value, count].min` clamp, and the
+`count==0 → target.select!(new_record); loaded!` side-effect). This work unit is
+now complete — no open items remain.
 
 **Gated / blocked:**
 
@@ -193,19 +182,14 @@ and `createBang` through the `replace_on_target` funnel). One item remains:
   per-record `continue`-on-abort also diverges from Rails' all-or-nothing
   `catch(:abort)`.
 
-**From #2568 (A2 preloader scope_for_association):** remaining
-`strict-loading.test.ts` stubs depend on separate features (the AssociationRelation
-`exec_queries` owner-strict backstop drop shipped in #2645 as AF7):
+**From #2568 (A2 preloader scope_for_association):** the 6 strict-loading test
+unblocks (reload interaction, CollectionProxy lazy proxy, validation-context,
+eager has_one opt-in) all shipped in #2688 (AF11); see "From #2688" below for
+residual deviations.
 
-- [ ] ~30 LOC + 2 tests: record-level `reload` + strict-loading (`strict
-loading has one reload`, `... has many singular association and
-reload`) — needs the reload / `find_from_target?` interaction.
-- [ ] ~15 LOC + 1 test: CollectionProxy unloaded-reader lazy-proxy semantics
-      (`strict loading with has many`).
-- [ ] ~20 LOC + 2 tests: validation-context association tests (guard exists;
-      needs a child model whose validation loads a strict owner's assoc).
-- [ ] ~25 LOC + 1 test: eager has_one reflection opt-in (`does not raise on
-eager loading a strict loading has one relation`).
+- [x] Done (#2688) — record-level `reload` + strict-loading, CollectionProxy
+      unloaded-reader lazy-proxy, validation-context association tests, eager
+      has_one reflection opt-in.
 - Still gated externally: habtm strict-loading, HMT cascade-to-middle.
 
 **From #2556 (H1 AssociationScope parity):** the `join`-into-`nextChainScope`
@@ -306,13 +290,12 @@ doesnt reset source association if already preloaded`.
 
 **From #2586 (G1 has_one :through — test-only):**
 
-- [ ] ~30–50 LOC (G1b, gated on H2 landing): fix the preload (`includes`-only,
-      no `references`) path that mis-places a through-table WHERE onto the
-      SOURCE query (`no such column: ce_memberships.favorite`). Rails copies
-      `reflection_scope.where_clause` onto the THROUGH query. Fix in
-      `preloader/through-association.ts` (`_buildThroughScope` /
-      source-scope application, ~lines 180-193 and 362-396). Then the
-      conditions test can switch to bare `includes` to match Rails verbatim.
+- [x] Done (#2689, AF12) — G1b preload through-WHERE placement. The
+      `includes`-only path now splits predicates: through-table predicates go on
+      the THROUGH query, source/target predicates stay on the source preloader
+      (`_partitionReflectionWhere` / `_buildThroughScope`). Two-query design, so
+      not the single-query JOIN Rails uses, but semantically equivalent for
+      AND-ed predicate arrays. See "From #2689" below for residual deviations.
 - 5 `disableJoins` specs in `has-one-through-disable-joins-associations.test.ts`
   remain blocked on the `disableJoins` scope chain.
 - Disproven: `ThroughReflection.isPolymorphic()` recognizing `has_one :as` was
@@ -421,10 +404,10 @@ for the #2585 self-join work).
   exec_queries parity; #2680 then dropped the trails-specific
   `reflection.options.strictLoading` record-marking block in
   `AssociationRelation#toArray` for pure exec_queries parity.
-- Reload-gated tests still skipped in `strict-loading.test.ts`: "strict loading
-  with has many", "… has many singular association and reload", "strict loading
-  has one reload" — need record-level reload re-preloading (find_from_target?
-  interaction). Tracked by existing FOLLOW-UP comments in the test file.
+- Reload-gated tests unblocked in #2688 (AF11): record-level reload now
+  re-preloads strict-loaded associations via a `_findRecord` harvest. See
+  "From #2688" below for the double-query deviation that the full reload-port
+  follow-up would close.
 
 **From #2664 / #2670 (dependent-handling dispatch consolidation + shim delete):**
 
@@ -508,3 +491,51 @@ for the #2585 self-join work).
   `errors.details[:base][0][:error]` carries `"invalid"`. No Rails test asserts
   this; switch the type + wire the locale keys if `errors.details` symbol parity
   is ever needed.
+
+**From #2685 (faithful countRecords port):** no follow-ups — counter_cache, the
+`[limit_value, count].min` clamp, and the `count==0 → select!(new_record);
+loaded!` side-effect all landed. Closes the collection-size / count_records work
+unit above.
+
+**From #2688 (AF11 strict-loading unblocks):**
+
+- ~80–120 LOC (own PR): full `reload` port onto `_findRecord` as the SOLE fetch
+  (copy `@attributes` + association caches from the fresh record, with the
+  `apply_scoping?` / `unscoped` branch). The strict path currently issues a
+  redundant raw-SQL row fetch AND a `_findRecord` fetch — behaviorally faithful,
+  but one extra query in the rare strict+reload path. Risky: touches ~15+ existing
+  reload tests (counter-cache/dirty/locking/timestamp/aggregations/nested-
+  attributes); ship standalone.
+- ~30 LOC: faithful validation-context integration test that runs a real
+  `save!`/`isValid()` whose validation triggers an async association load (vs.
+  the current synthetic `_validationContext` set). Blocked by validations being
+  sync while association loading is async — needs a sync-friendly hook or an
+  async-validation path first.
+- Verify (no test today): the `_findRecord` try/catch fallback in `reload`'s
+  strict-preload branch under a default scope on a strict-loading model — the
+  catch silently falls back to cache-clear, which would re-raise on next access.
+  No test covers strict + default-scope + reload.
+- Deviation (untested, mirrors a Rails quirk): Rails reload reassigns
+  `@association_cache` owners (`a.owner = self`); trails clears
+  `_associationInstances` and rebuilds top-level associations lazily, so
+  child-record inverses still point at the fresh `_findRecord` instance.
+
+**From #2689 (AF12 through-WHERE placement):**
+
+- Loose end (low risk, no test): `predicateReferencesTable` uses `fetchAttribute`
+  (first attribute of a node), so a single predicate that is an OR spanning the
+  through + source tables could be mis-routed by `_partitionReflectionWhere`. NOT
+  Rails-equivalent in that case, but not expressible via the hash-scope form.
+  Follow-up only if a future Rails-mirrored test uses a cross-table OR in a
+  through-association scope.
+- ~30–50 LOC parity slot: `associations/has_one_through_association.rb` sits at
+  92% api:compare (1 missing method) in `has-one-through-association.ts` —
+  PRE-EXISTING, untouched by this PR.
+- Not mirrored (tied to the single-query JOIN strategy trails doesn't use):
+  Rails' `through_scope` also handles `values[:joins]`,
+  `values[:left_outer_joins]`, and the
+  `scope.eager_loading? && order_values` re-order branch
+  (through_association.rb:132-142). `_buildThroughScope` only does annotate,
+  source_type, where-split, and cascade_strict_loading. Likely no-ops for the
+  two-query preloader, but worth noting if a join/order-on-through-scope test
+  surfaces.
