@@ -126,7 +126,9 @@ describe("ConnectionHandlerTest", () => {
       },
     };
     const configurations = new DatabaseConfigurations(config);
-    for (const dbConfig of configurations.configsFor()) {
+    const dbConfigs = configurations.configsFor();
+    expect(dbConfigs).toHaveLength(2);
+    for (const dbConfig of dbConfigs) {
       expect(dbConfig).toBeInstanceOf(HashConfig);
       expect(typeof dbConfig.envName).toBe("string");
       expect(typeof dbConfig.name).toBe("string");
