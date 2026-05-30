@@ -93,7 +93,6 @@ import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
 import { TableMetadata } from "./table-metadata.js";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
-import { getEnumDefinitions } from "./enum.js";
 import {
   WhereClause,
   getWrappedSqlPredicates as predicatesWithWrappedSqlLiterals,
@@ -1024,13 +1023,10 @@ export class Relation<T extends Base> {
     // (SqlLiteral) finds no attribute type and falls through to ValueType (no-op cast).
     const typeCaster = new TypeCasterMap(this._modelClass);
     const columnName = typeof column === "string" ? column : String(column);
-    // Enum attributes aren't yet registered in the model's type caster, so resolve
-    // their EnumType directly — Rails' type_caster returns it, mapping keys → integers.
-    const enumType = getEnumDefinitions(this._modelClass).get(columnName)?.type;
     // Normalize undefined → null so eq(null) emits IS NULL (not the invalid = NULL).
     const normalized = values.map((v) => {
       if (v === undefined || v === null) return null;
-      return enumType ? enumType.serialize(v) : typeCaster.typeCastForDatabase(columnName, v);
+      return typeCaster.typeCastForDatabase(columnName, v);
     });
 
     // Build CASE WHEN col = v1 THEN 1 ... END ASC (searched form, 1-indexed).

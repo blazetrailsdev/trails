@@ -103,18 +103,31 @@ Forward-looking items needing follow-up work, grouped into PR-sized work units.
 
 ### follow-up: EnumType in the global type caster (~30–50 LOC)
 
-Files: `base.ts` (`typeForAttribute`), `relation.ts` (`inOrderOf` enum branch).
-Source: #2671.
+Files: `type-caster/map.ts` (`typeCastForDatabase`), `relation.ts`
+(`inOrderOf` enum branch). Source: #2671.
 
-Wire `EnumType` into the model's global type caster (`Base.typeForAttribute` /
-`TypeCasterMap.typeForAttribute`) so enum attributes resolve through the
-standard type-casting path. Enums are NOT registered in `_attributeDefinitions`,
-which is why `inOrderOf` needs a local `getEnumDefinitions` lookup; once enums
-flow through `type_for_attribute` (Rails decorates the attribute with
-`EnumType`), the enum branch in `inOrderOf` can be deleted, making the method a
-1:1 mirror of Rails (`model.type_caster.type_cast_for_database`). Same gap
-affects `where({ enumCol: "key" })` value serialization. Blast radius: global
-enum type casting.
+**Partially shipped.** `TypeCasterMap.typeCastForDatabase` now resolves enum
+attributes through their `EnumType` so the database-cast path serializes keys →
+integers, and the local `getEnumDefinitions` branch in `inOrderOf` is deleted —
+the method is now a 1:1 Rails mirror (`type_caster.type_cast_for_database`).
+
+**Why not full `type_for_attribute` decoration (the remaining gap):** Rails
+decorates the attribute itself with `EnumType` via `decorate_attributes`, so
+`type_for_attribute` returns the `EnumType` and in-memory storage holds the
+_label_. Our enum implementation diverges: it stores the **raw subtype value**
+(integer) in `_attributes` and presents labels via accessors / `readEnumValue`.
+Decorating the attribute (or routing the predicate-builder `cast` path through
+`EnumType`) flips in-memory storage to labels, which breaks ~61 enum tests
+(`readEnumValue`, predicates, `whereValuesHash` → `scopeForCreate` round-trip).
+So only the **serialize** path (`typeCastForDatabase`) is wired here, not the
+`cast` path (`typeForAttribute`).
+
+**Remaining follow-up:** `where({ enumCol: "label" })` value serialization still
+does not map a string label → integer (the predicate builder casts via the raw
+subtype, not `EnumType`). Closing it cleanly requires the larger enum-as-
+attribute-type refactor: decorate the attribute with `EnumType` _and_ rework
+`readEnumValue` / the generated predicates / `whereValuesHash` consumption to
+work with label-based storage. Tracked as its own work unit; > 300 LOC.
 
 ### Actionable PR queue
 
