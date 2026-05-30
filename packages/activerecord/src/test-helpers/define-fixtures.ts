@@ -239,13 +239,42 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   fixtures: Record<K, FixtureAttrs>,
 ): Promise<{ [P in K]: InstanceType<T> }> {
   const tableName = ModelClass.tableName;
-  const pk = ModelClass.primaryKey;
-  if (Array.isArray(pk)) {
+  const declaredPk = ModelClass.primaryKey;
+  if (Array.isArray(declaredPk)) {
     throw new Error(
-      `defineFixtures: composite primary keys are not supported (model: ${ModelClass.name}, pk: [${pk.join(", ")}])`,
+      `defineFixtures: composite primary keys are not supported (model: ${ModelClass.name}, pk: [${declaredPk.join(", ")}])`,
     );
   }
-  const pkCol = pk;
+
+  // Reconcile the model's PK against the table's ACTUAL schema PK column. Rails
+  // resolves `Base.primary_key` by introspecting the schema; our models don't
+  // always declare a custom `primaryKey`, so for tables whose PK column differs
+  // from the default `id` (`bulbs` → "ID", `mixed_case_monkeys` → "monkeyID") or
+  // which have no PK at all (id-less tables like `mateys`), we trust the schema's
+  // actual PK over the model's default. `pkCol === null` means an id-less table:
+  // no PK column is seeded and the reload matches on the full row instead.
+  let pkCol: string | null = declaredPk;
+  if (typeof (adapter as any).primaryKey === "function") {
+    const schemaPk: string | string[] | null = await (adapter as any).primaryKey(tableName);
+    if (Array.isArray(schemaPk)) {
+      throw new Error(
+        `defineFixtures: composite primary keys are not supported (table: ${tableName}, pk: [${schemaPk.join(", ")}])`,
+      );
+    }
+    if (schemaPk === null) {
+      pkCol = null;
+    } else if (declaredPk !== "id" && declaredPk !== schemaPk) {
+      // The model trusts a custom PK that the schema contradicts — a real bug.
+      // (A plain `id` default just defers to the schema, exactly like Rails'
+      // introspected `Base.primary_key`.) Surface it rather than silently
+      // writing to a phantom column.
+      throw new Error(
+        `defineFixtures: ${ModelClass.name} declares primaryKey "${declaredPk}" but table "${tableName}" has primary key "${schemaPk}" — fix the model or the schema`,
+      );
+    } else {
+      pkCol = schemaPk;
+    }
+  }
 
   // Register this model in the adapter-scoped tableName registry (Phase 1b).
   const registry = getRegistry(adapter);
@@ -269,9 +298,16 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   // so we can roll back if the INSERT itself fails — `ref()` resolution must not
   // observe ids for rows that never landed in the database.
   const tableIds = new Map<string, number | string>();
-  for (const label of labels) {
-    const id = resolveDeclaredPk(tableName, pkCol, label, (fixtures[label] as FixtureAttrs)[pkCol]);
-    tableIds.set(label, id);
+  if (pkCol !== null) {
+    for (const label of labels) {
+      const id = resolveDeclaredPk(
+        tableName,
+        pkCol,
+        label,
+        (fixtures[label] as FixtureAttrs)[pkCol],
+      );
+      tableIds.set(label, id);
+    }
   }
   const adapterIds = declaredIdsFor(adapter);
   const priorTableIds = adapterIds.get(tableName);
@@ -282,11 +318,11 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   const rows: FixtureAttrs[] = [];
   for (const label of labels) {
     const attrs = fixtures[label];
-    const id = resolveDeclaredPk(tableName, pkCol, label, attrs[pkCol]);
-    const row: FixtureAttrs = { [pkCol]: id };
+    const row: FixtureAttrs =
+      pkCol !== null ? { [pkCol]: resolveDeclaredPk(tableName, pkCol, label, attrs[pkCol]) } : {};
 
     for (const [col, val] of Object.entries(attrs)) {
-      if (col === pkCol) continue; // PK already set above (declared id or fixtureId fallback)
+      if (pkCol !== null && col === pkCol) continue; // PK already set above (declared id or fixtureId fallback)
 
       // Evaluate poly once so both the ref guard and the expansion below share the result.
       const poly = findPolymorphicRef(ModelClass, col);
@@ -369,7 +405,7 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
         }
       }
 
-      if (val !== null && typeof val === "object" && pkCol in val) {
+      if (val !== null && typeof val === "object" && pkCol !== null && pkCol in val) {
         // Model instance (or any object with the PK): extract the PK value.
         row[col] = (val as FixtureAttrs)[pkCol];
       } else {
@@ -430,15 +466,24 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     throw err;
   }
 
-  // Reload persisted instances so AR attribute casting is applied
+  // Reload persisted instances so AR attribute casting is applied. Reload runs
+  // `unscoped` so a model default_scope (e.g. Bulb's `where(name: "defaulty")`)
+  // can't hide a just-seeded row — fixtures bypass default scopes in Rails too.
+  // Id-less tables (pkCol === null) have no PK to look up by, so match the full
+  // inserted row instead.
   const result = {} as { [P in K]: InstanceType<T> };
   for (let i = 0; i < labels.length; i++) {
     const label = labels[i]!;
-    const id = (rows[i] as FixtureAttrs)[pkCol];
-    const record = await (ModelClass as any).findBy({ [pkCol]: id });
+    const row = rows[i] as FixtureAttrs;
+    const criteria = pkCol !== null ? { [pkCol]: row[pkCol] } : row;
+    const find = () => (ModelClass as any).findBy(criteria);
+    const record =
+      typeof (ModelClass as any).unscoped === "function"
+        ? await (ModelClass as any).unscoped(find)
+        : await find();
     if (!record) {
       throw new Error(
-        `defineFixtures: inserted fixture "${label}" not found after insert (table: ${tableName}, ${pkCol}: ${id})`,
+        `defineFixtures: inserted fixture "${label}" not found after insert (table: ${tableName}, criteria: ${JSON.stringify(criteria)})`,
       );
     }
     result[label] = record as InstanceType<T>;
