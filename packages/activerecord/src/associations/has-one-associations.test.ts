@@ -27,7 +27,6 @@ import {
   Associations,
   loadBelongsTo,
   loadHasOne,
-  processDependentAssociations,
   setHasOne,
   buildHasOne,
 } from "../associations.js";
@@ -361,7 +360,7 @@ describe("HasOneAssociationsTest", () => {
     registerModel("DelAcct", DelAcct);
     const firm = await DelFirm.create({ name: "Del Corp" });
     const account = await DelAcct.create({ firm_id: firm.id, credit_limit: 10 });
-    await processDependentAssociations(firm);
+    await firm.destroy();
     const after = await DelAcct.find(account.id as number).catch(() => null);
     expect(after).toBeNull();
   });
@@ -387,7 +386,7 @@ describe("HasOneAssociationsTest", () => {
     registerModel("DestAcct", DestAcct);
     const firm = await DestFirm.create({ name: "Dest Corp" });
     const account = await DestAcct.create({ firm_id: firm.id, credit_limit: 20 });
-    await processDependentAssociations(firm);
+    await firm.destroy();
     const after = await DestAcct.find(account.id as number).catch(() => null);
     expect(after).toBeNull();
   });
@@ -415,7 +414,7 @@ describe("HasOneAssociationsTest", () => {
     });
     const firm = await Firm.create({ name: "Dep Corp" });
     const account = await Account.create({ firm_id: firm.id, credit_limit: 10 });
-    await processDependentAssociations(firm);
+    await firm.destroy();
     await firm.delete();
     const after = await Account.find(account.id as number).catch(() => null);
     expect(after).toBeNull();
@@ -442,7 +441,7 @@ describe("HasOneAssociationsTest", () => {
     registerModel("ExclAccount", ExclAccount);
     const firm = await ExclFirm.create({ name: "Excl Corp" });
     const account = await ExclAccount.create({ firm_id: firm.id, credit_limit: 10 });
-    await processDependentAssociations(firm);
+    await firm.destroy();
     const after = await ExclAccount.find(account.id as number);
     expect(after.firm_id).toBeNull();
   });
@@ -466,7 +465,7 @@ describe("HasOneAssociationsTest", () => {
     registerModel("NilFirm", NilFirm);
     registerModel("NilAcct", NilAcct);
     const firm = await NilFirm.create({ name: "Nil Assoc Corp" });
-    await expect(processDependentAssociations(firm)).resolves.toBeUndefined();
+    await expect(firm.destroy()).resolves.toBe(firm);
   });
 
   it("restrict with error", async () => {
@@ -489,7 +488,13 @@ describe("HasOneAssociationsTest", () => {
     registerModel("RsAcct", RsAcct);
     const firm = await RsFirm.create({ name: "Restrict Corp" });
     await RsAcct.create({ firm_id: firm.id });
-    await expect(processDependentAssociations(firm)).rejects.toThrow(DeleteRestrictionError);
+    // Rails: restrict_with_error does throw(:abort) — destroy returns false,
+    // errors are populated, and neither owner nor child is deleted.
+    expect(await firm.destroy()).toBe(false);
+    expect(firm.errors.where("base")).toHaveLength(1);
+    expect(firm.errors.fullMessages[0]).toMatch(/cannot delete/i);
+    expect(await RsFirm.findBy({ id: firm.id })).not.toBeNull();
+    expect(await RsAcct.all().count()).toBe(1);
   });
 
   it.skip("restrict with error with locale", () => {
@@ -814,7 +819,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("dependence with missing association", async () => {
-    // When dependent association record doesn't exist, processDependentAssociations should not error
+    // When dependent association record doesn't exist, destroy should not error
     class MissFirm extends Base {
       static {
         this.attribute("name", "string");
@@ -834,7 +839,7 @@ describe("HasOneAssociationsTest", () => {
     registerModel("MissAcct", MissAcct);
     const firm = await MissFirm.create({ name: "Missing Corp" });
     // No associated record created — dependent destroy should be fine
-    await expect(processDependentAssociations(firm)).resolves.toBeUndefined();
+    await expect(firm.destroy()).resolves.toBe(firm);
   });
 
   it("dependence with missing association and nullify", async () => {
@@ -857,7 +862,7 @@ describe("HasOneAssociationsTest", () => {
     registerModel("MissNAcct", MissNAcct);
     const firm = await MissNFirm.create({ name: "MissNull Corp" });
     // No associated record — nullify should succeed without error
-    await expect(processDependentAssociations(firm)).resolves.toBeUndefined();
+    await expect(firm.destroy()).resolves.toBe(firm);
   });
 
   it.skip("finding with interpolated condition", () => {

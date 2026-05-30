@@ -1814,31 +1814,6 @@ export async function loadHabtm(
 }
 
 /**
- * Process dependent associations before destroying a record.
- */
-export async function processDependentAssociations(record: Base): Promise<void> {
-  const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = ctor._associations ?? [];
-
-  for (const assoc of associations) {
-    // HABTM with through: handled by the middle hasMany's dependent: "delete"
-    if (assoc.type === "hasAndBelongsToMany") {
-      continue;
-    }
-
-    if (!assoc.options.dependent) continue;
-    if (assoc.type !== "hasMany" && assoc.type !== "hasOne") continue;
-
-    // Route through the same per-association dispatch the destroy callback
-    // chain uses in production (Reflection#add_destroy_callbacks ->
-    // before_destroy { association(name).handle_dependency }). The override
-    // dispatch (deleteOrNullifyAllRecords / delete) lives there, so this
-    // path no longer reimplements dependent handling inline.
-    await (record.association(assoc.name) as any).handleDependency();
-  }
-}
-
-/**
  * Fire one or more association callbacks (before_add, after_add, etc.).
  */
 export function fireAssocCallbacks(

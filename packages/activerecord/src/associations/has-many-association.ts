@@ -26,7 +26,7 @@ export class HasManyAssociation extends CollectionAssociation {
    * Supports: restrict_with_exception, restrict_with_error, destroy,
    * nullify, delete (delete_all).
    */
-  async handleDependency(): Promise<void> {
+  async handleDependency(): Promise<void | false> {
     const dependent = this.reflection.options.dependent;
     if (!dependent) return;
 
@@ -42,6 +42,9 @@ export class HasManyAssociation extends CollectionAssociation {
       case "restrictWithError": {
         const records = await this.loadTarget();
         if (records.length > 0) {
+          // Rails: owner.errors.add(:base, ...); throw(:abort). The owner is
+          // NOT destroyed and no exception is raised — `destroy` returns false.
+          // We signal :abort to the before_destroy chain by returning false.
           const ownerAny = this.owner as any;
           if (typeof ownerAny.errors?.add === "function") {
             const name = this.reflection.name;
@@ -49,7 +52,7 @@ export class HasManyAssociation extends CollectionAssociation {
               message: `Cannot delete record because dependent ${name} exists`,
             });
           }
-          throw new DeleteRestrictionError(this.owner, this.reflection.name);
+          return false;
         }
         break;
       }
