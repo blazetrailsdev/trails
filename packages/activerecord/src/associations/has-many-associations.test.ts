@@ -18,7 +18,6 @@ import {
   loadBelongsTo,
   loadHasMany,
   loadHasManyThrough,
-  processDependentAssociations,
   isAssociationCached,
 } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
@@ -716,7 +715,7 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(comment.author_id).toBe(author.id);
     expect(comment.author_type).toBe("DnpPerson");
-    await processDependentAssociations(author);
+    await author.destroy();
     const reloaded = await DnpComment.find(comment.id as number);
     expect(reloaded.author_id).toBeNull();
     expect(reloaded.author_type).toBeNull();
@@ -857,7 +856,7 @@ describe("HasManyAssociationsTest", () => {
     });
     const author = await DepAuthor.create({ name: "Alice" });
     await DepPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await DepPost.where({ author_id: author.id }).toArray();
     expect(remaining.length).toBe(0);
   });
@@ -883,7 +882,7 @@ describe("HasManyAssociationsTest", () => {
     });
     const author = await NullifyAllAuthor.create({ name: "Alice" });
     const post = await NullifyAllPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const reloaded = await NullifyAllPost.find(post.id!);
     expect((reloaded as any).author_id).toBeNull();
   });
@@ -910,7 +909,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await LimitedDelAuthor.create({ name: "Alice" });
     await LimitedDelPost.create({ author_id: author.id, title: "A" });
     await LimitedDelPost.create({ author_id: author.id, title: "B" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "limited_del_posts", {
       className: "LimitedDelPost",
       foreignKey: "author_id",
@@ -940,7 +939,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = await Firm.create({ name: "Acme" });
     await DepAccount.create({ firm_id: firm.id, credit_limit: 100 });
     await DepAccount.create({ firm_id: firm.id, credit_limit: 200 });
-    await processDependentAssociations(firm);
+    await firm.destroy();
     const remaining = await loadHasMany(firm, "dep_accounts", {
       className: "DepAccount",
       foreignKey: "firm_id",
@@ -1475,7 +1474,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DestroyAllAuthor.create({ name: "Alice" });
     await DestroyAllPost.create({ author_id: author.id, title: "A" });
     await DestroyAllPost.create({ author_id: author.id, title: "B" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "destroy_all_posts", {
       className: "DestroyAllPost",
       foreignKey: "author_id",
@@ -1505,7 +1504,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DeleteAllUnloadedAuthor.create({ name: "Alice" });
     await DeleteAllUnloadedPost.create({ author_id: author.id, title: "A" });
     // delete all without pre-loading the collection
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "delete_all_unloaded_posts", {
       className: "DeleteAllUnloadedPost",
       foreignKey: "author_id",
@@ -1534,7 +1533,7 @@ describe("HasManyAssociationsTest", () => {
     });
     const author = await NullifyAuthor.create({ name: "Alice" });
     const post = await NullifyPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const reloaded = await NullifyPost.find(post.id!);
     expect((reloaded as any).author_id).toBeNull();
   });
@@ -1568,7 +1567,7 @@ describe("HasManyAssociationsTest", () => {
       author_id: author.id,
       title: "A",
     });
-    await processDependentAssociations(author);
+    await author.destroy();
     const reloaded = await CpkPost.find(post.id!);
     expect((reloaded as any).tenant_id).toBeNull();
     expect((reloaded as any).author_id).toBeNull();
@@ -1755,7 +1754,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await ClearAuthor.create({ name: "Alice" });
     await ClearPost.create({ author_id: author.id, title: "A" });
     await ClearPost.create({ author_id: author.id, title: "B" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const posts = await loadHasMany(author, "clear_posts", {
       className: "ClearPost",
       foreignKey: "author_id",
@@ -1784,7 +1783,7 @@ describe("HasManyAssociationsTest", () => {
     });
     const author = await ClearDepAuthor.create({ name: "Alice" });
     await ClearDepPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "clear_dep_posts", {
       className: "ClearDepPost",
       foreignKey: "author_id",
@@ -2509,7 +2508,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await ClrUpdAuthor.create({ name: "Alice", updated_at: new Date("2020-01-01") });
     await ClrUpdPost.create({ author_id: author.id, title: "A" });
     const originalUpdatedAt = (author as any).updated_at;
-    await processDependentAssociations(author);
+    await author.destroy();
     // The author's updated_at should not have been changed by clearing children
     expect((author as any).updated_at).toEqual(originalUpdatedAt);
   });
@@ -2630,7 +2629,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DelAllAuthor.create({ name: "Alice" });
     await DelAllPost.create({ author_id: author.id, title: "A" });
     await DelAllPost.create({ author_id: author.id, title: "B" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "del_all_posts", {
       className: "DelAllPost",
       foreignKey: "author_id",
@@ -2659,7 +2658,7 @@ describe("HasManyAssociationsTest", () => {
     });
     const author = await NilDepAuthor.create({ name: "Alice" });
     const post = await NilDepPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const reloaded = await NilDepPost.find(post.id!);
     expect((reloaded as any).author_id).toBeNull();
   });
@@ -4692,7 +4691,7 @@ describe("HasManyAssociationsTest", () => {
     });
     const author = await ExclDepAuthor.create({ name: "Alice" });
     await ExclDepPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "excl_dep_posts", {
       className: "ExclDepPost",
       foreignKey: "author_id",
@@ -4730,7 +4729,7 @@ describe("HasManyAssociationsTest", () => {
       scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
     });
     expect(scoped.length).toBe(1);
-    await processDependentAssociations(firm);
+    await firm.destroy();
     expect((await DcClient.where({ firm_id: firm.id }).toArray()).length).toBe(1);
   });
   it("dependent association respects optional sanitized conditions on delete", async () => {
@@ -4756,7 +4755,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = await DsFirm.create({ name: "Odegy" });
     await DsClient.create({ firm_id: firm.id, name: "BigShot Inc." });
     await DsClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
-    await processDependentAssociations(firm);
+    await firm.destroy();
     expect((await DsClient.where({ firm_id: firm.id }).toArray()).length).toBe(1);
   });
   it("dependent association respects optional hash conditions on delete", async () => {
@@ -4782,7 +4781,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = await DhFirm.create({ name: "Odegy" });
     await DhClient.create({ firm_id: firm.id, name: "BigShot Inc." });
     await DhClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
-    await processDependentAssociations(firm);
+    await firm.destroy();
     expect((await DhClient.where({ firm_id: firm.id }).toArray()).length).toBe(1);
   });
   it("delete all association with primary key deletes correct records", async () => {
@@ -4808,7 +4807,7 @@ describe("HasManyAssociationsTest", () => {
     const author2 = await DelPkAuthor.create({ name: "Bob" });
     await DelPkPost.create({ author_id: author1.id, title: "A1" });
     await DelPkPost.create({ author_id: author2.id, title: "A2" });
-    await processDependentAssociations(author1);
+    await author1.destroy();
     const remaining1 = await loadHasMany(author1, "del_pk_posts", {
       className: "DelPkPost",
       foreignKey: "author_id",
@@ -4843,7 +4842,7 @@ describe("HasManyAssociationsTest", () => {
     await ClearNoAccessPost.create({ author_id: author.id, title: "A" });
     await ClearNoAccessPost.create({ author_id: author.id, title: "B" });
     // Clear without having loaded the association first
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "clear_no_access_posts", {
       className: "ClearNoAccessPost",
       foreignKey: "author_id",
@@ -4966,7 +4965,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DestroyAllScopeAuthor.create({ name: "Alice" });
     await DestroyAllScopePost.create({ author_id: author.id, title: "A" });
     await DestroyAllScopePost.create({ author_id: author.id, title: "B" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "destroy_all_scope_posts", {
       className: "DestroyAllScopePost",
       foreignKey: "author_id",
@@ -4998,7 +4997,7 @@ describe("HasManyAssociationsTest", () => {
     await DccPost.create({ author_id: author.id, title: "A" });
     await DccPost.create({ author_id: author.id, title: "B" });
     // Destroy all dependents
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "dcc_posts", {
       className: "DccPost",
       foreignKey: "author_id",
@@ -5074,7 +5073,7 @@ describe("HasManyAssociationsTest", () => {
     });
     const author = await HashCondAuthor.create({ name: "Alice" });
     await HashCondPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await HashCondPost.where({ author_id: author.id }).toArray();
     expect(remaining.length).toBe(0);
   });
@@ -5113,14 +5112,14 @@ describe("HasManyAssociationsTest", () => {
     const p = await Parent.create({ grandparent_id: gp.id, name: "P" });
     await Child.create({ parent_id: p.id, name: "C" });
     // Destroy parent's dependents first
-    await processDependentAssociations(p);
+    await p.destroy();
     const remainingChildren = await loadHasMany(p, "children", {
       className: "Child",
       foreignKey: "parent_id",
     });
     expect(remainingChildren.length).toBe(0);
     // Now destroy grandparent's dependents
-    await processDependentAssociations(gp);
+    await gp.destroy();
     const remainingParents = await loadHasMany(gp, "parents", {
       className: "Parent",
       foreignKey: "grandparent_id",
@@ -5149,7 +5148,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DepTxAuthor.create({ name: "Alice" });
     await DepTxPost.create({ author_id: author.id, title: "A" });
     // Even if transaction semantics aren't fully implemented, destroy should work
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "dep_tx_posts", {
       className: "DepTxPost",
       foreignKey: "author_id",
@@ -6315,7 +6314,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(LazyDelPost);
     const author = await LazyDelAuthor.create({ name: "Alice" });
     await LazyDelPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "lazy_del_posts", {
       className: "LazyDelPost",
       foreignKey: "author_id",
@@ -6343,7 +6342,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(LazyNullPost);
     const author = await LazyNullAuthor.create({ name: "Alice" });
     const post = await LazyNullPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const reloaded = await LazyNullPost.find(post.id!);
     expect((reloaded as any).author_id).toBeNull();
   });
@@ -6681,7 +6680,7 @@ describe("HasManyAssociationsTest", () => {
     await NoLoadDelPost.create({ author_id: author.id, title: "A" });
     await NoLoadDelPost.create({ author_id: author.id, title: "B" });
     // Delete without loading first
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "no_load_del_posts", {
       className: "NoLoadDelPost",
       foreignKey: "author_id",
@@ -7256,7 +7255,7 @@ describe("HasManyAssociationsTest", () => {
     });
     const author = await AsyncDepAuthor.create({ name: "Alice" });
     await AsyncDepPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "async_dep_posts", {
       className: "AsyncDepPost",
       foreignKey: "author_id",
@@ -7340,7 +7339,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DelAllOptAuthor.create({ name: "Alice" });
     await DelAllOptPost.create({ author_id: author.id, title: "A" });
     await DelAllOptPost.create({ author_id: author.id, title: "B" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "del_all_opt_posts", {
       className: "DelAllOptPost",
       foreignKey: "author_id",
@@ -7552,7 +7551,7 @@ describe("HasManyAssociationsTest", () => {
   it("replace", async () => {
     const author = await Author.create({ name: "Alice" });
     await Post.create({ author_id: author.id, title: "Old" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const newPost = await Post.create({ author_id: author.id, title: "New" });
     const posts = await loadHasMany(author, "posts", {
       className: "Post",
@@ -7838,7 +7837,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await NoCbAuthor.create({ name: "Alice" });
     await NoCbPost.create({ author_id: author.id, title: "A" });
     await NoCbPost.create({ author_id: author.id, title: "B" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "no_cb_posts", {
       className: "NoCbPost",
       foreignKey: "author_id",
@@ -7924,7 +7923,7 @@ describe("HasManyAssociationsTest", () => {
     });
     const author = await DepDelAuthor.create({ name: "Alice" });
     await DepDelPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "dep_del_posts", {
       className: "DepDelPost",
       foreignKey: "author_id",
@@ -7952,7 +7951,7 @@ describe("HasManyAssociationsTest", () => {
     });
     const author = await NullAuthor.create({ name: "Alice" });
     const post = await NullPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const reloaded = await NullPost.find(post.id!);
     expect(reloaded.author_id).toBeNull();
   });

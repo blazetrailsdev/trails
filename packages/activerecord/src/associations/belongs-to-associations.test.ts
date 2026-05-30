@@ -7,7 +7,6 @@ import { SubclassNotFound, Base, registerModel, enableSti, registerSubclass } fr
 import {
   Associations,
   loadBelongsTo,
-  processDependentAssociations,
   updateCounterCaches,
   buildBelongsTo,
   touchBelongsToParents,
@@ -2640,7 +2639,7 @@ describe("BelongsToAssociationsTest", () => {
     await DhAccount.create({ company_id: company.id });
     // Destroying parent with dependent restrict should throw
     await expect(async () => {
-      await processDependentAssociations(company);
+      await company.destroy();
     }).rejects.toThrow();
   });
   it("dependency should halt parent destruction with cascaded three levels", async () => {
@@ -2677,7 +2676,7 @@ describe("BelongsToAssociationsTest", () => {
     await Dh3SubAccount.create({ account_id: account.id });
     // Cascaded destruction should halt when reaching restrict level
     await expect(async () => {
-      await processDependentAssociations(company);
+      await company.destroy();
     }).rejects.toThrow();
   });
   it("attributes are being set when initialized from belongs to association with where clause", async () => {

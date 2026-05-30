@@ -54,7 +54,6 @@ export {
   buildBelongsTo,
   loadHasMany,
   loadHasManyThrough,
-  processDependentAssociations,
   association,
   isAssociationCached,
   loadHabtm,
