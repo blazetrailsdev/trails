@@ -137,24 +137,17 @@ Forward-looking items needing follow-up work, grouped into PR-sized work units.
 
 **Ready now:**
 
-- **Phase 3 — migrate tests, delete the wrapper, collapse `.inner` walks**
-  (~cleanup). **Now unblocked** — Phases 1 (#2662) and 2 (#2672) both merged and
-  the mixin is confirmed caching in the live path. Migrate the
-  `query_cache_test.rb`-matched tests in `query-cache.test.ts` from
-  `new QueryCacheAdapter(inner)` to the mixin adapter (names verbatim); delete
-  the `QueryCacheAdapter` wrapper + private helpers (`castBinds`,
-  `getCurrentUserTransaction`, `cacheKey`); drop the `QueryCacheAdapter` export
-  from `index.ts`; collapse the three `adapter.inner` walks
-  (`resolveColumnNameMatcher` / `resolveColumnNameWithOrderMatcher` in
-  `relation.ts`, `resolveOrderMatcher` in `relation/query-methods.ts`) to direct
-  static lookups; simplify `run`/`complete` signatures from the
-  `QueryCacheAdapter | QueryCachePoolTarget` union to pool-only (~5 LOC). Use
-  live `pnpm test:compare` for the baseline (NOT the stale
-  `activerecord-test-compare-100.md` snapshot). Subsumes the closed PR #2639.
-  The descriptive `query-cache-mixin.test.ts` may be pruned once Phase 3 lands.
+- _(none — all three phases shipped; this plan is complete. Residual
+  forward-looking items live under the per-PR follow-up headings below.)_
 
 **Shipped:**
 
+- [x] Done (#2684) — **Phase 3 — migrate tests, delete the wrapper, collapse
+      `.inner` walks.** Migrated the `query_cache_test.rb`-matched tests to the
+      mixin adapter (names verbatim); deleted the `QueryCacheAdapter` wrapper +
+      private helpers; dropped the `QueryCacheAdapter` export from `index.ts`;
+      collapsed the three `adapter.inner` walks to direct static lookups;
+      simplified `run`/`complete` to pool-only. Subsumed the closed PR #2639.
 - [x] Done (#2662) — **Phase 1 — wire the mixin cache into the live query path.**
       Ported the `selectAll` override + `dirtiesQueryCache` wiring; the mixin now
       caches in the live path. test:compare `query_cache_test.rb` 54 OK / 13 skipped;

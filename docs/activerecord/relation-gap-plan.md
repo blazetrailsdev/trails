@@ -101,14 +101,14 @@ enum*`, raw-SQL/table-alias hash select, etc.) are itemized under
 
 Forward-looking items needing follow-up work, grouped into PR-sized work units.
 
-### follow-up: EnumType in the global type caster (~30–50 LOC)
+### follow-up: EnumType in the global type caster — serialize path shipped; cast path is the remaining >300-LOC refactor
 
-Files: `type-caster/map.ts` (`typeCastForDatabase`), `relation.ts`
-(`inOrderOf` enum branch). Source: #2671.
+Files: `type-caster/map.ts` (`typeCastForDatabase`), `enum.ts`. Source: #2671
+(inOrderOf type-cast), #2687 (EnumType serialize wiring).
 
-**Partially shipped.** `TypeCasterMap.typeCastForDatabase` now resolves enum
-attributes through their `EnumType` so the database-cast path serializes keys →
-integers, and the local `getEnumDefinitions` branch in `inOrderOf` is deleted —
+**Serialize path shipped (#2687).** `TypeCasterMap.typeCastForDatabase` now
+resolves enum attributes through their `EnumType` so the database-cast path
+serializes keys → integers, and the local `inOrderOf` enum branch is deleted —
 the method is now a 1:1 Rails mirror (`type_caster.type_cast_for_database`).
 
 **Why not full `type_for_attribute` decoration (the remaining gap):** Rails
@@ -136,13 +136,16 @@ Detail/rationale in the per-PR sections below.
 
 **Ready now:**
 
-- **RF1 — FK-derivation consolidation** (~40–60 LOC, refactor). Fold the four
-  near-identical `derive_foreign_key` reimplementations in `relation.ts`
-  (`_resolveAssociationTarget` ~584, `_resolveHasManySubquery` ~620,
-  `_resolveHasManyJoin` ~655, `_resolveAssociationJoin` ~1455) into one helper
-  mirroring `Reflection#derive_foreign_key`, plus a direct-assertion test sweep
-  of the `.joins` string resolver's through/HABTM/STI branches. Files:
-  `relation.ts`, `relation/where.test.ts`. Source: #2590.
+- _(none — RF1 shipped in #2686; see the FK-derivation follow-up below for the
+  residual `inverse_of` / CPK `query_constraints` / through-SOURCE FK items.)_
+
+**Shipped:**
+
+- [x] Done (#2686) — **RF1 — FK-derivation consolidation.** Folded the four
+      near-identical `derive_foreign_key` reimplementations in `relation.ts` into
+      one `_deriveForeignKey` helper mirroring `Reflection#derive_foreign_key`
+      branch-for-branch, plus a direct-assertion test sweep. api:compare delta 0
+      (non-matching extra). See the FK-derivation follow-up below.
 - [x] Done (#2671) — **RF3 — `inOrderOf` type-cast.** Added
       `type_cast_for_database` value casting in `inOrderOf` via `TypeCasterMap`,
       plus an enum fallback. Files: `relation.ts`,
@@ -168,6 +171,37 @@ tables` (per-join table aliasing); `reselect with default scope select`;
   can't in a string-returning method; 4 `#inspect` + 3 `#pretty_print` tests
   stay on weakened assertions until an async-inspect API is designed. Source:
   #2617.
+
+**From #2686 (RF1 FK-derivation consolidation):**
+
+- ~20–40 LOC: port the `inverse_of` branch of `Reflection#derive_foreign_key`
+  (reflection.rb:832-833 — `inverse_of.foreign_key(infer_from_inverse_of: false)`).
+  Omitted in `_deriveForeignKey` (same gap the four prior reimplementations had,
+  so no behavior change), but a real fidelity gap. Needs reflection-layer
+  `inverse_of` resolution + a `foreign_key` method; non-trivial.
+- Future CPK work: port `query_constraints` / composite-PK FK derivation
+  (reflection.rb:554-575). The helper + callsites only handle scalar + simple
+  composite-array `foreignKey`; composite paths still throw/return null in
+  several resolvers (e.g. `_resolveAssociationTarget` throws on Array foreignKey).
+- ~10 LOC: fold the two `:through` SOURCE-association FK derivations in
+  `_resolveThroughJoin` (relation.ts ~1660, ~1671) into `_deriveForeignKey`. Left
+  inline because `sourceAssocDef` may be undefined there; needs a null-guard in
+  the helper first. (`_resolveHabtmJoin` target FK intentionally stays on
+  `habtmTargetFk` — target-side derivation, not `derive_foreign_key` semantics.)
+
+**From #2687 (EnumType serialize wiring):**
+
+- ~300+ LOC (separate work unit): full enum-as-attribute-type refactor —
+  decorate the attribute with `EnumType` (via `decorate_attributes`, so
+  `type_for_attribute` returns the `EnumType` and in-memory storage holds the
+  _label_) AND rework `readEnumValue` / generated predicates / `whereValuesHash`
+  consumption to work with label-based storage. This is the only clean way to
+  close the `where({ enumCol: "label" })` gap (the predicate builder currently
+  casts via the raw integer subtype, not `EnumType`). The dual-purpose `Map`
+  (shared by `inOrderOf` + the predicate builder, routed there for
+  `EncryptedAttributeType` serialization) is the root constraint; decorating the
+  attribute breaks ~61 enum tests. Enum _scopes_ and `where({ enumCol: 0 })`
+  already work. Root files: `type-caster/map.ts`, `enum.ts`.
 
 **From #2551 (R3 Arel order identity / reverseOrder):**
 
@@ -213,13 +247,12 @@ collection polymorphic relation`.
 
 **From #2569 (R5 inOrderOf extensions):**
 
-- Minor: `resolveColumnNameMatcher` vs `resolveColumnNameWithOrderMatcher` in
-  `relation.ts` are near-duplicates — candidate for a shared helper. **Subsumed
-  by `query-cache-mixin-plan.md` Phase 3**: once the `QueryCacheAdapter` wrapper
-  is removed there is no `adapter.inner` chain to walk, so both resolvers (plus
-  `resolveOrderMatcher` in `relation/query-methods.ts`) collapse to one-line
-  direct static lookups — no shared helper needed. (A standalone dedup, PR #2639,
-  was opened and closed for this reason.) Track in that plan, not here.
+- [x] Done (#2684) — `resolveColumnNameMatcher` / `resolveColumnNameWithOrderMatcher`
+      near-duplicate dedup. Subsumed by `query-cache-mixin-plan.md` Phase 3:
+      removing the `QueryCacheAdapter` wrapper eliminated the `adapter.inner`
+      chain, so both resolvers (plus `resolveOrderMatcher` in
+      `relation/query-methods.ts`) collapsed to direct static lookups — no shared
+      helper needed. (The standalone dedup, PR #2639, was closed as redundant.)
 - [x] ~10-20 LOC: `type_cast_for_database` value casting in `inOrderOf` shipped
       in #2671. Follow-up surfaced in the EnumType global type-caster section at
       the top of the Post-merge follow-ups.
