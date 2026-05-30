@@ -58,14 +58,12 @@ export interface FixtureRegistryEntry {
  * Additional gaps — model imports, but the fixture set does NOT seed against the
  * canonical `TEST_SCHEMA` today (verified by the seed-conformance test). Grouped by
  * the underlying loader gap; each is re-addable once that gap closes:
- * - id-less or custom-PK table while the model defaults to `id`: `bulbs` (PK `ID`),
- *   `edges`, `mateys`, `mixed-case-monkeys` (PK `monkeyID`), `cpk-order-tags`
- * - composite-PK column NOT NULL (`cpk_books.author_id`): `cpk-books`
+ * - composite-PK column NOT NULL (`cpk_books.author_id`): `cpk-books`; composite-PK
+ *   table (`cpk_order_tags` PK `[order_id, tag_id]`): `cpk-order-tags`
  * - STI `type` row whose subclass isn't loaded by a standalone `useFixtures([set])`:
  *   `parrots` (LiveParrot), `vegetables` (Cucumber)
  * - fixture references a non-column (HABTM assoc name): `developers` (`shared_computers`)
- * - table absent from the canonical SQLite `TEST_SCHEMA`: `uuid-children`, `uuid-parents`,
- *   `vertices`
+ * - table absent from the canonical SQLite `TEST_SCHEMA`: `uuid-children`, `uuid-parents`
  * - seeds on SQLite (dynamic typing) but NOT on the strict PG/MariaDB CI engines —
  *   real cross-engine data/cast bugs that would fail `useFixtures([set])` for those users:
  *   - `books` — `boolean_status` is boolean in PG; fixture row supplies an integer
@@ -81,6 +79,10 @@ export interface FixtureRegistryEntry {
  * "refs only loadable tables" conformance test):
  * - `subscriptions` → `books` (books declare ids 1-4; `book_id` would be CRC32)
  * - `cpk-order-agreements` → `cpk-orders`, `cpk-reviews` → `cpk-books` (composite-PK targets)
+ * - `edges` → `vertices`: `edges` is id-less and seeds fine, but it `ref()`s `vertices`,
+ *   which isn't registerable yet — `Vertex` has no `tableName` override so it mis-inflects
+ *   to `vertexes` (the table is `vertices`). Re-add `edges` once `Vertex.tableName` is fixed
+ *   and `vertices` is registered.
  */
 export const fixtureRegistry = {
   accounts: {
@@ -106,6 +108,10 @@ export const fixtureRegistry = {
   binaries: {
     model: () => import("./models/binary.js").then((m) => m.Binary),
     data: FixtureData.binaryFixtureData,
+  },
+  bulbs: {
+    model: () => import("./models/bulb.js").then((m) => m.Bulb),
+    data: FixtureData.bulbFixtureData,
   },
   cakeDesigners: {
     model: () => import("./models/cake-designer.js").then((m) => m.CakeDesigner),
@@ -243,6 +249,10 @@ export const fixtureRegistry = {
     model: () => import("./models/parrot.js").then((m) => m.LiveParrot),
     data: FixtureData.liveParrotFixtureData,
   },
+  mateys: {
+    model: () => import("./models/matey.js").then((m) => m.Matey),
+    data: FixtureData.mateyFixtureData,
+  },
   memberDetails: {
     model: () => import("./models/member-detail.js").then((m) => m.MemberDetail),
     data: FixtureData.memberDetailFixtureData,
@@ -262,6 +272,10 @@ export const fixtureRegistry = {
   minivans: {
     model: () => import("./models/minivan.js").then((m) => m.Minivan),
     data: FixtureData.minivanFixtureData,
+  },
+  mixedCaseMonkeys: {
+    model: () => import("./models/mixed-case-monkey.js").then((m) => m.MixedCaseMonkey),
+    data: FixtureData.mixedCaseMonkeyFixtureData,
   },
   movies: {
     model: () => import("./models/movie.js").then((m) => m.Movie),

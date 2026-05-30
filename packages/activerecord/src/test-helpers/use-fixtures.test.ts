@@ -300,6 +300,51 @@ describe("useFixtures with a string primary key", () => {
   });
 });
 
+// --- custom / absent PK column names (model defaults to `id`, schema differs) ---
+
+describe("useFixtures reconciles the PK column against the schema", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
+  // Bulb declares no `primary_key`, so the model defaults to `id`, but the
+  // `bulbs` table's PK column is `ID` (schema.rb: `primary_key: "ID"`). The
+  // seeder must seed `ID`, not a phantom `id`. Bulb also has a default_scope
+  // (`where(name: "defaulty")`) that would hide the `special` row on reload —
+  // the unscoped reload covers that.
+  const { bulbs } = useFixtures(["bulbs"], () => Base.adapter);
+  // mixed_case_monkeys: `t.primary_key :monkeyID` under a non-`id` camelCased name.
+  const { mixedCaseMonkeys } = useFixtures(["mixedCaseMonkeys"], () => Base.adapter);
+  // mateys is id-less (`id: false`, no PK) — no PK column may be seeded at all.
+  const { mateys } = useFixtures(["mateys"], () => Base.adapter);
+
+  it("populates the `ID` column for a custom-PK table", async () => {
+    const special = bulbs("special");
+    expect(special.readAttribute("ID")).not.toBeNull();
+    expect(special.readAttribute("ID")).not.toBeUndefined();
+    const [row] = await Base.adapter.execute(
+      `SELECT name FROM ${Base.adapter.quoteTableName("bulbs")} WHERE ${Base.adapter.quoteColumnName("ID")} = ${special.readAttribute("ID")}`,
+    );
+    expect((row as { name: string }).name).toBe("special");
+  });
+
+  it("round-trips the `monkeyID` primary-key column", () => {
+    expect(mixedCaseMonkeys("first").readAttribute("monkeyID")).toBe(1);
+    expect(mixedCaseMonkeys("second").readAttribute("monkeyID")).toBe(2);
+  });
+
+  it("seeds an id-less table without a PK column", async () => {
+    const m = mateys("blackbeard_to_redbeard");
+    expect(m.readAttribute("weight")).toBe(10);
+    const rows = await Base.adapter.execute(
+      `SELECT weight FROM ${Base.adapter.quoteTableName("mateys")}`,
+    );
+    expect(rows.length).toBe(1);
+  });
+});
+
 // --- fixture registry conformance ---
 
 describe("fixtureRegistry conformance", () => {
