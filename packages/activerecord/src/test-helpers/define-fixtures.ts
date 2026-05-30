@@ -264,11 +264,14 @@ function reflectionClassFor(
  * tolerates but the strict PG/MariaDB engines reject.
  */
 function resolveEnums(reflectionClass: BaseClass, row: FixtureAttrs): void {
-  // Read the mapping as number|string: `_enum` accepts string-backed values
-  // (Rails supports `enum status: { active: "active" }`), so the stored value a
-  // key maps to may be either — both are valid to write back to the row.
-  const enums = (reflectionClass as { _enums?: Map<string, Record<string, number | string>> })
-    ._enums;
+  // `assertValidEnumDefinitionValues` permits string/number/boolean/null backing
+  // values (Rails supports e.g. `enum verified: { yes: true, no: false }`), so the
+  // stored value a key maps to may be any of those — all valid to write back.
+  const enums = (
+    reflectionClass as {
+      _enums?: Map<string, Record<string, number | string | boolean | null>>;
+    }
+  )._enums;
   if (!enums || enums.size === 0) return;
   for (const [name, mapping] of enums) {
     if (!(name in row)) continue;

@@ -73,9 +73,10 @@ export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTable
  * (no composite-PK seeding gaps remain — `compositeIdentify` generates absent key
  * columns, so `cpk-books` seeds even when a row omits its key components.)
  * (STI bases with a `type`/custom-inheritance row — `parrots`, `vegetables` — now
- * register: their subclasses live in the same model module as the base, and the
- * base's `model` thunk `registerModel`s them so `findStiClass` resolves each row's
- * inheritance-column value and the reload returns the correct subclass instance.)
+ * register their subclasses: the subclasses live in the same model module as the
+ * base, and the base's `model` thunk `registerModel`s them so `findStiClass`
+ * resolves each row's inheritance-column value and the reload returns the correct
+ * subclass instance.)
  * - fixture references a non-column (HABTM assoc name): `developers` (`shared_computers`)
  * - table absent from the canonical SQLite `TEST_SCHEMA`: `uuid-children`, `uuid-parents`
  * - seeds on SQLite (dynamic typing) but NOT on the strict PG/MariaDB CI engines —
