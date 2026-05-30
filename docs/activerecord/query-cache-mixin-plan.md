@@ -137,35 +137,61 @@ Forward-looking items needing follow-up work, grouped into PR-sized work units.
 
 **Ready now:**
 
-- **Phase 1 — wire the mixin cache into the live query path** (~feature; see
-  §"Phase 1" above). The real missing piece. **Must land first** — Phases 2/3
-  depend on the mixin actually caching. Correction from #2651 to fold in:
-  the framing "`lookupSqlCache`/`cacheSql` have no callers" is imprecise — the
-  unwired `selectAll(original)` **factory** in
-  `connection-adapters/abstract/query-cache.ts` returns a `cachedSelectAll`
-  closure that already calls those helpers; it's the factory that's never
-  installed onto `AbstractAdapter`. Files: `abstract/query-cache.ts`,
-  `abstract-adapter.ts`.
-
-**Gated (sequence after Phase 1):**
-
-- **Phase 2 — pool-based `ActiveRecord::QueryCache`** (~refactor,
-  parity-preserving). Relocate `cache`/`uncached` off the wrapper, make
-  `run`/`complete` pool-based. Keeps `query_cache.rb` api:compare at 5/5.
-  Subsumes connection-pool-gap-plan PF2 (the guard move shipped partially in
-  #2654, but the pool-based `run()` remains). File: `query-cache.ts`.
 - **Phase 3 — migrate tests, delete the wrapper, collapse `.inner` walks**
-  (~cleanup). Names verbatim; use live `pnpm test:compare` for the baseline
-  (NOT the stale `activerecord-test-compare-100.md` snapshot). Subsumes the
-  closed PR #2639.
+  (~cleanup). **Now unblocked** — Phases 1 (#2662) and 2 (#2672) both merged and
+  the mixin is confirmed caching in the live path. Migrate the
+  `query_cache_test.rb`-matched tests in `query-cache.test.ts` from
+  `new QueryCacheAdapter(inner)` to the mixin adapter (names verbatim); delete
+  the `QueryCacheAdapter` wrapper + private helpers (`castBinds`,
+  `getCurrentUserTransaction`, `cacheKey`); drop the `QueryCacheAdapter` export
+  from `index.ts`; collapse the three `adapter.inner` walks
+  (`resolveColumnNameMatcher` / `resolveColumnNameWithOrderMatcher` in
+  `relation.ts`, `resolveOrderMatcher` in `relation/query-methods.ts`) to direct
+  static lookups; simplify `run`/`complete` signatures from the
+  `QueryCacheAdapter | QueryCachePoolTarget` union to pool-only (~5 LOC). Use
+  live `pnpm test:compare` for the baseline (NOT the stale
+  `activerecord-test-compare-100.md` snapshot). Subsumes the closed PR #2639.
+  The descriptive `query-cache-mixin.test.ts` may be pruned once Phase 3 lands.
 
-**From #2654 (PF2 query-cache guard move — partial):**
+**Shipped:**
 
-- The named guard move (`enableQueryCacheBang` → `QueryCache.run`) shipped, but
-  the residual PF2 items live in `connection-pool-gap-plan.md` "From #2654":
-  block-form `enableQueryCache` guard removal (~10–20 LOC), zero-arg `run()`
-  overload (~5 LOC), `complete()` pool symmetry (~10 LOC). The pool-based
-  `QueryCache.run` modeling is Phase 2 here.
+- [x] Done (#2662) — **Phase 1 — wire the mixin cache into the live query path.**
+      Ported the `selectAll` override + `dirtiesQueryCache` wiring; the mixin now
+      caches in the live path. test:compare `query_cache_test.rb` 54 OK / 13 skipped;
+      api:compare `query_cache.rb` 5/5, `abstract/query_cache.rb` 30/30.
+- [x] Done (#2672) — **Phase 2 — pool-based `ActiveRecord::QueryCache`.**
+      Relocated `cache`/`uncached` off the wrapper onto pool-based static methods on
+      the `QueryCache` class; `run`/`complete` are pool-based. api:compare held 5/5.
+      Subsumed connection-pool-gap-plan PF2's pool-based `run()` modeling.
+
+**From #2662 (Phase 1 — selectAll override):**
+
+- ~40–60 LOC (own PR): all-pools cache clear via a thread→pools registry. Rails'
+  `dirties_query_cache` clears ALL pools' caches on a write
+  (`Base.clear_query_caches_for_current_thread`, `query_cache.rb:24-25`, for
+  replica-staleness safety); trails' `dirtiesQueryCache` clears only the local
+  connection's `_queryCache`. No test gates on it yet.
+- Async / `FutureResult.wrap` branch not ported (intentional by phase design):
+  Rails wraps the cache hit/miss in `FutureResult.wrap` on the async path
+  (`query_cache.rb:244-246`); `makeCachedSelectAll`'s `opts` carries `allowRetry`
+  but not `async`. When async queries / FutureResult land, the cache hit path
+  needs a `FutureResult.wrap` equivalent.
+
+**From #2672 (Phase 2 — pool-based cache/uncached):**
+
+- Intentional (documented): Rails' `QueryCache::ClassMethods#cache`/`#uncached`
+  wrap their body in `if connected? || !configurations.empty? ... else yield`;
+  the trails statics omit that guard because the caller passes the pool directly
+  (static-on-class shape). Not a gap; noted for the Phase 3 reviewer.
+
+**From #2654 (PF2 query-cache guard move):**
+
+- The named guard move (`enableQueryCacheBang` → `QueryCache.run`) and the
+  block-form `enableQueryCache` early-return removal both shipped (the latter in
+  #2682; #2682 corrected the framing — Rails DOES have a block-form
+  `enable_query_cache`, so the method itself stays). The residual PF2 items live
+  in `connection-pool-gap-plan.md` "From #2654": zero-arg `run()` overload
+  (~5 LOC), `complete()` pool symmetry (~10 LOC).
 
 **From #2651 (this plan):**
 

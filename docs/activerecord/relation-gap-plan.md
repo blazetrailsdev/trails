@@ -101,6 +101,21 @@ enum*`, raw-SQL/table-alias hash select, etc.) are itemized under
 
 Forward-looking items needing follow-up work, grouped into PR-sized work units.
 
+### follow-up: EnumType in the global type caster (~30–50 LOC)
+
+Files: `base.ts` (`typeForAttribute`), `relation.ts` (`inOrderOf` enum branch).
+Source: #2671.
+
+Wire `EnumType` into the model's global type caster (`Base.typeForAttribute` /
+`TypeCasterMap.typeForAttribute`) so enum attributes resolve through the
+standard type-casting path. Enums are NOT registered in `_attributeDefinitions`,
+which is why `inOrderOf` needs a local `getEnumDefinitions` lookup; once enums
+flow through `type_for_attribute` (Rails decorates the attribute with
+`EnumType`), the enum branch in `inOrderOf` can be deleted, making the method a
+1:1 mirror of Rails (`model.type_caster.type_cast_for_database`). Same gap
+affects `where({ enumCol: "key" })` value serialization. Blast radius: global
+enum type casting.
+
 ### Actionable PR queue
 
 Open `[ ]` items bundled into ≤300-LOC work units, ordered by readiness.
@@ -115,10 +130,11 @@ Detail/rationale in the per-PR sections below.
   mirroring `Reflection#derive_foreign_key`, plus a direct-assertion test sweep
   of the `.joins` string resolver's through/HABTM/STI branches. Files:
   `relation.ts`, `relation/where.test.ts`. Source: #2590.
-- **RF3 — `inOrderOf` type-cast** (~10–20 LOC). Add `type_cast_for_database`
-  value casting in `inOrderOf`. Files: `relation.ts` /
-  `relation/query-methods.ts`. Source: #2569. (Surfaces only once a
-  typed-column caller exists — low urgency.)
+- [x] Done (#2671) — **RF3 — `inOrderOf` type-cast.** Added
+      `type_cast_for_database` value casting in `inOrderOf` via `TypeCasterMap`,
+      plus an enum fallback. Files: `relation.ts`,
+      `relation/field-ordered-values.test.ts`. See the EnumType global
+      type-caster follow-up at the top of this section.
 
 **Blocked / needs a design decision (not a clean PR yet):**
 
@@ -191,8 +207,9 @@ collection polymorphic relation`.
   `resolveOrderMatcher` in `relation/query-methods.ts`) collapse to one-line
   direct static lookups — no shared helper needed. (A standalone dedup, PR #2639,
   was opened and closed for this reason.) Track in that plan, not here.
-- [ ] ~10-20 LOC: add `type_cast_for_database` value casting in `inOrderOf`
-      once a typed-column caller surfaces the gap.
+- [x] ~10-20 LOC: `type_cast_for_database` value casting in `inOrderOf` shipped
+      in #2671. Follow-up surfaced in the EnumType global type-caster section at
+      the top of the Post-merge follow-ups.
 - belongsTo accessor returns `null` in minimal inline-model + handler-suite
   test setups: `await book.author === null` despite valid `author_id`. Join
   SQL + ordering correct; only accessor broken. Worth own investigation (may

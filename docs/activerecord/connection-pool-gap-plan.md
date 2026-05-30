@@ -73,30 +73,21 @@ Detail/rationale in the per-PR sections below.
 
 **Ready now:**
 
-- **PF5 — connection-handler skip re-audit** (triage, then sized). Re-check the
-  11 still-skipped `connection-handler.test.ts` tests now that nested
-  `connectedTo` switching is in place — some may already unblock; the rest split
-  by blocker (process-fork = permanent, schema-cache = not-yet-impl). Files:
-  `connection-handler.test.ts`. Source: #2530, #2547.
+- **PF5 follow-ups (#2668 re-audit complete)** — the re-audit of the 11 skipped
+  `connection-handler.test.ts` tests shipped in #2668 (2 implemented, 5
+  permanent-skip fork/Marshal, 4 remain blocked with accurate annotations). Two
+  sized follow-ups surfaced:
+  - ~80 LOC: `connectsTo` shared-pool, a `setupSharedConnectionPool` test
+    helper, and writing-role validation / role-aliasing / mutable `writingRole`.
+    Unblocks "not setting writing role while using another named role raises"
+    (`connection_handler_test.rb:81`), "fixtures dont raise if theres no writing
+    pool config" (:92), "setting writing role while using another named role does
+    not raise" (:108).
+  - ~50 LOC: Base default-pool `leaseConnection` integration (anonymous subclass
+    → Base pool fallback after `removeConnection`). Unblocks "a class using
+    custom pool and switching back to primary" (:282).
 
 **Round-4 follow-ups (named, PR-sized):**
-
-### follow-up: PG reconnect! loop inheritance + raw-connection initialize (~60–100 LOC)
-
-Files: `connection-adapters/postgresql-adapter.ts`,
-`connection-adapters/abstract-adapter.ts`. Source: #2646. The base
-`reconnectBang` retry loop (connection_retries / retry_deadline / backoff) +
-raw-connection ownership shipped in #2646; MySQL2 inherits it via a raw
-`reconnect()` override. **PostgreSQL still keeps its own `reconnectBang`
-override** (zero behavior change) and does NOT yet get the retry loop, blocked
-on two things: (a) `PostgreSQLAdapter#configureConnection(client)` takes an
-explicit client while the base lifecycle calls `configureConnection()` argless —
-needs a configure-with-no-client-tolerant (lazy-configure-on-next-acquire) path;
-(b) `PostgreSQLAdapter#reconnect()` calls `this.resetTransaction()` itself (a
-trails-ism — Rails' private PG `reconnect` does NOT reset the tx), which would
-clobber the base lifecycle's restore-aware `resetTransaction`. Move the tx reset
-out of `reconnect()` and audit its direct callers
-(`_doAcquire`/exec error paths/`verifyBang`) first.
 
 ### follow-up: deprecated raw-connection initialize overload (~larger)
 
@@ -117,9 +108,14 @@ non-`:memory:` adapter with raw-connection reopen — Rails gates the suite
   `allowRetry` once `execute → withRawConnection` threads it. Source: #2601.
 - **`cachedFindBy` StatementCache reconcile** (~30–50 LOC; gated on porting
   `cachedFindBy` off its current `findBy` bypass). Source: #2601.
-- **Env-resolution unify** (~20–40 LOC, low priority) — `fromEnv()` `currentEnv`
-  vs `forCurrentEnv` `defaultEnv` can disagree when `TRAILS_ENV != defaultEnv`.
-  Source: #2603.
+- **Env-resolution unify** (partial — #2675 shipped the dedup). #2675 extracted
+  the shared `DatabaseConfigurations.currentEnv()`
+  (`TRAILS_ENV ?? NODE_ENV ?? defaultEnv`); the `fromEnv` `currentEnv` vs
+  `forCurrentEnv` `defaultEnv` divergence is NOT reconciled and the original
+  plan direction (collapse `fromEnv` onto `defaultEnv`) is WRONG — it breaks the
+  runtime `DATABASE_URL` path under `NODE_ENV=test` (see "From #2675" below).
+  Remaining safe win: ~10–20 LOC mechanical, adopt `currentEnv()` in `schema.ts`
+  (~116) and `migration.ts` (~1613, ~2459). Source: #2603, #2675.
 - **Per-class callback registry** (~15 LOC; only if a concrete adapter ever
   registers its own checkout/checkin callback). Source: #2610.
 - **P13 StandaloneConnection** (~40 LOC + 4 tests; blocked on a Rails source
@@ -134,9 +130,42 @@ non-`:memory:` adapter with raw-connection reopen — Rails gates the suite
   SQLite3Adapter defines a private `reconnect` that close+reopens the driver) —
   base `reconnectBang` only runs the lifecycle, so sqlite "reconnect" is
   incomplete. Follow-up only if sqlite reconnect fidelity is needed. (The
-  materialized/unmaterialized integration tests stay skipped — see the _PG
-  reconnect! loop inheritance_ / _raw-connection initialize overload_ follow-ups
-  above.) Source: #2539, #2646.
+  materialized/unmaterialized integration tests stay skipped — see the
+  _deprecated raw-connection initialize overload_ follow-up above and "From
+  #2667" below; the PG `reconnectBang` retry-loop inheritance shipped in #2667.)
+  Source: #2539, #2646.
+
+**From #2667 (PG inherits base reconnectBang retry loop):**
+
+- The PG `reconnectBang` retry-loop inheritance shipped: PG now routes
+  reconnect-on-failure through `reconnectBang({ restoreTransactions: true })`
+  (matching Rails' `verify!` → `reconnect!(restore_transactions: true)`) via a
+  raw `reconnect()` override with no `resetTransaction` in the primitive.
+- Loose end (no test): exec / `withClient` connection-error paths
+  (`postgresql-adapter.ts` ~1018, 1420, 1452, 1493, 1519, 1594) fire
+  `this.reconnect()` and no longer get a tx reset (it moved into the inherited
+  lifecycle). Matches Rails' `with_raw_connection` + the MySQL2 precedent, but
+  no dedicated unit test asserts transaction-manager state after a
+  connection-error reconnect. Worth a targeted test if a regression surfaces.
+
+**From #2675 (extract `currentEnv()` to unify env resolution):**
+
+- ~10–20 LOC, mechanical: `schema.ts` (~116) and `migration.ts` (~1613, ~2459)
+  still inline the same
+  `getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv`
+  expression. Adopt `DatabaseConfigurations.currentEnv()` there (kept out of
+  #2675 to avoid extra-file overlap).
+- Architectural warning for env-unification: collapsing `fromEnv` onto
+  `defaultEnv` to match `forCurrentEnv` is WRONG — it breaks the runtime
+  `DATABASE_URL` path (`establish-connection.test.ts`) because `autoConnect`
+  selects the primary config by process env while `forCurrentEnv` uses
+  `defaultEnv`, and under `NODE_ENV=test` these legitimately differ. A real
+  unification is a larger, higher-risk refactor of how `defaultEnv` relates to
+  the process env; the plan's "~20–40 LOC" estimate is unrealistic.
+- Pre-existing (preserved): `currentEnv()` order puts the configured
+  `defaultEnv` LAST (Rails' `Rails.env` wins first) and `??` does not treat
+  empty-string env vars as absent (Rails uses `.presence`). Candidate for a
+  future fidelity pass if it ever bites.
 
 **From #2653 (PF3 ConnectionManagement middleware):**
 
@@ -155,13 +184,17 @@ non-`:memory:` adapter with raw-connection reopen — Rails gates the suite
 
 **From #2654 (PF2 query-cache guard move):**
 
-- [x] Removed the block-form `enableQueryCache` `_queryCacheMaxSize === null`
-      early-return for full `enable_query_cache` fidelity (`query_cache.rb:149`,
-      which enables unconditionally). The maxSize-0-vs-nil modeling difference is
-      resolved by the Store itself: config-false pools build a Store with maxSize
-      0, so `computeIfAbsent` short-circuits without storing — caching stays a
-      no-op while `queryCacheEnabled` now reports correctly inside the block,
-      making the early-return redundant.
+- [x] Done (#2682) — Removed the block-form `enableQueryCache`
+      `_queryCacheMaxSize === null` early-return (two trails-specific guards
+      introduced in PF2 #2654) for full `enable_query_cache` fidelity
+      (`query_cache.rb:149`, which enables unconditionally). #2682 corrected the
+      originating framing: Rails DOES have a block-form `enable_query_cache`
+      (`:149`) and a connection-level `cache(&block)` (`:206-208`), so the method
+      itself stays — only the guards were removed. The maxSize-0-vs-nil modeling
+      difference is resolved by the `Store` maxSize-0 short-circuit in
+      `computeIfAbsent` — config-false pools build a Store with maxSize 0, so it
+      short-circuits without storing. All four `ConnectionPoolConfiguration` cache
+      methods now mirror Rails line-for-line.
 - [ ] ~5 LOC (when global handler iteration is wired): add a zero-arg `run()`
       overload iterating `connection_handler.each_connection_pool` to fully
       mirror Rails' arg-less `QueryCache.run`.
@@ -216,7 +249,7 @@ non-`:memory:` adapter with raw-connection reopen — Rails gates the suite
 
 **From #2554 (P5 protocolAdapterMapping):**
 
-- [ ] ~20-40 LOC (pre-existing, low priority): `fromEnv()` passes `currentEnv = TRAILS_ENV ?? NODE_ENV ?? defaultEnv` into `_buildConfigs`, but `DatabaseConfig#forCurrentEnv` resolves via `DatabaseConfigurations.defaultEnv`. If `TRAILS_ENV` differs from `defaultEnv`, the build-time guard and `forCurrentEnv` can disagree. No test exercises the mismatch; unify env resolution only if it bites.
+- [ ] ~20-40 LOC (pre-existing, low priority): `fromEnv()` passes `currentEnv = TRAILS_ENV ?? NODE_ENV ?? defaultEnv` into `_buildConfigs`, but `DatabaseConfig#forCurrentEnv` resolves via `DatabaseConfigurations.defaultEnv`. If `TRAILS_ENV` differs from `defaultEnv`, the build-time guard and `forCurrentEnv` can disagree. No test exercises the mismatch; unify env resolution only if it bites. **Update:** #2675 extracted the shared `currentEnv()` resolver but did NOT reconcile this `fromEnv`/`forCurrentEnv` mismatch — and found the obvious collapse breaks the `DATABASE_URL` path (see "From #2675").
 - Deviation: the bare-name carve-out is narrower than Rails' `URI::RFC2396_Parser` (which treats ANY scheme-less path as the DB name). Revisit only if a real config surfaces a bare DB name containing a dot.
 
 **From #2561 (P7 pool checkout/checkin):**

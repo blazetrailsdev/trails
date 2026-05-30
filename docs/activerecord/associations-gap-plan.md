@@ -74,12 +74,6 @@ The per-PR sections that follow are the detail / rationale for each item.
 
 **Ready now (no unmerged dependency):**
 
-- **AF5 — eager_load raise semantics** (~150 LOC, new track entry).
-  Distinguish raise-worthy specs (polymorphic / misspelled →
-  `EagerLoadPolymorphicError` / `ConfigurationError`) from capability-gap
-  fallbacks (CPK / unjoinable-through) in `addAssociation`/`_walkSpec`. Files:
-  `associations/join-dependency.ts`, `relation.ts`. Unblocks
-  `eager_test.rb:1639` mirror + polymorphic-references stubs. Source: #2571.
 - **AF11 — strict-loading test unblocks** (~90 LOC + 6 tests; AF7 dep now
   satisfied by #2645). Record-level `reload` interaction (2 tests),
   CollectionProxy unloaded-reader lazy proxy (1), validation-context association
@@ -94,106 +88,26 @@ ce_memberships.favorite`). Rails copies `reflection_scope.where_clause` onto the
   Source: #2586.
 
 _Shipped since round 3: AF1 (#2632 + #2642), AF2 (#2633), AF3 (#2634),
-AF4 (#2649), AF6 (#2652), AF7 (#2645), AF8 (#2648), AF9 (#2647), AF10 (#2650)._
+AF4 (#2649), AF5 (#2658), AF6 (#2652), AF7 (#2645), AF8 (#2648), AF9 (#2647),
+AF10 (#2650)._
 
 **Round-4 follow-ups (named, PR-sized):**
 
-### follow-up: collection-size / add-to-target identity reconciliation (~70 LOC)
+### follow-up: collection-size / count_records port (~30–50 LOC)
 
 Files: `associations/collection-proxy.ts`, `associations/collection-association.ts`.
-Source: #2633, #2643.
+Source: #2633, #2643, #2660, #2677.
 
-- ~10 LOC + tests: reconcile the two `foreign_key_present?` impls — the new
-  proxy `_foreignKeyPresent()` is Rails-faithful (`false` for vanilla has_many),
-  but `collection-association.ts:401` `foreignKeyPresent()` returns `true` when
-  the owner's PK is present (Rails-divergent; Rails treats a new-record has_many
-  owner as non-fetchable regardless of PK). Make the association override
-  Rails-faithful, OR document the intentional divergence — they should not
-  disagree.
-- ~30–50 LOC: port AR-id-based equality into `_target` lookup in
-  `_addToTarget` (Rails' `@target.index(record)`) instead of JS `===`
-  (`indexOf`). Only then is the `distinct_value` wiring from #2643 observable
-  in-memory (currently behaviorally inert — `_replacedOrAddedTargets` identity
-  plus DB-side DISTINCT already dedup).
-- ~20 LOC each: route `build` (`collection-proxy.ts:628`) and `createBang`
-  (~2452) through `_addToTarget` so they hit the `set_inverse_instance` /
-  replaced-or-added dedup + before/after_add callback funnel (Rails' `build`
-  calls `add_to_target(record, replace: true)`).
-- Separate (pre-existing): faithful `count_records` port — Rails applies
-  counter_cache, the `[limit_value, count].min` clamp, and the
+The foreign-key-present reconciliation, AR-id-based `_target` equality, and the
+`build`/`createBang` → `_addToTarget` routing all shipped (#2660 made both
+`foreign_key_present?` impls faithful via a shared `foreignKeyPresentFor`
+helper; #2660 ported AR-id equality into `_addToTarget`; #2677 routed `build`
+and `createBang` through the `replace_on_target` funnel). One item remains:
+
+- Faithful `count_records` port — Rails applies counter_cache, the
+  `[limit_value, count].min` clamp, and the
   `count==0 → target.select!(new_record); loaded!` side-effect; the proxy's
   `size()` delegates to `count()` which may not implement all of these.
-
-### follow-up: strict-loading cascade on the proxy reader + mode propagation (~80 LOC)
-
-Files: `associations/collection-proxy.ts`, `association-relation.ts`,
-`associations/association.ts`, `associations/collection-association.ts`.
-Source: #2644, #2645.
-
-- ~30–50 LOC: `CollectionProxy#toArray`/`load` (`collection-proxy.ts:490,525`)
-  call the functional `loadHasMany` directly, bypassing
-  `CollectionAssociation.loadTarget` where `setStrictLoading` is wired — so
-  `await blog.posts` (the common reader) loads children WITHOUT cascading
-  strict_loading. Route the proxy load through the OO `CollectionAssociation`,
-  or apply `setStrictLoading` after `loadHasMany`. (This is the architectural
-  inconsistency #2644 worked around by routing the n+1 tests through the OO
-  path.)
-- ~30 LOC: full `exec_queries` parity — `association-relation.ts` `toArray()`
-  retains a _conditional_ per-record cascade, whereas Rails'
-  `Association#set_strict_loading` (association.rb:123) **always** calls
-  `record.strict_loading!`, with the else branch setting `false` with `mode:
-owner.strict_loading_mode`. trails never propagates the owner's strict-loading
-  _mode_ onto loaded children nor explicitly clears it. Extract
-  `setInverseInstanceFromQueries` / `setStrictLoading` onto the Association layer
-  and route `toArray`'s inverse + strict cascade through them.
-
-### follow-up: dependent-handling dispatch consolidation (~80 LOC)
-
-Files: `associations.ts` (`processDependentAssociations`, ~1821),
-`associations/collection-proxy.ts` (`deleteAll`, ~2473),
-`associations/collection-association.ts`. Source: #2649.
-
-The `deleteOrNullifyAllRecords` override dispatch is reached via the builder's
-`before_destroy` → `handleDependency` callback and direct
-`association(name).deleteAll()`. But the legacy `processDependentAssociations`
-reimplements dependent handling inline and does NOT route through this dispatch;
-`CollectionProxy.deleteAll` also has its own impl. Consolidate so all three
-paths share the override; candidate to retire `processDependentAssociations`.
-
-### follow-up: association-scope polymorphic-through alias coverage (~50 LOC)
-
-Files: `associations/association-scope.ts`,
-`associations/association-scope.test.ts`. Source: #2648.
-
-- ~30 LOC: add a polymorphic-source-type-through test whose chain repeats a
-  table, to pin the `_type` WHERE alias qualifier under aliasing (the qualifier
-  uses `tableNode.name`; only the non-polymorphic alias case is pinned today).
-- ~20 LOC: consider routing `applyScope`'s table comparison through Arel `Table`
-  identity (Rails `scope.table == table`) rather than string-name comparison
-  (`table !== scopeTable`), if a name-collision case ever surfaces.
-
-### follow-up: error-message + dead-code hygiene (~25 LOC)
-
-Files: `errors.ts`, `attribute-methods.ts`, `core.ts`. Source: #2632, #2650,
-#2655.
-
-- ~10 LOC: align `InverseOfAssociationNotFoundError` /
-  `InverseOfAssociationRecursiveError` base message strings to Rails wording
-  (trails drops the `in <class>` clause / adds a non-Rails second sentence; both
-  pass method-level api:compare but the strings aren't Rails-faithful). Check
-  for tests pinning current wording first.
-- ~10 LOC: `attribute-methods.ts` `_hasAttribute` (instance) reads
-  `this._attributeDefinitions` (undefined on instances) and throws if called as
-  an instance method — `Association#isForeignKeyFor` was rerouted to
-  `record._attributes` to dodge it (#2632). Audit/remove or fix the broken
-  instance method for other callers.
-- ~40 LOC (separate): wire `core.ts` `initInternals` properly — it sets
-  `_strictLoadingMode`/`_readonly`/`_destroyed`/`_destroyedByAssociation`/`_strictLoading`
-  but is **dead code** (only call site is the never-called wrapper in
-  `attribute-methods.ts:692`). #2655's per-model `strictLoadingMode` used a lazy
-  `effectiveStrictLoadingMode` fallback instead; wiring init_internals at
-  construction would let the fallback be removed. Touches `base.ts` ctor (mind
-  the suppress-after-initialize dance).
 
 **Gated / blocked:**
 
@@ -306,15 +220,11 @@ rework + polymorphic `_type` WHERE shipped in #2648 (AF8).
 
 **From #2571 (A5 eager_load → JoinDependency):**
 
-- [ ] ~150 LOC (needs its own track entry): flat `eager_load` of a
-      polymorphic or misspelled association must RAISE
-      (`EagerLoadPolymorphicError` / `ConfigurationError`), not silently
-      degrade to preload. `addAssociation` returns `null` for two cases Rails
-      treats oppositely — (a) polymorphic/misspelled → Rails raises; (b)
-      composite-key/unjoinable-through → Rails joins fine, trails degrades as a
-      genuine capability gap. Distinguish them in `addAssociation`/`_walkSpec`
-      and thread through `fallbackAssocs`/`_buildEagerSql`/`addNestedAssociation`.
-      Unskips `eager_test.rb:1639` mirror.
+- [x] Done (#2658, AF5) — flat `eager_load` of a polymorphic / misspelled
+      association now RAISES (`EagerLoadPolymorphicError` / `ConfigurationError`)
+      on the JOIN path rather than silently degrading; CPK / unjoinable-through
+      stay capability-gap fallbacks. Two residual deviations carried by #2658,
+      tracked under "From #2658" below.
 - Plan accuracy: A5's "~20 tests" estimate conflated A5 with A1–A4 + a missing
   `assert_queries_count`/`assert_no_queries` harness; the remaining
   `eager.test.ts` stubs route through the preloader (`includes` without
@@ -460,3 +370,141 @@ nil-method semantics fold-in shipped in #2649 (AF4).
 
 **From #2652 (AF6 self-join alias emission):** no follow-ups (test-coverage PR
 for the #2585 self-join work).
+
+**From #2658 (AF5 eager_load raise vs CPK fallback):**
+
+- ~30–60 LOC: unify the misspelled-`eager_load` error class. `eager_load(:misspelled).toArray()`
+  → preload fallback → `AssociationNotFoundError`; `.count()`/`.exists()`/aggregates
+  → `JoinDependency#validateEagerLoadSpec` → `ConfigurationError`. Both raise and
+  each is Rails-faithful per path, but they differ. Route `toArray`'s path
+  through `build()`-style validation (or vice-versa) for one consistent error.
+  Low priority (no Rails test asserts the count-path message).
+- Larger (unsized): CTE / set-op / FROM-override / composite-PK + `eager_load(:polymorphic)`
+  does NOT raise — `Relation#_eagerLoadBypassesJoinDependency()` skips both the
+  JOIN build and the raise-check, so it silently preloads. Internally consistent
+  but diverges from Rails (which always builds the join dependency and raises).
+  Closing the eager-JOIN-builder gap under those conditions also fixes the raise
+  divergence. Keep `_executeEagerLoad`/`_buildEagerSql`/`_checkEagerLoadable` in
+  sync with the bypass predicate. NOTE: `JoinDependency#build()`/`findReflection`
+  are now load-bearing (wired into `validateEagerLoadSpec`), no longer dead code.
+- ~50–200 LOC each (out of AF5 scope): two `eager.test.ts` stubs — "preloading a
+  polymorphic association with references to the associated table" and
+  "eager-loading …" — need the tags/taggings HMT-through-references join
+  (`eager_test.rb:1634` `Post.eager_load(:tags)`), not raise semantics.
+
+**From #2659 (error-message + `_hasAttribute` hygiene):**
+
+- Shipped: `InverseOfAssociationNotFoundError` / `…RecursiveError` now emit the
+  `in <class>` clause via threaded `this.className` at the two `reflection.ts`
+  call sites, and the `_hasAttribute` instance-method hazard was addressed.
+- Residual (no action unless triggered): the error CONSTRUCTORS still default
+  `associatedClass` to `null` and omit the `in <class>` clause if a future
+  caller passes none (trails errors take string args, no constructor-level
+  `class_name` fallback). `RecursiveError`'s second arg uses `inverse.name` where
+  Rails uses `options[:inverse_of].inspect` — coincide in the self-recursive
+  case.
+
+**From #2660 (collection foreignKeyPresent reconcile + AR-id equality):**
+
+- Plan-doc correction: the prose assumed the OO `CollectionAssociation#foreignKeyPresent`
+  was Rails-divergent and the proxy faithful — Rails (`ForeignAssociation`,
+  included by has_many) shows the OPPOSITE. Shipped reconciliation made both
+  faithful via a shared `foreignKeyPresentFor` helper + through-branch dispatch.
+- Composite-PK edge (flag if audited): Rails passes a single
+  `active_record_primary_key` to `attribute_present?`; trails iterates the keys
+  with `.every` + `attributePresent` — a faithful extension, but note it if
+  composite-PK has_many `find_target?` behavior is ever audited.
+
+**From #2661 (strict-loading cascade on the proxy reader + exec_queries parity):**
+
+- Shipped: the proxy reader now cascades strict_loading and `toArray` reaches
+  exec_queries parity; #2680 then dropped the trails-specific
+  `reflection.options.strictLoading` record-marking block in
+  `AssociationRelation#toArray` for pure exec_queries parity.
+- Reload-gated tests still skipped in `strict-loading.test.ts`: "strict loading
+  with has many", "… has many singular association and reload", "strict loading
+  has one reload" — need record-level reload re-preloading (find_from_target?
+  interaction). Tracked by existing FOLLOW-UP comments in the test file.
+
+**From #2664 / #2670 (dependent-handling dispatch consolidation + shim delete):**
+
+- Shipped: dependent handling is consolidated through `deleteOrNullifyAllRecords`;
+  the trails-only `processDependentAssociations` shim was deleted and all 67 test
+  call sites migrated to `record.destroy()` (the Rails-faithful driver) in #2670;
+  `restrict_with_error` abort-and-populate-errors shipped in #2676. This fully
+  closes the `project_dependent_dispatch_followup_delete_shim` work item.
+- ~30 LOC: `belongs_to` dependent-destroy cascade does NOT propagate a child
+  abort. Rails `belongs_to_association.rb#handle_dependency` does
+  `raise ActiveRecord::Rollback unless target.destroyed?`; trails
+  `belongs-to-association.ts#handleDependency` ignores the `target.destroy()`
+  result. Same class of gap the has_one fix closed; worth a dedicated PR once
+  `ActiveRecord::Rollback` semantics are wired.
+- `CollectionProxy.deleteAll` (~2491) still has its own impl rather than
+  delegating to `@association.delete_all(dependent)` (Rails `collection_proxy.rb:474`);
+  blocked because the base `CollectionAssociation.deleteAll` returns void (proxy
+  needs an affected-row count) and the proxy models diverged-relation-state /
+  through-row handling the association layer doesn't.
+- I18n: `restrict_with_error` message is still a hardcoded English string, not
+  Rails' i18n key with `human_attribute_name` interpolation (the "restrict with
+  error with locale" tests stay `it.skip`); see "From #2676" below.
+
+**From #2665 / #2679 (association-scope polymorphic-through alias coverage):**
+
+- Shipped: the source-type `_type` predicate now qualifies the joined-in alias
+  (`evalScope`/`_buildEntryScope` build against the entry's aliased `TableAlias`,
+  Rails `build_scope(reflection.aliased_table)`); `base.ts`
+  `_buildUnscopedRelation(table?)` alias-qualifies STI `type_condition` too; and
+  #2679 made `applyScope` use Arel `Table#eql?` value equality (the final item).
+- ~30 LOC: align the NON-aliased `_buildEntryScope` path with Rails' bare
+  `build_scope` — drop the STI `type_condition` that Rails' chain-entry scope
+  never carries (reflection.rb:336 → `Relation.create` bypasses core.rb:431,
+  contradicting the existing comment). Needs a careful regression pass over
+  polymorphic-sti-through / nested-through first.
+- ~20 LOC: `nextChainScope`'s `r.type` `tableNode.name` qualifier line is only
+  reachable when a polymorphic belongsTo sits mid-chain; a dedicated
+  mid-chain-polymorphic alias case would pin it directly (the shipped test
+  exercises the source_type_scope merge path instead).
+
+**From #2677 (build + createBang through `_addToTarget`):**
+
+- ~15 LOC: add a Rails-named test for `create!` (createBang) with an aborting
+  `before_add` callback, asserting the record is left unsaved and NOT raised
+  (the new Rollback-path behavior is currently uncovered).
+- ~10 LOC: add a test asserting `build` (direct + through) wires the inverse
+  instance, since `build` now runs `set_inverse_instance` (the old
+  direct-mutation path skipped it).
+- The `inversing` branch of Rails' `replace_on_target` is intentionally not
+  supported in `_addToTarget`/`_replaceOnTarget` (neither `build` nor `create`
+  use the inversing reflection path).
+
+**From #2678 (wire initInternals in Base ctor):**
+
+- ~4 LOC: `attribute-methods/dirty.ts:166` `initInternals` (resets
+  `_mutationsBeforeLastSave`/`_mutationsFromDatabase`/`_touchAttrNames`/`_skipDirtyTracking`)
+  is now uncalled — this PR removed its sole wrapper. Delete it, or — better for
+  Rails fidelity — fold those mutation-tracking resets into the now-wired
+  `core.ts` `initInternals` (Rails has ONE `init_internals`).
+- Doc note if anyone consolidates `init_internals` later: Rails' version also
+  sets `@marked_for_destruction = false`, `@_start_transaction_state = nil`, and
+  `@primary_key = klass.primary_key`; trails' `core.ts` `initInternals` omits
+  these (handled by other mechanisms). Structural: JS runs `initInternals` after
+  `super(attrs)`, not before — set before any callback fires, functionally
+  equivalent.
+
+**From #2676 (restrict_with_error aborts + populates errors):**
+
+- Shipped: `dependent: restrict_with_error` now `throw(:abort)`-equivalent —
+  `destroy` returns false (no raise) and populates `record.errors[:base]`,
+  matching Rails (was previously a thrown `DeleteRestrictionError`).
+- ~50–200 LOC: true I18n locale-override is still a feature gap. The has_one
+  "restrict with error with locale" test stays `it.skip`; the has_many locale
+  test asserts the default humanized name, not a `store_translations` override.
+  A real port (Rails `I18n.backend.store_translations`) unskips the has_one test
+  and lets both assert the overridden record name. Depends on I18n
+  attribute-translation support.
+- Error-type fidelity (not blocking): Rails passes the i18n symbol
+  `:'restrict_dependent_destroy.has_many'`/`.has_one` as the error type; trails
+  uses type `"invalid"` with an explicit `message:` override, so
+  `errors.details[:base][0][:error]` carries `"invalid"`. No Rails test asserts
+  this; switch the type + wire the locale keys if `errors.details` symbol parity
+  is ever needed.

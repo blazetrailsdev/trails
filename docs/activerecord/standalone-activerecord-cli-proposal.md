@@ -296,7 +296,11 @@ reflection from a getter without wrapping instances in a `Proxy`. Rails solves
 this with synchronous `method_missing`; for Trails this is an accepted
 edge — schemas are loaded by the first query in practice.
 
-### 6.2 `_abstractClass` own-property fix (bug)
+### 6.2 `_abstractClass` own-property fix (bug — SHIPPED #2657)
+
+> **Status:** shipped in #2657 (see the Post-merge follow-up queue below). The
+> description below is retained as historical context for the bug that was
+> fixed.
 
 `primaryAbstractClass()` / `abstractClass = true` sets `_abstractClass` on
 `ApplicationRecord`; concrete models **inherit** it via the prototype chain.
@@ -336,15 +340,12 @@ reference (#2638).
 
 **Ready now:**
 
-- **§6.2 `_abstractClass` own-property fix** (~10 LOC, high value, core bug).
-  `model-schema.ts` reads `this._abstractClass` un-guarded at ~819, ~890, ~392,
-  so concrete models under `ApplicationRecord` inherit the abstract flag via the
-  prototype chain and skip schema reflection → `INSERT … DEFAULT VALUES`. Rails'
-  `abstract_class?` is per-class (own-property only); `inheritance.ts`
-  `getAbstractClass` already guards with `hasOwnProperty`. Fix: own-property
-  check at those 3 sites. Unblocks the common `class X extends ApplicationRecord`
-  pattern the example had to avoid. Source: #2638. Orthogonal to the packaging
-  work — ship standalone.
+- [x] Done (#2657) — **§6.2 `_abstractClass` own-property fix**. Routed the three
+      un-guarded `_abstractClass` reads in `model-schema.ts` (`resetTableName` :392,
+      `loadSchemaFromAdapter` :819, `loadSchemaFromCacheSync` :890) through
+      `getAbstractClass`'s own-property `hasOwnProperty` check, matching Rails'
+      per-class `abstract_class?`. Concrete models under `ApplicationRecord` no
+      longer inherit abstractness and skip reflection.
 
 **Larger / multi-PR:**
 
@@ -366,6 +367,14 @@ reference (#2638).
   If signal is ever wanted, add a lightweight `examples/**`-gated job running
   `pnpm -C examples/twitter-clone typecheck && smoke` with
   `install --frozen-lockfile`, without the full package matrix. Source: #2638.
+
+**From #2657 (§6.2 `_abstractClass` own-property fix):**
+
+- ~10–20 LOC: `resetTableName` mirrors Rails' `abstract_class?` branch but does
+  NOT implement the `superclass.abstract_class?` branch
+  (`model_schema.rb:295` — `superclass.table_name || compute_table_name`).
+  Pre-existing gap; add it if STI-under-abstract table-name resolution surfaces
+  a need. Low priority; no known failing case.
 
 ### Notes / gotchas (from #2638)
 
