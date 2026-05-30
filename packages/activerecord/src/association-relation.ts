@@ -127,8 +127,8 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * Override the load path to propagate inverse_of / per-record
    * strict-loading onto the fetched
    * records — mirrors Rails' `AssociationRelation#exec_queries`, which
-   * calls `set_inverse_instance_from_queries` and applies
-   * `strict_loading!` when the owner or the reflection has it set.
+   * calls `set_inverse_instance_from_queries` and `set_strict_loading`,
+   * propagating the owner's strict-loading mode onto each record.
    * Without the inverse wiring, a record loaded via
    * `blog.posts.where(...)` wouldn't cache `post.blog = blog` on the
    * way back, so accessing the inverse would re-query.
@@ -210,16 +210,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     ).association?.(reflection.name);
     if (ownerAssoc && typeof ownerAssoc.setStrictLoading === "function") {
       for (const r of records) ownerAssoc.setStrictLoading(r);
-    }
-
-    // A reflection-level `strictLoading: true` opt-in marks the loaded
-    // records strict regardless of the owner's own mode — this is the
-    // reflection's own contract (`violates_strict_loading?` keys on
-    // `reflection.strict_loading?`), layered on top of the owner cascade.
-    if (reflection.options.strictLoading) {
-      for (const r of records) {
-        (r as unknown as { strictLoadingBang?: () => void }).strictLoadingBang?.();
-      }
     }
 
     return records;
