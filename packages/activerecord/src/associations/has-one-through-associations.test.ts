@@ -473,27 +473,24 @@ describe("HasOneThroughAssociationsTest", () => {
       favorite: true,
     });
 
-    // conditions on the through table — includes().references() promotes the
-    // scoped has_one :through to a JOIN-based eager load (Rails' includes auto-
-    // promotes when the scope references the joined tables).
-    let loaded = await CeMember.all()
-      .includes("favoriteClub")
-      .references("ce_memberships")
-      .toArray();
+    // conditions on the through table — includes-only preload (no references).
+    // The through-table WHERE is copied onto the through query; Rails:
+    // `Member.all.merge!(includes: :favorite_club)`.
+    let loaded = await CeMember.all().includes("favoriteClub").toArray();
     expect((loaded[0] as any).association("favoriteClub").target?.name).toBe(
       "Moustache and Eyebrow Fancier Club",
     );
     await membership.update({ favorite: false });
-    loaded = await CeMember.all().includes("favoriteClub").references("ce_memberships").toArray();
+    loaded = await CeMember.all().includes("favoriteClub").toArray();
     expect((loaded[0] as any).association("favoriteClub").target).toBeNull();
 
     // conditions on the source table
-    loaded = await CeMember.all().includes("hairyClub").references("ce_clubs").toArray();
+    loaded = await CeMember.all().includes("hairyClub").toArray();
     expect((loaded[0] as any).association("hairyClub").target?.name).toBe(
       "Moustache and Eyebrow Fancier Club",
     );
     await club.update({ name: "Association of Clean-Shaven Persons" });
-    loaded = await CeMember.all().includes("hairyClub").references("ce_clubs").toArray();
+    loaded = await CeMember.all().includes("hairyClub").toArray();
     expect((loaded[0] as any).association("hairyClub").target).toBeNull();
   });
 

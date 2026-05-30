@@ -2,7 +2,9 @@ import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 import { Association } from "./association.js";
 import { Preloader } from "../preloader.js";
+import { WhereClause } from "../../relation/where-clause.js";
 import { pluralize, singularize } from "@blazetrails/activesupport";
+import { Nodes } from "@blazetrails/arel";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
@@ -20,6 +22,9 @@ export class ThroughAssociation extends Association {
   private _throughRecordsByOwner: Map<Base, Base[]> | undefined;
   private _throughPreloadedRecords: Base[] | undefined;
   private _preloadIndex: Map<Base, number> | undefined;
+  private _reflectionWherePartition:
+    | { throughPredicates: Nodes.Node[]; sourceScope: any }
+    | undefined;
 
   constructor(
     klass: typeof Base,
@@ -180,8 +185,10 @@ export class ThroughAssociation extends Association {
     // Apply the per-owner reflection scope to source record loading so
     // instance-dependent scopes filter the final target (e.g. only comments
     // mentioning the owner). Merge the user-supplied preload scope on top so
-    // it is not silently dropped when _reflectionScope is set.
-    let sourceScope = this._reflectionScope ?? null;
+    // it is not silently dropped when _reflectionScope is set. Predicates that
+    // reference the THROUGH table are stripped here and applied to the through
+    // query instead (see _buildThroughScope / _partitionReflectionWhere).
+    let sourceScope = this._partitionReflectionWhere().sourceScope;
     if (sourceScope != null && this._preloadScope != null) {
       sourceScope = (sourceScope as any).merge(this._preloadScope);
     } else if (sourceScope == null) {
@@ -381,19 +388,77 @@ export class ThroughAssociation extends Association {
       if (foreignType) {
         scope = scope.where({ [foreignType]: options.sourceType });
       }
+    } else {
+      // Rails' `elsif !reflection_scope.where_clause.empty?` branch copies the
+      // reflection scope's WHERE onto the through query (and joins the source so
+      // target-table columns resolve). We split the where_clause: predicates that
+      // reference the THROUGH table belong here (the through query is the only one
+      // that selects that table), while source/target-table predicates stay at
+      // the source-preloader stage (see `_getSourcePreloaders`), which covers the
+      // JOIN branch's intent without a single-query JOIN. Without this split a
+      // through-table condition lands on the source query as
+      // `no such column: <through_table>.<col>`.
+      const { throughPredicates } = this._partitionReflectionWhere();
+      if (throughPredicates.length > 0) {
+        scope._whereClause = new WhereClause([
+          ...scope._whereClause.predicates,
+          ...throughPredicates,
+        ]);
+      }
     }
-    // Rails' `elsif !reflection_scope.where_clause.empty?` branch copies the
-    // reflection scope's WHERE onto the through query and adds
-    // `includes!(source)` / `references!` so target-table columns resolve via a
-    // JOIN on the through query (a single-query strategy). Our preloader applies
-    // those target-table conditions at the source-preloader stage instead (see
-    // `_getSourcePreloaders`), so the literal JOIN branch is intentionally not
-    // mirrored here — it is covered by the join-based eager-loading path.
 
     // cascade_strict_loading: a strict-loading preload scope propagates to the
     // through query so intermediate records inherit the constraint
     // (preloader/through_association.rb:145, Association#cascade_strict_loading).
     return this._cascadeStrictLoading(scope);
+  }
+
+  /**
+   * Split `_reflectionScope`'s WHERE predicates by referenced table: those that
+   * reference the through table go onto the through query, the rest (source /
+   * target table, unqualified) stay on the source preloader. Mirrors the intent
+   * of Rails' `through_scope` `reflection_scope.where_clause` copy
+   * (preloader/through_association.rb:117) without the single-query JOIN.
+   * @internal
+   */
+  private _partitionReflectionWhere(): { throughPredicates: Nodes.Node[]; sourceScope: any } {
+    if (this._reflectionWherePartition !== undefined) return this._reflectionWherePartition;
+
+    const reflScope = this._reflectionScope ?? null;
+    let result: { throughPredicates: Nodes.Node[]; sourceScope: any } = {
+      throughPredicates: [],
+      sourceScope: reflScope,
+    };
+
+    const wc = reflScope?._whereClause;
+    const throughTable = this._throughTableName();
+    if (reflScope != null && wc != null && !wc.isEmpty() && throughTable != null) {
+      const throughPredicates: Nodes.Node[] = [];
+      const sourcePredicates: Nodes.Node[] = [];
+      for (const pred of wc.predicates) {
+        if (predicateReferencesTable(pred, throughTable)) throughPredicates.push(pred);
+        else sourcePredicates.push(pred);
+      }
+      if (throughPredicates.length > 0) {
+        const sourceScope = reflScope._clone();
+        sourceScope._whereClause = new WhereClause(sourcePredicates);
+        result = { throughPredicates, sourceScope };
+      }
+    }
+
+    this._reflectionWherePartition = result;
+    return result;
+  }
+
+  /** @internal */
+  private _throughTableName(): string | null {
+    const throughRefl = this._throughReflection;
+    if (!throughRefl) return null;
+    try {
+      return (throughRefl.klass as any)?.tableName ?? null;
+    } catch {
+      return null;
+    }
   }
 
   private get _throughReflection(): AssociationLikeReflection | null {
@@ -436,6 +501,26 @@ export class ThroughAssociation extends Association {
     }
     return null;
   }
+}
+
+/**
+ * True when any attribute in `node` references `tableName`. Used to route a
+ * reflection-scope predicate to either the through query or the source query.
+ * @internal
+ */
+function predicateReferencesTable(node: any, tableName: string): boolean {
+  let found = false;
+  node.fetchAttribute?.((attr: any) => {
+    if (attr instanceof Nodes.Attribute && attr.relation?.name === tableName) {
+      found = true;
+      return false;
+    }
+    return true;
+  });
+  if (!found && node instanceof Nodes.Not) {
+    return predicateReferencesTable((node as any).expr, tableName);
+  }
+  return found;
 }
 
 /** @internal */
