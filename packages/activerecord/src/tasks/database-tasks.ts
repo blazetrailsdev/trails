@@ -298,16 +298,25 @@ export class DatabaseTasks {
   > {
     if (this._adapterInstance) return this._adapterInstance;
     const { Base } = await import("../base.js");
-    // Rails: `migration_connection == migration_class.lease_connection`.
-    // `isConnectedQ()` returns false (never throws) when no pool is
-    // established, so the no-pool case yields null and the caller reports
-    // "No adapter configured". A *present* but failing pool (discarded /
-    // exhausted) must surface its real `leaseConnection` error rather than be
-    // masked as "no adapter" — so this is deliberately not wrapped in a catch.
-    if (typeof Base.isConnectedQ === "function" && Base.isConnectedQ()) {
-      return Base.leaseConnection();
+    // Rails: `migration_connection == migration_class.lease_connection`, which
+    // leases (checking out on demand) from the established pool. Don't gate on
+    // `isConnectedQ()` — that's only true *after* a connection has been
+    // checked out, so a freshly `establishConnection`'d pool would wrongly
+    // yield null and the no-shim path would never lease. Resolve the pool
+    // instead: when none is registered, `connectionPool()` raises
+    // `ConnectionNotDefined`, which we map to null for the transitional shim
+    // era (caller then reports "No adapter configured"). A *present* pool's
+    // `leaseConnection` errors (discarded / exhausted) propagate rather than
+    // being masked as "no adapter".
+    let pool;
+    try {
+      pool = Base.connectionPool();
+    } catch (error) {
+      const { ConnectionNotDefined } = await import("../errors.js");
+      if (error instanceof ConnectionNotDefined) return null;
+      throw error;
     }
-    return null;
+    return pool.leaseConnection();
   }
 
   static async purge(config: DatabaseConfig): Promise<void> {
