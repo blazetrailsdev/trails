@@ -5,6 +5,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import {
   Associations,
+  association,
   loadBelongsTo,
   loadHasOne,
   loadHasMany,
@@ -84,6 +85,7 @@ const TEST_SCHEMA: Schema = {
   hmps_essays: { writer_id: "integer", writer_type: "string", hmps_category_id: "integer" },
   hmps_authors: { name: "string" },
   hmps_categories_posts: { hmps_category_id: "integer", hmps_post_id: "integer" },
+  categorizations: { author_id: "integer", category_id: "integer" },
 };
 
 describe("NestedThroughAssociationsTest", () => {
@@ -2121,10 +2123,45 @@ describe("NestedThroughAssociationsTest", () => {
     expect(preloadedCats[0].name).toBe("general");
   });
 
-  it.skip("nested has many through should not be autosaved", () => {
-    // BLOCKED: requires reading a nested HMT on an unsaved owner (through an
-    // in-memory belongs_to) and asserting `owner.save` does not autosave/clear
-    // it. Needs HMT readers on new records + autosave exclusion. Follow-up.
+  it("nested has many through should not be autosaved", async () => {
+    class Categorization extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("category_id", "integer");
+      }
+    }
+    registerModel(Categorization);
+
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+    Associations.hasMany.call(Author, "taggings", {
+      className: "Tagging",
+      through: "posts",
+      source: "taggings",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+      as: "taggable",
+    });
+    Associations.belongsTo.call(Categorization, "author", {
+      className: "Author",
+      foreignKey: "author_id",
+    });
+    Associations.hasMany.call(Categorization, "postTaggings", {
+      className: "Tagging",
+      through: "author",
+      source: "taggings",
+    });
+
+    const david = await Author.create({ name: "David" });
+    const post = await Post.create({ author_id: david.id, title: "P", body: "B" });
+    await Tagging.create({ taggable_id: post.id, taggable_type: "Post" });
+
+    const c = new Categorization();
+    (c as any).association("author").writer(david);
+    expect(await association(c, "postTaggings").toArray()).not.toHaveLength(0);
+    await c.save();
+    expect(await association(c, "postTaggings").toArray()).not.toHaveLength(0);
   });
 
   it("polymorphic has many through when through association has not loaded", async () => {

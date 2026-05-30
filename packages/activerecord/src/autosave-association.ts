@@ -434,6 +434,16 @@ async function _insertCollectionRecord(
   if (!isInsert) {
     return !!(await child.save({ validate: false }));
   }
+  // Rails save_collection_association:447 — the default (non-autosave) insert
+  // branch is `elsif !reflection.nested?`, so a nested has_many :through (e.g.
+  // `Categorization.post_taggings` through an in-memory `author`) is never
+  // inserted on owner save. Skipping here also avoids the
+  // `HasManyThroughNestedAssociationsAreReadonly` raise from
+  // `insert_record`/`ensure_not_nested`.
+  if (!assoc.options.autosave) {
+    const reflection = (record.constructor as any)._reflectOnAssociation?.(assoc.name);
+    if (reflection?.isNested?.()) return true;
+  }
   if (inst && typeof inst.insertRecord === "function") {
     inst.setInverseInstance?.(child);
     // Mirrors Rails save_collection_association branching: with `autosave:
