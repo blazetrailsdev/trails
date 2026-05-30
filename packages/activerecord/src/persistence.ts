@@ -1006,10 +1006,43 @@ export async function reload<T extends ReloadRecord>(this: T): Promise<T> {
   }
 
   this._dirty.snapshot(this._attributes);
+
+  // Rails' Persistence#reload re-preloads `strict_loaded_associations` so that
+  // re-reading an association that was loaded before the reload does not
+  // trigger a fresh lazy load (which, on a strict_loading record, would raise
+  // StrictLoadingViolationError). `strictLoadedAssociations` reads the current
+  // (pre-clear) association caches, so resolve the fresh copy before clearing.
+  const strictPreloads = strictLoadedAssociations.call(
+    this as unknown as ThisParameterType<typeof strictLoadedAssociations>,
+  );
+  let freshPreloaded: Map<string, unknown> | undefined;
+  let freshCached: Map<string, unknown> | undefined;
+  if (strictPreloads.length > 0) {
+    try {
+      const fresh = (await _findRecord.call(this as never)) as {
+        _preloadedAssociations?: Map<string, unknown>;
+        _cachedAssociations?: Map<string, unknown>;
+      };
+      freshPreloaded = fresh._preloadedAssociations;
+      freshCached = fresh._cachedAssociations;
+    } catch {
+      // A default scope (or similar) may exclude the just-refetched row from
+      // the preloading query; degrade to the plain cache-clear below.
+    }
+  }
+
   this._collectionProxies.clear();
-  this._preloadedAssociations.clear();
   this._associationInstances.clear();
-  this._cachedAssociations?.clear();
+  this._preloadedAssociations.clear();
+  if (freshPreloaded) {
+    for (const [name, value] of freshPreloaded) this._preloadedAssociations.set(name, value);
+  }
+  if (this._cachedAssociations) {
+    this._cachedAssociations.clear();
+    if (freshCached) {
+      for (const [name, value] of freshCached) this._cachedAssociations.set(name, value);
+    }
+  }
   clearAutosaveState(this as unknown as Parameters<typeof clearAutosaveState>[0]);
   return this;
 }
@@ -1183,16 +1216,34 @@ function initInternals(this: PersistencePrivateHost): void {
 
 /** @internal */
 export function strictLoadedAssociations(this: PersistencePrivateHost): string[] {
+  const names = new Set<string>();
   const cache = this._associationInstances;
-  if (!cache) return [];
-  const result: string[] = [];
-  for (const [name, assoc] of cache) {
-    const owner = assoc?.owner;
-    if (owner?._strictLoading && !owner?.isStrictLoadingNPlusOneOnly?.()) {
-      result.push(name);
+  if (cache) {
+    for (const [name, assoc] of cache) {
+      const owner = assoc?.owner;
+      if (owner?._strictLoading && !owner?.isStrictLoadingNPlusOneOnly?.()) {
+        names.add(name);
+      }
     }
   }
-  return result;
+  // Preloaded/cached/collection associations are also loaded entries of Rails'
+  // @association_cache; their owner is this record, so gate on its own
+  // strict-loading state.
+  const self = this as unknown as {
+    _strictLoading?: boolean;
+    isStrictLoadingNPlusOneOnly?(): boolean;
+    _preloadedAssociations?: Map<string, unknown>;
+    _cachedAssociations?: Map<string, unknown>;
+    _collectionProxies?: Map<string, { loaded?: boolean }>;
+  };
+  if (self._strictLoading && !self.isStrictLoadingNPlusOneOnly?.()) {
+    for (const name of self._preloadedAssociations?.keys() ?? []) names.add(name);
+    for (const name of self._cachedAssociations?.keys() ?? []) names.add(name);
+    for (const [name, proxy] of self._collectionProxies ?? []) {
+      if (proxy?.loaded) names.add(name);
+    }
+  }
+  return [...names];
 }
 
 /** @internal */

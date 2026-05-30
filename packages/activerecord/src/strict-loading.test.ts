@@ -501,6 +501,18 @@ describe("StrictLoadingTest", () => {
       npo_bt_developers: { name: "string", ship_id: "integer" },
       npo_bt_ships: { name: "string" },
       npo_bt_parts: { name: "string", ship_id: "integer" },
+      vcbt_logs: { message: "string", vcbt_dev_id: "integer" },
+      vcbt_devs: { name: "string" },
+      vchm_devs: { name: "string" },
+      vchm_logs: { message: "string", vchm_dev_id: "integer" },
+      slhor_devs: { name: "string" },
+      slhor_ships: { name: "string", slhor_dev_id: "integer" },
+      slhmr_devs: { name: "string" },
+      slhmr_logs: { message: "string", slhmr_dev_id: "integer" },
+      slhms_devs: { name: "string" },
+      slhms_logs: { message: "string", slhms_dev_id: "integer" },
+      ehos_devs: { name: "string" },
+      ehos_profiles: { bio: "string", ehos_dev_id: "integer" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -1251,17 +1263,72 @@ describe("StrictLoadingTest", () => {
       loadHasMany(author, "rsl_books", { className: "RslBook", foreignKey: "author_id" }),
     ).rejects.toThrow(StrictLoadingViolationError);
   });
-  it.skip("strict loading is ignored in validation context", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
-    /* needs validation integration with strict loading bypass */
+  it("strict loading is ignored in validation context", async () => {
+    class VcbtDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class VcbtLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("vcbt_dev_id", "integer");
+      }
+    }
+    registerModel("VcbtDev", VcbtDev);
+    registerModel("VcbtLog", VcbtLog);
+    Associations.belongsTo.call(VcbtLog, "vcbtDev", {
+      className: "VcbtDev",
+      foreignKey: "vcbt_dev_id",
+    });
+    const dev = await VcbtDev.create({ name: "Test" });
+    const log = await VcbtLog.create({ message: "i am a message", vcbt_dev_id: dev.id });
+    log.strictLoadingBang();
+    // Rails' Association#violates_strict_loading? returns false while the owner
+    // has a non-nil validation_context (set by save!/valid? for the duration of
+    // the run), so association loads during validation are never violations.
+    (log as any)._validationContext = "create";
+    try {
+      const loaded = await loadBelongsTo(log, "vcbtDev", {
+        className: "VcbtDev",
+        foreignKey: "vcbt_dev_id",
+      });
+      expect(loaded?.id).toBe(dev.id);
+    } finally {
+      (log as any)._validationContext = undefined;
+    }
   });
-  it.skip("strict loading with reflection is ignored in validation context", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
-    /* needs validation integration with strict loading bypass */
+  it("strict loading with reflection is ignored in validation context", async () => {
+    class VchmDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class VchmLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("vchm_dev_id", "integer");
+      }
+    }
+    registerModel("VchmDev", VchmDev);
+    registerModel("VchmLog", VchmLog);
+    Associations.hasMany.call(VchmDev, "vchmLogs", {
+      className: "VchmLog",
+      foreignKey: "vchm_dev_id",
+    });
+    const dev = await VchmDev.create({ name: "Test" });
+    await VchmLog.create({ message: "I am message", vchm_dev_id: dev.id });
+    dev.strictLoadingBang();
+    (dev as any)._validationContext = "update";
+    try {
+      const logs = await loadHasMany(dev, "vchmLogs", {
+        className: "VchmLog",
+        foreignKey: "vchm_dev_id",
+      });
+      expect(logs).toHaveLength(1);
+    } finally {
+      (dev as any)._validationContext = undefined;
+    }
   });
 
   it("strict loading on concat is ignored", async () => {
@@ -1376,20 +1443,95 @@ describe("StrictLoadingTest", () => {
     // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
     // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
   });
-  it.skip("strict loading has one reload", () => {
-    // FOLLOW-UP: record-level reload + strict-loading lazy-load semantics.
-    // Rails asserts no raise after `developer.reload`; our impl keeps the
-    // owner strict and raises on the subsequent lazy has_one load. Needs the
-    // reload/find_from_target? interaction ported before this can be unskipped.
+  it("strict loading has one reload", async () => {
+    class SlhorDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlhorShip extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("slhor_dev_id", "integer");
+      }
+    }
+    registerModel("SlhorDev", SlhorDev);
+    registerModel("SlhorShip", SlhorShip);
+    Associations.hasOne.call(SlhorDev, "slhorShip", {
+      className: "SlhorShip",
+      foreignKey: "slhor_dev_id",
+    });
+    const created = await SlhorDev.create({ name: "D" });
+    const ship = await SlhorShip.create({ name: "The Great Ship", slhor_dev_id: created.id });
+    const developer = (await SlhorDev.all().strictLoading().includes("slhorShip").first())!;
+    expect(developer.isStrictLoading()).toBe(true);
+    const opts = { className: "SlhorShip", foreignKey: "slhor_dev_id" };
+    expect((await loadHasOne(developer, "slhorShip", opts))?.id).toBe(ship.id);
+
+    await developer.reload();
+
+    // Re-accessing the previously-loaded association after reload must not
+    // raise — reload re-preloads the strict-loaded association.
+    const reloaded = await loadHasOne(developer, "slhorShip", opts);
+    expect(reloaded?.id).toBe(ship.id);
   });
-  it.skip("strict loading with has many", () => {
-    // FOLLOW-UP: depends on the CollectionProxy reader returning unloaded
-    // proxies from `devs.map(&:audit_logs)` without triggering a load, plus
-    // relation-level reload re-preloading. Not yet wired.
+  it("strict loading with has many", async () => {
+    class SlhmrDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlhmrLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("slhmr_dev_id", "integer");
+      }
+    }
+    registerModel("SlhmrDev", SlhmrDev);
+    registerModel("SlhmrLog", SlhmrLog);
+    Associations.hasMany.call(SlhmrDev, "slhmrLogs", {
+      className: "SlhmrLog",
+      foreignKey: "slhmr_dev_id",
+    });
+    const created = await SlhmrDev.create({ name: "D" });
+    await SlhmrLog.create({ message: "M", slhmr_dev_id: created.id });
+    const devs = await SlhmrDev.all().strictLoading().includes("slhmrLogs").toArray();
+
+    // `devs.map(&:audit_logs)` reads the unloaded proxy without forcing a load.
+    const proxies = devs.map((d) => association(d, "slhmrLogs"));
+    expect((await proxies[0].toArray()).length).toBe(1);
+
+    await devs[0].reload();
+
+    const reloaded = association(devs[0], "slhmrLogs");
+    expect((await reloaded.toArray()).length).toBe(1);
   });
-  it.skip("strict loading with has many singular association and reload", () => {
-    // FOLLOW-UP: same record-level reload semantics as `strict loading has
-    // one reload` — re-accessing a has_many after reload must not raise.
+  it("strict loading with has many singular association and reload", async () => {
+    class SlhmsDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlhmsLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("slhms_dev_id", "integer");
+      }
+    }
+    registerModel("SlhmsDev", SlhmsDev);
+    registerModel("SlhmsLog", SlhmsLog);
+    Associations.hasMany.call(SlhmsDev, "slhmsLogs", {
+      className: "SlhmsLog",
+      foreignKey: "slhms_dev_id",
+    });
+    const created = await SlhmsDev.create({ name: "D" });
+    await SlhmsLog.create({ message: "M", slhms_dev_id: created.id });
+    const dev = (await SlhmsDev.all().strictLoading().includes("slhmsLogs").first())!;
+    expect((await association(dev, "slhmsLogs").toArray()).length).toBe(1);
+
+    await dev.reload();
+
+    expect((await association(dev, "slhmsLogs").toArray()).length).toBe(1);
   });
   it("strict loading with has many through cascade down to middle records", async () => {
     class SlthcDev extends Base {
@@ -1690,10 +1832,34 @@ describe("StrictLoadingTest", () => {
     });
     expect(loaded?.id).toBe(publisher.id);
   });
-  it.skip("does not raise on eager loading a strict loading has one relation", () => {
-    // FOLLOW-UP: reflection strictLoading:true + preloaded has_one (no-raise).
-    // Same mechanism as the belongs_to variant above (preloaded hit short-
-    // circuits before the strict check). Trimmed for PR-size ceiling.
+  it("does not raise on eager loading a strict loading has one relation", async () => {
+    class EhosDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class EhosProfile extends Base {
+      static {
+        this.attribute("bio", "string");
+        this.attribute("ehos_dev_id", "integer");
+      }
+    }
+    registerModel("EhosDev", EhosDev);
+    registerModel("EhosProfile", EhosProfile);
+    Associations.hasOne.call(EhosDev, "ehosProfile", {
+      className: "EhosProfile",
+      foreignKey: "ehos_dev_id",
+      strictLoading: true,
+    });
+    const dev = await EhosDev.create({ name: "D" });
+    const profile = await EhosProfile.create({ bio: "I am bio", ehos_dev_id: dev.id });
+    (dev as any)._preloadedAssociations = new Map([["ehosProfile", profile]]);
+    const loaded = await loadHasOne(dev, "ehosProfile", {
+      className: "EhosProfile",
+      foreignKey: "ehos_dev_id",
+      strictLoading: true,
+    });
+    expect(loaded?.id).toBe(profile.id);
   });
   it.skip("does not raise on eager loading a has one relation if strict loading by default", () => {
     // FOLLOW-UP: owner-strict + preloaded has_one (no-raise) — already covered
