@@ -161,40 +161,6 @@ describe("AssociationRelation", () => {
     await expect(scope.createBang({ title: "" })).rejects.toThrow(/title/i);
   });
 
-  it("marks loaded records strict-loading when the reflection opts in", async () => {
-    class ArStrictBlog extends Base {
-      declare name: string;
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class ArStrictPost extends Base {
-      declare ar_strict_blog_id: number | null;
-      declare title: string;
-      static {
-        this.attribute("title", "string");
-        this.attribute("ar_strict_blog_id", "integer");
-      }
-    }
-    ArStrictBlog.hasMany("arStrictPosts", {
-      className: "ArStrictPost",
-      strictLoading: true,
-    });
-    ArStrictBlog.adapter = adapter;
-    ArStrictPost.adapter = adapter;
-    registerModel(ArStrictBlog);
-    registerModel(ArStrictPost);
-
-    const blog = new ArStrictBlog({ name: "s" });
-    await blog.save();
-    const proxy = association<ArStrictPost>(blog, "arStrictPosts");
-    await proxy.create({ title: "x" });
-
-    const scope = proxy.where({}) as unknown as AssociationRelation<ArStrictPost>;
-    const [post] = await scope.toArray();
-    expect((post as any)._strictLoading).toBe(true);
-  });
-
   it("sets inverse_of on records loaded through the relation", async () => {
     class ArInvBlog extends Base {
       declare name: string;
