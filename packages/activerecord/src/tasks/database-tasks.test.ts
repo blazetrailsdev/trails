@@ -585,6 +585,42 @@ describe("DatabaseTasksMigrateTest", () => {
   });
 });
 
+// Covers the no-`setAdapter` resolution path added when DatabaseTasks moved
+// off the `_adapterInstance` shim toward Rails' pool-backed
+// `migration_connection == migration_class.lease_connection`. Until the shim
+// is removed (see docs/activerecord/database-tasks-rails-equivalence-plan.md)
+// the rest of the suite exercises these call sites through `setAdapter`, so
+// this guards the pool fallback against regressing.
+describe("DatabaseTasks migration connection resolves from the pool without setAdapter", () => {
+  afterEach(async () => {
+    DatabaseTasks.setAdapter(null);
+    DatabaseTasks.registerMigrations([]);
+    const { Base } = await import("../base.js");
+    try {
+      (Base as unknown as { removeConnection?: () => void }).removeConnection?.();
+    } catch {
+      // no pool established — nothing to tear down
+    }
+  });
+
+  it("leases from an established Base pool when no shim adapter is set", async () => {
+    DatabaseTasks.setAdapter(null);
+    const { Base } = await import("../base.js");
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    DatabaseTasks.registerMigrations([]);
+    // Reaches _migrationAdapter() -> Base.connectionPool().leaseConnection().
+    // A freshly established pool has no checked-out connection yet, so this
+    // also pins the regression where the path was gated on isConnectedQ().
+    const status = await DatabaseTasks.migrateStatus();
+    expect(Array.isArray(status)).toBe(true);
+  });
+
+  it("reports the no-adapter error when neither a shim nor a pool is present", async () => {
+    DatabaseTasks.setAdapter(null);
+    await expect(DatabaseTasks.migrateStatus()).rejects.toThrow(/No adapter configured/);
+  });
+});
+
 describe("DatabaseTasksMigrateScopeTest", () => {
   it.skip("migrate using scope and verbose mode", () => {
     // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
