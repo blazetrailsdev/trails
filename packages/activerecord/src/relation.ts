@@ -2113,8 +2113,18 @@ export class Relation<T extends Base> {
       // promise so callers drain the same query (and carry its errors)
       // instead of racing to issue additional ones. The promise clears
       // itself in loadAsync's .finally once the load settles.
+      //
+      // This check must stay synchronous (before any await): loadAsync
+      // calls toArray() and only assigns _loadAsyncPromise once it
+      // returns. Awaiting earlier would let this call resume after the
+      // assignment and return the promise derived from itself, deadlocking.
       return this._loadAsyncPromise;
     }
+    // Lazily reflect the schema before issuing the query so consumers
+    // don't have to call loadSchema explicitly. Idempotent and cheap.
+    await (
+      this._modelClass as unknown as { ensureSchemaLoaded(): Promise<void> }
+    ).ensureSchemaLoaded();
 
     // Capture the load token before any await so we can detect if a
     // reset() landed while the query was in flight and bail without
