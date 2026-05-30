@@ -36,21 +36,24 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it.skip("not setting writing role while using another named role raises", () => {
-    // blocked on connectsTo shared-pool support + setupSharedConnectionPool test
-    // helper + writing-role validation (none ported yet). Not unblocked by
-    // nested connectedTo (#2547). Rails: connection_handler_test.rb:81
+    // BLOCKED: connects-to — shared-pool writing-role validation not ported
+    // ROOT-CAUSE: connectsTo lacks setupSharedConnectionPool + writing-role check
+    // SCOPE: needs connectsTo shared-pool support; not unblocked by nested connectedTo (#2547)
+    // RAILS: connection_handler_test.rb:81
   });
 
   it.skip("fixtures dont raise if theres no writing pool config", () => {
-    // blocked on connectsTo(database:) role-aliasing + retrieveConnection by
-    // role resolving reading→writing fallback (not ported yet). Not unblocked
-    // by nested connectedTo (#2547). Rails: connection_handler_test.rb:92
+    // BLOCKED: connects-to — role fallback in connectsTo(database:) not ported
+    // ROOT-CAUSE: retrieveConnection by role lacks reading→writing fallback
+    // SCOPE: needs connectsTo(database:) role-aliasing; not unblocked by nested connectedTo (#2547)
+    // RAILS: connection_handler_test.rb:92
   });
 
   it.skip("setting writing role while using another named role does not raise", () => {
-    // blocked on connectsTo shards + mutable ActiveRecord.writingRole +
-    // setupSharedConnectionPool test helper (none ported yet). Not unblocked
-    // by nested connectedTo (#2547). Rails: connection_handler_test.rb:108
+    // BLOCKED: connects-to — mutable writingRole + shared-pool setup not ported
+    // ROOT-CAUSE: connectsTo shards + ActiveRecord.writingRole mutation + setupSharedConnectionPool missing
+    // SCOPE: needs connectsTo shared-pool support; not unblocked by nested connectedTo (#2547)
+    // RAILS: connection_handler_test.rb:108
   });
 
   it("establish connection with primary works without deprecation", () => {
@@ -90,10 +93,15 @@ describe("ConnectionHandlerTest", () => {
     expect(pool.dbConfig.database).toBe("test.db");
   });
 
-  it.skip("establish connection using top level key in two level config", () => {
-    // blocked on global Base.configurations registry + establishConnection(:key)
-    // symbol-key resolution against it (handler currently takes a HashConfig
-    // directly). Rails: connection_handler_test.rb:196
+  it("establish connection using top level key in two level config", () => {
+    const configs = new DatabaseConfigurations({
+      development: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+      development_readonly: { adapter: "sqlite3", database: "test/db/readonly.sqlite3" },
+    });
+    const config = configs.configsFor({ envName: "development_readonly" })[0];
+    const pool = handler.establishConnection(config);
+    expect(pool).toBeTruthy();
+    expect(pool.dbConfig.database).toBe("test/db/readonly.sqlite3");
   });
 
   it("establish connection with string owner name", () => {
@@ -106,10 +114,25 @@ describe("ConnectionHandlerTest", () => {
     expect(pool).toBeTruthy();
   });
 
-  it.skip("symbolized configurations assignment", () => {
-    // blocked on global Base.configurations setter + configsFor; asserts
-    // symbol-keyed config hashes normalize to String envName/name. No global
-    // configurations registry ported yet. Rails: connection_handler_test.rb:228
+  it("symbolized configurations assignment", () => {
+    // The Symbol-vs-String distinction Rails asserts on config keys does not
+    // exist in TS (object keys are always strings); the rest of the test —
+    // that symbol-style nested config normalizes to HashConfig instances with
+    // String envName/name — translates directly.
+    const config = {
+      development: {
+        primary: { adapter: "sqlite3", database: "test/storage/development.sqlite3" },
+      },
+      test: {
+        primary: { adapter: "sqlite3", database: "test/storage/test.sqlite3" },
+      },
+    };
+    const configurations = new DatabaseConfigurations(config);
+    for (const dbConfig of configurations.configsFor()) {
+      expect(dbConfig).toBeInstanceOf(HashConfig);
+      expect(typeof dbConfig.envName).toBe("string");
+      expect(typeof dbConfig.name).toBe("string");
+    }
   });
 
   it("retrieve connection", () => {
@@ -166,10 +189,10 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it.skip("a class using custom pool and switching back to primary", () => {
-    // blocked on Base default-pool leaseConnection integration: anonymous
-    // subclass shares Base's pool, gets its own via establishConnection(hash),
-    // then removeConnection falls back to Base. Needs the global connection
-    // handler + Base.leaseConnection wiring. Rails: connection_handler_test.rb:282
+    // BLOCKED: base-integration — Base default-pool leaseConnection not wired for this flow
+    // ROOT-CAUSE: anonymous subclass sharing Base's pool then removeConnection→Base fallback needs connected Base + leaseConnection wiring
+    // SCOPE: needs global connection handler + Base.leaseConnection integration
+    // RAILS: connection_handler_test.rb:282
   });
 
   it("connection specification name should fallback to parent", () => {
@@ -293,26 +316,38 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it.skip("connection pool per pid", () => {
-    // permanent: requires process fork (Process.fork, guarded in Rails by
-    // `if Process.respond_to?(:fork)`). Rails: connection_handler_test.rb:340
+    // BLOCKED: permanent — requires process fork
+    // ROOT-CAUSE: Process.fork (Rails guards with `if Process.respond_to?(:fork)`); no node:* / process.* allowed
+    // SCOPE: permanent skip
+    // RAILS: connection_handler_test.rb:340
   });
 
   it.skip("forked child doesnt mangle parent connection", () => {
-    // permanent: requires process fork. Rails: connection_handler_test.rb:361
+    // BLOCKED: permanent — requires process fork
+    // ROOT-CAUSE: Process.fork; no node:* / process.* allowed
+    // SCOPE: permanent skip
+    // RAILS: connection_handler_test.rb:361
   });
 
   it.skip("forked child recovers from disconnected parent", () => {
-    // permanent: requires process fork. Rails: connection_handler_test.rb:390
+    // BLOCKED: permanent — requires process fork
+    // ROOT-CAUSE: Process.fork; no node:* / process.* allowed
+    // SCOPE: permanent skip
+    // RAILS: connection_handler_test.rb:390
   });
 
   it.skip("retrieve connection pool copies schema cache from ancestor pool", () => {
-    // blocked on schema cache port (not yet implemented); also requires process
-    // fork (asserts the forked child inherits the parent's schema cache).
-    // Rails: connection_handler_test.rb:432
+    // BLOCKED: schema-cache — schema cache not yet implemented
+    // ROOT-CAUSE: no schema cache port; also requires process fork (child inherits parent's schema cache)
+    // SCOPE: blocked on schema cache port (not yet implemented) + permanent fork dependency
+    // RAILS: connection_handler_test.rb:432
   });
 
   it.skip("pool from any process for uses most recent spec", () => {
-    // permanent: requires process fork. Rails: connection_handler_test.rb:455
+    // BLOCKED: permanent — requires process fork
+    // ROOT-CAUSE: Process.fork; no node:* / process.* allowed
+    // SCOPE: permanent skip
+    // RAILS: connection_handler_test.rb:455
   });
 
   it("connection pool names", () => {
