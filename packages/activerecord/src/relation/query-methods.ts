@@ -144,16 +144,13 @@ interface QueryMethodsHost {
 
 function resolveOrderMatcher(host: QueryMethodsHost): RegExp {
   try {
-    let adapter: any = host._modelClass.connection;
-    while (adapter) {
-      const matcher = (adapter.constructor as any)?.columnNameWithOrderMatcher?.();
-      if (matcher) return matcher;
-      adapter = adapter.inner;
-    }
+    // Mirrors Rails' `model.adapter_class.column_name_with_order_matcher`.
+    const adapter: any = host._modelClass.connection;
+    return (adapter?.constructor as any)?.columnNameWithOrderMatcher?.() ?? abstractOrderMatcher();
   } catch {
     // No adapter configured — fall back to abstract pattern.
+    return abstractOrderMatcher();
   }
-  return abstractOrderMatcher();
 }
 
 // ---------------------------------------------------------------------------
