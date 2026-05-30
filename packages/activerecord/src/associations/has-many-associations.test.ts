@@ -968,13 +968,15 @@ describe("HasManyAssociationsTest", () => {
     });
     const author = await ReAuthor.create({ name: "Writer" });
     await RePost.create({ author_id: author.id, title: "P" });
-    try {
-      await author.destroy();
-      const found = await ReAuthor.findBy({ id: author.id });
-      expect(found || true).toBeTruthy();
-    } catch (e: any) {
-      expect(e.message).toMatch(/restrict|cannot|delete/i);
-    }
+    // Rails: restrict_with_error does throw(:abort) — destroy returns false,
+    // errors are populated, and neither owner nor child is deleted.
+    expect(await author.destroy()).toBe(false);
+    expect(author.errors.where("base")).toHaveLength(1);
+    expect(author.errors.messagesFor("base")[0]).toBe(
+      "Cannot delete record because dependent reposts exist",
+    );
+    expect(await ReAuthor.findBy({ id: author.id })).not.toBeNull();
+    expect(await RePost.all().count()).toBe(1);
   });
 });
 
@@ -5177,14 +5179,17 @@ describe("HasManyAssociationsTest", () => {
     });
     const author = await ReLocaleAuthor.create({ name: "Writer" });
     await ReLocalePost.create({ author_id: author.id, title: "P" });
-    // With restrict_with_error, destroying should fail when children exist
-    try {
-      await author.destroy();
-      const found = await ReLocaleAuthor.findBy({ id: author.id });
-      expect(found || true).toBeTruthy();
-    } catch (e: any) {
-      expect(e.message).toMatch(/restrict|cannot|delete/i);
-    }
+    // With restrict_with_error, destroy aborts (returns false) and populates
+    // errors[:base]. The :base message is built from the humanized association
+    // name; a locale override on that attribute would change the interpolated
+    // record name — here no translation is stored, so the default is used.
+    expect(await author.destroy()).toBe(false);
+    expect(author.errors.where("base")).toHaveLength(1);
+    expect(author.errors.messagesFor("base")[0]).toBe(
+      "Cannot delete record because dependent re locale posts exist",
+    );
+    expect(await ReLocaleAuthor.findBy({ id: author.id })).not.toBeNull();
+    expect(await ReLocalePost.all().count()).toBe(1);
   });
   it("included in collection for composite keys", async () => {
     class InclAuthor extends Base {
