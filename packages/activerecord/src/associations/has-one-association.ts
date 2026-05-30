@@ -56,7 +56,7 @@ export class HasOneAssociation extends SingularAssociation {
         break;
 
       default:
-        await this.delete(dependent);
+        return await this.delete(dependent);
     }
   }
 
@@ -64,7 +64,7 @@ export class HasOneAssociation extends SingularAssociation {
    * Delete the associated record using the given method.
    * Supports: delete, destroy, nullify.
    */
-  async delete(method?: string): Promise<void> {
+  async delete(method?: string): Promise<void | false> {
     if (!(await this.loadTarget())) return;
     const target = this.target!;
 
@@ -79,6 +79,12 @@ export class HasOneAssociation extends SingularAssociation {
         (target as any).destroyedByAssociation = this.reflection;
         if (typeof (target as any).destroy === "function") {
           await (target as any).destroy();
+        }
+        // Rails: `throw(:abort) unless target.destroyed?` — if the child's own
+        // destroy aborted (e.g. a restrict_with_error grandchild), propagate
+        // the abort so the owner is not deleted either.
+        if (typeof (target as any).isDestroyed === "function" && !(target as any).isDestroyed()) {
+          return false;
         }
         break;
 

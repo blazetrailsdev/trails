@@ -68,6 +68,9 @@ const TEST_SCHEMA: Schema = {
   nil_accts: { firm_id: "integer" },
   rs_firms: { name: "string" },
   rs_accts: { firm_id: "integer" },
+  casc_gps: { name: "string" },
+  casc_parents: { casc_gp_id: "integer" },
+  casc_children: { casc_parent_id: "integer" },
   miss_firms: { name: "string" },
   miss_accts: { firm_id: "integer" },
   miss_n_firms: { name: "string" },
@@ -495,6 +498,48 @@ describe("HasOneAssociationsTest", () => {
     expect(firm.errors.fullMessages[0]).toMatch(/cannot delete/i);
     expect(await RsFirm.findBy({ id: firm.id })).not.toBeNull();
     expect(await RsAcct.all().count()).toBe(1);
+  });
+
+  it("restrict with error aborts a cascading parent destroy", async () => {
+    // Rails has_one#delete does `throw(:abort) unless target.destroyed?`, so a
+    // dependent: destroy whose child is itself blocked by restrict_with_error
+    // must abort the owner's destroy too — nothing in the chain is deleted.
+    class CascGp extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class CascParent extends Base {
+      static {
+        this.attribute("casc_gp_id", "integer");
+      }
+    }
+    class CascChild extends Base {
+      static {
+        this.attribute("casc_parent_id", "integer");
+      }
+    }
+    Associations.hasOne.call(CascGp, "cascParent", {
+      className: "CascParent",
+      foreignKey: "casc_gp_id",
+      dependent: "destroy",
+    });
+    Associations.hasOne.call(CascParent, "cascChild", {
+      className: "CascChild",
+      foreignKey: "casc_parent_id",
+      dependent: "restrictWithError",
+    });
+    registerModel("CascGp", CascGp);
+    registerModel("CascParent", CascParent);
+    registerModel("CascChild", CascChild);
+    const gp = await CascGp.create({ name: "GP" });
+    const parent = await CascParent.create({ casc_gp_id: gp.id });
+    await CascChild.create({ casc_parent_id: parent.id });
+
+    expect(await gp.destroy()).toBe(false);
+    expect(await CascGp.findBy({ id: gp.id })).not.toBeNull();
+    expect(await CascParent.findBy({ id: parent.id })).not.toBeNull();
+    expect(await CascChild.all().count()).toBe(1);
   });
 
   it.skip("restrict with error with locale", () => {
