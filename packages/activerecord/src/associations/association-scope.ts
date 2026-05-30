@@ -313,6 +313,21 @@ export class AssociationScope {
    * relation. For multi-step (through), `table` is a different
    * (joined-in) table — qualify the WHERE as `<table>.<key> = ?`.
    *
+   * Deviation: Rails compares Arel `Table` objects with `scope.table ==
+   * table`, which is VALUE equality — `Arel::Table#==` (aliased to
+   * `eql?`, arel/table.rb:95-99) compares `name` AND `table_alias`, not
+   * object identity. We compare the resolved table NAME (string
+   * equality) because Relation doesn't expose its Arel table as a
+   * comparable object yet. Since callers pass the ALIAS name when the
+   * chain table is aliased (lastChainScope / nextChainScope resolve
+   * `aliasedTable.name`), the two agree for both base and aliased
+   * tables — the only gap is the (currently unreachable) case where a
+   * generated alias string equals the scope table's name, which
+   * AliasTracker's `_N`-suffixed candidates never produce. The
+   * polymorphic-source-type alias coverage in the test file exercises
+   * the aliased path; if such a name-collision case ever surfaces,
+   * route this through an Arel `Table` value comparison instead.
+   *
    * Mirrors: ActiveRecord::Associations::AssociationScope#apply_scope
    * (association_scope.rb:161-167).
    */
@@ -741,7 +756,19 @@ export class AssociationScope {
   ): unknown {
     const entryKlass = (reflection as { klass?: typeof Base }).klass;
     if (!entryKlass) return undefined;
-    const relation = this._buildEntryScope(entryKlass);
+    // Rails: `relation = reflection.build_scope(reflection.aliased_table)`
+    // (association_scope.rb:169) — the chain entry's scope lambda binds its
+    // `where(...)` predicates to the ALIASED table. For a self-referential
+    // polymorphic through (a repeated table) the entry's `imageable_type`
+    // source-type filter must qualify the joined-in alias
+    // (`children_imageables`), not the FROM table. Only repoint when the
+    // tracker actually produced an alias (a `TableAlias` node); the
+    // non-aliased case keeps `klass.arelTable` so SQL is byte-identical.
+    const aliased = (reflection as ReflectionProxy).aliasedTable;
+    const relation = this._buildEntryScope(
+      entryKlass,
+      aliased instanceof Nodes.TableAlias ? aliased : undefined,
+    );
     return invokeScopeLambda(scopeFn as ScopeLambda<unknown>, relation, owner);
   }
 
@@ -764,7 +791,21 @@ export class AssociationScope {
    * via `relation()` (core.rb:431-435), and `Base.unscoped` now wires that
    * through `_buildUnscopedRelation`, so no compensation is needed here.
    */
-  protected _buildEntryScope(entryKlass: typeof Base): unknown {
+  protected _buildEntryScope(entryKlass: typeof Base, aliasedTable?: unknown): unknown {
+    // Build the entry relation against the chain entry's alias so the scope
+    // lambda's `where(...)` predicates — AND any STI `type_condition` — qualify
+    // by the alias (Rails' `build_scope(reflection.aliased_table)`,
+    // reflection.rb:336). For a self-referential through (repeated table) the
+    // source-type filter must land on the joined-in alias, not the FROM table.
+    // The `TableAlias` node delegates `typeForAttribute` / `typeCastForDatabase`
+    // to the underlying table, so attribute casting is preserved. We only feed
+    // the table when the tracker produced a real alias; otherwise keep
+    // `unscoped()` so non-aliased SQL is byte-identical.
+    if (aliasedTable) {
+      return (
+        entryKlass as unknown as { _buildUnscopedRelation: (t: unknown) => unknown }
+      )._buildUnscopedRelation(aliasedTable);
+    }
     return (entryKlass as unknown as { unscoped: () => unknown }).unscoped();
   }
 

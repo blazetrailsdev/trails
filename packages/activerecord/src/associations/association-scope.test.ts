@@ -46,6 +46,11 @@ describe("AssociationScope", () => {
       int_authors: { name: "string" },
       int_memberships: { int_author_id: "integer", int_tag_id: "integer" },
       int_tags: { label: "string" },
+      pst_galleries: {
+        pst_gallery_id: "integer",
+        imageable_id: "integer",
+        imageable_type: "string",
+      },
     });
   });
 
@@ -1097,5 +1102,66 @@ describe("AssociationScope", () => {
       /["`]through_posts["`]\.["`]id["`]\s*=\s*["`]through_memberships["`]\.["`]through_post_id["`]/,
     );
     expect(sql).toMatch(/["`]through_memberships["`]\.["`]through_author_id["`]\s*=\s*1/);
+  });
+
+  it("through chain with a polymorphic sourceType that repeats a table aliases the join and keeps the _type WHERE qualified", () => {
+    // Polymorphic-source-type variant of the self-referential alias
+    // pin in association-scope-alias-tracker.test.ts. A gallery has
+    // child galleries; each child `belongsTo :imageable` (polymorphic).
+    // `imageables` hops through children with `sourceType: "PstGallery"`,
+    // so the source target is the SAME `pst_galleries` table the scope
+    // seeds the tracker with — the repeat-visit alias branch fires and
+    // the joined-in source gets aliased to `children_imageables`.
+    //
+    // What this pins that the non-polymorphic case doesn't: the
+    // polymorphic source-type filter (`imageable_type = 'PstGallery'`,
+    // from the PolymorphicReflection source_type_scope) must qualify the
+    // ALIASED through rows — the `imageable_*` columns live on the
+    // children, joined in as `children_imageables`, not on the FROM
+    // table. Rails evaluates the scope lambda against
+    // `reflection.build_scope(reflection.aliased_table)`
+    // (association_scope.rb:169, reflection.rb:336/1243), so the
+    // `where(imageable_type:)` predicate binds to the alias. Filtering
+    // `pst_galleries.imageable_type` (the FROM side) would match the
+    // wrong rows.
+    class PstGallery extends Base {
+      static {
+        this._tableName = "pst_galleries";
+        this.attribute("pst_gallery_id", "integer");
+        this.attribute("imageable_id", "integer");
+        this.attribute("imageable_type", "string");
+      }
+    }
+    registerModel("PstGallery", PstGallery);
+    Associations.hasMany.call(PstGallery, "children", {
+      className: "PstGallery",
+      foreignKey: "pst_gallery_id",
+    });
+    Associations.belongsTo.call(PstGallery, "imageable", { polymorphic: true });
+    Associations.hasMany.call(PstGallery, "imageables", {
+      className: "PstGallery",
+      through: "children",
+      source: "imageable",
+      sourceType: "PstGallery",
+    });
+
+    const owner = new PstGallery({});
+    (owner as any).id = 5;
+    const reflection = (PstGallery as any)._reflectOnAssociation("imageables");
+    const sql = (
+      AssociationScope.scope({
+        owner,
+        reflection,
+        klass: reflection.klass,
+      }) as any
+    ).toSql();
+    // The repeat visit to pst_galleries is aliased as the join target.
+    expect(sql).toMatch(/INNER JOIN\s+["`]pst_galleries["`]\s+["`]children_imageables["`]/i);
+    // Owner-FK WHERE is qualified by the alias, not the bare table.
+    expect(sql).toMatch(/["`]children_imageables["`]\.["`]pst_gallery_id["`]\s*=\s*5/);
+    // Polymorphic source-type filter qualifies the aliased through rows
+    // (Rails' build_scope(reflection.aliased_table)), NOT the FROM table.
+    expect(sql).toMatch(/["`]children_imageables["`]\.["`]imageable_type["`]\s*=\s*'PstGallery'/);
+    expect(sql).not.toMatch(/["`]pst_galleries["`]\.["`]imageable_type["`]/);
   });
 });
