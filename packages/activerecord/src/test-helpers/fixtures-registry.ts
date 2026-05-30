@@ -1,4 +1,5 @@
 import type { Base } from "../base.js";
+import { registerModel } from "../associations.js";
 
 import * as FixtureData from "./fixtures/index.js";
 
@@ -71,8 +72,11 @@ export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTable
  * the underlying loader gap; each is re-addable once that gap closes:
  * (no composite-PK seeding gaps remain — `compositeIdentify` generates absent key
  * columns, so `cpk-books` seeds even when a row omits its key components.)
- * - STI `type` row whose subclass isn't loaded by a standalone `useFixtures([set])`:
- *   `parrots` (LiveParrot), `vegetables` (Cucumber)
+ * (STI bases with a `type`/custom-inheritance row — `parrots`, `vegetables` — now
+ * register their subclasses: the subclasses live in the same model module as the
+ * base, and the base's `model` thunk `registerModel`s them so `findStiClass`
+ * resolves each row's inheritance-column value and the reload returns the correct
+ * subclass instance.)
  * - fixture references a non-column (HABTM assoc name): `developers` (`shared_computers`)
  * - table absent from the canonical SQLite `TEST_SCHEMA`: `uuid-children`, `uuid-parents`
  * - seeds on SQLite (dynamic typing) but NOT on the strict PG/MariaDB CI engines —
@@ -344,6 +348,19 @@ export const fixtureRegistry = {
     model: () => import("./models/paragraph.js").then((m) => m.Paragraph),
     data: FixtureData.paragraphFixtureData,
   },
+  parrots: {
+    // STI base. LiveParrot/DeadParrot live in the same module; registering them
+    // in `modelRegistry` (Rails' autoloader analog — `findStiClass` resolves the
+    // inheritance-column value through it) lets the base reload hydrate each row
+    // as its declared `parrot_sti_class` subclass.
+    model: () =>
+      import("./models/parrot.js").then((m) => {
+        registerModel(m.LiveParrot);
+        registerModel(m.DeadParrot);
+        return m.Parrot;
+      }),
+    data: FixtureData.parrotFixtureData,
+  },
   parrotsPirates: {
     joinTable: "parrots_pirates",
     data: FixtureData.parrotsPiratesFixtureData,
@@ -467,6 +484,19 @@ export const fixtureRegistry = {
   variants: {
     model: () => import("./models/shop.js").then((m) => m.ShopVariant),
     data: FixtureData.variantFixtureData,
+  },
+  vegetables: {
+    // STI base with custom inheritance column `custom_type`. Register the
+    // subclasses the fixture rows reference so the base reload resolves each
+    // `custom_type` value to its concrete class.
+    model: () =>
+      import("./models/vegetables.js").then((m) => {
+        registerModel(m.Cucumber);
+        registerModel(m.Cabbage);
+        registerModel(m.RedCabbage);
+        return m.Vegetable;
+      }),
+    data: FixtureData.vegetableFixtureData,
   },
   warehouseThings: {
     model: () => import("./models/warehouse-thing.js").then((m) => m.WarehouseThing),

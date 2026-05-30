@@ -17,6 +17,8 @@ import { useHandlerTransactionalFixtures } from "./use-handler-transactional-fix
 import { TEST_SCHEMA } from "./test-schema.js";
 import { Author } from "./models/author.js";
 import { Post } from "./models/post.js";
+import { LiveParrot, DeadParrot } from "./models/parrot.js";
+import { Cucumber, Cabbage, RedCabbage } from "./models/vegetables.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 const TYPE_CONTRACT_SCHEMA = {
@@ -460,6 +462,57 @@ describe("useFixtures seeds composite-primary-key tables", () => {
     expect(book.readAttribute("author_id")).not.toBeUndefined();
     expect(book.readAttribute("id")).not.toBeNull();
     expect(book.readAttribute("title")).toBe("Generated author's book");
+  });
+});
+
+// --- STI subclass standalone load ---
+
+describe("useFixtures resolves STI subclasses on standalone load", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
+  // parrots.yml rows carry a custom inheritance column (`parrot_sti_class`)
+  // pointing at LiveParrot/DeadParrot. Loading the base `parrots` set must
+  // hydrate each row as its declared subclass — the subclasses live in the same
+  // module as Parrot, so the registry's `model` thunk eagerly loads them.
+  const { parrots } = useFixtures(["parrots"], () => Base.adapter);
+  // vegetables.yml uses `custom_type` → Cucumber/Cabbage/RedCabbage.
+  const { vegetables } = useFixtures(["vegetables"], () => Base.adapter);
+
+  it("hydrates a LiveParrot-typed row as a LiveParrot instance", () => {
+    expect(parrots("george")).toBeInstanceOf(LiveParrot);
+    expect(parrots("george").readAttribute("parrot_sti_class")).toBe("LiveParrot");
+  });
+
+  it("hydrates a DeadParrot-typed row as a DeadParrot instance", () => {
+    expect(parrots("polly")).toBeInstanceOf(DeadParrot);
+    expect(parrots("polly").readAttribute("parrot_sti_class")).toBe("DeadParrot");
+  });
+
+  it("resolves the subclass-only `breed` enum via the row's STI class", async () => {
+    // breed is an enum LiveParrot declares but Parrot (the base) does not, so the
+    // string key must be mapped through the subclass — Rails' resolve_enums keyed
+    // by reflection_class. Stored as the integer (african: 0, australian: 1), not
+    // the verbatim string that strict engines would reject on an integer column.
+    const [row] = (await Base.adapter.execute(
+      `SELECT breed FROM ${Base.adapter.quoteTableName("parrots")} WHERE name = 'Curious George'`,
+    )) as { breed: number }[];
+    expect(row!.breed).toBe(1);
+    expect(parrots("george").readAttribute("breed")).toBe(1);
+    expect(parrots("louis").readAttribute("breed")).toBe(0);
+  });
+
+  it("hydrates a Cucumber-typed row as a Cucumber instance", () => {
+    expect(vegetables("first_cucumber")).toBeInstanceOf(Cucumber);
+    expect(vegetables("first_cucumber").readAttribute("custom_type")).toBe("Cucumber");
+  });
+
+  it("hydrates RedCabbage and plain Cabbage rows as their subclasses", () => {
+    expect(vegetables("red_cabbage")).toBeInstanceOf(RedCabbage);
+    expect(vegetables("first_cabbage")).toBeInstanceOf(Cabbage);
   });
 });
 

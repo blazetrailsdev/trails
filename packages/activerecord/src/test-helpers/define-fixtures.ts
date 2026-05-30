@@ -4,6 +4,7 @@ import {
 } from "../connection-adapters/abstract/database-statements.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { Base } from "../base.js";
+import { findStiClass } from "../inheritance.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
 import { currentTimeFromProperTimezone } from "../timestamp.js";
 import { singularize } from "@blazetrails/activesupport";
@@ -226,6 +227,61 @@ function findPolymorphicRef(modelClass: BaseClass, colName: string): Polymorphic
   return { typeColumn, idColumn: rawFk };
 }
 
+// --- STI reflection class + enum resolution (Phase: STI subclass standalone load) ---
+
+/**
+ * Resolves the STI subclass a fixture row belongs to, mirroring Rails'
+ * `FixtureSet::TableRow#reflection_class`: the inheritance-column value is
+ * constantized (here looked up through `findStiClass`, the registry analog of
+ * Ruby's `constantize`), falling back to the base model when the column is
+ * absent/blank or names no registered subclass (Rails' `rescue model_class`).
+ * Used so enum (and future reflection-traversing) resolution honours the row's
+ * concrete subclass — e.g. a `parrots` row typed `LiveParrot` resolves the
+ * `breed` enum that only `LiveParrot` declares, not the bare `Parrot` base.
+ */
+function reflectionClassFor(
+  ModelClass: BaseClass,
+  inheritanceCol: string | null,
+  row: FixtureAttrs,
+): BaseClass {
+  if (!inheritanceCol) return ModelClass;
+  const typeName = row[inheritanceCol];
+  if (typeof typeName !== "string" || !typeName.trim()) return ModelClass;
+  try {
+    return findStiClass(ModelClass, typeName);
+  } catch {
+    return ModelClass;
+  }
+}
+
+/**
+ * Maps string enum keys in a row to their stored values, mirroring Rails'
+ * `FixtureSet::TableRow#resolve_enums`: for each enum the reflection class
+ * declares, a present column value that names an enum key is replaced with the
+ * mapped value (`values.fetch(@row[name], @row[name])` — non-key values pass
+ * through untouched). Without this a string enum key (e.g. `breed: "australian"`)
+ * is quoted verbatim into an integer column, which SQLite's dynamic typing
+ * tolerates but the strict PG/MariaDB engines reject.
+ */
+function resolveEnums(reflectionClass: BaseClass, row: FixtureAttrs): void {
+  // `assertValidEnumDefinitionValues` permits string/number/boolean/null backing
+  // values (Rails supports e.g. `enum verified: { yes: true, no: false }`), so the
+  // stored value a key maps to may be any of those — all valid to write back.
+  const enums = (
+    reflectionClass as {
+      _enums?: Map<string, Record<string, number | string | boolean | null>>;
+    }
+  )._enums;
+  if (!enums || enums.size === 0) return;
+  for (const [name, mapping] of enums) {
+    if (!(name in row)) continue;
+    const value = row[name];
+    if (typeof value === "string" && Object.prototype.hasOwnProperty.call(mapping, value)) {
+      row[name] = mapping[value];
+    }
+  }
+}
+
 type BaseClass = typeof Base;
 type FixtureAttrs = Record<string, unknown>;
 type InsertHost = DatabaseStatementsHost &
@@ -341,6 +397,10 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
 
   // Build rows with resolved IDs and references. Rows that declare `id: N` use it
   // verbatim (Rails parity); rows without one fall back to fixtureId(label).
+  // Inheritance column (mirrors Rails' model_metadata.inheritance_column_name):
+  // null when the model isn't STI, so non-STI fixtures skip subclass resolution.
+  const inheritanceCol = (ModelClass as BaseClass).inheritanceColumn;
+
   const rows: FixtureAttrs[] = [];
   for (const label of labels) {
     const attrs = fixtures[label];
@@ -454,6 +514,12 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
         if (!(keyCol in row)) row[keyCol] = generated[keyCol]!;
       }
     }
+
+    // Resolve enums against the row's STI subclass (Rails' reflection_class):
+    // a `parrots` row typed LiveParrot maps `breed: "australian"` → 1 via the
+    // subclass enum the base Parrot doesn't declare.
+    resolveEnums(reflectionClassFor(ModelClass, inheritanceCol, row), row);
+
     rows.push(row);
   }
 
