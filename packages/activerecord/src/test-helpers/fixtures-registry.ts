@@ -31,7 +31,7 @@ export interface FixtureJoinTableEntry {
 
 export type FixtureRegistryEntry = FixtureModelEntry | FixtureJoinTableEntry;
 
-/** @internal Narrows a registry entry to the model-backed variant. */
+/** @internal Narrows a registry entry to the join-table variant. */
 export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTableEntry {
   return "joinTable" in e;
 }
