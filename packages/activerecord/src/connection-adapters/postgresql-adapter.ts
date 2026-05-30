@@ -1989,9 +1989,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    *
    * Like Rails' private `reconnect`, this does NOT reset the transaction
    * manager — that is owned by the inherited `AbstractAdapter#reconnectBang`
-   * lifecycle, which runs the restore-aware `resetTransaction` after this
-   * raw reconnect. Direct callers that need a tx reset (e.g. `verifyBang`)
-   * do it themselves.
+   * lifecycle (Rails' `reconnect!`), which runs the restore-aware
+   * `resetTransaction` after this raw reconnect. Callers wanting the full
+   * reset/reconfigure/retry cycle drive `reconnectBang` (as `verifyBang` does),
+   * not this primitive.
    *
    * @internal
    */
@@ -2011,9 +2012,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   /**
    * Mirrors Rails' `PostgreSQLAdapter#active?` + `AbstractAdapter#verify!`.
-   * Pings the server with a lightweight query; on PG::Error (server-side
-   * disconnect, timeout, pg_terminate_backend) tears down the connection
-   * and reconnects so the next acquire gets a fresh `pg.Client`.
+   * Pings the server with a lightweight query (Rails' `active?`); on PG::Error
+   * (server-side disconnect, timeout, pg_terminate_backend) it drives the
+   * inherited `reconnectBang({ restoreTransactions: true })` — exactly Rails'
+   * `verify!` → `reconnect!(restore_transactions: true)` — for the retry loop,
+   * restore-aware tx reset, and reconfigure. PG keeps its own `verifyBang`
+   * because trails' `active` getter is a sync property and cannot run the
+   * async ping the way Rails' `active?` does.
    *
    * @internal
    */
@@ -2030,8 +2035,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       throw new Error("PostgreSQLAdapter: connection is closed");
     }
     if (this._closed || !this._rawConnection) {
-      this.reconnect();
-      this.resetTransaction();
+      await this.reconnectBang({ restoreTransactions: true });
       this.verifiedBang();
       return;
     }
@@ -2040,16 +2044,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // may have nulled _rawConnection while we were waiting.
     const conn = this._rawConnection;
     if (this._closed || !conn) {
-      this.reconnect();
-      this.resetTransaction();
+      await this.reconnectBang({ restoreTransactions: true });
       this.verifiedBang();
       return;
     }
     try {
       await conn.query(";");
     } catch {
-      this.reconnect();
-      this.resetTransaction();
+      await this.reconnectBang({ restoreTransactions: true });
     }
     this.verifiedBang();
   }
