@@ -278,6 +278,32 @@ describe("useFixtures seeds a single-row HABTM join table", () => {
   });
 });
 
+// --- vertices + edges cross-fixture ref() ---
+
+describe("useFixtures vertices and edges", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
+  // vertices must load before edges so edge ref()s resolve to declared vertex ids.
+  const { vertices, edges } = useFixtures(["vertices", "edges"], () => Base.adapter);
+
+  it("loads all 5 vertices and 4 edges", () => {
+    expect(vertices.all().length).toBe(5);
+    expect(edges.all().length).toBe(4);
+  });
+
+  it("resolves every edge ref() source_id and sink_id to a real vertex id", () => {
+    const vertexIds = vertices.all().map((v) => v.readAttribute("id"));
+    for (const edge of edges.all()) {
+      expect(vertexIds).toContain(edge.readAttribute("source_id"));
+      expect(vertexIds).toContain(edge.readAttribute("sink_id"));
+    }
+  });
+});
+
 // --- useFixtures schema auto-derivation ({ schema } option) ---
 
 describe("useFixtures { schema } auto-derivation", () => {
