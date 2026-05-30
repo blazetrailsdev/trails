@@ -1,0 +1,31 @@
+{
+  "name": "@blazetrails/activerecord-cli",
+  "version": "0.1.0",
+  "description": "Generators, migrator, and the `ar` CLI for standalone @blazetrails/activerecord projects",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "ar": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@blazetrails/activerecord": "workspace:*"
+  }
+}
