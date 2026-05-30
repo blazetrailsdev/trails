@@ -269,13 +269,13 @@ export const fixtureRegistry = {
     model: () => import("./models/minimalistic.js").then((m) => m.Minimalistic),
     data: FixtureData.minimalisticFixtureData,
   },
-  mixedCaseMonkeys: {
-    model: () => import("./models/mixed-case-monkey.js").then((m) => m.MixedCaseMonkey),
-    data: FixtureData.mixedCaseMonkeyFixtureData,
-  },
   minivans: {
     model: () => import("./models/minivan.js").then((m) => m.Minivan),
     data: FixtureData.minivanFixtureData,
+  },
+  mixedCaseMonkeys: {
+    model: () => import("./models/mixed-case-monkey.js").then((m) => m.MixedCaseMonkey),
+    data: FixtureData.mixedCaseMonkeyFixtureData,
   },
   movies: {
     model: () => import("./models/movie.js").then((m) => m.Movie),

@@ -289,7 +289,7 @@ describe("useFixtures reconciles the PK column against the schema", () => {
     expect(special.readAttribute("ID")).not.toBeNull();
     expect(special.readAttribute("ID")).not.toBeUndefined();
     const [row] = await Base.adapter.execute(
-      `SELECT name FROM ${Base.adapter.quoteTableName("bulbs")} WHERE "ID" = ${special.readAttribute("ID")}`,
+      `SELECT name FROM ${Base.adapter.quoteTableName("bulbs")} WHERE ${Base.adapter.quoteColumnName("ID")} = ${special.readAttribute("ID")}`,
     );
     expect((row as { name: string }).name).toBe("special");
   });
