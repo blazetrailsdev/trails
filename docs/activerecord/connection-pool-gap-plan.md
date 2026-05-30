@@ -155,11 +155,13 @@ non-`:memory:` adapter with raw-connection reopen — Rails gates the suite
 
 **From #2654 (PF2 query-cache guard move):**
 
-- [ ] ~10–20 LOC (low priority): remove the block-form `enableQueryCache`
-      `_queryCacheMaxSize === null` early-return for full `enable_query_cache`
-      fidelity; resolve the maxSize-0-vs-nil modeling difference at the same time
-      (trails maps config-false to Store maxSize 0; Rails maps to nil/unbounded
-      and gates via `QueryCache.run`, but `Base.cache {}` bypasses that gate).
+- [x] Removed the block-form `enableQueryCache` `_queryCacheMaxSize === null`
+      early-return for full `enable_query_cache` fidelity (`query_cache.rb:149`,
+      which enables unconditionally). The maxSize-0-vs-nil modeling difference is
+      resolved by the Store itself: config-false pools build a Store with maxSize
+      0, so `computeIfAbsent` short-circuits without storing — caching stays a
+      no-op while `queryCacheEnabled` now reports correctly inside the block,
+      making the early-return redundant.
 - [ ] ~5 LOC (when global handler iteration is wired): add a zero-arg `run()`
       overload iterating `connection_handler.each_connection_pool` to fully
       mirror Rails' arg-less `QueryCache.run`.

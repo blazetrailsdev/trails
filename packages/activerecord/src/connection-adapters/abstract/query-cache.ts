@@ -222,7 +222,6 @@ export class ConnectionPoolConfiguration {
   }
 
   async enableQueryCache<T>(fn: () => T | Promise<T>): Promise<T> {
-    if (this._queryCacheMaxSize === null) return await fn();
     const qc = this.queryCache;
     const oldEnabled = qc.enabled;
     const oldDirties = qc.dirties;
@@ -252,7 +251,6 @@ export class ConnectionPoolConfiguration {
   }
 
   disableQueryCacheBang(): void {
-    if (this._queryCacheMaxSize === null) return;
     const qc = this.queryCache;
     qc.enabled = false;
     qc.dirties = true;
