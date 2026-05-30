@@ -175,7 +175,7 @@ non-`:memory:` adapter with raw-connection reopen — Rails gates the suite
   test starts failing with unexpected dialect SQL, `installAdapterVisitor`
   (`connection-handling.ts`) and its eager-checkout / error-swallowing boundary
   are the first place to look. (Wider bootstrap→DatabaseTasks sequencing lives
-  in `docs/activerecord/bootstrap-to-databasetasks-plan.md`, not this doc.)
+  in the tasks repo as RFC 0002 `0002-bootstrap-databasetasks`, not this doc.)
 
 **From #2636 (SqliteDriver.restoreFromPath backup primitive):**
 
