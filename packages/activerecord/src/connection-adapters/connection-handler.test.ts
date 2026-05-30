@@ -36,24 +36,21 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it.skip("not setting writing role while using another named role raises", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for ConnectionHandlerTest
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs role validation logic */
+    // BLOCKED: connection-pool
+    // ROOT-CAUSE: connection-handling.ts#connectsTo: no setupSharedConnectionPool helper or writing-role validation (Rails connection_handler_test.rb:81)
+    // SCOPE: ~80 LOC connectsTo shared-pool support; affects ~3 tests
   });
 
   it.skip("fixtures dont raise if theres no writing pool config", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for ConnectionHandlerTest
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs fixture integration */
+    // BLOCKED: connection-pool
+    // ROOT-CAUSE: connection-handler.ts#retrieveConnection: no reading→writing role fallback for connectsTo(database:) (Rails connection_handler_test.rb:92)
+    // SCOPE: ~30 LOC role-aliasing; affects ~3 tests
   });
 
   it.skip("setting writing role while using another named role does not raise", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for ConnectionHandlerTest
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs role validation logic */
+    // BLOCKED: connection-pool
+    // ROOT-CAUSE: connection-handling.ts#connectsTo: no setupSharedConnectionPool helper or mutable writingRole (Rails connection_handler_test.rb:108)
+    // SCOPE: ~80 LOC connectsTo shared-pool support; affects ~3 tests
   });
 
   it("establish connection with primary works without deprecation", () => {
@@ -93,11 +90,15 @@ describe("ConnectionHandlerTest", () => {
     expect(pool.dbConfig.database).toBe("test.db");
   });
 
-  it.skip("establish connection using top level key in two level config", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs config resolution from raw YAML-like structures */
+  it("establish connection using top level key in two level config", () => {
+    const configs = new DatabaseConfigurations({
+      development: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
+      development_readonly: { adapter: "sqlite3", database: "test/db/readonly.sqlite3" },
+    });
+    const config = configs.configsFor({ envName: "development_readonly" })[0];
+    const pool = handler.establishConnection(config);
+    expect(pool).toBeTruthy();
+    expect(pool.dbConfig.database).toBe("test/db/readonly.sqlite3");
   });
 
   it("establish connection with string owner name", () => {
@@ -110,11 +111,28 @@ describe("ConnectionHandlerTest", () => {
     expect(pool).toBeTruthy();
   });
 
-  it.skip("symbolized configurations assignment", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* TS doesn't have symbols vs strings distinction in the same way */
+  it("symbolized configurations assignment", () => {
+    // Rails asserts each config-hash key is a Symbol; the raw config here is
+    // string-keyed and DatabaseConfigurations normalizes via Object.entries,
+    // so that key-type assertion has no TS analogue. The rest of the test —
+    // that nested config normalizes to HashConfig instances with String
+    // envName/name — translates directly.
+    const config = {
+      development: {
+        primary: { adapter: "sqlite3", database: "test/storage/development.sqlite3" },
+      },
+      test: {
+        primary: { adapter: "sqlite3", database: "test/storage/test.sqlite3" },
+      },
+    };
+    const configurations = new DatabaseConfigurations(config);
+    const dbConfigs = configurations.configsFor();
+    expect(dbConfigs).toHaveLength(2);
+    for (const dbConfig of dbConfigs) {
+      expect(dbConfig).toBeInstanceOf(HashConfig);
+      expect(typeof dbConfig.envName).toBe("string");
+      expect(typeof dbConfig.name).toBe("string");
+    }
   });
 
   it("retrieve connection", () => {
@@ -171,10 +189,9 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it.skip("a class using custom pool and switching back to primary", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs Base class integration */
+    // BLOCKED: connection-pool
+    // ROOT-CAUSE: connection-handling.ts#leaseConnection: anonymous subclass→Base pool fallback after removeConnection not wired (Rails connection_handler_test.rb:282)
+    // SCOPE: ~50 LOC Base default-pool integration; affects ~1 test
   });
 
   it("connection specification name should fallback to parent", () => {
@@ -298,38 +315,23 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it.skip("connection pool per pid", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs process forking */
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — fork
   });
 
   it.skip("forked child doesnt mangle parent connection", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs process forking */
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — fork
   });
 
   it.skip("forked child recovers from disconnected parent", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs process forking */
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — fork
   });
 
   it.skip("retrieve connection pool copies schema cache from ancestor pool", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs schema cache implementation */
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — fork
   });
 
   it.skip("pool from any process for uses most recent spec", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs process forking */
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — fork
   });
 
   it("connection pool names", () => {

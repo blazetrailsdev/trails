@@ -386,6 +386,18 @@ export const UNPORTED_FILES: UnportedFile[] = [
     tests: ["connection pool starts reaper in fork"],
     reason: "GVL / Ruby fork() semantics — process forking has no Node.js equivalent.",
   },
+  {
+    testFile: "connection_adapters/connection_handler_test.rb",
+    tests: [
+      "connection pool per pid",
+      "forked child doesnt mangle parent connection",
+      "forked child recovers from disconnected parent",
+      "retrieve connection pool copies schema cache from ancestor pool",
+      "pool from any process for uses most recent spec",
+    ],
+    reason:
+      "Ruby fork() + Marshal — process forking and binary serialization have no Node.js equivalent.",
+  },
   // --- Permanently not-portable: Ruby serialization formats ---
   {
     testFile: "yaml_serialization_test.rb",
