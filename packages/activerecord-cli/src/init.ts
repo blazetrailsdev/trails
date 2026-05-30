@@ -1,4 +1,4 @@
-import { mkdir, writeFile, access } from "fs/promises";
+import { mkdir, writeFile } from "fs/promises";
 import { dirname, join } from "path";
 
 // The files `ar init` writes, mirroring the §4.7 layout in the
@@ -64,19 +64,6 @@ const SCAFFOLD: ReadonlyArray<readonly [string, string]> = [
   ["db.ts", DB_GLUE],
 ];
 
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch (err) {
-    // Only a missing path means "does not exist". Permission errors
-    // (EACCES/EPERM) etc. are real failures — surface them rather than
-    // silently treating the path as absent and clobbering it.
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return false;
-    throw err;
-  }
-}
-
 export interface InitResult {
   /** Paths (relative to root) that were written. */
   created: string[];
@@ -93,13 +80,17 @@ export async function init(root: string): Promise<InitResult> {
   const skipped: string[] = [];
   for (const [rel, body] of SCAFFOLD) {
     const target = join(root, rel);
-    if (await exists(target)) {
-      skipped.push(rel);
-      continue;
-    }
     await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, body, "utf8");
-    created.push(rel);
+    try {
+      // `wx` creates atomically, failing with EEXIST if the path already
+      // exists — no check-then-write TOCTOU window. EEXIST means "skip";
+      // any other error (EACCES/EPERM/ENOTDIR…) is real and re-thrown.
+      await writeFile(target, body, { flag: "wx" });
+      created.push(rel);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+      skipped.push(rel);
+    }
   }
   return { created, skipped };
 }

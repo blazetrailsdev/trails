@@ -50,9 +50,9 @@ describe("ArInitTest", () => {
     expect(second.skipped.sort()).toEqual([...EXPECTED].sort());
   });
 
-  it("surfaces non-ENOENT errors instead of clobbering the path", async () => {
-    // A file where init() expects to create the `config/` directory makes the
-    // existence probe fail with ENOTDIR — a real error, not "does not exist".
+  it("surfaces real filesystem errors instead of silently skipping", async () => {
+    // A plain file where init() needs to create the `config/` directory makes
+    // mkdir fail — a real error that must propagate, not be swallowed as a skip.
     await writeFile(join(root, "config"), "not a dir\n", "utf8");
     await expect(init(root)).rejects.toThrow();
   });
