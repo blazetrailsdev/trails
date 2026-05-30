@@ -259,9 +259,13 @@ export const TEST_SCHEMA: Schema = {
   },
 
   citations: {
-    book1_id: "integer",
-    book2_id: "integer",
-    citation_id: "integer",
+    // Rails declares these via `t.references`, which defaults to bigint. The
+    // citations fixture stores `book2_id: i*i` for i up to 65535
+    // (4_294_836_225), overflowing a 32-bit integer column on PG/MariaDB —
+    // SQLite's dynamic typing tolerated it. Widen to bigint to match Rails.
+    book1_id: "big_integer",
+    book2_id: "big_integer",
+    citation_id: "big_integer",
   },
 
   cpk_books: {

@@ -14,7 +14,11 @@ export const bookFixtureData = {
     illustrator_visibility: 0,
     font_size: 1,
     difficulty: 1,
-    boolean_status: 1,
+    // Rails YAML carries `boolean_status: :enabled`; the Book enum maps
+    // `{ enabled: true, disabled: false }`, so the stored value is a real
+    // boolean. PG/MariaDB reject an integer literal in a boolean column
+    // (SQLite's dynamic typing tolerated the prior `1`).
+    boolean_status: true,
     cover: "soft",
   },
   rfr: {

@@ -5,8 +5,11 @@ import { ref } from "../define-fixtures.js";
 // belongs_to reflection) and ERB `joined_on` (3.weeks.ago). Translated to
 // the FK column so the data is loadable; the ERB stamps use a static
 // placeholder (compare skips this file as ERB-UNSUPPORTED regardless).
-// Note: Rails schema declares `t.integer :type` even though STI writes a
-// class-name string — preserved verbatim to match Rails fidelity.
+// Note: `type` is an *enum* (`enum :type, %i(Membership CurrentMembership …)`),
+// NOT an STI inheritance column — Rails schema declares `t.integer :type` and
+// the enum maps each class-name key to an integer. The fixture carries the enum
+// key; defineFixtures' resolveEnums() converts it to the integer at seed time
+// (so the integer column is satisfied on the strict PG/MariaDB engines).
 export const membershipFixtureData = {
   membership_of_boring_club: {
     joined_on: "2024-01-01 00:00:00",
