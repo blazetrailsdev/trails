@@ -653,25 +653,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (Array.isArray(attrs)) {
       return attrs.map((a) => this.build(a, block));
     }
-    // Through association: build the target record (no FK on target)
-    if (this._isThrough) {
-      const record = this._buildThrough(attrs) as T;
-      if (block) block(record);
-      const allowed = fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
-      if (allowed) {
-        this._target.push(record);
-        fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
-      }
-      return record;
-    }
-
-    const record = this._buildRaw(attrs) as T;
+    // Rails' build calls add_to_target(build_record(...), replace: true).
+    const record = (this._isThrough ? this._buildThrough(attrs) : this._buildRaw(attrs)) as T;
     if (block) block(record);
-    const allowed = fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
-    if (allowed) {
-      this._target.push(record);
-      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
-    }
+    this._replaceOnTarget(record, { replace: true });
     return record;
   }
 
@@ -854,10 +839,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     save?: () => Promise<boolean>,
   ): Promise<T | null> {
     const { skipCallbacks = false, replace = false } = options;
-    let index = -1;
-    if (replace && (!record.isNewRecord() || this._replacedOrAddedTargets.has(record))) {
-      index = this._indexInTarget(record);
-    }
+    const index = this._targetReplaceIndex(record, replace);
     if (
       !skipCallbacks &&
       !fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)
@@ -866,6 +848,57 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
     if (save && !(await save())) return record;
+    this._commitToTarget(record, index);
+    if (!skipCallbacks) fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    return record;
+  }
+
+  /**
+   * Synchronous sibling of `_addToTarget` for callers with no DB write to
+   * interleave (Rails' `add_to_target` with no block — e.g. `build`, which
+   * calls `add_to_target(build_record(...), replace: true)`). Same
+   * set_inverse_instance + `@replaced_or_added_targets` dedup + before/after_add
+   * funnel as `_addToTarget`, minus the `yield(record)` save step.
+   * @internal
+   */
+  private _replaceOnTarget(
+    record: T,
+    options: { skipCallbacks?: boolean; replace?: boolean } = {},
+  ): T | null {
+    const { skipCallbacks = false, replace = false } = options;
+    const index = this._targetReplaceIndex(record, replace);
+    if (
+      !skipCallbacks &&
+      !fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)
+    ) {
+      return null;
+    }
+    _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
+    this._commitToTarget(record, index);
+    if (!skipCallbacks) fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    return record;
+  }
+
+  /**
+   * Pre-callback `@target.index(record)` computation from Rails'
+   * `replace_on_target`: only meaningful when replacing a persisted record or
+   * one already tracked in `@replaced_or_added_targets`.
+   * @internal
+   */
+  private _targetReplaceIndex(record: T, replace: boolean): number {
+    if (replace && (!record.isNewRecord() || this._replacedOrAddedTargets.has(record))) {
+      return this._indexInTarget(record);
+    }
+    return -1;
+  }
+
+  /**
+   * Post-callback target mutation from Rails' `replace_on_target`: recompute
+   * the index (the record may have joined `@replaced_or_added_targets` during a
+   * save), record the identity, then either replace in place or append.
+   * @internal
+   */
+  private _commitToTarget(record: T, index: number): void {
     if (index === -1 && this._replacedOrAddedTargets.has(record)) {
       index = this._indexInTarget(record);
     }
@@ -878,8 +911,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       this._target.push(record);
       this._invalidateAssociationIds();
     }
-    if (!skipCallbacks) fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
-    return record;
   }
 
   /**
@@ -2493,13 +2524,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     const record = this._buildRaw(attrs) as T;
     if (block) block(record);
-    if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
-      throw new RecordNotSaved("Callback prevented record creation", record);
-    }
-    const saved = await record.save();
-    if (!saved) throw new RecordInvalid(record);
-    this._target.push(record);
-    fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    // Mirror Rails' _create_record(raise: true): add_to_target(record) { save! }.
+    // The save (insert_record) runs inside the add_to_target funnel, between
+    // set_inverse_instance and the target mutation. A before_add abort leaves
+    // the record unsaved and out of the target without raising.
+    await this._addToTarget(record, { replace: this.distinctValue }, async () => {
+      if (!(await record.save())) throw new RecordInvalid(record);
+      return true;
+    });
     return record;
   }
 
