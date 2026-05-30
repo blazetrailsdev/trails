@@ -1527,7 +1527,21 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         })()
       : this._throughOwnerAttrs(throughAssoc, ctor);
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
-    const sourceFk = `${underscore(sourceName)}_id`;
+    // Resolve the join-table FK from the source reflection's own
+    // `foreignKey` (Rails' `source_reflection.foreign_key`), not by deriving
+    // `<source>_id` from the association name. A self-referential or
+    // nonstandard-FK source belongsTo — e.g. `belongs_to :reference_of,
+    // foreign_key: "book2_id"` — has a name-derived FK (`reference_of_id`)
+    // that doesn't match the real column, so the convention path writes the
+    // wrong column and leaves the actual FK null (join row never matches).
+    const sourceRefl = (
+      ctor as unknown as {
+        _reflectOnAssociation?: (
+          n: string,
+        ) => { sourceReflection?: { foreignKey?: string } } | null;
+      }
+    )._reflectOnAssociation?.(this._assocName)?.sourceReflection;
+    const sourceFk = sourceRefl?.foreignKey ?? `${underscore(sourceName)}_id`;
 
     for (const record of records) {
       // Route the in-memory mutation through `_addToTarget` (Rails'

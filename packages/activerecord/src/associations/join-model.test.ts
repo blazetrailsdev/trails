@@ -1822,8 +1822,8 @@ describe("AssociationsJoinModelTest", () => {
     });
     const book = await NsiBook.create({ name: "awdr" });
     const reference = await NsiBook.create({ name: "Getting Real" });
-    await NsiCitation.create({ book1_id: book.id, book2_id: reference.id });
     const proxy = association(book, "references");
+    await proxy.push(reference);
     expect(await proxy.count()).toBe(1);
     await proxy.delete(reference);
     expect(await proxy.count()).toBe(0);
