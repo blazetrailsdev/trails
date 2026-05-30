@@ -56,12 +56,10 @@ import { strictLoadingViolationBang } from "./core.js";
 import { HasManyThroughAssociationNotFoundError } from "./associations/errors.js";
 import {
   AssociationNotFoundError,
-  DeleteRestrictionError,
   InverseOfAssociationNotFoundError,
   HasOneThroughNestedAssociationsAreReadonly,
   CompositePrimaryKeyMismatchError,
 } from "./associations/errors.js";
-import { ForeignAssociation } from "./associations/foreign-association.js";
 import { AssociationScope, invokeScopeLambda } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 import { validateThroughReflection } from "./associations/validate-through-reflection.js";
@@ -1831,81 +1829,12 @@ export async function processDependentAssociations(record: Base): Promise<void> 
     if (!assoc.options.dependent) continue;
     if (assoc.type !== "hasMany" && assoc.type !== "hasOne") continue;
 
-    const dep = assoc.options.dependent;
-
-    if (assoc.type === "hasMany") {
-      const children = await loadHasMany(record, assoc.name, assoc.options);
-      if (dep === "destroy") {
-        for (const child of children) {
-          await child.destroy();
-        }
-      } else if (dep === "delete") {
-        // Bulk delete avoids N+1 on join tables (HABTM middle hasMany)
-        const childModel = resolveAssocClass(
-          record,
-          assoc.name,
-          (assoc.options.className as string) ?? camelize(singularize(assoc.name)),
-        );
-        const fk = (assoc.options.foreignKey as string) ?? `${underscore(ctor.name)}_id`;
-        const pkCol = Array.isArray(ctor.primaryKey) ? ctor.primaryKey[0] : ctor.primaryKey;
-        await childModel.where({ [fk]: record._readAttribute(pkCol as string) }).deleteAll();
-      } else if (dep === "nullify") {
-        const asName = assoc.options.as;
-        const foreignKey = asName
-          ? (assoc.options.foreignKey ?? `${underscore(asName)}_id`)
-          : (assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`);
-        const typeCol = asName ? `${underscore(asName)}_type` : null;
-        const nullifiedEntries = Object.entries(
-          ForeignAssociation.nullifiedOwnerAttributes({ foreignKey, type: typeCol }),
-        );
-        for (const child of children) {
-          for (const [col, val] of nullifiedEntries) {
-            child._writeAttribute(col, val);
-          }
-          await child.save();
-        }
-      } else if (dep === "restrictWithException") {
-        if (children.length > 0) {
-          throw new DeleteRestrictionError(record, assoc.name);
-        }
-      } else if (dep === "restrictWithError") {
-        if (children.length > 0) {
-          (record as any).errors?.add("base", "invalid", {
-            message: `Cannot delete record because dependent ${assoc.name} exist`,
-          });
-          throw new DeleteRestrictionError(record, assoc.name);
-        }
-      }
-    } else if (assoc.type === "hasOne") {
-      const child = await loadHasOne(record, assoc.name, assoc.options);
-      if (!child) continue;
-      if (dep === "destroy") {
-        await child.destroy();
-      } else if (dep === "delete") {
-        await child.delete();
-      } else if (dep === "nullify") {
-        const hasOneAsName = assoc.options.as;
-        const foreignKey = hasOneAsName
-          ? (assoc.options.foreignKey ?? `${underscore(hasOneAsName)}_id`)
-          : (assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`);
-        const typeCol = hasOneAsName ? `${underscore(hasOneAsName)}_type` : null;
-        const nullified = ForeignAssociation.nullifiedOwnerAttributes({
-          foreignKey,
-          type: typeCol,
-        });
-        for (const [col, val] of Object.entries(nullified)) {
-          child._writeAttribute(col, val);
-        }
-        await child.save();
-      } else if (dep === "restrictWithException") {
-        throw new DeleteRestrictionError(record, assoc.name);
-      } else if (dep === "restrictWithError") {
-        (record as any).errors?.add("base", "invalid", {
-          message: `Cannot delete record because dependent ${assoc.name} exists`,
-        });
-        throw new DeleteRestrictionError(record, assoc.name);
-      }
-    }
+    // Route through the same per-association dispatch the destroy callback
+    // chain uses in production (Reflection#add_destroy_callbacks ->
+    // before_destroy { association(name).handle_dependency }). The override
+    // dispatch (deleteOrNullifyAllRecords / delete) lives there, so this
+    // path no longer reimplements dependent handling inline.
+    await (record.association(assoc.name) as any).handleDependency();
   }
 }
 
