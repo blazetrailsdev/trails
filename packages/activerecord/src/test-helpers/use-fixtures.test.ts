@@ -345,6 +345,57 @@ describe("useFixtures reconciles the PK column against the schema", () => {
   });
 });
 
+// --- composite primary keys ---
+
+describe("useFixtures seeds composite-primary-key tables", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
+  // CpkOrder declares a composite model PK (`["shop_id", "id"]`) but the test
+  // schema keeps a plain autoincrement `id`, so it seeds as a single-PK table.
+  // CpkOrderTag's schema PK IS composite (`["order_id", "tag_id"]`); both key
+  // columns are supplied by ref()s in the fixture row. cpkOrders loads first so
+  // its declared ids back the cpkOrderTags order_id ref().
+  const { cpkOrders, cpkOrderTags, cpkBooks } = useFixtures(
+    ["cpkOrders", "cpkOrderTags", "cpkBooks"],
+    () => Base.adapter,
+  );
+
+  it("seeds a composite-model-PK order against the schema's single id", () => {
+    const order = cpkOrders("cpk_groceries_order_1");
+    expect(order.readAttribute("status")).toBe("paid");
+    expect(order.readAttribute("id")).not.toBeNull();
+    expect(order.readAttribute("id")).not.toBeUndefined();
+  });
+
+  it("seeds a composite-schema-PK row from its ref()'d key columns", () => {
+    const tag = cpkOrderTags("cpk_first_order_loyal_customer");
+    // order_id resolves to cpk_orders.cpk_groceries_order_1's id; tag_id to a cpk_tag.
+    expect(tag.readAttribute("order_id")).toBe(
+      cpkOrders("cpk_groceries_order_1").readAttribute("id"),
+    );
+    expect(tag.readAttribute("tag_id")).not.toBeNull();
+    expect(tag.readAttribute("tag_id")).not.toBeUndefined();
+  });
+
+  it("round-trips every composite-PK row by its full key tuple", () => {
+    expect(cpkOrderTags.all().length).toBe(3);
+  });
+
+  it("generates both key columns for a composite-PK row that supplies neither", () => {
+    // cpk_book_with_generated_pk omits author_id and id; compositeIdentify fills
+    // both (Rails' generate_composite_primary_key), so the row still round-trips.
+    const book = cpkBooks("cpk_book_with_generated_pk");
+    expect(book.readAttribute("author_id")).not.toBeNull();
+    expect(book.readAttribute("author_id")).not.toBeUndefined();
+    expect(book.readAttribute("id")).not.toBeNull();
+    expect(book.readAttribute("title")).toBe("Generated author's book");
+  });
+});
+
 // --- fixture registry conformance ---
 
 describe("fixtureRegistry conformance", () => {
@@ -359,12 +410,9 @@ describe("fixtureRegistry conformance", () => {
       expect(ModelClass.tableName.length, `${name}: tableName must be non-empty`).toBeGreaterThan(
         0,
       );
-      // defineFixtures() throws on composite primary keys, so a registered entry
-      // with one is a name-based API that always fails at seed time — reject it.
-      expect(
-        Array.isArray((ModelClass as { primaryKey: unknown }).primaryKey),
-        `${name}: composite primary key is not seedable by defineFixtures — move to the gap list`,
-      ).toBe(false);
+      // Composite primary keys are seedable now (the seed-conformance describe
+      // below proves each entry actually inserts), so a composite `primaryKey` is
+      // no longer disqualifying — the model PK is reconciled against the schema.
 
       const data = (entry as { data: Record<string, unknown> }).data;
       const labels = Object.keys(data);

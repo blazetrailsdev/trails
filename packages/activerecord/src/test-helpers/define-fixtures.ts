@@ -40,6 +40,22 @@ export function fixtureId(label: string): number {
 }
 
 /**
+ * Per-column deterministic ids for a composite primary key. Mirrors Rails'
+ * `ActiveRecord::FixtureSet.composite_identify`: each key column gets
+ * `identify(label) << index` masked to MAX_ID, so a composite-PK fixture row may
+ * omit key columns and have them generated — the composite analogue of a
+ * single-PK row falling back to `fixtureId(label)`.
+ */
+function compositeIdentify(label: string, keyCols: readonly string[]): Record<string, number> {
+  const base = fixtureId(label);
+  const out: Record<string, number> = {};
+  keyCols.forEach((col, index) => {
+    out[col] = (base * 2 ** index) % FIXTURE_MAX_ID;
+  });
+  return out;
+}
+
+/**
  * Resolves a row's primary key. The declared value is used verbatim when it is
  * an integer (Rails fixture parity — YAML `id: N` parses as a number) or a
  * string (models with a declared string/non-integer `primary_key`, e.g.
@@ -228,6 +244,14 @@ type InsertHost = DatabaseStatementsHost &
  *   when a polymorphic `belongsTo :taggable` reflection exists on the model.
  * - Each call registers `ModelClass` by `tableName` in an internal registry, available via
  *   `resolveModelForTable` for use by HABTM detection and future Phase 2 tooling.
+ * - Composite primary keys: when the schema's PK is an array of columns
+ *   (`cpk_order_tags` → `["order_id", "tag_id"]`), each key column is taken from
+ *   the fixture row when present (typically via `ref()`) and otherwise generated
+ *   from the label via `compositeIdentify`, mirroring Rails'
+ *   `generate_composite_primary_key`/`composite_identify`. Reload matches on the
+ *   full key tuple. A model that declares a composite `primaryKey` over a table
+ *   whose schema PK is a plain `id` (e.g. `CpkOrder`) is seeded as single-PK,
+ *   deferring to the schema.
  * - Timestamps: when the model records timestamps, any existing
  *   `created_at`/`created_on`/`updated_at`/`updated_on` column the row omits is filled with the
  *   current time, mirroring Rails' `FixtureSet::TableRow#fill_timestamps` (lets NOT NULL
@@ -240,34 +264,33 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
 ): Promise<{ [P in K]: InstanceType<T> }> {
   const tableName = ModelClass.tableName;
   const declaredPk = ModelClass.primaryKey;
-  if (Array.isArray(declaredPk)) {
-    throw new Error(
-      `defineFixtures: composite primary keys are not supported (model: ${ModelClass.name}, pk: [${declaredPk.join(", ")}])`,
-    );
-  }
 
-  // Reconcile the model's PK against the table's ACTUAL schema PK column. Rails
-  // resolves `Base.primary_key` by introspecting the schema; our models don't
-  // always declare a custom `primaryKey`, so for tables whose PK column differs
-  // from the default `id` (`bulbs` → "ID", `mixed_case_monkeys` → "monkeyID") or
-  // which have no PK at all (id-less tables like `mateys`), we trust the schema's
-  // actual PK over the model's default. `pkCol === null` means an id-less table:
-  // no PK column is seeded and the reload matches on the full row instead.
-  let pkCol: string | null = declaredPk;
+  // Reconcile the model's PK against the table's ACTUAL schema PK column(s). Rails
+  // resolves `Base.primary_key` by introspecting the schema, so the schema is the
+  // source of truth. `pkCol` ends up as one of:
+  //   - `null`   → id-less table (`mateys`): no PK column seeded; reload matches the
+  //                full inserted row.
+  //   - string   → single-PK table. A PK column differing from the default `id`
+  //                (`bulbs` → "ID", `mixed_case_monkeys` → "monkeyID") is honoured.
+  //   - string[] → composite-PK table (`cpk_order_tags` → ["order_id", "tag_id"]):
+  //                key columns come from the fixture row when present (e.g. a
+  //                ref()) and are otherwise generated from the label, like single PKs.
+  // A model may declare a *composite* `primaryKey` while the test schema keeps a
+  // plain autoincrement `id` (e.g. CpkOrder: model `["shop_id", "id"]`, table `id`);
+  // that mismatch is an intentional, documented pattern, so we defer to the schema's
+  // single id rather than flag it as a contradiction.
+  let pkCol: string | string[] | null = declaredPk;
   if (typeof (adapter as any).primaryKey === "function") {
     const schemaPk: string | string[] | null = await (adapter as any).primaryKey(tableName);
-    if (Array.isArray(schemaPk)) {
-      throw new Error(
-        `defineFixtures: composite primary keys are not supported (table: ${tableName}, pk: [${schemaPk.join(", ")}])`,
-      );
-    }
     if (schemaPk === null) {
       pkCol = null;
-    } else if (declaredPk !== "id" && declaredPk !== schemaPk) {
-      // The model trusts a custom PK that the schema contradicts — a real bug.
-      // (A plain `id` default just defers to the schema, exactly like Rails'
-      // introspected `Base.primary_key`.) Surface it rather than silently
-      // writing to a phantom column.
+    } else if (Array.isArray(schemaPk)) {
+      pkCol = schemaPk;
+    } else if (!Array.isArray(declaredPk) && declaredPk !== "id" && declaredPk !== schemaPk) {
+      // The model trusts a custom single PK that the schema contradicts — a real
+      // bug. (A plain `id` default just defers to the schema, exactly like Rails'
+      // introspected `Base.primary_key`.) Surface it rather than silently writing
+      // to a phantom column.
       throw new Error(
         `defineFixtures: ${ModelClass.name} declares primaryKey "${declaredPk}" but table "${tableName}" has primary key "${schemaPk}" — fix the model or the schema`,
       );
@@ -297,8 +320,11 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   // entries for labels omitted from a subset reload. The prior entry is captured
   // so we can roll back if the INSERT itself fails — `ref()` resolution must not
   // observe ids for rows that never landed in the database.
+  // Only single-PK tables populate the declared-id registry: a `ref()` resolves to
+  // a single scalar id, so composite-PK tables (whose key is a tuple) are not a
+  // valid `ref()` target and are intentionally left unregistered here.
   const tableIds = new Map<string, number | string>();
-  if (pkCol !== null) {
+  if (typeof pkCol === "string") {
     for (const label of labels) {
       const id = resolveDeclaredPk(
         tableName,
@@ -318,11 +344,16 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   const rows: FixtureAttrs[] = [];
   for (const label of labels) {
     const attrs = fixtures[label];
+    // Single-PK rows seed the PK up front (declared id or fixtureId fallback).
+    // Composite-PK rows seed every key column from `attrs` in the loop below
+    // (each is a real fixture-supplied value or a ref), so they start empty.
     const row: FixtureAttrs =
-      pkCol !== null ? { [pkCol]: resolveDeclaredPk(tableName, pkCol, label, attrs[pkCol]) } : {};
+      typeof pkCol === "string"
+        ? { [pkCol]: resolveDeclaredPk(tableName, pkCol, label, attrs[pkCol]) }
+        : {};
 
     for (const [col, val] of Object.entries(attrs)) {
-      if (pkCol !== null && col === pkCol) continue; // PK already set above (declared id or fixtureId fallback)
+      if (typeof pkCol === "string" && col === pkCol) continue; // PK already set above
 
       // Evaluate poly once so both the ref guard and the expansion below share the result.
       const poly = findPolymorphicRef(ModelClass, col);
@@ -405,11 +436,22 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
         }
       }
 
-      if (val !== null && typeof val === "object" && pkCol !== null && pkCol in val) {
+      if (val !== null && typeof val === "object" && typeof pkCol === "string" && pkCol in val) {
         // Model instance (or any object with the PK): extract the PK value.
         row[col] = (val as FixtureAttrs)[pkCol];
       } else {
         row[col] = val;
+      }
+    }
+
+    // Auto-generate any composite primary-key column the row doesn't already
+    // supply, mirroring Rails' FixtureSet::TableRow#generate_composite_primary_key:
+    // columns already present (e.g. from a ref()) are kept; the rest come from
+    // composite_identify.
+    if (Array.isArray(pkCol)) {
+      const generated = compositeIdentify(label, pkCol);
+      for (const keyCol of pkCol) {
+        if (!(keyCol in row)) row[keyCol] = generated[keyCol]!;
       }
     }
     rows.push(row);
@@ -475,7 +517,17 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   for (let i = 0; i < labels.length; i++) {
     const label = labels[i]!;
     const row = rows[i] as FixtureAttrs;
-    const criteria = pkCol !== null ? { [pkCol]: row[pkCol] } : row;
+    // Single PK → match by the one column; composite PK → match by every key
+    // column; id-less (pkCol === null) → match the full inserted row.
+    let criteria: FixtureAttrs;
+    if (pkCol === null) {
+      criteria = row;
+    } else if (typeof pkCol === "string") {
+      criteria = { [pkCol]: row[pkCol] };
+    } else {
+      criteria = {};
+      for (const keyCol of pkCol) criteria[keyCol] = row[keyCol];
+    }
     const find = () => (ModelClass as any).findBy(criteria);
     const record =
       typeof (ModelClass as any).unscoped === "function"

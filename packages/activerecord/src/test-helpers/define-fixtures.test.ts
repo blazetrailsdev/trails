@@ -162,11 +162,22 @@ describe("defineFixtures", () => {
     expect(second.david.id).toBe(davidId);
   });
 
-  it("throws for composite primary keys", async () => {
-    const Model = { tableName: "orders", primaryKey: ["shop_id", "id"], findBy: vi.fn() } as any;
-    await expect(defineFixtures(makeAdapter(), Model, { order1: {} })).rejects.toThrow(
-      "composite primary keys are not supported",
-    );
+  it("auto-generates absent composite primary-key columns from the label", async () => {
+    // Mirrors Rails' generate_composite_primary_key/composite_identify: a row that
+    // omits its key columns has each generated as identify(label) << index.
+    const adapter = makeAdapter();
+    const Model = {
+      tableName: "orders",
+      primaryKey: ["shop_id", "id"],
+      findBy: vi.fn(async () => ({ shop_id: 1, id: 1 })),
+    } as any;
+    await defineFixtures(adapter, Model, { order1: { status: "paid" } });
+    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .find((s) => s.includes("INSERT INTO"));
+    const base = fixtureId("order1");
+    expect(insertSql).toContain(String(base));
+    expect(insertSql).toContain(String((base * 2) % (2 ** 30 - 1)));
   });
 
   it("HABTM join-table: two ref()s in one row both resolve", async () => {

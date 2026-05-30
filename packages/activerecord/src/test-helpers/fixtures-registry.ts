@@ -36,9 +36,6 @@ export interface FixtureRegistryEntry {
  *   eagerly rejects the polymorphic `employable` belongs_to, whereas Rails
  *   (chef.rb: `accepts_nested_attributes_for :employable`) defers that check to
  *   build time. Pre-existing model-port divergence; re-add once chef.ts imports cleanly.
- * - `cpk-orders` — `CpkOrder` has a composite primary key (`["shop_id", "id"]`);
- *   `defineFixtures` throws on composite PKs, so the entry would always fail at
- *   seed time. Re-add once composite-PK fixture seeding is supported.
  * - `developers-projects` — HABTM join table, no model class
  * - `encrypted-book-that-ignores-cases` — same encryption add-on requirement
  * - `encrypted-books` — model requires the `@blazetrails/activerecord/encryption` add-on loaded at import time
@@ -58,8 +55,8 @@ export interface FixtureRegistryEntry {
  * Additional gaps — model imports, but the fixture set does NOT seed against the
  * canonical `TEST_SCHEMA` today (verified by the seed-conformance test). Grouped by
  * the underlying loader gap; each is re-addable once that gap closes:
- * - composite-PK column NOT NULL (`cpk_books.author_id`): `cpk-books`; composite-PK
- *   table (`cpk_order_tags` PK `[order_id, tag_id]`): `cpk-order-tags`
+ * (no composite-PK seeding gaps remain — `compositeIdentify` generates absent key
+ * columns, so `cpk-books` seeds even when a row omits its key components.)
  * - STI `type` row whose subclass isn't loaded by a standalone `useFixtures([set])`:
  *   `parrots` (LiveParrot), `vegetables` (Cucumber)
  * - fixture references a non-column (HABTM assoc name): `developers` (`shared_computers`)
@@ -78,7 +75,10 @@ export interface FixtureRegistryEntry {
  * by name. Re-addable once the ref'd set becomes registerable (verified by the
  * "refs only loadable tables" conformance test):
  * - `subscriptions` → `books` (books declare ids 1-4; `book_id` would be CRC32)
- * - `cpk-order-agreements` → `cpk-orders`, `cpk-reviews` → `cpk-books` (composite-PK targets)
+ * - `cpk-reviews` → `cpk-books`: its rows `ref("cpk_books", …)`, but `ref()`
+ *   resolves to a single scalar (the CRC32 label id), not the book's generated
+ *   composite `id` key component — composite-target ref resolution is a separate
+ *   follow-up.
  * - `edges` → `vertices`: `edges` is id-less and seeds fine, but it `ref()`s `vertices`,
  *   which isn't registerable yet — `Vertex` has no `tableName` override so it mis-inflects
  *   to `vertexes` (the table is `vertices`). Re-add `edges` once `Vertex.tableName` is fixed
@@ -172,6 +172,22 @@ export const fixtureRegistry = {
   cpkAuthors: {
     model: () => import("./models/cpk.js").then((m) => m.CpkAuthor),
     data: FixtureData.cpkAuthorFixtureData,
+  },
+  cpkBooks: {
+    model: () => import("./models/cpk.js").then((m) => m.CpkBook),
+    data: FixtureData.cpkBookFixtureData,
+  },
+  cpkOrderAgreements: {
+    model: () => import("./models/cpk.js").then((m) => m.CpkOrderAgreement),
+    data: FixtureData.cpkOrderAgreementFixtureData,
+  },
+  cpkOrders: {
+    model: () => import("./models/cpk.js").then((m) => m.CpkOrder),
+    data: FixtureData.cpkOrderFixtureData,
+  },
+  cpkOrderTags: {
+    model: () => import("./models/cpk.js").then((m) => m.CpkOrderTag),
+    data: FixtureData.cpkOrderTagFixtureData,
   },
   cpkTags: {
     model: () => import("./models/cpk.js").then((m) => m.CpkTag),
