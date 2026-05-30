@@ -5,13 +5,7 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass, RecordInvalid } from "../index.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-import {
-  Associations,
-  association,
-  loadHasMany,
-  loadHasManyThrough,
-  processDependentAssociations,
-} from "../associations.js";
+import { Associations, association, loadHasMany, loadHasManyThrough } from "../associations.js";
 import { CollectionProxy } from "./collection-proxy.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { quoteTableName } from "../test-helpers/quote-regex.js";
@@ -2312,7 +2306,7 @@ describe("HasManyThroughAssociationsTest", () => {
       dep_null_owner_id: owner.id,
       dep_null_item_id: item.id,
     });
-    await processDependentAssociations(owner);
+    await owner.destroy();
     const joins = await DepNullJoin.all().toArray();
     expect(joins.length).toBe(1);
     expect(joins[0].dep_null_owner_id).toBeNull();
@@ -2338,7 +2332,7 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("DepDelJoin", DepDelJoin);
     const owner = await DepDelOwner.create({ name: "O" });
     await DepDelJoin.create({ dep_del_owner_id: owner.id, dep_del_item_id: 1 });
-    await processDependentAssociations(owner);
+    await owner.destroy();
     const joins = await DepDelJoin.all().toArray();
     expect(joins.length).toBe(0);
   });
@@ -2363,7 +2357,7 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("DepDesJoin", DepDesJoin);
     const owner = await DepDesOwner.create({ name: "O" });
     await DepDesJoin.create({ dep_des_owner_id: owner.id, dep_des_item_id: 1 });
-    await processDependentAssociations(owner);
+    await owner.destroy();
     const joins = await DepDesJoin.all().toArray();
     expect(joins.length).toBe(0);
   });
@@ -2391,7 +2385,7 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("BtDesChild", BtDesChild);
     const parent = await BtDesParent.create({ name: "P" });
     await BtDesChild.create({ bt_des_parent_id: parent.id });
-    await processDependentAssociations(parent);
+    await parent.destroy();
     const children = await BtDesChild.all().toArray();
     expect(children.length).toBe(0);
   });
@@ -2415,7 +2409,7 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("BtDelChild", BtDelChild);
     const parent = await BtDelParent.create({ name: "P" });
     await BtDelChild.create({ bt_del_parent_id: parent.id });
-    await processDependentAssociations(parent);
+    await parent.destroy();
     const children = await BtDelChild.all().toArray();
     expect(children.length).toBe(0);
   });
@@ -2439,7 +2433,7 @@ describe("HasManyThroughAssociationsTest", () => {
     registerModel("BtNullChild", BtNullChild);
     const parent = await BtNullParent.create({ name: "P" });
     await BtNullChild.create({ bt_null_parent_id: parent.id });
-    await processDependentAssociations(parent);
+    await parent.destroy();
     const children = await BtNullChild.all().toArray();
     expect(children.length).toBe(1);
     expect(children[0].bt_null_parent_id).toBeNull();
@@ -8168,7 +8162,7 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     const author = await ClearScopeAuthor.create({ name: "Alice" });
     await ClearScopePost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "clear_scope_posts", {
       className: "ClearScopePost",
       foreignKey: "author_id",

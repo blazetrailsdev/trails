@@ -29,7 +29,6 @@ import {
   loadHasOne,
   loadHasMany,
   loadHasManyThrough,
-  processDependentAssociations,
   updateCounterCaches,
   setBelongsTo,
 } from "./associations.js";
@@ -896,7 +895,7 @@ describe("DependentAssociations", () => {
     await Comment.create({ body: "A", post_id: post.id });
     await Comment.create({ body: "B", post_id: post.id });
 
-    await processDependentAssociations(post);
+    await post.destroy();
     expect(await Comment.all().count()).toBe(0);
   });
 
@@ -923,7 +922,7 @@ describe("DependentAssociations", () => {
 
     const item = await Item.create({ name: "Widget" });
     await Tag.create({ name: "red", item_id: item.id });
-    await processDependentAssociations(item);
+    await item.destroy();
     expect(await Tag.all().count()).toBe(0);
   });
 
@@ -950,7 +949,7 @@ describe("DependentAssociations", () => {
 
     const post = await Post.create({ title: "Hello" });
     const c = await Comment.create({ body: "A", post_id: post.id });
-    await processDependentAssociations(post);
+    await post.destroy();
 
     const reloaded = await Comment.find(c.id);
     expect(reloaded.post_id).toBeNull();
@@ -979,7 +978,7 @@ describe("DependentAssociations", () => {
 
     const post = await Post.create({ title: "Hello" });
     await Comment.create({ body: "A", post_id: post.id });
-    await expect(processDependentAssociations(post)).rejects.toThrow(DeleteRestrictionError);
+    await expect(post.destroy()).rejects.toThrow(DeleteRestrictionError);
   });
 
   // Rails: test_dependent_restrict_with_exception_no_children
@@ -1004,7 +1003,7 @@ describe("DependentAssociations", () => {
     registerModel(Comment);
 
     const post = await Post.create({ title: "Alone" });
-    await expect(processDependentAssociations(post)).resolves.toBeUndefined();
+    await expect(post.destroy()).resolves.toBe(post);
   });
 
   // Rails: test_dependent_destroy_has_one
@@ -1030,7 +1029,7 @@ describe("DependentAssociations", () => {
 
     const user = await User.create({ name: "Dean" });
     await Profile.create({ user_id: user.id, bio: "Hi" });
-    await processDependentAssociations(user);
+    await user.destroy();
     expect(await Profile.all().count()).toBe(0);
   });
 
@@ -1057,7 +1056,7 @@ describe("DependentAssociations", () => {
 
     const user = await User.create({ name: "Dean" });
     const p = await Profile.create({ user_id: user.id, bio: "Hi" });
-    await processDependentAssociations(user);
+    await user.destroy();
     const reloaded = await Profile.find(p.id);
     expect(reloaded.user_id).toBeNull();
   });
@@ -1084,7 +1083,7 @@ describe("DependentAssociations", () => {
 
     const user = await User.create({ name: "Dean" });
     await Profile.create({ user_id: user.id });
-    await expect(processDependentAssociations(user)).rejects.toThrow(DeleteRestrictionError);
+    await expect(user.destroy()).rejects.toThrow(DeleteRestrictionError);
   });
 
   // Rails: test_no_dependent_option_skips
@@ -1098,7 +1097,7 @@ describe("DependentAssociations", () => {
     registerModel(Post);
     const post = await Post.create({ title: "Safe" });
     // Should not throw
-    await expect(processDependentAssociations(post)).resolves.toBeUndefined();
+    await expect(post.destroy()).resolves.toBe(post);
   });
 });
 
@@ -6312,7 +6311,7 @@ describe("HasManyAssociationsTest", () => {
     const tagsBefore = await Tag.all().toArray();
     expect(tagsBefore.length).toBe(2);
 
-    await processDependentAssociations(post);
+    await post.destroy();
     await post.delete();
 
     const tagsAfter = await Tag.all().toArray();
@@ -6348,7 +6347,7 @@ describe("HasManyAssociationsTest", () => {
     const c1 = await Child.create({ name: "Kid1", parent_id: parent.id });
     const c2 = await Child.create({ name: "Kid2", parent_id: parent.id });
 
-    await processDependentAssociations(parent);
+    await parent.destroy();
     await parent.delete();
 
     const reloaded1 = await Child.find(c1.id as number);
@@ -6384,7 +6383,7 @@ describe("HasManyAssociationsTest", () => {
 
     const shelf = await Shelf.create({ name: "Empty Shelf" });
     // No children — should not throw
-    await expect(processDependentAssociations(shelf)).resolves.toBeUndefined();
+    await expect(shelf.destroy()).resolves.toBe(shelf);
   });
 
   // -------------------------------------------------------------------------
@@ -6415,7 +6414,13 @@ describe("HasManyAssociationsTest", () => {
     const log = await Log.create({ name: "Audit" });
     await Entry.create({ name: "e1", log_id: log.id });
 
-    await expect(processDependentAssociations(log)).rejects.toThrow(DeleteRestrictionError);
+    // Rails: restrict_with_error does throw(:abort) — destroy returns false,
+    // errors are populated, and neither owner nor children are deleted.
+    expect(await log.destroy()).toBe(false);
+    expect(log.errors.where("base")).toHaveLength(1);
+    expect(log.errors.fullMessages[0]).toMatch(/cannot delete/i);
+    expect(await Log.findBy({ id: log.id })).not.toBeNull();
+    expect(await Entry.all().count()).toBe(1);
   });
 
   // -------------------------------------------------------------------------
@@ -7195,7 +7200,7 @@ describe("HasManyAssociationsTest", () => {
     const child = await Child2.create({ name: "Child", root_id: root.id });
     await Grandchild.create({ name: "GC", child_id: child.id });
 
-    await processDependentAssociations(root);
+    await root.destroy();
     await root.delete();
 
     const childrenLeft = await Child2.all().toArray();

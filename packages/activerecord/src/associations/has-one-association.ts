@@ -29,7 +29,7 @@ export class HasOneAssociation extends SingularAssociation {
   /**
    * Handle the :dependent option when the owner is being destroyed.
    */
-  async handleDependency(): Promise<void> {
+  async handleDependency(): Promise<void | false> {
     const dependent = this.reflection.options.dependent;
     if (!dependent) return;
 
@@ -42,18 +42,21 @@ export class HasOneAssociation extends SingularAssociation {
 
       case "restrictWithError":
         if (await this.loadTarget()) {
+          // Rails: owner.errors.add(:base, ...); throw(:abort). The owner is
+          // NOT destroyed and no exception is raised — `destroy` returns false.
+          // We signal :abort to the before_destroy chain by returning false.
           const ownerAny = this.owner as any;
           if (typeof ownerAny.errors?.add === "function") {
             ownerAny.errors.add("base", "invalid", {
               message: `Cannot delete record because dependent ${this.reflection.name} exists`,
             });
           }
-          throw new DeleteRestrictionError(this.owner, this.reflection.name);
+          return false;
         }
         break;
 
       default:
-        await this.delete(dependent);
+        return await this.delete(dependent);
     }
   }
 
@@ -61,7 +64,7 @@ export class HasOneAssociation extends SingularAssociation {
    * Delete the associated record using the given method.
    * Supports: delete, destroy, nullify.
    */
-  async delete(method?: string): Promise<void> {
+  async delete(method?: string): Promise<void | false> {
     if (!(await this.loadTarget())) return;
     const target = this.target!;
 
@@ -76,6 +79,12 @@ export class HasOneAssociation extends SingularAssociation {
         (target as any).destroyedByAssociation = this.reflection;
         if (typeof (target as any).destroy === "function") {
           await (target as any).destroy();
+        }
+        // Rails: `throw(:abort) unless target.destroyed?` — if the child's own
+        // destroy aborted (e.g. a restrict_with_error grandchild), propagate
+        // the abort so the owner is not deleted either.
+        if (typeof (target as any).isDestroyed === "function" && !(target as any).isDestroyed()) {
+          return false;
         }
         break;
 

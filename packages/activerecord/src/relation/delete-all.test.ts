@@ -12,7 +12,7 @@ function epochMs(v: unknown): number {
   throw new TypeError(`epochMs: unsupported type ${(v as object)?.constructor?.name}`);
 }
 import { Base, registerModel } from "../index.js";
-import { Associations, loadHasMany, processDependentAssociations } from "../associations.js";
+import { Associations, loadHasMany } from "../associations.js";
 
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -442,7 +442,7 @@ describe("DeleteAllTest", () => {
     const author = await DeleteAllAuthor.create({ name: "Alice" });
     await DeleteAllPost.create({ author_id: author.id, title: "A" });
     await DeleteAllPost.create({ author_id: author.id, title: "B" });
-    await processDependentAssociations(author);
+    await author.destroy();
     const remaining = await loadHasMany(author, "delete_all_posts", {
       className: "DeleteAllPost",
       foreignKey: "author_id",
