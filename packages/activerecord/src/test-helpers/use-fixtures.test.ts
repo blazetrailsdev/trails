@@ -492,6 +492,19 @@ describe("useFixtures resolves STI subclasses on standalone load", () => {
     expect(parrots("polly").readAttribute("parrot_sti_class")).toBe("DeadParrot");
   });
 
+  it("resolves the subclass-only `breed` enum via the row's STI class", async () => {
+    // breed is an enum LiveParrot declares but Parrot (the base) does not, so the
+    // string key must be mapped through the subclass — Rails' resolve_enums keyed
+    // by reflection_class. Stored as the integer (african: 0, australian: 1), not
+    // the verbatim string that strict engines would reject on an integer column.
+    const [row] = (await Base.adapter.execute(
+      `SELECT breed FROM ${Base.adapter.quoteTableName("parrots")} WHERE name = 'Curious George'`,
+    )) as { breed: number }[];
+    expect(row!.breed).toBe(1);
+    expect(parrots("george").readAttribute("breed")).toBe(1);
+    expect(parrots("louis").readAttribute("breed")).toBe(0);
+  });
+
   it("hydrates a Cucumber-typed row as a Cucumber instance", () => {
     expect(vegetables("first_cucumber")).toBeInstanceOf(Cucumber);
     expect(vegetables("first_cucumber").readAttribute("custom_type")).toBe("Cucumber");
