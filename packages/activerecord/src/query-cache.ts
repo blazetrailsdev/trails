@@ -46,6 +46,17 @@ export interface QueryCachePoolTarget {
   enableQueryCacheBang(): void;
 }
 
+/**
+ * A connection pool whose query cache `cache`/`uncached` block helpers can
+ * drive. Mirrors the `connection_pool` that Rails'
+ * `ActiveRecord::QueryCache::ClassMethods` operate on (`enable_query_cache`
+ * via the clear-on-exit `withQueryCache`, and `disable_query_cache`).
+ */
+export interface QueryCacheBlockPool {
+  withQueryCache<T>(fn: () => T | Promise<T>): Promise<T>;
+  disableQueryCache<T>(fn: () => T | Promise<T>, options?: { dirties?: boolean }): Promise<T>;
+}
+
 function isQueryCachePoolTarget(
   target: QueryCacheAdapter | QueryCachePoolTarget,
 ): target is QueryCachePoolTarget {
@@ -53,6 +64,34 @@ function isQueryCachePoolTarget(
 }
 
 export class QueryCache {
+  /**
+   * Enable the query cache on `pool` for the duration of `block`, then restore
+   * the prior state — clearing the cache on exit unless it was already enabled.
+   *
+   * Mirrors: ActiveRecord::QueryCache::ClassMethods#cache
+   * (`pool.enable_query_cache(&block)` with `pool.clear_query_cache unless
+   * was_enabled` in the ensure; the pool's `withQueryCache` owns that logic).
+   */
+  static cache<T>(pool: QueryCacheBlockPool, block: () => T | Promise<T>): Promise<T> {
+    return pool.withQueryCache(block);
+  }
+
+  /**
+   * Disable the query cache on `pool` within `block`. Pass `dirties: false` to
+   * stop write operations from clearing every connection's query cache (the
+   * default dirties them in case they are replicas with now-stale caches).
+   *
+   * Mirrors: ActiveRecord::QueryCache::ClassMethods#uncached
+   * (`connection_pool.disable_query_cache(dirties: dirties, &block)`).
+   */
+  static uncached<T>(
+    pool: QueryCacheBlockPool,
+    block: () => T | Promise<T>,
+    options: { dirties?: boolean } = {},
+  ): Promise<T> {
+    return pool.disableQueryCache(block, options);
+  }
+
   /**
    * Enable query cache on all provided pools/adapters, skipping pools whose
    * cache is already enabled or disabled by configuration.
