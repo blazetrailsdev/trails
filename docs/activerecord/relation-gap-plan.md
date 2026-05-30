@@ -133,8 +133,8 @@ Detail/rationale in the per-PR sections below.
 - [x] Done (#2671) — **RF3 — `inOrderOf` type-cast.** Added
       `type_cast_for_database` value casting in `inOrderOf` via `TypeCasterMap`,
       plus an enum fallback. Files: `relation.ts`,
-      `relation/field-ordered-values.test.ts`. See the `### follow-up: EnumType
-    in the global type caster` section above.
+      `relation/field-ordered-values.test.ts`. See the EnumType global
+      type-caster follow-up at the top of this section.
 
 **Blocked / needs a design decision (not a clean PR yet):**
 
@@ -208,8 +208,8 @@ collection polymorphic relation`.
   direct static lookups — no shared helper needed. (A standalone dedup, PR #2639,
   was opened and closed for this reason.) Track in that plan, not here.
 - [x] ~10-20 LOC: `type_cast_for_database` value casting in `inOrderOf` shipped
-      in #2671. Follow-up surfaced in the `### follow-up: EnumType in the global
-    type caster` section above.
+      in #2671. Follow-up surfaced in the EnumType global type-caster section at
+      the top of the Post-merge follow-ups.
 - belongsTo accessor returns `null` in minimal inline-model + handler-suite
   test setups: `await book.author === null` despite valid `author_id`. Join
   SQL + ordering correct; only accessor broken. Worth own investigation (may
