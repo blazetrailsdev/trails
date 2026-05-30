@@ -939,3 +939,81 @@ describe("QueryCache executor hooks", () => {
     expect(adapter.cache.enabled).toBe(false);
   });
 });
+
+describe("QueryCache cache/uncached (pool-based)", () => {
+  // Minimal connection-pool stub exposing the query-cache block surface that
+  // ActiveRecord::QueryCache::ClassMethods drive (withQueryCache / disableQueryCache).
+  const makePool = () => {
+    let enabled = false;
+    let cleared = 0;
+    let lastDirties: boolean | undefined;
+    return {
+      get enabled() {
+        return enabled;
+      },
+      get cleared() {
+        return cleared;
+      },
+      get lastDirties() {
+        return lastDirties;
+      },
+      async withQueryCache<T>(fn: () => T | Promise<T>): Promise<T> {
+        const wasEnabled = enabled;
+        enabled = true;
+        try {
+          return await fn();
+        } finally {
+          enabled = false;
+          if (!wasEnabled) cleared++;
+        }
+      },
+      async disableQueryCache<T>(
+        fn: () => T | Promise<T>,
+        options?: { dirties?: boolean },
+      ): Promise<T> {
+        lastDirties = options?.dirties;
+        const wasEnabled = enabled;
+        enabled = false;
+        try {
+          return await fn();
+        } finally {
+          enabled = wasEnabled;
+        }
+      },
+    };
+  };
+
+  it("cache enables the query cache on the pool for the block", async () => {
+    const pool = makePool();
+    let enabledDuringBlock = false;
+    await QueryCache.cache(pool, () => {
+      enabledDuringBlock = pool.enabled;
+    });
+    expect(enabledDuringBlock).toBe(true);
+    expect(pool.enabled).toBe(false);
+    expect(pool.cleared).toBe(1);
+  });
+
+  it("cache returns the block result", async () => {
+    const pool = makePool();
+    const result = await QueryCache.cache(pool, () => 42);
+    expect(result).toBe(42);
+  });
+
+  it("uncached disables the query cache on the pool for the block", async () => {
+    const pool = makePool();
+    await pool.withQueryCache(async () => {
+      let enabledDuringBlock = true;
+      await QueryCache.uncached(pool, () => {
+        enabledDuringBlock = pool.enabled;
+      });
+      expect(enabledDuringBlock).toBe(false);
+    });
+  });
+
+  it("uncached forwards the dirties option to the pool", async () => {
+    const pool = makePool();
+    await QueryCache.uncached(pool, () => {}, { dirties: false });
+    expect(pool.lastDirties).toBe(false);
+  });
+});
