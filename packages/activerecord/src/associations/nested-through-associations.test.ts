@@ -1981,10 +1981,45 @@ describe("NestedThroughAssociationsTest", () => {
     expect(preloadedTags[0].name).toBe("blue");
   });
 
-  it.skip("through association preload doesnt reset source association if already preloaded", () => {
-    // BLOCKED: requires nested-hash preload of two associations sharing a
-    // source, where preloading the second must NOT reset the source already
-    // preloaded by the first. Not yet handled by the preloader. Follow-up.
+  it("through association preload doesnt reset source association if already preloaded", async () => {
+    // Mirrors Rails' test of the same name: preloading two associations that
+    // share a source reflection on Post (`tags`). `{ posts: "tags" }` loads
+    // `tags` onto each Post; the author-level HMT `postTags` (through posts,
+    // source tags) reuses those same Posts and must NOT reset the `tags`
+    // already preloaded onto `author.posts.first`.
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+    Associations.hasMany.call(Author, "postTags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
+    const author = await Author.create({ name: "Bob" });
+    const post = await Post.create({ author_id: author.id, title: "P1", body: "B" });
+    const blueTag = await Tag.create({ name: "blue" });
+    const redTag = await Tag.create({ name: "red" });
+    await Tagging.create({ tag_id: blueTag.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({ tag_id: redTag.id, taggable_id: post.id, taggable_type: "Post" });
+
+    const authors = await Author.all().preload({ posts: "tags" }, "postTags").toArray();
+    expect(authors).toHaveLength(1);
+
+    // The Post already had `tags` preloaded by `{ posts: "tags" }`; the later
+    // `postTags` through-preload (which reuses that Post as a middle record)
+    // must leave it loaded and intact, not reset it.
+    const post0 = ((authors[0] as any).association("posts").target ?? [])[0] as any;
+    expect(post0.association("tags").loaded).toBe(true);
+    const tagNames = (post0.association("tags").target ?? []).map((t: any) => t.name).sort();
+    expect(tagNames).toEqual(["blue", "red"]);
   });
 
   it("nested has many through with conditions on source associations preload via joins", async () => {
