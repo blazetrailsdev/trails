@@ -53,6 +53,7 @@ import {
 } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 import { buildThroughInverseFor } from "./has-many-through-association.js";
+import { countRecords } from "./has-many-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
 import { foreignKeyPresentFor } from "./foreign-association.js";
 
@@ -1156,9 +1157,44 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // COUNT(*) rather than ignoring them.
     if (!this.distinctValue && this._target.length > 0) {
       const unsaved = this._target.filter((r) => r.isNewRecord()).length;
-      return unsaved + (await this.count());
+      return unsaved + (await this._countRecords());
     }
-    return this.count();
+    return this._countRecords();
+  }
+
+  /**
+   * Mirrors ActiveRecord::Associations::HasManyAssociation#count_records
+   * (has_many_association.rb): prefer an active counter cache, otherwise issue
+   * a `COUNT(*)`; purge non-new records and mark the target loaded when the DB
+   * is empty (a documented side-effect that can avoid an extra SELECT); finally
+   * clamp the result to the association scope's `limit_value`.
+   * @internal
+   */
+  private _countRecords(): Promise<number> {
+    const ctor = this._record.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => unknown;
+    };
+    const refl = ctor._reflectOnAssociation?.(this._assocName) as
+      | { hasActiveCachedCounter?: () => boolean; counterCacheColumn?: () => string | null }
+      | undefined;
+    return countRecords({
+      hasActiveCachedCounter: () => refl?.hasActiveCachedCounter?.() ?? false,
+      counterCacheColumn: () => refl?.counterCacheColumn?.() ?? null,
+      readCounterAttribute: (col) => this._record.readAttribute(col),
+      countViaScope: () => this.count(),
+      // Rails clamps by `association_scope.limit_value` — the association's own
+      // scope, not any in-place proxy (`whereBang`/`limitBang`) mutation. So we
+      // read the limit from the rebuilt scope even on the diverged count path,
+      // matching count_records rather than the ad-hoc query limit.
+      limitValue: () =>
+        (this.scope() as { limitValue?: number | null } | undefined)?.limitValue ?? null,
+      retainOnlyNewRecords: () => {
+        this._target = this._target.filter((r) => r.isNewRecord());
+      },
+      markLoaded: () => {
+        this._targetLoaded = true;
+      },
+    });
   }
 
   /**

@@ -160,11 +160,94 @@ export class HasManyAssociation extends CollectionAssociation {
     if (count > 0) await updateCounter(this, -count);
     return count;
   }
+
+  /**
+   * Counts the collection's records, applying the counter cache, the
+   * `limit_value` clamp, and the empty-DB loaded side-effect.
+   *
+   * Mirrors: ActiveRecord::Associations::HasManyAssociation#count_records
+   * @internal
+   */
+  async countRecords(): Promise<number> {
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => unknown;
+    };
+    const refl = (ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection) as {
+      hasActiveCachedCounter?: () => boolean;
+      counterCacheColumn?: () => string | null;
+    };
+    return countRecords({
+      hasActiveCachedCounter: () => refl.hasActiveCachedCounter?.() ?? false,
+      counterCacheColumn: () => refl.counterCacheColumn?.() ?? null,
+      readCounterAttribute: (col) => (this.owner as any).readAttribute(col),
+      countViaScope: async () => {
+        const rel = (this as any).scope?.();
+        return rel && typeof rel.count === "function"
+          ? await rel.count()
+          : (this as CollectionAssociation).target.length;
+      },
+      limitValue: () =>
+        ((this as CollectionAssociation).associationScope() as { limitValue?: number | null })
+          ?.limitValue ?? null,
+      retainOnlyNewRecords: () => {
+        const self = this as CollectionAssociation;
+        self.target = self.target.filter((r) => r.isNewRecord());
+      },
+      markLoaded: () => (this as CollectionAssociation).loadedBang(),
+    });
+  }
 }
 
-/** @internal */
-function countRecords(assoc: HasManyAssociation): Promise<number> {
-  return (assoc as any).scope?.()?.count?.() ?? Promise.resolve(0);
+/**
+ * Host surface `countRecords` needs, abstracting the OO association and the
+ * CollectionProxy (which keep their cardinality in different fields).
+ * @internal
+ */
+export interface CountRecordsHost {
+  hasActiveCachedCounter(): boolean;
+  counterCacheColumn(): string | null;
+  readCounterAttribute(column: string): unknown;
+  countViaScope(): Promise<number>;
+  limitValue(): number | null;
+  retainOnlyNewRecords(): void;
+  markLoaded(): void;
+}
+
+/**
+ * Mirrors ActiveRecord::Associations::HasManyAssociation#count_records
+ * (has_many_association.rb): read the counter cache when active, otherwise
+ * `scope.count(:all)`; when the DB is empty purge non-new records and mark the
+ * target loaded — a documented side-effect that may avoid an extra SELECT —
+ * then clamp to `[association_scope.limit_value, count].compact.min`.
+ * @internal
+ */
+export async function countRecords(host: CountRecordsHost): Promise<number> {
+  let count: number;
+  if (host.hasActiveCachedCounter()) {
+    // has_active_cached_counter? guarantees a counter column, but guard against
+    // a null column anyway — `nil.to_i == 0` in Rails.
+    const column = host.counterCacheColumn();
+    count = column == null ? 0 : toI(host.readCounterAttribute(column));
+  } else {
+    count = await host.countViaScope();
+  }
+
+  if (count === 0) {
+    host.retainOnlyNewRecords();
+    host.markLoaded();
+  }
+
+  const limitValue = host.limitValue();
+  return limitValue == null ? count : Math.min(limitValue, count);
+}
+
+/** Ruby `Object#to_i` semantics: nil → 0, leading-integer parse otherwise. */
+function toI(value: unknown): number {
+  if (value == null) return 0;
+  if (typeof value === "number") return Math.trunc(value);
+  if (typeof value === "bigint") return Number(value);
+  const n = Number.parseInt(String(value), 10);
+  return Number.isNaN(n) ? 0 : n;
 }
 
 /** @internal */
