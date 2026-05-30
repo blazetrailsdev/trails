@@ -2133,3 +2133,123 @@ describe("WhereTest", () => {
     expect(expected.toSql()).toBe(actual.toSql());
   });
 });
+
+// ==========================================================================
+// Direct-assertion sweep of the `.joins` string resolver's foreign-key
+// derivation (mirrors Reflection#derive_foreign_key). Each branch — through,
+// HABTM, STI target — is asserted on the generated ON-clause SQL so a
+// regression in the shared deriveForeignKey helper surfaces here.
+// ==========================================================================
+describe("deriveForeignKey via joins string resolver", () => {
+  it("derives owner foreign keys for a has_many :through join", () => {
+    class DfkAuthor extends Base {
+      static {
+        this._tableName = "dfk_authors";
+        this.attribute("name", "string");
+      }
+    }
+    class DfkPost extends Base {
+      static {
+        this._tableName = "dfk_posts";
+        this.attribute("title", "string");
+      }
+    }
+    class DfkComment extends Base {
+      static {
+        this._tableName = "dfk_comments";
+        this.attribute("body", "string");
+      }
+    }
+    registerModel("DfkAuthor", DfkAuthor);
+    registerModel("DfkPost", DfkPost);
+    registerModel("DfkComment", DfkComment);
+    Associations.hasMany.call(DfkAuthor, "posts", { className: "DfkPost" });
+    Associations.hasMany.call(DfkPost, "comments", { className: "DfkComment" });
+    Associations.hasMany.call(DfkAuthor, "comments", {
+      className: "DfkComment",
+      through: "posts",
+    });
+
+    const sql = DfkAuthor.joins("comments").toSql();
+
+    // through has_many FK derives from the base owner (DfkAuthor → dfk_author_id)
+    expect(sql).toMatch(
+      new RegExp(
+        `${escapeRegExp(quoteTableName("dfk_posts"))}\\.${escapeRegExp(quoteColumnName("dfk_author_id"))} = ` +
+          `${escapeRegExp(quoteTableName("dfk_authors"))}\\.${escapeRegExp(quoteColumnName("id"))}`,
+      ),
+    );
+    // source has_many FK derives from the through model (DfkPost → dfk_post_id)
+    expect(sql).toMatch(
+      new RegExp(
+        `${escapeRegExp(quoteTableName("dfk_comments"))}\\.${escapeRegExp(quoteColumnName("dfk_post_id"))} = ` +
+          `${escapeRegExp(quoteTableName("dfk_posts"))}\\.${escapeRegExp(quoteColumnName("id"))}`,
+      ),
+    );
+  });
+
+  it("derives the owner foreign key for a HABTM join", () => {
+    class DfkProject extends Base {
+      static {
+        this._tableName = "dfk_projects";
+        this.attribute("name", "string");
+      }
+    }
+    class DfkDeveloper extends Base {
+      static {
+        this._tableName = "dfk_developers";
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("DfkProject", DfkProject);
+    registerModel("DfkDeveloper", DfkDeveloper);
+    Associations.hasAndBelongsToMany.call(DfkProject, "developers", {
+      className: "DfkDeveloper",
+    });
+
+    const sql = DfkProject.joins("developers").toSql();
+
+    // owner-side join FK derives from the owner model (DfkProject → dfk_project_id)
+    expect(sql).toMatch(
+      new RegExp(
+        `${escapeRegExp(quoteColumnName("dfk_project_id"))} = ` +
+          `${escapeRegExp(quoteTableName("dfk_projects"))}\\.${escapeRegExp(quoteColumnName("id"))}`,
+      ),
+    );
+  });
+
+  it("derives owner foreign key and adds the type condition for an STI target join", () => {
+    class DfkCompany extends Base {
+      static {
+        this._tableName = "dfk_companies";
+        this.inheritanceColumn = "type";
+        this.attribute("type", "string");
+        this.attribute("name", "string");
+      }
+    }
+    class DfkClient extends DfkCompany {}
+    class DfkAccount extends Base {
+      static {
+        this._tableName = "dfk_accounts";
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("DfkAccount", DfkAccount);
+    registerModel("DfkClient", DfkClient);
+    Associations.hasMany.call(DfkAccount, "clients", { className: "DfkClient" });
+
+    const sql = DfkAccount.joins("clients").toSql();
+
+    // FK derives from the owner (DfkAccount → dfk_account_id), independent of
+    // the STI subclass target.
+    expect(sql).toMatch(
+      new RegExp(
+        `${escapeRegExp(quoteTableName("dfk_companies"))}\\.${escapeRegExp(quoteColumnName("dfk_account_id"))} = ` +
+          `${escapeRegExp(quoteTableName("dfk_accounts"))}\\.${escapeRegExp(quoteColumnName("id"))}`,
+      ),
+    );
+    // STI subclass target appends a type IN (...) condition.
+    expect(sql).toContain(quoteColumnName("type"));
+    expect(sql).toContain("DfkClient");
+  });
+});

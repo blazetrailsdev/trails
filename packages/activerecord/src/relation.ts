@@ -587,7 +587,7 @@ export class Relation<T extends Base> {
     // the model** to get the JOIN form.
     const sourceTable = modelClass.tableName;
     if (assocDef.type === "belongsTo") {
-      const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
+      const foreignKey = this._deriveForeignKey(assocDef, assocName, modelClass.name);
       const pks = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
       return { joins: [], table: sourceTable, pks };
     }
@@ -608,9 +608,7 @@ export class Relation<T extends Base> {
         );
       }
       const sourcePk = rawSourcePk;
-      const foreignKey = assocDef.options.as
-        ? (assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`)
-        : (assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
+      const foreignKey = this._deriveForeignKey(assocDef, assocName, modelClass.name) as string;
       const tgt = new Table(targetTable);
       const src = new Table(sourceTable);
       const onPredicates: Nodes.Node[] = [tgt.get(foreignKey).eq(src.get(sourcePk))];
@@ -643,14 +641,11 @@ export class Relation<T extends Base> {
     }
     const targetTable = targetModel.tableName;
     const tgtTable = new Table(targetTable);
-    let foreignKey: string;
+    const foreignKey = this._deriveForeignKey(assocDef, assocName, modelClass.name) as string;
     const typeNodes: InstanceType<typeof Nodes.Node>[] = [];
     if (assocDef.options.as) {
-      foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`;
       const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
       typeNodes.push(tgtTable.get(typeCol).eq(modelClass.name));
-    } else {
-      foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
     }
     const inheritanceCol = getInheritanceColumn(targetModel);
     if (inheritanceCol && isStiSubclass(targetModel)) {
@@ -678,14 +673,12 @@ export class Relation<T extends Base> {
     const targetTable = targetModel.tableName;
     const sourceTable = modelClass.tableName;
     const pk = (assocDef.options.primaryKey ?? modelClass.primaryKey) as string;
-    let foreignKey: string;
+    const foreignKey = this._deriveForeignKey(assocDef, assocName, modelClass.name) as string;
     let onClause: string;
     if (assocDef.options.as) {
-      foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`;
       const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
       onClause = `"${targetTable}"."${foreignKey}" = "${sourceTable}"."${pk}" AND "${targetTable}"."${typeCol}" = '${modelClass.name}'`;
     } else {
-      foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
       onClause = `"${targetTable}"."${foreignKey}" = "${sourceTable}"."${pk}"`;
     }
     const inheritanceCol = getInheritanceColumn(targetModel);
@@ -1459,6 +1452,29 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * Derive an association's foreign key, mirroring Rails'
+   * `Reflection#derive_foreign_key` (reflection.rb):
+   *
+   * - `belongsTo` → `#{name}_id` (the association name)
+   * - polymorphic `as` → `#{as}_id`
+   * - otherwise → `#{owner.model_name}_id` (the owning model)
+   *
+   * An explicit `foreignKey` option always wins (and may be a composite
+   * `string[]`). `ownerName` is the owning model's class name — for a `:through`
+   * source association the owner is the through model, not the base model, so
+   * callers pass the appropriate name. The `infer_from_inverse_of` /
+   * `inverse_of` branch is not yet ported.
+   *
+   * @internal
+   */
+  private _deriveForeignKey(reflection: any, name: string, ownerName: string): string | string[] {
+    if (reflection.options.foreignKey != null) return reflection.options.foreignKey;
+    if (reflection.type === "belongsTo") return `${_toUnderscore(name)}_id`;
+    if (reflection.options.as) return `${_toUnderscore(reflection.options.as)}_id`;
+    return `${_toUnderscore(ownerName)}_id`;
+  }
+
+  /**
    * Resolve an association name to one or more JOIN table/ON pairs.
    * Returns null if the name is not a recognized association.
    *
@@ -1477,7 +1493,7 @@ export class Relation<T extends Base> {
     const sourcePk = modelClass.primaryKey ?? "id";
 
     if (assocDef.type === "belongsTo") {
-      const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(name)}_id`;
+      const foreignKey = this._deriveForeignKey(assocDef, name, modelClass.name);
       const className = assocDef.options.className ?? _camelize(name);
       const targetModel = modelRegistry.get(className);
       if (!targetModel) return null;
@@ -1522,9 +1538,7 @@ export class Relation<T extends Base> {
       if (!targetModel) return null;
       const targetTable = targetModel.tableName;
       const rawPk = assocDef.options.primaryKey ?? sourcePk;
-      const foreignKey = assocDef.options.as
-        ? (assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`)
-        : (assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
+      const foreignKey = this._deriveForeignKey(assocDef, name, modelClass.name);
       const pkArr = Array.isArray(rawPk) ? rawPk : [rawPk];
       const fkArr = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
       if (pkArr.length !== fkArr.length) return null;
@@ -1602,15 +1616,21 @@ export class Relation<T extends Base> {
     const throughPredicates: Nodes.Node[] = [];
 
     if (throughAssocDef.type === "belongsTo") {
-      const throughFk = throughAssocDef.options.foreignKey ?? `${_toUnderscore(throughName)}_id`;
+      const throughFk = this._deriveForeignKey(
+        throughAssocDef,
+        throughName,
+        modelClass.name,
+      ) as string;
       const throughTargetPk = throughAssocDef.options.primaryKey ?? throughModel.primaryKey ?? "id";
       throughPredicates.push(thrTable.get(throughTargetPk).eq(srcTable.get(throughFk)));
     } else {
       const throughPk = throughAssocDef.options.primaryKey ?? sourcePk;
       const throughAsName = throughAssocDef.options.as;
-      const throughFk = throughAsName
-        ? (throughAssocDef.options.foreignKey ?? `${_toUnderscore(throughAsName)}_id`)
-        : (throughAssocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
+      const throughFk = this._deriveForeignKey(
+        throughAssocDef,
+        throughName,
+        modelClass.name,
+      ) as string;
       throughPredicates.push(thrTable.get(throughFk).eq(srcTable.get(throughPk)));
       if (throughAsName) {
         throughPredicates.push(
@@ -1726,7 +1746,7 @@ export class Relation<T extends Base> {
     const defaultJoinTable = joinHabtmTableNames(sourceTable, targetTable);
     const joinTable = assocDef.options.joinTable ?? defaultJoinTable;
 
-    const ownerFk: string = fkOption ?? `${_toUnderscore(modelClass.name)}_id`;
+    const ownerFk = this._deriveForeignKey(assocDef, assocDef.name, modelClass.name) as string;
     const targetFk = habtmTargetFk(assocDef.name, assocDef.options);
 
     const srcT = new Table(sourceTable);
