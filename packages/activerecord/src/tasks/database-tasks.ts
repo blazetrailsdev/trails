@@ -275,7 +275,37 @@ export class DatabaseTasks {
   private static async _resolveAdapter(
     _config: DatabaseConfig,
   ): Promise<import("../adapter.js").DatabaseAdapter | null> {
-    return this._adapterInstance;
+    return this._migrationAdapter();
+  }
+
+  /**
+   * Resolve the connection that migration/schema tasks run against.
+   *
+   * Rails derives this purely from `migration_class.lease_connection` (the
+   * connection pool). trails is mid-migration off the legacy
+   * `setAdapter`/`_adapterInstance` bypass — see
+   * `docs/activerecord/database-tasks-rails-equivalence-plan.md`. The explicit
+   * shim still wins when set so existing callers keep working; when no shim is
+   * registered we resolve through `Base`'s pool exactly like Rails. Once every
+   * caller stops calling `setAdapter`, the shim branch is dead code and the
+   * whole bypass (`_adapterInstance`/`setAdapter`/`_resolveAdapter`) is deleted
+   * in the final step of that plan.
+   *
+   * @internal
+   */
+  private static async _migrationAdapter(): Promise<
+    import("../adapter.js").DatabaseAdapter | null
+  > {
+    if (this._adapterInstance) return this._adapterInstance;
+    try {
+      const { Base } = await import("../base.js");
+      if (typeof Base.isConnectedQ === "function" && Base.isConnectedQ()) {
+        return Base.leaseConnection();
+      }
+    } catch {
+      // No pool established for the migration class — fall through to null.
+    }
+    return null;
   }
 
   static async purge(config: DatabaseConfig): Promise<void> {
@@ -695,7 +725,7 @@ export class DatabaseTasks {
       return;
     }
     const { SchemaDumper } = await import("../schema-dumper.js");
-    const adapter = this._adapterInstance;
+    const adapter = await this._migrationAdapter();
     if (!adapter) {
       throw new Error("No adapter available for schema dump. Call DatabaseTasks.setAdapter first.");
     }
@@ -745,7 +775,7 @@ export class DatabaseTasks {
     if (typeof defineSchema !== "function") {
       throw new Error(`Schema file must export a default function (got ${typeof defineSchema})`);
     }
-    const adapter = this._adapterInstance;
+    const adapter = await this._migrationAdapter();
     if (!adapter) {
       throw new Error("No adapter configured. Call DatabaseTasks.setAdapter first.");
     }
@@ -766,7 +796,7 @@ export class DatabaseTasks {
    * `internal_metadata.create_table_and_set_flags(env, schema_sha1(file))`.
    */
   private static async _stampSchemaSha1(config: DatabaseConfig, filename: string): Promise<void> {
-    const adapter = this._adapterInstance;
+    const adapter = await this._migrationAdapter();
     if (!adapter) return;
     // Respect useMetadataTable opt-out — if the config says don't use
     // the metadata table, don't create one just to stamp the SHA1.
@@ -815,7 +845,7 @@ export class DatabaseTasks {
   static async migrateStatus(): Promise<
     Array<{ status: "up" | "down"; version: string; name: string }>
   > {
-    const adapter = this._adapterInstance;
+    const adapter = await this._migrationAdapter();
     if (!adapter) {
       throw new Error("No adapter configured. Call DatabaseTasks.setAdapter first.");
     }
@@ -911,7 +941,7 @@ export class DatabaseTasks {
     const fs = getFs();
     if (!fs.existsSync(filename)) return true;
 
-    const adapter = this._adapterInstance;
+    const adapter = await this._migrationAdapter();
     if (!adapter) return false;
 
     const { InternalMetadata } = await import("../internal-metadata.js");
@@ -946,7 +976,7 @@ export class DatabaseTasks {
    * hardcoded verbatim, matching Rails' `insert_versions_sql`.
    */
   private static async _appendSchemaInformation(filename: string): Promise<void> {
-    const adapter = this._adapterInstance;
+    const adapter = await this._migrationAdapter();
     if (!adapter) return;
 
     const { SchemaMigration } = await import("../schema-migration.js");
