@@ -2312,6 +2312,10 @@ export class Base extends Model {
             ._suppressInitializeCallback;
         }
       }
+      // Mirrors Rails Core#initialize: init_internals runs before
+      // initialize_internals_callback and after_initialize, regardless of
+      // callback suppression (found records run it via `new this()` too).
+      _Core.initInternals.call(this as any);
       executeMultiparameterAssignment(this as any, multiparams);
       // Re-snapshot so mp attrs are part of the initial clean state.
       (this as any)._dirty.snapshot((this as any)._attributes);
@@ -2363,6 +2367,10 @@ export class Base extends Model {
             ._suppressInitializeCallback;
         }
       }
+      // Mirrors Rails Core#initialize: init_internals runs before
+      // initialize_internals_callback and after_initialize, regardless of
+      // callback suppression (found records run it via `new this()` too).
+      _Core.initInternals.call(this as any);
       if (!wasSuppressed2) {
         // Mirrors Rails' initialize_internals_callback chain order:
         //   populate_with_current_scope_attributes (scoping) → ensure_proper_type (STI)
@@ -3313,8 +3321,6 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   delete(): Promise<this>;
   reload(): Promise<this>;
   initializeDup(other: unknown): void;
-  /** @internal */
-  initInternals(): void;
   /** @internal */
   committedBang(options?: { shouldRunCallbacks?: boolean }): Promise<void>;
   /** @internal */

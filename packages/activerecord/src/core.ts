@@ -230,28 +230,23 @@ export function initAttributes(
 type StrictLoadingModeHost = CoreRecord & { _strictLoadingMode?: StrictLoadingMode };
 
 /**
- * Resolve the effective strict-loading mode for this record: the
- * per-instance override if set (via `strictLoadingBang`), otherwise the
- * per-model class attribute (`Model.strictLoadingMode`, default "all").
+ * The record's strict-loading mode, seeded from `Model.strictLoadingMode` at
+ * construction by {@link initInternals} and overridable per-instance via
+ * `strictLoadingBang`. The `?? "all"` guards records built outside the normal
+ * constructor path (e.g. raw `Object.create`).
  *
  * Mirrors Rails `init_internals`: `@strict_loading_mode = klass.strict_loading_mode`.
  */
-function effectiveStrictLoadingMode(record: StrictLoadingModeHost): StrictLoadingMode {
-  const classMode = (record.constructor as { strictLoadingMode?: StrictLoadingMode })
-    .strictLoadingMode;
-  return record._strictLoadingMode ?? classMode ?? "all";
-}
-
 export function strictLoadingMode(this: StrictLoadingModeHost): StrictLoadingMode {
-  return effectiveStrictLoadingMode(this);
+  return this._strictLoadingMode ?? "all";
 }
 
 export function isStrictLoadingNPlusOneOnly(this: StrictLoadingModeHost): boolean {
-  return effectiveStrictLoadingMode(this) === "n_plus_one_only";
+  return strictLoadingMode.call(this) === "n_plus_one_only";
 }
 
 export function isStrictLoadingAll(this: StrictLoadingModeHost): boolean {
-  return effectiveStrictLoadingMode(this) === "all";
+  return strictLoadingMode.call(this) === "all";
 }
 
 export function fullInspect(this: CoreRecord): string {
@@ -595,7 +590,7 @@ export function arelTable(this: CoreHost): Table {
 }
 
 /** @internal */
-function initInternals(
+export function initInternals(
   this: CoreRecord & {
     _readonly: boolean;
     _previouslyNewRecord: boolean;

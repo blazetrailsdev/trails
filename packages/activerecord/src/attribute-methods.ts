@@ -544,7 +544,6 @@ import {
   changesToSave as _changesToSave,
   changedAttributeNamesToSave as _changedAttributeNamesToSave,
   attributesInDatabase as _attributesInDatabase,
-  initInternals as _initInternals,
   _touchRow as __touchRow,
   _updateRecord as __updateRecord,
   _createRecord as __createRecord,
@@ -695,10 +694,6 @@ export function changedAttributeNamesToSave(this: InstanceMethodHost): string[] 
 /** @internal */
 export function attributesInDatabase(this: InstanceMethodHost): Record<string, unknown> {
   return _attributesInDatabase(this as any);
-}
-/** @internal */
-export function initInternals(this: InstanceMethodHost): void {
-  _initInternals.call(this as any);
 }
 /** @internal */
 export function _touchRow(
