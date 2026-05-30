@@ -1758,7 +1758,7 @@ export class Relation<T extends Base> {
     const defaultJoinTable = joinHabtmTableNames(sourceTable, targetTable);
     const joinTable = assocDef.options.joinTable ?? defaultJoinTable;
 
-    const ownerFk: string = fkOption ?? `${_toUnderscore(modelClass.name)}_id`;
+    const ownerFk = this._deriveForeignKey(assocDef, assocDef.name, modelClass.name) as string;
     const targetFk = habtmTargetFk(assocDef.name, assocDef.options);
 
     const srcT = new Table(sourceTable);
