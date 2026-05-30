@@ -56,7 +56,8 @@ import {
   ValueTooLong,
   SQLWarning,
 } from "../errors.js";
-import { AbstractAdapter } from "./abstract-adapter.js";
+import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
+import { deprecator } from "../deprecator.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
 import type { SchemaStatements, JoinTableOptions } from "./abstract/schema-statements.js";
@@ -307,11 +308,45 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._statementPool?.setMaxSize(value);
   }
 
-  constructor(config: string | (pg.PoolConfig & PostgreSQLAdapterOptions)) {
+  constructor(config: string | (pg.PoolConfig & PostgreSQLAdapterOptions));
+  /**
+   * @deprecated Raw-connection overload (abstract_adapter.rb:141): pass a
+   * pre-opened `pg.Client`. Emits a deprecation warning; the connection is
+   * stashed for promotion. Prefer the config-hash / connection-string form.
+   */
+  constructor(rawConnection: pg.Client, deprecatedConfig?: Record<string, unknown> | null);
+  constructor(
+    config: string | (pg.PoolConfig & PostgreSQLAdapterOptions) | pg.Client,
+    deprecatedConfig?: Record<string, unknown> | null,
+  ) {
     super();
     // Rails: `PostgreSQLAdapter` inherits the abstract adapter's
     // `default_prepared_statements = true`.
     this.preparedStatements = true;
+    // Deprecated raw-connection overload (abstract_adapter.rb:141): a
+    // pre-opened pg.Client passed positionally is stashed in
+    // `_unconfiguredConnection`, mirroring Rails' `initialize`, which likewise
+    // only stashes (`@unconfigured_connection`) — usability comes later via
+    // `verify!`. The base `verifyBang` (abstract-adapter.ts) promotes the
+    // stash, but PostgreSQLAdapter OVERRIDES `verifyBang` and does not yet
+    // consume `_unconfiguredConnection` (it treats `_pgClientOptions == null`
+    // as closed). Wiring the stashed client into PG's connection-acquisition
+    // path so the overload can serve queries is a tracked follow-up
+    // (a larger restructure); for now the overload constructs + warns + stashes
+    // but the connection is not yet usable for queries on PG.
+    if (PostgreSQLAdapter._isDeprecatedRawConnectionArg(config)) {
+      deprecator().warn(RAW_CONNECTION_DEPRECATION_MESSAGE);
+      this._acceptDeprecatedRawConnection(config, deprecatedConfig);
+      return;
+    }
+    // Mirrors abstract_adapter.rb:135 — a config hash must be the only argument.
+    // A `nil`/`null` trailing arg is treated as absent (Rails' falsy guard),
+    // so only a non-null extra argument triggers the raise.
+    if (deprecatedConfig != null) {
+      throw new ArgumentError(
+        "when initializing an Active Record adapter with a config hash, that should be the only argument",
+      );
+    }
     if (typeof config === "string") {
       this._minMessages = "warning";
       this._sessionVariables = {};
@@ -364,7 +399,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       minMessages,
       variables,
       ...pgConfig
-    } = config;
+    } = config as pg.PoolConfig & PostgreSQLAdapterOptions;
     if (statementLimit !== undefined) this.statementLimit = statementLimit;
     if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
     if (insertReturning !== undefined) this._useInsertReturning = insertReturning;

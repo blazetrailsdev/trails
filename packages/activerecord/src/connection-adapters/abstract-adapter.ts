@@ -443,6 +443,17 @@ interface ConnectionCallback {
   method: (this: AbstractAdapter) => void;
 }
 
+/**
+ * Deprecation message emitted when a concrete adapter is constructed with the
+ * deprecated raw-connection overload (a pre-opened driver connection as the
+ * leading positional argument). Mirrors the soft-deprecated raw-connection
+ * branch of `AbstractAdapter#initialize` (abstract_adapter.rb:141).
+ */
+export const RAW_CONNECTION_DEPRECATION_MESSAGE =
+  "Initializing a connection adapter with a pre-opened raw connection is " +
+  "deprecated and will be removed. Pass a configuration hash (or connection " +
+  "string) and let the adapter open and manage the connection itself.";
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractAdapter implements Quoting {
   static readonly Version = Version;
@@ -469,10 +480,14 @@ export class AbstractAdapter implements Quoting {
   //
   // In Rails the only writer is the soft-deprecated `initialize` path that
   // accepts a pre-opened connection instead of a config hash
-  // (abstract_adapter.rb:141); trails has not ported that constructor overload,
-  // so today this is set only in tests. The verifyBang() read-side is ported
-  // here to keep `verify!` faithful — wiring the deprecated constructor writer
-  // is a tracked follow-up.
+  // (abstract_adapter.rb:141), ported via `_acceptDeprecatedRawConnection`
+  // (wired into PostgreSQLAdapter / Mysql2Adapter constructors). The base
+  // verifyBang() read-side promotes it into `_connection`. PostgreSQLAdapter
+  // overrides verifyBang and does not yet consume it; Mysql2Adapter inherits
+  // the base promotion but runs queries through a separate `_ensureClient()`
+  // pool the stash isn't wired into. So on both, the deprecated overload
+  // currently stashes-and-warns without being usable for queries (a tracked
+  // connection-acquisition follow-up).
   protected _unconfiguredConnection: AbstractAdapter | null = null;
   // Mirrors Rails @raw_connection_dirty. Setters land with the per-adapter
   // exec paths (PR 25b) and reconnect-with-restore (Wave 6 follow-up);
@@ -883,6 +898,51 @@ export class AbstractAdapter implements Quoting {
         throw translated;
       }
     }
+  }
+
+  /**
+   * @internal
+   * Detects the deprecated raw-connection `initialize` overload
+   * (abstract_adapter.rb:141): the leading positional argument is a
+   * pre-opened raw driver connection (a class instance) rather than a
+   * configuration hash or connection string. Plain config objects (whose
+   * prototype is `Object.prototype` or `null`), strings, and arrays are NOT
+   * treated as raw connections — mirroring Rails' `is_a?(Hash)` discriminator.
+   */
+  protected static _isDeprecatedRawConnectionArg(arg: unknown): boolean {
+    if (typeof arg !== "object" || arg === null || Array.isArray(arg)) return false;
+    const proto = Object.getPrototypeOf(arg) as object | null;
+    return proto !== Object.prototype && proto !== null;
+  }
+
+  /**
+   * @internal
+   * Stashes a pre-opened raw connection in `_unconfiguredConnection` (promoted
+   * to the live connection by `verifyBang`), mirroring the deprecated
+   * raw-connection branch of `AbstractAdapter#initialize`. `config` mirrors
+   * Rails' trailing `deprecated_config` positional. Concrete adapters emit the
+   * deprecation warning before delegating here.
+   */
+  protected _acceptDeprecatedRawConnection(
+    rawConnection: unknown,
+    config: Record<string, unknown> | null = {},
+  ): void {
+    this._unconfiguredConnection = rawConnection as AbstractAdapter | null;
+    // Mirrors Rails' `(deprecated_config || {}).symbolize_keys`
+    // (abstract_adapter.rb:142) — a `nil`/`null` config normalizes to `{}`.
+    this._config = { ...config };
+    // Rails' common-tail `@prepared_statements` (abstract_adapter.rb:159) runs
+    // for the deprecated path too, derived from `@config` falling back to
+    // `default_prepared_statements`. advisory_locks / default_timezone are read
+    // lazily from `_config` by their getters, so only prepared_statements needs
+    // applying here (it's cached into `_preparedStatements` at construction).
+    const configured =
+      "preparedStatements" in this._config
+        ? this._config.preparedStatements
+        : this.defaultPreparedStatements();
+    this.preparedStatements = (this.constructor as typeof AbstractAdapter).typeCastConfigToBoolean(
+      configured,
+    ) as boolean;
   }
 
   disconnectBang(): void {
