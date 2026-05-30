@@ -265,12 +265,49 @@ export class CollectionAssociation extends Association {
     return this.target.length;
   }
 
+  /**
+   * Mirrors ActiveRecord::Associations::HasManyAssociation#count_records
+   * (has_many_association.rb): read the counter cache when active, otherwise
+   * issue a `COUNT(*)`; purge non-new records and mark loaded when the DB is
+   * empty (a documented side-effect that can avoid an extra SELECT); finally
+   * clamp the result to the association scope's `limit_value`.
+   * @internal
+   */
   async countRecords(): Promise<number> {
-    const rel = this.scope();
-    if (rel && typeof rel.count === "function") {
-      return await rel.count();
+    const refl = this.richReflection();
+    let count: number;
+    if (typeof refl?.hasActiveCachedCounter === "function" && refl.hasActiveCachedCounter()) {
+      const col = refl.counterCacheColumn();
+      count = col ? toI(this.owner.readAttribute(col)) : 0;
+    } else {
+      const rel = this.scope();
+      count = rel && typeof rel.count === "function" ? await rel.count() : this.target.length;
     }
-    return this.target.length;
+
+    // If there's nothing in the database, @target should only contain new
+    // records or be an empty array — a documented side-effect that may avoid
+    // an extra SELECT.
+    if (count === 0) {
+      this.target = this.target.filter((r) => r.isNewRecord());
+      this.loadedBang();
+    }
+
+    const limitValue = (this.associationScope() as { limitValue?: number | null } | undefined)
+      ?.limitValue;
+    return limitValue == null ? count : Math.min(limitValue, count);
+  }
+
+  /**
+   * Resolve the rich Reflection (with counter-cache helpers) from the owner's
+   * class; falls back to the lightweight macro reflection.
+   * @internal
+   */
+  private richReflection(): RichReflection | undefined {
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => unknown;
+    };
+    return (ctor._reflectOnAssociation?.(this.reflection.name) ??
+      this.reflection) as RichReflection;
   }
 
   isEmpty(): boolean {
@@ -968,7 +1005,21 @@ function isIncludeInMemory(assoc: CollectionAssociation, record: Base): boolean 
   return (assoc.target as Base[]).includes(record);
 }
 
+interface RichReflection {
+  hasActiveCachedCounter?: () => boolean;
+  counterCacheColumn: () => string | null;
+}
+
 function arraysEqual(a: Base[], b: Base[]): boolean {
   if (a.length !== b.length) return false;
   return a.every((r, i) => r === b[i]);
+}
+
+/** Ruby `Object#to_i` semantics: nil → 0, leading-integer parse otherwise. */
+function toI(value: unknown): number {
+  if (value == null) return 0;
+  if (typeof value === "number") return Math.trunc(value);
+  if (typeof value === "bigint") return Number(value);
+  const n = Number.parseInt(String(value), 10);
+  return Number.isNaN(n) ? 0 : n;
 }

@@ -96,7 +96,7 @@ export interface AssociationOptions {
   sourceType?: string;
   polymorphic?: boolean;
   as?: string;
-  counterCache?: boolean | string;
+  counterCache?: boolean | string | { active?: boolean; column?: string };
   touch?: boolean | string | string[];
   autosave?: boolean;
   scope?: (rel: any, owner?: any) => any;

@@ -1156,9 +1156,43 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // COUNT(*) rather than ignoring them.
     if (!this.distinctValue && this._target.length > 0) {
       const unsaved = this._target.filter((r) => r.isNewRecord()).length;
-      return unsaved + (await this.count());
+      return unsaved + (await this._countRecords());
     }
-    return this.count();
+    return this._countRecords();
+  }
+
+  /**
+   * Mirrors ActiveRecord::Associations::HasManyAssociation#count_records
+   * (has_many_association.rb): prefer an active counter cache, otherwise issue
+   * a `COUNT(*)`; purge non-new records and mark the target loaded when the DB
+   * is empty (a documented side-effect that can avoid an extra SELECT); finally
+   * clamp the result to the association scope's `limit_value`.
+   * @internal
+   */
+  private async _countRecords(): Promise<number> {
+    const ctor = this._record.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => unknown;
+    };
+    const refl = ctor._reflectOnAssociation?.(this._assocName) as
+      | { hasActiveCachedCounter?: () => boolean; counterCacheColumn?: () => string | null }
+      | undefined;
+
+    let count: number;
+    if (typeof refl?.hasActiveCachedCounter === "function" && refl.hasActiveCachedCounter()) {
+      const col = refl.counterCacheColumn?.() ?? null;
+      const raw = col ? this._record.readAttribute(col) : 0;
+      count = _toI(raw);
+    } else {
+      count = await this.count();
+    }
+
+    if (count === 0) {
+      this._target = this._target.filter((r) => r.isNewRecord());
+      this._targetLoaded = true;
+    }
+
+    const limitValue = (this.scope() as { limitValue?: number | null } | undefined)?.limitValue;
+    return limitValue == null ? count : Math.min(limitValue, count);
   }
 
   /**
@@ -2895,4 +2929,13 @@ function isFindFromTarget(proxy: CollectionProxy<any>): boolean {
 /** @internal */
 function execQueries(proxy: CollectionProxy<any>): Promise<any[]> {
   return proxy.loadTarget() as Promise<any[]>;
+}
+
+/** Ruby `Object#to_i` semantics: nil → 0, leading-integer parse otherwise. */
+function _toI(value: unknown): number {
+  if (value == null) return 0;
+  if (typeof value === "number") return Math.trunc(value);
+  if (typeof value === "bigint") return Number(value);
+  const n = Number.parseInt(String(value), 10);
+  return Number.isNaN(n) ? 0 : n;
 }

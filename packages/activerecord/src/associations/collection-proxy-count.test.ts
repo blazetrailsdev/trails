@@ -33,6 +33,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
     static {
       this._tableName = "cpc_authors";
       this.attribute("name", "string");
+      this.attribute("postsCount", "integer");
     }
   }
   class CpcPost extends Base {
@@ -46,7 +47,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
   beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
-      cpc_authors: { name: "string" },
+      cpc_authors: { name: "string", postsCount: "integer" },
       cpc_posts: { cpc_author_id: "integer", title: "string" },
       cpc_comments: { cpc_post_id: "integer", body: "string" },
     });
@@ -269,5 +270,57 @@ describe("CollectionProxy#count — non-through fast path", () => {
     const withoutPkProxy = association(newWithoutPk, "cpcPosts") as any;
     expect(withPkProxy._foreignKeyPresent()).toBe(true);
     expect(withoutPkProxy._foreignKeyPresent()).toBe(false);
+  });
+
+  it("count_records reads the active counter cache instead of querying", async () => {
+    // Mirrors HasManyAssociation#count_records: when the reflection has an
+    // active cached counter, size() reads owner.read_attribute(counter_cache_column)
+    // rather than emitting a COUNT(*).
+    Associations.hasMany.call(CpcAuthor, "cpcPostsCounted", {
+      className: "CpcPost",
+      foreignKey: "cpc_author_id",
+      counterCache: { column: "postsCount" },
+    });
+    const author = await CpcAuthor.create({ name: "counted", postsCount: 7 });
+
+    const observed: string[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (event: any) => {
+      if (event?.payload?.name === "SCHEMA") return;
+      if (typeof event?.payload?.sql === "string") observed.push(event.payload.sql);
+    });
+    try {
+      expect(await association(author, "cpcPostsCounted").size()).toBe(7);
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    // The cache short-circuit means no COUNT(*) is issued.
+    expect(observed.some((s) => /SELECT\s+COUNT\b/i.test(s))).toBe(false);
+  });
+
+  it("count_records clamps the result to the association scope's limit_value", async () => {
+    // Mirrors `[association_scope.limit_value, count].compact.min`: a scoped
+    // limit caps the reported size even when the DB holds more rows.
+    Associations.hasMany.call(CpcAuthor, "cpcPostsLimited", {
+      className: "CpcPost",
+      foreignKey: "cpc_author_id",
+      scope: (rel: any) => rel.limit(2),
+    });
+    const author = await CpcAuthor.create({ name: "limited" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "p1" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "p2" });
+    await CpcPost.create({ cpc_author_id: author.id, title: "p3" });
+
+    expect(await association(author, "cpcPostsLimited").size()).toBe(2);
+  });
+
+  it("count_records marks the target loaded and purges non-new records when the DB is empty", async () => {
+    // Documented side-effect: when count == 0, @target retains only new records
+    // and the association is flagged loaded, avoiding an extra SELECT.
+    const author = await CpcAuthor.create({ name: "empty" });
+    const proxy = association(author, "cpcPosts") as any;
+
+    expect(await proxy.size()).toBe(0);
+    expect(proxy.loaded).toBe(true);
+    expect(proxy.target.length).toBe(0);
   });
 });
