@@ -1,9 +1,17 @@
 import { Notifications } from "@blazetrails/activesupport";
 import { typeCastedBinds, type DatabaseStatementsHost } from "./database-statements.js";
+import { Result } from "../../result.js";
 import {
   executionContextId,
   registerContextExitHook,
 } from "./connection-pool/execution-context.js";
+
+/**
+ * Matches the locking suffixes Rails refuses to cache (`SELECT ... FOR
+ * UPDATE` and friends). Mirrors `arel.locked` short-circuit in
+ * `QueryCache#select_all`.
+ */
+const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
 
 const DEFAULT_MAX_SIZE = 100;
 
@@ -393,71 +401,74 @@ export function clearQueryCache(this: QueryCacheHost): void {
   this._queryCache?.clear();
 }
 
-/**
- * Creates a cached selectAll that wraps the original. When the query cache
- * is enabled and the query is not locked (FOR UPDATE), results are served
- * from cache. Otherwise delegates to the original.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#select_all
- */
-export function selectAll(
-  original: (
-    sql: string,
-    name?: string | null,
-    binds?: unknown[],
-  ) => Promise<Record<string, unknown>[]>,
-): (
+/** The base (uncached) `selectAll` signature the override wraps via `super`. */
+type BaseSelectAll = (
   this: QueryCacheHost,
   sql: string,
   name?: string | null,
   binds?: unknown[],
-) => Promise<Record<string, unknown>[]> {
+  opts?: { allowRetry?: boolean },
+) => Promise<Result>;
+
+/**
+ * Wrap a base `selectAll` (e.g. the one mixed in from `DatabaseStatements`)
+ * with the query cache. When the cache is enabled and the query is not locked
+ * (`FOR UPDATE` & friends), results are served from / stored in the cache;
+ * otherwise the call delegates straight to `original` (Rails' `super`).
+ *
+ * The cache stores row hashes (`Result#toArray`), so a hit is reconstructed
+ * via `Result.fromRowHashes` — matching the retired `QueryCacheAdapter`
+ * wrapper's behavior.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#select_all
+ * (query_cache.rb:236), which does `lookup_sql_cache(...) || super` /
+ * `cache_sql(...) { super }`.
+ */
+export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
   return async function cachedSelectAll(
     this: QueryCacheHost,
     sql: string,
     name?: string | null,
     binds?: unknown[],
-  ): Promise<Record<string, unknown>[]> {
+    opts?: { allowRetry?: boolean },
+  ): Promise<Result> {
     const qc = this._queryCache;
-    if (qc?.enabled) {
-      if (/\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i.test(sql)) {
-        return original.call(this, sql, name, binds);
-      }
-
+    if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
       const cached = lookupSqlCache.call(this, sql, name, binds ?? []);
       if (cached !== undefined) {
-        return cached.map((r) => ({ ...r }));
+        return Result.fromRowHashes(cached.map((r) => ({ ...r })));
       }
-
-      return cacheSql.call(this, sql, name, binds ?? [], () =>
-        original.call(this, sql, name, binds),
-      );
+      const rows = await cacheSql.call(this, sql, name, binds ?? [], async () => {
+        const result = await original.call(this, sql, name, binds, opts);
+        return result.toArray();
+      });
+      return Result.fromRowHashes(rows);
     }
-    return original.call(this, sql, name, binds);
+    return original.call(this, sql, name, binds, opts);
   };
 }
 
 /**
- * Wraps adapter methods to clear query caches before execution when
- * the dirties flag is set. In Rails this uses class_eval to monkey-patch
- * each method; in TypeScript the cache invalidation is handled by the
- * QueryCacheAdapter wrapper's executeMutation/rollback methods.
+ * Wraps the named write methods on `base.prototype` so each clears the
+ * per-connection query cache (when its `dirties` flag is set) before
+ * delegating to the original implementation. Rails uses `class_eval` to
+ * redefine each method as `clear if pool.dirties_query_cache; super`; here we
+ * reassign the prototype slot to a wrapper that calls through to the captured
+ * original.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache.dirties_query_cache
  */
-export function dirtiesQueryCache(
-  _base: { prototype: Record<string, unknown> },
-  ...methodNames: string[]
-): void {
+export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: string[]): void {
+  const proto = base.prototype as Record<string, unknown>;
   for (const methodName of methodNames) {
-    const original = _base.prototype[methodName];
+    const original = proto[methodName];
     if (typeof original !== "function") continue;
 
-    _base.prototype[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
+    proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
       if (this._queryCache?.dirties) {
         this._queryCache.clear();
       }
-      return original.apply(this, args);
+      return (original as (...a: unknown[]) => unknown).apply(this, args);
     };
   }
 }
