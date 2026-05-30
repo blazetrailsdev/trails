@@ -313,36 +313,35 @@ export class AssociationScope {
    * relation. For multi-step (through), `table` is a different
    * (joined-in) table — qualify the WHERE as `<table>.<key> = ?`.
    *
-   * Deviation: Rails compares Arel `Table` objects with `scope.table ==
-   * table`, which is VALUE equality — `Arel::Table#==` (aliased to
-   * `eql?`, arel/table.rb:95-99) compares `name` AND `table_alias`, not
-   * object identity. We compare the resolved table NAME (string
-   * equality) because Relation doesn't expose its Arel table as a
-   * comparable object yet. Since callers pass the ALIAS name when the
-   * chain table is aliased (lastChainScope / nextChainScope resolve
-   * `aliasedTable.name`), the two agree for both base and aliased
-   * tables — the only gap is the (currently unreachable) case where a
-   * generated alias string equals the scope table's name, which
-   * AliasTracker's `_N`-suffixed candidates never produce. The
-   * polymorphic-source-type alias coverage in the test file exercises
-   * the aliased path; if such a name-collision case ever surfaces,
-   * route this through an Arel `Table` value comparison instead.
+   * `table` is the chain reflection's `aliasedTable` Arel node (base
+   * `Table` or `TableAlias`); `scope.table` is the Relation's Arel
+   * table. We compare them with `arelTableEql` — VALUE equality matching
+   * `Arel::Table#==` (aliased to `eql?`, arel/table.rb:95-99: compares
+   * `name` AND `table_alias`) and Ruby's `Table != TableAlias` across
+   * node classes. This is the faithful port of Rails' `scope.table ==
+   * table`: an alias whose name collides with the scope table's name is
+   * still recognized as a distinct table (different node class →
+   * qualified WHERE), which a bare string-name comparison would miss.
    *
    * Mirrors: ActiveRecord::Associations::AssociationScope#apply_scope
    * (association_scope.rb:161-167).
    */
-  private applyScope(scope: unknown, table: string | null, key: string, value: unknown): unknown {
+  private applyScope(
+    scope: unknown,
+    table: ArelTable | Nodes.TableAlias | null,
+    key: string,
+    value: unknown,
+  ): unknown {
     const w = scope as {
       where: (c: Record<string, unknown> | unknown) => unknown;
-      _modelClass?: { tableName?: string };
+      table?: ArelTable;
     };
-    const scopeTable = w._modelClass?.tableName ?? null;
-    if (table && scopeTable && table !== scopeTable) {
+    if (table && w.table && !arelTableEql(w.table, table)) {
       // Table-qualified WHERE for through chains where the FK lives on
       // an intermediate joined-in table. Use Arel so identifier quoting
       // and value escaping go through the same path as the rest of the
       // query — no manual interpolation.
-      const node = new ArelTable(table).get(key).eq(value);
+      const node = table.get(key).eq(value);
       return w.where(node);
     }
     return w.where({ [key]: value });
@@ -415,16 +414,20 @@ export class AssociationScope {
       const ownerName = (owner.constructor as typeof Base).name;
       throw new CompositePrimaryKeyMismatchError(ownerName, name);
     }
+    // Rails passes `reflection.aliased_table` (an Arel node) to apply_scope;
+    // resolve it the same way `nextChainScope` does so the identity check
+    // sees the alias node, not a bare name.
+    const tableNode = table ? this._arelTableFor(reflection, table) : null;
     for (let i = 0; i < joinPks.length; i++) {
       const rawValue = owner._readAttribute(joinFks[i]);
       const value = this.transformValue(rawValue);
-      scope = this.applyScope(scope, table, joinPks[i], value);
+      scope = this.applyScope(scope, tableNode, joinPks[i], value);
     }
     if (r.type) {
       // Rails: `owner.class.polymorphic_name` (returns base_class.name
       // for STI subclasses) routed through `transform_value`.
       const polyName = this.transformValue(polymorphicName(owner.constructor as typeof Base));
-      scope = this.applyScope(scope, table, r.type, polyName);
+      scope = this.applyScope(scope, tableNode, r.type, polyName);
     }
     return scope;
   }
@@ -569,7 +572,7 @@ export class AssociationScope {
       // table, ...)` where `table` is `reflection.aliased_table` (so
       // `table.name` is the alias). Keeps the `_type` WHERE on the same
       // identifier the JOIN uses.
-      scope = this.applyScope(scope, tableNode.name, r.type, this.transformValue(nextName));
+      scope = this.applyScope(scope, tableNode, r.type, this.transformValue(nextName));
     }
     // Wrap the join target + constraint in Arel's LeadingJoin/On nodes via
     // `join()` and push it through Relation#joins, which stores Arel join
@@ -851,6 +854,23 @@ export class AssociationScope {
     }
     return merged;
   }
+}
+
+/**
+ * Value-equality for two Arel table nodes, mirroring Ruby's
+ * `scope.table == table` in `apply_scope`. Two base `Table`s are equal
+ * iff `Arel::Table#eql?` (name AND tableAlias) agrees; two `TableAlias`
+ * nodes iff their alias name and underlying table name agree; a `Table`
+ * never equals a `TableAlias` (distinct Ruby classes). This last case is
+ * what string-name comparison missed: an alias whose name collides with
+ * the scope table's name is still a distinct table.
+ */
+function arelTableEql(a: ArelTable | Nodes.TableAlias, b: ArelTable | Nodes.TableAlias): boolean {
+  if (a instanceof ArelTable && b instanceof ArelTable) return a.eql(b);
+  if (a instanceof Nodes.TableAlias && b instanceof Nodes.TableAlias) {
+    return a.name === b.name && a.tableName === b.tableName;
+  }
+  return false;
 }
 
 /**
