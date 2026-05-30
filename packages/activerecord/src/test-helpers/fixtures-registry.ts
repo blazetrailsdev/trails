@@ -97,10 +97,6 @@ export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTable
  *   resolves to a single scalar (the CRC32 label id), not the book's generated
  *   composite `id` key component — composite-target ref resolution is a separate
  *   follow-up.
- * - `edges` → `vertices`: `edges` is id-less and seeds fine, but it `ref()`s `vertices`,
- *   which isn't registerable yet — `Vertex` has no `tableName` override so it mis-inflects
- *   to `vertexes` (the table is `vertices`). Re-add `edges` once `Vertex.tableName` is fixed
- *   and `vertices` is registered.
  * - `developers-projects` — HABTM join table (`developers_projects`); seeds fine via the
  *   join-table loader, but `ref()`s `developers`, which isn't registerable yet (the
  *   `developers` set has a `shared_computers` non-column gap, listed above). Re-add once
@@ -247,6 +243,10 @@ export const fixtureRegistry = {
   drinkDesigners: {
     model: () => import("./models/drink-designer.js").then((m) => m.DrinkDesigner),
     data: FixtureData.drinkDesignerFixtureData,
+  },
+  edges: {
+    model: () => import("./models/edge.js").then((m) => m.Edge),
+    data: FixtureData.edgeFixtureData,
   },
   entrants: {
     model: () => import("./models/entrant.js").then((m) => m.Entrant),
@@ -484,6 +484,10 @@ export const fixtureRegistry = {
   variants: {
     model: () => import("./models/shop.js").then((m) => m.ShopVariant),
     data: FixtureData.variantFixtureData,
+  },
+  vertices: {
+    model: () => import("./models/vertex.js").then((m) => m.Vertex),
+    data: FixtureData.vertexFixtureData,
   },
   vegetables: {
     // STI base with custom inheritance column `custom_type`. Register the
