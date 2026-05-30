@@ -36,24 +36,21 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it.skip("not setting writing role while using another named role raises", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for ConnectionHandlerTest
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs role validation logic */
+    // blocked on connectsTo shared-pool support + setupSharedConnectionPool test
+    // helper + writing-role validation (none ported yet). Not unblocked by
+    // nested connectedTo (#2547). Rails: connection_handler_test.rb:81
   });
 
   it.skip("fixtures dont raise if theres no writing pool config", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for ConnectionHandlerTest
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs fixture integration */
+    // blocked on connectsTo(database:) role-aliasing + retrieveConnection by
+    // role resolving reading→writing fallback (not ported yet). Not unblocked
+    // by nested connectedTo (#2547). Rails: connection_handler_test.rb:92
   });
 
   it.skip("setting writing role while using another named role does not raise", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for ConnectionHandlerTest
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs role validation logic */
+    // blocked on connectsTo shards + mutable ActiveRecord.writingRole +
+    // setupSharedConnectionPool test helper (none ported yet). Not unblocked
+    // by nested connectedTo (#2547). Rails: connection_handler_test.rb:108
   });
 
   it("establish connection with primary works without deprecation", () => {
@@ -94,10 +91,9 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it.skip("establish connection using top level key in two level config", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs config resolution from raw YAML-like structures */
+    // blocked on global Base.configurations registry + establishConnection(:key)
+    // symbol-key resolution against it (handler currently takes a HashConfig
+    // directly). Rails: connection_handler_test.rb:196
   });
 
   it("establish connection with string owner name", () => {
@@ -111,10 +107,9 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it.skip("symbolized configurations assignment", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* TS doesn't have symbols vs strings distinction in the same way */
+    // blocked on global Base.configurations setter + configsFor; asserts
+    // symbol-keyed config hashes normalize to String envName/name. No global
+    // configurations registry ported yet. Rails: connection_handler_test.rb:228
   });
 
   it("retrieve connection", () => {
@@ -171,10 +166,10 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it.skip("a class using custom pool and switching back to primary", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs Base class integration */
+    // blocked on Base default-pool leaseConnection integration: anonymous
+    // subclass shares Base's pool, gets its own via establishConnection(hash),
+    // then removeConnection falls back to Base. Needs the global connection
+    // handler + Base.leaseConnection wiring. Rails: connection_handler_test.rb:282
   });
 
   it("connection specification name should fallback to parent", () => {
@@ -298,38 +293,26 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it.skip("connection pool per pid", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs process forking */
+    // permanent: requires process fork (Process.fork, guarded in Rails by
+    // `if Process.respond_to?(:fork)`). Rails: connection_handler_test.rb:340
   });
 
   it.skip("forked child doesnt mangle parent connection", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs process forking */
+    // permanent: requires process fork. Rails: connection_handler_test.rb:361
   });
 
   it.skip("forked child recovers from disconnected parent", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs process forking */
+    // permanent: requires process fork. Rails: connection_handler_test.rb:390
   });
 
   it.skip("retrieve connection pool copies schema cache from ancestor pool", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs schema cache implementation */
+    // blocked on schema cache port (not yet implemented); also requires process
+    // fork (asserts the forked child inherits the parent's schema cache).
+    // Rails: connection_handler_test.rb:432
   });
 
   it.skip("pool from any process for uses most recent spec", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs process forking */
+    // permanent: requires process fork. Rails: connection_handler_test.rb:455
   });
 
   it("connection pool names", () => {
