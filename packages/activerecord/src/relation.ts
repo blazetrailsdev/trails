@@ -1610,33 +1610,61 @@ export class Relation<T extends Base> {
     if (!throughModel) return null;
     const throughTable = (throughModel as any).tableName;
 
-    // Build the first JOIN: source -> through
+    // Build the first JOIN(s): source -> through. When the through association
+    // is itself a :through or HABTM (a nested-through chain, e.g. Post
+    // `has_many :essays, through: :categories` where `categories` is HABTM),
+    // delegate to the recursive resolver so the full intermediate join chain
+    // (join table + categories + essays) is emitted rather than a bogus direct
+    // FK against the through target. Mirrors Rails' ThroughReflection chain.
     const srcTable = new Table(sourceTable);
     const thrTable = new Table(throughTable);
-    const throughPredicates: Nodes.Node[] = [];
+    const throughIsNested =
+      throughAssocDef.options.through != null ||
+      throughAssocDef.type === "hasAndBelongsToMany" ||
+      (throughAssocDef.type as string) === "hasManyThrough" ||
+      (throughAssocDef.type as string) === "hasOneThrough";
 
-    if (throughAssocDef.type === "belongsTo") {
-      const throughFk = this._deriveForeignKey(
-        throughAssocDef,
-        throughName,
-        modelClass.name,
-      ) as string;
-      const throughTargetPk = throughAssocDef.options.primaryKey ?? throughModel.primaryKey ?? "id";
-      throughPredicates.push(thrTable.get(throughTargetPk).eq(srcTable.get(throughFk)));
+    let throughJoins: Array<{ table: string; on: string }>;
+    if (throughIsNested) {
+      const resolved = this._resolveAssociationJoin(throughName);
+      if (!resolved) return null;
+      throughJoins = Array.isArray(resolved) ? resolved : [resolved];
     } else {
-      const throughPk = throughAssocDef.options.primaryKey ?? sourcePk;
-      const throughAsName = throughAssocDef.options.as;
-      const throughFk = this._deriveForeignKey(
-        throughAssocDef,
-        throughName,
-        modelClass.name,
-      ) as string;
-      throughPredicates.push(thrTable.get(throughFk).eq(srcTable.get(throughPk)));
-      if (throughAsName) {
-        throughPredicates.push(
-          thrTable.get(`${_toUnderscore(throughAsName)}_type`).eq(modelClass.name),
-        );
+      const throughPredicates: Nodes.Node[] = [];
+      if (throughAssocDef.type === "belongsTo") {
+        const throughFk = this._deriveForeignKey(
+          throughAssocDef,
+          throughName,
+          modelClass.name,
+        ) as string;
+        const throughTargetPk =
+          throughAssocDef.options.primaryKey ?? throughModel.primaryKey ?? "id";
+        throughPredicates.push(thrTable.get(throughTargetPk).eq(srcTable.get(throughFk)));
+      } else {
+        const throughPk = throughAssocDef.options.primaryKey ?? sourcePk;
+        const throughAsName = throughAssocDef.options.as;
+        const throughFk = this._deriveForeignKey(
+          throughAssocDef,
+          throughName,
+          modelClass.name,
+        ) as string;
+        throughPredicates.push(thrTable.get(throughFk).eq(srcTable.get(throughPk)));
+        if (throughAsName) {
+          throughPredicates.push(
+            thrTable.get(`${_toUnderscore(throughAsName)}_type`).eq(modelClass.name),
+          );
+        }
       }
+      throughJoins = [
+        {
+          table: throughTable,
+          on: this._arelVisitor().compile(
+            throughPredicates.length === 1
+              ? throughPredicates[0]
+              : new Nodes.And(throughPredicates),
+          ),
+        },
+      ];
     }
 
     // Resolve the source association on the through model to build the second JOIN
@@ -1700,13 +1728,13 @@ export class Relation<T extends Base> {
       }
     }
 
+    // Fold the outer through-association's own `scope:` lambda (e.g.
+    // `-> { where(name: "Bob") }`) into the final target join's ON predicates,
+    // mirroring JoinDependency's reflection-scope handling.
+    this._appendAssociationScope(targetPredicates, assocDef, targetModel);
+
     return [
-      {
-        table: throughTable,
-        on: this._arelVisitor().compile(
-          throughPredicates.length === 1 ? throughPredicates[0] : new Nodes.And(throughPredicates),
-        ),
-      },
+      ...throughJoins,
       {
         table: targetTable,
         on: this._arelVisitor().compile(

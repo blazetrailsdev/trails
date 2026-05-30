@@ -79,6 +79,11 @@ const TEST_SCHEMA: Schema = {
   },
   phmt_cake_designer2s: { name: "string" },
   phmt_drink_designer2s: { name: "string" },
+  hmps_categories: { name: "string" },
+  hmps_posts: { title: "string", body: "string" },
+  hmps_essays: { writer_id: "integer", writer_type: "string", hmps_category_id: "integer" },
+  hmps_authors: { name: "string" },
+  hmps_categories_posts: { hmps_category_id: "integer", hmps_post_id: "integer" },
 };
 
 describe("NestedThroughAssociationsTest", () => {
@@ -2280,10 +2285,95 @@ describe("NestedThroughAssociationsTest", () => {
     // follow-up outside AF6's file scope.
   });
 
-  it.skip("has many through polymorphic with scope", () => {
-    // BLOCKED: `Post.joins(:authors_of_essays_named_bob)` joins through a HABTM
-    // into a polymorphic source (source_type "Author") with a scope. Requires
-    // HABTM-into-polymorphic-source joins in JoinDependency. Follow-up.
+  it("has many through polymorphic with scope", async () => {
+    // Mirrors Rails test_has_many_through_polymorphic_with_scope:
+    //   Post.joins(:authors_of_essays_named_bob).count == 1
+    // The chain is Post --HABTM-> categories --> essays (through categories)
+    // --> writer (belongs_to polymorphic, source_type "Author"), with a
+    // `-> { where(name: "Bob") }` scope folded into the final join.
+    class HmpsCategory extends Base {
+      static {
+        this.tableName = "hmps_categories";
+        this.attribute("name", "string");
+      }
+    }
+    class HmpsPost extends Base {
+      static {
+        this.tableName = "hmps_posts";
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+      }
+    }
+    class HmpsEssay extends Base {
+      static {
+        this.tableName = "hmps_essays";
+        this.attribute("writer_id", "integer");
+        this.attribute("writer_type", "string");
+        this.attribute("hmps_category_id", "integer");
+      }
+    }
+    class HmpsAuthor extends Base {
+      static {
+        this.tableName = "hmps_authors";
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("HmpsCategory", HmpsCategory);
+    registerModel("HmpsPost", HmpsPost);
+    registerModel("HmpsEssay", HmpsEssay);
+    registerModel("HmpsAuthor", HmpsAuthor);
+
+    Associations.hasAndBelongsToMany.call(HmpsPost, "categories", {
+      className: "HmpsCategory",
+      joinTable: "hmps_categories_posts",
+      foreignKey: "hmps_post_id",
+      associationForeignKey: "hmps_category_id",
+    });
+    Associations.hasMany.call(HmpsCategory, "essays", {
+      className: "HmpsEssay",
+      foreignKey: "hmps_category_id",
+    });
+    Associations.hasMany.call(HmpsPost, "essays", {
+      className: "HmpsEssay",
+      through: "categories",
+      source: "essays",
+    });
+    Associations.belongsTo.call(HmpsEssay, "writer", {
+      polymorphic: true,
+      foreignKey: "writer_id",
+    });
+    Associations.hasMany.call(HmpsPost, "authorsOfEssaysNamedBob", {
+      className: "HmpsAuthor",
+      through: "essays",
+      source: "writer",
+      sourceType: "HmpsAuthor",
+      scope: (rel: any) => rel.where({ name: "Bob" }),
+    });
+
+    const post = await HmpsPost.create({ title: "Catchy Title", body: "Interesting body." });
+    const category = await HmpsCategory.create({ name: "Anything" });
+    await (HmpsPost as any)
+      .leaseConnection()
+      .executeMutation(
+        `INSERT INTO "hmps_categories_posts" ("hmps_category_id", "hmps_post_id") VALUES (${category.id}, ${post.id})`,
+      );
+    const author = await HmpsAuthor.create({ name: "Bob" });
+    await HmpsEssay.create({
+      writer_id: author.id,
+      writer_type: "HmpsAuthor",
+      hmps_category_id: category.id,
+    });
+
+    const sql = (HmpsPost as any).all().joins("authorsOfEssaysNamedBob").toSql();
+    expect(sql).toMatch(/JOIN ["`]hmps_categories_posts["`]/);
+    expect(sql).toMatch(/JOIN ["`]hmps_categories["`]/);
+    expect(sql).toMatch(/JOIN ["`]hmps_essays["`]/);
+    expect(sql).toMatch(/JOIN ["`]hmps_authors["`]/);
+    expect(sql).toMatch(/["`]writer_type["`]\s*=\s*'HmpsAuthor'/);
+    expect(sql).toMatch(/["`]name["`]\s*=\s*'Bob'/);
+
+    const count = await (HmpsPost as any).all().joins("authorsOfEssaysNamedBob").count();
+    expect(count).toBe(1);
   });
 
   it("has many through reset source reflection after loading is complete", async () => {
