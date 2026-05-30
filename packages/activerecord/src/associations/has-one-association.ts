@@ -47,8 +47,11 @@ export class HasOneAssociation extends SingularAssociation {
           // We signal :abort to the before_destroy chain by returning false.
           const ownerAny = this.owner as any;
           if (typeof ownerAny.errors?.add === "function") {
+            const record = (this.owner.constructor as any)
+              .humanAttributeName(this.reflection.name)
+              .toLowerCase();
             ownerAny.errors.add("base", "invalid", {
-              message: `Cannot delete record because dependent ${this.reflection.name} exists`,
+              message: `Cannot delete record because a dependent ${record} exists`,
             });
           }
           return false;

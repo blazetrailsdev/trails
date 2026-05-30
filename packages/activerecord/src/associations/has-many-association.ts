@@ -47,9 +47,11 @@ export class HasManyAssociation extends CollectionAssociation {
           // We signal :abort to the before_destroy chain by returning false.
           const ownerAny = this.owner as any;
           if (typeof ownerAny.errors?.add === "function") {
-            const name = this.reflection.name;
+            const record = (this.owner.constructor as any)
+              .humanAttributeName(this.reflection.name)
+              .toLowerCase();
             ownerAny.errors.add("base", "invalid", {
-              message: `Cannot delete record because dependent ${name} exists`,
+              message: `Cannot delete record because dependent ${record} exist`,
             });
           }
           return false;
