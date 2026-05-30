@@ -5184,10 +5184,12 @@ describe("HasManyAssociationsTest", () => {
     // name; a locale override on that attribute would change the interpolated
     // record name — here no translation is stored, so the default is used.
     expect(await author.destroy()).toBe(false);
+    expect(author.errors.where("base")).toHaveLength(1);
     expect(author.errors.messagesFor("base")[0]).toBe(
       "Cannot delete record because dependent re locale posts exist",
     );
     expect(await ReLocaleAuthor.findBy({ id: author.id })).not.toBeNull();
+    expect(await ReLocalePost.all().count()).toBe(1);
   });
   it("included in collection for composite keys", async () => {
     class InclAuthor extends Base {
