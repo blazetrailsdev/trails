@@ -1834,9 +1834,7 @@ export async function processDependentAssociations(record: Base): Promise<void> 
     // before_destroy { association(name).handle_dependency }). The override
     // dispatch (deleteOrNullifyAllRecords / delete) lives there, so this
     // path no longer reimplements dependent handling inline.
-    await (
-      record.association(assoc.name) as unknown as { handleDependency(): Promise<void> }
-    ).handleDependency();
+    await (record.association(assoc.name) as any).handleDependency();
   }
 }
 
