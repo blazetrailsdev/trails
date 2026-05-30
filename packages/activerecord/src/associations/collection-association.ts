@@ -265,14 +265,6 @@ export class CollectionAssociation extends Association {
     return this.target.length;
   }
 
-  async countRecords(): Promise<number> {
-    const rel = this.scope();
-    if (rel && typeof rel.count === "function") {
-      return await rel.count();
-    }
-    return this.target.length;
-  }
-
   isEmpty(): boolean {
     if (this.isLoaded() || this._associationIds) {
       return this.size === 0;
