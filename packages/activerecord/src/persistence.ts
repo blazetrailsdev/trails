@@ -50,6 +50,7 @@ interface PersistenceHost {
   _queryConstraintsList?: string[] | null;
   _hasQueryConstraints?: boolean;
   _isBaseClass?: boolean;
+  ensureSchemaLoaded(): Promise<void>;
 }
 
 /**
@@ -68,6 +69,9 @@ export async function create(
     }
     return records;
   }
+  // Reflect the schema before constructing — the constructor casts attrs
+  // against attribute definitions that lazy reflection populates.
+  await this.ensureSchemaLoaded();
   const record = new this((this as any)._mergeCurrentScopeAttrs(attrs));
   if (block) block(record);
   await record.save();
@@ -90,6 +94,7 @@ export async function createBang(
     }
     return records;
   }
+  await this.ensureSchemaLoaded();
   const record = new this((this as any)._mergeCurrentScopeAttrs(attrs));
   if (block) block(record);
   await record.saveBang();
@@ -607,6 +612,10 @@ export async function save<T extends SaveRecord>(
   if (this._readonly) {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
+  // Reflect the schema before validations/INSERT touch attribute defs.
+  await (
+    this.constructor as unknown as { ensureSchemaLoaded(): Promise<void> }
+  ).ensureSchemaLoaded();
   if (!performValidations.call(this, options)) return false;
   const self = this as any;
   if (options?.validate !== false) {

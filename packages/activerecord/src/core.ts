@@ -275,6 +275,7 @@ interface CoreHost {
   prototype: any;
   all(): any;
   _castAttributeValue(key: string, value: unknown): unknown;
+  ensureSchemaLoaded(): Promise<void>;
 }
 
 function parentClass(klass: CoreHost): CoreHost | null {
@@ -668,6 +669,9 @@ function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): Promis
 }
 
 export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
+  // Reflect the schema before casting ids — the cast below reads
+  // attribute definitions that lazy reflection populates.
+  await this.ensureSchemaLoaded();
   if (ids.length === 0) {
     throw new RecordNotFound(
       `Couldn't find ${this.name} with an empty list of ids`,
