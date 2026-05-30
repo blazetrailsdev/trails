@@ -235,6 +235,35 @@ describe("useFixtures auto-stamps NOT NULL timestamps", () => {
   });
 });
 
+// --- string / non-integer declared primary keys ---
+
+describe("useFixtures with a string primary key", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
+  // Subscriber sets `self.primary_key = "nick"` (a string column). The fixture
+  // row declares `nick: "alterself"`; resolveDeclaredPk must use that string
+  // verbatim instead of coercing/rejecting it. Without string-PK support the
+  // seeder threw on the non-integer declared id.
+  const { subscribers } = useFixtures(["subscribers"], () => Base.adapter);
+
+  it("loads a record keyed by its declared string primary key", async () => {
+    const luke = subscribers("first");
+    expect(luke.readAttribute("nick")).toBe("alterself");
+    const [row] = await Base.adapter.execute(
+      `SELECT name FROM ${Base.adapter.quoteTableName("subscribers")} WHERE nick = 'alterself'`,
+    );
+    expect((row as { name: string }).name).toBe("Luke Holden");
+  });
+
+  it("all() returns every seeded subscriber", () => {
+    expect(subscribers.all().length).toBe(3);
+  });
+});
+
 // --- fixture registry conformance ---
 
 describe("fixtureRegistry conformance", () => {

@@ -40,23 +40,26 @@ export function fixtureId(label: string): number {
 }
 
 /**
- * Resolves a row's primary key: the declared value if it's an integer (Rails
- * fixture parity — YAML `id: N` parses as a number), else `fixtureId(label)`
- * when the PK column is absent. A PK column present with any other value
- * (string, boolean, fractional number) is rejected: it means the fixture
- * author tried to declare an id but the type is wrong, and silently falling
- * back to CRC32 would mask the bug.
+ * Resolves a row's primary key. The declared value is used verbatim when it is
+ * an integer (Rails fixture parity — YAML `id: N` parses as a number) or a
+ * string (models with a declared string/non-integer `primary_key`, e.g.
+ * Subscriber's `nick` or Dashboard's `dashboard_id`). When the PK column is
+ * absent, `fixtureId(label)` supplies the deterministic CRC32 id. A PK column
+ * present with any other value (boolean, fractional number, object) is rejected:
+ * it means the fixture author tried to declare an id but the type is wrong, and
+ * silently falling back to CRC32 would mask the bug.
  */
 function resolveDeclaredPk(
   tableName: string,
   pkCol: string,
   label: string,
   declared: unknown,
-): number {
+): number | string {
   if (declared === undefined) return fixtureId(label);
   if (typeof declared === "number" && Number.isInteger(declared)) return declared;
+  if (typeof declared === "string") return declared;
   throw new Error(
-    `defineFixtures: ${tableName}.${label} declares a non-integer primary key (${typeof declared}: ${String(declared)}); use an integer literal (e.g. \`${pkCol}: 1\`) or omit the column.`,
+    `defineFixtures: ${tableName}.${label} declares an invalid primary key (${typeof declared}: ${String(declared)}); use an integer or string literal (e.g. \`${pkCol}: 1\` or \`${pkCol}: "foo"\`) or omit the column.`,
   );
 }
 
@@ -94,9 +97,9 @@ export function isFixtureRef(v: unknown): v is FixtureRef {
 // defineFixtures() call for the same table fully replaces the prior label set —
 // no leakage of stale labels when the caller reloads a subset. Values are the row's
 // primary-key value (declared PK when the row carries one, else fixtureId(label)).
-const declaredIds = new WeakMap<object, Map<string, Map<string, number>>>();
+const declaredIds = new WeakMap<object, Map<string, Map<string, number | string>>>();
 
-function declaredIdsFor(adapter: object): Map<string, Map<string, number>> {
+function declaredIdsFor(adapter: object): Map<string, Map<string, number | string>> {
   let m = declaredIds.get(adapter);
   if (!m) {
     m = new Map();
@@ -110,7 +113,7 @@ export function resolveFixtureId(
   adapter: DatabaseAdapter,
   tableName: string,
   fixtureName: string,
-): number {
+): number | string {
   const declared = declaredIdsFor(adapter).get(tableName)?.get(fixtureName);
   return declared ?? fixtureId(fixtureName);
 }
@@ -265,7 +268,7 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   // entries for labels omitted from a subset reload. The prior entry is captured
   // so we can roll back if the INSERT itself fails — `ref()` resolution must not
   // observe ids for rows that never landed in the database.
-  const tableIds = new Map<string, number>();
+  const tableIds = new Map<string, number | string>();
   for (const label of labels) {
     const id = resolveDeclaredPk(tableName, pkCol, label, (fixtures[label] as FixtureAttrs)[pkCol]);
     tableIds.set(label, id);

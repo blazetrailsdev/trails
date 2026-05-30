@@ -107,6 +107,31 @@ describe("defineFixtures", () => {
     expect(insertSql).toContain(String(fixtureId("david")));
   });
 
+  it("ref() resolves a declared string primary key from a previously loaded target", async () => {
+    // When the target set declares an explicit string PK (Subscriber's `nick`), a
+    // dependent's ref() to it must resolve to that string verbatim — not the CRC32
+    // fallback. Mirrors loading the target before its dependent so the declared-id
+    // registry is populated (resolveFixtureId returns the string, not fixtureId()).
+    const adapter = makeAdapter();
+
+    const subscriberRows = new Map([["webster132", { nick: "webster132", name: "DHH" }]]);
+    const Subscriber = makeModel("subscribers", subscriberRows, "nick");
+    await defineFixtures(adapter, Subscriber, {
+      second: { nick: "webster132", name: "DHH" },
+    });
+
+    const subId = fixtureId("sub1");
+    const Subscription = makeModel("subscriptions", new Map([[subId, { id: subId }]]));
+    await defineFixtures(adapter, Subscription, {
+      sub1: { subscriber_id: ref("subscribers", "second") },
+    });
+
+    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .find((s) => s.includes("INSERT INTO") && s.includes("subscriptions"));
+    expect(insertSql).toMatch(/webster132/);
+  });
+
   it("direct model instance is resolved to its PK value", async () => {
     const adapter = makeAdapter();
     const welcomeRow = { id: fixtureId("welcome"), title: "Welcome" };
@@ -340,17 +365,38 @@ describe("defineFixtures", () => {
     ).rejects.toThrow("polymorphic association");
   });
 
-  it("rejects non-integer declared primary keys with a clear error", async () => {
+  it("uses a string declared primary key verbatim", async () => {
+    // Rails' FixtureSet::TableRow#generate_primary_key only auto-generates an id
+    // when the PK column is absent (column_defined? false); a declared value is
+    // used as-is regardless of type. A model with a string primary_key (Subscriber's
+    // `nick`, Dashboard's `dashboard_id`) therefore seeds the literal string.
+    const adapter = makeAdapter();
+    const rows = new Map([["abc", { id: "abc", name: "x" }]]);
+    const Model = makeModel("widgets", rows);
+
+    const result = await defineFixtures(adapter, Model, { thing: { id: "abc", name: "x" } });
+    expect((result.thing as { id: string }).id).toBe("abc");
+
+    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .find((s) => s.includes("INSERT INTO"));
+    expect(insertSql).toContain("abc");
+  });
+
+  it("rejects a fractional or boolean declared primary key with a clear error", async () => {
+    // Strings and integers are accepted verbatim; any other declared type (fractional
+    // number, boolean, object) is a fixture-author mistake — reject rather than mask it
+    // by silently falling back to the CRC32 id.
     const adapter = makeAdapter();
     const Model = makeModel("widgets", new Map());
 
-    await expect(
-      defineFixtures(adapter, Model, { thing: { id: "1" as unknown as number, name: "x" } }),
-    ).rejects.toThrow(/widgets\.thing declares a non-integer primary key/);
-
     await expect(defineFixtures(adapter, Model, { thing: { id: 1.5, name: "x" } })).rejects.toThrow(
-      /non-integer primary key/,
+      /widgets\.thing declares an invalid primary key/,
     );
+
+    await expect(
+      defineFixtures(adapter, Model, { thing: { id: true as unknown as number, name: "x" } }),
+    ).rejects.toThrow(/invalid primary key/);
   });
 
   it("STI: type column passed explicitly is preserved in INSERT", async () => {

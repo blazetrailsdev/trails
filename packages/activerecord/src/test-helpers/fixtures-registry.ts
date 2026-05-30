@@ -58,8 +58,6 @@ export interface FixtureRegistryEntry {
  * Additional gaps — model imports, but the fixture set does NOT seed against the
  * canonical `TEST_SCHEMA` today (verified by the seed-conformance test). Grouped by
  * the underlying loader gap; each is re-addable once that gap closes:
- * - string / non-integer declared PK (`resolveDeclaredPk` integer-only): `dashboards`,
- *   `minivans`, `speedometers`, `string-key-objects`, `subscribers`
  * - id-less or custom-PK table while the model defaults to `id`: `bulbs` (PK `ID`),
  *   `edges`, `mateys`, `mixed-case-monkeys` (PK `monkeyID`), `cpk-order-tags`
  * - composite-PK column NOT NULL (`cpk_books.author_id`): `cpk-books`
@@ -177,6 +175,10 @@ export const fixtureRegistry = {
     model: () => import("./models/customer.js").then((m) => m.Customer),
     data: FixtureData.customerFixtureData,
   },
+  dashboards: {
+    model: () => import("./models/dashboard.js").then((m) => m.Dashboard),
+    data: FixtureData.dashboardFixtureData,
+  },
   deadParrots: {
     model: () => import("./models/parrot.js").then((m) => m.DeadParrot),
     data: FixtureData.deadParrotFixtureData,
@@ -256,6 +258,10 @@ export const fixtureRegistry = {
   minimalistics: {
     model: () => import("./models/minimalistic.js").then((m) => m.Minimalistic),
     data: FixtureData.minimalisticFixtureData,
+  },
+  minivans: {
+    model: () => import("./models/minivan.js").then((m) => m.Minivan),
+    data: FixtureData.minivanFixtureData,
   },
   movies: {
     model: () => import("./models/movie.js").then((m) => m.Movie),
@@ -349,6 +355,10 @@ export const fixtureRegistry = {
     model: () => import("./models/ship.js").then((m) => m.Ship),
     data: FixtureData.shipFixtureData,
   },
+  speedometers: {
+    model: () => import("./models/speedometer.js").then((m) => m.Speedometer),
+    data: FixtureData.speedometerFixtureData,
+  },
   sponsors: {
     model: () => import("./models/sponsor.js").then((m) => m.Sponsor),
     data: FixtureData.sponsorFixtureData,
@@ -356,6 +366,14 @@ export const fixtureRegistry = {
   strictZines: {
     model: () => import("./models/strict-zine.js").then((m) => m.StrictZine),
     data: FixtureData.strictZineFixtureData,
+  },
+  stringKeyObjects: {
+    model: () => import("./models/string-key-object.js").then((m) => m.StringKeyObject),
+    data: FixtureData.stringKeyObjectFixtureData,
+  },
+  subscribers: {
+    model: () => import("./models/subscriber.js").then((m) => m.Subscriber),
+    data: FixtureData.subscriberFixtureData,
   },
   taggings: {
     model: () => import("./models/tagging.js").then((m) => m.Tagging),
