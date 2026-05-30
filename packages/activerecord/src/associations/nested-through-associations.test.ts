@@ -86,6 +86,10 @@ const TEST_SCHEMA: Schema = {
   hmps_authors: { name: "string" },
   hmps_categories_posts: { hmps_category_id: "integer", hmps_post_id: "integer" },
   categorizations: { author_id: "integer", category_id: "integer" },
+  ds_categories: { name: "string" },
+  ds_clubs: { name: "string", ds_category_id: "integer" },
+  ds_memberships: { ds_member_id: "integer", ds_club_id: "integer" },
+  ds_members: { name: "string" },
 };
 
 describe("NestedThroughAssociationsTest", () => {
@@ -120,15 +124,50 @@ describe("NestedThroughAssociationsTest", () => {
     }
   }
 
+  class DsCategory extends Base {
+    static {
+      this.attribute("name", "string");
+    }
+  }
+
+  class DsClub extends Base {
+    static {
+      this.attribute("name", "string");
+      this.attribute("ds_category_id", "integer");
+    }
+  }
+
+  class DsMembership extends Base {
+    static {
+      this.attribute("ds_member_id", "integer");
+      this.attribute("ds_club_id", "integer");
+    }
+  }
+
+  class DsMember extends Base {
+    static {
+      this.attribute("name", "string");
+    }
+  }
+
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
     registerModel(Author);
     registerModel(Post);
     registerModel(Tag);
     registerModel(Tagging);
+    registerModel(DsCategory);
+    registerModel(DsClub);
+    registerModel(DsMembership);
+    registerModel(DsMember);
   });
 
   beforeEach(() => {
+    (DsCategory as any)._associations = [];
+    (DsClub as any)._associations = [];
+    (DsMembership as any)._associations = [];
+    (DsMember as any)._associations = [];
+    (DsClub as any).defaultScopes = [];
     // Reset associations to avoid cross-test coupling
     (Author as any)._associations = [];
     (Post as any)._associations = [];
@@ -1187,10 +1226,50 @@ describe("NestedThroughAssociationsTest", () => {
     expect(loadedPost!.title).toBe("BC");
   });
 
-  it.skip("joins and includes from through models not included in association", () => {
-    // BLOCKED: requires `default_scope` with a proc calling
-    // includes/preload/joins/eager_load on the model. Default-scope
-    // query-method injection is not yet ported. Tracked as a follow-up.
+  it("joins and includes from through models not included in association", async () => {
+    // Member -> currentMembership -> club (has_one :through) -> category.
+    // clubCategory is nested-through (through the `club` through-assoc). When
+    // DsClub carries a default_scope whose proc calls includes/preload/joins/
+    // eagerLoad(:category) — an association NOT part of the clubCategory chain —
+    // loading clubCategory must still resolve to the club's category.
+    Associations.hasOne.call(DsMember, "currentMembership", {
+      className: "DsMembership",
+      foreignKey: "ds_member_id",
+    });
+    Associations.hasOne.call(DsMember, "club", {
+      className: "DsClub",
+      through: "currentMembership",
+      source: "club",
+    });
+    Associations.hasOne.call(DsMember, "clubCategory", {
+      className: "DsCategory",
+      through: "club",
+      source: "category",
+    });
+    Associations.belongsTo.call(DsMembership, "club", {
+      className: "DsClub",
+      foreignKey: "ds_club_id",
+    });
+    Associations.belongsTo.call(DsClub, "category", {
+      className: "DsCategory",
+      foreignKey: "ds_category_id",
+    });
+
+    const general = await DsCategory.create({ name: "General" });
+    const club = await DsClub.create({ name: "Boring Club", ds_category_id: general.id });
+    const member = await DsMember.create({ name: "Groucho" });
+    await DsMembership.create({ ds_member_id: member.id, ds_club_id: club.id });
+
+    for (const q of ["includes", "preload", "joins", "eagerLoad"] as const) {
+      (DsClub as any).defaultScopes = [];
+      (DsClub as any).defaultScope((rel: any) => rel[q]("category"));
+
+      const members = await DsMember.all().preload("clubCategory").toArray();
+      expect(members).toHaveLength(1);
+      const loaded = (members[0] as any)._preloadedAssociations?.get("clubCategory");
+      expect(loaded).not.toBeNull();
+      expect(loaded.id).toBe(general.id);
+    }
   });
 
   it("has one through has one through with belongs to source reflection preload", async () => {
