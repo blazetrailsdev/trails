@@ -792,19 +792,21 @@ export class AssociationScope {
    * through `_buildUnscopedRelation`, so no compensation is needed here.
    */
   protected _buildEntryScope(entryKlass: typeof Base, aliasedTable?: unknown): unknown {
-    const relation = (entryKlass as unknown as { unscoped: () => unknown }).unscoped();
-    // Point the relation's Arel table at the chain entry's alias so the
-    // lazily-built predicate builder qualifies `where(...)` predicates by
-    // the alias (Rails' `build_scope(reflection.aliased_table)`). The
-    // `TableAlias` node delegates `typeForAttribute` / `typeCastForDatabase`
-    // to the underlying table, so attribute casting is preserved. We never
-    // execute this relation's own FROM — only its WHERE/ORDER predicates are
-    // pushed onto the main scope — so swapping the table is safe.
+    // Build the entry relation against the chain entry's alias so the scope
+    // lambda's `where(...)` predicates — AND any STI `type_condition` — qualify
+    // by the alias (Rails' `build_scope(reflection.aliased_table)`,
+    // reflection.rb:336). For a self-referential through (repeated table) the
+    // source-type filter must land on the joined-in alias, not the FROM table.
+    // The `TableAlias` node delegates `typeForAttribute` / `typeCastForDatabase`
+    // to the underlying table, so attribute casting is preserved. We only feed
+    // the table when the tracker produced a real alias; otherwise keep
+    // `unscoped()` so non-aliased SQL is byte-identical.
     if (aliasedTable) {
-      (relation as { _table?: unknown; _predicateBuilder?: unknown })._table = aliasedTable;
-      (relation as { _table?: unknown; _predicateBuilder?: unknown })._predicateBuilder = null;
+      return (
+        entryKlass as unknown as { _buildUnscopedRelation: (t: unknown) => unknown }
+      )._buildUnscopedRelation(aliasedTable);
     }
-    return relation;
+    return (entryKlass as unknown as { unscoped: () => unknown }).unscoped();
   }
 
   /**

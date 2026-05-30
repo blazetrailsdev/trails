@@ -354,7 +354,7 @@ export type PrimaryKeyValue = PrimaryKeyScalar | PrimaryKeyScalar[];
 // x = null` would hoist then RESET the value back to null; `var x;`
 // hoists as `undefined` without clobbering a later-set value.
 // eslint-disable-next-line no-var
-var _RelationCtor: (new (modelClass: typeof Base) => any) | undefined;
+var _RelationCtor: (new (modelClass: typeof Base, table?: any) => any) | undefined;
 // eslint-disable-next-line no-var
 var _wrapWithScopeProxy: ((rel: any) => any) | undefined;
 
@@ -1554,11 +1554,17 @@ export class Base extends Model {
    *  STILL applies the STI `type_condition` for `finder_needs_type_condition?`
    *  classes, so callers like `AssociationScope` get a type-filtered base
    *  without re-adding the condition themselves. */
-  static _buildUnscopedRelation(): any {
+  static _buildUnscopedRelation(table?: any): any {
     if (!_RelationCtor) {
       throw new Error("Relation not loaded. Import relation.ts first.");
     }
-    const rel = new _RelationCtor(this);
+    // `table` lets callers build the relation against a specific Arel table
+    // (e.g. an association-scope chain entry's aliased table). Passing it to
+    // the ctor means the STI `type_condition` that `_applyStiTypeCondition`
+    // adds below is qualified by that same table — so a self-referential
+    // through doesn't end up with the STI predicate on the FROM table and
+    // the source-type predicate on the alias.
+    const rel = new _RelationCtor(this, table);
     return this._applyStiTypeCondition(_wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel);
   }
 
