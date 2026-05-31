@@ -183,9 +183,22 @@ export class DatabaseTasks {
 
   static async createAll(): Promise<void> {
     if (!this.databaseConfiguration) return;
+    // Rails: capture current db_config before iterating so we can restore it after.
+    const { Base } = await import("../base.js");
+    this._baseClass = Base;
+    let originalConfig: DatabaseConfig | null = null;
+    try {
+      originalConfig = Base.connectionDbConfig();
+    } catch (error) {
+      if (!(error instanceof ConnectionNotDefined)) throw error;
+    }
     const configs = this.eachLocalConfiguration();
     for (const config of configs) {
       await this.create(config);
+    }
+    // Rails: re-establish connection to the original config after all creates.
+    if (originalConfig !== null) {
+      await Base.establishConnection(originalConfig.configuration as Record<string, unknown>);
     }
   }
 
@@ -234,7 +247,10 @@ export class DatabaseTasks {
     this._migrations = migrations;
   }
 
-  static async migrate(version?: number | string): Promise<void> {
+  static async migrate(
+    version?: number | string,
+    { skipInitialize = false }: { skipInitialize?: boolean } = {},
+  ): Promise<void> {
     const raw = version ?? this.targetVersion();
     const effectiveVersion = typeof raw === "string" ? raw.trim() || null : raw;
     this.checkTargetVersion(effectiveVersion ?? undefined);
@@ -244,6 +260,11 @@ export class DatabaseTasks {
     if (configs.length === 0) return;
 
     const config = configs.find((c) => c.name === "primary") ?? configs[0];
+
+    if (!skipInitialize) {
+      await initializeDatabase(config);
+    }
+
     const { Migrator } = await import("../migration.js");
 
     const runMigration = async (adapter: import("../adapter.js").DatabaseAdapter) => {
@@ -831,6 +852,11 @@ export class DatabaseTasks {
   static async migrateAll(): Promise<void> {
     const configs = this.configsFor(this._normalizeEnv());
 
+    // Rails: initialize_database for every config before the single-primary fast path or version loop.
+    for (const config of configs) {
+      await initializeDatabase(config);
+    }
+
     // Rails: a single primary database short-circuits the per-config loop and
     // migrates the already-established connection directly, skipping the
     // temporary-pool churn (`db_configs.size == 1 && db_configs.first.primary?`).
@@ -838,54 +864,88 @@ export class DatabaseTasks {
     // (TS: `isPrimary()`) lives on HashConfig/UrlConfig, not the abstract
     // DatabaseConfig, so reach it structurally off the concrete instance.
     if (configs.length === 1 && (configs[0] as { isPrimary?(): boolean }).isPrimary?.()) {
-      await this.migrate();
+      await this.migrate(undefined, { skipInitialize: true });
       return;
     }
 
-    for (const config of configs) {
-      await this.withTemporaryPool(config, async (pool) => {
-        const effectiveVersion = this.targetVersion();
-        this.checkTargetVersion(effectiveVersion ?? undefined);
-        const { Migrator } = await import("../migration.js");
-        const adapter = pool.leaseConnection();
-        const migrator = new Migrator(adapter, this._migrations);
-        await migrator.migrate(effectiveVersion ?? null);
-        adapter.schemaCache?.clear();
-      });
+    const mappedVersions = await this.dbConfigsWithVersions();
+    const sorted = Array.from(mappedVersions.entries()).sort(([a], [b]) =>
+      BigInt(String(a)) < BigInt(String(b)) ? -1 : BigInt(String(a)) > BigInt(String(b)) ? 1 : 0,
+    );
+    for (const [version, dbConfigs] of sorted) {
+      for (const dbConfig of dbConfigs) {
+        await this.withTemporaryConnection(dbConfig, async (adapter) => {
+          const { Migrator } = await import("../migration.js");
+          const migrator = new Migrator(adapter, this._migrations);
+          await migrator.migrate(version ?? null);
+          adapter.schemaCache?.clear();
+        });
+      }
     }
   }
 
   static async prepareAll(): Promise<void> {
-    const { DatabaseAlreadyExists } = await import("../errors.js");
-    const configs = this.configsFor(this._normalizeEnv());
-
-    // Rails seeds only when a database was newly initialized AND its config
-    // opts into seeding (`seed = true if database_initialized && db_config.seeds?`).
-    // A successful `create` (no DatabaseAlreadyExists) is our "initialized"
-    // signal, so a re-prepared, already-existing database is not re-seeded.
+    const env = this._normalizeEnv();
     let seed = false;
-    for (const config of configs) {
-      try {
-        await this.create(config);
-        if (config.seeds) seed = true;
-      } catch (error) {
-        if (!(error instanceof DatabaseAlreadyExists)) throw error;
+    const dumpDbConfigs: DatabaseConfig[] = [];
+
+    // Rails: each_current_configuration { |db_config| initialize_database(db_config) }
+    for (const envName of eachCurrentEnvironment(env)) {
+      for (const dbConfig of this.configsFor(envName)) {
+        const databaseInitialized = await initializeDatabase(dbConfig);
+        if (databaseInitialized && dbConfig.seeds) seed = true;
       }
     }
-    await this.migrateAll();
+
+    // Rails: db_configs_with_versions per environment, sort, migrate each.
+    for (const envName of eachCurrentEnvironment(env)) {
+      const mappedVersions = await this.dbConfigsWithVersions(envName);
+      const sorted = Array.from(mappedVersions.entries()).sort(([a], [b]) =>
+        BigInt(String(a)) < BigInt(String(b)) ? -1 : BigInt(String(a)) > BigInt(String(b)) ? 1 : 0,
+      );
+      for (const [version, dbConfigs] of sorted) {
+        for (const dbConfig of dbConfigs) {
+          if (!dumpDbConfigs.includes(dbConfig)) dumpDbConfigs.push(dbConfig);
+          await this.withTemporaryPool(dbConfig, async (pool) => {
+            const { Migrator } = await import("../migration.js");
+            const migrator = new Migrator(pool.leaseConnection(), this._migrations);
+            await migrator.migrate(version ?? null);
+          });
+        }
+      }
+    }
+
+    if (this.dumpSchemaAfterMigration) {
+      for (const config of dumpDbConfigs) {
+        await this.withTemporaryPool(config, async () => {
+          await this.dumpSchema(config);
+        });
+      }
+    }
+
     if (seed && this.seedLoader) await this.loadSeed();
   }
 
-  static async dbConfigsWithVersions(): Promise<Map<string, DatabaseConfig[]>> {
-    const result = new Map<string, DatabaseConfig[]>();
-    const env = this._normalizeEnv();
+  static async dbConfigsWithVersions(
+    environment?: string,
+  ): Promise<Map<string | number, DatabaseConfig[]>> {
+    const dbConfigsWithVersions = new Map<string | number, DatabaseConfig[]>();
+    const env = this._normalizeEnv(environment);
+    const targetVersion = this.targetVersion();
+    const { Migrator } = await import("../migration.js");
     for (const config of this.configsFor(env)) {
-      const key = config.envName;
-      const list = result.get(key) ?? [];
-      list.push(config);
-      result.set(key, list);
+      await this.withTemporaryPool(config, async (pool) => {
+        const migrator = new Migrator(pool.leaseConnection(), this._migrations);
+        const versionsToRun = await migrator.pendingMigrationVersions();
+        for (const version of versionsToRun) {
+          if (targetVersion !== null && targetVersion !== Number(version)) continue;
+          const list = dbConfigsWithVersions.get(version) ?? [];
+          list.push(config);
+          dbConfigsWithVersions.set(version, list);
+        }
+      });
     }
-    return result;
+    return dbConfigsWithVersions;
   }
 
   /**

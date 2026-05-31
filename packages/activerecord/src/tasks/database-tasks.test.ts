@@ -219,6 +219,29 @@ describe("DatabaseTasksCreateAllTest", () => {
     await DatabaseTasks.createAll();
     expect(created).toContain("dev.db");
   });
+
+  it("re-establishes connection to original db_config after all creates", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-createall-"));
+    const originalDb = path.join(tmp, "original.sqlite3");
+    const newDb = path.join(tmp, "new.sqlite3");
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: { adapter: "sqlite3", database: newDb },
+    });
+    Base.removeConnection();
+    await Base.establishConnection({ adapter: "sqlite3", database: originalDb, pool: 1 });
+    try {
+      await DatabaseTasks.createAll();
+      const restoredConfig = Base.connectionDbConfig();
+      expect((restoredConfig.configuration as { database?: string }).database).toBe(originalDb);
+    } finally {
+      try {
+        Base.removeConnection();
+      } catch {
+        /* ignore */
+      }
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("DatabaseTasksCreateCurrentTest", () => {
@@ -660,6 +683,70 @@ describe("DatabaseTasksMigrateTest", () => {
         await a.close();
       }
     } finally {
+      try {
+        Base.removeConnection();
+      } catch {
+        /* ignore */
+      }
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("migrate calls initializeDatabase by default, skips when skipInitialize is true", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-migrate-init-"));
+    const dbFile = path.join(tmp, "test.sqlite3");
+    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: { adapter: "sqlite3", database: dbFile },
+    });
+    DatabaseTasks.registerMigrations([]);
+    Base.removeConnection();
+    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
+    // initializeDatabase always calls withTemporaryConnection; spy on it to count calls.
+    const spy = vi.spyOn(DatabaseTasks, "withTemporaryConnection");
+    try {
+      // Default path — initializeDatabase should call withTemporaryConnection once.
+      await DatabaseTasks.migrate();
+      const callsWithInit = spy.mock.calls.length;
+      expect(callsWithInit).toBeGreaterThan(0);
+
+      spy.mockClear();
+      // skipInitialize: true — withTemporaryConnection should not be called by initializeDatabase.
+      await DatabaseTasks.migrate(undefined, { skipInitialize: true });
+      expect(spy.mock.calls.length).toBe(0);
+    } finally {
+      spy.mockRestore();
+      try {
+        Base.removeConnection();
+      } catch {
+        /* ignore */
+      }
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("migrateAll calls initializeDatabase for each config before migrating", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-migrateall-init-"));
+    const primaryDb = path.join(tmp, "primary.sqlite3");
+    const animalsDb = path.join(tmp, "animals.sqlite3");
+    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: {
+        primary: { adapter: "sqlite3", database: primaryDb },
+        animals: { adapter: "sqlite3", database: animalsDb },
+      },
+    });
+    DatabaseTasks.registerMigrations([]);
+    Base.removeConnection();
+    await Base.establishConnection({ adapter: "sqlite3", database: primaryDb, pool: 1 });
+    // initializeDatabase always calls withTemporaryConnection; spy before migrateAll runs.
+    const spy = vi.spyOn(DatabaseTasks, "withTemporaryConnection");
+    try {
+      await DatabaseTasks.migrateAll();
+      // Two configs → withTemporaryConnection called at least twice (once per initializeDatabase).
+      expect(spy.mock.calls.length).toBeGreaterThanOrEqual(2);
+    } finally {
+      spy.mockRestore();
       try {
         Base.removeConnection();
       } catch {
