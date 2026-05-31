@@ -1728,12 +1728,15 @@ describe("initializeDatabase", () => {
   });
 
   it("re-throws unexpected errors from the probe query", async () => {
-    vi.spyOn(DatabaseTasks as any, "_connectFor").mockResolvedValue({
+    const fakeAdapter = {
       execute: async () => {
         throw new Error("unexpected connection error");
       },
       close: async () => {},
-    });
+    };
+    vi.spyOn(DatabaseTasks, "withTemporaryConnection").mockImplementation(async (_config, fn) =>
+      fn(fakeAdapter as never),
+    );
     const config = new HashConfig("test", "primary", {
       adapter: "sqlite3",
       database: ":memory:",
@@ -1759,12 +1762,15 @@ describe("initializeDatabase", () => {
 
   it("calls DatabaseTasks.create when probe throws NoDatabaseError", async () => {
     let created = false;
-    vi.spyOn(DatabaseTasks as any, "_connectFor").mockResolvedValue({
+    const fakeAdapter = {
       execute: async () => {
         throw new NoDatabaseError("no database");
       },
       close: async () => {},
-    });
+    };
+    vi.spyOn(DatabaseTasks, "withTemporaryConnection").mockImplementation(async (_config, fn) =>
+      fn(fakeAdapter as never),
+    );
     vi.spyOn(DatabaseTasks, "create").mockImplementation(async () => {
       created = true;
     });
@@ -1780,18 +1786,21 @@ describe("initializeDatabase", () => {
       code: "ER_BAD_DB_ERROR",
       errno: 1049,
     });
-    vi.spyOn(DatabaseTasks as any, "_connectFor").mockResolvedValue({
+    const fakeAdapter = {
       execute: async () => {
         throw rawDriverError;
       },
       close: async () => {},
       isNoDatabaseError: (e: unknown) => (e as { code?: unknown }).code === "ER_BAD_DB_ERROR",
-    });
+    };
+    vi.spyOn(DatabaseTasks, "withTemporaryConnection").mockImplementation(async (_config, fn) =>
+      fn(fakeAdapter as never),
+    );
     vi.spyOn(DatabaseTasks, "create").mockImplementation(async () => {
       created = true;
     });
-    // adapter is "mysql2" to match the MySQL-flavored raw error; _connectFor is
-    // mocked so no real connection is made — the test validates delegation only.
+    // withTemporaryConnection is mocked so no real connection is made — the test
+    // validates adapter.isNoDatabaseError delegation only.
     const config = new HashConfig("test", "primary", { adapter: "mysql2", database: "mydb" });
     const result = await initializeDatabase(config);
     expect(created).toBe(true);
@@ -1803,12 +1812,15 @@ describe("initializeDatabase", () => {
     const schemaFile = path.join(tmp, "schema.ts");
     fs.writeFileSync(schemaFile, "export default async () => {};");
     try {
-      vi.spyOn(DatabaseTasks as any, "_connectFor").mockResolvedValue({
+      const fakeAdapter = {
         execute: async () => {
           throw new NoDatabaseError("no database");
         },
         close: async () => {},
-      });
+      };
+      vi.spyOn(DatabaseTasks, "withTemporaryConnection").mockImplementation(async (_config, fn) =>
+        fn(fakeAdapter as never),
+      );
       vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined);
       const loadSchemaSpy = vi.spyOn(DatabaseTasks, "loadSchema").mockResolvedValue(undefined);
       vi.spyOn(DatabaseTasks, "schemaDumpPath").mockReturnValue(schemaFile);
@@ -1821,5 +1833,127 @@ describe("initializeDatabase", () => {
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
+  });
+});
+
+describe("DatabaseTasksWithTemporaryPoolTest", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    try {
+      Base.removeConnection();
+    } catch {
+      /* no pool */
+    }
+    DatabaseTasks.databaseConfiguration = null;
+  });
+
+  it("restores the prior pool even when fn throws", async () => {
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:" });
+    await expect(
+      DatabaseTasks.withTemporaryPool(config, async () => {
+        throw new Error("fn error");
+      }),
+    ).rejects.toThrow("fn error");
+    // Prior pool must be restored — connectionPool() must not throw
+    expect(Base.connectionPool().dbConfig.database).toBe(":memory:");
+  });
+
+  it("yields an isolated pool so fn writes do not affect the prior pool", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-wtp-"));
+    const primaryDb = path.join(tmp, "primary.sqlite3");
+    const secondaryDb = path.join(tmp, "secondary.sqlite3");
+    try {
+      await Base.establishConnection({ adapter: "sqlite3", database: primaryDb, pool: 1 });
+      const secondaryConfig = new HashConfig("test", "secondary", {
+        adapter: "sqlite3",
+        database: secondaryDb,
+      });
+      let innerDb: string | undefined;
+      await DatabaseTasks.withTemporaryPool(secondaryConfig, async (pool) => {
+        innerDb = pool.dbConfig.database;
+        await pool.leaseConnection().executeMutation("CREATE TABLE tmp_table (id INTEGER)");
+      });
+      // Prior pool (primaryDb) is restored
+      expect(Base.connectionPool().dbConfig.database).toBe(primaryDb);
+      // The isolated pool pointed at secondaryDb
+      expect(innerDb).toBe(secondaryDb);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("handles re-entrancy: nested withTemporaryPool restores each level correctly", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-wtp-reentrant-"));
+    const outerDb = path.join(tmp, "outer.sqlite3");
+    const innerDb = path.join(tmp, "inner.sqlite3");
+    const deepDb = path.join(tmp, "deep.sqlite3");
+    try {
+      await Base.establishConnection({ adapter: "sqlite3", database: outerDb, pool: 1 });
+      const innerConfig = new HashConfig("test", "inner", {
+        adapter: "sqlite3",
+        database: innerDb,
+      });
+      const deepConfig = new HashConfig("test", "deep", {
+        adapter: "sqlite3",
+        database: deepDb,
+      });
+      const visited: string[] = [];
+      await DatabaseTasks.withTemporaryPool(innerConfig, async (pool) => {
+        visited.push(pool.dbConfig.database!);
+        await DatabaseTasks.withTemporaryPool(deepConfig, async (deepPool) => {
+          visited.push(deepPool.dbConfig.database!);
+        });
+        // After deep pool exits, inner pool is restored
+        expect(Base.connectionPool().dbConfig.database).toBe(innerDb);
+        visited.push(Base.connectionPool().dbConfig.database!);
+      });
+      // After inner pool exits, outer pool is restored
+      expect(Base.connectionPool().dbConfig.database).toBe(outerDb);
+      expect(visited).toEqual([innerDb, deepDb, innerDb]);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("removes the pool when no prior pool existed", async () => {
+    const { ConnectionNotDefined } = await import("../errors.js");
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:" });
+    let poolDuringFn:
+      | import("../connection-adapters/abstract/connection-pool.js").ConnectionPool
+      | undefined;
+    await DatabaseTasks.withTemporaryPool(config, async (pool) => {
+      poolDuringFn = pool;
+    });
+    expect(poolDuringFn).toBeDefined();
+    expect(() => Base.connectionPool()).toThrow(ConnectionNotDefined);
+  });
+
+  it("withTemporaryConnection routes through withTemporaryPool and passes the leased connection", async () => {
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:" });
+    let receivedAdapter: unknown;
+    await DatabaseTasks.withTemporaryConnection(config, async (adapter) => {
+      receivedAdapter = adapter;
+      const rows = await (adapter as import("../adapter.js").DatabaseAdapter).execute("SELECT 1");
+      expect(rows).toBeDefined();
+    });
+    expect(receivedAdapter).toBeDefined();
+  });
+
+  it("withTemporaryPoolForEach iterates configs via withTemporaryPool", async () => {
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      test: {
+        primary: { adapter: "sqlite3", database: ":memory:" },
+        secondary: { adapter: "sqlite3", database: ":memory:" },
+      },
+    });
+    const visited: string[] = [];
+    const withTemporaryPoolSpy = vi.spyOn(DatabaseTasks, "withTemporaryPool");
+    await DatabaseTasks.withTemporaryPoolForEach("test", async (config) => {
+      visited.push(config.name);
+    });
+    expect(visited).toContain("primary");
+    expect(visited).toContain("secondary");
+    expect(withTemporaryPoolSpy).toHaveBeenCalledTimes(2);
   });
 });
