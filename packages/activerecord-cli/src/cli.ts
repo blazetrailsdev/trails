@@ -47,7 +47,7 @@ Commands:
   db:prepare                     Idempotent setup (create if missing, migrate, seed)
   db:abort_if_pending_migrations Exit non-zero if there are pending migrations
   console                        Launch a REPL with Base + models pre-loaded
-  runner <script>                Run a script with Base + models pre-loaded
+  runner <script>                Run a script with models registered + connection established
 
 Coming in later slices: db:migrate:status.
 
@@ -162,8 +162,8 @@ const CONSOLE_HELP = `ar console — REPL with Base + app/models pre-loaded. Pro
 Options:
   --env <name>   Override TRAILS_ENV for this session.`;
 
-const RUNNER_HELP = `ar runner <script> [args...] — run a script with Base + app/models pre-loaded.
-Remaining positional args after <script> are forwarded as __ARGV__.
+const RUNNER_HELP = `ar runner <script> [args...] — run a script with models registered and connection established.
+app/models/index.ts is imported (side-effect: models registered for AR queries). Remaining args: __ARGV__.
 Options:
   --env <name>   Override TRAILS_ENV for this invocation.`;
 

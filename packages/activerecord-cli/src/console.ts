@@ -4,6 +4,7 @@ import { loadDatabaseConfig, tryLoadModels } from "./db-helpers.js";
 export interface StartOptions {
   /** Override of repl.start — injected by tests to avoid opening a real REPL. */
   startRepl?: (opts: { prompt: string; useGlobal: boolean }) => {
+    context: Record<string, unknown>;
     on(event: string, cb: () => void): void;
   };
 }
@@ -43,14 +44,14 @@ export async function arConsole(
   if (!models) return 1;
 
   type ReplStart = (o: { prompt: string; useGlobal: boolean }) => {
+    context: Record<string, unknown>;
     on(e: string, cb: () => void): void;
   };
   const startFn: ReplStart =
     opts.startRepl ?? ((await import("repl")).start as unknown as ReplStart);
   const replContext = startFn({ prompt: "trails> ", useGlobal: false });
 
-  const ctx = (replContext as unknown as { context: Record<string, unknown> }).context;
-  if (ctx) Object.assign(ctx, { Base, ...models });
+  Object.assign(replContext.context, { Base, ...models });
 
   return new Promise<number>((res) => {
     replContext.on("exit", () => {
