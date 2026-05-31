@@ -68,7 +68,7 @@ Files: `tasks/database-tasks.ts`.
 
 ---
 
-### P2-4 — `withTemporaryPoolForEach` missing `name:` filter param (~10 LOC)
+### P2-4 — `withTemporaryPoolForEach` missing `name:` filter param (~10 LOC) ✅ shipped
 
 **Source:** PR #2718 post-merge findings.
 
@@ -79,7 +79,7 @@ Files: `tasks/database-tasks.ts`.
 
 ---
 
-### P2-5 — SQLite path normalization in `withTemporaryPool` (~10 LOC)
+### P2-5 — SQLite path normalization in `withTemporaryPool` (~10 LOC) ✅ shipped
 
 **Source:** PR #2723 post-merge findings.
 

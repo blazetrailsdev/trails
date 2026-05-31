@@ -967,9 +967,11 @@ export class DatabaseTasks {
     } catch (error) {
       if (!(error instanceof ConnectionNotDefined)) throw error;
     }
+    const rawConfiguration = config.configuration as Record<string, unknown>;
+    const configuration = _normalizeSQLitePath(rawConfiguration, this.root);
     // Mirrors Rails' `ensure` which restores even if establish_connection raises.
     try {
-      await Base.establishConnection(config.configuration as Record<string, unknown>);
+      await Base.establishConnection(configuration);
       const pool = Base.connectionPool();
       return await fn(pool);
     } finally {
@@ -995,11 +997,20 @@ export class DatabaseTasks {
   static async withTemporaryPoolForEach<T>(
     envName: string,
     fn: (config: DatabaseConfig) => Promise<T>,
+    options: { name?: string } = {},
   ): Promise<void> {
-    for (const config of this.configsFor(envName)) {
-      await this.withTemporaryPool(config, async () => {
-        await fn(config);
-      });
+    if (options.name !== undefined) {
+      const dbConfig = this.databaseConfiguration?.configsFor({
+        envName,
+        name: options.name,
+      })?.[0];
+      if (dbConfig) await this.withTemporaryPool(dbConfig, async () => fn(dbConfig));
+    } else {
+      for (const config of this.configsFor(envName)) {
+        await this.withTemporaryPool(config, async () => {
+          await fn(config);
+        });
+      }
     }
   }
 
@@ -1336,6 +1347,32 @@ export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<bool
     }
     return !alreadyInitialized;
   });
+}
+
+// Mirrors SQLite3Adapter._isMemoryFilename: `:memory:`, `file::memory:`, and
+// `file:...?mode=memory` are all in-memory and must not be path-resolved.
+function _isSQLiteMemoryDatabase(database: string): boolean {
+  if (database === ":memory:") return true;
+  if (!database.startsWith("file:")) return false;
+  if (database.startsWith("file::memory:")) return true;
+  const q = database.indexOf("?");
+  if (q === -1) return false;
+  return new URLSearchParams(database.slice(q + 1)).get("mode") === "memory";
+}
+
+// Mirrors Rails' SQLiteDatabaseTasks#initialize: resolve relative `database`
+// paths against root so all withTemporaryPool callers behave consistently.
+function _normalizeSQLitePath(
+  configuration: Record<string, unknown>,
+  root: string,
+): Record<string, unknown> {
+  const adapter = configuration["adapter"];
+  if (typeof adapter !== "string" || !adapter.includes("sqlite")) return configuration;
+  const database = configuration["database"];
+  if (typeof database !== "string" || _isSQLiteMemoryDatabase(database)) return configuration;
+  const p = getPath();
+  if (!p.isAbsolute || p.isAbsolute(database)) return configuration;
+  return { ...configuration, database: p.resolve(root, database) };
 }
 
 // Defensive fallback for SQL-level errors that slip through pool proxies or
