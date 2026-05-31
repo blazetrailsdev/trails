@@ -251,6 +251,21 @@ function useTablelessFixtures(
   getAdapter: () => DatabaseAdapter,
   opts?: UseFixturesOpts,
 ): Record<string, unknown> {
+  // Mirror the same-table duplicate guard in resolveFixtureNames: each
+  // defineJoinTableFixtures call deletes the table before inserting, so a
+  // second entry for the same table would wipe the first entry's rows.
+  const seenTables = new Map<string, string>();
+  for (const { table } of entries) {
+    const prior = seenTables.get(table);
+    if (prior !== undefined) {
+      throw new Error(
+        `useFixtures: tableless entries "${prior}" and a later entry both target table "${table}"; ` +
+          `the second insert would delete the first entry's rows. Use a single entry instead.`,
+      );
+    }
+    seenTables.set(table, table);
+  }
+
   const keys = entries.map((e) => e.table);
   const store: Record<string, Record<string, unknown>> = {};
 
