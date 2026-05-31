@@ -592,13 +592,15 @@ export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<str
 // prettier-ignore
 export async function compareFile(yamlPath: string, yamlByTable: Map<string, FixtureMap>, idIndex: Map<string, Map<number, string[]>>, prelimFailure: Status | undefined, schema: Schema = TEST_SCHEMA): Promise<FileResult> {
   const snake = yamlPath.replace(/\.yml$/, "");
-  // For schema/FK lookups the key must be the DB table name, not the fixture set
-  // path. Top-level files: identical ("accounts"). Namespaced subdir files:
-  // "admin/accounts" → "admin_accounts" (Rails table_name for Admin::Account).
-  // Non-namespaced subdir files (e.g. "reserved_words/distinct" → "distinct")
-  // won't match this joined form, so they fall through to schema:not-ported —
-  // the same no-op behavior as an unrecognised table, not a false positive.
-  const tableSnake = snake.replace(/\//g, "_");
+  // Derive the DB table name for schema/FK lookups from the fixture path.
+  // Two conventions:
+  //   1. Namespaced dirs:     "admin/accounts"     → "admin_accounts"  (Rails table_name for Admin::Account)
+  //   2. Non-namespaced dirs: "reserved_words/distinct" → "distinct"   (Distinct.table_name = "distinct")
+  // Try the slash→underscore form first; fall back to the bare basename when
+  // the joined form isn't in the schema. Top-level files: joined === snake (no-op).
+  const tableSnakeJoined = snake.replace(/\//g, "_");
+  const tableSnakeBase = snake.includes("/") ? (snake.split("/").pop() ?? snake) : snake;
+  const tableSnake = schema[tableSnakeJoined] ? tableSnakeJoined : tableSnakeBase;
   const tsFile = path.join(TS_DIR, `${kebab(snake)}.ts`);
   const tsBase = existsSync(tsFile) ? `${kebab(snake)}.ts` : null;
   const r: FileResult = { yamlPath, tsBase, status: "MATCH", rowsMatched: 0, rowsTotal: 0, attrsMatched: 0, attrsTotal: 0, attrsSkipped: 0, schemaPorted: false, schemaExtras: 0, notes: [] }; // prettier-ignore
@@ -753,11 +755,21 @@ async function main(): Promise<void> {
     if (loaded.ok) yamlByTable.set(snake, loaded.data);
     else prelim.set(snake, loaded.reason);
   }
-  // Build the id index keyed by DB table name (tableSnake), not path key.
-  // ref("admin_accounts", "david") calls idIndex.get("admin_accounts"); storing
-  // under "admin/accounts" would cause false FK diffs for every subdir fixture ref.
+  // Build the id index keyed by DB table name, not path key.
+  // Two conventions (see compareFile tableSnake derivation above):
+  //   - Namespaced:     "admin/accounts"         → "admin_accounts"
+  //   - Non-namespaced: "reserved_words/distinct" → also alias as "distinct"
+  // Always add the joined form; also add the basename alias for subdir files
+  // when it doesn't collide with an existing top-level key (e.g. "accounts"
+  // is occupied by accounts.yml, so admin/accounts gets no "accounts" alias).
   const yamlByTableName = new Map<string, FixtureMap>();
-  for (const [snake, rows] of yamlByTable) yamlByTableName.set(snake.replace(/\//g, "_"), rows);
+  for (const [snake, rows] of yamlByTable) {
+    yamlByTableName.set(snake.replace(/\//g, "_"), rows);
+    if (snake.includes("/")) {
+      const base = snake.split("/").pop()!;
+      if (!yamlByTableName.has(base)) yamlByTableName.set(base, rows);
+    }
+  }
   const idIndex = buildIdIndex(yamlByTableName);
 
   const results: FileResult[] = [];

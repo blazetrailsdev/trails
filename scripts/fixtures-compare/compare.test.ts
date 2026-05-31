@@ -299,9 +299,9 @@ describe("collectYamlPaths", () => {
   });
 
   it("passes the basename (not the full path) as the label-root for list-form auto-labels", () => {
-    // Rails' auto_named_fixtures uses the last path component as the label prefix
-    // (e.g. `admin/accounts_0`). Verify that loadRailsYamlForTest receives the
-    // basename so list-form rows are labelled "accounts_0", not "admin/accounts_0".
+    // Rails' auto_named_fixtures uses the last path component as the label prefix.
+    // The compare script passes just "accounts" (the basename), so list-form rows
+    // are labelled "accounts_0" — not "admin_accounts_0" or "admin/accounts_0".
     const dir = mkdtempSync(join(tmpdir(), "fixtures-basename-"));
     try {
       mkdirSync(join(dir, "admin"));
