@@ -124,6 +124,31 @@ describe("useFixtures multi-set", () => {
   });
 });
 
+// --- useFixtures slash-key smoke test ---
+
+describe("useFixtures slash-keyed fixture sets", () => {
+  const adapter = makeAdapter();
+  const rowId = fixtureId("david");
+  const rows = new Map([[rowId, { id: rowId, name: "David" }]]);
+  const AccountModel = makeModel("accounts", rows);
+
+  // Slash-keyed entries in the object-map overload. The result property is
+  // accessible via bracket notation only; dot-access would be a syntax error.
+  const result = useFixtures(
+    { "admin/accounts": [AccountModel, { david: { name: "David" } }] },
+    () => adapter,
+  );
+
+  it("result property is accessible via bracket notation", () => {
+    expect(typeof result["admin/accounts"]).toBe("function");
+  });
+
+  it("accessor returns the instance by label after beforeEach runs", () => {
+    const acct = result["admin/accounts"]("david");
+    expect(acct).toMatchObject({ id: rowId });
+  });
+});
+
 // --- useFixtures type contract ---
 
 describe("useFixtures type contract", () => {
