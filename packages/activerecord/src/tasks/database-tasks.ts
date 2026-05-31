@@ -301,6 +301,21 @@ export class DatabaseTasks {
     }
   }
 
+  /** Roll back the last N migrations (default 1). Mirrors `db:rollback`. */
+  static async rollback(steps: number = 1): Promise<void> {
+    if (!this.databaseConfiguration) return;
+    const configs = this.configsFor(this._normalizeEnv());
+    if (configs.length === 0) return;
+    const config = configs.find((c) => c.name === "primary") ?? configs[0];
+    const { Migrator } = await import("../migration.js");
+    const adapter = await this._resolveAdapter(config);
+    if (!adapter)
+      throw new Error("No database adapter configured. Call DatabaseTasks.setAdapter() first.");
+    const migrator = new Migrator(adapter, this._migrations);
+    await migrator.rollback(steps);
+    adapter.schemaCache?.clear();
+  }
+
   private static _adapterInstance: import("../adapter.js").DatabaseAdapter | null = null;
 
   static setAdapter(adapter: import("../adapter.js").DatabaseAdapter | null): void {
