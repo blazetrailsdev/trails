@@ -36,11 +36,11 @@ export async function arConsole(
     }
   }
 
-  let models: Record<string, unknown>;
-  try {
-    models = await tryLoadModels(cwd);
-  } catch (err) {
+  const models = await tryLoadModels(cwd).catch((err: unknown) => {
     console.error(`ar: failed to load app/models/index.ts — ${String(err)}`);
+    return null;
+  });
+  if (!models) {
     try {
       Base.removeConnection();
     } catch {
