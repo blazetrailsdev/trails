@@ -870,7 +870,7 @@ export class DatabaseTasks {
 
     const mappedVersions = await this.dbConfigsWithVersions();
     const sorted = Array.from(mappedVersions.entries()).sort(([a], [b]) =>
-      String(a).localeCompare(String(b)),
+      BigInt(String(a)) < BigInt(String(b)) ? -1 : BigInt(String(a)) > BigInt(String(b)) ? 1 : 0,
     );
     for (const [version, dbConfigs] of sorted) {
       for (const dbConfig of dbConfigs) {
@@ -901,7 +901,7 @@ export class DatabaseTasks {
     for (const envName of eachCurrentEnvironment(env)) {
       const mappedVersions = await this.dbConfigsWithVersions(envName);
       const sorted = Array.from(mappedVersions.entries()).sort(([a], [b]) =>
-        String(a).localeCompare(String(b)),
+        BigInt(String(a)) < BigInt(String(b)) ? -1 : BigInt(String(a)) > BigInt(String(b)) ? 1 : 0,
       );
       for (const [version, dbConfigs] of sorted) {
         for (const dbConfig of dbConfigs) {
@@ -935,13 +935,12 @@ export class DatabaseTasks {
     const { Migrator } = await import("../migration.js");
     for (const config of this.configsFor(env)) {
       await this.withTemporaryPool(config, async (pool) => {
-        const dbConfig = pool.dbConfig;
         const migrator = new Migrator(pool.leaseConnection(), this._migrations);
         const versionsToRun = await migrator.pendingMigrationVersions();
         for (const version of versionsToRun) {
           if (targetVersion !== null && targetVersion !== Number(version)) continue;
           const list = dbConfigsWithVersions.get(version) ?? [];
-          list.push(dbConfig);
+          list.push(config);
           dbConfigsWithVersions.set(version, list);
         }
       });
