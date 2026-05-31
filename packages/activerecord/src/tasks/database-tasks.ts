@@ -898,6 +898,7 @@ export class DatabaseTasks {
     fn: (pool: ConnectionPool) => Promise<T>,
   ): Promise<T> {
     const { Base } = await import("../base.js");
+    this._baseClass = Base;
     let priorConfig: DatabaseConfig | null = null;
     try {
       priorConfig = Base.connectionDbConfig();
