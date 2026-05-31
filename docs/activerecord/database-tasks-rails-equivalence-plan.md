@@ -1,92 +1,151 @@
-# DatabaseTasks → Rails equivalence (split plan)
+# DatabaseTasks Rails equivalence — Phase 2
 
-Goal: bring `packages/activerecord/src/tasks/` to full fidelity with
-`ActiveRecord::Tasks::DatabaseTasks`, culminating in removal of the
-`_adapterInstance` / `setAdapter` bypass so connections resolve through
-`Base.connectionHandler` + pool exactly as Rails does.
+Phase 1 (7 PRs, #2704–#2723) is complete: the `_adapterInstance`/`setAdapter`
+bypass shim is removed; all tasks files are at 100% api:compare parity. This
+doc tracks the residual behavioral gaps and minor clean-ups surfaced during
+Phase 1 post-merge audits.
 
-## Context / why this is now feasible
+Historical Phase 1 sequence: see `git log --oneline | grep db-tasks` or
+`git log --follow -- docs/activerecord/database-tasks-rails-equivalence-plan.md`.
 
-The historical blocker — "SQLite `:memory:` + pool 1 + handler re-entry
-deadlocks `loadSchema`" (PR #2268, Phase D-0) — is **resolved**. Probed
-2026-05-30: re-entrant `Base.withConnection` under `:memory:`+`pool:1` (pinned
-and unpinned) returns the pinned/sticky connection with no deadlock, because
-`connection-pool.ts` now resolves a per-AsyncLocalStorage-context pinned
-connection (`_resolvePinnedConnection`) before a fresh checkout. So routing
-`migrate`/`loadSchema` through `migrationConnectionPool().withConnection` is
-safe and no core-pool change is required.
+## Phase 2 stories
 
-## Review findings (grades)
+### P2-1 — `migrate` missing `initialize_database` call (~30 LOC)
 
-- `database-tasks.ts` fidelity: **A−**. Adapter usage: **C+** (the bypass).
-- Behavioral gaps vs Rails: `migrate` skips `initialize_database` +
-  `schema_cache.clear!` (#9); `migrate_all` lacks single-primary fast path
-  (#10); `prepare_all` lacks version-sort + post-migrate dump + per-config
-  `seeds?` (#12); `reconstruct_from_schema` skips the `schema_up_to_date?`
-  truncate fast path + `SKIP_TEST_DATABASE_TRUNCATE` (#13);
-  `create_all`/`drop_all` re-`establish_connection` semantics (#8);
-  `check_target_version` error-message shape (#14).
-- `_resolveAdapter(config)` ignores its config arg → multi-db `migrate`
-  targets the wrong DB (#2).
-- Several Rails-`private` methods exposed public without `@internal` (#15).
+**Source:** PR #2706 post-merge findings.
 
-## Blast radius
+Rails calls `initialize_database(migration_connection_pool.db_config)` at the
+top of `migrate` unless `skip_initialize` is set (and callers like `migrateAll`
+pass `skipInitialize: true`). Our `migrate` omits this entirely.
 
-- `setAdapter`: 32 sites (17 in `database-tasks.test.ts`, 3 in subclasses,
-  8 in trailties `commands/db.ts`, plus the def + error messages).
-- `migrationConnection`: 11 sites (subclasses + trailties).
+Fix: add `skipInitialize` param + `initialize_database(migration_connection_pool.db_config)`
+call inside `migrate`; pass `skipInitialize: true` from `migrateAll`.
 
-## PR sequence (sibling branches off `main`, shipped sequentially)
+Files: `tasks/database-tasks.ts`.
 
-Each PR is green on its own; the bypass shim is removed only in the final PR.
+---
 
-1. **`db-tasks-conn-core`** — `database-tasks.ts` only. **(this PR / shipped)**
-   Add `_migrationAdapter()`: shim-first (returns `_adapterInstance` when set,
-   so all current callers stay green) with a `Base` connection-pool fallback
-   (`connectionPool().leaseConnection()`, leasing on demand; `ConnectionNotDefined`
-   → null for the shim era; real lease errors propagate). Route the async
-   migration/schema methods (`migrate` via `_resolveAdapter`, `dumpSchema`,
-   `loadSchema`, `migrateStatus`, `schemaUpToDate`, `_stampSchemaSha1`,
-   `_appendSchemaInformation`) through it. `@internal` on the new helper.
-   No caller changes → green.
+### P2-2 — `createAll` missing re-establish_connection (~10 LOC)
 
-   **Explicitly NOT in this PR (deferred, see below):** `withTemporaryPool`,
-   making the _sync_ `migrationConnection()` pool-derived (blocked by the
-   `base → connection-handler → pool-config → database-tasks` import cycle —
-   needs the subclasses to move to async access first), and the #2 multi-db
-   `migrate` fix (real per-config pool routing breaks the shim-based migrate
-   tests, so it lands with the test migration).
+**Source:** PR #2706 post-merge findings.
 
-2. **`db-tasks-behavior`** — `database-tasks.ts` (sequential after #1, same
-   file). Behavioral gaps #8/#9/#10/#12/#13/#14.
+Rails `create_all` captures the current `migration_connection.pool.db_config`
+before iterating and calls `migration_class.establish_connection(db_config)`
+after all creates, restoring the pool to the original config. Our `createAll`
+skips this, leaving the handler pointing at whatever config was last created.
+(`drop_all` in Rails does not re-establish — only `create_all` does.)
 
-3. **`db-tasks-subclasses`** — `sqlite|postgresql|mysql-database-tasks.ts`.
-   Replace `connectAdapter`/`connectAdmin`/`withAdmin` with
-   `Base.establishConnection`/`leaseConnection`; drop the `:memory:` reuse
-   hack. Stop calling `setAdapter`. Convert `migrationConnection()` to async /
-   make it pool-derived now that callers no longer need it sync.
+Files: `tasks/database-tasks.ts`.
 
-4. **`db-tasks-tests`** — `database-tasks.test.ts`. Migrate 17 `setAdapter`
-   sites to `bootstrapTestHandler()` / handler establish. Land the #2 multi-db
-   `migrate` fix (per-config pool routing) here, where the shim-based migrate
-   tests are rewritten to use a real pool.
+---
 
-5. **`db-tasks-with-temporary-pool`** — add faithful `withTemporaryPool(config,
-fn)` (handler `establishConnection({clobber})` + restore via
-   `connectionDbConfig`) and route `withTemporaryConnection` /
-   `withTemporaryPoolForEach` through it. Sequenced after the test migration so
-   the establish/restore behavior change lands against pool-based tests.
+### P2-3 — `dbConfigsWithVersions` / `prepareAll` / `migrateAll` behavioral fidelity (~60 LOC)
 
-6. **`trailties-db-handler`** — trailties `commands/db.ts`, `database.ts`,
-   `db.test.ts`. Populate `DatabaseTasks.databaseConfiguration` and resolve
-   adapters via the pool instead of `setAdapter`/`migrationConnection`.
+**Source:** PR #2706 post-merge findings; verified against Rails source.
 
-7. **`db-tasks-drop-shim`** — delete `_adapterInstance`/`setAdapter`/
-   `_resolveAdapter`/`_connectFor`. Only safe once 3–6 have merged.
+Three interrelated gaps:
 
-## Hard floor (stays as documented substitution, not a gap)
+1. **`dbConfigsWithVersions`** groups by `envName` instead of querying
+   `pool.migration_context.pending_migration_versions` per config as Rails does.
+   Rails returns a `version → db_configs[]` map; ours returns an `envName → configs[]`
+   map. This is foundational — `prepareAll` and `migrateAll` both depend on it.
 
-- `schema_format :ruby` → `ts`/`js` (no Ruby `load`).
-- `class_for_adapter` `constantize`, `OpenSSL::Digest`, `mattr_accessor`.
-- `migrate_status`/`check_schema_file` return/throw instead of
-  `Kernel.abort`/`puts` (better DX; not chased).
+2. **`migrateAll`** calls `initialize_database` before iterating (Rails does
+   `db_configs.each { |c| initialize_database(c) }` before the single-primary
+   fast path or the version-sorted loop). Our implementation skips this entirely
+   and should pass `skipInitialize: true` to `migrate` once P2-1 lands.
+
+3. **`prepareAll`** differs from Rails in structure: Rails calls
+   `initialize_database` (not `create`) per config, then iterates
+   `db_configs_with_versions(environment).sort` inside
+   `each_current_environment`, calling `with_temporary_pool(db_config) { migrate(version) }`
+   for each version/config pair, then runs a post-migrate `dump_schema` pass
+   when `dumpSchemaAfterMigration` is set. Our `prepareAll` uses `create` + `migrateAll`.
+
+Fix these three together once P2-1 (`skipInitialize`) is in place.
+
+Files: `tasks/database-tasks.ts`.
+
+---
+
+### P2-4 — `withTemporaryPoolForEach` missing `name:` filter param (~10 LOC)
+
+**Source:** PR #2718 post-merge findings.
+
+Rails `with_temporary_pool_for_each(name:)` accepts a `name:` keyword to
+filter to a single named DB config. We have no equivalent parameter.
+
+Files: `tasks/database-tasks.ts`.
+
+---
+
+### P2-5 — SQLite path normalization in `withTemporaryPool` (~10 LOC)
+
+**Source:** PR #2723 post-merge findings.
+
+`withTemporaryPool` passes `config.configuration` (raw hash) to
+`Base.establishConnection` without resolving relative SQLite paths against
+`DatabaseTasks.root`. Pre-existing across all callers (`migrateAll`,
+`reconstructFromSchema`, etc.); only `checkProtectedEnvironmentsBang` previously
+escaped via the removed `_connectFor` shim.
+
+Fix: normalize SQLite `database` path at `withTemporaryPool` entry (or at the
+`SQLiteDatabaseTasks` / config-loading layer) using `DatabaseTasks.root`.
+Low practical impact but breaks the Rails invariant that `root` governs
+relative DB paths.
+
+Files: `tasks/database-tasks.ts` (or `tasks/sqlite-database-tasks.ts`).
+
+---
+
+### P2-6 — `migrationConnection()` order-dependency registration hook (~20 LOC)
+
+**Source:** PR #2723 post-merge findings.
+
+`migrationConnection()` returns null if called before any async DatabaseTasks
+method has had a chance to capture `_baseClass`. Root cause: `base.ts` cannot be
+statically top-level-imported from `database-tasks.ts` due to a real ESM
+circular dependency (`base → connection-handler → pool-config → database-tasks`).
+
+Proper fix: add a registration hook (e.g. `DatabaseTasks._registerBase(Base)`)
+that `base.ts` calls at module init time (via a side-effect import in
+`model.ts`), eliminating the order dependency without a top-level import cycle.
+
+Files: `tasks/database-tasks.ts`, `base.ts` (or `model.ts`).
+
+---
+
+### P2-7 — MySQL `socket`→`socketPath` remapping relocation (~10 LOC)
+
+**Source:** PR #2710 post-merge findings.
+
+`MySQLDatabaseTasks.establishConnection()` remaps `socket` → `socketPath` inline
+as a workaround. This conversion belongs in `buildAdapterArg` (config layer) or
+the `Mysql2Adapter` constructor so all callers benefit.
+
+Files: `tasks/mysql-database-tasks.ts`, and wherever `buildAdapterArg` /
+`Mysql2Adapter` constructor lives.
+
+---
+
+### P2-8 — 14 remaining skipped tests in `database-tasks.test.ts`
+
+**Source:** PR #2713 post-merge findings.
+
+14 tests remain skipped — scope/status/schema-cache gaps noted as step 2
+behavioral gaps. Many of these will unskip once P2-1 through P2-3 land;
+audit after those PRs.
+
+Files: `tasks/database-tasks.test.ts`.
+
+## Bundling guidance
+
+P2-1 must land first (adds `skipInitialize` which P2-3 depends on), but at
+~30 + ~10 + ~60 LOC the three stories total well under 300 LOC and can ship
+as a single PR. P2-1 + P2-2 + P2-3 are thematically cohesive (`migrate`/
+`createAll`/`prepareAll`/`migrateAll`/`dbConfigsWithVersions` behavioral
+fidelity) — bundle all three together.
+P2-4 + P2-5 are small and can be bundled together. P2-6 and P2-7 are
+independent cleanups that can go separately or bundled with any of the above.
+P2-8 is a follow-up audit, not its own story — attach to whichever PR closes
+the last behavioral gap it depends on.
