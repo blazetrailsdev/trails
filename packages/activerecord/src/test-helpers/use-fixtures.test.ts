@@ -149,6 +149,45 @@ describe("useFixtures slash-keyed fixture sets", () => {
   });
 });
 
+// --- all/ fixture sets (Phase 9) ---
+// Mirrors LoadAllFixturesTest / FileFixtureConflictTest in fixtures_test.rb:
+// "fixtures :all" from the `all/` dir loads developers, namespaced/accounts,
+// people, and tasks (admin is a symlink treated as a file fixture conflict and
+// excluded). developers/people/tasks are empty YAMLs; only namespaced/accounts
+// carries a row.
+
+describe("all/ fixture sets — explicit enumeration", () => {
+  const adapter = makeAdapter();
+  const rowId = fixtureId("signals37");
+  const rows = new Map([[rowId, { id: rowId, name: "37signals" }]]);
+  const AccountModel = makeModel("accounts", rows);
+  const DevModel = makeModel("developers", new Map());
+  const PersonModel = makeModel("people", new Map());
+  const TaskModel = makeModel("tasks", new Map());
+
+  const result = useFixtures(
+    {
+      "all/developers": [DevModel, {}],
+      "all/people": [PersonModel, {}],
+      "all/tasks": [TaskModel, {}],
+      "all/namespaced/accounts": [AccountModel, { signals37: { name: "37signals" } }],
+    },
+    () => adapter,
+  );
+
+  it("all four fixture sets are accessible via bracket notation", () => {
+    expect(typeof result["all/developers"]).toBe("function");
+    expect(typeof result["all/people"]).toBe("function");
+    expect(typeof result["all/tasks"]).toBe("function");
+    expect(typeof result["all/namespaced/accounts"]).toBe("function");
+  });
+
+  it("namespaced/accounts returns signals37 instance", () => {
+    const acct = result["all/namespaced/accounts"]("signals37");
+    expect(acct).toMatchObject({ id: rowId });
+  });
+});
+
 // --- useFixtures type contract ---
 
 describe("useFixtures type contract", () => {

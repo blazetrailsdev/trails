@@ -130,9 +130,16 @@ export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTable
  *   classes have no shared model files.
  * - `to_be_linked/` (Phase 4b) — needs model-less loader extension; no shared models.
  * - Phase 5 (`primary_key_error/`),
- *   Phase 6 (`all/` + `naked/yml/`) — follow-up PRs.
+ *   Phase 6 (`naked/yml/`) — follow-up PRs.
  */
 export const fixtureRegistry = {
+  "all/namespaced/accounts": {
+    // Rails looks up Namespaced::Account which doesn't exist; the fixture data
+    // carries only `name` — matching admin_accounts, not accounts. AdminAccount
+    // is the model whose table schema fits this fixture.
+    model: () => import("./models/admin/account.js").then((m) => m.AdminAccount),
+    data: FixtureData.allNamespacedAccountsFixtureData,
+  },
   "admin/accounts": {
     model: () => import("./models/admin/account.js").then((m) => m.AdminAccount),
     data: FixtureData.adminAccountsFixtureData,
