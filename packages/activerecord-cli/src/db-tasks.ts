@@ -290,3 +290,58 @@ export async function dbPrepare(cwd: string, _args: string[]): Promise<number> {
     return 1;
   }
 }
+
+function printMigrateStatusTable(
+  dbName: string,
+  rows: Array<{ status: "up" | "down"; version: string; name: string }>,
+): void {
+  console.log(`\ndatabase: ${dbName}\n`);
+  console.log(`${"Status".padStart(7).padEnd(8)}  ${"Migration ID".padEnd(14)}  Migration Name`);
+  console.log("-".repeat(50));
+  for (const row of rows) {
+    console.log(`${row.status.padStart(7).padEnd(8)}  ${row.version.padEnd(14)}  ${row.name}`);
+  }
+  console.log("");
+}
+
+export async function dbMigrateStatus(cwd: string, args: string[]): Promise<number> {
+  const all = args.includes("--all");
+  try {
+    await loadDatabaseConfig(cwd);
+  } catch (err) {
+    console.error(`ar: failed to load config/database.ts — ${String(err)}`);
+    return 1;
+  }
+  await tryLoadModels(cwd);
+  loadMigrations(cwd);
+
+  const env = DatabaseConfigurations.currentEnv();
+
+  if (all) {
+    const configs = DatabaseTasks.eachLocalConfiguration();
+    for (const config of configs) {
+      const dbName = config.database ?? "(unknown)";
+      try {
+        await DatabaseTasks.withTemporaryPool(config, async () => {
+          const rows = await DatabaseTasks.migrateStatus();
+          printMigrateStatusTable(dbName, rows);
+        });
+      } catch (err) {
+        console.error(`ar: db:migrate:status failed for '${dbName}' — ${String(err)}`);
+        return 1;
+      }
+    }
+    return 0;
+  }
+
+  try {
+    const rows = await DatabaseTasks.migrateStatus();
+    const configs = DatabaseTasks.configsFor(env);
+    const dbName = configs[0]?.database ?? env;
+    printMigrateStatusTable(dbName, rows);
+    return 0;
+  } catch (err) {
+    console.error(`ar: db:migrate:status failed — ${String(err)}`);
+    return 1;
+  }
+}
