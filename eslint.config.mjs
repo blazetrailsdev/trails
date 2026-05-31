@@ -13,6 +13,7 @@ import noNativeDate from "./eslint/no-native-date.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
 import railsFileStructureMethodOrder from "./eslint/rails-file-structure-method-order.mjs";
 import expectedFixtures from "./eslint/expected-fixtures.mjs";
+import manifestComplete from "./eslint/manifest-complete.mjs";
 
 export default defineConfig(
   {
@@ -113,6 +114,8 @@ export default defineConfig(
           "nie-requires-annotation": nieRequiresAnnotation,
           "rails-file-structure-method-order": railsFileStructureMethodOrder,
           "expected-fixtures": expectedFixtures,
+          // Off by default — opt in per project (see eslint/manifest-complete.mjs).
+          "manifest-complete": manifestComplete,
         },
       },
     },
