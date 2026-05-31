@@ -4,7 +4,17 @@ import { generateManifest } from "./generate-manifest.js";
 import { generateMigration, migrationTimestamp, parseFields } from "./generate-migration.js";
 import { generateModel } from "./generate-model.js";
 import { delegateBin } from "./delegate.js";
-import { dbCreate, dbDrop, dbMigrate, dbRollback, dbSchemaLoad, dbSeed } from "./db-tasks.js";
+import {
+  dbCreate,
+  dbDrop,
+  dbMigrate,
+  dbRollback,
+  dbSchemaLoad,
+  dbSeed,
+  dbSetup,
+  dbReset,
+  dbPrepare,
+} from "./db-tasks.js";
 
 const HELP = `ar — the CLI for standalone @blazetrails/activerecord projects
 
@@ -24,8 +34,11 @@ Commands:
   db:rollback                    Roll back the last migration
   db:schema:load                 Load db/schema.ts into the database
   db:seed                        Load db/seeds.ts
+  db:setup                       Create, load schema, and seed
+  db:reset                       Drop, then db:setup
+  db:prepare                     Idempotent setup (create if missing, migrate, seed)
 
-Coming in later slices: db:migrate:status, db:setup, db:prepare, db:reset.
+Coming in later slices: db:migrate:status.
 
 Run \`ar <command> --help\` for command-specific help.`;
 
@@ -76,6 +89,19 @@ const DB_SCHEMA_LOAD_HELP = `ar db:schema:load — load db/schema.ts into the da
 
 const DB_SEED_HELP = `ar db:seed — load db/seeds.ts (no-op if file is absent)`;
 
+const DB_SETUP_HELP = `ar db:setup — create the database, load the schema, and seed
+
+Equivalent to db:create + db:schema:load + db:seed for the current TRAILS_ENV.`;
+
+const DB_RESET_HELP = `ar db:reset — drop and recreate the database
+
+Equivalent to db:drop + db:setup. Protected environments are checked before drop.`;
+
+const DB_PREPARE_HELP = `ar db:prepare — idempotent database setup
+
+Creates the database if it does not exist, runs pending migrations, and seeds
+if the database was freshly created. Safe to run on an already-setup database.`;
+
 const GENERATE_MIGRATION_HELP = `ar generate:migration <Name> [field:type ...] — emit a migration file
 
 Creates db/migrate/<YYYYMMDDHHMMSS>_<snake_name>.ts. The migration class name is the
@@ -99,9 +125,7 @@ Options:
   --dry-run    Print the intended paths without writing.`;
 
 /** Commands recognized but deferred to a later slice (see proposal §5). */
-const NOT_IMPLEMENTED = new Set(
-  "db:migrate:status db:schema:dump db:setup db:prepare db:reset".split(" "),
-);
+const NOT_IMPLEMENTED = new Set("db:migrate:status db:schema:dump".split(" "));
 
 function wantsHelp(args: string[]): boolean {
   return args.includes("--help") || args.includes("-h");
@@ -226,6 +250,27 @@ export async function run(argv: string[], cwd: string): Promise<number> {
       return 0;
     }
     return dbSeed(cwd, rest);
+  }
+  if (command === "db:setup") {
+    if (wantsHelp(rest)) {
+      console.log(DB_SETUP_HELP);
+      return 0;
+    }
+    return dbSetup(cwd, rest);
+  }
+  if (command === "db:reset") {
+    if (wantsHelp(rest)) {
+      console.log(DB_RESET_HELP);
+      return 0;
+    }
+    return dbReset(cwd, rest);
+  }
+  if (command === "db:prepare") {
+    if (wantsHelp(rest)) {
+      console.log(DB_PREPARE_HELP);
+      return 0;
+    }
+    return dbPrepare(cwd, rest);
   }
   if (command === "generate:migration") {
     if (wantsHelp(rest)) {
