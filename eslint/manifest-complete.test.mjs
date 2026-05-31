@@ -27,12 +27,9 @@ const tester = new RuleTester({
 });
 
 // Code snippets used across cases.
-const BOTH_IMPORTS =
-  'import { User } from "./user.js";\nimport { Post } from "./post.js";\n';
-const USER_ONLY =
-  'import { User } from "./user.js";\n';
-const USER_PLUS_GHOST =
-  'import { User } from "./user.js";\nimport { Ghost } from "./ghost.js";\n';
+const BOTH_IMPORTS = 'import { User } from "./user.js";\nimport { Post } from "./post.js";\n';
+const USER_ONLY = 'import { User } from "./user.js";\n';
+const USER_PLUS_GHOST = 'import { User } from "./user.js";\nimport { Ghost } from "./ghost.js";\n';
 
 tester.run("manifest-complete", rule, {
   valid: [
@@ -49,8 +46,7 @@ tester.run("manifest-complete", rule, {
     // Extra non-relative import (e.g. framework import) is ignored.
     {
       filename: manifestPath,
-      code:
-        'import { registerModel } from "@blazetrails/activerecord";\n' + BOTH_IMPORTS,
+      code: 'import { registerModel } from "@blazetrails/activerecord";\n' + BOTH_IMPORTS,
     },
   ],
   invalid: [
