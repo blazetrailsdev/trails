@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { mkdtemp, readFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { parseFields, renderMigration, generateMigration } from "./generate-migration.js";
+import {
+  parseFields,
+  renderMigration,
+  generateMigration,
+  migrationTimestamp,
+} from "./generate-migration.js";
 
 describe("ArGenerateMigrationTest", () => {
   let dir: string;
@@ -10,10 +15,13 @@ describe("ArGenerateMigrationTest", () => {
     dir = await mkdtemp(join(tmpdir(), "ar-mig-"));
   });
 
-  it("parses field:type tokens, skips bare tokens without colon", () => {
-    expect(parseFields(["title:string", "count:integer", "noType"])).toEqual([
+  it("parses field:type tokens, skips bare tokens without colon, strips {…} modifiers", () => {
+    expect(
+      parseFields(["title:string", "count:integer", "noType", ":string", "size:string{40}"]),
+    ).toEqual([
       { name: "title", type: "string" },
       { name: "count", type: "integer" },
+      { name: "size", type: "string" },
     ]);
   });
 
@@ -44,21 +52,25 @@ describe("ArGenerateMigrationTest", () => {
     expect(src).not.toContain("removeColumn");
   });
 
-  it("renders create_* migration with createTable block and timestamps", () => {
+  it("renders create_* migration with t.column(name, type) and timestamps", () => {
     const src = renderMigration("create_articles", [{ name: "title", type: "string" }]);
     expect(src).toContain('this.createTable("articles"');
-    expect(src).toContain('t.string("title")');
+    expect(src).toContain('t.column("title", "string")');
     expect(src).toContain("t.timestamps()");
   });
 
   it("renders create_* migration with t.references for reference fields", () => {
     const src = renderMigration("create_comments", [{ name: "post", type: "references" }]);
     expect(src).toContain('t.references("post", { foreignKey: true })');
-    expect(src).not.toContain("t.references_id");
   });
 
   it("renders generic migration with TODO body", () => {
     expect(renderMigration("do_something", [])).toContain("// TODO: implement migration");
+  });
+
+  it("migrationTimestamp returns a 14-digit YYYYMMDDHHMMSS string", () => {
+    const ts = migrationTimestamp();
+    expect(ts).toMatch(/^\d{14}$/);
   });
 
   it("writes file to db/migrate/ with timestamp prefix", async () => {
@@ -66,16 +78,16 @@ describe("ArGenerateMigrationTest", () => {
       dir,
       "AddEmailToUsers",
       [{ name: "email", type: "string" }],
-      1700000000000,
+      "20240101120000",
     );
     expect(result.written).toBe(true);
-    expect(result.path).toMatch(/1700000000000_add_email_to_users\.ts$/);
+    expect(result.path).toMatch(/20240101120000_add_email_to_users\.ts$/);
     const content = await readFile(result.path, "utf8");
     expect(content).toContain('this.addColumn("users", "email", "string")');
   });
 
   it("refuses overwrite without --force; succeeds with --force", async () => {
-    const ts = 1700000001000;
+    const ts = "20240101120001";
     await generateMigration(dir, "CreatePosts", [], ts);
     expect((await generateMigration(dir, "CreatePosts", [], ts)).skipped).toBe(true);
     const forced = await generateMigration(
@@ -86,11 +98,13 @@ describe("ArGenerateMigrationTest", () => {
       { force: true },
     );
     expect(forced.written).toBe(true);
-    expect(await readFile(forced.path, "utf8")).toContain('t.string("title")');
+    expect(await readFile(forced.path, "utf8")).toContain('t.column("title", "string")');
   });
 
   it("dry-run returns path without writing", async () => {
-    const result = await generateMigration(dir, "CreateItems", [], 1700000002000, { dryRun: true });
+    const result = await generateMigration(dir, "CreateItems", [], "20240101120002", {
+      dryRun: true,
+    });
     expect(result.written).toBe(false);
     await expect(readFile(result.path, "utf8")).rejects.toThrow();
   });

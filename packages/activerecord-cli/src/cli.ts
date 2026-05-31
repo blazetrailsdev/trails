@@ -1,7 +1,7 @@
 import { getPathAsync } from "@blazetrails/activesupport";
 import { init } from "./init.js";
 import { generateManifest } from "./generate-manifest.js";
-import { generateMigration, parseFields } from "./generate-migration.js";
+import { generateMigration, migrationTimestamp, parseFields } from "./generate-migration.js";
 import { generateModel } from "./generate-model.js";
 import { delegateBin } from "./delegate.js";
 import { dbCreate, dbDrop, dbMigrate, dbRollback, dbSchemaLoad, dbSeed } from "./db-tasks.js";
@@ -240,7 +240,10 @@ export async function run(argv: string[], cwd: string): Promise<number> {
     const force = rest.includes("--force");
     const dryRun = rest.includes("--dry-run");
     const fields = parseFields(fieldTokens);
-    const result = await generateMigration(cwd, name, fields, Date.now(), { force, dryRun });
+    const result = await generateMigration(cwd, name, fields, migrationTimestamp(), {
+      force,
+      dryRun,
+    });
     if (result.skipped) {
       console.error(`ar: ${result.path} already exists. Use --force to overwrite.`);
       return 1;
@@ -262,7 +265,7 @@ export async function run(argv: string[], cwd: string): Promise<number> {
     const force = rest.includes("--force");
     const dryRun = rest.includes("--dry-run");
     const fields = parseFields(fieldTokens);
-    const result = await generateModel(cwd, name, fields, Date.now(), { force, dryRun });
+    const result = await generateModel(cwd, name, fields, migrationTimestamp(), { force, dryRun });
     if (result.skipped) {
       console.error(
         `ar: ${result.modelPath} or ${result.migrationPath} already exists. Use --force to overwrite.`,

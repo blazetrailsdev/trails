@@ -11,14 +11,14 @@ describe("ArGenerateModelTest", () => {
   });
 
   it("writes model to app/models and migration to db/migrate", async () => {
-    const result = await generateModel(dir, "Article", [], 1700000010000);
+    const result = await generateModel(dir, "Article", [], "20240101120000");
     expect(result.written).toBe(true);
     expect(result.modelPath).toMatch(/app[/\\]models[/\\]article\.ts$/);
-    expect(result.migrationPath).toMatch(/1700000010000_create_articles\.ts$/);
+    expect(result.migrationPath).toMatch(/20240101120000_create_articles\.ts$/);
   });
 
   it("model file exports a Base subclass", async () => {
-    const result = await generateModel(dir, "User", [], 1700000011000);
+    const result = await generateModel(dir, "User", [], "20240101120001");
     const src = await readFile(result.modelPath, "utf8");
     expect(src).toContain("export class User extends Base");
     expect(src).toContain('from "@blazetrails/activerecord"');
@@ -29,11 +29,11 @@ describe("ArGenerateModelTest", () => {
       dir,
       "Post",
       [{ name: "title", type: "string" }],
-      1700000012000,
+      "20240101120002",
     );
     const src = await readFile(result.migrationPath, "utf8");
     expect(src).toContain('this.createTable("posts"');
-    expect(src).toContain('t.string("title")');
+    expect(src).toContain('t.column("title", "string")');
     expect(src).toContain("t.timestamps()");
   });
 
@@ -46,20 +46,31 @@ describe("ArGenerateModelTest", () => {
         { name: "body", type: "text" },
         { name: "score", type: "integer" },
       ],
-      1700000013000,
+      "20240101120003",
     );
     const src = await readFile(result.modelPath, "utf8");
-    // foreign-key declaration (associations.test-d.ts pattern)
     expect(src).toContain("declare post_id: number");
     expect(src).toContain("declare body: string");
     expect(src).toContain("declare score: number");
-    // single static {} block
     expect(src).toContain('this.belongsTo("post")');
     expect((src.match(/static\s*\{/g) ?? []).length).toBe(1);
   });
 
+  it("normalizes already-suffixed reference name: author_id:references → author_id, belongsTo(author)", async () => {
+    const result = await generateModel(
+      dir,
+      "Comment",
+      [{ name: "author_id", type: "references" }],
+      "20240101120004",
+    );
+    const src = await readFile(result.modelPath, "utf8");
+    expect(src).toContain("declare author_id: number");
+    expect(src).toContain('this.belongsTo("author")');
+    expect(src).not.toContain("author_id_id");
+  });
+
   it("handles CamelCase name via underscore conversion", async () => {
-    const result = await generateModel(dir, "BlogPost", [], 1700000014000);
+    const result = await generateModel(dir, "BlogPost", [], "20240101120005");
     expect(result.modelPath).toMatch(/blog_post\.ts$/);
     expect(result.migrationPath).toMatch(/create_blog_posts\.ts$/);
     expect(await readFile(result.modelPath, "utf8")).toContain(
@@ -68,7 +79,7 @@ describe("ArGenerateModelTest", () => {
   });
 
   it("refuses overwrite without --force; succeeds with --force", async () => {
-    const ts = 1700000015000;
+    const ts = "20240101120006";
     await generateModel(dir, "Tag", [], ts);
     expect((await generateModel(dir, "Tag", [], ts)).skipped).toBe(true);
     const forced = await generateModel(dir, "Tag", [{ name: "name", type: "string" }], ts, {
@@ -79,7 +90,7 @@ describe("ArGenerateModelTest", () => {
   });
 
   it("dry-run returns paths without writing", async () => {
-    const result = await generateModel(dir, "Widget", [], 1700000016000, { dryRun: true });
+    const result = await generateModel(dir, "Widget", [], "20240101120007", { dryRun: true });
     expect(result.written).toBe(false);
     await expect(readFile(result.modelPath, "utf8")).rejects.toThrow();
   });

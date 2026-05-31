@@ -1,4 +1,4 @@
-import { mkdir, writeFile, access } from "fs/promises";
+import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { camelize, underscore, pluralize } from "@blazetrails/activesupport";
 
@@ -18,14 +18,29 @@ export interface GenerateMigrationResult {
   skipped: boolean;
 }
 
+/** Rails-style YYYYMMDDHHMMSS migration version prefix. */
+export function migrationTimestamp(): string {
+  const now = new Date();
+  const y = now.getFullYear().toString();
+  const mo = (now.getMonth() + 1).toString().padStart(2, "0");
+  const d = now.getDate().toString().padStart(2, "0");
+  const h = now.getHours().toString().padStart(2, "0");
+  const mi = now.getMinutes().toString().padStart(2, "0");
+  const s = now.getSeconds().toString().padStart(2, "0");
+  return `${y}${mo}${d}${h}${mi}${s}`;
+}
+
 export function parseFields(tokens: string[]): FieldSpec[] {
   return tokens
     .filter((t) => t.includes(":"))
     .map((t) => {
       const [name, rawType = "string"] = t.split(":");
-      const type = rawType || "string";
+      if (!name) return null;
+      // Strip Rails-style attribute option suffixes: title:string{40}, name:string{index}
+      const type = (rawType || "string").replace(/\{[^}]*\}.*$/, "");
       return { name, type };
-    });
+    })
+    .filter((f): f is FieldSpec => f !== null);
 }
 
 /** Normalize a user-supplied name: strip namespace separators so `Admin::User` → `admin_user`. */
@@ -73,15 +88,15 @@ function renderBody(snakeName: string, fields: FieldSpec[]): string {
     return cols || `    // TODO: remove columns from ${tbl}`;
   }
 
-  // create_* — emit t.references(...) for reference fields (Rails template does the same)
+  // create_* — use t.column(name, type) to keep type as a string literal (no injection risk)
   m = /^create_(.+)$/.exec(snakeName);
   if (m) {
     const tbl = pluralize(m[1]);
     const cols = fields
       .map((f) =>
         isReference(f.type)
-          ? `      t.references("${f.name}", { foreignKey: true });`
-          : `      t.${f.type}("${f.name}");`,
+          ? `      t.references(${JSON.stringify(f.name)}, { foreignKey: true });`
+          : `      t.column(${JSON.stringify(f.name)}, ${JSON.stringify(f.type)});`,
       )
       .join("\n");
     const inner = cols ? `\n${cols}\n      t.timestamps();\n    ` : "\n      t.timestamps();\n    ";
@@ -103,29 +118,29 @@ export function renderMigration(snakeName: string, fields: FieldSpec[]): string 
   );
 }
 
-export async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export async function generateMigration(
   root: string,
   name: string,
   fields: FieldSpec[],
-  ts: number,
+  ts: string,
   options: GenerateMigrationOptions = {},
 ): Promise<GenerateMigrationResult> {
   const snakeName = normalizeSnakeName(name);
-  const path = join(root, "db", "migrate", `${ts}_${snakeName}.ts`);
+  const migrateDir = join(root, "db", "migrate");
+  const path = join(migrateDir, `${ts}_${snakeName}.ts`);
   // Existence check runs even in dry-run so the output reflects what a real run would do.
-  if (!options.force && (await exists(path))) return { path, written: false, skipped: true };
+  const content = renderMigration(snakeName, fields);
   if (!options.dryRun) {
-    await mkdir(join(root, "db", "migrate"), { recursive: true });
-    await writeFile(path, renderMigration(snakeName, fields), "utf8");
+    await mkdir(migrateDir, { recursive: true });
+    try {
+      // Atomic create: flag "wx" fails with EEXIST if the file already exists.
+      await writeFile(path, content, options.force ? "utf8" : { encoding: "utf8", flag: "wx" });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "EEXIST") {
+        return { path, written: false, skipped: true };
+      }
+      throw err;
+    }
   }
   return { path, written: !options.dryRun, skipped: false };
 }
