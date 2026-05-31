@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * Dump the live database schema as JSON consumable by
  * `trails-tsc --schema <path>`.
@@ -18,8 +16,7 @@
 
 import { getFs, getPath } from "@blazetrails/activesupport";
 
-import { Base } from "../base.js";
-import { dumpSchemaColumns } from "../schema-columns-dump.js";
+import { Base, dumpSchemaColumns } from "@blazetrails/activerecord";
 
 interface Args {
   databaseUrl?: string;
@@ -27,48 +24,61 @@ interface Args {
   ignore: readonly string[];
 }
 
-function parseArgs(argv: readonly string[]): Args {
+function parseArgs(argv: readonly string[]): Args | number {
   const out: { databaseUrl?: string; outPath?: string; ignore: string[] } = { ignore: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
-    const readValue = (flag: string): string => {
+    const readValue = (flag: string): string | number => {
       const next = argv[i + 1];
       if (!next || next.startsWith("-")) {
         process.stderr.write(`trails-schema-dump: ${flag} expects a value.\n`);
-        process.exit(1);
+        return 1;
       }
       i++;
       return next;
     };
-    if (a === "--database-url") out.databaseUrl = readValue("--database-url");
-    else if (a.startsWith("--database-url=")) out.databaseUrl = a.slice("--database-url=".length);
-    else if (a === "--out") out.outPath = readValue("--out");
-    else if (a.startsWith("--out=")) out.outPath = a.slice("--out=".length);
-    else if (a === "--ignore") {
-      out.ignore.push(...readValue("--ignore").split(",").filter(Boolean));
+    if (a === "--database-url") {
+      const v = readValue("--database-url");
+      if (typeof v === "number") return v;
+      out.databaseUrl = v;
+    } else if (a.startsWith("--database-url=")) {
+      out.databaseUrl = a.slice("--database-url=".length);
+    } else if (a === "--out") {
+      const v = readValue("--out");
+      if (typeof v === "number") return v;
+      out.outPath = v;
+    } else if (a.startsWith("--out=")) {
+      out.outPath = a.slice("--out=".length);
+    } else if (a === "--ignore") {
+      const v = readValue("--ignore");
+      if (typeof v === "number") return v;
+      out.ignore.push(...v.split(",").filter(Boolean));
     } else if (a.startsWith("--ignore=")) {
       out.ignore.push(...a.slice("--ignore=".length).split(",").filter(Boolean));
     } else if (a === "-h" || a === "--help") {
       process.stdout.write(
         "Usage: trails-schema-dump [--database-url <url>] [--out <path>] [--ignore t1,t2]\n",
       );
-      process.exit(0);
+      return 0;
     } else {
       process.stderr.write(`trails-schema-dump: unknown argument: ${a}\n`);
-      process.exit(1);
+      return 1;
     }
   }
   return out;
 }
 
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
+export async function run(argv: readonly string[]): Promise<number> {
+  const parsed = parseArgs(argv);
+  if (typeof parsed === "number") return parsed;
+  const args = parsed;
+
   const url = args.databaseUrl ?? process.env.DATABASE_URL;
   if (!url) {
     process.stderr.write(
       "trails-schema-dump: no database URL — pass --database-url or set DATABASE_URL.\n",
     );
-    process.exit(1);
+    return 1;
   }
 
   await Base.establishConnection(url);
@@ -83,10 +93,5 @@ async function main(): Promise<void> {
   } else {
     process.stdout.write(json);
   }
+  return 0;
 }
-
-main().catch((err: unknown) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`trails-schema-dump: ${msg}\n`);
-  process.exit(1);
-});

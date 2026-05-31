@@ -6,7 +6,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "ar": "./bin/ar.js"
+    "ar": "./bin/ar.js",
+    "trails-schema-dump": "./bin/trails-schema-dump.js",
+    "trails-models-dump": "./bin/trails-models-dump.js"
   },
   "exports": {
     ".": {

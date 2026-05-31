@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * Dump the live database schema as a TypeScript module declaring one
  * `@blazetrails/activerecord` model class per table, with belongsTo /
@@ -26,14 +24,15 @@
 
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 
-import { Base } from "../base.js";
 import {
+  Base,
   introspectTables,
   introspectColumns,
   introspectPrimaryKey,
   introspectForeignKeys,
-} from "../schema-introspection.js";
-import { generateModels, type IntrospectedTable } from "../model-codegen.js";
+  generateModels,
+  type IntrospectedTable,
+} from "@blazetrails/activerecord";
 
 interface Args {
   databaseUrl?: string;
@@ -55,7 +54,7 @@ function usage(stream: NodeJS.WriteStream): void {
   );
 }
 
-function parseArgs(argv: readonly string[]): Args {
+function parseArgs(argv: readonly string[]): Args | number {
   const out: {
     databaseUrl?: string;
     outPath?: string;
@@ -68,44 +67,66 @@ function parseArgs(argv: readonly string[]): Args {
   } = { ignore: [], only: [], noHeader: false, format: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
-    const readValue = (flag: string): string => {
+    const readValue = (flag: string): string | number => {
       const next = argv[i + 1];
       if (!next || next.startsWith("-")) {
         process.stderr.write(`trails-models-dump: ${flag} expects a value.\n`);
-        process.exit(1);
+        return 1;
       }
       i++;
       return next;
     };
-    if (a === "--database-url") out.databaseUrl = readValue("--database-url");
-    else if (a.startsWith("--database-url=")) out.databaseUrl = a.slice("--database-url=".length);
-    else if (a === "--out") out.outPath = readValue("--out");
-    else if (a.startsWith("--out=")) out.outPath = a.slice("--out=".length);
-    else if (a === "--ignore") {
-      out.ignore.push(...readValue("--ignore").split(",").filter(Boolean));
+    if (a === "--database-url") {
+      const v = readValue("--database-url");
+      if (typeof v === "number") return v;
+      out.databaseUrl = v;
+    } else if (a.startsWith("--database-url=")) {
+      out.databaseUrl = a.slice("--database-url=".length);
+    } else if (a === "--out") {
+      const v = readValue("--out");
+      if (typeof v === "number") return v;
+      out.outPath = v;
+    } else if (a.startsWith("--out=")) {
+      out.outPath = a.slice("--out=".length);
+    } else if (a === "--ignore") {
+      const v = readValue("--ignore");
+      if (typeof v === "number") return v;
+      out.ignore.push(...v.split(",").filter(Boolean));
     } else if (a.startsWith("--ignore=")) {
       out.ignore.push(...a.slice("--ignore=".length).split(",").filter(Boolean));
     } else if (a === "--only") {
-      out.only.push(...readValue("--only").split(",").filter(Boolean));
+      const v = readValue("--only");
+      if (typeof v === "number") return v;
+      out.only.push(...v.split(",").filter(Boolean));
     } else if (a.startsWith("--only=")) {
       out.only.push(...a.slice("--only=".length).split(",").filter(Boolean));
-    } else if (a === "--strip-prefix") out.stripPrefix = readValue("--strip-prefix");
-    else if (a.startsWith("--strip-prefix=")) out.stripPrefix = a.slice("--strip-prefix=".length);
-    else if (a === "--strip-suffix") out.stripSuffix = readValue("--strip-suffix");
-    else if (a.startsWith("--strip-suffix=")) out.stripSuffix = a.slice("--strip-suffix=".length);
-    else if (a === "--no-header") out.noHeader = true;
-    else if (a === "--format") out.format = true;
-    else if (a === "-h" || a === "--help") {
+    } else if (a === "--strip-prefix") {
+      const v = readValue("--strip-prefix");
+      if (typeof v === "number") return v;
+      out.stripPrefix = v;
+    } else if (a.startsWith("--strip-prefix=")) {
+      out.stripPrefix = a.slice("--strip-prefix=".length);
+    } else if (a === "--strip-suffix") {
+      const v = readValue("--strip-suffix");
+      if (typeof v === "number") return v;
+      out.stripSuffix = v;
+    } else if (a.startsWith("--strip-suffix=")) {
+      out.stripSuffix = a.slice("--strip-suffix=".length);
+    } else if (a === "--no-header") {
+      out.noHeader = true;
+    } else if (a === "--format") {
+      out.format = true;
+    } else if (a === "-h" || a === "--help") {
       usage(process.stdout);
-      process.exit(0);
+      return 0;
     } else {
       process.stderr.write(`trails-models-dump: unknown argument: ${a}\n`);
-      process.exit(1);
+      return 1;
     }
   }
   if (out.ignore.length > 0 && out.only.length > 0) {
     process.stderr.write("trails-models-dump: --only and --ignore are mutually exclusive\n");
-    process.exit(1);
+    return 1;
   }
   return out;
 }
@@ -114,14 +135,17 @@ function parseArgs(argv: readonly string[]): Args {
 // that users shouldn't be modelling.
 const BUILTIN_IGNORE = new Set(["schema_migrations", "ar_internal_metadata"]);
 
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
+export async function run(argv: readonly string[]): Promise<number> {
+  const parsed = parseArgs(argv);
+  if (typeof parsed === "number") return parsed;
+  const args = parsed;
+
   const url = args.databaseUrl ?? process.env.DATABASE_URL;
   if (!url) {
     process.stderr.write(
       "trails-models-dump: no database URL — pass --database-url or set DATABASE_URL.\n",
     );
-    process.exit(1);
+    return 1;
   }
 
   await Base.establishConnection(url);
@@ -138,7 +162,7 @@ async function main(): Promise<void> {
 
   if (tableNames.length === 0) {
     process.stderr.write("trails-models-dump: no tables to generate (check --only/--ignore)\n");
-    process.exit(1);
+    return 1;
   }
 
   // Assemble IntrospectedTable[] — run the four introspection helpers per
@@ -191,6 +215,7 @@ async function main(): Promise<void> {
   } else {
     process.stdout.write(output);
   }
+  return 0;
 }
 
 async function maybePrettierFormat(code: string): Promise<string> {
@@ -208,9 +233,3 @@ async function maybePrettierFormat(code: string): Promise<string> {
     return code;
   }
 }
-
-main().catch((err: unknown) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`trails-models-dump: ${msg}\n`);
-  process.exit(1);
-});

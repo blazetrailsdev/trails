@@ -477,6 +477,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - run: pnpm vitest run packages/activerecord
 
   postgres-tests:
@@ -510,6 +511,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - name: Create parallel test databases
         run: |
           for i in 2 3 4; do
@@ -550,6 +552,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - name: Create parallel test databases
         run: |
           for i in 2 3 4; do

@@ -13,7 +13,7 @@ import Database from "better-sqlite3";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "../../../..");
-const BIN_PATH = join(SCRIPT_DIR, "trails-models-dump.ts");
+const BIN_PATH = join(SCRIPT_DIR, "trails-models-dump-bin.ts");
 const TSX_BIN = resolve(
   REPO_ROOT,
   "node_modules/.bin",
@@ -68,6 +68,9 @@ beforeAll(() => {
     "arel",
     "did-you-mean",
     "globalid",
+    "tse-compiler",
+    "trails-tsc",
+    "activerecord",
   ];
   const anyMissing = depsInOrder.some(
     (p) => !existsSync(join(packagesRoot, p, "dist", "index.js")),

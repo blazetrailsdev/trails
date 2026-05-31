@@ -194,6 +194,14 @@ export type { SchemaSource, ColumnInfo, IndexInfo } from "./schema-dumper.js";
 export { dumpSchemaColumns } from "./schema-columns-dump.js";
 export type { DumpSchemaColumnsOptions } from "./schema-columns-dump.js";
 export {
+  introspectTables,
+  introspectColumns,
+  introspectPrimaryKey,
+  introspectForeignKeys,
+} from "./schema-introspection.js";
+export { generateModels } from "./model-codegen.js";
+export type { IntrospectedTable, GenerateModelsOptions } from "./model-codegen.js";
+export {
   ActiveRecordError,
   SubclassNotFound,
   AdapterNotSpecified,

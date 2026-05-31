@@ -4,6 +4,8 @@ import { generateManifest } from "./generate-manifest.js";
 import { generateMigration, migrationTimestamp, parseFields } from "./generate-migration.js";
 import { generateModel } from "./generate-model.js";
 import { delegateBin } from "./delegate.js";
+import { run as runSchemaDump } from "./bin/trails-schema-dump.js";
+import { run as runModelsDump } from "./bin/trails-models-dump.js";
 import {
   dbCreate,
   dbDrop,
@@ -213,10 +215,10 @@ export async function run(argv: string[], cwd: string): Promise<number> {
     return delegateBin("@blazetrails/activerecord", "trails-tsc", rest);
   }
   if (command === "schema:dump") {
-    return delegateBin("@blazetrails/activerecord", "trails-schema-dump", rest);
+    return runSchemaDump(rest);
   }
   if (command === "models:dump") {
-    return delegateBin("@blazetrails/activerecord", "trails-models-dump", rest);
+    return runModelsDump(rest);
   }
   if (command === "db:create") {
     if (wantsHelp(rest)) {
