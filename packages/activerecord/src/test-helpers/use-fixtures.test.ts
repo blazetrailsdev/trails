@@ -64,19 +64,18 @@ function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>
   } as any;
 }
 
-// Configures encryption with the shared test keys + cleartext fallback so encrypted
-// fixtures seed and read back, returning a restore fn for `afterAll`. The encrypted
-// attribute type needs keys (and supportUnencryptedData, for the cleartext rows) to
-// reload. Dynamically imports the encryption test-helpers so this file doesn't
-// register `Base.encrypts` hooks at module-collection time — the per-entry `addOn`
-// is what loads encryption lazily at run time, and keeping it out of module scope
-// preserves the opt-in property. Mirrors how Rails' encryption test cases set keys
-// via ActiveRecord::EncryptionTestCase, scoped to the suite that needs them.
+// Configures encryption with the shared test keys so encrypted fixtures seed as
+// ciphertext and decrypt on read, returning a restore fn for `afterAll`.
+// Dynamically imports the encryption test-helpers so this file doesn't register
+// `Base.encrypts` hooks at module-collection time — the per-entry `addOn` is what
+// loads encryption lazily at run time, and keeping it out of module scope preserves
+// the opt-in property. Mirrors how Rails' encryption test cases set keys via
+// ActiveRecord::EncryptionTestCase, scoped to the suite that needs them.
 async function setupScopedEncryption(): Promise<() => void> {
   const { configureEncryption, snapshotEncryptionConfig, restoreEncryptionConfig } =
     await import("../encryption/test-helpers.js");
   const snapshot = snapshotEncryptionConfig();
-  configureEncryption({ supportUnencryptedData: true });
+  configureEncryption();
   return () => restoreEncryptionConfig(snapshot);
 }
 
@@ -718,9 +717,9 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
   // EncryptedBook calls `encrypts("name", { deterministic: true })` in a static
   // block, which throws at import unless the encryption add-on registered its
   // hooks first. The registry entry's `addOn` runs before the model thunk and
-  // bootstraps it. The fixture row seeds as cleartext (see the EncryptedFixtures
-  // parity note in fixtures-registry.ts) and `supportUnencryptedData` lets the
-  // encrypted attribute read it back as the expected plaintext.
+  // bootstraps it. defineFixtures encrypts the fixture row at seed time
+  // (mirrors Rails' EncryptedFixtures) so the DB stores ciphertext; the
+  // encrypted attribute type decrypts on read back.
   //
   // `encryptedBooks` and `encryptedBookThatIgnoresCases` both map to the
   // `encrypted_books` table, and each `useFixtures` registers its own beforeEach
@@ -734,6 +733,18 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
     it("reads the encrypted name attribute back as its expected plaintext", () => {
       expect(encryptedBooks("awdr").readAttribute("name")).toBe("Agile Web Development with Rails");
     });
+
+    it("stores ciphertext in the DB column, not cleartext", async () => {
+      const book = encryptedBooks("awdr");
+      // readAttributeBeforeTypeCast returns the raw DB value (before cast/deserialize).
+      const rawDbValue = book.readAttributeBeforeTypeCast?.("name");
+      // Ciphertext is a JSON string (the encryptor's envelope format), not the plaintext.
+      expect(rawDbValue).not.toBe("Agile Web Development with Rails");
+      expect(typeof rawDbValue).toBe("string");
+      // The encrypted attribute type reports it as encrypted.
+      const { EncryptableRecord } = await import("../encryption/encryptable-record.js");
+      expect(EncryptableRecord.isEncryptedAttribute(book, "name")).toBe(true);
+    });
   });
 
   describe("encryptedBookThatIgnoresCases set", () => {
@@ -743,7 +754,22 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
     );
 
     it("reads an ignore-case encrypted fixture back as plaintext", () => {
-      expect(encryptedBookThatIgnoresCases("rfr").readAttribute("name")).toBe("Ruby for Rails");
+      // For ignoreCase attributes, the `name` column stores the lowercased ciphertext;
+      // `original_name` stores the original-cased ciphertext. The prototype getter for
+      // `name` reads `original_name` first (preserving case), mirroring Rails.
+      expect((encryptedBookThatIgnoresCases("rfr") as any).name).toBe("Ruby for Rails");
+    });
+
+    it("stores ciphertext for name and original_name columns", async () => {
+      const book = encryptedBookThatIgnoresCases("rfr");
+      const rawName = book.readAttributeBeforeTypeCast?.("name");
+      expect(rawName).not.toBe("Ruby for Rails");
+      expect(typeof rawName).toBe("string");
+      const rawOriginal = book.readAttributeBeforeTypeCast?.("original_name");
+      expect(rawOriginal).not.toBe("Ruby for Rails");
+      expect(typeof rawOriginal).toBe("string");
+      const { EncryptableRecord } = await import("../encryption/encryptable-record.js");
+      expect(EncryptableRecord.isEncryptedAttribute(book, "name")).toBe(true);
     });
   });
 });

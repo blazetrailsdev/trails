@@ -35,23 +35,11 @@ export interface FixtureModelEntry {
  * module-load side effect — all the `static { encrypts(...) }` blocks in
  * `book-encrypted.ts` need to evaluate without throwing.
  *
- * Deliberately does NOT touch the process-global encryption config (keys /
- * `supportUnencryptedData`): that is per-suite state a fixture loader must not
- * leak into unrelated tests. Reading the seeded rows back as plaintext needs keys
- * plus the cleartext fallback; the suites that load encrypted fixtures configure
- * that themselves with snapshot/restore (mirroring how Rails' encryption test
- * cases set up keys via `ActiveRecord::EncryptionTestCase`).
- *
- * Fidelity note: Rails' encryption test cases prepend
- * `ActiveRecord::Encryption::EncryptedFixtures` onto `ActiveRecord::Fixture`,
- * which encrypts encrypted attributes at load time (`type.serialize(clean)`) so
- * the column stores ciphertext. trails decorates encrypted attribute types
- * lazily (at instance-attribute build, not on `typeForAttribute`), so a
- * fixture-load `serialize()` against the schema-reflected `EncryptedBook` model
- * still returns cleartext — encrypt-at-rest for fixtures needs a separate change
- * to the decoration timing. Until then the rows seed as cleartext and
- * `supportUnencryptedData` lets the encrypted attribute read them back, which is
- * a supported Rails mode. See the EncryptedFixtures parity follow-up.
+ * Deliberately does NOT touch the process-global encryption config (keys):
+ * that is per-suite state a fixture loader must not leak into unrelated tests.
+ * The suites that load encrypted fixtures configure keys themselves with
+ * snapshot/restore (mirroring how Rails' encryption test cases set up keys via
+ * `ActiveRecord::EncryptionTestCase`).
  *
  * @internal
  */

@@ -8,6 +8,10 @@ import { findStiClass } from "../inheritance.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
 import { currentTimeFromProperTimezone } from "../timestamp.js";
 import { singularize } from "@blazetrails/activesupport";
+import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.js";
+import { EncryptableRecord } from "../encryption/encryptable-record.js";
+import { Configurable } from "../encryption/configurable.js";
+import type { Type } from "@blazetrails/activemodel";
 
 const FIXTURE_MAX_ID = 2 ** 30 - 1;
 
@@ -288,6 +292,69 @@ type InsertHost = DatabaseStatementsHost &
   Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">;
 
 /**
+ * Mirrors Rails' EncryptedFixtures#encrypt_fixture_data +
+ * process_preserved_original_columns. For each encrypted attribute in each
+ * row, serializes the cleartext value to ciphertext in-place so the DB stores
+ * encrypted data. For original_* preserve-columns (added by ignoreCase),
+ * encrypts the source attribute's clean value into the original_* column.
+ *
+ * Uses _pendingEncryptions to obtain the scheme directly — the schema may not
+ * have been reflected yet at fixture-load time (loadSchemaFromAdapter is async),
+ * so typeForAttribute returns a plain ValueType. The pending-encryption scheme
+ * is the same one applyPendingEncryptions will use later, so the ciphertext
+ * produced here is compatible with what the reloaded record will decrypt.
+ */
+function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
+  const encryptedAttrs = EncryptableRecord.encryptedAttributes(ModelClass);
+  // Build a name→EncryptedAttributeType map from _pendingEncryptions. This lets
+  // us serialize even before loadSchemaFromAdapter has run (schema-reflected types
+  // won't be in _attributeDefinitions yet, but the scheme is already recorded).
+  // When an existing _attributeDefinitions entry is present (e.g. attribute(:name, :date)
+  // was called before encrypts(:name)), its castType is preserved so the fixture value
+  // is serialized through the correct inner type before encryption — mirrors Rails'
+  // `model_class.type_for_attribute(attribute_name)` which returns the full decorated type.
+  const typeMap = new Map<string, EncryptedAttributeType>();
+  const pending: Array<{ name: string; scheme: unknown }> =
+    (ModelClass as any)._pendingEncryptions ?? [];
+  const defs: Map<string, { type: unknown }> | undefined = (ModelClass as any)
+    ._attributeDefinitions;
+  for (const { name, scheme } of pending) {
+    const existingType = defs?.get(name)?.type;
+    const castType =
+      existingType instanceof EncryptedAttributeType
+        ? existingType.castType
+        : existingType !== undefined
+          ? (existingType as Type)
+          : undefined;
+    typeMap.set(name, new EncryptedAttributeType({ scheme: scheme as any, castType }));
+  }
+
+  for (const row of rows) {
+    // Phase 1: encrypt_fixture_data — encrypt each declared encrypted attribute.
+    const cleanValues: Record<string, unknown> = {};
+    for (const attrName of encryptedAttrs) {
+      if (!(attrName in row)) continue;
+      const cleanValue = row[attrName];
+      cleanValues[attrName] = cleanValue;
+      const type = typeMap.get(attrName);
+      if (!type) continue;
+      row[attrName] = type.serialize(cleanValue);
+    }
+    // Phase 2: process_preserved_original_columns — for original_* preserve-columns,
+    // encrypt the source attribute's clean value.
+    for (const attrName of encryptedAttrs) {
+      const sourceAttrName = EncryptableRecord.sourceAttributeFromPreservedAttribute(attrName);
+      if (sourceAttrName === undefined) continue;
+      const cleanValue = cleanValues[sourceAttrName];
+      if (cleanValue === undefined) continue;
+      const type = typeMap.get(attrName);
+      if (!type) continue;
+      row[attrName] = type.serialize(cleanValue);
+    }
+  }
+}
+
+/**
  * Inserts fixture rows for a model and returns persisted instances keyed by label.
  *
  * IDs are deterministic: same label → same ID across test runs, enabling cross-batch
@@ -556,6 +623,14 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
         }
       }
     }
+  }
+
+  // Mirrors Rails' EncryptedFixtures (gated on Encryption.config.encryptFixtures):
+  // serialize each encrypted column value to ciphertext before insert so the DB stores
+  // encrypted data (not cleartext), and populate original_* preserve-columns for ignoreCase.
+  // Mirrors: ActiveRecord::Railtie `Fixture.prepend EncryptedFixtures if config.encrypt_fixtures`
+  if (Configurable.config.encryptFixtures && EncryptableRecord.hasEncryptedAttributes(ModelClass)) {
+    encryptFixtureRows(ModelClass, rows);
   }
 
   // Mirrors Rails: pass tableName as tablesToDelete so rows are replaced, not appended.

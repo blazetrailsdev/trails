@@ -137,8 +137,9 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "encryption/encrypted_fixtures.rb",
-    testFile: "encryption/encrypted_fixtures_test.rb",
-    reason: "Encrypts YAML fixture rows on load. Excluded transitively with fixtures.rb.",
+    reason:
+      "Encrypts YAML fixture rows on load. Behavior ported inline into defineFixtures() " +
+      "(define-fixtures.ts) rather than as a separate module. Tests live in encrypted-fixtures.test.ts.",
   },
   {
     pattern: "destroy_association_async_job.rb", // no test counterpart

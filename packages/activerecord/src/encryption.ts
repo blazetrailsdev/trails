@@ -262,10 +262,14 @@ export function applyPendingEncryptions(klass: any): void {
     if (def.type instanceof EncryptedAttributeType) continue;
     // Route through decorateAttributes so the encryption PendingDecorator
     // lands in the pending queue in declaration order (after any PendingType),
-    // ensuring _defaultAttributes replays correctly.
-    klass.decorateAttributes(
-      [name],
-      (_attrName: string, castType: Type) => new EncryptedAttributeType({ scheme, castType }),
+    // ensuring _defaultAttributes replays correctly. The decorator returns
+    // null when the type is already an EncryptedAttributeType — the PendingDecorator
+    // replays on every _defaultAttributes rebuild, so it must be idempotent to
+    // avoid double-wrapping when schema reflection pre-populated the type.
+    klass.decorateAttributes([name], (_attrName: string, castType: Type) =>
+      castType instanceof EncryptedAttributeType
+        ? (null as unknown as Type)
+        : new EncryptedAttributeType({ scheme, castType }),
     );
   }
 

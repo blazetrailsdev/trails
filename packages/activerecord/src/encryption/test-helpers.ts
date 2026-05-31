@@ -79,6 +79,7 @@ interface ConfigSnapshot {
   deterministicKey: string | undefined;
   keyDerivationSalt: string | undefined;
   supportUnencryptedData: boolean;
+  encryptFixtures: boolean;
   previousSchemes: typeof Configurable.config.previousSchemes;
   forcedEncodingForDeterministicEncryption: string;
   supportSha1ForNonDeterministicEncryption: boolean;
@@ -91,6 +92,7 @@ export function snapshotEncryptionConfig(): ConfigSnapshot {
     deterministicKey: c.deterministicKey,
     keyDerivationSalt: c.keyDerivationSalt,
     supportUnencryptedData: c.supportUnencryptedData,
+    encryptFixtures: c.encryptFixtures,
     previousSchemes: [...c.previousSchemes],
     forcedEncodingForDeterministicEncryption: c.forcedEncodingForDeterministicEncryption,
     supportSha1ForNonDeterministicEncryption: c.supportSha1ForNonDeterministicEncryption,
@@ -103,6 +105,7 @@ export function restoreEncryptionConfig(snapshot: ConfigSnapshot): void {
   c.deterministicKey = snapshot.deterministicKey;
   c.keyDerivationSalt = snapshot.keyDerivationSalt;
   c.supportUnencryptedData = snapshot.supportUnencryptedData;
+  c.encryptFixtures = snapshot.encryptFixtures;
   c.previousSchemes = snapshot.previousSchemes;
   c.forcedEncodingForDeterministicEncryption = snapshot.forcedEncodingForDeterministicEncryption;
   c.supportSha1ForNonDeterministicEncryption = snapshot.supportSha1ForNonDeterministicEncryption;
@@ -119,6 +122,7 @@ export function configureEncryption(
     deterministicKey: string;
     keyDerivationSalt: string;
     supportUnencryptedData: boolean;
+    encryptFixtures: boolean;
   }> = {},
 ): void {
   Configurable.configure({
@@ -129,6 +133,9 @@ export function configureEncryption(
   if (overrides.supportUnencryptedData !== undefined) {
     Configurable.config.supportUnencryptedData = overrides.supportUnencryptedData;
   }
+  // Mirrors Rails' encryption test helper which unconditionally prepends EncryptedFixtures:
+  // `class ActiveRecord::Fixture; prepend ActiveRecord::Encryption::EncryptedFixtures; end`
+  Configurable.config.encryptFixtures = overrides.encryptFixtures ?? true;
 }
 
 export const AUTHOR_NAME_LIMIT = 100;
