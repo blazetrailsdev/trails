@@ -210,6 +210,8 @@ export class DatabaseTasks {
         await this.create(config);
       }
     }
+    const { Base } = await import("../base.js");
+    await Base.establishConnection(this._normalizeEnv(environment));
   }
 
   static async drop(config: DatabaseConfig): Promise<void> {
