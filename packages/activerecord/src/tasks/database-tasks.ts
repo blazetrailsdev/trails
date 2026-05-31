@@ -257,19 +257,48 @@ export class DatabaseTasks {
 
     const config = configs.find((c) => c.name === "primary") ?? configs[0];
     const { Migrator } = await import("../migration.js");
-    const adapter = await this._resolveAdapter(config);
-    if (!adapter) {
-      throw new Error("No database adapter configured. Call DatabaseTasks.setAdapter() first.");
+
+    const runMigration = async (adapter: import("../adapter.js").DatabaseAdapter) => {
+      const migrator = new Migrator(adapter, this._migrations);
+      await migrator.migrate(effectiveVersion ?? null);
+      // Rails: `migration_connection_pool.schema_cache.clear!` — drop the
+      // reflected schema so post-migration introspection re-reads the
+      // freshly-migrated tables. Optional-chained so an adapter without a
+      // schema cache is a no-op rather than a crash.
+      adapter.schemaCache?.clear();
+    };
+
+    // Shim path (legacy): use the explicitly set adapter directly.
+    if (this._adapterInstance) {
+      await runMigration(this._adapterInstance);
+      return;
     }
 
-    const migrator = new Migrator(adapter, this._migrations);
-    await migrator.migrate(effectiveVersion ?? null);
-
-    // Rails: `migration_connection_pool.schema_cache.clear!` — drop the
-    // reflected schema so post-migration introspection re-reads the
-    // freshly-migrated tables. Optional-chained so an adapter without a
-    // schema cache is a no-op rather than a crash.
-    adapter.schemaCache?.clear();
+    // Pool path: check whether the Base pool is connected to this config's database.
+    // When pool and config point to different known databases (multi-db scenario),
+    // route through withTemporaryConnection so the owned adapter is properly closed.
+    // "database unknown on either side" means a URL-only config or no database
+    // restriction — treat as matching so the established pool is reused.
+    const { Base } = await import("../base.js");
+    let pool: ConnectionPool | undefined;
+    try {
+      pool = Base.connectionPool();
+    } catch (error) {
+      const { ConnectionNotDefined } = await import("../errors.js");
+      if (!(error instanceof ConnectionNotDefined)) throw error;
+      // No pool — fall through to withTemporaryConnection via _connectFor.
+    }
+    // Use the pool when: pool is present AND databases are equal, or either side
+    // is unknown (URL-only config / pool established without an explicit database).
+    if (
+      pool &&
+      (!pool.dbConfig.database || !config.database || config.database === pool.dbConfig.database)
+    ) {
+      await runMigration(pool.leaseConnection());
+    } else {
+      // Multi-db or no pool: withTemporaryConnection scopes the adapter lifecycle.
+      await this.withTemporaryConnection(config, runMigration);
+    }
   }
 
   private static _adapterInstance: import("../adapter.js").DatabaseAdapter | null = null;
