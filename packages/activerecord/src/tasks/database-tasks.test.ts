@@ -2099,3 +2099,19 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
     },
   );
 });
+
+describe("migrationConnection registration", () => {
+  it("returns a connection after module init without requiring an async DatabaseTasks method first", () => {
+    // Base is imported (module init ran) so _registerBase has already been called.
+    // Verify migrationConnection() resolves without a preceding async call.
+    vi.spyOn(Base, "connectionPool").mockReturnValue({
+      leaseConnection: () => ({}) as never,
+    } as never);
+    try {
+      const conn = DatabaseTasks.migrationConnection();
+      expect(conn).not.toBeNull();
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+});
