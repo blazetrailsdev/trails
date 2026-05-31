@@ -3317,11 +3317,19 @@ export class Migrator {
     // MigrationContext#last_stored_environment short-circuits on
     // `internal_metadata.enabled?` before the table_exists? read.
     if (!this._internalMetadata.enabled) return null;
-    // Read-only: if ar_internal_metadata doesn't exist yet, the database
-    // has never been stamped with an environment — return null without
-    // creating the table.
-    if (!(await this._internalMetadata.tableExists())) return null;
-    return this._internalMetadata.get("environment");
+    const noEnvMsg =
+      "Environment data not found in the schema. To resolve this issue, run: bin/rails db:environment:set";
+    if (!(await this._internalMetadata.tableExists())) {
+      // Rails: return nil when current_version == 0 (no migrations applied yet).
+      // When migrations are present but the metadata table is absent, raise.
+      if ((await this.currentVersionReadOnly()) === 0) return null;
+      throw new NoEnvironmentInSchemaError(noEnvMsg);
+    }
+    const environment = await this._internalMetadata.get("environment");
+    if (!environment) {
+      throw new NoEnvironmentInSchemaError(noEnvMsg);
+    }
+    return environment;
   }
 
   async currentMigration(): Promise<MigrationProxy | null> {

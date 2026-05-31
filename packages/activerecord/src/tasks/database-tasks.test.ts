@@ -1,4 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  afterAll,
+  vi,
+  type MockInstance,
+} from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -18,6 +28,7 @@ import { quoteTableName as abstractQuoteTableName } from "../connection-adapters
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { NoDatabaseError } from "../errors.js";
+import { NoEnvironmentInSchemaError } from "../migration.js";
 import { Base } from "../base.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
@@ -33,11 +44,35 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
     // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:98
   });
 
-  it.skip("raises an error if no migrations have been made", () => {
-    // P3 skip: requires NoEnvironmentInSchemaError path in checkProtectedEnvironmentsBang —
-    // needs InternalMetadata table-absent detection + error throw when schema_migrations
-    // has rows but internal_metadata is absent. ~30 LOC in database-tasks.ts + Migrator.
-    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:122
+  it("raises an error if no migrations have been made", async () => {
+    // Rails: test_raises_an_error_if_no_migrations_have_been_made
+    // schema_migrations has a row but ar_internal_metadata is absent → NoEnvironmentInSchemaError.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-no-env-"));
+    const dbFile = path.join(tmp, "test.sqlite3");
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      arunit: { adapter: "sqlite3", database: dbFile },
+    });
+    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    const { SQLite3Adapter } = await import("../connection-adapters/sqlite3-adapter.js");
+    const adapter = new SQLite3Adapter(dbFile);
+    try {
+      await adapter.executeMutation(
+        "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
+      );
+      await adapter.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
+      await adapter.executeMutation("DROP TABLE IF EXISTS ar_internal_metadata");
+    } finally {
+      await adapter.close();
+    }
+    try {
+      await expect(DatabaseTasks.checkProtectedEnvironmentsBang("arunit")).rejects.toThrow(
+        NoEnvironmentInSchemaError,
+      );
+    } finally {
+      DatabaseTasks.databaseConfiguration = null;
+      DatabaseTasks.clearRegisteredTasks();
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
 
@@ -307,8 +342,11 @@ describe("DatabaseTasksCreateAllTest", () => {
 
 describe("DatabaseTasksCreateCurrentTest", () => {
   let created: string[];
+
+  let establishSpy: MockInstance<any>;
   beforeEach(() => {
     created = [];
+    establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
     DatabaseTasks.registerTask("sqlite", {
       create: async (config) => {
         created.push(`${config.envName}:${config.database}`);
@@ -324,6 +362,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
     DatabaseTasks.env = "development";
+    vi.restoreAllMocks();
   });
 
   it("creates current environment database", async () => {
@@ -364,18 +403,24 @@ describe("DatabaseTasksCreateCurrentTest", () => {
       else process.env.SKIP_TEST_DATABASE = prev;
     }
   });
-  it.skip("establishes connection for the given environments", () => {
-    // P3 skip: createCurrent does not call Base.establishConnection(env) after creating.
-    // Rails calls establish_connection(:development) at the end of create_current so the
-    // caller's pool is re-pointed. ~20 LOC addition to createCurrent in database-tasks.ts.
-    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:586
+  it("establishes connection for the given environments", async () => {
+    await DatabaseTasks.createCurrent("development");
+    expect(establishSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        adapter: "sqlite3",
+        database: path.resolve(DatabaseTasks.root, "dev.db"),
+      }),
+    );
   });
 });
 
 describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   let created: string[];
+
+  let establishSpy: MockInstance<any>;
   beforeEach(() => {
     created = [];
+    establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
     DatabaseTasks.registerTask("sqlite", {
       create: async (config) => {
         created.push(`${config.envName}:${config.name}:${config.database}`);
@@ -399,6 +444,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
     DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
     DatabaseTasks.env = "development";
+    vi.restoreAllMocks();
   });
 
   it("creates current environment database", async () => {
@@ -428,10 +474,14 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
     expect(created.some((c) => c.includes("test"))).toBe(true);
   });
 
-  it.skip("establishes connection for the given environments config", () => {
-    // P3 skip: same gap as two-tier "establishes connection for the given environments" —
-    // createCurrent doesn't call Base.establishConnection(env) post-create in three-tier setup.
-    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:703
+  it("establishes connection for the given environments config", async () => {
+    await DatabaseTasks.createCurrent("development");
+    expect(establishSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        adapter: "sqlite3",
+        database: path.resolve(DatabaseTasks.root, "dev_primary.db"),
+      }),
+    );
   });
 });
 

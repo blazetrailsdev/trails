@@ -210,6 +210,19 @@ export class DatabaseTasks {
         await this.create(config);
       }
     }
+    // Rails: establish_connection(environment.to_sym) calls configurations.resolve(:env)
+    // → find_db_config(env) which returns forCurrentEnv configs first, then falls back
+    // to the first config for that env_name. findDbConfig mirrors that exact lookup.
+    const envName = this._normalizeEnv(environment);
+    const primaryConfig = this.databaseConfiguration?.findDbConfig(envName);
+    if (primaryConfig) {
+      const { Base } = await import("../base.js");
+      const configuration = _normalizeSQLitePath(
+        primaryConfig.configuration as Record<string, unknown>,
+        this.root,
+      );
+      await Base.establishConnection(configuration);
+    }
   }
 
   static async drop(config: DatabaseConfig): Promise<void> {

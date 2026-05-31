@@ -145,28 +145,26 @@ Files: `tasks/database-tasks.ts`, `tasks/database-tasks.test.ts`.
 
 These 9 skips remain after P2-8 audit. Each has a clear scope.
 
-### P3-1 — `checkProtectedEnvironmentsBang` NoEnvironmentInSchemaError path
+### ~~P3-1 — `checkProtectedEnvironmentsBang` NoEnvironmentInSchemaError path~~ ✅ shipped
 
 **Source:** "raises an error if no migrations have been made" test.
 
 When `schema_migrations` has rows but `ar_internal_metadata` table is absent,
-Rails raises `NoEnvironmentInSchemaError`. Our `checkProtectedEnvironmentsBang`
-reads `migrator.lastStoredEnvironment()` which returns null when the table
-doesn't exist — no error thrown. Requires:
+Rails raises `NoEnvironmentInSchemaError`. Fixed in `Migrator.lastStoredEnvironment()`
+to check `currentVersionReadOnly() > 0` before returning null when the metadata table
+is absent. 1 test unskipped.
 
-1. `Migrator.lastStoredEnvironment()` (or a new helper) to detect the "migrations
-   present but no env stamped" state.
-2. `checkProtectedEnvironmentsBang` to throw `NoEnvironmentInSchemaError` in that case.
+Rails: `test/cases/tasks/database_tasks_test.rb:122`.
 
-~30 LOC. Rails: `test/cases/tasks/database_tasks_test.rb:122`.
-
-### P3-2 — `createCurrent` re-establishes connection post-create
+### ~~P3-2 — `createCurrent` re-establishes connection post-create~~ ✅ shipped
 
 **Source:** "establishes connection for the given environments" (two-tier + three-tier).
 
 Rails `create_current` calls `ActiveRecord::Base.establish_connection(env)` after
-creating so the caller's pool is re-pointed to the env's primary. Our `createCurrent`
-doesn't do this. ~20 LOC addition to `createCurrent`.
+creating so the caller's pool is re-pointed to the env's first config. Added post-create
+`Base.establishConnection(config.configuration)` call to `createCurrent`, where the
+config is resolved via `databaseConfiguration.findDbConfig(envName)` (mirrors Rails'
+`configurations.find_db_config`) with SQLite path normalization applied. 2 tests unskipped.
 
 Rails: `test/cases/tasks/database_tasks_test.rb:586, 703`.
 
