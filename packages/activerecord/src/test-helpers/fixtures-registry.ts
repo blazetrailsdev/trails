@@ -122,7 +122,10 @@ export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTable
  *   `developers` is registerable. The other three HABTM join sets (`categories-posts`,
  *   `parrots-pirates`, `peoples-treasures`) ref only loadable model sets and ARE registered.
  *
- * Subdirectory fixture-set gaps (4 admin sets ported in Phase 3; remaining phases below):
+ * Subdirectory fixture-set gaps (3 of 4 admin sets registered in Phase 3; remaining phases below):
+ * - `admin/users` — `AdminUser.store("params", { coder: "YAML" })` passes a string
+ *   where store() requires an object with `dump()`/`load()`; re-add once the YAML
+ *   store coder is implemented.
  * - Phase 2 (`reserved_words/`) — needs model-less loader extension; inline Rails test
  *   classes have no shared model files.
  * - Phase 4 (`categories/` + `to_be_linked/`), Phase 5 (`primary_key_error/`),
@@ -146,10 +149,6 @@ export const fixtureRegistry = {
         (m) => m.AdminClassNameThatDoesNotFollowCONVENTIONS2,
       ),
     data: FixtureData.adminRandomlyNamedB0FixtureData,
-  },
-  "admin/users": {
-    model: () => import("./models/admin/user.js").then((m) => m.AdminUser),
-    data: FixtureData.adminUsersFixtureData,
   },
   accounts: {
     model: () => import("./models/account.js").then((m) => m.Account),
