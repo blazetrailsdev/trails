@@ -64,14 +64,20 @@ export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTable
 }
 
 /**
- * Maps a Rails-style fixture-set name (camelCased file basename) to its canonical
- * model class and the matching `<name>FixtureData` export. Lets tests load fixtures
- * by name — `useFixtures(["authors", "posts"])` — mirroring Rails' `fixtures :authors`.
+ * Maps a Rails-style fixture-set name to its canonical model class and the matching
+ * `<name>FixtureData` export. Lets tests load fixtures by name —
+ * `useFixtures(["authors", "posts"])` — mirroring Rails' `fixtures :authors`.
  *
- * Hand-maintained: add an entry when a fixture file gains a canonical model. Keys are
- * camelCase (no snake_case) so they are valid accessor identifiers; the underlying DB
- * table name comes from `model.tableName`, independent of the key here. The `model`
- * thunk dynamic-imports the class so import-time side effects stay lazy.
+ * **Key convention:** top-level fixture files use camelCase (e.g. `"authorAddresses"`
+ * for `author_addresses.yml`). Subdirectory fixture files use a slash-separated path
+ * whose segments are camelCased where the original YAML basename is snake_case
+ * (e.g. `"admin/accounts"` for `admin/accounts.yml`,
+ * `"reservedWords/distinct"` for `reserved_words/distinct.yml`).
+ * Accessing a slash-keyed result requires bracket notation: `result["admin/accounts"]("david")`.
+ *
+ * Hand-maintained: add an entry when a fixture file gains a canonical model. The
+ * underlying DB table name comes from `model.tableName`, independent of the key here.
+ * The `model` thunk dynamic-imports the class so import-time side effects stay lazy.
  *
  * Known gaps — fixture data WITHOUT a registered model (intentionally omitted):
  * - `bad-posts` — no canonical model (arunit2 alt-connection fixture)

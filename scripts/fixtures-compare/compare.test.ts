@@ -279,9 +279,43 @@ describe("canonicalizeRailsRow", () => {
   });
 });
 
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { collectYamlPaths } from "./compare.js";
+
+describe("collectYamlPaths", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "fixtures-collect-"));
+  afterAll(() => rmSync(tmp, { recursive: true, force: true }));
+
+  it("finds top-level YAMLs and recurses into subdirectories", () => {
+    writeFileSync(join(tmp, "accounts.yml"), "");
+    mkdirSync(join(tmp, "admin"));
+    writeFileSync(join(tmp, "admin", "users.yml"), "");
+    mkdirSync(join(tmp, "admin", "nested"));
+    writeFileSync(join(tmp, "admin", "nested", "deep.yml"), "");
+    const paths = collectYamlPaths(tmp);
+    expect(paths).toEqual(["accounts.yml", "admin/nested/deep.yml", "admin/users.yml"]);
+  });
+
+  it("passes the basename (not the full path) as the label-root for list-form auto-labels", () => {
+    // Rails' auto_named_fixtures uses the last path component as the label prefix.
+    // The compare script passes just "accounts" (the basename), so list-form rows
+    // are labelled "accounts_0" — not "admin_accounts_0" or "admin/accounts_0".
+    const dir = mkdtempSync(join(tmpdir(), "fixtures-basename-"));
+    try {
+      mkdirSync(join(dir, "admin"));
+      writeFileSync(join(dir, "admin", "accounts.yml"), "- id: 1\n  name: Foo\n");
+      const p = join(dir, "admin", "accounts.yml");
+      const r = loadRailsYamlForTest(p, "accounts"); // basename, not "admin/accounts"
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(Object.keys(r.data)).toEqual(["accounts_0"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("loadRailsYaml (parsing fidelity)", () => {
   const tmp = mkdtempSync(join(tmpdir(), "fixtures-compare-"));
   const write = (basename: string, contents: string): string => {
