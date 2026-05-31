@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import type { DatabaseAdapter } from "../../adapter.js";
 import { defineFixtures, fixtureId, isFixtureRef, type FixtureRef } from "../define-fixtures.js";
+import { adminAccountsFixtureData } from "./admin/accounts.js";
+import { adminUsersFixtureData } from "./admin/users.js";
+import { adminRandomlyNamedA9FixtureData } from "./admin/randomly-named-a9.js";
+import { adminRandomlyNamedB0FixtureData } from "./admin/randomly-named-b0.js";
 import { topicFixtureData } from "./topics.js";
 import { postFixtureData } from "./posts.js";
 import { commentFixtureData } from "./comments.js";
@@ -467,5 +471,66 @@ describe("authorAddressFixtureData", () => {
   it("address fixtures are PK-only rows mirroring Rails ids", () => {
     expect(authorAddressFixtureData.david_address).toEqual({ id: 1 });
     expect(authorAddressFixtureData.mary_address).toEqual({ id: 3 });
+  });
+});
+
+describe("admin/accounts (slash-keyed subdir fixture)", () => {
+  it("exports signals37 with correct name", () => {
+    expect(Object.keys(adminAccountsFixtureData)).toEqual(["signals37"]);
+    expect(adminAccountsFixtureData.signals37.name).toBe("37signals");
+  });
+});
+
+describe("admin/users (slash-keyed subdir fixture)", () => {
+  it("exports david and jamis", () => {
+    expect(Object.keys(adminUsersFixtureData)).toEqual(["david", "jamis"]);
+  });
+
+  it("david has correct name and account_id ref to admin_accounts", () => {
+    expect(adminUsersFixtureData.david.name).toBe("David");
+    const acctRef = adminUsersFixtureData.david.account_id as FixtureRef;
+    expect(isFixtureRef(acctRef)).toBe(true);
+    expect(acctRef.tableName).toBe("admin_accounts");
+    expect(acctRef.fixtureName).toBe("signals37");
+  });
+
+  it("jamis has settings with symbol key and account_id ref", () => {
+    expect(adminUsersFixtureData.jamis.name).toBe("Jamis");
+    const acctRef = adminUsersFixtureData.jamis.account_id as FixtureRef;
+    expect(isFixtureRef(acctRef)).toBe(true);
+    expect(acctRef.fixtureName).toBe("signals37");
+    expect((adminUsersFixtureData.jamis.settings as Record<string, string>)[":symbol"]).toBe(
+      "symbol",
+    );
+  });
+});
+
+describe("admin/randomlyNamedA9 (slash-keyed subdir fixture)", () => {
+  it("exports first_instance and second_instance", () => {
+    expect(Object.keys(adminRandomlyNamedA9FixtureData)).toEqual([
+      "first_instance",
+      "second_instance",
+    ]);
+  });
+
+  it("rows have correct attribute values", () => {
+    expect(adminRandomlyNamedA9FixtureData.first_instance.some_attribute).toBe("AAA");
+    expect(adminRandomlyNamedA9FixtureData.first_instance.another_attribute).toBe(0);
+    expect(adminRandomlyNamedA9FixtureData.second_instance.some_attribute).toBe("BBB");
+    expect(adminRandomlyNamedA9FixtureData.second_instance.another_attribute).toBe(999);
+  });
+});
+
+describe("admin/randomlyNamedB0 (slash-keyed subdir fixture)", () => {
+  it("exports first_instance and second_instance", () => {
+    expect(Object.keys(adminRandomlyNamedB0FixtureData)).toEqual([
+      "first_instance",
+      "second_instance",
+    ]);
+  });
+
+  it("rows have correct attribute values mirroring B0 table (randomly_named_table3)", () => {
+    expect(adminRandomlyNamedB0FixtureData.first_instance.some_attribute).toBe("AAA");
+    expect(adminRandomlyNamedB0FixtureData.second_instance.another_attribute).toBe(999);
   });
 });

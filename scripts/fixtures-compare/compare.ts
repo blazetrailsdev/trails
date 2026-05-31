@@ -107,10 +107,10 @@ interface FileResult { yamlPath: string; tsBase: string | null; status: Status; 
 export const ERB_SKIP_SENTINEL = "__ERB_SKIP__";
 
 // Baseline locked at PR #2715 (93% milestone) + updated for recursive subdir scan
-// (Phase 1 of the subdir-fixtures plan). The 24 subdir YAMLs have no TS counterparts
-// yet; Phases 2-5 will progressively close them. Bump match when new fixtures are ported;
-// bump diff only for intentional accepted drifts.
-const CI_BASELINE = { match: 113, diff: 6, missing: 24 } as const;
+// (Phase 1 of the subdir-fixtures plan) + 4 admin fixtures ported in Phase 3.
+// Phases 2, 4-6 will close the remaining 20 subdir YAMLs. Bump match when new
+// fixtures are ported; bump diff only for intentional accepted drifts.
+const CI_BASELINE = { match: 117, diff: 6, missing: 20 } as const;
 
 function parseArgs(argv: string[]): {
   pkg: string;
@@ -376,6 +376,20 @@ function resolveEnumSymbol(table: string, attr: string, symbol: string): number 
   return map && Object.hasOwn(map, symbol) ? map[symbol] : undefined;
 }
 
+/** JSON.stringify with keys sorted at every nesting level — order-insensitive deep equality. */
+function stableStringify(v: unknown): string {
+  return JSON.stringify(v, (_key, val: unknown) => {
+    if (val !== null && typeof val === "object" && !Array.isArray(val)) {
+      return Object.fromEntries(
+        Object.entries(val as Record<string, unknown>).sort(([a], [b]) =>
+          a < b ? -1 : a > b ? 1 : 0,
+        ),
+      );
+    }
+    return val;
+  });
+}
+
 // prettier-ignore
 export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, idIndex: Map<string, Map<number, string[]>>, notes: string[], table: string = "", attrsSkipped?: { n: number }): boolean {
   if (isRefLike(tsVal)) {
@@ -406,6 +420,15 @@ export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, id
   if (Array.isArray(tsVal) && Array.isArray(railsVal)
     && tsVal.length === railsVal.length && tsVal.every((v, i) => v === railsVal[i]))
     return true;
+  // Plain-object columns (store/serialize hash values): Rails YAML carries a
+  // nested hash; compare via a key-sorted JSON round-trip so symbol-keyed
+  // hashes (e.g. `{":symbol": "symbol"}`) that are structurally identical
+  // don't DIFF regardless of property insertion order.
+  if (
+    tsVal !== null && typeof tsVal === "object" && !Array.isArray(tsVal) &&
+    railsVal !== null && typeof railsVal === "object" && !Array.isArray(railsVal) &&
+    stableStringify(tsVal) === stableStringify(railsVal)
+  ) return true;
   // Datetime tolerance: round to second-precision since Rails fixtures often
   // carry sub-second fractions the TS side trims when materializing values.
   const tsT = normalizeDatetime(tsVal);
