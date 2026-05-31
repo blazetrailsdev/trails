@@ -280,11 +280,9 @@ export class DatabaseTasks {
     // "database unknown on either side" means a URL-only config or no database
     // restriction — treat as matching so the established pool is reused.
     const { Base } = await import("../base.js");
-    let poolDb: string | undefined;
-    let poolPresent = false;
+    let pool;
     try {
-      poolDb = Base.connectionPool().dbConfig.database;
-      poolPresent = true;
+      pool = Base.connectionPool();
     } catch (error) {
       const { ConnectionNotDefined } = await import("../errors.js");
       if (!(error instanceof ConnectionNotDefined)) throw error;
@@ -292,13 +290,11 @@ export class DatabaseTasks {
     }
     // Use the pool when: pool is present AND databases are equal, or either side
     // is unknown (URL-only config / pool established without an explicit database).
-    if (poolPresent && (!poolDb || !config.database || config.database === poolDb)) {
-      const adapter = await this._migrationAdapter();
-      if (!adapter)
-        throw new Error(
-          "No database adapter configured. Call Base.establishConnection() or DatabaseTasks.setAdapter() first.",
-        );
-      await runMigration(adapter);
+    if (
+      pool &&
+      (!pool.dbConfig.database || !config.database || config.database === pool.dbConfig.database)
+    ) {
+      await runMigration(pool.leaseConnection());
     } else {
       // Multi-db or no pool: withTemporaryConnection scopes the adapter lifecycle.
       await this.withTemporaryConnection(config, runMigration);
