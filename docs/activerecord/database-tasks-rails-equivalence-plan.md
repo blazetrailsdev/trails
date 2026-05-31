@@ -10,7 +10,7 @@ Historical Phase 1 sequence: see `git log --oneline | grep db-tasks` or
 
 ## Phase 2 stories
 
-### P2-1 — `migrate` missing `initialize_database` call (~30 LOC)
+### P2-1 — `migrate` missing `initialize_database` call (~30 LOC) ✅ shipped
 
 **Source:** PR #2706 post-merge findings.
 
@@ -25,7 +25,7 @@ Files: `tasks/database-tasks.ts`.
 
 ---
 
-### P2-2 — `createAll` missing re-establish_connection (~10 LOC)
+### P2-2 — `createAll` missing re-establish_connection (~10 LOC) ✅ shipped
 
 **Source:** PR #2706 post-merge findings.
 
@@ -39,7 +39,7 @@ Files: `tasks/database-tasks.ts`.
 
 ---
 
-### P2-3 — `dbConfigsWithVersions` / `prepareAll` / `migrateAll` behavioral fidelity (~60 LOC)
+### P2-3 — `dbConfigsWithVersions` / `prepareAll` / `migrateAll` behavioral fidelity (~60 LOC) ✅ shipped
 
 **Source:** PR #2706 post-merge findings; verified against Rails source.
 

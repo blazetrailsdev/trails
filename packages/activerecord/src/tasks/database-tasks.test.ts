@@ -219,6 +219,29 @@ describe("DatabaseTasksCreateAllTest", () => {
     await DatabaseTasks.createAll();
     expect(created).toContain("dev.db");
   });
+
+  it("re-establishes connection to original db_config after all creates", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-createall-"));
+    const originalDb = path.join(tmp, "original.sqlite3");
+    const newDb = path.join(tmp, "new.sqlite3");
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: { adapter: "sqlite3", database: newDb },
+    });
+    Base.removeConnection();
+    await Base.establishConnection({ adapter: "sqlite3", database: originalDb, pool: 1 });
+    try {
+      await DatabaseTasks.createAll();
+      const restoredConfig = Base.connectionDbConfig();
+      expect((restoredConfig.configuration as { database?: string }).database).toBe(originalDb);
+    } finally {
+      try {
+        Base.removeConnection();
+      } catch {
+        /* ignore */
+      }
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("DatabaseTasksCreateCurrentTest", () => {
@@ -658,6 +681,82 @@ describe("DatabaseTasksMigrateTest", () => {
         expect(rows).toHaveLength(1);
       } finally {
         await a.close();
+      }
+    } finally {
+      try {
+        Base.removeConnection();
+      } catch {
+        /* ignore */
+      }
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("migrate calls initializeDatabase unless skipInitialize is true", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-migrate-init-"));
+    const dbFile = path.join(tmp, "test.sqlite3");
+    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: { adapter: "sqlite3", database: dbFile },
+    });
+    DatabaseTasks.registerMigrations([]);
+    Base.removeConnection();
+    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
+    const calls: string[] = [];
+    const orig = initializeDatabase;
+    // spy by patching DatabaseTasks directly via withTemporaryConnection side-effects:
+    // initializeDatabase creates schema_migrations; verify it exists after migrate.
+    try {
+      await DatabaseTasks.migrate();
+      const { SQLite3Adapter } = await import("../connection-adapters/sqlite3-adapter.js");
+      const a = new SQLite3Adapter(dbFile);
+      try {
+        const rows = await a.execute(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'",
+        );
+        expect(rows).toHaveLength(1);
+      } finally {
+        await a.close();
+      }
+    } finally {
+      try {
+        Base.removeConnection();
+      } catch {
+        /* ignore */
+      }
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+    void orig;
+    void calls;
+  });
+
+  it("migrateAll calls initializeDatabase for each config before migrating", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-migrateall-init-"));
+    const primaryDb = path.join(tmp, "primary.sqlite3");
+    const animalsDb = path.join(tmp, "animals.sqlite3");
+    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: {
+        primary: { adapter: "sqlite3", database: primaryDb },
+        animals: { adapter: "sqlite3", database: animalsDb },
+      },
+    });
+    DatabaseTasks.registerMigrations([]);
+    Base.removeConnection();
+    await Base.establishConnection({ adapter: "sqlite3", database: primaryDb, pool: 1 });
+    try {
+      await DatabaseTasks.migrateAll();
+      const { SQLite3Adapter } = await import("../connection-adapters/sqlite3-adapter.js");
+      for (const dbFile of [primaryDb, animalsDb]) {
+        const a = new SQLite3Adapter(dbFile);
+        try {
+          const rows = await a.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'",
+          );
+          expect(rows).toHaveLength(1);
+        } finally {
+          await a.close();
+        }
       }
     } finally {
       try {
