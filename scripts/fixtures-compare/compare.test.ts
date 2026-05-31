@@ -96,6 +96,19 @@ describe("compareValue", () => {
     expect(cmp(["a", "b"], ["a", "c"])[0]).toBe(false);
     expect(cmp(["a"], ["a", "b"])[0]).toBe(false);
   });
+
+  it("compares plain objects by value regardless of key insertion order", () => {
+    // Positive: same entries, different insertion order — must MATCH.
+    expect(cmp({ a: 1, b: 2 }, { b: 2, a: 1 })[0]).toBe(true);
+    // Positive: symbol-keyed hash from admin/users settings (":symbol" key).
+    expect(
+      cmp({ ":symbol": "symbol", string: "string" }, { string: "string", ":symbol": "symbol" })[0],
+    ).toBe(true);
+    // Negative: different values must DIFF.
+    expect(cmp({ a: 1 }, { a: 2 })[0]).toBe(false);
+    // Negative: extra key on one side must DIFF.
+    expect(cmp({ a: 1, b: 2 }, { a: 1 })[0]).toBe(false);
+  });
 });
 
 describe("schemaCheck", () => {
