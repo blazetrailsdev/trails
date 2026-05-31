@@ -17,6 +17,7 @@ import {
   dbSetup,
   dbReset,
   dbPrepare,
+  dbMigrateStatus,
 } from "./db-tasks.js";
 import { dbAbortIfPendingMigrations } from "./pending-migrations.js";
 import { arConsole } from "./console.js";
@@ -41,6 +42,7 @@ Commands:
   db:create                      Create the database for the current TRAILS_ENV
   db:drop                        Drop the database for the current TRAILS_ENV
   db:migrate                     Run pending migrations
+  db:migrate:status              Show up/down status for each migration
   db:rollback                    Roll back the last migration
   db:schema:load                 Load db/schema.ts into the database
   db:seed                        Load db/seeds.ts
@@ -50,8 +52,6 @@ Commands:
   db:abort_if_pending_migrations Exit non-zero if there are pending migrations
   console                        Launch a REPL with Base + models pre-loaded
   runner <script>                Run a script with models registered + connection established
-
-Coming in later slices: db:migrate:status.
 
 Run \`ar <command> --help\` for command-specific help.`;
 
@@ -97,6 +97,11 @@ Production environments are protected unless DISABLE_DATABASE_ENVIRONMENT_CHECK 
 
 Options:
   --all   Drop databases for all environments, not just the current one.`;
+
+const DB_MIGRATE_STATUS_HELP = `ar db:migrate:status — show up/down status for each migration
+
+Options:
+  --all   Show status for all configured databases, not just the current one.`;
 
 const DB_MIGRATE_HELP = `ar db:migrate — run pending migrations
 
@@ -180,7 +185,7 @@ Options:
   --env <name>   Override TRAILS_ENV for this invocation.`;
 
 /** Commands recognized but deferred to a later slice (see proposal §5). */
-const NOT_IMPLEMENTED = new Set("db:migrate:status db:schema:dump".split(" "));
+const NOT_IMPLEMENTED = new Set("db:schema:dump".split(" "));
 
 function wantsHelp(args: string[]): boolean {
   return args.includes("--help") || args.includes("-h");
@@ -320,6 +325,13 @@ export async function run(argv: string[], cwd: string): Promise<number> {
       return 0;
     }
     return dbDrop(cwd, rest);
+  }
+  if (command === "db:migrate:status") {
+    if (wantsHelp(rest)) {
+      console.log(DB_MIGRATE_STATUS_HELP);
+      return 0;
+    }
+    return dbMigrateStatus(cwd, rest);
   }
   if (command === "db:migrate") {
     if (wantsHelp(rest)) {
