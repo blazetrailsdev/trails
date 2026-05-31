@@ -386,7 +386,7 @@ export async function run(argv: string[], cwd: string): Promise<number> {
       return 1;
     }
     if (!result.deleted) {
-      console.error(`ar: no migration matching *_${name.toLowerCase()}.ts found.`);
+      console.error(`ar: no migration found matching ${result.path}.`);
       return 1;
     }
     const verb = dryRun ? "  (dry)   " : "  remove  ";
@@ -407,12 +407,18 @@ export async function run(argv: string[], cwd: string): Promise<number> {
     const dryRun = rest.includes("--dry-run");
     const fields = parseFields(fieldTokens);
     const result = await destroyModel(cwd, name, fields, { force, dryRun });
+    if (result.ambiguous) {
+      console.error(
+        `ar: multiple create migrations match — delete manually:\n${result.ambiguous.map((p) => `  ${p}`).join("\n")}`,
+      );
+      return 1;
+    }
     if (result.modified !== undefined) {
       console.error(`ar: file was modified. Use --force to delete anyway.\n${result.modified}`);
       return 1;
     }
     if (!result.deleted) {
-      console.error(`ar: no model file found at ${result.modelPath}.`);
+      console.error(`ar: no model or migration found for ${result.modelPath}.`);
       return 1;
     }
     const verb = dryRun ? "  (dry)   " : "  remove  ";

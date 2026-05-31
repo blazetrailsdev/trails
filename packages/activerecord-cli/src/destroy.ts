@@ -24,6 +24,8 @@ export interface DestroyModelResult {
   migrationPath: string | undefined;
   deleted: boolean;
   modified?: string;
+  /** Set when multiple create migrations match and the target is ambiguous. */
+  ambiguous?: string[];
 }
 
 async function readIfPresent(path: string): Promise<string | undefined> {
@@ -114,12 +116,22 @@ export async function destroyModel(
   const migrateDir = join(root, "db", "migrate");
   const migrationSuffix = `create_${pluralize(snakeName)}`;
   const migrationMatches = await findMigrations(migrateDir, migrationSuffix);
-  // Take the last (most recent) match; 0 matches → undefined (no migration to delete).
-  const migrationPath =
-    migrationMatches.length > 0 ? migrationMatches[migrationMatches.length - 1] : undefined;
+  if (migrationMatches.length > 1) {
+    return {
+      modelPath,
+      migrationPath: undefined,
+      deleted: false,
+      ambiguous: migrationMatches,
+    };
+  }
+  const migrationPath = migrationMatches.length === 1 ? migrationMatches[0] : undefined;
+
+  const actualModel = await readIfPresent(modelPath);
+  if (actualModel === undefined && migrationPath === undefined) {
+    return { modelPath, migrationPath, deleted: false };
+  }
 
   if (!options.force) {
-    const actualModel = await readIfPresent(modelPath);
     if (actualModel !== undefined) {
       const diff = checkModified(actualModel, renderModel(className, fields));
       if (diff !== undefined) return { modelPath, migrationPath, deleted: false, modified: diff };

@@ -143,4 +143,57 @@ describe("ArCliTest", () => {
     expect(await run(["generate:model"], ".")).toBe(1);
     expect(err.join("\n")).toContain("requires a model name");
   });
+
+  it("destroy:migration requires a name", async () => {
+    expect(await run(["destroy:migration"], ".")).toBe(1);
+    expect(err.join("\n")).toContain("requires a migration name");
+  });
+
+  it("destroy:migration deletes a generated migration and prints remove line", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-cli-destroy-mig-"));
+    await run(["generate:migration", "AddEmailToUsers"], dir);
+    expect(await run(["destroy:migration", "AddEmailToUsers"], dir)).toBe(0);
+    expect(out.join("\n")).toMatch(/remove.*add_email_to_users\.ts/);
+  });
+
+  it("destroy:migration --dry-run reports remove without deleting", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-cli-destroy-mig-dry-"));
+    await run(["generate:migration", "CreateThings"], dir);
+    expect(await run(["destroy:migration", "--dry-run", "CreateThings"], dir)).toBe(0);
+    expect(out.join("\n")).toContain("(dry)");
+    expect(
+      await import("fs/promises").then((m) => m.readdir(join(dir, "db", "migrate"))),
+    ).toHaveLength(1);
+  });
+
+  it("destroy:migration exits 1 when no match exists", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-cli-destroy-mig-miss-"));
+    expect(await run(["destroy:migration", "NonExistent"], dir)).toBe(1);
+    expect(err.join("\n")).toContain("no migration found");
+  });
+
+  it("destroy:model requires a name", async () => {
+    expect(await run(["destroy:model"], ".")).toBe(1);
+    expect(err.join("\n")).toContain("requires a model name");
+  });
+
+  it("destroy:model deletes model and migration and prints remove lines", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-cli-destroy-model-"));
+    await run(["generate:model", "Article"], dir);
+    out.length = 0;
+    expect(await run(["destroy:model", "Article"], dir)).toBe(0);
+    const lines = out.join("\n");
+    expect(lines).toMatch(/remove.*article\.ts/);
+    expect(lines).toMatch(/remove.*create_articles\.ts/);
+  });
+
+  it("destroy:model --force deletes a hand-edited model", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-cli-destroy-model-force-"));
+    const result = await run(["generate:model", "Post"], dir);
+    expect(result).toBe(0);
+    const modelPath = join(dir, "app", "models", "post.ts");
+    await writeFile(modelPath, "// hand-edited\n");
+    expect(await run(["destroy:model", "--force", "Post"], dir)).toBe(0);
+    await expect(import("fs/promises").then((m) => m.readFile(modelPath))).rejects.toThrow();
+  });
 });
