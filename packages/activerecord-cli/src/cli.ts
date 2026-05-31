@@ -83,7 +83,7 @@ CamelCase form of <Name>. Name patterns trigger different templates:
   add_<cols>_to_<table>    → addColumn calls
   remove_<cols>_from_<tbl> → removeColumn calls
   create_<table>           → createTable block (same as generate:model)
-  anything else            → empty change() body
+  anything else            → change() body with a TODO comment
 
 Options:
   --force      Overwrite if file already exists (default: refuse).

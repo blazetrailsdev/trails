@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
-import { camelize, underscore, pluralize } from "@blazetrails/activesupport";
-import { renderMigration, exists } from "./generate-migration.js";
+import { camelize, pluralize } from "@blazetrails/activesupport";
+import { renderMigration, exists, normalizeSnakeName } from "./generate-migration.js";
 import type { FieldSpec, GenerateMigrationOptions } from "./generate-migration.js";
 
 export type { FieldSpec };
@@ -43,7 +43,9 @@ export async function generateModel(
   ts: number,
   options: GenerateMigrationOptions = {},
 ): Promise<GenerateModelResult> {
-  const snakeName = underscore(name);
+  // Normalize namespace separators (Admin::User → admin_user) before building paths.
+  const snakeName = normalizeSnakeName(name);
+  const className = camelize(snakeName);
   const modelPath = join(root, "app", "models", `${snakeName}.ts`);
   const migrationPath = join(root, "db", "migrate", `${ts}_create_${pluralize(snakeName)}.ts`);
   if (!options.dryRun) {
@@ -52,7 +54,7 @@ export async function generateModel(
     if (!options.force && ((await exists(modelPath)) || (await exists(migrationPath)))) {
       return { modelPath, migrationPath, written: false, skipped: true };
     }
-    await writeFile(modelPath, renderModel(camelize(name), fields), "utf8");
+    await writeFile(modelPath, renderModel(className, fields), "utf8");
     await writeFile(
       migrationPath,
       renderMigration(`create_${pluralize(snakeName)}`, fields),

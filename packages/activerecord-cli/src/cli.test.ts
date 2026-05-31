@@ -104,4 +104,43 @@ describe("ArCliTest", () => {
     expect(await run(["generate:manifest", "--root", "--check"], ".")).toBe(1);
     expect(err.join("\n")).toContain("--root requires a directory");
   });
+
+  it("generate:migration prints help for --help", async () => {
+    expect(await run(["generate:migration", "--help"], ".")).toBe(0);
+    expect(out.join("\n")).toContain("generate:migration");
+  });
+
+  it("generate:migration requires a name", async () => {
+    expect(await run(["generate:migration"], ".")).toBe(1);
+    expect(err.join("\n")).toContain("requires a migration name");
+  });
+
+  it("generate:migration writes file and prints create line with path", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-cli-gen-mig-"));
+    expect(await run(["generate:migration", "AddEmailToUsers", "email:string"], dir)).toBe(0);
+    expect(out[0]).toMatch(/create.*db[/\\]migrate[/\\]\d+_add_email_to_users\.ts/);
+  });
+
+  it("generate:migration --dry-run prints path without writing", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-cli-gen-mig-dry-"));
+    expect(await run(["generate:migration", "--dry-run", "CreateThings"], dir)).toBe(0);
+    expect(out[0]).toContain("(dry)");
+    // db/migrate must not have been created
+    await expect(
+      import("fs/promises").then((m) => m.readdir(join(dir, "db", "migrate"))),
+    ).rejects.toThrow();
+  });
+
+  it("generate:model writes both files and prints create lines", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-cli-gen-model-"));
+    expect(await run(["generate:model", "Post", "title:string"], dir)).toBe(0);
+    const lines = out.join("\n");
+    expect(lines).toMatch(/app[/\\]models[/\\]post\.ts/);
+    expect(lines).toMatch(/db[/\\]migrate[/\\]\d+_create_posts\.ts/);
+  });
+
+  it("generate:model requires a name", async () => {
+    expect(await run(["generate:model"], ".")).toBe(1);
+    expect(err.join("\n")).toContain("requires a model name");
+  });
 });

@@ -22,10 +22,22 @@ export function parseFields(tokens: string[]): FieldSpec[] {
   return tokens
     .filter((t) => t.includes(":"))
     .map((t) => {
-      const [name, type = "string"] = t.split(":");
+      const [name, rawType = "string"] = t.split(":");
+      // normalize empty type (e.g. "name:") to the default
+      const type = rawType || "string";
       return { name, type };
     });
 }
+
+/** Normalize a user-supplied name: strip namespace separators so `Admin::User` → `admin_user`. */
+export function normalizeSnakeName(name: string): string {
+  return underscore(name).replace(/\//g, "_");
+}
+
+// References/belongs_to fields are associations — they have no column-level equivalent
+// in the table definition. We skip them in the createTable body (they get a
+// belongs_to in the model file and the migration author can add add_reference manually).
+const SKIP_TABLE_TYPES = new Set(["references", "belongs_to"]);
 
 function renderBody(snakeName: string, fields: FieldSpec[]): string {
   let m: RegExpExecArray | null;
@@ -33,24 +45,27 @@ function renderBody(snakeName: string, fields: FieldSpec[]): string {
   if (m) {
     const tbl = m[1];
     const cols = fields
-      .map((f) => `    this.addColumn("${tbl}", "${f.name}", "${f.type}");`)
+      .map((f) => `    await this.addColumn("${tbl}", "${f.name}", "${f.type}");`)
       .join("\n");
-    return cols || `    // add columns to ${tbl}`;
+    return cols || `    // TODO: add columns to ${tbl}`;
   }
   m = /^remove_.*_from_(.+)$/.exec(snakeName);
   if (m) {
     const tbl = m[1];
     const cols = fields
-      .map((f) => `    this.removeColumn("${tbl}", "${f.name}", "${f.type}");`)
+      .map((f) => `    await this.removeColumn("${tbl}", "${f.name}", "${f.type}");`)
       .join("\n");
-    return cols || `    // remove columns from ${tbl}`;
+    return cols || `    // TODO: remove columns from ${tbl}`;
   }
   m = /^create_(.+)$/.exec(snakeName);
   if (m) {
     const tbl = pluralize(m[1]);
-    const cols = fields.map((f) => `      t.${f.type}("${f.name}");`).join("\n");
+    const cols = fields
+      .filter((f) => !SKIP_TABLE_TYPES.has(f.type))
+      .map((f) => `      t.${f.type}("${f.name}");`)
+      .join("\n");
     const inner = cols ? `\n${cols}\n      t.timestamps();\n    ` : "\n      t.timestamps();\n    ";
-    return `    this.createTable("${tbl}", (t) => {${inner}});`;
+    return `    await this.createTable("${tbl}", (t) => {${inner}});`;
   }
   return "    // TODO: implement migration";
 }
@@ -83,7 +98,7 @@ export async function generateMigration(
   ts: number,
   options: GenerateMigrationOptions = {},
 ): Promise<GenerateMigrationResult> {
-  const snakeName = underscore(name);
+  const snakeName = normalizeSnakeName(name);
   const path = join(root, "db", "migrate", `${ts}_${snakeName}.ts`);
   if (!options.dryRun) {
     await mkdir(join(root, "db", "migrate"), { recursive: true });
