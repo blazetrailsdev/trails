@@ -686,7 +686,7 @@ jobs:
       - name: Test comparison
         run: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/test-compare.ts
       - name: Fixtures comparison
-        run: pnpm exec tsx scripts/fixtures-compare/compare.ts --package activerecord
+        run: pnpm exec tsx scripts/fixtures-compare/compare.ts --package activerecord --ci
       - name: Models comparison
         run: pnpm exec tsx scripts/fixtures-compare/compare.ts --models
 

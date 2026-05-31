@@ -106,16 +106,22 @@ interface FileResult { yamlBase: string; tsBase: string | null; status: Status; 
 // the rest of the file comparable instead of dropping it as ERB-UNSUPPORTED.
 export const ERB_SKIP_SENTINEL = "__ERB_SKIP__";
 
+// Baseline locked at PR #2712 (93% milestone). Bump match when new fixtures
+// are ported; bump diff only for intentional accepted drifts. missing must stay 0.
+const CI_BASELINE = { match: 113, diff: 6, missing: 0 } as const;
+
 function parseArgs(argv: string[]): {
   pkg: string;
   filter: string | null;
   models: boolean;
   incomplete: boolean;
+  ci: boolean;
 } {
   let pkg = "activerecord";
   let filter: string | null = null;
   let models = false;
   let incomplete = false;
+  let ci = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--package") {
@@ -128,9 +134,11 @@ function parseArgs(argv: string[]): {
       models = true;
     } else if (a === "--incomplete") {
       incomplete = true;
+    } else if (a === "--ci") {
+      ci = true;
     } else if (!a.startsWith("--") && filter === null) filter = a;
   }
-  return { pkg, filter, models, incomplete };
+  return { pkg, filter, models, incomplete, ci };
 }
 
 const kebab = (s: string): string => s.replace(/_/g, "-");
@@ -701,7 +709,7 @@ function formatLine(r: FileResult): string {
 }
 
 async function main(): Promise<void> {
-  const { pkg, filter, models, incomplete } = parseArgs(process.argv.slice(2));
+  const { pkg, filter, models, incomplete, ci } = parseArgs(process.argv.slice(2));
   if (pkg !== "activerecord") {
     console.error(`fixtures:compare: --package ${pkg} not supported yet`);
     process.exit(2);
@@ -750,13 +758,36 @@ async function main(): Promise<void> {
   console.log(
     `schema — ported=${ported}/${evaluated.length} extras-flagged=${withExtras} (skipped ${results.length - evaluated.length})`,
   );
-  console.log("(fixture MISSING/DIFF soft; runtime errors hard-fail)");
+  if (ci) {
+    console.log(
+      `(--ci baseline: match>=${CI_BASELINE.match} diff<=${CI_BASELINE.diff} missing=${CI_BASELINE.missing})`,
+    );
+  } else {
+    console.log("(fixture MISSING/DIFF soft; runtime errors hard-fail)");
+  }
 
   if (models) runModelsPass(filter, incomplete);
 
   // Fixture MISSING/DIFF are soft; YAML/TS load errors are script-runtime, hard-fail.
   const hard: readonly Status[] = ["YAML-PARSE-ERR", "TS-IMPORT-ERR", "TS-EXPORT-MISSING"];
   if (results.some((r) => hard.includes(r.status))) process.exit(1);
+
+  if (ci) {
+    const matchCount = n("MATCH");
+    const diffCount = n("DIFF");
+    const missingCount = n("MISSING");
+    const failures: string[] = [];
+    if (matchCount < CI_BASELINE.match)
+      failures.push(`match regressed: ${matchCount} < baseline ${CI_BASELINE.match}`);
+    if (diffCount > CI_BASELINE.diff)
+      failures.push(`diff grew: ${diffCount} > baseline ${CI_BASELINE.diff}`);
+    if (missingCount > CI_BASELINE.missing)
+      failures.push(`missing grew: ${missingCount} > baseline ${CI_BASELINE.missing}`);
+    if (failures.length > 0) {
+      for (const f of failures) console.error(`fixtures:compare: ${f}`);
+      process.exit(1);
+    }
+  }
 }
 
 // ---- Models pass ----
