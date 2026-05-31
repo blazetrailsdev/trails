@@ -2532,7 +2532,11 @@ export class Migrator {
    *
    * Mirrors: ActiveRecord::Migrator#migrate
    */
-  async migrate(targetVersion?: number | string | null): Promise<void> {
+  async migrate(
+    targetVersion?: number | string | null,
+    filter?: (m: MigrationProxy) => boolean,
+  ): Promise<MigrationProxy[]> {
+    let ran: MigrationProxy[] = [];
     await this._withAdvisoryLock(async () => {
       await this._ensureSchemaTable();
 
@@ -2541,14 +2545,15 @@ export class Migrator {
         const target = BigInt(targetVersion);
         const current = BigInt(await this.currentVersion());
         if (target > current) {
-          await this._migrateUp(targetVersion);
+          ran = await this._migrateUp(targetVersion, filter);
         } else if (target < current) {
-          await this._migrateDown(targetVersion);
+          ran = await this._migrateDown(targetVersion, filter);
         }
       } else {
-        await this._migrateUp(null);
+        ran = await this._migrateUp(null, filter);
       }
     });
+    return ran;
   }
 
   /**
@@ -3060,29 +3065,41 @@ export class Migrator {
     await this._withAdvisoryLock(() => this.runWithoutLock(direction, targetVersion));
   }
 
-  private async _migrateUp(targetVersion: number | string | null): Promise<void> {
+  private async _migrateUp(
+    targetVersion: number | string | null,
+    filter?: (m: MigrationProxy) => boolean,
+  ): Promise<MigrationProxy[]> {
     if (targetVersion !== null) this._validateTargetVersion(targetVersion);
     const target = targetVersion !== null ? BigInt(targetVersion) : null;
     const applied = await this._appliedVersions();
+    const ran: MigrationProxy[] = [];
 
     for (const proxy of this._migrations) {
       if (applied.has(proxy.version)) continue;
       if (target !== null && BigInt(proxy.version) > target) break;
+      if (filter && !filter(proxy)) continue;
       await this._runMigration(proxy, "up");
+      ran.push(proxy);
     }
+    return ran;
   }
 
-  private async _migrateDown(targetVersion: number | string): Promise<void> {
+  private async _migrateDown(
+    targetVersion: number | string,
+    filter?: (m: MigrationProxy) => boolean,
+  ): Promise<MigrationProxy[]> {
     this._validateTargetVersion(targetVersion);
     const target = BigInt(targetVersion);
     const applied = await this._appliedVersions();
     const toRevert = this._migrations
       .filter((m) => applied.has(m.version) && BigInt(m.version) > target)
+      .filter((m) => !filter || filter(m))
       .reverse();
 
     for (const proxy of toRevert) {
       await this._runMigration(proxy, "down");
     }
+    return toRevert;
   }
 
   private async _runMigration(proxy: MigrationProxy, direction: "up" | "down"): Promise<void> {

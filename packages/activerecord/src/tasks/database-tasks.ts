@@ -265,11 +265,31 @@ export class DatabaseTasks {
       await initializeDatabase(config);
     }
 
-    const { Migrator } = await import("../migration.js");
+    const { Migrator, Migration } = await import("../migration.js");
+    const scope = getEnv("SCOPE");
+    const verbose = isVerbose();
 
     const runMigration = async (adapter: import("../adapter.js").DatabaseAdapter) => {
       const migrator = new Migrator(adapter, this._migrations);
-      await migrator.migrate(effectiveVersion ?? null);
+      migrator.verbose = verbose;
+      // Rails block: `version.blank? ? (scope.blank? || scope == m.scope) : m.version == version`
+      // `version` is the *method parameter* (explicit arg), NOT ENV["VERSION"].
+      // The rake task always calls migrate() with no arg, so version is nil → scope filter only.
+      // The exact-version branch fires only for explicit migrate(version) callers (migrate:up/down).
+      // Normalize version the same way Rails does `version.blank?`: treat "", " " as nil.
+      const explicitVersion =
+        version == null ? null : typeof version === "string" ? version.trim() || null : version;
+      let filter: ((m: import("../migration.js").MigrationProxy) => boolean) | undefined;
+      if (explicitVersion !== null) {
+        const versionKey = String(BigInt(explicitVersion));
+        filter = (m) => String(BigInt(m.version)) === versionKey;
+      } else if (scope !== undefined && scope.trim() !== "") {
+        filter = (m) => m.scope === scope;
+      }
+      const ran = await migrator.migrate(effectiveVersion ?? null, filter);
+      if (scope && scope.trim() !== "" && ran.length === 0 && verbose) {
+        Migration.logger.info(`No migrations ran. (using ${scope} scope)`);
+      }
       // Rails: `migration_connection_pool.schema_cache.clear!` — drop the
       // reflected schema so post-migration introspection re-reads the
       // freshly-migrated tables. Optional-chained so an adapter without a

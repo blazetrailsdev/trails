@@ -842,19 +842,126 @@ describe("DatabaseTasks migration connection resolves from the pool", () => {
 });
 
 describe("DatabaseTasksMigrateScopeTest", () => {
-  it.skip("migrate using scope and verbose mode", () => {
-    // P3 skip: SCOPE env variable not implemented. Rails filters migrations by scope substring
-    // when ENV["SCOPE"] is set. Requires ~30 LOC in Migrator + DatabaseTasks.migrate to thread
-    // the scope filter through. Also needs "scope/" migration fixtures.
-    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:1105
+  let originalVerbose: string | undefined;
+  let originalVersion: string | undefined;
+  let originalScope: string | undefined;
+  let stdoutChunks: string[];
+  let stdoutSpy: { mockRestore: () => void };
+  let tmpDir: string;
+  let dbFile: string;
+
+  beforeEach(async () => {
+    originalVerbose = process.env.VERBOSE;
+    originalVersion = process.env.VERSION;
+    originalScope = process.env.SCOPE;
+    stdoutChunks = [];
+    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      stdoutChunks.push(typeof chunk === "string" ? chunk : chunk.toString());
+      return true;
+    });
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-scope-"));
+    dbFile = path.join(tmpDir, "scope.sqlite3");
+    await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: { adapter: "sqlite3", database: dbFile },
+    });
+    DatabaseTasks.registerMigrations([
+      {
+        version: "1",
+        name: "Unscoped",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+      {
+        version: "2",
+        name: "MysqlOnly",
+        scope: "mysql",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+    ]);
   });
-  it.skip("migrate using scope and non verbose mode", () => {
-    // P3 skip: same SCOPE gap as "migrate using scope and verbose mode".
-    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:1125
+
+  afterEach(() => {
+    stdoutSpy.mockRestore();
+    if (originalVerbose === undefined) delete process.env.VERBOSE;
+    else process.env.VERBOSE = originalVerbose;
+    if (originalVersion === undefined) delete process.env.VERSION;
+    else process.env.VERSION = originalVersion;
+    if (originalScope === undefined) delete process.env.SCOPE;
+    else process.env.SCOPE = originalScope;
+    DatabaseTasks.registerMigrations([]);
+    try {
+      Base.removeConnection();
+    } catch {
+      /* no pool */
+    }
+    DatabaseTasks.databaseConfiguration = null;
+    try {
+      fs.rmSync(tmpDir, { recursive: true });
+    } catch {
+      /* ignore */
+    }
   });
-  it.skip("migrate using empty scope and verbose mode", () => {
-    // P3 skip: same SCOPE gap as "migrate using scope and verbose mode".
-    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:1141
+
+  it("migrate using scope and verbose mode", async () => {
+    process.env.VERSION = "2";
+    process.env.VERBOSE = "true";
+    process.env.SCOPE = "mysql";
+
+    await DatabaseTasks.migrate();
+    const output1 = stdoutChunks.join("");
+    expect(output1).toContain("migrating");
+    expect(output1).not.toContain("No migrations ran. (using mysql scope)");
+
+    stdoutChunks = [];
+    await DatabaseTasks.migrate();
+    const output2 = stdoutChunks.join("");
+    expect(output2).toContain("No migrations ran. (using mysql scope)");
+    expect(output2).not.toContain("migrating");
+  });
+
+  it("migrate using scope and non verbose mode", async () => {
+    process.env.VERSION = "2";
+    process.env.VERBOSE = "false";
+    process.env.SCOPE = "mysql";
+
+    await DatabaseTasks.migrate();
+    expect(stdoutChunks.join("")).toBe("");
+
+    stdoutChunks = [];
+    await DatabaseTasks.migrate();
+    expect(stdoutChunks.join("")).toBe("");
+  });
+
+  it("migrate using empty scope and verbose mode", async () => {
+    process.env.VERSION = "2";
+    process.env.VERBOSE = "true";
+    process.env.SCOPE = "";
+
+    await DatabaseTasks.migrate();
+    const output1 = stdoutChunks.join("");
+    expect(output1).toContain("migrating");
+    expect(output1).not.toContain("No migrations ran. (using mysql scope)");
+
+    stdoutChunks = [];
+    await DatabaseTasks.migrate();
+    const output2 = stdoutChunks.join("");
+    expect(output2).toBe("");
+    expect(output2).not.toContain("No migrations ran. (using mysql scope)");
+  });
+
+  it("scope-only filter (no VERSION): runs only scoped migrations", async () => {
+    process.env.VERBOSE = "true";
+    process.env.SCOPE = "mysql";
+
+    await DatabaseTasks.migrate();
+    const output1 = stdoutChunks.join("");
+    expect(output1).toContain("MysqlOnly");
+    expect(output1).not.toContain("Unscoped");
+
+    stdoutChunks = [];
+    await DatabaseTasks.migrate();
+    const output2 = stdoutChunks.join("");
+    expect(output2).toContain("No migrations ran. (using mysql scope)");
   });
 });
 

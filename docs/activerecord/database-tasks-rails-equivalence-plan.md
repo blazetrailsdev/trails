@@ -180,13 +180,14 @@ authoring task (the implementation is likely already correct). ~50 LOC test.
 
 Rails: `test/cases/tasks/database_tasks_test.rb:155`.
 
-### P3-4 — SCOPE env variable migration filtering
+### P3-4 — SCOPE env variable migration filtering ✅ shipped
 
 **Source:** "migrate using scope and verbose mode" (×3 tests).
 
 `ENV["SCOPE"]` filters which migrations run (only those whose filename contains
-the scope string). Not implemented in `Migrator` or `DatabaseTasks.migrate`.
-~30 LOC in `Migrator` + `DatabaseTasks` + scope migration fixtures.
+the scope string). Implemented in `Migrator._migrateUp/_migrateDown` (filter param)
+and `DatabaseTasks.migrate` (reads SCOPE, builds filter, emits "No migrations ran." message).
+All 3 tests unskipped and passing.
 
 Rails: `test/cases/tasks/database_tasks_test.rb:1105–1158`.
 
