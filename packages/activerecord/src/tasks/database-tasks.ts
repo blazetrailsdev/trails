@@ -705,10 +705,11 @@ export class DatabaseTasks {
   /**
    * Mirrors Rails' `DatabaseTasks.schema_dump_path`:
    * - Returns `ENV["SCHEMA"]` when set.
-   * - Delegates to `config.schemaDump(format)` when available — a string
-   *   value overrides the default filename; `null` means dumping is disabled.
-   * - Falls back to `dumpSchemaFilename(config)` for bare configs without
-   *   the `schemaDump` accessor (e.g. non-HashConfig objects).
+   * - When config has an explicit `schemaDump` key in its raw configuration:
+   *   - `false`/`null` → returns `null` (dumping disabled).
+   *   - A string path → returns that path directly (custom location).
+   * - Otherwise falls back to `dumpSchemaFilename(config)` which includes
+   *   the `dbDir` prefix (e.g. `"db/schema.ts"`).
    *
    * Returns `null` when the config disables schema dumping (`schemaDump: false`).
    */
@@ -716,10 +717,17 @@ export class DatabaseTasks {
     const envSchema = getEnv("SCHEMA")?.trim();
     if (envSchema) return envSchema;
     if (config) {
-      const cfgWithDump = config as unknown as { schemaDump?: (format?: string) => string | null };
-      if (typeof cfgWithDump.schemaDump === "function") {
-        const format = this.schemaFormat === "js" ? "ts" : this.schemaFormat;
-        return cfgWithDump.schemaDump(format);
+      // Only consult schemaDump() when the key is explicitly present in the
+      // configuration hash. The default (key absent) case defers to
+      // dumpSchemaFilename(), which includes the dbDir prefix. If we called
+      // schemaDump() unconditionally we'd get a bare filename ("schema.ts")
+      // instead of the full path ("db/schema.ts").
+      const rawCfg = (config as unknown as { configuration?: Record<string, unknown> })
+        .configuration;
+      if (rawCfg && Object.hasOwn(rawCfg, "schemaDump")) {
+        const val = rawCfg["schemaDump"];
+        if (val === false || val === null) return null;
+        if (typeof val === "string") return val;
       }
     }
     return this.dumpSchemaFilename(config);
