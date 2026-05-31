@@ -3750,12 +3750,14 @@ _setGlobalIdModelFinder((name: string) => {
   return undefined;
 });
 
+// Wire Base into DatabaseTasks so migrationConnection() works synchronously
+// without waiting for an async method to capture _baseClass first.
+// Registered before runLoadHooks so that any on_load(:active_record) callback
+// can call migrationConnection() and find it wired.
+DatabaseTasks._registerBase(Base);
+
 // Mirrors `ActiveSupport.run_load_hooks(:active_record, Base)` at the
 // bottom of `activerecord/lib/active_record/base.rb`. Lets railtie
 // initializers register `on_load(:active_record)` consumers that need a
 // fully-defined `Base` class (timezone, filter attributes, ...).
 runLoadHooks("active_record", Base);
-
-// Wire Base into DatabaseTasks so migrationConnection() works synchronously
-// without waiting for an async method to capture _baseClass first.
-DatabaseTasks._registerBase(Base);
