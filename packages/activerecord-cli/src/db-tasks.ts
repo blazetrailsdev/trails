@@ -6,7 +6,7 @@ import {
   NoDatabaseError,
   DatabaseAlreadyExists,
 } from "@blazetrails/activerecord";
-import { loadDatabaseConfig, loadMigrations } from "./db-helpers.js";
+import { loadDatabaseConfig, loadMigrations, tryLoadModels } from "./db-helpers.js";
 
 async function runCreate(
   config: import("@blazetrails/activerecord").DatabaseConfig,
@@ -98,14 +98,6 @@ export async function dbDrop(cwd: string, args: string[]): Promise<number> {
     if (!(await runDrop(config))) ok = false;
   }
   return ok ? 0 : 1;
-}
-
-async function tryLoadModels(cwd: string): Promise<void> {
-  const fsAdapter = await getFsAsync();
-  const modelsPath = resolve(join(cwd, "app", "models", "index.ts"));
-  if (!fsAdapter.existsSync(modelsPath)) return;
-  const { pathToFileURL } = await import("node:url");
-  await import(pathToFileURL(modelsPath).href);
 }
 
 function flagValue(args: string[], flag: string): string | undefined {

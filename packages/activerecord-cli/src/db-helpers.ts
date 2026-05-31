@@ -21,6 +21,14 @@ export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigura
   return configs;
 }
 
+export async function tryLoadModels(cwd: string): Promise<Record<string, unknown>> {
+  const fsAdapter = await getFsAsync();
+  const modelsPath = resolve(join(cwd, "app", "models", "index.ts"));
+  if (!fsAdapter.existsSync(modelsPath)) return {};
+  const { pathToFileURL } = await import("node:url");
+  return import(pathToFileURL(modelsPath).href) as Promise<Record<string, unknown>>;
+}
+
 export function loadMigrations(cwd: string): import("@blazetrails/activerecord").MigrationProxy[] {
   const paths = DatabaseTasks.migrationsPaths.map((p) => resolve(join(cwd, p)));
   const migrations = Migrator.discoverMigrations(paths);

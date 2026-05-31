@@ -19,6 +19,8 @@ import {
   dbPrepare,
 } from "./db-tasks.js";
 import { dbAbortIfPendingMigrations } from "./pending-migrations.js";
+import { arConsole } from "./console.js";
+import { arRunner } from "./runner.js";
 
 const HELP = `ar — the CLI for standalone @blazetrails/activerecord projects
 
@@ -44,6 +46,8 @@ Commands:
   db:reset                       Drop, then db:setup
   db:prepare                     Idempotent setup (create if missing, migrate, seed)
   db:abort_if_pending_migrations Exit non-zero if there are pending migrations
+  console                        Launch a REPL with Base + models pre-loaded
+  runner <script>                Run a script with models registered + connection established
 
 Coming in later slices: db:migrate:status.
 
@@ -153,6 +157,15 @@ re-runs generate:manifest. Refuses when a file differs from the template.
 
 Options:
   --force    Delete even if hand-modified.   --dry-run  Print without deleting.`;
+
+const CONSOLE_HELP = `ar console — REPL with Base + app/models pre-loaded. Prompt: "trails> ".
+Options:
+  --env <name>   Override TRAILS_ENV for this session.`;
+
+const RUNNER_HELP = `ar runner <script> [args...] — run a script with models registered and connection established.
+app/models/index.ts is imported (side-effect: models registered for AR queries). Remaining args: __ARGV__.
+Options:
+  --env <name>   Override TRAILS_ENV for this invocation.`;
 
 /** Commands recognized but deferred to a later slice (see proposal §5). */
 const NOT_IMPLEMENTED = new Set("db:migrate:status db:schema:dump".split(" "));
@@ -425,6 +438,20 @@ export async function run(argv: string[], cwd: string): Promise<number> {
     if (result.modelDeleted) console.log(`${verb}${result.modelPath}`);
     if (result.migrationPath) console.log(`${verb}${result.migrationPath}`);
     return 0;
+  }
+  if (command === "console") {
+    if (wantsHelp(rest)) {
+      console.log(CONSOLE_HELP);
+      return 0;
+    }
+    return arConsole(cwd, rest);
+  }
+  if (command === "runner") {
+    if (wantsHelp(rest)) {
+      console.log(RUNNER_HELP);
+      return 0;
+    }
+    return arRunner(cwd, rest);
   }
   if (NOT_IMPLEMENTED.has(command)) {
     console.error(`ar: "${command}" is not implemented in this slice yet.`);
