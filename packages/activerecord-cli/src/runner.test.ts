@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+import { DatabaseTasks } from "@blazetrails/activerecord";
 import { arRunner } from "./runner.js";
 
 const DB_CONFIG = `export default { development: { adapter: "sqlite3", database: ":memory:" } };\n`;
@@ -12,18 +13,16 @@ async function scaffoldProject(dir: string) {
 
 describe("ArRunnerTest", () => {
   let err: string[];
-  let savedEnv: string | undefined;
 
   beforeEach(() => {
     err = [];
-    savedEnv = process.env["TRAILS_ENV"];
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    if (savedEnv === undefined) delete process.env["TRAILS_ENV"];
-    else process.env["TRAILS_ENV"] = savedEnv;
+    delete process.env["TRAILS_ENV"];
+    DatabaseTasks.databaseConfiguration = null;
   });
 
   it("returns 1 when no script path is given", async () => {

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+import { DatabaseTasks } from "@blazetrails/activerecord";
 import { arConsole } from "./console.js";
 
 function makeReplStub() {
@@ -28,18 +29,16 @@ async function scaffoldProject(dir: string) {
 
 describe("ArConsoleTest", () => {
   let err: string[];
-  let savedEnv: string | undefined;
 
   beforeEach(() => {
     err = [];
-    savedEnv = process.env["TRAILS_ENV"];
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    if (savedEnv === undefined) delete process.env["TRAILS_ENV"];
-    else process.env["TRAILS_ENV"] = savedEnv;
+    delete process.env["TRAILS_ENV"];
+    DatabaseTasks.databaseConfiguration = null;
   });
 
   it("launches REPL, puts Base in context, resolves 0 on exit", async () => {
