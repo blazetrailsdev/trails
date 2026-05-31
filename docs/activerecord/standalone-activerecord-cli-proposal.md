@@ -357,7 +357,7 @@ reference (#2638).
       `getAbstractClass`'s own-property `hasOwnProperty` check, matching Rails'
       per-class `abstract_class?`. Concrete models under `ApplicationRecord` no
       longer inherit abstractness and skip reflection.
-- [x] Done (#NNNN) — **§4.8 full bin relocation (schema/models dumps)**. Moved
+- [x] Done (#2725) — **§4.8 full bin relocation (schema/models dumps)**. Moved
       `trails-schema-dump` and `trails-models-dump` bins + tests from
       `packages/activerecord` to `packages/activerecord-cli`. Both now export a
       `run(argv)` function; `ar schema:dump` and `ar models:dump` call them
