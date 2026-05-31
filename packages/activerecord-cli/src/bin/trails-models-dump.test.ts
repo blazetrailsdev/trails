@@ -68,6 +68,8 @@ beforeAll(() => {
     "arel",
     "did-you-mean",
     "globalid",
+    "tse-compiler",
+    "trails-tsc",
     "activerecord",
   ];
   const anyMissing = depsInOrder.some(
