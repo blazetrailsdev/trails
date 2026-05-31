@@ -103,8 +103,11 @@ export class PostgreSQLDatabaseTasks {
         });
       }
       throw error;
+    } finally {
+      // Always restore the pool to the target DB so Base is not left pointing
+      // at the postgres system DB after create() returns or throws.
+      if (!connectionAlreadyEstablished) await this.establishConnection();
     }
-    await this.establishConnection();
   }
 
   async drop(): Promise<void> {
@@ -369,7 +372,7 @@ export class PostgreSQLDatabaseTasks {
       const parsed = new URL(String(c.url));
       parsed.pathname = "/postgres";
       const { database: _db, ...rest } = c;
-      return { ...rest, url: parsed.toString() };
+      return { ...rest, url: parsed.toString(), schemaSearchPath: "public" };
     }
     return { ...c, database: "postgres", schemaSearchPath: "public" };
   }

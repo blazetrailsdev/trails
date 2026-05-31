@@ -87,8 +87,11 @@ export class MySQLDatabaseTasks {
         });
       }
       throw error;
+    } finally {
+      // Always restore the pool to the target DB so Base is not left pointing
+      // at the no-database admin pool after create() returns or throws.
+      await this.establishConnection();
     }
-    await this.establishConnection();
   }
 
   async drop(): Promise<void> {
