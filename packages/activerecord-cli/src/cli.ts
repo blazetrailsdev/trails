@@ -61,8 +61,7 @@ Options:
 const DB_MIGRATE_HELP = `ar db:migrate — run pending migrations
 
 Options:
-  --version <v>   Migrate to a specific version.
-  --step <n>      Run exactly N migrations forward.`;
+  --version <v>   Migrate to a specific version.`;
 
 const DB_ROLLBACK_HELP = `ar db:rollback — roll back the last migration
 

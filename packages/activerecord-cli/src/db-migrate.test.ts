@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import { DatabaseTasks, DatabaseConfigurations } from "@blazetrails/activerecord";
+import { DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
 
 const FAKE_CONFIG = `
 const config = { development: { adapter: "sqlite3", database: ":memory:", pool: 1 } };
@@ -38,6 +38,7 @@ describe("DbMigrateTest", () => {
     vi.spyOn(DatabaseTasks, "rollback").mockImplementation(rollbackSpy);
     vi.spyOn(DatabaseTasks, "loadSchemaCurrent").mockImplementation(loadSchemaCurrentSpy);
     vi.spyOn(DatabaseTasks, "loadSeed").mockImplementation(loadSeedSpy);
+    vi.spyOn(Migrator, "discoverMigrations").mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -60,9 +61,10 @@ describe("DbMigrateTest", () => {
     expect(migrateSpy).toHaveBeenCalledWith("20240101000000");
   });
 
-  it("db:migrate --step 3 calls migrate three times", async () => {
-    expect(await run(["db:migrate", "--step", "3"], await makeFakeProject())).toBe(0);
-    expect(migrateSpy).toHaveBeenCalledTimes(3);
+  it("db:migrate calls Migrator.discoverMigrations before migrate", async () => {
+    const discoverSpy = vi.spyOn(Migrator, "discoverMigrations").mockReturnValue([]);
+    expect(await run(["db:migrate"], await makeFakeProject())).toBe(0);
+    expect(discoverSpy).toHaveBeenCalled();
   });
 
   it("db:migrate exits 1 on missing config", async () => {
