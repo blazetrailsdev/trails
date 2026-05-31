@@ -254,16 +254,15 @@ function useTablelessFixtures(
   // Mirror the same-table duplicate guard in resolveFixtureNames: each
   // defineJoinTableFixtures call deletes the table before inserting, so a
   // second entry for the same table would wipe the first entry's rows.
-  const seenTables = new Map<string, string>();
+  const seenTables = new Set<string>();
   for (const { table } of entries) {
-    const prior = seenTables.get(table);
-    if (prior !== undefined) {
+    if (seenTables.has(table)) {
       throw new Error(
-        `useFixtures: tableless entries "${prior}" and a later entry both target table "${table}"; ` +
+        `useFixtures: two tableless entries both target table "${table}"; ` +
           `the second insert would delete the first entry's rows. Use a single entry instead.`,
       );
     }
-    seenTables.set(table, table);
+    seenTables.add(table);
   }
 
   const keys = entries.map((e) => e.table);
@@ -353,6 +352,18 @@ export function useFixtures(
     (fixturesOrNames as readonly unknown[])[0] !== null &&
     "table" in ((fixturesOrNames as readonly TablelessFixtureEntry[])[0] as object)
   ) {
+    // Validate that all elements are uniformly tableless to catch mixed arrays early
+    // rather than surfacing a confusing downstream error in resolveFixtureNames or
+    // defineJoinTableFixtures.
+    for (let i = 1; i < (fixturesOrNames as readonly unknown[]).length; i++) {
+      const el = (fixturesOrNames as readonly unknown[])[i];
+      if (typeof el !== "object" || el === null || !("table" in (el as object))) {
+        throw new Error(
+          `useFixtures: mixed tableless and by-name entries are not supported. ` +
+            `Element at index ${i} (${JSON.stringify(el)}) is not a tableless { table, data } entry.`,
+        );
+      }
+    }
     return useTablelessFixtures(
       fixturesOrNames as readonly TablelessFixtureEntry[],
       getAdapter,
