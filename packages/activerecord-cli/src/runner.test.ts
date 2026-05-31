@@ -4,13 +4,10 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { arRunner } from "./runner.js";
 
+const DB_CONFIG = `export default { development: { adapter: "sqlite3", database: ":memory:" } };\n`;
 async function scaffoldProject(dir: string) {
   await mkdir(join(dir, "config"), { recursive: true });
-  await writeFile(
-    join(dir, "config", "database.ts"),
-    `export default { development: { adapter: "sqlite3", database: ":memory:" } };\n`,
-    "utf8",
-  );
+  await writeFile(join(dir, "config", "database.ts"), DB_CONFIG, "utf8");
 }
 
 describe("ArRunnerTest", () => {
@@ -60,7 +57,6 @@ describe("ArRunnerTest", () => {
     const dir = await mkdtemp(join(tmpdir(), "ar-runner-throw-"));
     await scaffoldProject(dir);
     await writeFile(join(dir, "boom.ts"), `throw new Error("intentional");\n`, "utf8");
-
     const code = await arRunner(dir, ["--env", "test", "boom.ts"]);
     expect(code).toBe(1);
     expect(err.join("\n")).toContain("intentional");

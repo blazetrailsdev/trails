@@ -21,10 +21,6 @@ export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigura
   return configs;
 }
 
-/**
- * Import `app/models/index.ts` if it exists and return all its exports.
- * Returns an empty object when the manifest is absent.
- */
 export async function tryLoadModels(cwd: string): Promise<Record<string, unknown>> {
   const fsAdapter = await getFsAsync();
   const modelsPath = resolve(join(cwd, "app", "models", "index.ts"));
