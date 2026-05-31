@@ -26,11 +26,11 @@ export async function arConsole(
     return 1;
   }
 
-  const env = DatabaseConfigurations.currentEnv();
-  const configs = DatabaseTasks.configsFor(env);
+  const configs = DatabaseTasks.configsFor(DatabaseConfigurations.currentEnv());
   if (configs.length > 0) {
+    const dbConfig = configs.find((c) => c.name === "primary") ?? configs[0]!;
     try {
-      await Base.establishConnection(configs[0]!.configurationHash as { [key: string]: unknown });
+      await Base.establishConnection(dbConfig.configurationHash as { [key: string]: unknown });
     } catch (err) {
       console.error(`ar: failed to establish connection — ${String(err)}`);
       return 1;

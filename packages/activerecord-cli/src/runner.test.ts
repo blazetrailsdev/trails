@@ -51,6 +51,18 @@ describe("ArRunnerTest", () => {
     expect(code).toBe(0);
   });
 
+  it("--env after script path is not forwarded to __ARGV__", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-runner-env-after-"));
+    await scaffoldProject(dir);
+    await writeFile(
+      join(dir, "check.ts"),
+      `const a = (globalThis as any).__ARGV__;\nif (a.includes("--env") || a.includes("test")) throw new Error("--env leaked: " + JSON.stringify(a));\n`,
+      "utf8",
+    );
+    const code = await arRunner(dir, ["check.ts", "--env", "test", "keep"]);
+    expect(code).toBe(0);
+  });
+
   it("returns 1 when the script throws", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ar-runner-throw-"));
     await scaffoldProject(dir);

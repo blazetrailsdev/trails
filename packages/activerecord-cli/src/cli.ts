@@ -447,7 +447,7 @@ export async function run(argv: string[], cwd: string): Promise<number> {
     return arConsole(cwd, rest);
   }
   if (command === "runner") {
-    if (rest.length === 0 || rest[0] === "--help" || rest[0] === "-h") {
+    if (rest.length === 0 || wantsHelp(rest)) {
       console.log(RUNNER_HELP);
       return 0;
     }

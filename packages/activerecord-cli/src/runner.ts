@@ -25,7 +25,10 @@ export async function arRunner(cwd: string, args: string[]): Promise<number> {
     console.error("ar: runner requires a script path.");
     return 1;
   }
-  const scriptArgv = args.slice(scriptIdx + 1);
+  // Strip any --env <value> pairs that appear after the script path.
+  const scriptArgv = args
+    .slice(scriptIdx + 1)
+    .filter((a, i, arr) => a !== "--env" && arr[i - 1] !== "--env");
 
   try {
     await loadDatabaseConfig(cwd);
@@ -34,11 +37,11 @@ export async function arRunner(cwd: string, args: string[]): Promise<number> {
     return 1;
   }
 
-  const env = DatabaseConfigurations.currentEnv();
-  const configs = DatabaseTasks.configsFor(env);
+  const configs = DatabaseTasks.configsFor(DatabaseConfigurations.currentEnv());
   if (configs.length > 0) {
+    const dbConfig = configs.find((c) => c.name === "primary") ?? configs[0]!;
     try {
-      await Base.establishConnection(configs[0]!.configurationHash as { [key: string]: unknown });
+      await Base.establishConnection(dbConfig.configurationHash as { [key: string]: unknown });
     } catch (err) {
       console.error(`ar: failed to establish connection — ${String(err)}`);
       return 1;
