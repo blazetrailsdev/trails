@@ -879,7 +879,10 @@ export class DatabaseTasks {
     // Rails: a single primary database short-circuits the per-config loop and
     // migrates the already-established connection directly, skipping the
     // temporary-pool churn (`db_configs.size == 1 && db_configs.first.primary?`).
-    if (configs.length === 1 && (configs[0] as { primary?: boolean }).primary) {
+    // Rails: `db_configs.size == 1 && db_configs.first.primary?`. `primary?`
+    // (TS: `isPrimary()`) lives on HashConfig/UrlConfig, not the abstract
+    // DatabaseConfig, so reach it structurally off the concrete instance.
+    if (configs.length === 1 && (configs[0] as { isPrimary?(): boolean }).isPrimary?.()) {
       await this.migrate();
       return;
     }
