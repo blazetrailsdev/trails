@@ -975,8 +975,10 @@ export class DatabaseTasks {
     let adapter: import("../adapter.js").DatabaseAdapter;
     try {
       adapter = await this._migrationAdapter();
-    } catch {
-      return false;
+    } catch (error) {
+      const { ConnectionNotDefined } = await import("../errors.js");
+      if (error instanceof ConnectionNotDefined) return false;
+      throw error;
     }
 
     const { InternalMetadata } = await import("../internal-metadata.js");
@@ -1014,8 +1016,10 @@ export class DatabaseTasks {
     let adapter: import("../adapter.js").DatabaseAdapter;
     try {
       adapter = await this._migrationAdapter();
-    } catch {
-      return;
+    } catch (error) {
+      const { ConnectionNotDefined } = await import("../errors.js");
+      if (error instanceof ConnectionNotDefined) return;
+      throw error;
     }
 
     const { SchemaMigration } = await import("../schema-migration.js");
