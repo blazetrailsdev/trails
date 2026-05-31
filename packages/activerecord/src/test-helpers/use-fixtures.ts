@@ -12,6 +12,19 @@ import {
 import type { DatabaseAdapter } from "../adapter.js";
 import type { Base } from "../base.js";
 
+/**
+ * A tableless fixture entry: seeds rows directly into the named table with no
+ * model class. Mirrors Rails' "naked" fixture path — the table's schema columns
+ * are validated at seed time, but no `ActiveRecord::Base` subclass is involved.
+ *
+ * The accessor key is the `table` value as-is (e.g. `{ table: "accounts" }` →
+ * `result.accounts`). Rows return as plain resolved-attribute objects.
+ */
+export type TablelessFixtureEntry = {
+  table: string;
+  data: Record<string, Record<string, unknown>>;
+};
+
 export { FixtureSet } from "./fixture-set.js";
 
 type BaseClass = typeof Base;
@@ -218,6 +231,76 @@ function isTableMissingError(e: unknown): boolean {
  * const { customers } = useFixtures(["customers"], () => Base.connection, { schema: TEST_SCHEMA });
  * ```
  */
+/** Result of the tableless overload: one `JoinTableAccessor` per entry, keyed by `table`. */
+export type UseTablelessFixturesResult<T extends readonly TablelessFixtureEntry[]> = {
+  [K in T[number]["table"]]: JoinTableAccessor<string>;
+};
+
+/**
+ * Implements the tableless overload of `useFixtures`. Seeds each entry directly
+ * into the named table via {@link defineJoinTableFixtures} — no model class required.
+ * Columns are validated against the live schema; unknown columns throw at seed time.
+ * @internal
+ */
+function useTablelessFixtures(
+  entries: readonly TablelessFixtureEntry[],
+  getAdapter: () => DatabaseAdapter,
+  opts?: UseFixturesOpts,
+): Record<string, unknown> {
+  const keys = entries.map((e) => e.table);
+  const store: Record<string, Record<string, unknown>> = {};
+
+  if (opts?.schema) {
+    const fullSchema = opts.schema;
+    beforeAll(async () => {
+      const sub: Schema = {};
+      for (const { table } of entries) {
+        if (table in fullSchema) sub[table] = fullSchema[table]!;
+      }
+      await defineSchema(getAdapter(), sub);
+    });
+  }
+
+  beforeEach(async () => {
+    const adapter = getAdapter();
+    for (const { table, data } of entries) {
+      store[table] = await defineJoinTableFixtures(adapter, table, data);
+    }
+  });
+
+  afterEach(async () => {
+    const adapter = getAdapter();
+    for (const { table } of [...entries].reverse()) {
+      try {
+        await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
+      } catch (e) {
+        if (!isTableMissingError(e)) throw e;
+      }
+    }
+    for (const key of keys) delete store[key];
+  });
+
+  const result: Record<string, unknown> = {};
+  for (const { table } of entries) {
+    const accessor = (name: string) => {
+      const set = store[table];
+      if (!set)
+        throw new Error(`useFixtures: fixture set "${table}" not loaded — call inside a test`);
+      const row = set[name];
+      if (!row) throw new Error(`useFixtures: no fixture named "${name}" in set "${table}"`);
+      return row;
+    };
+    accessor.all = () => {
+      const set = store[table];
+      if (!set)
+        throw new Error(`useFixtures: fixture set "${table}" not loaded — call inside a test`);
+      return Object.values(set);
+    };
+    result[table] = accessor;
+  }
+  return result;
+}
+
 export function useFixtures<M extends FixtureMap>(
   fixtures: M,
   getAdapter: () => DatabaseAdapter,
@@ -228,11 +311,30 @@ export function useFixtures<const N extends FixtureName>(
   getAdapter: () => DatabaseAdapter,
   opts?: UseFixturesOpts,
 ): UseFixturesByNameResult<N>;
+export function useFixtures<const T extends readonly TablelessFixtureEntry[]>(
+  tablelessEntries: T,
+  getAdapter: () => DatabaseAdapter,
+  opts?: UseFixturesOpts,
+): UseTablelessFixturesResult<T>;
 export function useFixtures(
-  fixturesOrNames: FixtureMap | readonly FixtureName[],
+  fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
   getAdapter: () => DatabaseAdapter,
   opts?: UseFixturesOpts,
 ): Record<string, unknown> {
+  // Tableless array: every element is an object with { table, data }.
+  if (
+    Array.isArray(fixturesOrNames) &&
+    fixturesOrNames.length > 0 &&
+    typeof (fixturesOrNames as readonly unknown[])[0] === "object" &&
+    (fixturesOrNames as readonly unknown[])[0] !== null &&
+    "table" in ((fixturesOrNames as readonly TablelessFixtureEntry[])[0] as object)
+  ) {
+    return useTablelessFixtures(
+      fixturesOrNames as readonly TablelessFixtureEntry[],
+      getAdapter,
+      opts,
+    );
+  }
   const isNameArray = Array.isArray(fixturesOrNames);
   // Keys are known synchronously (the names, or the map's own keys) so accessors
   // can be wired up before the (possibly async) model resolution in beforeEach.
