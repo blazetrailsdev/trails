@@ -110,9 +110,10 @@ export const ERB_SKIP_SENTINEL = "__ERB_SKIP__";
 // (Phase 1 of the subdir-fixtures plan) + 4 admin fixtures ported in Phase 3
 // + 2 categories fixtures ported in Phase 4a
 // + 7 reserved_words/to_be_linked YAMLs ported in Phase 7 (missing: 18 → 11).
-// Phases 2, 4b-6 will close the remaining 11 subdir YAMLs. Bump match when new
+// + 4 all/ fixtures ported in Phase 9 (missing: 5 → 1).
+// Phase 10 (primary_key_error/) will close the last missing YAML. Bump match when new
 // fixtures are ported; bump diff only for intentional accepted drifts.
-const CI_BASELINE = { match: 128, diff: 8, missing: 5 } as const;
+const CI_BASELINE = { match: 133, diff: 9, missing: 1 } as const;
 
 function parseArgs(argv: string[]): {
   pkg: string;
