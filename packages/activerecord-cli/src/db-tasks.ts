@@ -5,6 +5,7 @@ import {
   DatabaseConfigurations,
   NoDatabaseError,
   DatabaseAlreadyExists,
+  Migrator,
 } from "@blazetrails/activerecord";
 
 /**
@@ -116,4 +117,122 @@ export async function dbDrop(cwd: string, args: string[]): Promise<number> {
     if (!(await runDrop(config))) ok = false;
   }
   return ok ? 0 : 1;
+}
+
+async function tryLoadModels(cwd: string): Promise<void> {
+  const fsAdapter = await getFsAsync();
+  const modelsPath = resolve(join(cwd, "app", "models", "index.ts"));
+  if (!fsAdapter.existsSync(modelsPath)) return;
+  const { pathToFileURL } = await import("node:url");
+  await import(pathToFileURL(modelsPath).href);
+}
+
+function flagValue(args: string[], flag: string): string | undefined {
+  const i = args.indexOf(flag);
+  const raw = i >= 0 ? args[i + 1] : undefined;
+  return raw && !raw.startsWith("-") ? raw : undefined;
+}
+
+function parseStep(args: string[], fallback: number): number {
+  const raw = flagValue(args, "--step");
+  if (!raw) return fallback;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 ? n : fallback;
+}
+
+function loadMigrations(cwd: string): void {
+  const paths = DatabaseTasks.migrationsPaths.map((p) => resolve(join(cwd, p)));
+  DatabaseTasks.registerMigrations(Migrator.discoverMigrations(paths));
+}
+
+export async function dbMigrate(cwd: string, args: string[]): Promise<number> {
+  try {
+    await loadDatabaseConfig(cwd);
+  } catch (err) {
+    console.error(`ar: failed to load config/database.ts — ${String(err)}`);
+    return 1;
+  }
+  await tryLoadModels(cwd);
+  loadMigrations(cwd);
+
+  const version = flagValue(args, "--version");
+  try {
+    await DatabaseTasks.migrate(version);
+    return 0;
+  } catch (err) {
+    console.error(`ar: db:migrate failed — ${String(err)}`);
+    return 1;
+  }
+}
+
+export async function dbRollback(cwd: string, args: string[]): Promise<number> {
+  try {
+    await loadDatabaseConfig(cwd);
+  } catch (err) {
+    console.error(`ar: failed to load config/database.ts — ${String(err)}`);
+    return 1;
+  }
+  await tryLoadModels(cwd);
+  loadMigrations(cwd);
+  const step = parseStep(args, 1);
+
+  try {
+    await DatabaseTasks.rollback(step);
+    return 0;
+  } catch (err) {
+    console.error(`ar: db:rollback failed — ${String(err)}`);
+    return 1;
+  }
+}
+
+export async function dbSchemaLoad(cwd: string, _args: string[]): Promise<number> {
+  try {
+    await loadDatabaseConfig(cwd);
+  } catch (err) {
+    console.error(`ar: failed to load config/database.ts — ${String(err)}`);
+    return 1;
+  }
+
+  const env = DatabaseConfigurations.currentEnv();
+  try {
+    await DatabaseTasks.checkProtectedEnvironmentsBang(env);
+    await DatabaseTasks.loadSchemaCurrent(undefined, undefined, env);
+    return 0;
+  } catch (err) {
+    console.error(`ar: db:schema:load failed — ${String(err)}`);
+    return 1;
+  }
+}
+
+export async function dbSeed(cwd: string, _args: string[]): Promise<number> {
+  try {
+    await loadDatabaseConfig(cwd);
+  } catch (err) {
+    console.error(`ar: failed to load config/database.ts — ${String(err)}`);
+    return 1;
+  }
+
+  const fsAdapter = await getFsAsync();
+  const seedsPath = resolve(join(cwd, "db", "seeds.ts"));
+  if (!fsAdapter.existsSync(seedsPath)) {
+    console.log("db/seeds.ts not found — nothing to seed.");
+    return 0;
+  }
+
+  DatabaseTasks.seedLoader = {
+    loadSeed: async () => {
+      const { pathToFileURL } = await import("node:url");
+      const mod = await import(pathToFileURL(seedsPath).href);
+      const fn = mod.seed ?? mod.default;
+      if (typeof fn === "function") await fn();
+    },
+  };
+
+  try {
+    await DatabaseTasks.loadSeed();
+    return 0;
+  } catch (err) {
+    console.error(`ar: db:seed failed — ${String(err)}`);
+    return 1;
+  }
 }

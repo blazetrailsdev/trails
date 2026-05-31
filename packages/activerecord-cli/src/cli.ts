@@ -2,7 +2,7 @@ import { getPathAsync } from "@blazetrails/activesupport";
 import { init } from "./init.js";
 import { generateManifest } from "./generate-manifest.js";
 import { delegateBin } from "./delegate.js";
-import { dbCreate, dbDrop } from "./db-tasks.js";
+import { dbCreate, dbDrop, dbMigrate, dbRollback, dbSchemaLoad, dbSeed } from "./db-tasks.js";
 
 const HELP = `ar — the CLI for standalone @blazetrails/activerecord projects
 
@@ -16,9 +16,12 @@ Commands:
   models:dump          Dump model metadata via trails-models-dump
   db:create            Create the database for the current TRAILS_ENV
   db:drop              Drop the database for the current TRAILS_ENV
+  db:migrate           Run pending migrations
+  db:rollback          Roll back the last migration
+  db:schema:load       Load db/schema.ts into the database
+  db:seed              Load db/seeds.ts
 
-Coming in later slices: db:migrate, db:rollback, db:migrate:status, db:seed,
-db:setup, db:prepare, db:reset.
+Coming in later slices: db:migrate:status, db:setup, db:prepare, db:reset.
 
 Run \`ar <command> --help\` for command-specific help.`;
 
@@ -55,12 +58,23 @@ Production environments are protected unless DISABLE_DATABASE_ENVIRONMENT_CHECK 
 Options:
   --all   Drop databases for all environments, not just the current one.`;
 
+const DB_MIGRATE_HELP = `ar db:migrate — run pending migrations
+
+Options:
+  --version <v>   Migrate to a specific version.`;
+
+const DB_ROLLBACK_HELP = `ar db:rollback — roll back the last migration
+
+Options:
+  --step <n>   Roll back N migrations (default: 1).`;
+
+const DB_SCHEMA_LOAD_HELP = `ar db:schema:load — load db/schema.ts into the database`;
+
+const DB_SEED_HELP = `ar db:seed — load db/seeds.ts (no-op if file is absent)`;
+
 /** Commands recognized but deferred to a later slice (see proposal §5). */
 const NOT_IMPLEMENTED = new Set(
-  (
-    "generate db:migrate db:rollback " +
-    "db:migrate:status db:seed db:schema:dump db:setup db:prepare db:reset"
-  ).split(" "),
+  "generate db:migrate:status db:schema:dump db:setup db:prepare db:reset".split(" "),
 );
 
 function wantsHelp(args: string[]): boolean {
@@ -158,6 +172,34 @@ export async function run(argv: string[], cwd: string): Promise<number> {
       return 0;
     }
     return dbDrop(cwd, rest);
+  }
+  if (command === "db:migrate") {
+    if (wantsHelp(rest)) {
+      console.log(DB_MIGRATE_HELP);
+      return 0;
+    }
+    return dbMigrate(cwd, rest);
+  }
+  if (command === "db:rollback") {
+    if (wantsHelp(rest)) {
+      console.log(DB_ROLLBACK_HELP);
+      return 0;
+    }
+    return dbRollback(cwd, rest);
+  }
+  if (command === "db:schema:load") {
+    if (wantsHelp(rest)) {
+      console.log(DB_SCHEMA_LOAD_HELP);
+      return 0;
+    }
+    return dbSchemaLoad(cwd, rest);
+  }
+  if (command === "db:seed") {
+    if (wantsHelp(rest)) {
+      console.log(DB_SEED_HELP);
+      return 0;
+    }
+    return dbSeed(cwd, rest);
   }
   if (NOT_IMPLEMENTED.has(command)) {
     console.error(`ar: "${command}" is not implemented in this slice yet.`);

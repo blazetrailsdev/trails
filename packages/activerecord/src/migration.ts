@@ -2907,6 +2907,39 @@ export class Migrator {
   }
 
   /**
+   * Scan one or more directories and return `MigrationProxy[]` without
+   * requiring a live adapter. Intended for CLI bootstrap — call
+   * `DatabaseTasks.registerMigrations(Migrator.discoverMigrations(paths))`
+   * before invoking `DatabaseTasks.migrate()` or `DatabaseTasks.rollback()`.
+   */
+  static discoverMigrations(dirs: string[]): MigrationProxy[] {
+    const helper = new Migrator(null as unknown as DatabaseAdapter, []);
+    const proxies: MigrationProxy[] = [];
+    for (const file of helper.migrationFiles(dirs)) {
+      const parsed = helper.parseMigrationFilename(file);
+      if (!parsed) continue;
+      const [version, rawName, scope] = parsed;
+      const name = camelize(rawName);
+      proxies.push({
+        version,
+        name,
+        filename: file,
+        scope: scope || undefined,
+        migration: async () => {
+          const { pathToFileURL } = await import("node:url");
+          const mod = await import(pathToFileURL(file).href);
+          return (mod.default ?? mod[name]) as MigrationLike;
+        },
+      });
+    }
+    return proxies.sort((a, b) => {
+      const va = BigInt(a.version),
+        vb = BigInt(b.version);
+      return va < vb ? -1 : va > vb ? 1 : 0;
+    });
+  }
+
+  /**
    * Scan `dir` for migration files and build `MigrationProxy[]` (without
    * wrapping them in a Migrator). Mirrors the discovery half of Rails'
    * `MigrationContext#migrations`.
