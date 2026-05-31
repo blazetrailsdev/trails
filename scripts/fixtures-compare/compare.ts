@@ -753,7 +753,12 @@ async function main(): Promise<void> {
     if (loaded.ok) yamlByTable.set(snake, loaded.data);
     else prelim.set(snake, loaded.reason);
   }
-  const idIndex = buildIdIndex(yamlByTable);
+  // Build the id index keyed by DB table name (tableSnake), not path key.
+  // ref("admin_accounts", "david") calls idIndex.get("admin_accounts"); storing
+  // under "admin/accounts" would cause false FK diffs for every subdir fixture ref.
+  const yamlByTableName = new Map<string, FixtureMap>();
+  for (const [snake, rows] of yamlByTable) yamlByTableName.set(snake.replace(/\//g, "_"), rows);
+  const idIndex = buildIdIndex(yamlByTableName);
 
   const results: FileResult[] = [];
   for (const f of yamlFiles) {
