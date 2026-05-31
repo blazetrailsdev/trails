@@ -39,18 +39,12 @@ describe("ArRunnerTest", () => {
     expect(err.join("\n")).toContain("config/database.ts");
   });
 
-  it("runs a script that asserts models are in scope and returns 0", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "ar-runner-models-"));
+  it("runs a script with Base importable and --flag forwarded via __ARGV__", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-runner-script-"));
     await scaffoldProject(dir);
-    await mkdir(join(dir, "app", "models"), { recursive: true });
-    await writeFile(
-      join(dir, "app", "models", "index.ts"),
-      `export const User = "sentinel";\n`,
-      "utf8",
-    );
     await writeFile(
       join(dir, "check.ts"),
-      `import { Base } from "@blazetrails/activerecord";\nif (!Base) throw new Error("Base not found");\nconst argv = (globalThis as any).__ARGV__;\nif (argv[0] !== "hello") throw new Error("ARGV[0] mismatch");\nif (argv[1] !== "--flag") throw new Error("ARGV[1] flag mismatch");\n`,
+      `import { Base } from "@blazetrails/activerecord";\nif (!Base) throw new Error("Base not found");\nconst a = (globalThis as any).__ARGV__;\nif (a[0] !== "hello" || a[1] !== "--flag") throw new Error("ARGV mismatch: " + JSON.stringify(a));\n`,
       "utf8",
     );
     const code = await arRunner(dir, ["--env", "test", "check.ts", "hello", "--flag"]);
