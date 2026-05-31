@@ -28,46 +28,23 @@ function parseFixtureNames(after: string): string[] {
   return names;
 }
 
-interface TestEntry {
-  desc: string;
-  body: string;
-}
-
-function extractTests(src: string): TestEntry[] {
+function extractTestDescs(src: string): string[] {
   const lines = src.split("\n");
-  const entries: TestEntry[] = [];
+  const descs: string[] = [];
 
   const DEF_RE = /^(\s*)def\s+(test_[a-zA-Z0-9_?!]*)/;
   const BLK_RE = /^(\s*)test\s+["']([^"']+)["']\s+do\b/;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  for (const line of lines) {
     const dm = line.match(DEF_RE);
     if (dm) {
-      const indent = dm[1].length;
-      const rawDesc = dm[2].replace(/^test_/, "").replace(/_/g, " ");
-      const end = findBodyEnd(lines, i, indent);
-      entries.push({ desc: normalize(rawDesc), body: lines.slice(i + 1, end).join("\n") });
+      descs.push(normalize(dm[2].replace(/^test_/, "").replace(/_/g, " ")));
       continue;
     }
     const bm = line.match(BLK_RE);
-    if (bm) {
-      const indent = bm[1].length;
-      const end = findBodyEnd(lines, i, indent);
-      entries.push({ desc: normalize(bm[2]), body: lines.slice(i + 1, end).join("\n") });
-    }
+    if (bm) descs.push(normalize(bm[2]));
   }
-  return entries;
-}
-
-function findBodyEnd(lines: string[], startIdx: number, indent: number): number {
-  for (let j = startIdx + 1; j < lines.length; j++) {
-    const l = lines[j];
-    if (l.trim() === "") continue;
-    const lead = l.match(/^(\s*)/)![1].length;
-    if (lead === indent && /^\s*end\b/.test(l)) return j;
-  }
-  return lines.length;
+  return descs;
 }
 
 function processFile(file: string): { trailsRel: string; descs: string[] } | null {
@@ -79,17 +56,11 @@ function processFile(file: string): { trailsRel: string; descs: string[] } | nul
     fixtureNames.push(...parseFixtureNames(m[1]));
   }
 
-  const tests = extractTests(src);
-  if (tests.length === 0) return null;
+  if (fixtureNames.length === 0) return null;
 
-  let useDescs: string[];
-  if (fixtureNames.length > 0) {
-    useDescs = tests.map((t) => t.desc);
-  } else {
-    useDescs = [];
-  }
-
-  if (useDescs.length === 0) return null;
+  const descs = extractTestDescs(src);
+  if (descs.length === 0) return null;
+  const useDescs = descs;
 
   const relPath = path.relative(CASES_DIR, file).replace(/\\/g, "/");
   const trailsRel = railsToTrailsRel(relPath);

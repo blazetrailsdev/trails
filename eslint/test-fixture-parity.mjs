@@ -16,18 +16,19 @@ const MAPPING_PATH =
   process.env.TEST_FIXTURE_PARITY_MAP_PATH ??
   path.resolve(__dirname, "test-fixture-parity.json");
 
+// Mtime-based cache: a single lint run reads the file once; tests can swap
+// the file on disk between runs and get fresh data (same pattern as expected-fixtures.mjs).
 let mappingCache = null;
+let mappingCacheMtime = -1;
 function loadMapping() {
-  if (mappingCache) return mappingCache;
-  if (!fs.existsSync(MAPPING_PATH)) {
-    mappingCache = {};
-    return mappingCache;
-  }
+  if (!fs.existsSync(MAPPING_PATH)) return {};
+  const mtime = fs.statSync(MAPPING_PATH).mtimeMs;
+  if (mappingCache && mtime === mappingCacheMtime) return mappingCache;
   const raw = JSON.parse(fs.readFileSync(MAPPING_PATH, "utf8"));
-  // Convert arrays to Sets for O(1) lookup
   const out = {};
   for (const [k, v] of Object.entries(raw)) out[k] = new Set(v);
   mappingCache = out;
+  mappingCacheMtime = mtime;
   return mappingCache;
 }
 
