@@ -1,6 +1,8 @@
 import { getPathAsync } from "@blazetrails/activesupport";
 import { init } from "./init.js";
 import { generateManifest } from "./generate-manifest.js";
+import { generateMigration, migrationTimestamp, parseFields } from "./generate-migration.js";
+import { generateModel } from "./generate-model.js";
 import { delegateBin } from "./delegate.js";
 import { dbCreate, dbDrop, dbMigrate, dbRollback, dbSchemaLoad, dbSeed } from "./db-tasks.js";
 
@@ -9,17 +11,19 @@ const HELP = `ar — the CLI for standalone @blazetrails/activerecord projects
 Usage: ar <command> [options]
 
 Commands:
-  init                 Scaffold config/database.ts, db/, app/models/, and db.ts
-  generate:manifest    Scan app/models/ and (re)write app/models/index.ts
-  typecheck            Type-check your models via trails-tsc
-  schema:dump          Dump the current schema via trails-schema-dump
-  models:dump          Dump model metadata via trails-models-dump
-  db:create            Create the database for the current TRAILS_ENV
-  db:drop              Drop the database for the current TRAILS_ENV
-  db:migrate           Run pending migrations
-  db:rollback          Roll back the last migration
-  db:schema:load       Load db/schema.ts into the database
-  db:seed              Load db/seeds.ts
+  init                           Scaffold config/database.ts, db/, app/models/, and db.ts
+  generate:manifest              Scan app/models/ and (re)write app/models/index.ts
+  generate:migration <Name>      Emit db/migrate/<ts>_<snake_name>.ts
+  generate:model <Name>          Emit app/models/<snake>.ts + a create migration
+  typecheck                      Type-check your models via trails-tsc
+  schema:dump                    Dump the current schema via trails-schema-dump
+  models:dump                    Dump model metadata via trails-models-dump
+  db:create                      Create the database for the current TRAILS_ENV
+  db:drop                        Drop the database for the current TRAILS_ENV
+  db:migrate                     Run pending migrations
+  db:rollback                    Roll back the last migration
+  db:schema:load                 Load db/schema.ts into the database
+  db:seed                        Load db/seeds.ts
 
 Coming in later slices: db:migrate:status, db:setup, db:prepare, db:reset.
 
@@ -72,9 +76,31 @@ const DB_SCHEMA_LOAD_HELP = `ar db:schema:load — load db/schema.ts into the da
 
 const DB_SEED_HELP = `ar db:seed — load db/seeds.ts (no-op if file is absent)`;
 
+const GENERATE_MIGRATION_HELP = `ar generate:migration <Name> [field:type ...] — emit a migration file
+
+Creates db/migrate/<YYYYMMDDHHMMSS>_<snake_name>.ts. The migration class name is the
+CamelCase form of <Name>. Name patterns trigger different templates:
+  add_<cols>_to_<table>    → addColumn calls
+  remove_<cols>_from_<tbl> → removeColumn calls
+  create_<table>           → createTable block (same as generate:model)
+  anything else            → change() body with a TODO comment
+
+Options:
+  --force      Overwrite if file already exists (default: refuse).
+  --dry-run    Print the intended path without writing.`;
+
+const GENERATE_MODEL_HELP = `ar generate:model <Name> [field:type ...] — emit a model + creation migration
+
+Creates app/models/<snake_name>.ts (a Base subclass) and
+db/migrate/<YYYYMMDDHHMMSS>_create_<plural_snake>.ts.
+
+Options:
+  --force      Overwrite if files already exist (default: refuse).
+  --dry-run    Print the intended paths without writing.`;
+
 /** Commands recognized but deferred to a later slice (see proposal §5). */
 const NOT_IMPLEMENTED = new Set(
-  "generate db:migrate:status db:schema:dump db:setup db:prepare db:reset".split(" "),
+  "db:migrate:status db:schema:dump db:setup db:prepare db:reset".split(" "),
 );
 
 function wantsHelp(args: string[]): boolean {
@@ -200,6 +226,56 @@ export async function run(argv: string[], cwd: string): Promise<number> {
       return 0;
     }
     return dbSeed(cwd, rest);
+  }
+  if (command === "generate:migration") {
+    if (wantsHelp(rest)) {
+      console.log(GENERATE_MIGRATION_HELP);
+      return 0;
+    }
+    const [name, ...fieldTokens] = rest.filter((a) => !a.startsWith("-"));
+    if (!name) {
+      console.error("ar: generate:migration requires a migration name.");
+      return 1;
+    }
+    const force = rest.includes("--force");
+    const dryRun = rest.includes("--dry-run");
+    const fields = parseFields(fieldTokens);
+    const result = await generateMigration(cwd, name, fields, migrationTimestamp(), {
+      force,
+      dryRun,
+    });
+    if (result.skipped) {
+      console.error(`ar: ${result.path} already exists. Use --force to overwrite.`);
+      return 1;
+    }
+    const verb = dryRun ? "  (dry)   " : "  create  ";
+    console.log(`${verb}${result.path}`);
+    return 0;
+  }
+  if (command === "generate:model") {
+    if (wantsHelp(rest)) {
+      console.log(GENERATE_MODEL_HELP);
+      return 0;
+    }
+    const [name, ...fieldTokens] = rest.filter((a) => !a.startsWith("-"));
+    if (!name) {
+      console.error("ar: generate:model requires a model name.");
+      return 1;
+    }
+    const force = rest.includes("--force");
+    const dryRun = rest.includes("--dry-run");
+    const fields = parseFields(fieldTokens);
+    const result = await generateModel(cwd, name, fields, migrationTimestamp(), { force, dryRun });
+    if (result.skipped) {
+      console.error(
+        `ar: ${result.modelPath} or ${result.migrationPath} already exists. Use --force to overwrite.`,
+      );
+      return 1;
+    }
+    const verb = dryRun ? "  (dry)   " : "  create  ";
+    console.log(`${verb}${result.modelPath}`);
+    console.log(`${verb}${result.migrationPath}`);
+    return 0;
   }
   if (NOT_IMPLEMENTED.has(command)) {
     console.error(`ar: "${command}" is not implemented in this slice yet.`);
