@@ -21,12 +21,14 @@ import {
 import { dbAbortIfPendingMigrations } from "./pending-migrations.js";
 import { arConsole } from "./console.js";
 import { arRunner } from "./runner.js";
+import { arNew, parseDriver } from "./new.js";
 
 const HELP = `ar — the CLI for standalone @blazetrails/activerecord projects
 
 Usage: ar <command> [options]
 
 Commands:
+  new <app-name>                 Create a new directory and scaffold a standalone AR project
   init                           Scaffold config/database.ts, db/, app/models/, and db.ts
   generate:manifest              Scan app/models/ and (re)write app/models/index.ts
   generate:migration <Name>      Emit db/migrate/<ts>_<snake_name>.ts
@@ -62,6 +64,16 @@ Idempotent: a second run is a no-op.
 Options:
   --root <dir>   Directory to scan (default: ./app/models)
   --check        Don't write; exit 1 if app/models/index.ts is out of date (CI).`;
+
+const NEW_HELP = `ar new <app-name> — create a new standalone activerecord project
+
+Creates ./<app-name>/, writes package.json, tsconfig.json, .gitignore, and
+runs the same scaffolding as \`ar init\` inside the new directory. Does NOT
+run \`pnpm install\` or \`git init\` — prints the next-step commands instead.
+
+Options:
+  --driver <name>   Database driver: better-sqlite3 (default), node-sqlite, pg, mysql2.
+  --force           Overwrite if the directory already exists.`;
 
 const INIT_HELP = `ar init — scaffold a standalone activerecord project
 
@@ -196,6 +208,49 @@ export async function run(argv: string[], cwd: string): Promise<number> {
   const [command, ...rest] = argv;
   if (!command || command === "help" || command === "--help" || command === "-h") {
     console.log(HELP);
+    return 0;
+  }
+  if (command === "new") {
+    if (wantsHelp(rest)) {
+      console.log(NEW_HELP);
+      return 0;
+    }
+    const driverIdx = rest.indexOf("--driver");
+    let rawDriver: string | undefined;
+    if (driverIdx >= 0) {
+      const next = rest[driverIdx + 1];
+      if (next === undefined || next.startsWith("-")) {
+        console.error("ar: --driver requires a value: better-sqlite3, node-sqlite, pg, or mysql2.");
+        return 1;
+      }
+      rawDriver = next;
+    }
+    // Exclude flag tokens and the --driver value so `ar new --driver pg myapp`
+    // correctly resolves appName to "myapp" rather than "pg".
+    const appName = rest.find(
+      (a, i) => !a.startsWith("-") && (driverIdx < 0 || i !== driverIdx + 1),
+    );
+    if (!appName) {
+      console.error("ar: new requires an app name. Usage: ar new <app-name>");
+      return 1;
+    }
+    const driver = parseDriver(rawDriver);
+    if (driver === null) {
+      console.error(
+        `ar: unknown driver "${rawDriver}". Valid options: better-sqlite3, node-sqlite, pg, mysql2.`,
+      );
+      return 1;
+    }
+    const force = rest.includes("--force");
+    const result = await arNew(cwd, appName, driver, { force });
+    for (const rel of result.created) console.log(`  create  ${appName}/${rel}`);
+    for (const rel of result.skipped) console.log(`  skip    ${appName}/${rel} (already exists)`);
+    console.log(`\nScaffolded ${result.created.length} file(s) in ${result.appDir}.`);
+    console.log("\nNext steps:");
+    console.log(`  cd ${appName}`);
+    console.log("  pnpm install    # or: npm install");
+    console.log("  git init && git add -A && git commit -m 'Initial commit'");
+    console.log("  ar db:create");
     return 0;
   }
   if (command === "init") {

@@ -68,21 +68,29 @@ export interface InitResult {
   skipped: string[];
 }
 
+export interface InitOptions {
+  /** Overwrite existing files instead of skipping them. */
+  force?: boolean;
+  /** Per-path content overrides (relative paths → body). `ar new` uses this to inject driver-specific config. */
+  overrides?: Record<string, string>;
+}
+
 /**
- * Scaffold a standalone-activerecord project under `root`. Never overwrites an
- * existing file — those are `skipped`, so re-running `ar init` is safe.
+ * Scaffold a standalone-activerecord project under `root`. Existing files are
+ * skipped by default; pass `force: true` to overwrite them.
  */
-export async function init(root: string): Promise<InitResult> {
+export async function init(root: string, opts: InitOptions = {}): Promise<InitResult> {
+  const { force = false, overrides = {} } = opts;
   const created: string[] = [];
   const skipped: string[] = [];
-  for (const [rel, body] of SCAFFOLD) {
+  for (const [rel, defaultBody] of SCAFFOLD) {
+    const body = Object.prototype.hasOwnProperty.call(overrides, rel)
+      ? overrides[rel]
+      : defaultBody;
     const target = join(root, rel);
     await mkdir(dirname(target), { recursive: true });
     try {
-      // `wx` creates atomically, failing with EEXIST if the path already
-      // exists — no check-then-write TOCTOU window. EEXIST means "skip";
-      // any other error (EACCES/EPERM/ENOTDIR…) is real and re-thrown.
-      await writeFile(target, body, { flag: "wx" });
+      await writeFile(target, body, { flag: force ? "w" : "wx" });
       created.push(rel);
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
