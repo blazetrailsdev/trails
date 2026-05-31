@@ -116,6 +116,7 @@ import {
   findSignedBang as _findSignedBang,
 } from "./signed-id.js";
 import { registerMigrationArConfig } from "./migration.js";
+import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
 import { hookAttributeType as tzHookAttributeType } from "./attribute-methods/time-zone-conversion.js";
@@ -3754,3 +3755,7 @@ _setGlobalIdModelFinder((name: string) => {
 // initializers register `on_load(:active_record)` consumers that need a
 // fully-defined `Base` class (timezone, filter attributes, ...).
 runLoadHooks("active_record", Base);
+
+// Wire Base into DatabaseTasks so migrationConnection() works synchronously
+// without waiting for an async method to capture _baseClass first.
+DatabaseTasks._registerBase(Base);

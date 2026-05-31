@@ -1020,6 +1020,11 @@ export class DatabaseTasks {
     return Base;
   }
 
+  /** Called from base.ts at module init so migrationConnection() works before any async method runs. */
+  static _registerBase(base: typeof import("../base.js").Base): void {
+    this._baseClass = base;
+  }
+
   static migrationConnection(): import("../adapter.js").DatabaseAdapter | null {
     if (!this._baseClass) return null;
     try {

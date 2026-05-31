@@ -320,12 +320,6 @@ export class MySQLDatabaseTasks {
   /** @internal */
   private async establishConnection(configHash?: Record<string, unknown>): Promise<void> {
     const hash: Record<string, unknown> = { ...(configHash ?? this.dbConfig.configuration) };
-    // mysql2 accepts `socketPath`; database.yml uses `socket`. buildAdapterArg
-    // passes keys through as-is, so remap before handing off to Base.
-    if (hash.socket !== undefined && hash.socketPath === undefined) {
-      hash.socketPath = hash.socket;
-      delete hash.socket;
-    }
     await Base.establishConnection(hash as { adapter?: string; [key: string]: unknown });
   }
 

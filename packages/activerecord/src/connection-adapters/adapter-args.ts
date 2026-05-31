@@ -98,7 +98,17 @@ export function buildAdapterArg(
   if (adapterConfig.user === undefined && username !== undefined) {
     adapterConfig.user = username;
   }
-  if (adapterConfig.host === undefined) {
+  // mysql2 uses `socketPath`; database.yml uses `socket`. Normalise here so
+  // all callers benefit, not just the DatabaseTasks path.
+  if (
+    normalized === "mysql" &&
+    adapterConfig.socket !== undefined &&
+    adapterConfig.socketPath === undefined
+  ) {
+    adapterConfig.socketPath = adapterConfig.socket;
+    delete adapterConfig.socket;
+  }
+  if (adapterConfig.host === undefined && adapterConfig.socketPath === undefined) {
     adapterConfig.host = "localhost";
   }
   return [adapterConfig];
