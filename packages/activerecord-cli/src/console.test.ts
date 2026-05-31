@@ -27,13 +27,10 @@ async function scaffoldProject(dir: string) {
 }
 
 describe("ArConsoleTest", () => {
-  let out: string[];
   let err: string[];
 
   beforeEach(() => {
-    out = [];
     err = [];
-    vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
   });
 

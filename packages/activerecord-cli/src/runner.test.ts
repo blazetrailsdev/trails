@@ -22,7 +22,6 @@ describe("ArRunnerTest", () => {
 
   it("returns 1 when no script path is given", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ar-runner-noarg-"));
-    await scaffoldProject(dir);
     const code = await arRunner(dir, []);
     expect(code).toBe(1);
     expect(err.join("\n")).toContain("runner requires a script path");
