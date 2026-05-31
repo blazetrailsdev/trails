@@ -22,6 +22,7 @@ async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigurations> 
   const raw = mod.default ?? mod;
   const configs = DatabaseConfigurations.fromEnv(raw);
   DatabaseTasks.databaseConfiguration = configs;
+  DatabaseTasks.root = cwd;
   return configs;
 }
 
@@ -102,8 +103,13 @@ export async function dbDrop(cwd: string, args: string[]): Promise<number> {
   }
   // Mirror DatabaseTasks.dropAll / dropCurrent: check protected envs before
   // any drop so a single production config in a multi-db set doesn't slip through.
-  for (const config of configs) {
-    await DatabaseTasks.checkProtectedEnvironmentsBang(config.envName);
+  try {
+    for (const config of configs) {
+      await DatabaseTasks.checkProtectedEnvironmentsBang(config.envName);
+    }
+  } catch (err) {
+    console.error(`ar: ${String(err)}`);
+    return 1;
   }
   let ok = true;
   for (const config of configs) {

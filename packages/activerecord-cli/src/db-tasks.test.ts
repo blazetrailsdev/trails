@@ -42,6 +42,7 @@ describe("DbTasksTest", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     DatabaseTasks.databaseConfiguration = null;
+    (DatabaseTasks as unknown as { _root: null })._root = null;
   });
 
   it("db:create loads config and calls DatabaseTasks.create for current env", async () => {
