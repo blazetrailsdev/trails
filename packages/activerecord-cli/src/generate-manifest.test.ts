@@ -48,7 +48,7 @@ describe("ArGenerateManifestTest", () => {
     await writeModel(
       dir,
       "field.ts",
-      `import { Base } from "x";\n` +
+      `import { Base } from "@blazetrails/activerecord";\n` +
         `export class FieldBase extends Base {\n  static abstractClass = true;\n}\n` +
         `export class Widget extends FieldBase {}\n`,
     );
@@ -56,7 +56,7 @@ describe("ArGenerateManifestTest", () => {
     await writeModel(
       dir,
       "backing.ts",
-      `import { Base } from "x";\n` +
+      `import { Base } from "@blazetrails/activerecord";\n` +
         `export class BackingBase extends Base {\n  static override _abstractClass = true;\n}\n` +
         `export class Gizmo extends BackingBase {}\n`,
     );
@@ -65,13 +65,38 @@ describe("ArGenerateManifestTest", () => {
     await writeModel(
       dir,
       "block.ts",
-      `import { Base } from "x";\n` +
+      `import { Base } from "@blazetrails/activerecord";\n` +
         `export class BlockBase extends Base {\n  static {\n    this._abstractClass = true;\n  }\n}\n` +
         `export class Gadget extends BlockBase {}\n`,
     );
     const names = (await scanModels(dir)).map((e) => e.className);
     // Every abstract base bridges the chain but is not registered.
     expect(names).toEqual(["Gadget", "Gizmo", "Widget"]);
+  });
+
+  it("ignores a class extending a `Base` imported from another package", async () => {
+    // Same identifier, different origin — only ActiveRecord's Base counts, so
+    // this helper must not be registered (it'd fail registerModel/loadSchema).
+    await writeModel(
+      dir,
+      "helper.ts",
+      `import { Base } from "some-ui-lib";\nexport class Helper extends Base {}\n`,
+    );
+    await writeModel(
+      dir,
+      "user.ts",
+      `import { Base } from "@blazetrails/activerecord";\nexport class User extends Base {}\n`,
+    );
+    expect((await scanModels(dir)).map((e) => e.className)).toEqual(["User"]);
+  });
+
+  it("recognizes Base under an import alias", async () => {
+    await writeModel(
+      dir,
+      "user.ts",
+      `import { Base as AR } from "@blazetrails/activerecord";\nexport class User extends AR {}\n`,
+    );
+    expect((await scanModels(dir)).map((e) => e.className)).toEqual(["User"]);
   });
 
   it("handles an empty models dir without dangling re-exports", async () => {
@@ -94,7 +119,7 @@ describe("ArGenerateManifestTest", () => {
     await writeModel(
       dir,
       "account.ts",
-      `import { Base } from "x";\nexport default class Account extends Base {}\n`,
+      `import { Base } from "@blazetrails/activerecord";\nexport default class Account extends Base {}\n`,
     );
     const manifest = await buildManifest(dir);
     expect(manifest).toContain(`import Account from "./account.js";`);
@@ -103,8 +128,16 @@ describe("ArGenerateManifestTest", () => {
   });
 
   it("rejects two model classes that share a name (would not compile)", async () => {
-    await writeModel(dir, "a.ts", `import { Base } from "x";\nexport class Dup extends Base {}\n`);
-    await writeModel(dir, "b.ts", `import { Base } from "x";\nexport class Dup extends Base {}\n`);
+    await writeModel(
+      dir,
+      "a.ts",
+      `import { Base } from "@blazetrails/activerecord";\nexport class Dup extends Base {}\n`,
+    );
+    await writeModel(
+      dir,
+      "b.ts",
+      `import { Base } from "@blazetrails/activerecord";\nexport class Dup extends Base {}\n`,
+    );
     await expect(scanModels(dir)).rejects.toThrow(
       /duplicate exported class "Dup" in a\.ts and b\.ts/,
     );
@@ -113,7 +146,11 @@ describe("ArGenerateManifestTest", () => {
   it("rejects a non-model duplicate rather than letting it shadow a real model", async () => {
     // The model (a.ts) must not be silently dropped because a same-named
     // non-model class (z.ts) overwrote it during inheritance resolution.
-    await writeModel(dir, "a.ts", `import { Base } from "x";\nexport class User extends Base {}\n`);
+    await writeModel(
+      dir,
+      "a.ts",
+      `import { Base } from "@blazetrails/activerecord";\nexport class User extends Base {}\n`,
+    );
     await writeModel(dir, "z.ts", `export class User {}\n`);
     await expect(scanModels(dir)).rejects.toThrow(
       /duplicate exported class "User" in a\.ts and z\.ts/,

@@ -2,10 +2,11 @@ import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 import type { FsAdapter } from "@blazetrails/activesupport";
 import ts from "typescript";
 
-// A class is a model worth registering when its `extends` chain reaches
-// `Base` (imported from `@blazetrails/activerecord`). Its declaration is never
-// in the scanned files, so reaching the bare name `Base` terminates the walk.
-const BASE_CLASS = "Base";
+// A class is a model worth registering when its `extends` chain reaches the
+// `Base` exported by `@blazetrails/activerecord`. We terminate the walk on a
+// parent that is *that* import specifically — not any identifier named `Base`,
+// so a class extending an unrelated `Base` from another package is not a model.
+const AR_PACKAGE = "@blazetrails/activerecord";
 const MANIFEST_NAME = "index.ts";
 
 const HEADER =
@@ -22,6 +23,7 @@ export interface ModelEntry {
 interface ClassDecl {
   name: string;
   parent: string | undefined; // the `extends` target's identifier name, if any
+  parentIsArBase: boolean; // `extends` target is this file's `@blazetrails/activerecord` Base import
   isDefault: boolean;
   isAbstract: boolean;
   file: string;
@@ -87,6 +89,28 @@ function isAbstractModel(node: ts.ClassDeclaration): boolean {
   return node.members.some(memberMarksAbstract);
 }
 
+/**
+ * The local identifiers a file binds to `@blazetrails/activerecord`'s `Base`
+ * export — e.g. `{ "Base" }` for `import { Base } from "..."`, or `{ "AR" }`
+ * for `import { Base as AR } from "..."`. Used to confirm an `extends Base`
+ * really targets ActiveRecord's Base and not a same-named class from elsewhere.
+ */
+function collectArBaseNames(sf: ts.SourceFile): Set<string> {
+  const out = new Set<string>();
+  for (const stmt of sf.statements) {
+    if (!ts.isImportDeclaration(stmt)) continue;
+    if (!ts.isStringLiteral(stmt.moduleSpecifier) || stmt.moduleSpecifier.text !== AR_PACKAGE) {
+      continue;
+    }
+    const named = stmt.importClause?.namedBindings;
+    if (!named || !ts.isNamedImports(named)) continue;
+    for (const el of named.elements) {
+      if ((el.propertyName ?? el.name).text === "Base") out.add(el.name.text);
+    }
+  }
+  return out;
+}
+
 /** The identifier name of a class's `extends` clause, if it extends one. */
 function extendsName(node: ts.ClassDeclaration): string | undefined {
   for (const clause of node.heritageClauses ?? []) {
@@ -121,14 +145,16 @@ export async function scanModels(modelsDir: string): Promise<ModelEntry[]> {
   for (const file of files) {
     const text = await fs.readFile!(path.join(modelsDir, file), "utf8");
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.ES2022, true);
+    const arBaseNames = collectArBaseNames(sf);
     for (const stmt of sf.statements) {
       if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
       if (!hasModifier(stmt, ts.SyntaxKind.ExportKeyword)) continue;
-      const isDefault = hasModifier(stmt, ts.SyntaxKind.DefaultKeyword);
+      const parent = extendsName(stmt);
       decls.push({
         name: stmt.name.text,
-        parent: extendsName(stmt),
-        isDefault,
+        parent,
+        parentIsArBase: parent !== undefined && arBaseNames.has(parent),
+        isDefault: hasModifier(stmt, ts.SyntaxKind.DefaultKeyword),
         isAbstract: isAbstractModel(stmt),
         file,
       });
@@ -146,17 +172,24 @@ export async function scanModels(modelsDir: string): Promise<ModelEntry[]> {
     byName.set(d.name, d);
   }
 
-  // A class is a model iff its `extends` chain reaches `Base`; `seen` guards
-  // cyclic declarations, `cache` memoizes shared ancestors.
+  // A class is a model iff its `extends` chain reaches ActiveRecord's `Base`.
+  // The terminal step is `parentIsArBase` (an AR-Base import in the declaring
+  // file); otherwise we follow the parent name to the next local class. A
+  // parent that's neither resolves to no `byName` entry → not a model. `seen`
+  // guards cyclic declarations, `cache` memoizes the single-inheritance chain.
   const cache = new Map<string, boolean>();
   function reachesBase(name: string, seen: Set<string>): boolean {
-    if (name === BASE_CLASS) return true;
     const cached = cache.get(name);
     if (cached !== undefined) return cached;
     const decl = byName.get(name);
-    if (!decl || !decl.parent || seen.has(name)) return false;
-    seen.add(name);
-    const result = reachesBase(decl.parent, seen);
+    let result: boolean;
+    if (!decl) result = false;
+    else if (decl.parentIsArBase) result = true;
+    else if (!decl.parent || seen.has(name)) result = false;
+    else {
+      seen.add(name);
+      result = reachesBase(decl.parent, seen);
+    }
     cache.set(name, result);
     return result;
   }
