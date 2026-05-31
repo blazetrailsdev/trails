@@ -1,4 +1,5 @@
-import { describe, it, expect, expectTypeOf, vi, beforeAll } from "vitest";
+import { describe, it, expect, expectTypeOf, vi, beforeAll, afterAll } from "vitest";
+import { snapshotEncryptionConfig, restoreEncryptionConfig } from "../encryption/test-helpers.js";
 import { useFixtures, resolveFixtureNames, deriveFixtureSchema } from "./use-fixtures.js";
 import { fixtureRegistry, isJoinTableEntry } from "./fixtures-registry.js";
 import { FixtureSet } from "./fixture-set.js";
@@ -677,8 +678,20 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
 describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
+
+  // The addOn calls `configureEncryption` (keys + supportUnencryptedData), which
+  // mutates the process-global encryption config. Snapshot before and restore
+  // after so this suite doesn't leak that state into later suites in the worker.
+  // (Configuring encryption is intrinsic to reading encrypted fixtures — you
+  // can't decrypt/round-trip them without keys — mirroring how Rails' encryption
+  // test cases configure keys via ActiveRecord::EncryptionTestCase.)
+  let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
   beforeAll(async () => {
+    configSnapshot = snapshotEncryptionConfig();
     await defineSchema(TEST_SCHEMA);
+  });
+  afterAll(() => {
+    restoreEncryptionConfig(configSnapshot);
   });
 
   // EncryptedBook calls `encrypts("name", { deterministic: true })` in a static
@@ -687,18 +700,30 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
   // bootstraps it. The fixture row seeds as cleartext (see the EncryptedFixtures
   // parity note in fixtures-registry.ts) and `supportUnencryptedData` lets the
   // encrypted attribute read it back as the expected plaintext.
-  const { encryptedBooks } = useFixtures(["encryptedBooks"], () => Base.adapter);
-  const { encryptedBookThatIgnoresCases } = useFixtures(
-    ["encryptedBookThatIgnoresCases"],
-    () => Base.adapter,
-  );
+  //
+  // `encryptedBooks` and `encryptedBookThatIgnoresCases` both map to the
+  // `encrypted_books` table, and each `useFixtures` registers its own beforeEach
+  // seeder that deletes the table before inserting. Loading both in one scope
+  // would have the second seeder wipe the first set on every test (the same
+  // hazard `resolveFixtureNames` rejects within a single call), so each is scoped
+  // to its own nested describe — only one seeder runs per test.
+  describe("encryptedBooks set", () => {
+    const { encryptedBooks } = useFixtures(["encryptedBooks"], () => Base.adapter);
 
-  it("reads the encrypted name attribute back as its expected plaintext", () => {
-    expect(encryptedBooks("awdr").readAttribute("name")).toBe("Agile Web Development with Rails");
+    it("reads the encrypted name attribute back as its expected plaintext", () => {
+      expect(encryptedBooks("awdr").readAttribute("name")).toBe("Agile Web Development with Rails");
+    });
   });
 
-  it("reads an ignore-case encrypted fixture back as plaintext", () => {
-    expect(encryptedBookThatIgnoresCases("rfr").readAttribute("name")).toBe("Ruby for Rails");
+  describe("encryptedBookThatIgnoresCases set", () => {
+    const { encryptedBookThatIgnoresCases } = useFixtures(
+      ["encryptedBookThatIgnoresCases"],
+      () => Base.adapter,
+    );
+
+    it("reads an ignore-case encrypted fixture back as plaintext", () => {
+      expect(encryptedBookThatIgnoresCases("rfr").readAttribute("name")).toBe("Ruby for Rails");
+    });
   });
 });
 
