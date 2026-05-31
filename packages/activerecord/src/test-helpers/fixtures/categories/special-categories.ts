@@ -1,0 +1,13 @@
+// activerecord/test/fixtures/categories/special_categories.yml
+export const categoriesSpecialCategoriesFixtureData = {
+  sub_special_1: {
+    id: 100,
+    name: "A special category in a subdir file",
+    type: "SpecialCategory",
+  },
+  sub_special_2: {
+    id: 101,
+    name: "Another special category",
+    type: "SpecialCategory",
+  },
+};

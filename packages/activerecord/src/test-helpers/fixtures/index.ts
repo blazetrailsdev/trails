@@ -7,6 +7,8 @@ export * from "./admin/accounts.js";
 export * from "./admin/randomly-named-a9.js";
 export * from "./admin/randomly-named-b0.js";
 export * from "./admin/users.js";
+export * from "./categories/special-categories.js";
+export * from "./categories/subsubdir/arbitrary-filename.js";
 export * from "./aircrafts.js";
 export * from "./author-addresses.js";
 export * from "./author-favorites.js";

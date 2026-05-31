@@ -128,7 +128,8 @@ export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTable
  *   store coder is implemented.
  * - Phase 2 (`reserved_words/`) — needs model-less loader extension; inline Rails test
  *   classes have no shared model files.
- * - Phase 4 (`categories/` + `to_be_linked/`), Phase 5 (`primary_key_error/`),
+ * - `to_be_linked/` (Phase 4b) — needs model-less loader extension; no shared models.
+ * - Phase 5 (`primary_key_error/`),
  *   Phase 6 (`all/` + `naked/yml/`) — follow-up PRs.
  */
 export const fixtureRegistry = {
@@ -193,6 +194,14 @@ export const fixtureRegistry = {
   categories: {
     model: () => import("./models/category.js").then((m) => m.Category),
     data: FixtureData.categoryFixtureData,
+  },
+  "categories/specialCategories": {
+    model: () => import("./models/category.js").then((m) => m.SpecialCategory),
+    data: FixtureData.categoriesSpecialCategoriesFixtureData,
+  },
+  "categories/subsubdir/arbitraryFilename": {
+    model: () => import("./models/category.js").then((m) => m.SpecialCategory),
+    data: FixtureData.categoriesSubsubdirArbitraryFilenameFixtureData,
   },
   categoriesPosts: {
     joinTable: "categories_posts",
