@@ -603,7 +603,7 @@ describe("DatabaseTasksMigrateTest", () => {
     DatabaseTasks.registerMigrations([]);
     // Establish a Base pool as representative app-state (primary DB already connected).
     // migrateAll has 2 configs, so it uses withTemporaryConnection for both — each
-    // config gets its own direct connection via _connectFor regardless of this pool.
+    // config gets its own direct connection via withTemporaryConnection regardless of this pool.
     Base.removeConnection();
     await Base.establishConnection({ adapter: "sqlite3", database: primaryDb, pool: 1 });
     try {
@@ -670,15 +670,8 @@ describe("DatabaseTasksMigrateTest", () => {
   });
 });
 
-// Covers the no-`setAdapter` resolution path added when DatabaseTasks moved
-// off the `_adapterInstance` shim toward Rails' pool-backed
-// `migration_connection == migration_class.lease_connection`. Until the shim
-// is removed (see docs/activerecord/database-tasks-rails-equivalence-plan.md)
-// the rest of the suite exercises these call sites through `setAdapter`, so
-// this guards the pool fallback against regressing.
-describe("DatabaseTasks migration connection resolves from the pool without setAdapter", () => {
+describe("DatabaseTasks migration connection resolves from the pool", () => {
   afterEach(() => {
-    DatabaseTasks.setAdapter(null);
     DatabaseTasks.registerMigrations([]);
     try {
       Base.removeConnection();
@@ -687,20 +680,16 @@ describe("DatabaseTasks migration connection resolves from the pool without setA
     }
   });
 
-  it("leases from an established Base pool when no shim adapter is set", async () => {
-    DatabaseTasks.setAdapter(null);
+  it("leases from an established Base pool", async () => {
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
     DatabaseTasks.registerMigrations([]);
-    // Reaches _migrationAdapter() -> Base.connectionPool().leaseConnection().
-    // A freshly established pool has no checked-out connection yet, so this
-    // also pins the regression where the path was gated on isConnectedQ().
     const status = await DatabaseTasks.migrateStatus();
     expect(Array.isArray(status)).toBe(true);
   });
 
-  it("reports the no-adapter error when neither a shim nor a pool is present", async () => {
-    DatabaseTasks.setAdapter(null);
-    await expect(DatabaseTasks.migrateStatus()).rejects.toThrow(/No adapter configured/);
+  it("raises ConnectionNotDefined when no pool is present", async () => {
+    const { ConnectionNotDefined } = await import("../errors.js");
+    await expect(DatabaseTasks.migrateStatus()).rejects.toThrow(ConnectionNotDefined);
   });
 });
 
@@ -1520,7 +1509,9 @@ describe("DatabaseTasks _appendSchemaInformation adapter quoting", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-append-mysql-"));
     const filename = path.join(tmp, "structure.sql");
     fs.writeFileSync(filename, "-- mysqldump output\n");
-    DatabaseTasks.setAdapter(stubAdapter("Mysql2", ["20260101000000"]) as never);
+    const spy = vi
+      .spyOn(DatabaseTasks as never, "_migrationAdapter")
+      .mockResolvedValue(stubAdapter("Mysql2", ["20260101000000"]) as never);
     try {
       // private; reach in through indexer for the test (matches how
       // dumpSchema would call it through the public path).
@@ -1531,7 +1522,7 @@ describe("DatabaseTasks _appendSchemaInformation adapter quoting", () => {
       expect(written).toContain("INSERT INTO `schema_migrations` (version)");
       expect(written).toContain("('20260101000000')");
     } finally {
-      DatabaseTasks.setAdapter(null);
+      spy.mockRestore();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
@@ -1540,7 +1531,9 @@ describe("DatabaseTasks _appendSchemaInformation adapter quoting", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-append-sqlite-"));
     const filename = path.join(tmp, "structure.sql");
     fs.writeFileSync(filename, "-- sqlite dump\n");
-    DatabaseTasks.setAdapter(stubAdapter("SQLite", ["20260101000000"]) as never);
+    const spy = vi
+      .spyOn(DatabaseTasks as never, "_migrationAdapter")
+      .mockResolvedValue(stubAdapter("SQLite", ["20260101000000"]) as never);
     try {
       await (
         DatabaseTasks as unknown as { _appendSchemaInformation(f: string): Promise<void> }
@@ -1548,20 +1541,19 @@ describe("DatabaseTasks _appendSchemaInformation adapter quoting", () => {
       const written = fs.readFileSync(filename, "utf8");
       expect(written).toContain('INSERT INTO "schema_migrations" (version)');
     } finally {
-      DatabaseTasks.setAdapter(null);
+      spy.mockRestore();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
 
   it("appends in place without rewriting the existing dump", async () => {
-    // For very large dumps the original implementation read+rewrote the
-    // entire file. Verify we now stream the appended content and leave
-    // the original bytes untouched.
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-append-stream-"));
     const filename = path.join(tmp, "structure.sql");
     const head = "-- existing dump\nCREATE TABLE foo (id INTEGER);\n";
     fs.writeFileSync(filename, head);
-    DatabaseTasks.setAdapter(stubAdapter("SQLite", ["20260101000000"]) as never);
+    const spy = vi
+      .spyOn(DatabaseTasks as never, "_migrationAdapter")
+      .mockResolvedValue(stubAdapter("SQLite", ["20260101000000"]) as never);
     try {
       await (
         DatabaseTasks as unknown as { _appendSchemaInformation(f: string): Promise<void> }
@@ -1570,7 +1562,7 @@ describe("DatabaseTasks _appendSchemaInformation adapter quoting", () => {
       expect(written.startsWith(head)).toBe(true);
       expect(written.length).toBeGreaterThan(head.length);
     } finally {
-      DatabaseTasks.setAdapter(null);
+      spy.mockRestore();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
@@ -1693,7 +1685,6 @@ describe("structureDumpFlagsFor / structureLoadFlagsFor", () => {
 
 describe("initializeDatabase", () => {
   afterEach(() => {
-    DatabaseTasks.setAdapter(null);
     vi.restoreAllMocks();
   });
 

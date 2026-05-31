@@ -266,9 +266,6 @@ export class SQLiteDatabaseTasks {
 
   private resolveDbPath(): string {
     const path = getPath();
-    // Align with DatabaseTasks._connectFor which defaults missing sqlite
-    // database to ":memory:" — makes create/drop no-ops on in-memory
-    // configs instead of throwing on otherwise-valid setups.
     const database = this.dbConfig.database ?? ":memory:";
     // Per PathAdapter contract, a missing isAbsolute means the adapter
     // doesn't model relative/absolute distinctions (e.g. a VFS) — treat
@@ -289,24 +286,14 @@ export class SQLiteDatabaseTasks {
 
   /**
    * For in-memory databases opening a fresh adapter creates an unrelated empty
-   * DB, so we must reuse the established migration connection. We first check
-   * the shim adapter (DatabaseTasks.migrationConnection — still active while
-   * callers like trailties use setAdapter), then fall back to the pool-leased
-   * connection. For file-backed databases a fresh per-call adapter is correct
-   * and doesn't require a pool to be established.
+   * DB, so we must reuse the pool-leased connection. For file-backed databases
+   * a fresh per-call adapter is correct.
    *
-   * `owned` tells callers whether to close the adapter: borrowed connections
-   * (pool or shim) must not be closed by the caller.
+   * `owned` tells callers whether to close the adapter: borrowed pool
+   * connections must not be closed by the caller.
    */
   private async adapterForOperation(): Promise<{ adapter: DatabaseAdapter; owned: boolean }> {
     if (isInMemoryDatabase(this.resolveDbPath())) {
-      const migration = DatabaseTasks.migrationConnection();
-      if (
-        migration &&
-        (migration as { adapterName?: string }).adapterName?.toLowerCase().includes("sqlite")
-      ) {
-        return { adapter: migration, owned: false };
-      }
       return { adapter: await this.connection(), owned: false };
     }
     return { adapter: await this.connectAdapter(), owned: true };
