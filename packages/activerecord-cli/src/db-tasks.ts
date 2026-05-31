@@ -290,10 +290,10 @@ export async function dbSetup(cwd: string, _args: string[]): Promise<number> {
   return 0;
 }
 
-export async function dbReset(cwd: string, args: string[]): Promise<number> {
-  const dropCode = await dbDrop(cwd, args);
+export async function dbReset(cwd: string, _args: string[]): Promise<number> {
+  const dropCode = await dbDrop(cwd, []);
   if (dropCode !== 0) return dropCode;
-  return dbSetup(cwd, args);
+  return dbSetup(cwd, []);
 }
 
 export async function dbPrepare(cwd: string, _args: string[]): Promise<number> {
@@ -303,6 +303,13 @@ export async function dbPrepare(cwd: string, _args: string[]): Promise<number> {
     console.error(`ar: failed to load config/database.ts — ${String(err)}`);
     return 1;
   }
+
+  const env = DatabaseConfigurations.currentEnv();
+  if (DatabaseTasks.configsFor(env).length === 0) {
+    console.error(`ar: no database configuration found for environment "${env}"`);
+    return 1;
+  }
+
   await tryLoadModels(cwd);
   loadMigrations(cwd);
   installSeedLoader(cwd);
