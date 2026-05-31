@@ -3,6 +3,7 @@ import { init } from "./init.js";
 import { generateManifest } from "./generate-manifest.js";
 import { generateMigration, migrationTimestamp, parseFields } from "./generate-migration.js";
 import { generateModel } from "./generate-model.js";
+import { destroyMigration, destroyModel } from "./destroy.js";
 import { delegateBin } from "./delegate.js";
 import { run as runSchemaDump } from "./bin/trails-schema-dump.js";
 import { run as runModelsDump } from "./bin/trails-models-dump.js";
@@ -28,6 +29,8 @@ Commands:
   generate:manifest              Scan app/models/ and (re)write app/models/index.ts
   generate:migration <Name>      Emit db/migrate/<ts>_<snake_name>.ts
   generate:model <Name>          Emit app/models/<snake>.ts + a create migration
+  destroy:migration <Name>       Delete the matching db/migrate/*_<snake_name>.ts
+  destroy:model <Name>           Delete app/models/<snake>.ts + its create migration
   typecheck                      Type-check your models via trails-tsc
   schema:dump                    Dump the current schema via trails-schema-dump
   models:dump                    Dump model metadata via trails-models-dump
@@ -134,6 +137,22 @@ db/migrate/<YYYYMMDDHHMMSS>_create_<plural_snake>.ts.
 Options:
   --force      Overwrite if files already exist (default: refuse).
   --dry-run    Print the intended paths without writing.`;
+
+const DESTROY_MIGRATION_HELP = `ar destroy:migration <Name> [field:type ...] — delete a generated migration
+
+Finds db/migrate/*_<snake_name>.ts and deletes it. Errors if multiple match.
+Refuses when the file differs from the template; pass --force to override.
+
+Options:
+  --force    Delete even if hand-modified.   --dry-run  Print without deleting.`;
+
+const DESTROY_MODEL_HELP = `ar destroy:model <Name> [field:type ...] — delete a generated model + migration
+
+Deletes app/models/<snake_name>.ts and the matching create migration, then
+re-runs generate:manifest. Refuses when a file differs from the template.
+
+Options:
+  --force    Delete even if hand-modified.   --dry-run  Print without deleting.`;
 
 /** Commands recognized but deferred to a later slice (see proposal §5). */
 const NOT_IMPLEMENTED = new Set("db:migrate:status db:schema:dump".split(" "));
@@ -338,6 +357,73 @@ export async function run(argv: string[], cwd: string): Promise<number> {
     const verb = dryRun ? "  (dry)   " : "  create  ";
     console.log(`${verb}${result.modelPath}`);
     console.log(`${verb}${result.migrationPath}`);
+    return 0;
+  }
+  if (command === "destroy:migration") {
+    if (wantsHelp(rest)) {
+      console.log(DESTROY_MIGRATION_HELP);
+      return 0;
+    }
+    const [name, ...fieldTokens] = rest.filter((a) => !a.startsWith("-"));
+    if (!name) {
+      console.error("ar: destroy:migration requires a migration name.");
+      return 1;
+    }
+    const force = rest.includes("--force");
+    const dryRun = rest.includes("--dry-run");
+    const fields = parseFields(fieldTokens);
+    const result = await destroyMigration(cwd, name, fields, { force, dryRun });
+    if (result.ambiguous) {
+      console.error(
+        `ar: multiple migrations match — delete manually:\n${result.ambiguous.map((p) => `  ${p}`).join("\n")}`,
+      );
+      return 1;
+    }
+    if (result.modified !== undefined) {
+      console.error(
+        `ar: ${result.path} was modified. Use --force to delete anyway.\n${result.modified}`,
+      );
+      return 1;
+    }
+    if (!result.deleted) {
+      console.error(`ar: no migration found matching ${result.path}.`);
+      return 1;
+    }
+    const verb = dryRun ? "  (dry)   " : "  remove  ";
+    console.log(`${verb}${result.path}`);
+    return 0;
+  }
+  if (command === "destroy:model") {
+    if (wantsHelp(rest)) {
+      console.log(DESTROY_MODEL_HELP);
+      return 0;
+    }
+    const [name, ...fieldTokens] = rest.filter((a) => !a.startsWith("-"));
+    if (!name) {
+      console.error("ar: destroy:model requires a model name.");
+      return 1;
+    }
+    const force = rest.includes("--force");
+    const dryRun = rest.includes("--dry-run");
+    const fields = parseFields(fieldTokens);
+    const result = await destroyModel(cwd, name, fields, { force, dryRun });
+    if (result.ambiguous) {
+      console.error(
+        `ar: multiple create migrations match — delete manually:\n${result.ambiguous.map((p) => `  ${p}`).join("\n")}`,
+      );
+      return 1;
+    }
+    if (result.modified !== undefined) {
+      console.error(`ar: file was modified. Use --force to delete anyway.\n${result.modified}`);
+      return 1;
+    }
+    if (!result.deleted) {
+      console.error(`ar: no model or migration found for ${result.modelPath}.`);
+      return 1;
+    }
+    const verb = dryRun ? "  (dry)   " : "  remove  ";
+    if (result.modelDeleted) console.log(`${verb}${result.modelPath}`);
+    if (result.migrationPath) console.log(`${verb}${result.migrationPath}`);
     return 0;
   }
   if (NOT_IMPLEMENTED.has(command)) {

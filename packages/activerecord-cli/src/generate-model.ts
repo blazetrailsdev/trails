@@ -24,7 +24,7 @@ const TS_TYPES: Record<string, string> = {
   timestamp: "Date",
 };
 
-function renderModel(className: string, fields: FieldSpec[]): string {
+export function renderModel(className: string, fields: FieldSpec[]): string {
   const refs = fields.filter((f) => f.type === "references" || f.type === "belongs_to");
   const cols = fields.filter((f) => f.type !== "references" && f.type !== "belongs_to");
 
