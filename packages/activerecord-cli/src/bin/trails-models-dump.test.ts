@@ -68,6 +68,7 @@ beforeAll(() => {
     "arel",
     "did-you-mean",
     "globalid",
+    "activerecord",
   ];
   const anyMissing = depsInOrder.some(
     (p) => !existsSync(join(packagesRoot, p, "dist", "index.js")),
