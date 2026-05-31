@@ -161,13 +161,11 @@ async function forEachDatabase(
   }
   const multiDb = filtered.length > 1;
   for (const { name, raw, hashConfig } of filtered) {
-    const adapter = await connectAdapter(raw);
     const prefix = multiDb ? `[${name}] ` : "";
-    try {
+    await DatabaseTasks.withTemporaryPool(hashConfig, async (pool) => {
+      const adapter = pool.leaseConnection();
       await fn({ adapter, raw, config: hashConfig, name, prefix });
-    } finally {
-      await closeAdapter(adapter);
-    }
+    });
   }
 }
 
@@ -341,21 +339,14 @@ async function runProtectedEnvCheck(config: HashConfig, envName: string): Promis
  * app that commits a structure.sql stays on sql through the whole
  * migrate → dump cycle.
  */
-async function dumpSchemaAfterMigrate(
-  adapter: DatabaseAdapter,
-  raw: RawConfig,
-  hashConfig?: HashConfig,
-): Promise<void> {
+async function dumpSchemaAfterMigrate(raw: RawConfig, hashConfig?: HashConfig): Promise<void> {
   if (!DatabaseTasks.dumpSchemaAfterMigration) return;
   const config = hashConfig ?? toDbConfig(raw);
-  const previous = DatabaseTasks.migrationConnection();
   const previousFormat = DatabaseTasks.schemaFormat;
   try {
     DatabaseTasks.schemaFormat = await resolveSchemaFormat();
-    DatabaseTasks.setAdapter(adapter);
     await DatabaseTasks.dumpSchema(config);
   } finally {
-    DatabaseTasks.setAdapter(previous);
     DatabaseTasks.schemaFormat = previousFormat;
   }
 }
@@ -408,7 +399,7 @@ async function runMigrate(
   const pending = await migrator.pendingMigrations();
   if (pending.length === 0) console.log("All migrations are up to date.");
 
-  if (!options.skipDump) await dumpSchemaAfterMigrate(adapter, raw);
+  if (!options.skipDump) await dumpSchemaAfterMigrate(raw);
 }
 
 /**
@@ -463,18 +454,9 @@ async function runTestLoadSchema(options: {
     return;
   }
   await DatabaseTasks.purge(config);
-  const adapter = await connectAdapter(raw);
-  try {
-    const previous = DatabaseTasks.migrationConnection();
-    DatabaseTasks.setAdapter(adapter);
-    try {
-      await DatabaseTasks.loadSchema(config);
-    } finally {
-      DatabaseTasks.setAdapter(previous);
-    }
-  } finally {
-    await closeAdapter(adapter);
-  }
+  await DatabaseTasks.withTemporaryPool(config, async () => {
+    await DatabaseTasks.loadSchema(config);
+  });
   console.log(options.successMessage(displayNameFor(config, raw), filename));
 }
 
@@ -611,7 +593,7 @@ async function withMigratorForDb(
   } finally {
     Migration.logger = prevLogger;
   }
-  if (!opts?.skipDump) await dumpSchemaAfterMigrate(ctx.adapter, ctx.raw, ctx.config);
+  if (!opts?.skipDump) await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
 }
 
 export function dbCommand(): Command {
@@ -785,7 +767,7 @@ export function dbCommand(): Command {
         const migrations = await discoverMigrationsFromDirs(mDirs);
         const migrator = createMigrator(adapter, migrations, raw);
         await migrator.run("up", opts.version);
-        await dumpSchemaAfterMigrate(adapter, raw, config);
+        await dumpSchemaAfterMigrate(raw, config);
       });
     });
 
@@ -800,7 +782,7 @@ export function dbCommand(): Command {
         const migrations = await discoverMigrationsFromDirs(mDirs);
         const migrator = createMigrator(adapter, migrations, raw);
         await migrator.run("down", opts.version);
-        await dumpSchemaAfterMigrate(adapter, raw, config);
+        await dumpSchemaAfterMigrate(raw, config);
       });
     });
 
@@ -858,13 +840,11 @@ export function dbCommand(): Command {
       "Create the database if it doesn't exist, run pending migrations, and seed when fresh",
     )
     .action(async () => {
-      // Do NOT go through withAdapter — connectAdapter would try to
-      // connect to the target DB before we've had a chance to create
-      // it, which fails for pg/mysql when the DB doesn't exist yet.
-      // Create first, then connect.
+      // Create the DB first, then connect via withTemporaryPool — establishing
+      // the pool before creation would fail for pg/mysql when the DB doesn't exist.
       const raw = normalizeRawConfig(await loadDatabaseConfig());
       const config = toDbConfig(raw);
-      const { DatabaseAlreadyExists, Migrator } = await import("@blazetrails/activerecord");
+      const { DatabaseAlreadyExists } = await import("@blazetrails/activerecord");
 
       try {
         await DatabaseTasks.create(config);
@@ -873,13 +853,13 @@ export function dbCommand(): Command {
         if (!(error instanceof DatabaseAlreadyExists)) throw error;
       }
 
-      const adapter = await connectAdapter(raw);
-      try {
+      await DatabaseTasks.withTemporaryPool(config, async (pool) => {
         // Rails measures "fresh" via `!schema_migration.table_exists?`,
         // matching its `initialize_database` contract. A sqlite DB file
         // may have been created by either our DatabaseTasks.create call
         // above or by better-sqlite3 on connect; the meaningful signal
         // is whether migrations have been applied.
+        const adapter = pool.leaseConnection();
         const migrator = createMigrator(adapter, [], raw);
         const wasFresh = !(await migrator.schemaMigrationTableExists());
 
@@ -887,10 +867,7 @@ export function dbCommand(): Command {
         if (wasFresh) {
           await withSeedAdapter(adapter, runSeed);
         }
-      } finally {
-        const close = (adapter as { close?: () => Promise<void> }).close;
-        if (typeof close === "function") await close.call(adapter);
-      }
+      });
     });
 
   cmd
@@ -1021,17 +998,14 @@ export function dbCommand(): Command {
     .option("--format <format>", "Override schema format: ts, js, or sql")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
-      await forEachDatabase(opts, async ({ adapter, config, prefix }) => {
+      await forEachDatabase(opts, async ({ config, prefix }) => {
         const previousFormat = DatabaseTasks.schemaFormat;
-        const previous = DatabaseTasks.migrationConnection();
         try {
           DatabaseTasks.schemaFormat = await resolveSchemaFormat(opts);
           const filename = DatabaseTasks.schemaDumpPath(config);
-          DatabaseTasks.setAdapter(adapter);
           await DatabaseTasks.dumpSchema(config);
           console.log(`${prefix}Schema dumped to ${filename}`);
         } finally {
-          DatabaseTasks.setAdapter(previous);
           DatabaseTasks.schemaFormat = previousFormat;
         }
       });
@@ -1046,12 +1020,11 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       const fs = await getFsAsync();
-      await forEachDatabase(opts, async ({ adapter, config, prefix }) => {
+      await forEachDatabase(opts, async ({ config, prefix }) => {
         // schema:load is destructive — Rails gates on
         // check_protected_environments.
         await runProtectedEnvCheck(config, config.envName);
         const previousFormat = DatabaseTasks.schemaFormat;
-        const previous = DatabaseTasks.migrationConnection();
         try {
           DatabaseTasks.schemaFormat = await resolveSchemaFormat(opts);
           const filename = DatabaseTasks.schemaDumpPath(config);
@@ -1060,7 +1033,6 @@ export function dbCommand(): Command {
             setExitCode(1);
             return;
           }
-          DatabaseTasks.setAdapter(adapter);
           try {
             console.log(`${prefix}Loading schema from ${filename}...`);
             await DatabaseTasks.loadSchema(config);
@@ -1079,7 +1051,6 @@ export function dbCommand(): Command {
             throw error;
           }
         } finally {
-          DatabaseTasks.setAdapter(previous);
           DatabaseTasks.schemaFormat = previousFormat;
         }
       });
@@ -1102,13 +1073,14 @@ export function dbCommand(): Command {
           new HashConfig(envName, name, normalizeRawConfig(config) as Record<string, unknown>),
       );
       await withRegisteredConfigurations(configs, envName, async () => {
-        await DatabaseTasks.withTemporaryPoolForEach(envName, async (config) => {
-          const adapter = DatabaseTasks.migrationConnection();
-          if (!adapter) return;
-          const filename = DatabaseTasks.cacheDumpFilename(config);
-          await DatabaseTasks.dumpSchemaCache(adapter, filename);
-          console.log(`Schema cache dumped to ${filename}`);
-        });
+        for (const config of DatabaseTasks.configsFor(envName)) {
+          await DatabaseTasks.withTemporaryPool(config, async (pool) => {
+            const adapter = pool.leaseConnection();
+            const filename = DatabaseTasks.cacheDumpFilename(config);
+            await DatabaseTasks.dumpSchemaCache(adapter, filename);
+            console.log(`Schema cache dumped to ${filename}`);
+          });
+        }
       });
     });
 
