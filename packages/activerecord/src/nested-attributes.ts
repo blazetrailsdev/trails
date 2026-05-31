@@ -66,13 +66,12 @@ export function acceptsNestedAttributesFor(
     throw new Error(`No association found for name '${associationName}'. Has it been defined yet?`);
   }
 
-  // Rails raises ArgumentError for polymorphic belongs_to
-  if (assocExists.type === "belongsTo" && assocExists.options?.polymorphic) {
-    throw new Error(
-      `Cannot build a polymorphic belongs_to association '${associationName}' with nested attributes. ` +
-        `You need to define which model to use for the polymorphic association.`,
-    );
-  }
+  // Rails does NOT reject polymorphic belongs_to at declaration time — the
+  // check is deferred to build time (the writer raises when it tries to build
+  // a new record and finds no `build_#{association_name}` method). See
+  // assign_nested_attributes_for_one_to_one_association in Rails'
+  // nested_attributes.rb. We mirror that in
+  // assignNestedAttributesForOneToOneAssociation.
 
   // Store config on the class
   if (!(modelClass as any)._nestedAttributeConfigs) {
@@ -396,6 +395,13 @@ function generateAssociationWriter(
 }
 
 /** @internal */
+export function isPolymorphicBelongsTo(record: Base, associationName: string): boolean {
+  const associations: any[] = (record.constructor as any)._associations ?? [];
+  const assocDef = associations.find((a: any) => a.name === associationName);
+  return assocDef?.type === "belongsTo" && Boolean(assocDef?.options?.polymorphic);
+}
+
+/** @internal */
 export function assignNestedAttributesForOneToOneAssociation(
   record: Base,
   associationName: string,
@@ -407,6 +413,20 @@ export function assignNestedAttributesForOneToOneAssociation(
     );
   }
   if (!isRejectNewRecord(record, associationName, attributes)) {
+    // Rails defers the polymorphic-target check to build time: when no `id` is
+    // present a new record must be built, but a polymorphic belongs_to has no
+    // `build_#{association_name}` method, so the writer raises. Updates (with a
+    // matching `id`) are unaffected.
+    const id = (attributes as any).id;
+    if (
+      (id === undefined || id === null || id === "") &&
+      isPolymorphicBelongsTo(record, associationName)
+    ) {
+      throw new Error(
+        `Cannot build association \`${associationName}'. ` +
+          `Are you trying to build a polymorphic one-to-one association?`,
+      );
+    }
     if (!(record as any)._pendingNestedAttributes) {
       (record as any)._pendingNestedAttributes = new Map();
     }
@@ -460,6 +480,7 @@ export const InstanceMethods = {
   findRecordById,
   raiseNestedAttributesRecordNotFoundBang,
   checkRecordLimitBang,
+  isPolymorphicBelongsTo,
   assignNestedAttributesForOneToOneAssociation,
   assignNestedAttributesForCollectionAssociation,
 };
