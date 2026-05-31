@@ -11,6 +11,7 @@ import { singularize } from "@blazetrails/activesupport";
 import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.js";
 import { EncryptableRecord } from "../encryption/encryptable-record.js";
 import { Configurable } from "../encryption/configurable.js";
+import type { Type } from "@blazetrails/activemodel";
 
 const FIXTURE_MAX_ID = 2 ** 30 - 1;
 
@@ -308,11 +309,24 @@ function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
   // Build a name→EncryptedAttributeType map from _pendingEncryptions. This lets
   // us serialize even before loadSchemaFromAdapter has run (schema-reflected types
   // won't be in _attributeDefinitions yet, but the scheme is already recorded).
+  // When an existing _attributeDefinitions entry is present (e.g. attribute(:name, :date)
+  // was called before encrypts(:name)), its castType is preserved so the fixture value
+  // is serialized through the correct inner type before encryption — mirrors Rails'
+  // `model_class.type_for_attribute(attribute_name)` which returns the full decorated type.
   const typeMap = new Map<string, EncryptedAttributeType>();
   const pending: Array<{ name: string; scheme: unknown }> =
     (ModelClass as any)._pendingEncryptions ?? [];
+  const defs: Map<string, { type: unknown }> | undefined = (ModelClass as any)
+    ._attributeDefinitions;
   for (const { name, scheme } of pending) {
-    typeMap.set(name, new EncryptedAttributeType({ scheme: scheme as any }));
+    const existingType = defs?.get(name)?.type;
+    const castType =
+      existingType instanceof EncryptedAttributeType
+        ? existingType.castType
+        : existingType !== undefined
+          ? (existingType as Type)
+          : undefined;
+    typeMap.set(name, new EncryptedAttributeType({ scheme: scheme as any, castType }));
   }
 
   for (const row of rows) {
