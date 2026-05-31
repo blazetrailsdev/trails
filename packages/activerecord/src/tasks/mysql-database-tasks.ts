@@ -8,6 +8,7 @@ import { getFs, getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/
 import type { DatabaseAdapter } from "../adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseAlreadyExists } from "../errors.js";
+import { Base } from "../base.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { coercePort } from "./task-utils.js";
 
@@ -75,8 +76,9 @@ export class MySQLDatabaseTasks {
     const collation = opts.collation ? ` COLLATE \`${this.escapeIdent(opts.collation)}\`` : "";
     const dbName = this.requireDatabaseName();
     const sql = `CREATE DATABASE \`${this.escapeIdent(dbName)}\`${charset}${collation}`;
+    await this.establishConnection(this.configurationHashWithoutDatabase());
     try {
-      await this.withAdmin((admin) => admin.executeMutation(sql));
+      await (await this.connection()).executeMutation(sql);
     } catch (error) {
       if (isMySQLDatabaseExistsError(error)) {
         throw new DatabaseAlreadyExists(`Database '${dbName}' already exists`, {
@@ -85,14 +87,19 @@ export class MySQLDatabaseTasks {
         });
       }
       throw error;
+    } finally {
+      // Always restore the pool to the target DB so Base is not left pointing
+      // at the no-database admin pool after create() returns or throws.
+      await this.establishConnection();
     }
   }
 
   async drop(): Promise<void> {
-    await this.withAdmin((admin) =>
-      admin.executeMutation(
-        `DROP DATABASE IF EXISTS \`${this.escapeIdent(this.requireDatabaseName())}\``,
-      ),
+    await this.establishConnection();
+    await (
+      await this.connection()
+    ).executeMutation(
+      `DROP DATABASE IF EXISTS \`${this.escapeIdent(this.requireDatabaseName())}\``,
     );
   }
 
@@ -271,32 +278,8 @@ export class MySQLDatabaseTasks {
     return env;
   }
 
-  private async withAdmin<T>(fn: (admin: DatabaseAdapter) => Promise<T>): Promise<T> {
-    const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
-    const socket = this.resolvedField("socket");
-    const adminConfig: {
-      host?: string;
-      port?: number;
-      user?: string;
-      password?: string;
-      socketPath?: string;
-    } = {
-      user: this.resolvedField("username"),
-      password: this.resolvedField("password"),
-    };
-    if (socket) {
-      adminConfig.socketPath = socket;
-    } else {
-      adminConfig.host = this.resolvedField("host") ?? "localhost";
-      adminConfig.port = coercePort(this.resolvedField("port"), 3306);
-    }
-    const adapter = new Mysql2Adapter(adminConfig);
-    try {
-      return await fn(adapter);
-    } finally {
-      const close = (adapter as unknown as { close?: () => Promise<void> }).close;
-      if (typeof close === "function") await close.call(adapter);
-    }
+  private async connection(): Promise<DatabaseAdapter> {
+    return Base.connectionPool().leaseConnection();
   }
 
   private async runCmd(cmd: string, args: string[], action: string, stdin?: string): Promise<void> {
@@ -335,41 +318,29 @@ export class MySQLDatabaseTasks {
   }
 
   /** @internal */
-  private connection(): DatabaseAdapter | null {
-    return DatabaseTasks.migrationConnection();
-  }
-
-  /** @internal */
-  private async establishConnection(config?: DatabaseConfig): Promise<void> {
-    const cfg = config ?? this.dbConfig;
-    const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
-    const c = cfg.configuration;
-    let adapter: DatabaseAdapter;
-    if (c.url) {
-      adapter = new Mysql2Adapter(String(c.url));
-    } else {
-      const socket = c.socket as string | undefined;
-      adapter = socket
-        ? new Mysql2Adapter({
-            database: cfg.database,
-            user: c.username as string | undefined,
-            password: c.password as string | undefined,
-            socketPath: socket,
-          })
-        : new Mysql2Adapter({
-            host: (c.host as string) ?? "localhost",
-            port: coercePort(c.port, 3306),
-            database: cfg.database,
-            user: c.username as string | undefined,
-            password: c.password as string | undefined,
-          });
+  private async establishConnection(configHash?: Record<string, unknown>): Promise<void> {
+    const hash: Record<string, unknown> = { ...(configHash ?? this.dbConfig.configuration) };
+    // mysql2 accepts `socketPath`; database.yml uses `socket`. buildAdapterArg
+    // passes keys through as-is, so remap before handing off to Base.
+    if (hash.socket !== undefined && hash.socketPath === undefined) {
+      hash.socketPath = hash.socket;
+      delete hash.socket;
     }
-    DatabaseTasks.setAdapter(adapter);
+    await Base.establishConnection(hash as { adapter?: string; [key: string]: unknown });
   }
 
   /** @internal */
   private configurationHashWithoutDatabase(): ConfigHash {
     const { database: _db, ...rest } = this.configurationHash;
+    if (rest.url) {
+      try {
+        const parsed = new URL(String(rest.url));
+        parsed.pathname = "/";
+        rest.url = parsed.toString();
+      } catch {
+        // malformed URL — leave as-is and let the adapter surface the error
+      }
+    }
     return rest;
   }
 }

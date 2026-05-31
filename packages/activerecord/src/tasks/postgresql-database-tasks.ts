@@ -14,6 +14,7 @@ import {
 import type { DatabaseAdapter } from "../adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseAlreadyExists } from "../errors.js";
+import { Base } from "../base.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { coercePort } from "./task-utils.js";
 
@@ -87,10 +88,13 @@ export class PostgreSQLDatabaseTasks {
   async create(connectionAlreadyEstablished = false): Promise<void> {
     const dbName = this.requireDatabaseName();
     const encoding = this.encoding();
+    if (!connectionAlreadyEstablished) {
+      await this.establishConnection(this.publicSchemaConfig());
+    }
+    const conn = await this.connection();
     const sql = `CREATE DATABASE "${this.escapeIdent(dbName)}" ENCODING '${this.escapeSingle(encoding)}'`;
-    const admin = await this.connectAdmin();
     try {
-      await admin.executeMutation(sql);
+      await conn.executeMutation(sql);
     } catch (error) {
       if (isPGDuplicateDatabaseError(error)) {
         throw new DatabaseAlreadyExists(`Database '${dbName}' already exists`, {
@@ -100,19 +104,20 @@ export class PostgreSQLDatabaseTasks {
       }
       throw error;
     } finally {
-      await this.closeAdapter(admin);
+      // Always restore the pool to the target DB. Rails establish_connection at
+      // the end of create() is unconditional — it runs even when called as
+      // create(true) (from purge()), so the pool is always re-pointed at the
+      // target DB after create() finishes, regardless of success or failure.
+      await this.establishConnection();
     }
-    void connectionAlreadyEstablished;
   }
 
   async drop(): Promise<void> {
-    const dbName = this.requireDatabaseName();
-    const admin = await this.connectAdmin();
-    try {
-      await admin.executeMutation(`DROP DATABASE IF EXISTS "${this.escapeIdent(dbName)}"`);
-    } finally {
-      await this.closeAdapter(admin);
-    }
+    await this.establishConnection(this.publicSchemaConfig());
+    const conn = await this.connection();
+    await conn.executeMutation(
+      `DROP DATABASE IF EXISTS "${this.escapeIdent(this.requireDatabaseName())}"`,
+    );
   }
 
   charset(): string {
@@ -265,21 +270,8 @@ export class PostgreSQLDatabaseTasks {
     return String(this.configurationHash.encoding ?? defaultEncoding());
   }
 
-  private async connectAdmin(): Promise<DatabaseAdapter> {
-    const { PostgreSQLAdapter } = await import("../connection-adapters/postgresql-adapter.js");
-    const c = this.configurationHash;
-    if (c.url) {
-      const parsed = new URL(String(c.url));
-      parsed.pathname = "/postgres";
-      return new PostgreSQLAdapter(parsed.toString());
-    }
-    return new PostgreSQLAdapter({
-      host: (c.host as string) ?? "localhost",
-      port: coercePort(c.port, 5432),
-      database: "postgres",
-      user: c.username as string | undefined,
-      password: c.password as string | undefined,
-    });
+  private async connection(): Promise<DatabaseAdapter> {
+    return Base.connectionPool().leaseConnection();
   }
 
   private async closeAdapter(adapter: DatabaseAdapter): Promise<void> {
@@ -365,30 +357,26 @@ export class PostgreSQLDatabaseTasks {
   }
 
   /** @internal */
-  private connection(): DatabaseAdapter | null {
-    return DatabaseTasks.migrationConnection();
-  }
-
-  /** @internal */
-  private async establishConnection(config?: DatabaseConfig): Promise<void> {
-    const cfg = config ?? this.dbConfig;
-    const { PostgreSQLAdapter } = await import("../connection-adapters/postgresql-adapter.js");
-    const c = cfg.configuration;
-    const adapter = c.url
-      ? new PostgreSQLAdapter(String(c.url))
-      : new PostgreSQLAdapter({
-          host: (c.host as string) ?? "localhost",
-          port: coercePort(c.port, 5432),
-          database: cfg.database,
-          user: c.username as string | undefined,
-          password: c.password as string | undefined,
-        });
-    DatabaseTasks.setAdapter(adapter);
+  private async establishConnection(configHash?: Record<string, unknown>): Promise<void> {
+    await Base.establishConnection(
+      (configHash ?? this.dbConfig.configuration) as { adapter?: string; [key: string]: unknown },
+    );
   }
 
   /** @internal */
   private publicSchemaConfig(): ConfigHash {
-    return { ...this.configurationHash, database: "postgres", schemaSearchPath: "public" };
+    const c = this.configurationHash;
+    if (c.url) {
+      // Modify the URL to target the postgres system DB and strip `database`
+      // from the spread. buildAdapterArg uses the URL path when `database` is
+      // undefined; if `database` remains in the hash it discards the URL and
+      // builds a host-less config instead.
+      const parsed = new URL(String(c.url));
+      parsed.pathname = "/postgres";
+      const { database: _db, ...rest } = c;
+      return { ...rest, url: parsed.toString(), schemaSearchPath: "public" };
+    }
+    return { ...c, database: "postgres", schemaSearchPath: "public" };
   }
 }
 
