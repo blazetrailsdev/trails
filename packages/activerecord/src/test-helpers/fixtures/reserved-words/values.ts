@@ -1,0 +1,11 @@
+// activerecord/test/fixtures/reserved_words/values.yml
+export const reservedWordsValuesFixtureData = {
+  values1: {
+    as: 1,
+    group_id: 2,
+  },
+  values2: {
+    as: 2,
+    group_id: 1,
+  },
+};

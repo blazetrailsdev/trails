@@ -1624,4 +1624,37 @@ export const TEST_SCHEMA: Schema = {
     },
     primaryKey: false,
   },
+
+  // to_be_linked fixtures (no corresponding model class; inline inline-map only).
+  to_be_linked_accounts: {
+    name: "string",
+  },
+  to_be_linked_users: {
+    name: "string",
+    account_id: "integer",
+    settings: "text",
+  },
+
+  // Reserved-word tables (ReservedWordTest). Table and column names are SQL
+  // reserved words, so they exercise identifier quoting throughout AR.
+  group: {
+    order: "string",
+    select_id: "integer",
+  },
+  select: {},
+  distinct: {},
+  distinct_select: {
+    columns: {
+      distinct_id: "integer",
+      select_id: "integer",
+    },
+    primaryKey: false,
+  },
+  values: {
+    columns: {
+      as: "integer",
+      group_id: "integer",
+    },
+    primaryKey: ["as"],
+  },
 };

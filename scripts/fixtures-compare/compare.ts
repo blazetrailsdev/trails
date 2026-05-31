@@ -108,10 +108,11 @@ export const ERB_SKIP_SENTINEL = "__ERB_SKIP__";
 
 // Baseline locked at PR #2715 (93% milestone) + updated for recursive subdir scan
 // (Phase 1 of the subdir-fixtures plan) + 4 admin fixtures ported in Phase 3
-// + 2 categories fixtures ported in Phase 4a.
-// Phases 2, 4b-6 will close the remaining 18 subdir YAMLs. Bump match when new
+// + 2 categories fixtures ported in Phase 4a
+// + 7 reserved_words/to_be_linked YAMLs ported in Phase 7 (missing: 18 → 11).
+// Phases 2, 4b-6 will close the remaining 11 subdir YAMLs. Bump match when new
 // fixtures are ported; bump diff only for intentional accepted drifts.
-const CI_BASELINE = { match: 119, diff: 6, missing: 18 } as const;
+const CI_BASELINE = { match: 124, diff: 6, missing: 11 } as const;
 
 function parseArgs(argv: string[]): {
   pkg: string;
