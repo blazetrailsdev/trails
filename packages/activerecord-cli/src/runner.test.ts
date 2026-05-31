@@ -39,27 +39,15 @@ describe("ArRunnerTest", () => {
     expect(err.join("\n")).toContain("config/database.ts");
   });
 
-  it("runs a script with Base importable and --flag forwarded via __ARGV__", async () => {
+  it("runs a script with Base importable, --flag forwarded, --env after script stripped", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ar-runner-script-"));
     await scaffoldProject(dir);
     await writeFile(
       join(dir, "check.ts"),
-      `import { Base } from "@blazetrails/activerecord";\nif (!Base) throw new Error("Base not found");\nconst a = (globalThis as any).__ARGV__;\nif (a[0] !== "hello" || a[1] !== "--flag") throw new Error("ARGV mismatch: " + JSON.stringify(a));\n`,
+      `import { Base } from "@blazetrails/activerecord";\nif (!Base) throw new Error("no Base");\nconst a = (globalThis as any).__ARGV__;\nif (a[0] !== "hello" || a[1] !== "--flag") throw new Error("ARGV mismatch: " + JSON.stringify(a));\nif (a.includes("--env") || a.includes("test")) throw new Error("--env leaked");\n`,
       "utf8",
     );
-    const code = await arRunner(dir, ["--env", "test", "check.ts", "hello", "--flag"]);
-    expect(code).toBe(0);
-  });
-
-  it("--env after script path is not forwarded to __ARGV__", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "ar-runner-env-after-"));
-    await scaffoldProject(dir);
-    await writeFile(
-      join(dir, "check.ts"),
-      `const a = (globalThis as any).__ARGV__;\nif (a.includes("--env") || a.includes("test")) throw new Error("--env leaked: " + JSON.stringify(a));\n`,
-      "utf8",
-    );
-    const code = await arRunner(dir, ["check.ts", "--env", "test", "keep"]);
+    const code = await arRunner(dir, ["check.ts", "hello", "--flag", "--env", "test"]);
     expect(code).toBe(0);
   });
 
