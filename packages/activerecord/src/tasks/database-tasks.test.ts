@@ -948,6 +948,21 @@ describe("DatabaseTasksMigrateScopeTest", () => {
     expect(output2).toBe("");
     expect(output2).not.toContain("No migrations ran. (using mysql scope)");
   });
+
+  it("scope-only filter (no VERSION): runs only scoped migrations", async () => {
+    process.env.VERBOSE = "true";
+    process.env.SCOPE = "mysql";
+
+    await DatabaseTasks.migrate();
+    const output1 = stdoutChunks.join("");
+    expect(output1).toContain("MysqlOnly");
+    expect(output1).not.toContain("Unscoped");
+
+    stdoutChunks = [];
+    await DatabaseTasks.migrate();
+    const output2 = stdoutChunks.join("");
+    expect(output2).toContain("No migrations ran. (using mysql scope)");
+  });
 });
 
 describe("DatabaseTasksMigrateStatusTest", () => {

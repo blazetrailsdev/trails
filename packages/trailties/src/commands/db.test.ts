@@ -1352,7 +1352,7 @@ export class CreatePosts extends Migration {
 
       // Migrate should succeed and NOT throw EnvironmentStorageError
       // despite the stamping call site being hit.
-      await expect(migrator.migrate()).resolves.toBeUndefined();
+      await expect(migrator.migrate()).resolves.toEqual(expect.any(Array));
 
       // Table exists; metadata table does not.
       const tables = (await adapter.execute(
