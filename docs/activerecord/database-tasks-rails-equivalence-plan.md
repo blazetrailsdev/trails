@@ -128,15 +128,88 @@ Files: `tasks/mysql-database-tasks.ts`, and wherever `buildAdapterArg` /
 
 ---
 
-### P2-8 — 14 remaining skipped tests in `database-tasks.test.ts`
+### ~~P2-8 — 14 remaining skipped tests in `database-tasks.test.ts`~~ ✅ shipped
 
 **Source:** PR #2713 post-merge findings.
 
-14 tests remain skipped — scope/status/schema-cache gaps noted as step 2
-behavioral gaps. Many of these will unskip once P2-1 through P2-3 land;
-audit after those PRs.
+Audit complete. 5 tests unskipped (2 schema-cache tests + 3 schemaDumpPath tests);
+9 remain skipped as P3 follow-ups below. The `schemaDumpPath` implementation was
+updated to delegate to `config.schemaDump()`, which also fixed the `schemaDump: false`
+nil-return gap and the `schema_dump: "custom/path"` directory-creation paths.
 
-Files: `tasks/database-tasks.test.ts`.
+Files: `tasks/database-tasks.ts`, `tasks/database-tasks.test.ts`.
+
+---
+
+## Phase 3 follow-up stories
+
+These 9 skips remain after P2-8 audit. Each has a clear scope.
+
+### P3-1 — `checkProtectedEnvironmentsBang` NoEnvironmentInSchemaError path
+
+**Source:** "raises an error if no migrations have been made" test.
+
+When `schema_migrations` has rows but `ar_internal_metadata` table is absent,
+Rails raises `NoEnvironmentInSchemaError`. Our `checkProtectedEnvironmentsBang`
+reads `migrator.lastStoredEnvironment()` which returns null when the table
+doesn't exist — no error thrown. Requires:
+
+1. `Migrator.lastStoredEnvironment()` (or a new helper) to detect the "migrations
+   present but no env stamped" state.
+2. `checkProtectedEnvironmentsBang` to throw `NoEnvironmentInSchemaError` in that case.
+
+~30 LOC. Rails: `test/cases/tasks/database_tasks_test.rb:122`.
+
+### P3-2 — `createCurrent` re-establishes connection post-create
+
+**Source:** "establishes connection for the given environments" (two-tier + three-tier).
+
+Rails `create_current` calls `ActiveRecord::Base.establish_connection(env)` after
+creating so the caller's pool is re-pointed to the env's primary. Our `createCurrent`
+doesn't do this. ~20 LOC addition to `createCurrent`.
+
+Rails: `test/cases/tasks/database_tasks_test.rb:586, 703`.
+
+### P3-3 — Multi-db `checkProtectedEnvironmentsBang` integration test
+
+**Source:** "with multiple databases" test.
+
+Needs two real SQLite file DBs, each stamped with `internal_metadata` env, then
+verifying the protected-env check fires correctly across both. Primarily a test
+authoring task (the implementation is likely already correct). ~50 LOC test.
+
+Rails: `test/cases/tasks/database_tasks_test.rb:155`.
+
+### P3-4 — SCOPE env variable migration filtering
+
+**Source:** "migrate using scope and verbose mode" (×3 tests).
+
+`ENV["SCOPE"]` filters which migrations run (only those whose filename contains
+the scope string). Not implemented in `Migrator` or `DatabaseTasks.migrate`.
+~30 LOC in `Migrator` + `DatabaseTasks` + scope migration fixtures.
+
+Rails: `test/cases/tasks/database_tasks_test.rb:1105–1158`.
+
+### P3-5 — `migrateStatus` stdout output
+
+**Source:** "migrate status table" test.
+
+Rails' `migrate_status` prints a formatted table to stdout (database name header +
+up/down rows per migration). Our `migrateStatus()` returns structured data with no
+output. ~30 LOC stdout-printing wrapper or `displayMigrateStatus` helper.
+
+Rails: `test/cases/tasks/database_tasks_test.rb:1169`.
+
+### P3-6 — Symbol env name in `checkProtectedEnvironmentsBang` (N/A)
+
+**Source:** "raises an error when called with protected environment which name is a symbol".
+
+TypeScript has no `Symbol` type for string env names; Ruby-specific coercion behavior
+has no TS equivalent. Permanently inapplicable — keep skipped indefinitely.
+
+Rails: `test/cases/tasks/database_tasks_test.rb:98`.
+
+---
 
 ## Bundling guidance
 

@@ -28,26 +28,25 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
   });
 
   it.skip("raises an error when called with protected environment which name is a symbol", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* TS doesn't have symbols for env names */
+    // P3 skip: TypeScript has no Symbol type for string env names; Rails-only coercion,
+    // no TS equivalent. Permanently language-level inapplicable.
+    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:98
   });
 
   it.skip("raises an error if no migrations have been made", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs migration tracking */
+    // P3 skip: requires NoEnvironmentInSchemaError path in checkProtectedEnvironmentsBang —
+    // needs InternalMetadata table-absent detection + error throw when schema_migrations
+    // has rows but internal_metadata is absent. ~30 LOC in database-tasks.ts + Migrator.
+    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:122
   });
 });
 
 describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
   it.skip("with multiple databases", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs multi-database config */
+    // P3 skip: needs multi-db checkProtectedEnvironmentsBang integration test with two
+    // real SQLite file DBs, each stamped with internal_metadata env, then verifying
+    // protected-env check fires on either. ~50 LOC test + potential Migrator fix.
+    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:155
   });
 });
 
@@ -97,17 +96,35 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
     DatabaseTasks.dbDir = originalDbDir;
   });
 
-  it.skip("dump schema cache", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs schema cache implementation */
+  it("dump schema cache", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dump-sc-"));
+    const cachePath = path.join(tmp, "schema_cache.json");
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    try {
+      expect(fs.existsSync(cachePath)).toBe(false);
+      const adapter = Base.connectionPool().leaseConnection();
+      await DatabaseTasks.dumpSchemaCache(adapter, cachePath);
+      expect(fs.existsSync(cachePath)).toBe(true);
+    } finally {
+      try {
+        Base.removeConnection();
+      } catch {
+        /* ignore */
+      }
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
-  it.skip("clear schema cache", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs schema cache implementation */
+  it("clear schema cache", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-clear-sc-"));
+    const cachePath = path.join(tmp, "schema_cache.json");
+    fs.writeFileSync(cachePath, "This is a cache.");
+    try {
+      expect(fs.existsSync(cachePath)).toBe(true);
+      DatabaseTasks.clearSchemaCache(cachePath);
+      expect(fs.existsSync(cachePath)).toBe(false);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
   it("cache dump default filename", () => {
     expect(DatabaseTasks.dumpSchemaFilename()).toBe("db/schema.ts");
@@ -135,17 +152,61 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
 });
 
 describe("DatabaseTasksDumpSchemaTest", () => {
-  it.skip("ensure db dir", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs filesystem operations */
+  it("ensure db dir", async () => {
+    // Mirrors Rails: schemaDump is a bare filename; schemaDumpPath prepends dbDir.
+    // The dir is removed before dumpSchema runs; dumpSchema must recreate it.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-ensure-dbdir-"));
+    const prevDbDir = DatabaseTasks.dbDir;
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    try {
+      DatabaseTasks.dbDir = tmp;
+      const schemaPath = path.join(tmp, "fake_db_config_schema.ts");
+      const config = new HashConfig("arunit", "primary", {
+        adapter: "sqlite3",
+        database: ":memory:",
+        schemaDump: "fake_db_config_schema.ts",
+      });
+      fs.rmSync(tmp, { recursive: true, force: true });
+      expect(fs.existsSync(schemaPath)).toBe(false);
+      await DatabaseTasks.dumpSchema(config);
+      expect(fs.existsSync(schemaPath)).toBe(true);
+    } finally {
+      DatabaseTasks.dbDir = prevDbDir;
+      try {
+        Base.removeConnection();
+      } catch {
+        /* ignore */
+      }
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
-  it.skip("db dir ignored if included in schema dump", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs schema dump config */
+  it("db dir ignored if included in schema dump", async () => {
+    // Mirrors Rails: schemaDump is an absolute path whose dirname == dbDir.
+    // schemaDumpPath returns it verbatim (no double-prefix).
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dbdir-ignored-"));
+    const prevDbDir = DatabaseTasks.dbDir;
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    try {
+      DatabaseTasks.dbDir = tmp;
+      const schemaPath = path.join(tmp, "fake_db_config_schema.ts");
+      const config = new HashConfig("arunit", "primary", {
+        adapter: "sqlite3",
+        database: ":memory:",
+        schemaDump: schemaPath, // absolute path — dirname == dbDir
+      });
+      fs.rmSync(tmp, { recursive: true, force: true });
+      expect(fs.existsSync(schemaPath)).toBe(false);
+      await DatabaseTasks.dumpSchema(config);
+      expect(fs.existsSync(schemaPath)).toBe(true);
+    } finally {
+      DatabaseTasks.dbDir = prevDbDir;
+      try {
+        Base.removeConnection();
+      } catch {
+        /* ignore */
+      }
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
 
@@ -304,10 +365,10 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     }
   });
   it.skip("establishes connection for the given environments", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs connection establishment */
+    // P3 skip: createCurrent does not call Base.establishConnection(env) after creating.
+    // Rails calls establish_connection(:development) at the end of create_current so the
+    // caller's pool is re-pointed. ~20 LOC addition to createCurrent in database-tasks.ts.
+    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:586
   });
 });
 
@@ -368,9 +429,9 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   });
 
   it.skip("establishes connection for the given environments config", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
+    // P3 skip: same gap as two-tier "establishes connection for the given environments" —
+    // createCurrent doesn't call Base.establishConnection(env) post-create in three-tier setup.
+    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:703
   });
 });
 
@@ -782,28 +843,28 @@ describe("DatabaseTasks migration connection resolves from the pool", () => {
 
 describe("DatabaseTasksMigrateScopeTest", () => {
   it.skip("migrate using scope and verbose mode", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
+    // P3 skip: SCOPE env variable not implemented. Rails filters migrations by scope substring
+    // when ENV["SCOPE"] is set. Requires ~30 LOC in Migrator + DatabaseTasks.migrate to thread
+    // the scope filter through. Also needs "scope/" migration fixtures.
+    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:1105
   });
   it.skip("migrate using scope and non verbose mode", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
+    // P3 skip: same SCOPE gap as "migrate using scope and verbose mode".
+    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:1125
   });
   it.skip("migrate using empty scope and verbose mode", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
+    // P3 skip: same SCOPE gap as "migrate using scope and verbose mode".
+    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:1141
   });
 });
 
 describe("DatabaseTasksMigrateStatusTest", () => {
   it.skip("migrate status table", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs migration status tracking */
+    // P3 skip: migrateStatus() returns structured data but does not print to stdout.
+    // Rails' migrate_status prints a formatted table including "database: :memory:" header
+    // and up/down rows per migration. Requires ~30 LOC stdout-printing wrapper in
+    // DatabaseTasks or a separate displayMigrateStatus helper.
+    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:1169
   });
 });
 
@@ -1115,11 +1176,13 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
     expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/animals_schema.ts");
   });
 
-  it.skip("setting schema dump to nil", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs schema_dump config option */
+  it("setting schema dump to nil", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev-db",
+      schemaDump: false,
+    });
+    expect(DatabaseTasks.schemaDumpPath(config)).toBeNull();
   });
 
   it("check dump filename with schema env with non primary databases", () => {

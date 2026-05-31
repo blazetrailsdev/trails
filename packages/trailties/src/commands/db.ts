@@ -448,8 +448,10 @@ async function runTestLoadSchema(options: {
   await runProtectedEnvCheck(config, "test");
   const filename = DatabaseTasks.schemaDumpPath(config);
   const fs = await getFsAsync();
-  if (!(await fs.exists(filename))) {
-    console.error(`No schema file found at ${filename}. Run \`trails db schema:dump\` first.`);
+  if (!filename || !(await fs.exists(filename))) {
+    console.error(
+      `No schema file found at ${filename ?? "(none)"}. Run \`trails db schema:dump\` first.`,
+    );
     setExitCode(1);
     return;
   }
@@ -1004,7 +1006,7 @@ export function dbCommand(): Command {
           DatabaseTasks.schemaFormat = await resolveSchemaFormat(opts);
           const filename = DatabaseTasks.schemaDumpPath(config);
           await DatabaseTasks.dumpSchema(config);
-          console.log(`${prefix}Schema dumped to ${filename}`);
+          console.log(`${prefix}Schema dumped to ${filename ?? "(skipped — schemaDump disabled)"}`);
         } finally {
           DatabaseTasks.schemaFormat = previousFormat;
         }
@@ -1028,8 +1030,8 @@ export function dbCommand(): Command {
         try {
           DatabaseTasks.schemaFormat = await resolveSchemaFormat(opts);
           const filename = DatabaseTasks.schemaDumpPath(config);
-          if (!(await fs.exists(filename))) {
-            console.error(`${prefix}No schema file found at ${filename}`);
+          if (!filename || !(await fs.exists(filename))) {
+            console.error(`${prefix}No schema file found at ${filename ?? "(none)"}`);
             setExitCode(1);
             return;
           }

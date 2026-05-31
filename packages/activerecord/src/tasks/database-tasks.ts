@@ -702,26 +702,61 @@ export class DatabaseTasks {
     return null;
   }
 
-  static schemaDumpPath(config?: DatabaseConfig): string {
-    return this.dumpSchemaFilename(config);
+  /**
+   * Mirrors Rails' `DatabaseTasks.schema_dump_path`:
+   * 1. Returns `ENV["SCHEMA"]` when set.
+   * 2. When `schemaDump` is explicitly set in the config hash, consults
+   *    `config.schemaDump(format)` — returns `null` for `false`/null (disabled),
+   *    or the custom path string. Applies Rails' db_dir prefix rule:
+   *    dirname == dbDir → return as-is; otherwise prepend dbDir.
+   * 3. For configs with no explicit `schemaDump` key, falls back to
+   *    `dumpSchemaFilename()` which already includes dbDir and handles all
+   *    formats including the Trails-specific `"js"` format.
+   *
+   * Returns `null` when the config disables schema dumping (`schemaDump: false`).
+   */
+  static schemaDumpPath(config?: DatabaseConfig): string | null {
+    const envSchema = getEnv("SCHEMA")?.trim();
+    if (envSchema) return envSchema;
+
+    // Only consult config.schemaDump() when the key is explicitly present.
+    // When absent, dumpSchemaFilename() is the authoritative path — it handles
+    // all formats (including the Trails-only "js") with the dbDir prefix.
+    // Calling schemaDump() unconditionally for "js" would return "schema.ts"
+    // (after "js"→"ts" normalization) giving the wrong extension.
+    const rawCfg = (config as unknown as { configuration?: Record<string, unknown> })
+      ?.configuration;
+    const hasExplicitSchemaDump =
+      rawCfg != null && Object.hasOwn(rawCfg, "schemaDump") && rawCfg["schemaDump"] !== undefined;
+
+    if (!hasExplicitSchemaDump) {
+      return this.dumpSchemaFilename(config);
+    }
+
+    // Explicit key: call schemaDump() for the value.
+    // Normalize "js" → "ts": HashConfig.schemaDump() has no "js" case and
+    // returns null for unknown formats, which would incorrectly gate the dump.
+    const cfgWithDump = config as unknown as { schemaDump?: (format?: string) => string | null };
+    if (typeof cfgWithDump?.schemaDump !== "function") {
+      return this.dumpSchemaFilename(config);
+    }
+    const format = this.schemaFormat === "js" ? "ts" : this.schemaFormat;
+    const filename = cfgWithDump.schemaDump(format);
+    if (filename == null) return null;
+
+    // Mirrors: `File.dirname(filename) == db_dir ? filename : File.join(db_dir, filename)`.
+    const p = getPath();
+    const dir = p.dirname ? p.dirname(filename) : ".";
+    if (dir === this.dbDir) return filename;
+    return p.join ? p.join(this.dbDir, filename) : `${this.dbDir}/${filename}`;
   }
 
   static async dumpSchema(config: DatabaseConfig): Promise<void> {
     // Rails: `return unless db_config.schema_dump` — lets per-config
-    // `schemaDump: false` (or null) suppress dumping. HashConfig.schemaDump()
-    // normalizes both to null. Pass the current format so the check matches
-    // what's being dumped.
-    const cfgWithDump = config as unknown as {
-      schemaDump?: (format?: string) => string | null;
-    };
-    if (typeof cfgWithDump.schemaDump === "function") {
-      // JS dumps use the same schema file path/config as TS; normalize
-      // so HashConfig.schemaDump (which recognizes ruby/sql/ts but not
-      // js) doesn't return null and accidentally suppress the dump.
-      const format = this.schemaFormat === "js" ? "ts" : this.schemaFormat;
-      if (cfgWithDump.schemaDump(format) == null) return;
-    }
+    // `schemaDump: false` (or null) suppress dumping.
+    // schemaDumpPath() returns null when schemaDump is disabled.
     const filename = this.schemaDumpPath(config);
+    if (filename == null) return;
     if (this.schemaFormat === "sql") {
       const fs = getFs();
       const path = getPath();
@@ -752,7 +787,7 @@ export class DatabaseTasks {
     format: SchemaFormat = DatabaseTasks.schemaFormat,
     file?: string,
   ): Promise<void> {
-    const filename = file ?? this.schemaDumpPath(config);
+    const filename = file ?? this.schemaDumpPath(config) ?? "";
     this.checkSchemaFile(filename);
 
     if (format === "sql") {
@@ -1049,6 +1084,7 @@ export class DatabaseTasks {
   ): Promise<boolean> {
     void format;
     const filename = file ?? this.schemaDumpPath(config);
+    if (!filename) return true;
     const fs = getFs();
     if (!fs.existsSync(filename)) return true;
 
