@@ -556,7 +556,28 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     });
     registerModel("PolyTarget", PolyTarget);
     registerModel("PolyOwner", PolyOwner);
-    expect(() => acceptsNestedAttributesFor(PolyOwner, "target")).toThrow(/polymorphic/);
+    // Rails defers the polymorphic-target check to build time: declaring
+    // accepts_nested_attributes_for on a polymorphic belongs_to succeeds, and
+    // the ArgumentError only fires when a nested payload tries to build a new
+    // record for the polymorphic association.
+    expect(() => acceptsNestedAttributesFor(PolyOwner, "target")).not.toThrow();
+    const owner = new PolyOwner();
+    expect(() => {
+      (owner as any).targetAttributes = { name: "pearl" };
+    }).toThrow(
+      "Cannot build association `target'. Are you trying to build a polymorphic one-to-one association?",
+    );
+
+    // An `id`-bearing payload routes to the update / record-not-found branches
+    // in Rails (nested_attributes.rb:436-441), never the polymorphic build
+    // error — so the check must NOT block it. It enqueues like any update.
+    const updater = new PolyOwner();
+    expect(() => {
+      (updater as any).targetAttributes = { id: 1, name: "pearl" };
+    }).not.toThrow();
+    expect((updater as any)._pendingNestedAttributes.get("target")).toEqual([
+      { id: 1, name: "pearl" },
+    ]);
   });
 
   it("should define an attribute writer method for the association", () => {

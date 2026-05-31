@@ -10,8 +10,8 @@ type FixtureAttrs = Record<string, unknown>;
  * A model-backed fixture-set entry. The model is resolved lazily through a dynamic
  * import so the registry can enumerate every fixture set without eagerly
  * importing every model module — several canonical models run import-time side
- * effects (`encrypts()`, `acceptsNestedAttributesFor` on polymorphic refs) that
- * throw unless their add-on/handler is already bootstrapped. Deferring the import
+ * effects (`encrypts()`) that throw unless their add-on/handler is already
+ * bootstrapped. Deferring the import
  * to seed time means a test only loads the models for the fixtures it requests.
  */
 export interface FixtureModelEntry {
@@ -50,10 +50,6 @@ export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTable
  * Known gaps — fixture data WITHOUT a registered model (intentionally omitted):
  * - `bad-posts` — no canonical model (arunit2 alt-connection fixture)
  * - `categories-ordered` — no dedicated model (alternate ordering fixture for categories)
- * - `chefs` — `chef.ts` throws at import: trails' `acceptsNestedAttributesFor`
- *   eagerly rejects the polymorphic `employable` belongs_to, whereas Rails
- *   (chef.rb: `accepts_nested_attributes_for :employable`) defers that check to
- *   build time. Pre-existing model-port divergence; re-add once chef.ts imports cleanly.
  * - `encrypted-book-that-ignores-cases` — same encryption add-on requirement
  * - `encrypted-books` — model requires the `@blazetrails/activerecord/encryption` add-on loaded at import time
  * - `fk-object-to-point-to` — no canonical model
@@ -148,6 +144,10 @@ export const fixtureRegistry = {
   categorizations: {
     model: () => import("./models/categorization.js").then((m) => m.Categorization),
     data: FixtureData.categorizationFixtureData,
+  },
+  chefs: {
+    model: () => import("./models/chef.js").then((m) => m.Chef),
+    data: FixtureData.chefFixtureData,
   },
   citations: {
     model: () => import("./models/citation.js").then((m) => m.Citation),
