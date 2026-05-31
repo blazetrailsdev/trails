@@ -376,6 +376,20 @@ function resolveEnumSymbol(table: string, attr: string, symbol: string): number 
   return map && Object.hasOwn(map, symbol) ? map[symbol] : undefined;
 }
 
+/** JSON.stringify with keys sorted at every nesting level — order-insensitive deep equality. */
+function stableStringify(v: unknown): string {
+  return JSON.stringify(v, (_key, val: unknown) => {
+    if (val !== null && typeof val === "object" && !Array.isArray(val)) {
+      return Object.fromEntries(
+        Object.entries(val as Record<string, unknown>).sort(([a], [b]) =>
+          a < b ? -1 : a > b ? 1 : 0,
+        ),
+      );
+    }
+    return val;
+  });
+}
+
 // prettier-ignore
 export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, idIndex: Map<string, Map<number, string[]>>, notes: string[], table: string = "", attrsSkipped?: { n: number }): boolean {
   if (isRefLike(tsVal)) {
@@ -407,12 +421,13 @@ export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, id
     && tsVal.length === railsVal.length && tsVal.every((v, i) => v === railsVal[i]))
     return true;
   // Plain-object columns (store/serialize hash values): Rails YAML carries a
-  // nested hash; compare via JSON round-trip so symbol-keyed hashes
-  // (e.g. `{":symbol": "symbol"}`) that are structurally identical don't DIFF.
+  // nested hash; compare via a key-sorted JSON round-trip so symbol-keyed
+  // hashes (e.g. `{":symbol": "symbol"}`) that are structurally identical
+  // don't DIFF regardless of property insertion order.
   if (
     tsVal !== null && typeof tsVal === "object" && !Array.isArray(tsVal) &&
     railsVal !== null && typeof railsVal === "object" && !Array.isArray(railsVal) &&
-    JSON.stringify(tsVal) === JSON.stringify(railsVal)
+    stableStringify(tsVal) === stableStringify(railsVal)
   ) return true;
   // Datetime tolerance: round to second-precision since Rails fixtures often
   // carry sub-second fractions the TS side trims when materializing values.
