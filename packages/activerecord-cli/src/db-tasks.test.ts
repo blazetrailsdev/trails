@@ -36,6 +36,7 @@ describe("DbTasksTest", () => {
     dropAll = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(DatabaseTasks, "create").mockImplementation(createAll);
     vi.spyOn(DatabaseTasks, "drop").mockImplementation(dropAll);
+    vi.spyOn(DatabaseTasks, "checkProtectedEnvironmentsBang").mockResolvedValue(undefined);
   });
 
   afterEach(() => {

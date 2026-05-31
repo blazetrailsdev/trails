@@ -20,7 +20,7 @@ async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigurations> 
   const { pathToFileURL } = await import("node:url");
   const mod = await import(pathToFileURL(configPath).href);
   const raw = mod.default ?? mod;
-  const configs = DatabaseConfigurations.fromRaw(raw);
+  const configs = DatabaseConfigurations.fromEnv(raw);
   DatabaseTasks.databaseConfiguration = configs;
   return configs;
 }
@@ -75,7 +75,7 @@ export async function dbCreate(cwd: string, args: string[]): Promise<number> {
   let ok = true;
   const configs = all
     ? DatabaseTasks.eachLocalConfiguration()
-    : DatabaseTasks.configsFor(DatabaseConfigurations.defaultEnv ?? "development");
+    : DatabaseTasks.configsFor(DatabaseConfigurations.currentEnv());
   for (const config of configs) {
     if (!(await runCreate(config))) ok = false;
   }
@@ -91,10 +91,15 @@ export async function dbDrop(cwd: string, args: string[]): Promise<number> {
     return 1;
   }
 
-  let ok = true;
   const configs = all
     ? DatabaseTasks.eachLocalConfiguration()
-    : DatabaseTasks.configsFor(DatabaseConfigurations.defaultEnv ?? "development");
+    : DatabaseTasks.configsFor(DatabaseConfigurations.currentEnv());
+  // Mirror DatabaseTasks.dropAll / dropCurrent: check protected envs before
+  // any drop so a single production config in a multi-db set doesn't slip through.
+  for (const config of configs) {
+    await DatabaseTasks.checkProtectedEnvironmentsBang(config.envName);
+  }
+  let ok = true;
   for (const config of configs) {
     if (!(await runDrop(config))) ok = false;
   }
