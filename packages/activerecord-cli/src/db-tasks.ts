@@ -263,6 +263,10 @@ export async function dbSetup(cwd: string, _args: string[]): Promise<number> {
 
   const env = DatabaseConfigurations.currentEnv();
   const configs = DatabaseTasks.configsFor(env);
+  if (configs.length === 0) {
+    console.error(`ar: no database configuration found for environment "${env}"`);
+    return 1;
+  }
   let ok = true;
   for (const config of configs) {
     if (!(await runCreate(config))) ok = false;

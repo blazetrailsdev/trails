@@ -55,6 +55,7 @@ describe("DbPrepareTest", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.seedLoader = null;
     (DatabaseTasks as unknown as { _root: null })._root = null;
   });
 
