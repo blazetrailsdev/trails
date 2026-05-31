@@ -17,7 +17,32 @@ type FixtureAttrs = Record<string, unknown>;
 export interface FixtureModelEntry {
   readonly model: () => Promise<BaseClass>;
   readonly data: Record<string, FixtureAttrs>;
+  /**
+   * Optional add-on bootstrap awaited BEFORE the {@link FixtureModelEntry.model}
+   * thunk fires. Some canonical models run import-time side effects that require
+   * an opt-in add-on already loaded into the runtime — e.g. `encrypted-book.ts`
+   * calls `encrypts()` in a `static {}` block, which throws unless the encryption
+   * add-on (`@blazetrails/activerecord/encryption`) has registered its hooks. The
+   * hook keeps the add-on opt-in: only entries that declare it pay the cost, and
+   * a fixture set without one (e.g. `authors`) never loads encryption.
+   */
+  readonly addOn?: () => Promise<void>;
 }
+
+/**
+ * Bootstraps the encryption add-on so the `EncryptedBook*` models import cleanly.
+ * Importing `encryption/test-helpers.js` triggers the `../encryption.js` side
+ * effect that registers `Base.encrypts`' hooks, then configures the shared test
+ * key material. `supportUnencryptedData` is enabled so the plaintext fixture rows
+ * round-trip through the encrypted attribute type (Rails fixtures store plaintext
+ * unless `encrypt_fixtures` is set).
+ *
+ * @internal
+ */
+const bootstrapEncryptionAddOn = (): Promise<void> =>
+  import("../encryption/test-helpers.js").then(({ configureEncryption }) => {
+    configureEncryption({ supportUnencryptedData: true });
+  });
 
 /**
  * A HABTM join-table fixture-set entry. These tables (e.g. `categories_posts`)
@@ -50,8 +75,6 @@ export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTable
  * Known gaps — fixture data WITHOUT a registered model (intentionally omitted):
  * - `bad-posts` — no canonical model (arunit2 alt-connection fixture)
  * - `categories-ordered` — no dedicated model (alternate ordering fixture for categories)
- * - `encrypted-book-that-ignores-cases` — same encryption add-on requirement
- * - `encrypted-books` — model requires the `@blazetrails/activerecord/encryption` add-on loaded at import time
  * - `fk-object-to-point-to` — no canonical model
  * - `fk-test-has-fk` — no canonical model
  * - `fk-test-has-pk` — no canonical model
@@ -248,6 +271,16 @@ export const fixtureRegistry = {
   edges: {
     model: () => import("./models/edge.js").then((m) => m.Edge),
     data: FixtureData.edgeFixtureData,
+  },
+  encryptedBooks: {
+    addOn: bootstrapEncryptionAddOn,
+    model: () => import("./models/book-encrypted.js").then((m) => m.EncryptedBook),
+    data: FixtureData.encryptedBookFixtureData,
+  },
+  encryptedBookThatIgnoresCases: {
+    addOn: bootstrapEncryptionAddOn,
+    model: () => import("./models/book-encrypted.js").then((m) => m.EncryptedBookThatIgnoresCase),
+    data: FixtureData.encryptedBookThatIgnoresCasesFixtureData,
   },
   entrants: {
     model: () => import("./models/entrant.js").then((m) => m.Entrant),

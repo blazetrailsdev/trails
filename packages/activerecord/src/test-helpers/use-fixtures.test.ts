@@ -553,6 +553,7 @@ describe("fixtureRegistry conformance", () => {
         );
         expect(entry.joinTable.length, `${name}: joinTable must be non-empty`).toBeGreaterThan(0);
       } else {
+        await (entry as { addOn?: () => Promise<void> }).addOn?.();
         const ModelClass = await (entry as { model: () => Promise<typeof Base> }).model();
         expect(typeof ModelClass, `${name}: model thunk must resolve to a class`).toBe("function");
         expect(
@@ -596,6 +597,7 @@ describe("fixtureRegistry ref targets", () => {
       if (isJoinTableEntry(entry)) {
         loadable.add(entry.joinTable);
       } else {
+        await (entry as { addOn?: () => Promise<void> }).addOn?.();
         const M = await (entry as { model: () => Promise<typeof Base> }).model();
         loadable.add(M.tableName);
       }
@@ -658,6 +660,7 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
         if (isJoinTableEntry(entry)) {
           await defineJoinTableFixtures(Base.adapter, entry.joinTable, data);
         } else {
+          await (entry as { addOn?: () => Promise<void> }).addOn?.();
           const ModelClass = await (entry as { model: () => Promise<typeof Base> }).model();
           await defineFixtures(Base.adapter, ModelClass, data);
         }
@@ -667,6 +670,47 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
     }
     expect(failures, `unseedable registry entries:\n${failures.join("\n")}`).toEqual([]);
   }, 120000);
+});
+
+// --- encryption add-on bootstrap (opt-in addOn hook) ---
+
+describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
+  // EncryptedBook calls `encrypts("name", { deterministic: true })` in a static
+  // block, which throws at import unless the encryption add-on registered its
+  // hooks first. The registry entry's `addOn` runs before the model thunk and
+  // bootstraps it. The fixture row stores plaintext (Rails fixture parity), so
+  // the encrypted attribute reads back as the expected plaintext.
+  const { encryptedBooks } = useFixtures(["encryptedBooks"], () => Base.adapter);
+  const { encryptedBookThatIgnoresCases } = useFixtures(
+    ["encryptedBookThatIgnoresCases"],
+    () => Base.adapter,
+  );
+
+  it("round-trips the encrypted name attribute to its plaintext", () => {
+    expect(encryptedBooks("awdr").readAttribute("name")).toBe("Agile Web Development with Rails");
+  });
+
+  it("round-trips an ignore-case encrypted fixture", () => {
+    expect(encryptedBookThatIgnoresCases("rfr").readAttribute("name")).toBe("Ruby for Rails");
+  });
+});
+
+describe("useFixtures encryption add-on is opt-in", () => {
+  it("only encrypted fixture entries declare an addOn hook", () => {
+    expect(typeof (fixtureRegistry.encryptedBooks as { addOn?: unknown }).addOn).toBe("function");
+    expect(
+      typeof (fixtureRegistry.encryptedBookThatIgnoresCases as { addOn?: unknown }).addOn,
+    ).toBe("function");
+    // A non-encryption fixture never carries the hook, so loading it can't pull
+    // the encryption add-on into the runtime.
+    expect((fixtureRegistry.authors as { addOn?: unknown }).addOn).toBeUndefined();
+  });
 });
 
 // --- FixtureSet.createFixtures ---
