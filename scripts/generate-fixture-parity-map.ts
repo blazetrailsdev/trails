@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env -S npx tsx
 /**
  * Generates eslint/test-fixture-parity.json — trails file → fixture-using
  * test descriptions. Class-level `fixtures :foo` marks ALL tests in the file.
