@@ -38,6 +38,23 @@ Run in the project root. Writes config/database.ts (TRAILS_ENV-keyed),
 db/migrate/, db/seeds.ts, app/models/index.ts (the generated manifest), and
 db.ts (bootstrap glue). Existing files are never overwritten.`;
 
+const DB_CREATE_HELP = `ar db:create — create the database for the current TRAILS_ENV
+
+Loads config/database.ts, resolves the active environment (TRAILS_ENV →
+NODE_ENV → "development"), and creates each configured database.
+
+Options:
+  --all   Create databases for all environments, not just the current one.`;
+
+const DB_DROP_HELP = `ar db:drop — drop the database for the current TRAILS_ENV
+
+Loads config/database.ts, resolves the active environment (TRAILS_ENV →
+NODE_ENV → "development"), and drops each configured database.
+Production environments are protected unless DISABLE_DATABASE_ENVIRONMENT_CHECK is set.
+
+Options:
+  --all   Drop databases for all environments, not just the current one.`;
+
 /** Commands recognized but deferred to a later slice (see proposal §5). */
 const NOT_IMPLEMENTED = new Set(
   (
@@ -129,9 +146,17 @@ export async function run(argv: string[], cwd: string): Promise<number> {
     return delegateBin("@blazetrails/activerecord", "trails-models-dump", rest);
   }
   if (command === "db:create") {
+    if (wantsHelp(rest)) {
+      console.log(DB_CREATE_HELP);
+      return 0;
+    }
     return dbCreate(cwd, rest);
   }
   if (command === "db:drop") {
+    if (wantsHelp(rest)) {
+      console.log(DB_DROP_HELP);
+      return 0;
+    }
     return dbDrop(cwd, rest);
   }
   if (NOT_IMPLEMENTED.has(command)) {

@@ -72,10 +72,13 @@ export async function dbCreate(cwd: string, args: string[]): Promise<number> {
     return 1;
   }
 
+  const env = DatabaseConfigurations.currentEnv();
+  const configs = all ? DatabaseTasks.eachLocalConfiguration() : DatabaseTasks.configsFor(env);
+  if (!all && configs.length === 0) {
+    console.error(`ar: no database configuration found for environment "${env}"`);
+    return 1;
+  }
   let ok = true;
-  const configs = all
-    ? DatabaseTasks.eachLocalConfiguration()
-    : DatabaseTasks.configsFor(DatabaseConfigurations.currentEnv());
   for (const config of configs) {
     if (!(await runCreate(config))) ok = false;
   }
@@ -91,9 +94,12 @@ export async function dbDrop(cwd: string, args: string[]): Promise<number> {
     return 1;
   }
 
-  const configs = all
-    ? DatabaseTasks.eachLocalConfiguration()
-    : DatabaseTasks.configsFor(DatabaseConfigurations.currentEnv());
+  const env = DatabaseConfigurations.currentEnv();
+  const configs = all ? DatabaseTasks.eachLocalConfiguration() : DatabaseTasks.configsFor(env);
+  if (!all && configs.length === 0) {
+    console.error(`ar: no database configuration found for environment "${env}"`);
+    return 1;
+  }
   // Mirror DatabaseTasks.dropAll / dropCurrent: check protected envs before
   // any drop so a single production config in a multi-db set doesn't slip through.
   for (const config of configs) {
