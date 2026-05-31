@@ -291,15 +291,21 @@ export async function dbPrepare(cwd: string, _args: string[]): Promise<number> {
   }
 }
 
+function center(s: string, width: number): string {
+  const pad = width - s.length;
+  const left = Math.floor(pad / 2);
+  return " ".repeat(left) + s + " ".repeat(pad - left);
+}
+
 function printMigrateStatusTable(
   dbName: string,
   rows: Array<{ status: "up" | "down"; version: string; name: string }>,
 ): void {
   console.log(`\ndatabase: ${dbName}\n`);
-  console.log(`${"Status".padStart(7).padEnd(8)}  ${"Migration ID".padEnd(14)}  Migration Name`);
+  console.log(`${center("Status", 8)}  ${"Migration ID".padEnd(14)}  Migration Name`);
   console.log("-".repeat(50));
   for (const row of rows) {
-    console.log(`${row.status.padStart(7).padEnd(8)}  ${row.version.padEnd(14)}  ${row.name}`);
+    console.log(`${center(row.status, 8)}  ${row.version.padEnd(14)}  ${row.name}`);
   }
   console.log("");
 }
@@ -334,10 +340,9 @@ export async function dbMigrateStatus(cwd: string, args: string[]): Promise<numb
     return 0;
   }
 
+  const dbName = DatabaseTasks.configsFor(env)[0]?.database ?? env;
   try {
     const rows = await DatabaseTasks.migrateStatus();
-    const configs = DatabaseTasks.configsFor(env);
-    const dbName = configs[0]?.database ?? env;
     printMigrateStatusTable(dbName, rows);
     return 0;
   } catch (err) {
