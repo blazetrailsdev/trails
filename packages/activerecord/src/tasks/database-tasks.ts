@@ -264,6 +264,12 @@ export class DatabaseTasks {
 
     const migrator = new Migrator(adapter, this._migrations);
     await migrator.migrate(effectiveVersion ?? null);
+
+    // Rails: `migration_connection_pool.schema_cache.clear!` — drop the
+    // reflected schema so post-migration introspection re-reads the
+    // freshly-migrated tables. Optional-chained so an adapter without a
+    // schema cache is a no-op rather than a crash.
+    adapter.schemaCache?.clear();
   }
 
   private static _adapterInstance: import("../adapter.js").DatabaseAdapter | null = null;
@@ -401,7 +407,9 @@ export class DatabaseTasks {
     if (v === undefined || v === null || String(v).trim() === "") return;
     const str = String(v).trim();
     if (!/^\d+$/.test(str)) {
-      throw new Error(`Invalid format of target version: '${str}'`);
+      // Mirror Rails' message shape:
+      // `raise "Invalid format of target version: \`VERSION=#{ENV['VERSION']}\`"`.
+      throw new Error(`Invalid format of target version: \`VERSION=${str}\``);
     }
   }
 
@@ -867,6 +875,18 @@ export class DatabaseTasks {
 
   static async migrateAll(): Promise<void> {
     const configs = this.configsFor(this._normalizeEnv());
+
+    // Rails: a single primary database short-circuits the per-config loop and
+    // migrates the already-established connection directly, skipping the
+    // temporary-pool churn (`db_configs.size == 1 && db_configs.first.primary?`).
+    // Rails: `db_configs.size == 1 && db_configs.first.primary?`. `primary?`
+    // (TS: `isPrimary()`) lives on HashConfig/UrlConfig, not the abstract
+    // DatabaseConfig, so reach it structurally off the concrete instance.
+    if (configs.length === 1 && (configs[0] as { isPrimary?(): boolean }).isPrimary?.()) {
+      await this.migrate();
+      return;
+    }
+
     for (const config of configs) {
       await this.withTemporaryConnection(config, async () => {
         await this.migrate();
@@ -877,15 +897,22 @@ export class DatabaseTasks {
   static async prepareAll(): Promise<void> {
     const { DatabaseAlreadyExists } = await import("../errors.js");
     const configs = this.configsFor(this._normalizeEnv());
+
+    // Rails seeds only when a database was newly initialized AND its config
+    // opts into seeding (`seed = true if database_initialized && db_config.seeds?`).
+    // A successful `create` (no DatabaseAlreadyExists) is our "initialized"
+    // signal, so a re-prepared, already-existing database is not re-seeded.
+    let seed = false;
     for (const config of configs) {
       try {
         await this.create(config);
+        if (config.seeds) seed = true;
       } catch (error) {
         if (!(error instanceof DatabaseAlreadyExists)) throw error;
       }
     }
     await this.migrateAll();
-    if (this.seedLoader) await this.loadSeed();
+    if (seed && this.seedLoader) await this.loadSeed();
   }
 
   static async dbConfigsWithVersions(): Promise<Map<string, DatabaseConfig[]>> {
@@ -1061,12 +1088,23 @@ export class DatabaseTasks {
   ): Promise<void> {
     const { NoDatabaseError } = await import("../errors.js");
     try {
-      await this.purge(config);
+      // Rails fast path: when the loaded schema already matches the dump's
+      // SHA1 (`schema_up_to_date?`), skip the expensive purge+reload and just
+      // truncate — unless SKIP_TEST_DATABASE_TRUNCATE is set, mirroring
+      // `truncate_tables(db_config) unless ENV["SKIP_TEST_DATABASE_TRUNCATE"]`.
+      if (await this.schemaUpToDate(config, format, file)) {
+        if (getEnv("SKIP_TEST_DATABASE_TRUNCATE") === undefined) {
+          await this.truncateTables(config);
+        }
+      } else {
+        await this.purge(config);
+        await this.loadSchema(config, format, file);
+      }
     } catch (error) {
       if (!(error instanceof NoDatabaseError)) throw error;
       await this.create(config);
+      await this.loadSchema(config, format, file);
     }
-    await this.loadSchema(config, format, file);
   }
 
   private static async _connectFor(

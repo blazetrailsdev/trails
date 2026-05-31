@@ -653,17 +653,41 @@ describe("DatabaseTasksMigrateErrorTest", () => {
     await expect(DatabaseTasks.migrate("abc")).rejects.toThrow(/Invalid format/);
   });
 
-  it.skip("migrate raise error on failed check target version", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
+  it("migrate raise error on failed check target version", async () => {
+    const spy = vi.spyOn(DatabaseTasks, "checkTargetVersion").mockImplementation(() => {
+      throw new Error("foo");
+    });
+    try {
+      await expect(DatabaseTasks.migrate()).rejects.toThrow("foo");
+    } finally {
+      spy.mockRestore();
+    }
   });
 
-  it.skip("migrate clears schema cache afterward", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs schema cache */
+  it("migrate clears schema cache afterward", async () => {
+    const { SchemaCache } = await import("../connection-adapters/schema-cache.js");
+    const { adapter } = createSidecarTestAdapter();
+    const originalVersion = process.env.VERSION;
+    delete process.env.VERSION;
+    DatabaseTasks.setAdapter(adapter);
+    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      [DatabaseTasks.env]: { adapter: "sqlite3", database: "dev.db" },
+    });
+    DatabaseTasks.registerMigrations([]);
+    const clearSpy = vi.spyOn(SchemaCache.prototype, "clear");
+    try {
+      await DatabaseTasks.migrate();
+      expect(clearSpy).toHaveBeenCalled();
+    } finally {
+      clearSpy.mockRestore();
+      if (originalVersion === undefined) delete process.env.VERSION;
+      else process.env.VERSION = originalVersion;
+      DatabaseTasks.setAdapter(null);
+      DatabaseTasks.databaseConfiguration = null;
+      DatabaseTasks.registerMigrations([]);
+      DatabaseTasks.clearRegisteredTasks();
+    }
   });
 });
 
