@@ -112,7 +112,7 @@ export const ERB_SKIP_SENTINEL = "__ERB_SKIP__";
 // + 7 reserved_words/to_be_linked YAMLs ported in Phase 7 (missing: 18 → 11).
 // Phases 2, 4b-6 will close the remaining 11 subdir YAMLs. Bump match when new
 // fixtures are ported; bump diff only for intentional accepted drifts.
-const CI_BASELINE = { match: 128, diff: 8, missing: 5 } as const;
+const CI_BASELINE = { match: 80, diff: 4, missing: 1 } as const;
 
 function parseArgs(argv: string[]): {
   pkg: string;
