@@ -702,26 +702,35 @@ export class DatabaseTasks {
     return null;
   }
 
-  static schemaDumpPath(config?: DatabaseConfig): string {
+  /**
+   * Mirrors Rails' `DatabaseTasks.schema_dump_path`:
+   * - Returns `ENV["SCHEMA"]` when set.
+   * - Delegates to `config.schemaDump(format)` when available — a string
+   *   value overrides the default filename; `null` means dumping is disabled.
+   * - Falls back to `dumpSchemaFilename(config)` for bare configs without
+   *   the `schemaDump` accessor (e.g. non-HashConfig objects).
+   *
+   * Returns `null` when the config disables schema dumping (`schemaDump: false`).
+   */
+  static schemaDumpPath(config?: DatabaseConfig): string | null {
+    const envSchema = getEnv("SCHEMA")?.trim();
+    if (envSchema) return envSchema;
+    if (config) {
+      const cfgWithDump = config as unknown as { schemaDump?: (format?: string) => string | null };
+      if (typeof cfgWithDump.schemaDump === "function") {
+        const format = this.schemaFormat === "js" ? "ts" : this.schemaFormat;
+        return cfgWithDump.schemaDump(format);
+      }
+    }
     return this.dumpSchemaFilename(config);
   }
 
   static async dumpSchema(config: DatabaseConfig): Promise<void> {
     // Rails: `return unless db_config.schema_dump` — lets per-config
-    // `schemaDump: false` (or null) suppress dumping. HashConfig.schemaDump()
-    // normalizes both to null. Pass the current format so the check matches
-    // what's being dumped.
-    const cfgWithDump = config as unknown as {
-      schemaDump?: (format?: string) => string | null;
-    };
-    if (typeof cfgWithDump.schemaDump === "function") {
-      // JS dumps use the same schema file path/config as TS; normalize
-      // so HashConfig.schemaDump (which recognizes ruby/sql/ts but not
-      // js) doesn't return null and accidentally suppress the dump.
-      const format = this.schemaFormat === "js" ? "ts" : this.schemaFormat;
-      if (cfgWithDump.schemaDump(format) == null) return;
-    }
+    // `schemaDump: false` (or null) suppress dumping.
+    // schemaDumpPath() returns null when schemaDump is disabled.
     const filename = this.schemaDumpPath(config);
+    if (filename == null) return;
     if (this.schemaFormat === "sql") {
       const fs = getFs();
       const path = getPath();
@@ -752,7 +761,7 @@ export class DatabaseTasks {
     format: SchemaFormat = DatabaseTasks.schemaFormat,
     file?: string,
   ): Promise<void> {
-    const filename = file ?? this.schemaDumpPath(config);
+    const filename = file ?? this.schemaDumpPath(config) ?? "";
     this.checkSchemaFile(filename);
 
     if (format === "sql") {
@@ -1049,6 +1058,7 @@ export class DatabaseTasks {
   ): Promise<boolean> {
     void format;
     const filename = file ?? this.schemaDumpPath(config);
+    if (!filename) return true;
     const fs = getFs();
     if (!fs.existsSync(filename)) return true;
 
