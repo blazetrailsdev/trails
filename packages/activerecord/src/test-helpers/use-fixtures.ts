@@ -104,9 +104,20 @@ export async function resolveFixtureNames(
       );
     }
     // Join-table sets have no model class — resolve straight to the literal table.
-    const { table, model } = isJoinTableEntry(entry)
-      ? { table: entry.joinTable, model: null as BaseClass | null }
-      : await entry.model().then((m) => ({ table: m.tableName, model: m as BaseClass | null }));
+    // A model entry may declare an `addOn` (e.g. the encryption bootstrap) that
+    // MUST run before its model thunk: the model's import-time side effects
+    // (`encrypts()`) throw unless the add-on registered its hooks first.
+    let table: string;
+    let model: BaseClass | null;
+    if (isJoinTableEntry(entry)) {
+      table = entry.joinTable;
+      model = null;
+    } else {
+      if ("addOn" in entry) await entry.addOn?.();
+      const m = await entry.model();
+      table = m.tableName;
+      model = m;
+    }
     const prior = tableToName.get(table);
     if (prior !== undefined) {
       throw new Error(

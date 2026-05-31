@@ -17,7 +17,45 @@ type FixtureAttrs = Record<string, unknown>;
 export interface FixtureModelEntry {
   readonly model: () => Promise<BaseClass>;
   readonly data: Record<string, FixtureAttrs>;
+  /**
+   * Optional add-on bootstrap awaited BEFORE the {@link FixtureModelEntry.model}
+   * thunk fires. Some canonical models run import-time side effects that require
+   * an opt-in add-on already loaded into the runtime — e.g. `book-encrypted.ts`
+   * calls `encrypts()` in a `static {}` block, which throws unless the encryption
+   * add-on (`@blazetrails/activerecord/encryption`) has registered its hooks. The
+   * hook keeps the add-on opt-in: only entries that declare it pay the cost, and
+   * a fixture set without one (e.g. `authors`) never loads encryption.
+   */
+  readonly addOn?: () => Promise<void>;
 }
+
+/**
+ * Bootstraps the encryption add-on so the `EncryptedBook*` models import cleanly.
+ * Importing the `../encryption.js` wiring registers `Base.encrypts`' hooks via its
+ * module-load side effect — all the `static { encrypts(...) }` blocks in
+ * `book-encrypted.ts` need to evaluate without throwing.
+ *
+ * Deliberately does NOT touch the process-global encryption config (keys /
+ * `supportUnencryptedData`): that is per-suite state a fixture loader must not
+ * leak into unrelated tests. Reading the seeded rows back as plaintext needs keys
+ * plus the cleartext fallback; the suites that load encrypted fixtures configure
+ * that themselves with snapshot/restore (mirroring how Rails' encryption test
+ * cases set up keys via `ActiveRecord::EncryptionTestCase`).
+ *
+ * Fidelity note: Rails' encryption test cases prepend
+ * `ActiveRecord::Encryption::EncryptedFixtures` onto `ActiveRecord::Fixture`,
+ * which encrypts encrypted attributes at load time (`type.serialize(clean)`) so
+ * the column stores ciphertext. trails decorates encrypted attribute types
+ * lazily (at instance-attribute build, not on `typeForAttribute`), so a
+ * fixture-load `serialize()` against the schema-reflected `EncryptedBook` model
+ * still returns cleartext — encrypt-at-rest for fixtures needs a separate change
+ * to the decoration timing. Until then the rows seed as cleartext and
+ * `supportUnencryptedData` lets the encrypted attribute read them back, which is
+ * a supported Rails mode. See the EncryptedFixtures parity follow-up.
+ *
+ * @internal
+ */
+const bootstrapEncryptionAddOn = (): Promise<void> => import("../encryption.js").then(() => {});
 
 /**
  * A HABTM join-table fixture-set entry. These tables (e.g. `categories_posts`)
@@ -50,8 +88,6 @@ export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTable
  * Known gaps — fixture data WITHOUT a registered model (intentionally omitted):
  * - `bad-posts` — no canonical model (arunit2 alt-connection fixture)
  * - `categories-ordered` — no dedicated model (alternate ordering fixture for categories)
- * - `encrypted-book-that-ignores-cases` — same encryption add-on requirement
- * - `encrypted-books` — model requires the `@blazetrails/activerecord/encryption` add-on loaded at import time
  * - `fk-object-to-point-to` — no canonical model
  * - `fk-test-has-fk` — no canonical model
  * - `fk-test-has-pk` — no canonical model
@@ -248,6 +284,16 @@ export const fixtureRegistry = {
   edges: {
     model: () => import("./models/edge.js").then((m) => m.Edge),
     data: FixtureData.edgeFixtureData,
+  },
+  encryptedBooks: {
+    addOn: bootstrapEncryptionAddOn,
+    model: () => import("./models/book-encrypted.js").then((m) => m.EncryptedBook),
+    data: FixtureData.encryptedBookFixtureData,
+  },
+  encryptedBookThatIgnoresCases: {
+    addOn: bootstrapEncryptionAddOn,
+    model: () => import("./models/book-encrypted.js").then((m) => m.EncryptedBookThatIgnoresCase),
+    data: FixtureData.encryptedBookThatIgnoresCasesFixtureData,
   },
   entrants: {
     model: () => import("./models/entrant.js").then((m) => m.Entrant),

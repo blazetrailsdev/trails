@@ -1,4 +1,4 @@
-import { describe, it, expect, expectTypeOf, vi, beforeAll } from "vitest";
+import { describe, it, expect, expectTypeOf, vi, beforeAll, afterAll } from "vitest";
 import { useFixtures, resolveFixtureNames, deriveFixtureSchema } from "./use-fixtures.js";
 import { fixtureRegistry, isJoinTableEntry } from "./fixtures-registry.js";
 import { FixtureSet } from "./fixture-set.js";
@@ -62,6 +62,22 @@ function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>
     primaryKey: pk,
     findBy: vi.fn(async (attrs: Record<string, unknown>) => rows.get(attrs[pk]) ?? null),
   } as any;
+}
+
+// Configures encryption with the shared test keys + cleartext fallback so encrypted
+// fixtures seed and read back, returning a restore fn for `afterAll`. The encrypted
+// attribute type needs keys (and supportUnencryptedData, for the cleartext rows) to
+// reload. Dynamically imports the encryption test-helpers so this file doesn't
+// register `Base.encrypts` hooks at module-collection time — the per-entry `addOn`
+// is what loads encryption lazily at run time, and keeping it out of module scope
+// preserves the opt-in property. Mirrors how Rails' encryption test cases set keys
+// via ActiveRecord::EncryptionTestCase, scoped to the suite that needs them.
+async function setupScopedEncryption(): Promise<() => void> {
+  const { configureEncryption, snapshotEncryptionConfig, restoreEncryptionConfig } =
+    await import("../encryption/test-helpers.js");
+  const snapshot = snapshotEncryptionConfig();
+  configureEncryption({ supportUnencryptedData: true });
+  return () => restoreEncryptionConfig(snapshot);
 }
 
 // --- useFixtures ---
@@ -553,6 +569,7 @@ describe("fixtureRegistry conformance", () => {
         );
         expect(entry.joinTable.length, `${name}: joinTable must be non-empty`).toBeGreaterThan(0);
       } else {
+        if ("addOn" in entry) await entry.addOn?.();
         const ModelClass = await (entry as { model: () => Promise<typeof Base> }).model();
         expect(typeof ModelClass, `${name}: model thunk must resolve to a class`).toBe("function");
         expect(
@@ -596,6 +613,7 @@ describe("fixtureRegistry ref targets", () => {
       if (isJoinTableEntry(entry)) {
         loadable.add(entry.joinTable);
       } else {
+        if ("addOn" in entry) await entry.addOn?.();
         const M = await (entry as { model: () => Promise<typeof Base> }).model();
         loadable.add(M.tableName);
       }
@@ -646,8 +664,17 @@ describe("resolveFixtureNames same-table guard", () => {
 describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
+  // Encrypted entries (encryptedBooks…) reload through the encrypted attribute
+  // type, which needs keys + the cleartext fallback. Configure (scoped) so the
+  // seed loop can reload them, and restore after so this describe doesn't leak
+  // encryption config to later suites.
+  let restoreEncryption: (() => void) | undefined;
   beforeAll(async () => {
+    restoreEncryption = await setupScopedEncryption();
     await defineSchema(TEST_SCHEMA);
+  });
+  afterAll(() => {
+    restoreEncryption?.();
   });
 
   it("every registered entry seeds without error", async () => {
@@ -658,6 +685,7 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
         if (isJoinTableEntry(entry)) {
           await defineJoinTableFixtures(Base.adapter, entry.joinTable, data);
         } else {
+          if ("addOn" in entry) await entry.addOn?.();
           const ModelClass = await (entry as { model: () => Promise<typeof Base> }).model();
           await defineFixtures(Base.adapter, ModelClass, data);
         }
@@ -667,6 +695,97 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
     }
     expect(failures, `unseedable registry entries:\n${failures.join("\n")}`).toEqual([]);
   }, 120000);
+});
+
+// --- encryption add-on bootstrap (opt-in addOn hook) ---
+
+describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  // Reading encrypted fixtures back needs keys + the cleartext fallback. Configure
+  // that here (scoped, with snapshot/restore) rather than in the addOn, so the
+  // global encryption config doesn't leak into later suites in the worker.
+  let restoreEncryption: (() => void) | undefined;
+  beforeAll(async () => {
+    restoreEncryption = await setupScopedEncryption();
+    await defineSchema(TEST_SCHEMA);
+  });
+  afterAll(() => {
+    restoreEncryption?.();
+  });
+
+  // EncryptedBook calls `encrypts("name", { deterministic: true })` in a static
+  // block, which throws at import unless the encryption add-on registered its
+  // hooks first. The registry entry's `addOn` runs before the model thunk and
+  // bootstraps it. The fixture row seeds as cleartext (see the EncryptedFixtures
+  // parity note in fixtures-registry.ts) and `supportUnencryptedData` lets the
+  // encrypted attribute read it back as the expected plaintext.
+  //
+  // `encryptedBooks` and `encryptedBookThatIgnoresCases` both map to the
+  // `encrypted_books` table, and each `useFixtures` registers its own beforeEach
+  // seeder that deletes the table before inserting. Loading both in one scope
+  // would have the second seeder wipe the first set on every test (the same
+  // hazard `resolveFixtureNames` rejects within a single call), so each is scoped
+  // to its own nested describe — only one seeder runs per test.
+  describe("encryptedBooks set", () => {
+    const { encryptedBooks } = useFixtures(["encryptedBooks"], () => Base.adapter);
+
+    it("reads the encrypted name attribute back as its expected plaintext", () => {
+      expect(encryptedBooks("awdr").readAttribute("name")).toBe("Agile Web Development with Rails");
+    });
+  });
+
+  describe("encryptedBookThatIgnoresCases set", () => {
+    const { encryptedBookThatIgnoresCases } = useFixtures(
+      ["encryptedBookThatIgnoresCases"],
+      () => Base.adapter,
+    );
+
+    it("reads an ignore-case encrypted fixture back as plaintext", () => {
+      expect(encryptedBookThatIgnoresCases("rfr").readAttribute("name")).toBe("Ruby for Rails");
+    });
+  });
+});
+
+describe("useFixtures encryption add-on is opt-in", () => {
+  it("only encrypted fixture entries declare an addOn hook", () => {
+    expect(typeof (fixtureRegistry.encryptedBooks as { addOn?: unknown }).addOn).toBe("function");
+    expect(
+      typeof (fixtureRegistry.encryptedBookThatIgnoresCases as { addOn?: unknown }).addOn,
+    ).toBe("function");
+    // A non-encryption fixture never carries the hook, so loading it can't pull
+    // the encryption add-on into the runtime.
+    expect((fixtureRegistry.authors as { addOn?: unknown }).addOn).toBeUndefined();
+  });
+
+  it("awaits an entry's addOn before invoking its model thunk", async () => {
+    // The contract that makes the add-on work: `resolveFixtureNames` must run
+    // `addOn` (which registers the encryption hooks) BEFORE the `model` thunk
+    // imports book-encrypted.ts, or the `encrypts()` static block throws. Spy on
+    // a real entry (stubbing the model so no actual import happens) and assert the
+    // call order, so a regression that moves the hook after the thunk is caught.
+    type SpyableEntry = { addOn?: () => Promise<void>; model: () => Promise<typeof Base> };
+    const entry = fixtureRegistry.encryptedBooks as unknown as SpyableEntry;
+    const originalAddOn = entry.addOn;
+    const originalModel = entry.model;
+    const order: string[] = [];
+    const stubModel = { tableName: "encrypted_books" } as unknown as typeof Base;
+    entry.addOn = vi.fn(async () => {
+      order.push("addOn");
+    });
+    entry.model = vi.fn(async () => {
+      order.push("model");
+      return stubModel;
+    });
+    try {
+      await resolveFixtureNames(["encryptedBooks"]);
+    } finally {
+      entry.addOn = originalAddOn;
+      entry.model = originalModel;
+    }
+    expect(order).toEqual(["addOn", "model"]);
+  });
 });
 
 // --- FixtureSet.createFixtures ---
