@@ -617,7 +617,7 @@ describe("DatabaseTasksMigrateTest", () => {
           );
           expect(rows).toHaveLength(1);
         } finally {
-          await (a as unknown as { close(): Promise<void> }).close();
+          await a.close();
         }
       }
     } finally {
@@ -656,7 +656,7 @@ describe("DatabaseTasksMigrateTest", () => {
         );
         expect(rows).toHaveLength(1);
       } finally {
-        await (a as unknown as { close(): Promise<void> }).close();
+        await a.close();
       }
     } finally {
       try {

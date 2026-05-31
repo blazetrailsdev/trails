@@ -292,14 +292,23 @@ export class DatabaseTasks {
     // in-memory pools always match any config and must not be bypassed.
     const { Base } = await import("../base.js");
     let poolDb: string | undefined;
+    let poolPresent = false;
     try {
       poolDb = Base.connectionPool().dbConfig.database;
+      poolPresent = true;
     } catch (error) {
       const { ConnectionNotDefined } = await import("../errors.js");
       if (!(error instanceof ConnectionNotDefined)) throw error;
       // No pool — fall through to withTemporaryConnection via _connectFor.
     }
-    if (poolDb && (_isMemoryDatabase(poolDb) || !config.database || config.database === poolDb)) {
+    // Use the pool when: pool is present AND (pool db is in-memory, config db is
+    // unknown, pool db is unknown — URL-only config, or databases match exactly).
+    // "pool present but database unknown" means a URL-only config whose pool owns
+    // the connection; bypass would open a second unrelated in-memory database.
+    if (
+      poolPresent &&
+      (!poolDb || _isMemoryDatabase(poolDb) || !config.database || config.database === poolDb)
+    ) {
       const adapter = await this._migrationAdapter();
       if (!adapter)
         throw new Error("No database adapter configured. Call DatabaseTasks.setAdapter() first.");
