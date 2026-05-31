@@ -99,7 +99,7 @@ describe("ReservedWordTest", () => {
     const cols = Group.columns()
       .map((c: { name: string }) => c.name)
       .sort();
-    expect(cols).toEqual(expect.arrayContaining(["id", "order", "select_id"]));
+    expect(cols).toEqual(["id", "order", "select_id"]);
   });
 
   it("calculations work with reserved words", async () => {
