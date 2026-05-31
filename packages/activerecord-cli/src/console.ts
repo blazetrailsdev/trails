@@ -40,14 +40,7 @@ export async function arConsole(
     console.error(`ar: failed to load app/models/index.ts — ${String(err)}`);
     return null;
   });
-  if (!models) {
-    try {
-      Base.removeConnection();
-    } catch {
-      /* ignore */
-    }
-    return 1;
-  }
+  if (!models) return 1;
 
   type ReplStart = (o: { prompt: string; useGlobal: boolean }) => {
     on(e: string, cb: () => void): void;
