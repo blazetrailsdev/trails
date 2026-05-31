@@ -15,6 +15,7 @@ import railsFileStructureMethodOrder from "./eslint/rails-file-structure-method-
 import expectedFixtures from "./eslint/expected-fixtures.mjs";
 import manifestComplete from "./eslint/manifest-complete.mjs";
 import testFixtureParity from "./eslint/test-fixture-parity.mjs";
+import useFixturesSchema from "./eslint/use-fixtures-schema.mjs";
 
 export default defineConfig(
   {
@@ -116,6 +117,7 @@ export default defineConfig(
           "rails-file-structure-method-order": railsFileStructureMethodOrder,
           "expected-fixtures": expectedFixtures,
           "test-fixture-parity": testFixtureParity,
+          "use-fixtures-schema": useFixturesSchema,
           // Off by default — opt in per project (see eslint/manifest-complete.mjs).
           "manifest-complete": manifestComplete,
         },
@@ -243,6 +245,15 @@ export default defineConfig(
     files: ["packages/activerecord/src/**/*.test.ts"],
     rules: {
       "blazetrails/test-fixture-parity": "warn",
+    },
+  },
+  {
+    // Exclude test-helpers/ — those tests exercise useFixtures itself and
+    // intentionally omit { schema } as part of the infrastructure test surface.
+    files: ["packages/activerecord/src/**/*.test.ts"],
+    ignores: ["packages/activerecord/src/test-helpers/**"],
+    rules: {
+      "blazetrails/use-fixtures-schema": "warn",
     },
   },
 
