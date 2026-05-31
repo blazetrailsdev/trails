@@ -20,7 +20,7 @@ export interface FixtureModelEntry {
   /**
    * Optional add-on bootstrap awaited BEFORE the {@link FixtureModelEntry.model}
    * thunk fires. Some canonical models run import-time side effects that require
-   * an opt-in add-on already loaded into the runtime — e.g. `encrypted-book.ts`
+   * an opt-in add-on already loaded into the runtime — e.g. `book-encrypted.ts`
    * calls `encrypts()` in a `static {}` block, which throws unless the encryption
    * add-on (`@blazetrails/activerecord/encryption`) has registered its hooks. The
    * hook keeps the add-on opt-in: only entries that declare it pay the cost, and
