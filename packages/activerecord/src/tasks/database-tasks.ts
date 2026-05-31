@@ -210,12 +210,11 @@ export class DatabaseTasks {
         await this.create(config);
       }
     }
-    // Rails: establish_connection(environment.to_sym) re-points the caller's pool to the
-    // primary config for the env. Take the first config for the target env (equivalent to
-    // Rails resolving a symbol to the primary/first db_config for that env), then normalize
-    // relative SQLite paths against root before calling establishConnection.
+    // Rails: establish_connection(environment.to_sym) calls configurations.resolve(:env)
+    // → find_db_config(env) which returns forCurrentEnv configs first, then falls back
+    // to the first config for that env_name. findDbConfig mirrors that exact lookup.
     const envName = this._normalizeEnv(environment);
-    const primaryConfig = this.configsFor(envName)[0];
+    const primaryConfig = this.databaseConfiguration?.findDbConfig(envName);
     if (primaryConfig) {
       const { Base } = await import("../base.js");
       const configuration = _normalizeSQLitePath(
