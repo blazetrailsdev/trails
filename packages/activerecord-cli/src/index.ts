@@ -8,3 +8,4 @@ export {
 } from "./generate-manifest.js";
 export type { ModelEntry, ManifestResult } from "./generate-manifest.js";
 export { run } from "./cli.js";
+export { checkPendingMigrations } from "./pending-migrations.js";

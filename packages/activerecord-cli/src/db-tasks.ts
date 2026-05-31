@@ -5,27 +5,8 @@ import {
   DatabaseConfigurations,
   NoDatabaseError,
   DatabaseAlreadyExists,
-  Migrator,
 } from "@blazetrails/activerecord";
-
-/**
- * Load `config/database.ts` from `cwd` and install it into `DatabaseTasks`.
- * Returns the resolved `DatabaseConfigurations` so callers can inspect it.
- */
-async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigurations> {
-  const configPath = resolve(join(cwd, "config", "database.ts"));
-  const fsAdapter = await getFsAsync();
-  if (!fsAdapter.existsSync(configPath)) {
-    throw new Error(`config/database.ts not found at ${configPath}`);
-  }
-  const { pathToFileURL } = await import("node:url");
-  const mod = await import(pathToFileURL(configPath).href);
-  const raw = mod.default ?? mod;
-  const configs = DatabaseConfigurations.fromEnv(raw);
-  DatabaseTasks.databaseConfiguration = configs;
-  DatabaseTasks.root = cwd;
-  return configs;
-}
+import { loadDatabaseConfig, loadMigrations } from "./db-helpers.js";
 
 async function runCreate(
   config: import("@blazetrails/activerecord").DatabaseConfig,
@@ -138,11 +119,6 @@ function parseStep(args: string[], fallback: number): number {
   if (!raw) return fallback;
   const n = Number(raw);
   return Number.isInteger(n) && n >= 0 ? n : fallback;
-}
-
-function loadMigrations(cwd: string): void {
-  const paths = DatabaseTasks.migrationsPaths.map((p) => resolve(join(cwd, p)));
-  DatabaseTasks.registerMigrations(Migrator.discoverMigrations(paths));
 }
 
 export async function dbMigrate(cwd: string, args: string[]): Promise<number> {
