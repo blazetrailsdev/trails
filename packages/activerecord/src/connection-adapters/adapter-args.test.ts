@@ -82,6 +82,47 @@ describe("buildAdapterArg", () => {
         port: 3307,
       });
     });
+
+    it("remaps socket to socketPath for mysql and omits host", () => {
+      const [config] = buildAdapterArg("mysql2", {
+        adapter: "mysql2",
+        database: "db",
+        socket: "/var/run/mysqld/mysqld.sock",
+      }) as [Record<string, unknown>];
+      expect(config.socketPath).toBe("/var/run/mysqld/mysqld.sock");
+      expect(config.socket).toBeUndefined();
+      expect(config.host).toBeUndefined();
+    });
+
+    it("treats empty socket as absent and falls back to localhost for mysql", () => {
+      const [config] = buildAdapterArg("mysql2", {
+        adapter: "mysql2",
+        database: "db",
+        socket: "",
+      }) as [Record<string, unknown>];
+      expect(config.socketPath).toBeUndefined();
+      expect(config.host).toBe("localhost");
+    });
+
+    it("does not remap socketPath when already set for mysql", () => {
+      const [config] = buildAdapterArg("mysql2", {
+        adapter: "mysql2",
+        database: "db",
+        socket: "/old.sock",
+        socketPath: "/new.sock",
+      }) as [Record<string, unknown>];
+      expect(config.socketPath).toBe("/new.sock");
+      expect(config.socket).toBe("/old.sock");
+    });
+
+    it("does not suppress host for non-mysql adapters with socketPath", () => {
+      const [config] = buildAdapterArg("postgresql", {
+        adapter: "postgresql",
+        database: "db",
+        socketPath: "/var/run/pg",
+      }) as [Record<string, unknown>];
+      expect(config.host).toBe("localhost");
+    });
   });
 });
 

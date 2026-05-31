@@ -98,7 +98,7 @@ Files: `tasks/database-tasks.ts` (or `tasks/sqlite-database-tasks.ts`).
 
 ---
 
-### P2-6 — `migrationConnection()` order-dependency registration hook (~20 LOC)
+### ~~P2-6 — `migrationConnection()` order-dependency registration hook (~20 LOC)~~ ✅ shipped (#2734)
 
 **Source:** PR #2723 post-merge findings.
 
@@ -115,7 +115,7 @@ Files: `tasks/database-tasks.ts`, `base.ts` (or `model.ts`).
 
 ---
 
-### P2-7 — MySQL `socket`→`socketPath` remapping relocation (~10 LOC)
+### ~~P2-7 — MySQL `socket`→`socketPath` remapping relocation (~10 LOC)~~ ✅ shipped (#2734)
 
 **Source:** PR #2710 post-merge findings.
 

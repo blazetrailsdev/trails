@@ -116,6 +116,7 @@ import {
   findSignedBang as _findSignedBang,
 } from "./signed-id.js";
 import { registerMigrationArConfig } from "./migration.js";
+import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
 import { hookAttributeType as tzHookAttributeType } from "./attribute-methods/time-zone-conversion.js";
@@ -3748,6 +3749,12 @@ _setGlobalIdModelFinder((name: string) => {
   }
   return undefined;
 });
+
+// Wire Base into DatabaseTasks so migrationConnection() works synchronously
+// without waiting for an async method to capture _baseClass first.
+// Registered before runLoadHooks so that any on_load(:active_record) callback
+// can call migrationConnection() and find it wired.
+DatabaseTasks._registerBase(Base);
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record, Base)` at the
 // bottom of `activerecord/lib/active_record/base.rb`. Lets railtie
