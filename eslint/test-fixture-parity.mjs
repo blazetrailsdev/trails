@@ -123,6 +123,9 @@ const rule = {
       },
 
       "Program:exit"() {
+        // null in the set means useFixtures was called at file scope — it covers
+        // all tests in the file regardless of their describe nesting.
+        if (describeBodiesWithFixtures.has(null)) return;
         for (const { node, desc, body } of toCheck) {
           if (!describeBodiesWithFixtures.has(body)) {
             context.report({ node, messageId: "missing", data: { desc } });

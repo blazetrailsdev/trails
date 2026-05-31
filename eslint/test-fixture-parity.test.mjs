@@ -66,9 +66,14 @@ describe("test-fixture-parity rule", () => {
           code: `describe("X", () => { it("find single value object", () => {}); });`,
         },
         {
-          name: "useFixtures at file scope (null describe) → no warning",
+          name: "useFixtures at file scope satisfies it() at file scope",
           filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
           code: `const fx = useFixtures(["customers"], () => conn); it("find single value object", () => {});`,
+        },
+        {
+          name: "useFixtures at file scope satisfies it() inside describe",
+          filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+          code: `const fx = useFixtures(["customers"], () => conn); describe("T", () => { it("find single value object", () => {}); });`,
         },
       ],
       invalid: [
