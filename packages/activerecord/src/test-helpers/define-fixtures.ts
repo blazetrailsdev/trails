@@ -716,12 +716,17 @@ export async function defineJoinTableFixtures(
   const resolved: Record<string, FixtureAttrs> = {};
   for (const [label, attrs] of Object.entries(fixtures)) {
     const row: FixtureAttrs = {};
-    for (const [col, val] of Object.entries(attrs)) {
-      if (columnNames && !columnNames.has(col)) {
+    if (columnNames) {
+      const unknown = Object.keys(attrs).filter((col) => !columnNames.has(col));
+      if (unknown.length > 0) {
+        // Mirrors Rails' build_fixture_sql error format (database_statements.rb):
+        // table "X" has no columns named "a", "b".
         throw new Error(
-          `defineJoinTableFixtures: ${tableName}.${label} references unknown column "${col}" — not present in the table schema`,
+          `table "${tableName}" has no columns named ${unknown.map((c) => `"${c}"`).join(", ")}.`,
         );
       }
+    }
+    for (const [col, val] of Object.entries(attrs)) {
       // ref() resolves to the target row's PK (single-PK and composite-PK targets
       // both surface a scalar id here); scalar columns pass through verbatim.
       row[col] = isFixtureRef(val)
