@@ -236,3 +236,89 @@ export async function dbSeed(cwd: string, _args: string[]): Promise<number> {
     return 1;
   }
 }
+
+function installSeedLoader(cwd: string): void {
+  const seedsPath = resolve(join(cwd, "db", "seeds.ts"));
+  DatabaseTasks.seedLoader = {
+    loadSeed: async () => {
+      const fsAdapter = await getFsAsync();
+      if (!fsAdapter.existsSync(seedsPath)) return;
+      const { pathToFileURL } = await import("node:url");
+      const mod = await import(pathToFileURL(seedsPath).href);
+      const fn = mod.seed ?? mod.default;
+      if (typeof fn === "function") await fn();
+    },
+  };
+}
+
+export async function dbSetup(cwd: string, _args: string[]): Promise<number> {
+  try {
+    await loadDatabaseConfig(cwd);
+  } catch (err) {
+    console.error(`ar: failed to load config/database.ts — ${String(err)}`);
+    return 1;
+  }
+  await tryLoadModels(cwd);
+  installSeedLoader(cwd);
+
+  const env = DatabaseConfigurations.currentEnv();
+  const configs = DatabaseTasks.configsFor(env);
+  if (configs.length === 0) {
+    console.error(`ar: no database configuration found for environment "${env}"`);
+    return 1;
+  }
+  let ok = true;
+  for (const config of configs) {
+    if (!(await runCreate(config))) ok = false;
+  }
+  if (!ok) return 1;
+
+  try {
+    await DatabaseTasks.checkProtectedEnvironmentsBang(env);
+    await DatabaseTasks.loadSchemaCurrent(undefined, undefined, env);
+  } catch (err) {
+    console.error(`ar: db:setup schema load failed — ${String(err)}`);
+    return 1;
+  }
+
+  try {
+    await DatabaseTasks.loadSeed();
+  } catch (err) {
+    console.error(`ar: db:setup seed failed — ${String(err)}`);
+    return 1;
+  }
+  return 0;
+}
+
+export async function dbReset(cwd: string, _args: string[]): Promise<number> {
+  const dropCode = await dbDrop(cwd, []);
+  if (dropCode !== 0) return dropCode;
+  return dbSetup(cwd, []);
+}
+
+export async function dbPrepare(cwd: string, _args: string[]): Promise<number> {
+  try {
+    await loadDatabaseConfig(cwd);
+  } catch (err) {
+    console.error(`ar: failed to load config/database.ts — ${String(err)}`);
+    return 1;
+  }
+
+  const env = DatabaseConfigurations.currentEnv();
+  if (DatabaseTasks.configsFor(env).length === 0) {
+    console.error(`ar: no database configuration found for environment "${env}"`);
+    return 1;
+  }
+
+  await tryLoadModels(cwd);
+  loadMigrations(cwd);
+  installSeedLoader(cwd);
+
+  try {
+    await DatabaseTasks.prepareAll();
+    return 0;
+  } catch (err) {
+    console.error(`ar: db:prepare failed — ${String(err)}`);
+    return 1;
+  }
+}
