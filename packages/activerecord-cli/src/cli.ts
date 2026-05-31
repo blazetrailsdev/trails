@@ -80,7 +80,7 @@ const INIT_HELP = `ar init — scaffold a standalone activerecord project
 Run in the project root. Writes package.json (or updates an existing one),
 config/database.ts (TRAILS_ENV-keyed), db/migrate/, db/seeds.ts,
 app/models/index.ts (the generated manifest), and db.ts (bootstrap glue).
-Existing files are never overwritten.
+Existing files are skipped by default; pass --force to overwrite them.
 
 Options:
   --driver <name>   Database driver: better-sqlite3 (default), node-sqlite, pg, mysql2.
