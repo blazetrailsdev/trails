@@ -295,8 +295,14 @@ export class DatabaseTasks {
     adapter.schemaCache?.clear();
   }
 
+  // Cached sync reference to Base, populated on the first _migrationAdapter() call.
+  // Lets migrationConnection() (which must be synchronous) lease from the pool
+  // without a top-level import that would create a circular-dependency cycle.
+  private static _baseClass: typeof import("../base.js").Base | null = null;
+
   private static async _migrationAdapter(): Promise<import("../adapter.js").DatabaseAdapter> {
     const { Base } = await import("../base.js");
+    this._baseClass = Base;
     return Base.connectionPool().leaseConnection();
   }
 
@@ -941,7 +947,12 @@ export class DatabaseTasks {
   }
 
   static migrationConnection(): import("../adapter.js").DatabaseAdapter | null {
-    return null;
+    if (!this._baseClass) return null;
+    try {
+      return this._baseClass.connectionPool().leaseConnection();
+    } catch {
+      return null;
+    }
   }
 
   static async migrationConnectionPool(): Promise<ConnectionPool | null> {
