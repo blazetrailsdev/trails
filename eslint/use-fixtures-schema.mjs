@@ -14,11 +14,63 @@
  * The object overload `useFixtures({ topics: [Topic, {...}] }, ...)` is exempt
  * because inline fixtures wire the schema themselves.
  *
- * Only fires when the describe scope has at least one `it()` / `test()` that
- * calls the returned accessor (`customers("david")`) or references a model
- * class method — i.e. the fixtures are demonstrably used. This keeps warnings
- * to a very low count (currently 2 in the codebase).
+ * Only fires when the describe scope has at least one `it()` / `test()` (including
+ * `it.skip`, `it.skipIf(cond)(...)`, etc.) that calls the returned accessor
+ * (e.g. `customers("david")`). Accessor calls are attributed to ALL enclosing
+ * describe bodies so nested-describe usage is detected correctly.
+ *
+ * Autofix inserts `{ schema: <importedSchemaVar> }` only when a *_SCHEMA import
+ * is found in the file; otherwise reports without a fix to avoid inserting an
+ * undefined identifier.
  */
+
+/** Recursively resolve the root base name: it / it.skip / it.skipIf(x)(...) → "it". */
+function rootCalleeName(callee) {
+  if (callee?.type === "Identifier") return callee.name;
+  if (callee?.type === "MemberExpression") return callee.object?.name ?? null;
+  if (callee?.type === "CallExpression") return rootCalleeName(callee.callee);
+  return null;
+}
+
+/** All enclosing describe BlockStatement bodies from innermost to outermost. */
+function allEnclosingDescribeBodies(node) {
+  const bodies = [];
+  let cur = node.parent;
+  while (cur) {
+    if (cur.type === "CallExpression" && rootCalleeName(cur.callee) === "describe") {
+      const cb = cur.arguments[cur.arguments.length - 1];
+      if (cb && (cb.type === "ArrowFunctionExpression" || cb.type === "FunctionExpression")) {
+        if (cb.body?.type === "BlockStatement") bodies.push(cb.body);
+      }
+    }
+    cur = cur.parent;
+  }
+  return bodies;
+}
+
+/** Returns true if the node is nested inside an it()/test() callback body. */
+function isInsideItBody(node) {
+  let cur = node.parent;
+  while (cur) {
+    const name = cur.type === "CallExpression" ? rootCalleeName(cur.callee) : null;
+    if (name === "it" || name === "test") return true;
+    if (name === "describe") return false;
+    cur = cur.parent;
+  }
+  return false;
+}
+
+/** Extract variable names from `const { foo, bar } = expr`. */
+function extractDestructuredNames(callNode) {
+  const parent = callNode.parent;
+  if (!parent) return [];
+  if (parent.type === "VariableDeclarator" && parent.id?.type === "ObjectPattern") {
+    return parent.id.properties
+      .filter((p) => p.type === "Property" && p.value?.type === "Identifier")
+      .map((p) => p.value.name);
+  }
+  return [];
+}
 
 const rule = {
   meta: {
@@ -30,16 +82,16 @@ const rule = {
     schema: [],
     fixable: "code",
     messages: {
-      missingSchema:
-        "`useFixtures` with a fixture-name array requires a `{ schema: ... }` option so the fixture loader can derive and create the necessary tables. Pass e.g. `{ schema: {{schemaVar}} }` as the third argument.",
+      missingSchemaWithFix:
+        "`useFixtures` with a fixture-name array requires `{ schema: {{schemaVar}} }`. Add it as the third argument.",
+      missingSchemaNoFix:
+        "`useFixtures` with a fixture-name array requires a `{ schema: <schemaVar> }` option. Import a *_SCHEMA constant and pass it.",
     },
   },
   create(context) {
-    // Collect useFixtures(array, ...) calls that lack { schema }.
     const candidates = [];
-    // Collect describe-body → Set of accessor names that are called inside it().
-    const accessorCallsInDescribe = new Map(); // BlockStatement → Set<string>
-    // Collect *_SCHEMA identifiers imported in this file (e.g. TEST_SCHEMA).
+    // Maps each describe BlockStatement to the set of accessor names called in it() bodies within it.
+    const accessorCallsInDescribe = new Map();
     let schemaVar = null;
 
     return {
@@ -56,12 +108,8 @@ const rule = {
         if (calleeName !== "useFixtures") return;
 
         const firstArg = node.arguments[0];
-        // Object overload: first arg is an ObjectExpression — exempt.
         if (!firstArg || firstArg.type === "ObjectExpression") return;
-        // Must be the array/name overload: first arg is ArrayExpression or Literal.
 
-        // Check for { schema } in the options object (last argument if it's an
-        // ObjectExpression, or if there's a 3rd+ argument that is one).
         const hasSchema = node.arguments.some(
           (arg) =>
             arg.type === "ObjectExpression" &&
@@ -75,118 +123,59 @@ const rule = {
         );
         if (hasSchema) return;
 
-        // Record the accessor name (from `const { foo } = useFixtures(...)`)
-        // so we can detect usage in it() bodies later.
-        const accessorNames = extractDestructuredNames(node);
-        candidates.push({ node, accessorNames });
+        candidates.push({ node, accessorNames: extractDestructuredNames(node) });
       },
 
-      // Track any identifier call that looks like an accessor: foo("bar") where
-      // foo matches a known accessor name. Record these per containing describe body.
       "CallExpression:exit"(node) {
+        // Track accessor calls inside it()/test() bodies, attributed to ALL
+        // enclosing describe bodies so nested-describe usage is captured.
         if (node.callee?.type !== "Identifier" || node.arguments.length === 0) return;
-        // Check if this call is inside an it()/test() body.
         if (!isInsideItBody(node)) return;
         const name = node.callee.name;
-        const descBody = nearestDescribeBody(node);
-        if (!descBody) return;
-        let calls = accessorCallsInDescribe.get(descBody);
-        if (!calls) {
-          calls = new Set();
-          accessorCallsInDescribe.set(descBody, calls);
+        for (const body of allEnclosingDescribeBodies(node)) {
+          let calls = accessorCallsInDescribe.get(body);
+          if (!calls) {
+            calls = new Set();
+            accessorCallsInDescribe.set(body, calls);
+          }
+          calls.add(name);
         }
-        calls.add(name);
       },
 
       "Program:exit"() {
-        const sv = schemaVar ?? "TEST_SCHEMA";
         for (const { node, accessorNames } of candidates) {
-          // Only report if any accessor name is actually called in an it() body
-          // within the enclosing describe scope.
-          const descBody = nearestDescribeBody(node);
-          if (!descBody) continue;
-          const calls = accessorCallsInDescribe.get(descBody) ?? new Set();
-          const isUsed = accessorNames.some((n) => calls.has(n));
+          const descBodies = allEnclosingDescribeBodies(node);
+          if (descBodies.length === 0) continue;
+
+          // Check whether any accessor is called inside any enclosing describe.
+          const isUsed = descBodies.some((body) => {
+            const calls = accessorCallsInDescribe.get(body) ?? new Set();
+            return accessorNames.some((n) => calls.has(n));
+          });
           if (!isUsed) continue;
 
           const lastArg = node.arguments[node.arguments.length - 1];
           const hasEmptyOpts =
             lastArg?.type === "ObjectExpression" && lastArg.properties.length === 0;
 
-          context.report({
-            node,
-            messageId: "missingSchema",
-            data: { schemaVar: sv },
-            fix(fixer) {
-              if (hasEmptyOpts) {
-                // Replace `{}` with `{ schema: TEST_SCHEMA }`.
-                return fixer.replaceText(lastArg, `{ schema: ${sv} }`);
-              }
-              // Append `, { schema: TEST_SCHEMA }` after the last argument.
-              return fixer.insertTextAfter(lastArg, `, { schema: ${sv} }`);
-            },
-          });
+          if (schemaVar) {
+            const sv = schemaVar;
+            context.report({
+              node,
+              messageId: "missingSchemaWithFix",
+              data: { schemaVar: sv },
+              fix(fixer) {
+                if (hasEmptyOpts) return fixer.replaceText(lastArg, `{ schema: ${sv} }`);
+                return fixer.insertTextAfter(lastArg, `, { schema: ${sv} }`);
+              },
+            });
+          } else {
+            context.report({ node, messageId: "missingSchemaNoFix" });
+          }
         }
       },
     };
   },
 };
-
-/** Extract variable names from `const { foo, bar } = expr`. */
-function extractDestructuredNames(callNode) {
-  const parent = callNode.parent;
-  if (!parent) return [];
-  // const { foo } = useFixtures(...)
-  if (parent.type === "VariableDeclarator" && parent.id?.type === "ObjectPattern") {
-    return parent.id.properties
-      .filter((p) => p.type === "Property" && p.value?.type === "Identifier")
-      .map((p) => p.value.name);
-  }
-  return [];
-}
-
-/** Returns true if the node is nested inside an it()/test() callback body. */
-function isInsideItBody(node) {
-  let cur = node.parent;
-  while (cur) {
-    if (
-      cur.type === "CallExpression" &&
-      cur.callee?.type === "Identifier" &&
-      (cur.callee.name === "it" || cur.callee.name === "test")
-    )
-      return true;
-    // Stop at describe boundary.
-    if (
-      cur.type === "CallExpression" &&
-      cur.callee?.type === "Identifier" &&
-      cur.callee.name === "describe"
-    )
-      return false;
-    cur = cur.parent;
-  }
-  return false;
-}
-
-/** BlockStatement body of the nearest enclosing describe call. */
-function nearestDescribeBody(node) {
-  let cur = node.parent;
-  while (cur) {
-    if (
-      cur.type === "CallExpression" &&
-      cur.callee?.type === "Identifier" &&
-      cur.callee.name === "describe"
-    ) {
-      const cb = cur.arguments[cur.arguments.length - 1];
-      if (
-        cb &&
-        (cb.type === "ArrowFunctionExpression" || cb.type === "FunctionExpression") &&
-        cb.body?.type === "BlockStatement"
-      )
-        return cb.body;
-    }
-    cur = cur.parent;
-  }
-  return null;
-}
 
 export default rule;

@@ -93,14 +93,27 @@ function buildAccessorRe(fixtureNames: string[]): RegExp | null {
   return new RegExp(`\\b(${escaped.join("|")})\\s*\\(`);
 }
 
+function collectFixtureNames(src: string): string[] {
+  // Multi-line-aware: trailing comma means the list continues on the next line.
+  const lines = src.split("\n");
+  const names: string[] = [];
+  const START_RE = /^\s*fixtures\s+(.+)$/;
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(START_RE);
+    if (!m) continue;
+    let buf = m[1];
+    while (buf.trimEnd().endsWith(",") && i + 1 < lines.length) {
+      buf += " " + lines[++i].trim();
+    }
+    names.push(...parseFixtureNames(buf));
+  }
+  return names;
+}
+
 function processFile(file: string): { trailsRel: string; descs: string[] } | null {
   const src = fs.readFileSync(file, "utf8");
 
-  // Collect all class-level fixtures declarations (may appear multiple times)
-  const fixtureNames: string[] = [];
-  for (const m of src.matchAll(/^\s*fixtures\s+(.+)$/gm)) {
-    fixtureNames.push(...parseFixtureNames(m[1]));
-  }
+  const fixtureNames = collectFixtureNames(src);
   if (fixtureNames.length === 0) return null;
 
   const tests = extractTests(src);

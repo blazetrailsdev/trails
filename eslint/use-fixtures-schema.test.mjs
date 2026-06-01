@@ -29,58 +29,92 @@ describe("use-fixtures-schema rule", () => {
           });`,
         },
         {
-          name: "string-array without schema but accessor never called → no warning",
+          name: "accessor not called in any it() → no warning",
           code: `describe("T", () => {
             const { customers } = useFixtures(["customers"], () => conn);
             it("foo", () => { expect(1).toBe(1); });
           });`,
         },
         {
-          name: "string-array with schema in extra options key position",
+          name: "it.skipIf with schema present → valid",
           code: `describe("T", () => {
-            const { customers } = useFixtures(["customers"], () => conn, { schema: S, other: 1 });
-            it("foo", () => { customers("david"); });
+            const { customers } = useFixtures(["customers"], () => conn, { schema: S });
+            it.skipIf(true)("foo", () => { customers("david"); });
+          });`,
+        },
+        {
+          name: "accessor called in nested describe → valid when schema present",
+          code: `describe("Outer", () => {
+            const { customers } = useFixtures(["customers"], () => conn, { schema: S });
+            describe("Inner", () => { it("foo", () => { customers("david"); }); });
           });`,
         },
       ],
       invalid: [
         {
-          name: "string-array without schema, accessor used → warns with default schemaVar",
-          code: `describe("T", () => {
-            const { customers } = useFixtures(["customers"], () => conn);
-            it("foo", () => { const c = customers("david"); });
-          });`,
-          errors: [{ messageId: "missingSchema" }],
-          output: `describe("T", () => {
-            const { customers } = useFixtures(["customers"], () => conn, { schema: TEST_SCHEMA });
-            it("foo", () => { const c = customers("david"); });
-          });`,
-        },
-        {
-          name: "detects imported schema name and uses it in message + fix",
-          code: `import { MY_SCHEMA } from "./test-schema.js";
+          name: "no schema, accessor used, schema import present → fix applied",
+          code: `import { TEST_SCHEMA } from "./test-schema.js";
 describe("T", () => {
   const { customers } = useFixtures(["customers"], () => conn);
   it("foo", () => { customers("david"); });
 });`,
-          errors: [{ messageId: "missingSchema", data: { schemaVar: "MY_SCHEMA" } }],
-          output: `import { MY_SCHEMA } from "./test-schema.js";
+          errors: [{ messageId: "missingSchemaWithFix", data: { schemaVar: "TEST_SCHEMA" } }],
+          output: `import { TEST_SCHEMA } from "./test-schema.js";
 describe("T", () => {
-  const { customers } = useFixtures(["customers"], () => conn, { schema: MY_SCHEMA });
+  const { customers } = useFixtures(["customers"], () => conn, { schema: TEST_SCHEMA });
   it("foo", () => { customers("david"); });
 });`,
         },
         {
-          name: "empty options object replaced, not appended",
+          name: "no schema import → reports without autofix",
           code: `describe("T", () => {
-            const { encryptedBooks } = useFixtures(["encryptedBooks"], () => Base.adapter, {});
-            it("foo", () => { encryptedBooks("awdr"); });
+            const { customers } = useFixtures(["customers"], () => conn);
+            it("foo", () => { customers("david"); });
           });`,
-          errors: [{ messageId: "missingSchema" }],
-          output: `describe("T", () => {
-            const { encryptedBooks } = useFixtures(["encryptedBooks"], () => Base.adapter, { schema: TEST_SCHEMA });
-            it("foo", () => { encryptedBooks("awdr"); });
-          });`,
+          errors: [{ messageId: "missingSchemaNoFix" }],
+          output: null,
+        },
+        {
+          name: "empty options object replaced when schema import present",
+          code: `import { MY_SCHEMA } from "./s.js";
+describe("T", () => {
+  const { books } = useFixtures(["books"], () => conn, {});
+  it("foo", () => { books("one"); });
+});`,
+          errors: [{ messageId: "missingSchemaWithFix", data: { schemaVar: "MY_SCHEMA" } }],
+          output: `import { MY_SCHEMA } from "./s.js";
+describe("T", () => {
+  const { books } = useFixtures(["books"], () => conn, { schema: MY_SCHEMA });
+  it("foo", () => { books("one"); });
+});`,
+        },
+        {
+          name: "it.skipIf accessor usage triggers warning",
+          code: `import { TEST_SCHEMA } from "./s.js";
+describe("T", () => {
+  const { customers } = useFixtures(["customers"], () => conn);
+  it.skipIf(true)("foo", () => { customers("david"); });
+});`,
+          errors: [{ messageId: "missingSchemaWithFix" }],
+          output: `import { TEST_SCHEMA } from "./s.js";
+describe("T", () => {
+  const { customers } = useFixtures(["customers"], () => conn, { schema: TEST_SCHEMA });
+  it.skipIf(true)("foo", () => { customers("david"); });
+});`,
+        },
+        {
+          name: "accessor in nested describe triggers warning on outer useFixtures",
+          code: `import { TEST_SCHEMA } from "./s.js";
+describe("Outer", () => {
+  const { customers } = useFixtures(["customers"], () => conn);
+  describe("Inner", () => { it("foo", () => { customers("david"); }); });
+});`,
+          errors: [{ messageId: "missingSchemaWithFix" }],
+          output: `import { TEST_SCHEMA } from "./s.js";
+describe("Outer", () => {
+  const { customers } = useFixtures(["customers"], () => conn, { schema: TEST_SCHEMA });
+  describe("Inner", () => { it("foo", () => { customers("david"); }); });
+});`,
         },
       ],
     });
