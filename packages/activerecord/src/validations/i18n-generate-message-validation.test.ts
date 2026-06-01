@@ -1,17 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
 import { Base } from "../index.js";
 import { I18n } from "@blazetrails/activemodel";
 import { RecordInvalid } from "../validations.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({ topics: { title: "string" } });
-});
 
 describe("I18nGenerateMessageValidationTest", () => {
   afterEach(() => {
