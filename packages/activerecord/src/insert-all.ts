@@ -468,6 +468,7 @@ export interface InsertBuilder {
   skipDuplicates(): boolean;
   updateDuplicates(): boolean;
   firstColumn(): string | undefined;
+  quotedTableName(): string;
 }
 
 /**
@@ -580,7 +581,7 @@ export class Builder implements InsertBuilder {
     if (quotedUpdatable.length === 0) return "";
     const updatable = this._insertAll.updatableColumns();
     const parts: string[] = [];
-    const tableName = `"${this.model.arelTable.name}"`;
+    const tableName = this.quotedTableName();
     const conditions = quotedUpdatable.map(block).join(" AND ");
     for (const col of UPDATE_TIMESTAMP_COLUMNS) {
       if (this.model._attributeDefinitions.has(col) && !updatable.includes(col)) {
@@ -591,6 +592,11 @@ export class Builder implements InsertBuilder {
       }
     }
     return parts.join(",");
+  }
+
+  /** @internal Mirrors Rails `insert.model.quoted_table_name`. */
+  quotedTableName(): string {
+    return `"${this.model.arelTable.name}"`;
   }
 
   rawUpdateSql(): Nodes.SqlLiteral | undefined {

@@ -2289,8 +2289,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // ---------------------------------------------------------------------------
 
   // Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#build_insert_sql.
-  // Identical to the SQLite form except the timestamp-touch guard uses
-  // `IS NOT DISTINCT FROM` (Postgres-correct NULL comparison).
+  // Like the SQLite form, but the timestamp-touch guard uses
+  // `<table>.<col> IS NOT DISTINCT FROM excluded.<col>` (Rails qualifies the
+  // target with the table name and uses Postgres-correct NULL comparison).
   override buildInsertSql(insert: InsertBuilder): string {
     let sql = `INSERT ${insert.into()}`;
 
@@ -2304,7 +2305,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       } else {
         const assignments: string[] = [];
         const touch = insert.touchModelTimestampsUnless(
-          (col) => `${col} IS NOT DISTINCT FROM excluded.${col}`,
+          (col) => `${insert.quotedTableName()}.${col} IS NOT DISTINCT FROM excluded.${col}`,
         );
         if (touch) assignments.push(touch);
         for (const col of insert.updatableColumns()) assignments.push(`${col}=excluded.${col}`);
