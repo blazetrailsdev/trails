@@ -167,7 +167,7 @@ export async function arNew(
   // node-sqlite must be explicitly registered before establishConnection().
   if (driver === "node-sqlite") overrides["db.ts"] = DB_GLUE_NODE_SQLITE;
 
-  const initResult = await init(appDir, { force, overrides });
+  const initResult = await init(appDir, { force, overrides, driver, skipPackageJson: true });
   for (const rel of initResult.created) created.push(rel);
   for (const rel of initResult.skipped) skipped.push(rel);
 
