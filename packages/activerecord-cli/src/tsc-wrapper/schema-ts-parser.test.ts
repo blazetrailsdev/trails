@@ -155,6 +155,22 @@ describe("parseSchemaTs", () => {
     expect(result["logs"]!["updated_at"]).toEqual({ type: "datetime", null: false });
   });
 
+  it("skips createTable with concise (non-block) arrow body without crashing", () => {
+    // Concise arrow bodies are not emitted by SchemaDumper but must not crash.
+    const source = `
+      export default async function defineSchema(ctx: MigrationContext) {
+        await ctx.createTable("weird", { force: "cascade" }, (t) => void t);
+        await ctx.createTable("normal", { force: "cascade" }, (t) => {
+          t.string("name");
+        });
+      }
+    `;
+    const result = parseSchemaTs(source, FILE);
+    expect(result["weird"]).toBeDefined();
+    expect(result["weird"]).not.toHaveProperty("name");
+    expect(result["normal"]!["name"]).toEqual({ type: "string", null: true });
+  });
+
   it("parses multiple tables", () => {
     const source = `
       export default async function defineSchema(ctx: MigrationContext) {

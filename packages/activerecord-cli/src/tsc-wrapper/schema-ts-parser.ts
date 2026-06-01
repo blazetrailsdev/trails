@@ -27,11 +27,6 @@ function isFalse(node: ts.Expression | undefined): boolean {
   return !!node && node.kind === ts.SyntaxKind.FalseKeyword;
 }
 
-function isStringValue(node: ts.Expression | undefined, val: string): boolean {
-  if (!node) return false;
-  return strLiteral(node) === val;
-}
-
 function isArrayLiteral(node: ts.Expression | undefined): node is ts.ArrayLiteralExpression {
   return !!node && ts.isArrayLiteralExpression(node);
 }
@@ -50,15 +45,15 @@ function parseCreateTable(
 
   if (args.length === 2) {
     const second = args[1];
-    if (second && ts.isArrowFunction(second)) {
-      arrowBody = second.body as ts.Block;
+    if (second && ts.isArrowFunction(second) && ts.isBlock(second.body)) {
+      arrowBody = second.body;
     }
   } else if (args.length >= 3) {
     const second = args[1];
     if (second && ts.isObjectLiteralExpression(second)) opts = second;
     const third = args[2];
-    if (third && ts.isArrowFunction(third)) {
-      arrowBody = third.body as ts.Block;
+    if (third && ts.isArrowFunction(third) && ts.isBlock(third.body)) {
+      arrowBody = third.body;
     }
   }
 
@@ -75,7 +70,7 @@ function synthesizePk(
 
   if (isArrayLiteral(pkVal)) return "composite";
   if (isFalse(idVal)) return null;
-  if (isStringValue(idVal, "uuid")) return { type: "uuid", null: false };
+  if (strLiteral(idVal) === "uuid") return { type: "uuid", null: false };
   return { type: DEFAULT_PK_TYPE, null: false };
 }
 
@@ -108,7 +103,7 @@ function parseColumnStatement(stmt: ts.Statement): { colName: string; col: DumpC
         ? (args[2] as ts.ObjectLiteralExpression)
         : undefined;
     const nullFalse = !!(optsNode && isFalse(objPropValue(optsNode, "null")));
-    const col: DumpColumnSchema = { type: sqlType, null: nullFalse ? false : true };
+    const col: DumpColumnSchema = { type: sqlType, null: !nullFalse };
     return [{ colName, col }];
   }
 
@@ -124,13 +119,13 @@ function parseColumnStatement(stmt: ts.Statement): { colName: string; col: DumpC
   if (isArray) {
     const col: DumpColumnSchema = {
       type: "array",
-      null: nullFalse ? false : true,
+      null: !nullFalse,
       arrayElementType: method,
     };
     return [{ colName, col }];
   }
 
-  const col: DumpColumnSchema = { type: method, null: nullFalse ? false : true };
+  const col: DumpColumnSchema = { type: method, null: !nullFalse };
   return [{ colName, col }];
 }
 
