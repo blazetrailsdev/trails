@@ -100,7 +100,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("does not have a primary key", async () => {
-      // BLOCKED: trails Base.primaryKey defaults to "id" and does not consult
+      // BLOCKED: adapter-pg — trails Base.primaryKey defaults to "id" and does not consult
       // schema introspection. Rails sets primary_key to nil when
       // connection.schema_cache.primary_keys(table_name) returns nil (foreign
       // tables have no PK constraint). Closing this gap requires wiring

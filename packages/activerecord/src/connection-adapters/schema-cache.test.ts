@@ -644,7 +644,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(order).toEqual(["clear:accounts_people", "sql"]);
   });
 
-  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
   // abstract/schema-statements.ts SchemaStatements#renameTable (both old AND new name,
   // matching Rails PG/MySQL/SQLite adapter overrides which clear both)
   it.skip("renameTable clears schema cache entry for both old and new name", async () => {
@@ -660,7 +660,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(cache.isCached("articles")).toBe(false);
   });
 
-  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
   // abstract/schema-statements.ts SchemaStatements#createTable (non-force branch,
   // matching Rails abstract/schema_statements.rb:306)
   it.skip("createTable clears schema cache entry (non-force branch)", async () => {
@@ -674,7 +674,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(cache.isCached("posts")).toBe(false);
   });
 
-  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
   // abstract/schema-statements.ts SchemaStatements#addColumn
   it.skip("addColumn clears schema cache entry", async () => {
     const cache = new SchemaCache();
@@ -686,7 +686,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(cache.isCached("posts")).toBe(false);
   });
 
-  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
   // abstract/schema-statements.ts SchemaStatements#removeColumn
   it.skip("removeColumn clears schema cache entry", async () => {
     const cache = new SchemaCache();
@@ -698,7 +698,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(cache.isCached("posts")).toBe(false);
   });
 
-  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
   // abstract/schema-statements.ts SchemaStatements#addIndex
   it.skip("addIndex clears schema cache entry", async () => {
     const cache = new SchemaCache();
@@ -710,7 +710,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(cache.isCached("posts")).toBe(false);
   });
 
-  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
   // abstract/schema-statements.ts SchemaStatements#removeIndex
   it.skip("removeIndex clears schema cache entry", async () => {
     const cache = new SchemaCache();
@@ -722,7 +722,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(cache.isCached("posts")).toBe(false);
   });
 
-  // BLOCKED: F2 — needs inline schemaCache.clearDataSourceCacheBang at
+  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
   // abstract/schema-statements.ts SchemaStatements#changeColumn
   it.skip("changeColumn clears schema cache entry", async () => {
     const cache = new SchemaCache();

@@ -21,19 +21,19 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlInvertibleMigrationTest", () => {
     it.skip("up", async () => {
-      // BLOCKED: Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
+      // BLOCKED: migration — Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
     });
     it.skip("down", async () => {
-      // BLOCKED: Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
+      // BLOCKED: migration — Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
     });
     it.skip("change", async () => {
-      // BLOCKED: Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
+      // BLOCKED: migration — Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
     });
     it.skip("revert", async () => {
-      // BLOCKED: Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
+      // BLOCKED: migration — Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
     });
     it.skip("revert whole migration", async () => {
-      // BLOCKED: Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
+      // BLOCKED: migration — Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
     });
     it("migrate and revert", async () => {
       class CreateHorses extends Migration {
@@ -50,7 +50,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await adapter.tableExists("settings")).toBe(false);
     });
     it.skip("migrate revert add index with expression", () => {
-      // BLOCKED: expression index reversal requires CommandRecorder inversion for non-name indexes
+      // BLOCKED: migration — expression index reversal requires CommandRecorder inversion for non-name indexes
     });
     it("migrate revert create enum", async () => {
       class CreateEnumMig extends Migration {

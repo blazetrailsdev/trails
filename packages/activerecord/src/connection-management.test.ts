@@ -73,7 +73,7 @@ describe("ConnectionManagementTest", () => {
   });
 
   it.skip("connections are cleared even if inside a non-joinable transaction", () => {
-    // BLOCKED: pin_connection!/unpin_connection! not yet ported (Phase 6 blocker).
+    // BLOCKED: connection-pool — pin_connection!/unpin_connection! not yet ported (Phase 6 blocker).
     // Rails pins the connection on the main thread, then asserts a separate
     // thread's lease is cleared on body close. Unblocks when pinConnectionBang/
     // unpinConnectionBang land — see project_phase6_pin_connection_blocker.
@@ -112,7 +112,7 @@ describe("ConnectionManagementTest", () => {
   });
 
   it.skip("cancel asynchronous queries if an exception is raised", () => {
-    // BLOCKED: asynchronous queries (select_all async:) / FutureResult not yet
+    // BLOCKED: load-async — asynchronous queries (select_all async:) / FutureResult not yet
     // ported. Rails asserts an in-flight async query is canceled when the app
     // raises. Unblocks with async-query support in the abstract adapter.
   });

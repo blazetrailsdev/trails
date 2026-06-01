@@ -607,7 +607,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await assertEncryptedAttribute(await Book2.create({ logo: jsonBytes }), "logo", jsonBytes);
   });
   it.skip("deterministic ciphertexts remain constant", () => {
-    // BLOCKED: message-serializer format divergence — not a key-derivation gap.
+    // BLOCKED: encryption — message-serializer format divergence — not a key-derivation gap.
     // MRI Rails' MessageSerializer stores cipher headers (iv, at) as
     // Base64.strict_encode64(raw_bytes) — single base64 of raw bytes.
     // Our MessageSerializer stores them as base64(utf8(base64_string)) —

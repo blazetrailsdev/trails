@@ -281,13 +281,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it.skip("update with dirty primary key", () => {
-    // BLOCKED: primary key mutation not supported
+    // BLOCKED: unknown — primary key mutation not supported
   });
   it.skip("delete with dirty primary key", () => {
-    // BLOCKED: primary key mutation not supported
+    // BLOCKED: unknown — primary key mutation not supported
   });
   it.skip("destroy with dirty primary key", () => {
-    // BLOCKED: primary key mutation not supported
+    // BLOCKED: unknown — primary key mutation not supported
   });
 
   it("explicit update lock column raise error", async () => {
@@ -478,7 +478,7 @@ describe("OptimisticLockingTest", () => {
   });
 
   it.skip("lock without default queries count", () => {
-    // BLOCKED: needs query counting infrastructure (spy on execute call count)
+    // BLOCKED: unknown — needs query counting infrastructure (spy on execute call count)
   });
 
   it("lock with custom column without default sets version to zero", async () => {
@@ -527,7 +527,7 @@ describe("OptimisticLockingTest", () => {
   });
 
   it.skip("lock with custom column without default queries count", () => {
-    // BLOCKED: needs query counting infrastructure
+    // BLOCKED: unknown — needs query counting infrastructure
   });
 
   it("readonly attributes", async () => {
@@ -579,13 +579,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it.skip("counter cache with touch and lock version", () => {
-    // BLOCKED: counter cache with locking not fully integrated
+    // BLOCKED: associations — counter cache with locking not fully integrated
   });
   it.skip("polymorphic destroy with dependencies and lock version", () => {
-    // BLOCKED: polymorphic + locking not supported
+    // BLOCKED: associations — polymorphic + locking not supported
   });
   it.skip("removing has and belongs to many associations upon destroy", () => {
-    // BLOCKED: habtm not supported
+    // BLOCKED: associations — habtm not supported
   });
 
   it("yaml dumping with lock column", async () => {
@@ -612,22 +612,22 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   it.skip("increment counter updates lock version", () => {
-    // BLOCKED: requires DDL column add/remove
+    // BLOCKED: migration — requires DDL column add/remove
   });
   it.skip("decrement counter updates lock version", () => {
-    // BLOCKED: requires DDL column add/remove
+    // BLOCKED: migration — requires DDL column add/remove
   });
   it.skip("update counters updates lock version", () => {
-    // BLOCKED: requires DDL column add/remove
+    // BLOCKED: migration — requires DDL column add/remove
   });
   it.skip("increment counter updates custom lock version", () => {
-    // BLOCKED: requires DDL column add/remove
+    // BLOCKED: migration — requires DDL column add/remove
   });
   it.skip("decrement counter updates custom lock version", () => {
-    // BLOCKED: requires DDL column add/remove
+    // BLOCKED: migration — requires DDL column add/remove
   });
   it.skip("update counters updates custom lock version", () => {
-    // BLOCKED: requires DDL column add/remove
+    // BLOCKED: migration — requires DDL column add/remove
   });
 
   it("destroy dependents", async () => {
@@ -715,7 +715,7 @@ describe("PessimisticLockingTest", () => {
   });
 
   it.skip("eager find with lock", () => {
-    // BLOCKED: needs eager loading (includes) with lock support
+    // BLOCKED: associations — needs eager loading (includes) with lock support
   });
 
   it("lock does not raise when the object is not dirty", async () => {
@@ -776,11 +776,11 @@ describe("PessimisticLockingTest", () => {
   });
 
   it.skip("lock sending custom lock statement", async () => {
-    // BLOCKED: needs query matching infrastructure
+    // BLOCKED: unknown — needs query matching infrastructure
   });
 
   it.skip("with lock sets isolation", () => {
-    // BLOCKED: needs transaction isolation level support
+    // BLOCKED: transactions — needs transaction isolation level support
   });
 
   it("with lock locks with no args", async () => {
@@ -791,6 +791,6 @@ describe("PessimisticLockingTest", () => {
   });
 
   it.skip("no locks no wait", () => {
-    // BLOCKED: requires concurrent database connections
+    // BLOCKED: connection-pool — requires concurrent database connections
   });
 });

@@ -401,13 +401,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
     });
     it.skip("type map", async () => {
-      // BLOCKED: typeMap is HashLookupTypeMap, not pg-driver PG::TypeMapByOid.
+      // BLOCKED: adapter-pg — typeMap is HashLookupTypeMap, not pg-driver PG::TypeMapByOid.
     });
     it.skip("type map for results", async () => {
-      // BLOCKED: Same as "type map" — pg-driver type_map_for_results not exposed.
+      // BLOCKED: adapter-pg — Same as "type map" — pg-driver type_map_for_results not exposed.
     });
     it.skip("only reload type map once for every unrecognized type", async () => {
-      // BLOCKED: assert_queries_count needed; SQLCounter doesn't isolate pg_type queries.
+      // BLOCKED: adapter-pg — assert_queries_count needed; SQLCounter doesn't isolate pg_type queries.
     });
     it("only warn on first encounter of unrecognized oid", async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -742,7 +742,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("reconnect after bad connection on check version", async () => {
-      // BLOCKED: Rails stubs raw_connection.server_version=0 on the PG::Connection to
+      // BLOCKED: adapter-pg — Rails stubs raw_connection.server_version=0 on the PG::Connection to
       // simulate a bad version check during reconnect!. Our adapter wraps pg.Client
       // and exposes no equivalent low-level server_version stub point.
     });
@@ -915,7 +915,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result).toBeNull();
     });
     it.skip("pk and sequence for with collision pg class oid", async () => {
-      // BLOCKED: Requires superuser access to manipulate pg_depend for OID collision.
+      // BLOCKED: adapter-pg — Requires superuser access to manipulate pg_depend for OID collision.
     });
 
     it("partial index on column named like keyword", async () => {
@@ -1018,7 +1018,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await expect(adapter.execute(null as any)).rejects.toBeInstanceOf(TypeError);
     });
     it.skip("translate no connection exception to not established", async () => {
-      // BLOCKED: pg_terminate_backend approach is inherently racy — pg.Pool reconnects
+      // BLOCKED: adapter-pg — pg_terminate_backend approach is inherently racy — pg.Pool reconnects
       // transparently after a backend is killed, so the subsequent execute() may succeed
       // instead of raising ConnectionNotEstablished. Rails avoids this by calling
       // raw_connection.send_query() directly on a PG::Connection (no pool), but pg npm
@@ -1246,7 +1246,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("reconnection error", () => {
-      // BLOCKED: Rails creates a fake PG::Connection object with a reset() that
+      // BLOCKED: adapter-pg — Rails creates a fake PG::Connection object with a reset() that
       // throws PG::ConnectionBad, then stubs PG.connect to throw. The pg npm
       // driver doesn't expose equivalent interception points.
     });

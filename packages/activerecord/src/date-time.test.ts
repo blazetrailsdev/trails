@@ -15,11 +15,11 @@ describe("DateTimeTest", () => {
   });
 
   it("high precision current timestamp", () => {
-    // BLOCKED: needs Task model + DB + select({expr: "alias"}).find() flow
+    // BLOCKED: fixture — needs Task model + DB + select({expr: "alias"}).find() flow
   });
 
   it("saves both date and time", () => {
-    // BLOCKED: needs vi.stubEnv("TZ") + Task model + DB round-trip
+    // BLOCKED: fixture — needs vi.stubEnv("TZ") + Task model + DB round-trip
   });
 
   it("assign empty date time", () => {
@@ -70,15 +70,15 @@ describe("DateTimeTest", () => {
   });
 
   it("assign in local timezone", () => {
-    // BLOCKED: vi.stubEnv("TZ") doesn't retroactively affect Temporal
+    // BLOCKED: type — vi.stubEnv("TZ") doesn't retroactively affect Temporal
   });
 
   it("date time with string value with subsecond precision", () => {
-    // BLOCKED: needs Topic model + DB for create(written_on: str) + findBy(written_on: str)
+    // BLOCKED: fixture — needs Topic model + DB for create(written_on: str) + findBy(written_on: str)
   });
 
   it("date time with string value with non iso format", () => {
-    // BLOCKED: loose-date-parse.ts doesn't handle "MM/DD/YYYY H:MMam" format
+    // BLOCKED: type — loose-date-parse.ts doesn't handle "MM/DD/YYYY H:MMam" format
     // ROOT-CAUSE: ~20 LOC in activemodel/src/type/helpers/loose-date-parse.ts
   });
 });

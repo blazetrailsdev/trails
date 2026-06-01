@@ -142,11 +142,11 @@ describe("DateTimePrecisionTest", () => {
   });
 
   it("formatting datetime according to precision using timestamptz", () => {
-    // BLOCKED: postgres-only (with_postgresql_datetime_type(:timestamptz))
+    // BLOCKED: adapter-pg — postgres-only (with_postgresql_datetime_type(:timestamptz))
   });
 
   it("formatting datetime according to precision when time zone aware using timestamptz", () => {
-    // BLOCKED: postgres-only + TimeZoneAware extension
+    // BLOCKED: adapter-pg — postgres-only + TimeZoneAware extension
   });
 
   it("writing a blank attribute", async () => {
@@ -175,15 +175,15 @@ describe("DateTimePrecisionTest", () => {
   });
 
   it("writing a blank attribute timestamptz", () => {
-    // BLOCKED: postgres-only (with_postgresql_datetime_type(:timestamptz))
+    // BLOCKED: adapter-pg — postgres-only (with_postgresql_datetime_type(:timestamptz))
   });
 
   it("writing a date attribute timestamptz", () => {
-    // BLOCKED: postgres-only
+    // BLOCKED: adapter-pg — postgres-only
   });
 
   it("writing a time with zone attribute timestamptz", () => {
-    // BLOCKED: postgres-only
+    // BLOCKED: adapter-pg — postgres-only
   });
 
   it("schema dump with default precision is not dumped", async () => {
@@ -205,6 +205,6 @@ describe("DateTimePrecisionTest", () => {
   });
 
   it("datetime precision with zero should be dumped", () => {
-    // BLOCKED: postgres-only test (current_adapter?(:PostgreSQLAdapter))
+    // BLOCKED: adapter-pg — postgres-only test (current_adapter?(:PostgreSQLAdapter))
   });
 });
