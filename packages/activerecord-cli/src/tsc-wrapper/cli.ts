@@ -66,7 +66,21 @@ export function loadSchemaColumns(
   }
   const ext = path.extname(resolved).toLowerCase();
   if (ext === ".ts" || ext === ".js") {
-    return parseSchemaTs(source, resolved);
+    const result = parseSchemaTs(source, resolved);
+    if (Object.keys(result).length === 0) {
+      process.stderr.write(
+        `trails-tsc: --schema ${resolved}: no createTable() calls found; ` +
+          `proceeding without schema-driven declares.\n`,
+      );
+    }
+    return result;
+  }
+  if (ext !== ".json" && ext !== "") {
+    process.stderr.write(
+      `trails-tsc: --schema: extension "${ext}" is not supported. ` +
+        `Use db/schema.ts (TypeScript) or a .json dump from trails-schema-dump.\n`,
+    );
+    process.exit(1);
   }
   let parsed: unknown;
   try {
@@ -164,12 +178,13 @@ function validateColumnValue(
   return out;
 }
 
-function handleHelp(args: string[]): void {
+export function handleHelp(args: string[]): void {
   if (!args.includes("--help") && !args.includes("-h")) return;
   process.stdout.write(
     "Usage: trails-tsc [tsc-options] [--schema <path>]\n\n" +
       "  --schema <path>  Schema source: db/schema.ts (TypeScript) or a .json dump\n" +
-      "                   from trails-schema-dump. Drives attribute virtualization.\n",
+      "                   from trails-schema-dump. Drives attribute virtualization.\n\n" +
+      "  All other options are passed through to tsc. Run tsc --help for the full list.\n",
   );
   process.exit(0);
 }

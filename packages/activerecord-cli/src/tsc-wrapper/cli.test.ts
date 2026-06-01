@@ -585,3 +585,74 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
     expect(diags.length).toBeGreaterThan(0);
   });
 });
+
+describe("trails-tsc handleHelp", () => {
+  const tmpDirs: string[] = [];
+  afterEach(() => {
+    for (const dir of tmpDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  function spyExitAndStdout() {
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
+    const out = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    return { exit, out };
+  }
+
+  it("--help prints usage including --schema and tsc passthrough note, exits 0", async () => {
+    const { handleHelp } = await import("./cli.js");
+    const { exit, out } = spyExitAndStdout();
+    expect(() => handleHelp(["--help"])).toThrow(/process\.exit\(0\)/);
+    expect(exit).toHaveBeenCalledWith(0);
+    const text = out.mock.calls.map((c) => String(c[0])).join("");
+    expect(text).toMatch(/Usage: trails-tsc/);
+    expect(text).toMatch(/db\/schema\.ts/);
+    expect(text).toMatch(/tsc --help/);
+  });
+
+  it("-h is an alias for --help", async () => {
+    const { handleHelp } = await import("./cli.js");
+    const { out } = spyExitAndStdout();
+    expect(() => handleHelp(["-h"])).toThrow(/process\.exit\(0\)/);
+    const text = out.mock.calls.map((c) => String(c[0])).join("");
+    expect(text).toMatch(/Usage: trails-tsc/);
+  });
+
+  it("no-op when neither --help nor -h is present", async () => {
+    const { handleHelp } = await import("./cli.js");
+    const { exit } = spyExitAndStdout();
+    handleHelp(["--schema", "schema.ts", "--noEmit"]);
+    expect(exit).not.toHaveBeenCalled();
+  });
+
+  it("loadSchemaColumns: warns on stderr when a .ts schema file has no createTable calls", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-empty-"));
+    tmpDirs.push(dir);
+    const tsPath = path.join(dir, "schema.ts");
+    fs.writeFileSync(tsPath, "// no createTable calls here\nexport const version = 1;\n");
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const result = loadSchemaColumns(["--schema", tsPath]);
+    expect(result).toBeDefined();
+    expect(Object.keys(result!)).toHaveLength(0);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/no createTable\(\) calls found/);
+  });
+
+  it("loadSchemaColumns: rejects unsupported schema extension with a clear error", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-mts-"));
+    tmpDirs.push(dir);
+    const mtsPath = path.join(dir, "schema.mts");
+    fs.writeFileSync(mtsPath, "export {};\n");
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
+    expect(() => loadSchemaColumns(["--schema", mtsPath])).toThrow(/process\.exit\(1\)/);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/extension ".mts" is not supported/);
+  });
+});
