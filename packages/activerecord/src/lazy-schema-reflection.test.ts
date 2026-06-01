@@ -2,7 +2,7 @@
  * Lazy async schema reflection: the query/persistence path awaits a
  * one-shot `ensureSchemaLoaded()` so consumers don't have to call
  * `loadSchema` explicitly. See
- * docs/activerecord/standalone-activerecord-cli-proposal.md §6.1.
+ * packages/activerecord-cli/README.md (lazy reflection / ensureSchemaLoaded).
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";

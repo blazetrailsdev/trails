@@ -104,6 +104,41 @@ association preload` reuse.
 - **Associations — Marshal tests** (`extension.test.ts` 2, plus ~18 scattered
   marshal/Ruby-only across the layer).
 
+## activerecord-cli follow-ups
+
+Post-merge findings from the ar-cli PR series (#2703–#2757). None are regressions;
+all are small unblocked improvements or Rails-fidelity gaps.
+
+### Unblocked — small (≤30 LOC each)
+
+- **Generator name validation** (~10 LOC). `generate:migration` and
+  `generate:model` do not reject names with characters outside `[a-zA-Z0-9_]`.
+  Rails' `validate_file_name!` (`activerecord/lib/rails/generators/active_record/migration/migration_generator.rb:65`,
+  invoked at line 16) raises on illegal names. Also: field names or model names with hyphens/leading digits
+  produce uncompilable output — no guard. (#2717 finding)
+- **`ManifestResult.path` JSDoc** (~1 LOC). JSDoc says "absolute path" but
+  `generateManifest(modelsDir)` returns `join(modelsDir, "index.ts")` — relative
+  when a direct library caller passes a relative `modelsDir`. Fix: resolve inside
+  `generateManifest`, or soften the JSDoc. CLI is unaffected (always resolves
+  against `cwd` first). (`packages/activerecord-cli/src/generate-manifest.ts`,
+  #2705 finding)
+- **`ar console` / `ar runner` empty-config error** (~30 LOC). Neither command
+  errors when `configsFor()` returns an empty array for the requested
+  environment. `db:*` commands do error. Fix: add the same guard for Rails
+  fidelity. (`console.ts`, `runner.ts`, #2736 finding)
+- **E2E shared helpers** (~30–50 LOC). The three E2E suites
+  (`sqlite-happy-path`, `postgres-happy-path`, `mysql-happy-path`) each
+  copy a tmp-dir scaffold + `DatabaseTasks` teardown block inline. Extract into
+  `src/__e2e__/helpers.ts`. No behavior change. (#2752 finding)
+- **`ar init` `--driver node-sqlite`** (~5 LOC). `ar new` supports
+  `--driver node-sqlite`; `ar init` always scaffolds `better-sqlite3` config.
+  Low priority — `ar new` covers the new-project case. (#2741 finding)
+
+### Tracked elsewhere (do not duplicate)
+
+- **DatabaseTasks P3-5** (`migrateStatus` stdout) — already in "Unblocked" above.
+- **Global Arel visitor removal** — tracked in `adapter-architecture-cleanup.md`.
+
 ## Query-cache mixin — COMPLETE (#2662, #2672, #2684)
 
 All three phases of the former `query-cache-mixin-plan.md` shipped: the live

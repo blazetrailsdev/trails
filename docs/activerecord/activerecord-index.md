@@ -18,16 +18,15 @@ For the audit reports that produced the original sequencing, see
 
 ## Doc map (post-consolidation)
 
-| Doc                                                                                  | Owns                                                                                                                                   |
-| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `activerecord-index.md` (this)                                                       | sequencing + doc map                                                                                                                   |
-| [`activerecord-100-plan.md`](activerecord-100-plan.md)                               | test:compare drive — batch list (Part 1) + per-file backlog table (Part 2)                                                             |
-| [`activerecord-gaps.md`](activerecord-gaps.md)                                       | residual gaps from the 5 merged gap plans (associations, relation, connection-pool, database-tasks, query-cache) — mostly blocked/done |
-| [`adapter-architecture-cleanup.md`](adapter-architecture-cleanup.md)                 | adapter→connection collapse, global-Arel-visitor removal, hash-only constructor, `this.adapter` audit                                  |
-| [`activerecord-type-audit.md`](activerecord-type-audit.md)                           | type cleanup (W1b, small follow-ups, W4)                                                                                               |
-| [`standalone-activerecord-cli-proposal.md`](standalone-activerecord-cli-proposal.md) | `activerecord-cli` (actively being built)                                                                                              |
-| [`parity-verification.md`](parity-verification.md)                                   | reference: schema + query parity pipelines                                                                                             |
-| [`fixtures-adoption-inventory.md`](fixtures-adoption-inventory.md)                   | reference: script-generated fixture tiering                                                                                            |
+| Doc                                                                  | Owns                                                                                                                                   |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `activerecord-index.md` (this)                                       | sequencing + doc map                                                                                                                   |
+| [`activerecord-100-plan.md`](activerecord-100-plan.md)               | test:compare drive — batch list (Part 1) + per-file backlog table (Part 2)                                                             |
+| [`activerecord-gaps.md`](activerecord-gaps.md)                       | residual gaps from the 5 merged gap plans (associations, relation, connection-pool, database-tasks, query-cache) — mostly blocked/done |
+| [`adapter-architecture-cleanup.md`](adapter-architecture-cleanup.md) | adapter→connection collapse, global-Arel-visitor removal, hash-only constructor, `this.adapter` audit                                  |
+| [`activerecord-type-audit.md`](activerecord-type-audit.md)           | type cleanup (W1b, small follow-ups, W4)                                                                                               |
+| [`parity-verification.md`](parity-verification.md)                   | reference: schema + query parity pipelines                                                                                             |
+| [`fixtures-adoption-inventory.md`](fixtures-adoption-inventory.md)   | reference: script-generated fixture tiering                                                                                            |
 
 ## Focused work set (what's actually buildable)
 
@@ -37,8 +36,7 @@ For the audit reports that produced the original sequencing, see
    removal (Phases A–C, **unblocked**), adapter→connection PR A/B/C, hash-only
    constructor (gated on #2700).
 3. **type cleanup** — `activerecord-type-audit.md` (~250 LOC, bundleable).
-4. **AR-CLI** — `standalone-activerecord-cli-proposal.md` (in progress, #2746+).
-5. **Small unblocked gap items** — `activerecord-gaps.md` "Unblocked" section
+4. **Small unblocked gap items** — `activerecord-gaps.md` "Unblocked" section
    (DatabaseTasks P3-5 migrateStatus stdout ~30 LOC; associations Track 9; a
    2-LOC JSDoc fix). Everything else in that doc is blocked or done.
 
@@ -81,7 +79,6 @@ Owned outside `docs/activerecord/`:
 test:compare drive (100-plan)        ── continuous ──
 adapter-architecture cleanup         ── parallel (visitor removal unblocked) ──
 type cleanup (type-audit)            ── parallel ──
-AR-CLI (standalone proposal)         ── parallel (active) ──
 gap residuals (gaps)                 ── mostly blocked; pick unblocked items only ──
 DX / packaging (Phase 7)             ── parallel, separate ──
 ```

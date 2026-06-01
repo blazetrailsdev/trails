@@ -63,8 +63,7 @@ the model code is adapter-agnostic, exactly like Rails.
 > We key on `TRAILS_ENV`, not `NODE_ENV`: the JS ecosystem treats `NODE_ENV`
 > as a build-time hint, so reusing it to select a database silently picks the
 > wrong one in many setups. `NODE_ENV` is honored only as a fallback. This is
-> the convention the [`activerecord-cli` proposal](../../docs/activerecord/standalone-activerecord-cli-proposal.md)
-> recommends standardizing on.
+> the convention documented in [`packages/activerecord-cli/README.md`](../../packages/activerecord-cli/README.md).
 
 ## Database tasks
 
