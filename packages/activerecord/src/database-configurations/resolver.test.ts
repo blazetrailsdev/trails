@@ -157,9 +157,12 @@ describe("PoolConfig", () => {
     it("pool config with invalid type", () => {
       // Rails passes Object.new to establish_connection and expects a TypeError;
       // resolve() raises the same for a value that is neither a string, a hash,
-      // nor a DatabaseConfig.
+      // nor a DatabaseConfig. A number (not a plain object) is the faithful JS
+      // analog: resolve() treats *any* non-null object as a hash, so `{}` would
+      // build a HashConfig instead of throwing — only a non-object primitive
+      // reaches the TypeError arm.
       const configs = new DatabaseConfigurations({});
-      expect(() => configs.resolve(123 as unknown)).toThrow(TypeError);
+      expect(() => configs.resolve(123)).toThrow(TypeError);
     });
   });
 });
