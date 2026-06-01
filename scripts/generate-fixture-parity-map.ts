@@ -3,18 +3,31 @@
  * Generates eslint/test-fixture-parity.json — trails file → fixture-using
  * test descriptions.
  *
- * Detection signals (union):
- *   1. Class-level `fixtures :foo` + per-test body accessor `foo(:record)` →
- *      marks that specific test (precise: skips tests that don't touch fixtures).
- *   2. Class-level `fixtures :foo` with NO body access detected for a test →
- *      marks the test anyway (Rails still loads fixtures for it; it may use
- *      fixtures indirectly via associations or model state).
+ * Detection signal (precise, body-accessor only):
+ *   Class-level `fixtures :foo` + per-test body accessor `foo(:record)` →
+ *   marks that specific test. Tests that declare fixtures but never call a
+ *   row accessor in their body are NOT marked: the rule gates literal accessor
+ *   usage, so whole-file marking just produced false-positives for tests that
+ *   exercise infrastructure (e.g. connection-handler) or build records inline.
  *
- * Run: pnpm tsx scripts/generate-fixture-parity-map.ts  (commit the result).
+ *   Trade-off (measured): Rails commonly reads fixture rows through the model
+ *   (`Post.first`) rather than the `posts(:welcome)` accessor, so dropping the
+ *   fallback also un-gates ~31 files whose trails port DID migrate to
+ *   `useFixtures` accessors — they stay green, they just lose the
+ *   un-migration ratchet. A model-aware signal (mark on the `classify()`'d
+ *   model constant) was evaluated to recover them and rejected: a model
+ *   reference ≠ fixture-row use, so it re-introduced the documented
+ *   false-positives (database-tasks, query-logs, …). Restoring the ratchet
+ *   without false-positives would require reading the trails sources — a
+ *   separate change.
+ *
+ * Run: pnpm tsx scripts/generate-fixture-parity-map.ts  (commit the result —
+ * output is prettier-canonical, so no separate format step is needed).
  */
 // fs/path bare per convention; sync fs acceptable in a one-shot CLI generator.
 import * as fs from "fs";
 import * as path from "path";
+import * as prettier from "prettier";
 
 const ROOT = path.resolve(__dirname, "..");
 const CASES_DIR = path.join(ROOT, "vendor/rails/activerecord/test/cases");
@@ -116,18 +129,15 @@ function processFile(file: string): { trailsRel: string; descs: string[] } | nul
   const fixtureNames = collectFixtureNames(src);
   if (fixtureNames.length === 0) return null;
 
+  const accessorRe = buildAccessorRe(fixtureNames);
+  if (!accessorRe) return null;
+
   const tests = extractTests(src);
   if (tests.length === 0) return null;
 
-  const accessorRe = buildAccessorRe(fixtureNames);
-
-  // Mark tests that access fixtures in their body; fall back to marking all
-  // when no body-access is detected (class-level declaration implies availability).
-  const withAccess = accessorRe ? tests.filter((t) => accessorRe.test(t.bodyLines.join("\n"))) : [];
-
-  // If the file declares fixtures but no test body references them, the whole
-  // file still counts — Rails loads them for every test.
-  const useDescs = withAccess.length > 0 ? withAccess.map((t) => t.desc) : tests.map((t) => t.desc);
+  // Mark only tests that call a fixture row accessor in their body. Tests that
+  // declare fixtures but never reference a row are not gated (see header).
+  const useDescs = tests.filter((t) => accessorRe.test(t.bodyLines.join("\n"))).map((t) => t.desc);
 
   if (useDescs.length === 0) return null;
 
@@ -145,7 +155,7 @@ function walk(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-function main() {
+async function main() {
   if (!fs.existsSync(CASES_DIR)) {
     console.error(
       `[generate-fixture-parity-map] ${CASES_DIR} not found. Run pnpm vendor:fetch first.`,
@@ -164,8 +174,19 @@ function main() {
 
   const entries = Object.keys(out).length;
   const tests = Object.values(out).reduce((a, b) => a + b.length, 0);
-  fs.writeFileSync(OUT_FILE, JSON.stringify(out, null, 2) + "\n");
+  // Emit prettier-canonical JSON so `regenerate → commit` is a single
+  // reproducible step that passes CI's `prettier --check` (the file is not in
+  // .prettierignore). Raw JSON.stringify leaves single-element arrays expanded.
+  const config = await prettier.resolveConfig(OUT_FILE);
+  const formatted = await prettier.format(JSON.stringify(out), {
+    ...config,
+    filepath: OUT_FILE,
+  });
+  fs.writeFileSync(OUT_FILE, formatted);
   console.log(`Wrote ${OUT_FILE}: ${entries} files, ${tests} fixture-using tests`);
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
