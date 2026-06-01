@@ -113,8 +113,8 @@ all are small unblocked improvements or Rails-fidelity gaps.
 
 - **Generator name validation** (~10 LOC). `generate:migration` and
   `generate:model` do not reject names with characters outside `[a-zA-Z0-9_]`.
-  Rails' `validate_file_name!` (`thor/actions/file_manipulation.rb`) raises on
-  illegal names. Also: field names or model names with hyphens/leading digits
+  Rails' `validate_file_name!` (`activerecord/lib/rails/generators/active_record/migration/migration_generator.rb:65`,
+  invoked at line 16) raises on illegal names. Also: field names or model names with hyphens/leading digits
   produce uncompilable output — no guard. (#2717 finding)
 - **`ManifestResult.path` JSDoc** (~1 LOC). JSDoc says "absolute path" but
   `generateManifest(modelsDir)` returns `join(modelsDir, "index.ts")` — relative
