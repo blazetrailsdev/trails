@@ -5,18 +5,19 @@
 import { describe, expect } from "vitest";
 import { Notifications, squish } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";
+import { isSqliteRun } from "../../test-helpers/sqlite-template.js";
 
 /**
  * Scope a suite to the SQLite backend, mirroring Rails'
  * `ActiveRecord::SQLite3TestCase`. The handler connection is swapped to
- * PG/MySQL in the cross-backend CI matrix (via `PG_TEST_URL`/`MYSQL_TEST_URL`),
- * so suites whose assertions are SQLite-specific — `EXPLAIN QUERY PLAN` plan
- * shape, `"`-quoted identifiers — must skip there rather than run against a
- * backend Rails never points them at. Counterpart to `describeIfPg` /
+ * PG/MySQL in the cross-backend CI matrix, so suites whose assertions are
+ * SQLite-specific — `EXPLAIN QUERY PLAN` plan shape, `"`-quoted identifiers —
+ * must skip there rather than run against a backend Rails never points them at.
+ * Reuses the canonical {@link isSqliteRun} predicate so the "what counts as a
+ * SQLite run" rule has one source of truth. Counterpart to `describeIfPg` /
  * `describeIfMysql`.
  */
-const sqliteBackend = !process.env.PG_TEST_URL && !process.env.MYSQL_TEST_URL;
-export const describeIfSqlite = sqliteBackend ? describe : (describe.skip as typeof describe);
+export const describeIfSqlite = isSqliteRun() ? describe : (describe.skip as typeof describe);
 
 /**
  * Subscribe to `sql.active_record` for the duration of `fn`, then assert the
