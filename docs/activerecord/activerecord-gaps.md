@@ -13,7 +13,7 @@
 ## Unblocked — actionable now
 
 These are the only items below that can be picked up without waiting on an
-external blocker. Small; bundle toward the 300-LOC ceiling.
+external blocker. Small; bundle toward the 500-LOC ceiling.
 
 - **DatabaseTasks P3-5** — `migrateStatus` stdout fidelity (~20 LOC).
   **Mostly addressed:** the formatted up/down table shipped at the

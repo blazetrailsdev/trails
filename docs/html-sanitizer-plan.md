@@ -147,7 +147,7 @@ with nothing usable would be a tiny PR (see [[feedback_no_tiny_prs]]).
 
 **LOC ceiling exception:** PR 2 is data-heavy (the Rails
 `safe_list_sanitizer_test.rb` port is mostly fixture-style assertions
-over allowlists, not new logic). Approved to exceed the 300 LOC ceiling
+over allowlists, not new logic). Approved to exceed the 500 LOC ceiling
 rather than splitting fixture data across PRs. Note the exception in
 the PR body.
 
@@ -183,7 +183,7 @@ an order of magnitude.
 
 ## Risks / sequencing notes
 
-- **PR 2 LOC exception.** Approved to exceed the 300 LOC ceiling — the
+- **PR 2 LOC exception.** Approved to exceed the 500 LOC ceiling — the
   bulk is fixture-style test data, not logic, and splitting it across
   PRs creates churn without review benefit. Flag the exception in the
   PR body so reviewers know it's intentional.

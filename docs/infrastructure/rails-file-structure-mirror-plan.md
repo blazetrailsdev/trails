@@ -550,7 +550,7 @@ need to swap, the fix is one range covering both.
 
 ## 6. Wave-based rollout
 
-Each PR sized to ≤300 LOC per [CLAUDE.md](../../CLAUDE.md). Estimates are
+Each PR sized to ≤500 LOC per [CLAUDE.md](../../CLAUDE.md). Estimates are
 implementation LOC excluding generated JSON.
 
 | wave      | scope                                                                                                    |  est. LOC | notes                                                                                                                                                                                                                                                         |
