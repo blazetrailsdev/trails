@@ -5,13 +5,12 @@
  */
 import { describe, it, expect } from "vitest";
 import "./index.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Post } from "./test-helpers/models/post.js";
 
 describe("AnnotateTest", () => {
-  setupHandlerSuite();
+  // `useHandlerFixtures` wires `setupHandlerSuite` internally, so no separate call.
   // Mirrors Rails `fixtures :posts` — seed the canonical posts rows so each
   // annotated `select(:id)` relation has data to read back with `.first()`
   // (Rails' `assert posts.first`). `schema` recreates the canonical `posts`
