@@ -128,9 +128,16 @@ export class InsertAll {
     // any inserts.empty? check) still fires on upsertAll([], { uniqueBy }).
     await this._populateUpdatableColumns();
     if (this.inserts.length === 0) return 0;
-    const dialect = this.connection.adapterName;
-    const builder = new Builder(this, dialect);
-    return this.connection.executeMutation(this.connection.toSql(builder));
+    return this.connection.executeMutation(this.toSql());
+  }
+
+  /**
+   * Mirrors: ActiveRecord::InsertAll#to_sql — the adapter assembles the
+   * dialect-specific statement from the Builder's fragments.
+   * @internal
+   */
+  toSql(): string {
+    return this.connection.buildInsertSql(new Builder(this, this.connection.adapterName));
   }
 
   updatableColumns(): string[] {
@@ -447,6 +454,23 @@ export class InsertAll {
 }
 
 /**
+ * The fragment surface an adapter's `buildInsertSql` consumes to assemble a
+ * dialect-specific INSERT statement. Mirrors the methods Rails'
+ * `ActiveRecord::InsertAll::Builder` exposes to `connection.build_insert_sql`.
+ */
+export interface InsertBuilder {
+  into(): string;
+  conflictTarget(): string;
+  returning(): string | undefined;
+  updatableColumns(): string[];
+  touchModelTimestampsUnless(block: (col: string) => string): string;
+  rawUpdateSql(): Nodes.SqlLiteral | undefined;
+  skipDuplicates(): boolean;
+  updateDuplicates(): boolean;
+  firstColumn(): string | undefined;
+}
+
+/**
  * Builds SQL fragments for InsertAll operations.
  *
  * Mirrors: ActiveRecord::InsertAll::Builder
@@ -455,7 +479,7 @@ export class InsertAll {
  * converts them to backticks at execution time via mysqlQuote(), matching
  * how the rest of the codebase works with Arel-generated SQL.
  */
-export class Builder {
+export class Builder implements InsertBuilder {
   readonly model: ModelClass;
   private _insertAll: InsertAll;
   private _dialect: AdapterDialect;
@@ -485,9 +509,12 @@ export class Builder {
       .join(", ");
   }
 
-  /** @internal */
-  toSql(): string {
-    return this._dialect === "mysql" ? this._buildMysqlSql() : this._buildStandardSql();
+  skipDuplicates(): boolean {
+    return this._insertAll.skipDuplicates();
+  }
+
+  updateDuplicates(): boolean {
+    return this._insertAll.updateDuplicates();
   }
 
   into(): string {
@@ -570,78 +597,6 @@ export class Builder {
     return this._insertAll.updateSql;
   }
 
-  private _buildStandardSql(): string {
-    let sql = `INSERT ${this.into()}`;
-
-    if (this._insertAll.skipDuplicates()) {
-      sql += ` ON CONFLICT ${this.conflictTarget()} DO NOTHING`;
-    } else if (this._insertAll.updateDuplicates()) {
-      sql += ` ON CONFLICT ${this.conflictTarget()} DO UPDATE SET `;
-      if (this._insertAll.updateSql) {
-        sql += this._insertAll.updateSql.value;
-      } else {
-        const touchCondition =
-          this._dialect === "postgres"
-            ? (col: string) => `${col} IS NOT DISTINCT FROM excluded.${col}`
-            : (col: string) => `${col} IS excluded.${col}`;
-        const assignments = this._updateAssignments(
-          touchCondition,
-          (col) => `${col}=excluded.${col}`,
-        );
-        sql += assignments.join(",");
-      }
-    }
-
-    const ret = this.returning();
-    if (ret) {
-      sql += ` RETURNING ${ret}`;
-    }
-
-    return sql;
-  }
-
-  private _buildMysqlSql(): string {
-    let sql = `INSERT ${this.into()}`;
-    const noOpColumn = this._firstColumn();
-
-    if (this._insertAll.skipDuplicates()) {
-      if (noOpColumn) {
-        sql += ` ON DUPLICATE KEY UPDATE ${noOpColumn}=${noOpColumn}`;
-      }
-    } else if (this._insertAll.updateDuplicates()) {
-      if (this._insertAll.updateSql) {
-        sql += ` ON DUPLICATE KEY UPDATE ${this._insertAll.updateSql.value}`;
-      } else {
-        sql += " ON DUPLICATE KEY UPDATE ";
-        const assignments = this._updateAssignments(
-          (col) => `${col}<=>VALUES(${col})`,
-          (col) => `${col}=VALUES(${col})`,
-        );
-        sql += assignments.join(",");
-      }
-    }
-
-    return sql;
-  }
-
-  private _updateAssignments(
-    touchCondition: (col: string) => string,
-    updateExpr: (col: string) => string,
-  ): string[] {
-    const assignments: string[] = [];
-
-    const touch = this.touchModelTimestampsUnless(touchCondition);
-    if (touch) {
-      assignments.push(touch);
-    }
-
-    for (const col of this.updatableColumns()) {
-      assignments.push(updateExpr(col));
-    }
-
-    return assignments;
-  }
-
   private _visitor(): Visitors.ToSql {
     const v = this._insertAll.connection.visitor;
     if (v) return v;
@@ -651,7 +606,8 @@ export class Builder {
     return new Visitors.SQLite(q);
   }
 
-  private _firstColumn(): string | undefined {
+  /** @internal Quoted no-op column for MySQL `ON DUPLICATE KEY UPDATE col=col`. */
+  firstColumn(): string | undefined {
     const keys = [...this._insertAll.keysIncludingTimestamps()];
     if (keys.length > 0) return `"${keys[0]}"`;
     const pk = this._insertAll.primaryKeys();

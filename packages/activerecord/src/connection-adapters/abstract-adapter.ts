@@ -7,6 +7,7 @@
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { DatabaseAdapter } from "../adapter.js";
+import type { InsertBuilder } from "../insert-all.js";
 import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
 import {
   ReadOnlyError,
@@ -18,6 +19,7 @@ import {
   TransactionRollbackError,
   Deadlocked,
   LockWaitTimeout,
+  NotImplementedError,
 } from "../errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { disablePreparedStatements } from "../ar-config.js";
@@ -1616,12 +1618,18 @@ export class AbstractAdapter implements Quoting {
 
   // --- Insert SQL ---
 
-  buildInsertSql(
-    _insertManager: unknown,
-    _onDuplicate?: unknown,
-    _returning?: unknown,
-  ): string | null {
-    return null;
+  // Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_insert_sql.
+  // The base adapter only knows plain inserts; adapters that support upsert /
+  // skip-duplicates override this. `into()` already bundles the VALUES list,
+  // mirroring `"INSERT #{insert.into} #{insert.values_list}"`.
+  buildInsertSql(insert: InsertBuilder): string {
+    if (insert.skipDuplicates() || insert.updateDuplicates()) {
+      // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:843
+      throw new NotImplementedError(
+        `${this.constructor.name} should define \`buildInsertSql\` to implement adapter-specific logic for handling duplicates during INSERT`,
+      );
+    }
+    return `INSERT ${insert.into()}`;
   }
 
   // --- Version introspection ---

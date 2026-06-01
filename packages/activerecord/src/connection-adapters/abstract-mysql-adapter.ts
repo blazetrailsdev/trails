@@ -10,6 +10,7 @@
 
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
+import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import type { Column } from "./column.js";
@@ -998,14 +999,30 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return index.using == null || index.using.toUpperCase() === "BTREE";
   }
 
-  buildInsertSql(insert: { skip_duplicates?: boolean; update?: unknown }): string | null {
-    if (insert.skip_duplicates) {
-      return "INSERT IGNORE INTO";
+  // Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#build_insert_sql.
+  override buildInsertSql(insert: InsertBuilder): string {
+    let sql = `INSERT ${insert.into()}`;
+    const noOpColumn = insert.firstColumn();
+
+    if (insert.skipDuplicates()) {
+      if (noOpColumn) {
+        sql += ` ON DUPLICATE KEY UPDATE ${noOpColumn}=${noOpColumn}`;
+      }
+    } else if (insert.updateDuplicates()) {
+      const raw = insert.rawUpdateSql();
+      if (raw) {
+        sql += ` ON DUPLICATE KEY UPDATE ${raw.value}`;
+      } else {
+        sql += " ON DUPLICATE KEY UPDATE ";
+        const assignments: string[] = [];
+        const touch = insert.touchModelTimestampsUnless((col) => `${col}<=>VALUES(${col})`);
+        if (touch) assignments.push(touch);
+        for (const col of insert.updatableColumns()) assignments.push(`${col}=VALUES(${col})`);
+        sql += assignments.join(",");
+      }
     }
-    if (insert.update) {
-      return "INSERT INTO";
-    }
-    return null;
+
+    return sql;
   }
 
   checkVersion(): void {}
