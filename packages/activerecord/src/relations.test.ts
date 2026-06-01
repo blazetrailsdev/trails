@@ -1835,19 +1835,15 @@ describe("RelationTest", () => {
   });
 
   it.skip("where id with delegated ar object", () => {
-    // BLOCKED: relation — Relation feature gap (standalone relations test)
-    // ROOT-CAUSE: relation.ts missing Rails parity for this feature
-    // SCOPE: ~30 LOC fix in relation.ts; affects ~8 tests in relations.test.ts
-    // Rails: Author.where(id: SimpleDelegator.new(author)) — unwraps delegated objects
-    // JS has no SimpleDelegator equivalent; not implementable
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — simple-delegator
+    // Rails: Author.where(id: SimpleDelegator.new(author)) — unwraps delegated objects.
+    // JS has no SimpleDelegator equivalent.
   });
 
   it.skip("where relation with delegated ar object", () => {
-    // BLOCKED: relation — Relation feature gap (standalone relations test)
-    // ROOT-CAUSE: relation.ts missing Rails parity for this feature
-    // SCOPE: ~30 LOC fix in relation.ts; affects ~8 tests in relations.test.ts
-    // Rails: Post.where(author: SimpleDelegator.new(author)) — delegated AR object in assoc where
-    // JS has no SimpleDelegator equivalent; not implementable
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — simple-delegator
+    // Rails: Post.where(author: SimpleDelegator.new(author)) — delegated AR object in assoc where.
+    // JS has no SimpleDelegator equivalent.
   });
 
   it("typecasting where with array", async () => {

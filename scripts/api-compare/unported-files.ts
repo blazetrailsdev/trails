@@ -311,9 +311,10 @@ export const UNPORTED_FILES: UnportedFile[] = [
     reason:
       "GVL / Ruby Thread semantics — concurrent connection tests cannot translate to single-threaded Node.js.",
   },
-  // load_async / FutureResult — Ruby thread pool, no JS analog. The whole
-  // relation/load_async_test.rb is excluded above (future_result.rb entry);
-  // these are the scattered thread/fork query-cache cases in mixed files.
+  // --- Permanently not-portable: GVL / Ruby Thread + fork in mixed files ---
+  // (load_async / FutureResult itself is already fully excluded above via the
+  //  future_result.rb / relation/load_async_test.rb entry — these are the
+  //  scattered thread/fork cases that live in otherwise-portable test files.)
   {
     testFile: "query_cache_test.rb",
     tests: [
@@ -335,8 +336,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "GVL / Ruby Thread semantics — concurrent multi-db connection access on shared " +
       "objects has no single-threaded Node.js equivalent.",
   },
-  // SimpleDelegator where — Ruby SimpleDelegator (Delegator/method_missing
-  // forwarding) has no JS analog; Rails unwraps the delegated AR object.
+  // --- Permanently not-portable: Ruby SimpleDelegator (Delegator/method_missing) ---
   {
     testFile: "relations_test.rb",
     className: "RelationTest",
@@ -346,7 +346,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "unwraps it via the delegator protocol. JS has no SimpleDelegator equivalent. " +
       "The plain-object equivalent (find by with delegated ar object) is covered.",
   },
-  // Scattered YAML/Marshal serialization — Ruby-only formats, no Node.js equivalent.
+  // --- Permanently not-portable: scattered YAML/Marshal serialization ---
   {
     testFile: "adapters/postgresql/hstore_test.rb",
     tests: ["yaml round trip with store accessors"],
@@ -385,7 +385,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "new threads get default the default connection handler",
       "changing a connection handler in a main thread does not poison the other threads",
       "connection_handler can be overridden", // Thread.new overrides the handler in a child thread and asserts isolation
-
       // Ruby Marshal serialization
       "marshal round trip",
       "marshal inspected round trip",
