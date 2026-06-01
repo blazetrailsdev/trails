@@ -12,6 +12,7 @@ import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import { ConnectionNotEstablished, RecordNotSaved, RecordNotUnique } from "./errors.js";
 import { disallowRawSqlBang } from "./sanitization.js";
+import { sanitizeAsSqlComment } from "./connection-adapters/abstract/quoting.js";
 import {
   columnNameMatcher as abstractColumnNameMatcher,
   columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
@@ -2329,7 +2330,7 @@ export class Relation<T extends Base> {
 
     let sql = manager.toSql();
     if (this._annotations.length > 0) {
-      const comments = this._annotations.map((c) => `/* ${c} */`).join(" ");
+      const comments = this._annotations.map((c) => `/* ${sanitizeAsSqlComment(c)} */`).join(" ");
       sql = `${sql} ${comments}`;
     }
 
@@ -3723,7 +3724,7 @@ export class Relation<T extends Base> {
 
     let sql = this._compileSelectSql(manager);
     if (this._annotations.length > 0) {
-      const comments = this._annotations.map((c) => `/* ${c} */`).join(" ");
+      const comments = this._annotations.map((c) => `/* ${sanitizeAsSqlComment(c)} */`).join(" ");
       sql = `${sql} ${comments}`;
     }
     return sql;
@@ -3816,7 +3817,7 @@ export class Relation<T extends Base> {
 
     // Append SQL comments from annotate()
     if (this._annotations.length > 0) {
-      const comments = this._annotations.map((c) => `/* ${c} */`).join(" ");
+      const comments = this._annotations.map((c) => `/* ${sanitizeAsSqlComment(c)} */`).join(" ");
       sql = `${sql} ${comments}`;
     }
 
