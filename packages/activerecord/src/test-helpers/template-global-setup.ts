@@ -14,6 +14,7 @@
  */
 
 import pg from "pg";
+import mysql from "mysql2/promise";
 import "@blazetrails/activesupport/sqlite/better-sqlite3";
 import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -165,10 +166,70 @@ const pgAdapter: DbTemplateAdapter = {
 };
 
 // ---------------------------------------------------------------------------
+// MySQL/MariaDB adapter
+// ---------------------------------------------------------------------------
+//
+// MySQL has no CREATE DATABASE … TEMPLATE primitive, so we can't clone. We
+// instead run defineSchema(TEST_SCHEMA) directly against each slot DB in
+// globalSetup. Same DDL cost as the current per-file preload, but moved to
+// before any worker forks — test-setup-dy.ts can then seed signatures and
+// make every subsequent per-file defineSchema(TEST_SCHEMA) a cache-hit.
+
+export const MYSQL_TEMPLATE_ENV = "AR_TEST_MYSQL_TEMPLATE";
+
+function mysqlSlotUrl(baseUrl: string, slot: number): string {
+  if (slot === 1) return baseUrl;
+  const u = new URL(baseUrl);
+  const db = u.pathname.replace(/^\//, "");
+  u.pathname = `/${db}_${slot}`;
+  return u.toString();
+}
+
+function mysqlConnOpts(url: string): mysql.ConnectionOptions {
+  const u = new URL(url);
+  return {
+    host: u.hostname,
+    port: u.port ? parseInt(u.port, 10) : 3306,
+    user: u.username || undefined,
+    password: u.password || undefined,
+  };
+}
+
+const mysqlAdapter: DbTemplateAdapter = {
+  isActive: () => Boolean(process.env.MYSQL_TEST_URL),
+
+  async provision() {
+    const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
+    const baseUrl = process.env.MYSQL_TEST_URL!;
+    const baseDb = new URL(baseUrl).pathname.replace(/^\//, "");
+    const admin = await mysql.createConnection(mysqlConnOpts(baseUrl));
+
+    for (let slot = 1; slot <= slotCount(); slot++) {
+      const slotDb = slot === 1 ? baseDb : `${baseDb}_${slot}`;
+      await admin.query(`DROP DATABASE IF EXISTS \`${slotDb}\``);
+      await admin.query(`CREATE DATABASE \`${slotDb}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`);
+      const slotUrl = mysqlSlotUrl(baseUrl, slot);
+      const adapter = new Mysql2Adapter({
+        uri: slotUrl,
+        connectionLimit: 1,
+        flags: ["FOUND_ROWS"],
+      }) as unknown as DatabaseAdapter;
+      await buildTemplateSchema(adapter, async () => {
+        await (adapter as unknown as { disconnect(): Promise<void> }).disconnect?.();
+      });
+    }
+
+    await admin.end();
+    process.env[MYSQL_TEMPLATE_ENV] = "1";
+    return undefined;
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
 
-const ADAPTERS: DbTemplateAdapter[] = [sqliteAdapter, pgAdapter];
+const ADAPTERS: DbTemplateAdapter[] = [sqliteAdapter, pgAdapter, mysqlAdapter];
 
 export default async function setup(): Promise<(() => Promise<void>) | undefined> {
   const teardowns: (() => Promise<void>)[] = [];
