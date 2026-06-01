@@ -92,9 +92,6 @@ export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTable
  * - `bad-posts`, `other-books`, `other-comments`, `other-posts`, `other-topics`
  *
  * **Category C — other blockers:**
- * - `admin/users` — `AdminUser.store("params", { coder: "YAML" })` passes a string
- *   where store() requires an object with `dump()`/`load()`; re-add once the YAML
- *   store coder is implemented.
  * - `developers` — `shared_computers` references a HABTM association name, not a column;
  *   loader can't resolve it.
  * - `developers-projects` — HABTM join table; `ref()`s `developers`, which isn't
@@ -139,6 +136,10 @@ export const fixtureRegistry = {
         (m) => m.AdminClassNameThatDoesNotFollowCONVENTIONS2,
       ),
     data: FixtureData.adminRandomlyNamedB0FixtureData,
+  },
+  "admin/users": {
+    model: () => import("./models/admin/user.js").then((m) => m.AdminUser),
+    data: FixtureData.adminUsersFixtureData,
   },
   accounts: {
     model: () => import("./models/account.js").then((m) => m.Account),

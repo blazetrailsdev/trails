@@ -15,6 +15,7 @@
       "@blazetrails/activesupport/key-generator": ["../../activesupport/src/key-generator.ts"],
       "@blazetrails/activesupport/temporal": ["../../activesupport/src/temporal.ts"],
       "@blazetrails/activesupport/gzip": ["../../activesupport/src/gzip.ts"],
+      "@blazetrails/activesupport/yaml": ["../../activesupport/src/yaml.ts"],
       "@blazetrails/activesupport/sqlite-adapter": ["../../activesupport/src/sqlite-adapter.ts"],
       "@blazetrails/activesupport/sqlite/better-sqlite3": [
         "../../activesupport/src/sqlite-drivers/better-sqlite3.ts"

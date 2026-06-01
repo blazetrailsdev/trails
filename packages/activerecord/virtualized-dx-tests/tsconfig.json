@@ -14,6 +14,7 @@
       ],
       "@blazetrails/activesupport/process-adapter": ["../../activesupport/src/process-adapter.ts"],
       "@blazetrails/activesupport/gzip": ["../../activesupport/src/gzip.ts"],
+      "@blazetrails/activesupport/yaml": ["../../activesupport/src/yaml.ts"],
       "@blazetrails/globalid/signed-global-id": ["../../globalid/src/signed-global-id.ts"]
     }
   },

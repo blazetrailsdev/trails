@@ -109,8 +109,10 @@ export const UNPORTED_FILES: UnportedFile[] = [
     pattern: "coders/yaml_column.rb",
     testFile: "coders/yaml_column_test.rb",
     reason:
-      "YAML column coder built on Psych. `serialize :col, coder: YAMLColumn` has " +
-      "no natural JS analog; JSON is the default column coder instead.",
+      "YAML column coder. The store-column dump/load path is ported (coders/yaml-column.ts, " +
+      'backed by the `yaml` package — `store :col, coder: "YAML"`), but the Psych-specific ' +
+      "safe-load machinery (permitted_classes, unsafe_load, type-mismatch-on-Ruby-class) has " +
+      "no JS analog; those test cases stay Ruby-only.",
   },
   {
     pattern: "fixtures.rb",
