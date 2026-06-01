@@ -21,6 +21,7 @@ For the audit reports that produced the original sequencing, see
 | Doc                                                                      | Owns                                                                                                                                   |
 | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `activerecord-index.md` (this)                                           | sequencing + doc map                                                                                                                   |
+| [`workplan.md`](workplan.md)                                             | prioritized, dependency-sensitive PR ordering (waves 0–7) for test:compare 100% + fidelity                                             |
 | [`activerecord-100-plan.md`](activerecord-100-plan.md)                   | test:compare drive — batch list (Part 1) + per-file backlog table (Part 2)                                                             |
 | [`activerecord-gaps.md`](activerecord-gaps.md)                           | residual gaps from the 5 merged gap plans (associations, relation, connection-pool, database-tasks, query-cache) — mostly blocked/done |
 | [`adapter-architecture-cleanup.md`](adapter-architecture-cleanup.md)     | adapter→connection collapse, global-Arel-visitor removal, hash-only constructor, `this.adapter` audit                                  |
