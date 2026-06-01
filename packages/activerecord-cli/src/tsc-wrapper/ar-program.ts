@@ -6,7 +6,7 @@ import {
   type TrailsProgram,
   type TrailsSolutionBuilder,
 } from "@blazetrails/trails-tsc";
-import { collectBaseDescendants } from "../type-virtualization/transitive-extends-walker.js";
+import { collectBaseDescendants } from "@blazetrails/activerecord/type-virtualization/transitive-extends-walker.js";
 import { createArModelsPlugin, type ArModelsPluginOptions } from "./ar-models-plugin.js";
 
 export interface CreateArTrailsProgramOptions {

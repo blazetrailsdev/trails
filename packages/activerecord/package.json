@@ -22,9 +22,9 @@
       "types": "./dist/connection-adapters/mysql2-adapter.d.ts",
       "default": "./dist/connection-adapters/mysql2-adapter.js"
     },
-    "./tsc": {
-      "types": "./dist/tsc-wrapper/index.d.ts",
-      "default": "./dist/tsc-wrapper/index.js"
+    "./type-virtualization/*.js": {
+      "types": "./dist/type-virtualization/*.d.ts",
+      "default": "./dist/type-virtualization/*.js"
     },
     "./encryption": {
       "types": "./dist/encryption/index.d.ts",
@@ -39,9 +39,6 @@
       "default": "./dist/*.js"
     }
   },
-  "bin": {
-    "trails-tsc": "./bin/trails-tsc.js"
-  },
   "scripts": {
     "build": "tsc"
   },
@@ -50,8 +47,7 @@
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",
-    "@blazetrails/globalid": "workspace:*",
-    "@blazetrails/trails-tsc": "workspace:*"
+    "@blazetrails/globalid": "workspace:*"
   },
   "peerDependencies": {
     "better-sqlite3": "^12.6.2",

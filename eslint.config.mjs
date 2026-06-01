@@ -24,7 +24,7 @@ export default defineConfig(
       "packages/website/static/**",
       "packages/website/build/**",
       "packages/activerecord/src/type-virtualization/fixtures/**",
-      "packages/activerecord/src/tsc-wrapper/__fixtures__/**",
+      "packages/activerecord-cli/src/tsc-wrapper/__fixtures__/**",
     ],
   },
   eslint.configs.recommended,
@@ -81,7 +81,7 @@ export default defineConfig(
       "packages/activesupport/src/child-process-adapter.ts",
       "packages/activesupport/src/os-adapter.ts",
       // Node-only modules exposed via subpath imports (no browser equivalent)
-      "packages/activerecord/src/tsc-wrapper/**",
+      "packages/activerecord-cli/src/tsc-wrapper/**",
       "packages/activesupport/src/sqlite-drivers/node-sqlite.ts",
       "packages/activesupport/src/sqlite-drivers/expo-sqlite.ts",
       "packages/activesupport/src/gzip.ts",
