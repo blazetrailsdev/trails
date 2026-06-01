@@ -392,7 +392,7 @@ export async function run(argv: string[], cwd: string): Promise<number> {
     return 0;
   }
   if (command === "typecheck") {
-    return delegateBin("@blazetrails/activerecord", "trails-tsc", rest);
+    return delegateBin("@blazetrails/activerecord-cli", "trails-tsc", rest);
   }
   if (command === "schema:dump") {
     return runSchemaDump(rest);

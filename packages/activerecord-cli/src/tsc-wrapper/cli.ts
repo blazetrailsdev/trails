@@ -5,9 +5,9 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { remapDiagnostics } from "@blazetrails/trails-tsc";
-import { virtualize } from "../type-virtualization/virtualize.js";
+import { virtualize } from "@blazetrails/activerecord/type-virtualization/virtualize.js";
 import { createArTrailsProgram, createArSolutionBuilder } from "./ar-program.js";
-import type { SchemaColumnValue } from "../type-virtualization/synthesize.js";
+import type { SchemaColumnValue } from "@blazetrails/activerecord/type-virtualization/synthesize.js";
 
 /**
  * Load a schema-columns JSON file produced by the schema dumper.

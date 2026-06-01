@@ -6,12 +6,11 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "exclude": ["src/type-virtualization/fixtures", "src/tsc-wrapper/__fixtures__"],
+  "exclude": ["src/type-virtualization/fixtures"],
   "references": [
     { "path": "../arel" },
     { "path": "../activemodel" },
     { "path": "../did-you-mean" },
-    { "path": "../globalid" },
-    { "path": "../trails-tsc" }
+    { "path": "../globalid" }
   ]
 }
