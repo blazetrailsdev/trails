@@ -76,6 +76,7 @@ environment in many setups. `ar` resolves `TRAILS_ENV → NODE_ENV → "developm
 | `ar db:migrate:status`              | Show up/down status for each migration                |
 | `ar db:version`                     | Print the current schema version                      |
 | `ar db:seed`                        | Run `db/seeds.ts`                                     |
+| `ar db:schema:dump`                 | Dump the current database schema to `db/schema.ts`    |
 | `ar db:schema:load`                 | Load `db/schema.ts` into the database                 |
 | `ar db:setup`                       | `db:create` + `db:schema:load` + `db:seed`            |
 | `ar db:reset`                       | `db:drop` + `db:setup`                                |

@@ -243,6 +243,35 @@ describe("DatabaseTasksDumpSchemaTest", () => {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
+  it("resolves a relative schema path against root, not process cwd", async () => {
+    // A relative dbDir must land under DatabaseTasks.root (the app dir),
+    // mirroring loadSchema. Otherwise the dump leaks into the process cwd.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dump-root-"));
+    const prevDbDir = DatabaseTasks.dbDir;
+    const prevRoot = (DatabaseTasks as unknown as { _root: string | null })._root;
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    try {
+      DatabaseTasks.root = tmp;
+      DatabaseTasks.dbDir = "db"; // relative — must resolve under root
+      const config = new HashConfig("arunit", "primary", {
+        adapter: "sqlite3",
+        database: ":memory:",
+      });
+      await DatabaseTasks.dumpSchema(config);
+      // Without root resolution the dump would land in process cwd, leaving
+      // this path absent — so its existence proves the fix.
+      expect(fs.existsSync(path.join(tmp, "db", "schema.ts"))).toBe(true);
+    } finally {
+      DatabaseTasks.dbDir = prevDbDir;
+      (DatabaseTasks as unknown as { _root: string | null })._root = prevRoot;
+      try {
+        Base.removeConnection();
+      } catch {
+        /* ignore */
+      }
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("DatabaseTasksCreateAllTest", () => {
