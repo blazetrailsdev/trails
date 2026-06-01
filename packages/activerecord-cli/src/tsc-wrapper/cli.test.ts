@@ -481,6 +481,86 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
     expect(combined).toMatch(/`arrayElementType` is only valid when `type` is "array"/);
   });
 
+  it("loadSchemaColumns: --schema <path>.ts parses TypeScript schema file", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const schemaSrc = [
+      'schema.createTable("posts", { id: false }, (t) => {',
+      '  t.string("title", { null: false });',
+      '  t.boolean("published");',
+      "});",
+    ].join("\n");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-ts-"));
+    tmpDirs.push(dir);
+    const tsPath = path.join(dir, "schema.ts");
+    fs.writeFileSync(tsPath, schemaSrc);
+    const result = loadSchemaColumns(["--schema", tsPath]);
+    expect(result).toBeDefined();
+    expect(result!.posts.title).toEqual({ type: "string", null: false });
+    expect(result!.posts.published).toEqual({ type: "boolean", null: true });
+  });
+
+  it("loadSchemaColumns: --schema <path>.js also routes through parseSchemaTs", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const schemaSrc = 'schema.createTable("tags", { id: false }, (t) => { t.string("name"); });';
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-js-"));
+    tmpDirs.push(dir);
+    const jsPath = path.join(dir, "schema.js");
+    fs.writeFileSync(jsPath, schemaSrc);
+    const result = loadSchemaColumns(["--schema", jsPath]);
+    expect(result).toBeDefined();
+    expect(result!.tags.name).toEqual({ type: "string", null: true });
+  });
+
+  it(".ts schema drives the same virtualized declares as equivalent .json schema end-to-end", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    // null: false on all columns so the schema fixture consumer.ts type-checks (no | null widening).
+    const schemaSrc = [
+      'schema.createTable("users", { id: false }, (t) => {',
+      '  t.string("name", { null: false });',
+      '  t.integer("age", { null: false });',
+      '  t.boolean("is_admin", { null: false });',
+      "});",
+    ].join("\n");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-ts-"));
+    tmpDirs.push(dir);
+    const tsPath = path.join(dir, "schema.ts");
+    fs.writeFileSync(tsPath, schemaSrc);
+
+    const fromTs = loadSchemaColumns(["--schema", tsPath]);
+    const fromJson = loadSchemaColumns([
+      "--schema",
+      writeSchemaJson({
+        users: {
+          name: { type: "string", null: false },
+          age: { type: "integer", null: false },
+          is_admin: { type: "boolean", null: false },
+        },
+      }),
+    ]);
+    // Both paths produce identical SchemaColumnsByTable values.
+    expect(fromTs).toEqual(fromJson);
+    // The loaded schema drives correct type virtualization end-to-end.
+    // Probe types directly rather than checking zero-diagnostics (the schema
+    // fixture has a pre-existing `static override tableName` diagnostic that
+    // is unrelated to schema loading and is not checked by the sibling tests).
+    const configPath = path.join(SCHEMA_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath, { schemaColumnsByTable: fromTs });
+    const checker = program.getTypeChecker();
+    const consumer = program.getSourceFile(path.join(SCHEMA_DIR, "consumer.ts"));
+    expect(consumer).toBeDefined();
+    const probed: Record<string, string> = {};
+    function visit(node: ts.Node): void {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        probed[node.name.text] = checker.typeToString(checker.getTypeAtLocation(node.initializer));
+      }
+      node.forEachChild(visit);
+    }
+    consumer!.forEachChild(visit);
+    expect(probed["name"]).toBe("string");
+    expect(probed["age"]).toBe("number");
+    expect(probed["isAdmin"]).toBe("boolean");
+  });
+
   it("without schema, those accesses fall back to unknown (declares weren't injected)", () => {
     const configPath = path.join(SCHEMA_DIR, "tsconfig.json");
     const { program } = createProgramWithArPlugin(configPath);
@@ -503,5 +583,76 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
       ...program.getSyntacticDiagnostics(consumer),
     ];
     expect(diags.length).toBeGreaterThan(0);
+  });
+});
+
+describe("trails-tsc handleHelp", () => {
+  const tmpDirs: string[] = [];
+  afterEach(() => {
+    for (const dir of tmpDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  function spyExitAndStdout() {
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
+    const out = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    return { exit, out };
+  }
+
+  it("--help prints usage including --schema and tsc passthrough note, exits 0", async () => {
+    const { handleHelp } = await import("./cli.js");
+    const { exit, out } = spyExitAndStdout();
+    expect(() => handleHelp(["--help"])).toThrow(/process\.exit\(0\)/);
+    expect(exit).toHaveBeenCalledWith(0);
+    const text = out.mock.calls.map((c) => String(c[0])).join("");
+    expect(text).toMatch(/Usage: trails-tsc/);
+    expect(text).toMatch(/db\/schema\.ts/);
+    expect(text).toMatch(/tsc --help/);
+  });
+
+  it("-h is an alias for --help", async () => {
+    const { handleHelp } = await import("./cli.js");
+    const { out } = spyExitAndStdout();
+    expect(() => handleHelp(["-h"])).toThrow(/process\.exit\(0\)/);
+    const text = out.mock.calls.map((c) => String(c[0])).join("");
+    expect(text).toMatch(/Usage: trails-tsc/);
+  });
+
+  it("no-op when neither --help nor -h is present", async () => {
+    const { handleHelp } = await import("./cli.js");
+    const { exit } = spyExitAndStdout();
+    handleHelp(["--schema", "schema.ts", "--noEmit"]);
+    expect(exit).not.toHaveBeenCalled();
+  });
+
+  it("loadSchemaColumns: warns on stderr when a .ts schema file has no createTable calls", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-empty-"));
+    tmpDirs.push(dir);
+    const tsPath = path.join(dir, "schema.ts");
+    fs.writeFileSync(tsPath, "// no createTable calls here\nexport const version = 1;\n");
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const result = loadSchemaColumns(["--schema", tsPath]);
+    expect(result).toBeDefined();
+    expect(Object.keys(result!)).toHaveLength(0);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/no createTable\(\) calls found/);
+  });
+
+  it("loadSchemaColumns: rejects unsupported schema extension with a clear error", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-mts-"));
+    tmpDirs.push(dir);
+    const mtsPath = path.join(dir, "schema.mts");
+    fs.writeFileSync(mtsPath, "export {};\n");
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
+    expect(() => loadSchemaColumns(["--schema", mtsPath])).toThrow(/process\.exit\(1\)/);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/extension ".mts" is not supported/);
   });
 });

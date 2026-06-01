@@ -8,17 +8,17 @@ import { remapDiagnostics } from "@blazetrails/trails-tsc";
 import { virtualize } from "@blazetrails/activerecord/type-virtualization/virtualize.js";
 import { createArTrailsProgram, createArSolutionBuilder } from "./ar-program.js";
 import type { SchemaColumnValue } from "@blazetrails/activerecord/type-virtualization/synthesize.js";
+import { parseSchemaTs } from "./schema-ts-parser.js";
 
 /**
- * Load a schema-columns JSON file produced by the schema dumper.
+ * Load schema columns from a `--schema` file. Accepts:
+ *   - `.ts` / `.js` — TypeScript schema file (e.g. `db/schema.ts`); parsed by `parseSchemaTs`.
+ *   - `.json` — dump produced by `trails-schema-dump`. Column values take either shape:
+ *       `{ "<table>": { "<column>": "<rails_type>", ... }, ... }` — legacy
+ *       `{ "<table>": { "<column>": { "type": "<rails_type>", "null"?: boolean, "arrayElementType"?: string }, ... }, ... }` — rich
  *
- * Format (either shape per column, may mix in one file):
- *   `{ "<table>": { "<column>": "<rails_type>", ... }, ... }` — legacy
- *   `{ "<table>": { "<column>": { "type": "<rails_type>", "null"?: boolean, "arrayElementType"?: string }, ... }, ... }` — rich
- *
- * The rich shape — as emitted by `trails-schema-dump` — drives
- * nullability (`T | null`) and typed array elements (`ElementTsType[]`)
- * in the generated TypeScript declares.
+ * The rich JSON shape drives nullability (`T | null`) and typed array elements
+ * (`ElementTsType[]`) in the generated TypeScript declares.
  */
 type RichColumnValue = Extract<SchemaColumnValue, object>;
 
@@ -56,17 +56,35 @@ export function loadSchemaColumns(
     process.stderr.write(`trails-tsc: --schema file not found: ${resolved}\n`);
     process.exit(1);
   }
-  let schemaJson: string;
+  let source: string;
   try {
-    schemaJson = fs.readFileSync(resolved, "utf8");
+    source = fs.readFileSync(resolved, "utf8");
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     process.stderr.write(`trails-tsc: failed to read --schema file: ${msg}\n`);
     process.exit(1);
   }
+  const ext = path.extname(resolved).toLowerCase();
+  if (ext === ".ts" || ext === ".js") {
+    const result = parseSchemaTs(source, resolved);
+    if (Object.keys(result).length === 0) {
+      process.stderr.write(
+        `trails-tsc: --schema ${resolved}: no createTable() calls found; ` +
+          `proceeding without schema-driven declares.\n`,
+      );
+    }
+    return result;
+  }
+  if (ext !== ".json" && ext !== "") {
+    process.stderr.write(
+      `trails-tsc: --schema: extension "${ext}" is not supported. ` +
+        `Use db/schema.ts (TypeScript) or a .json dump from trails-schema-dump.\n`,
+    );
+    process.exit(1);
+  }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(schemaJson);
+    parsed = JSON.parse(source);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     process.stderr.write(`trails-tsc: --schema file is not valid JSON: ${msg}\n`);
@@ -158,6 +176,17 @@ function validateColumnValue(
     out.arrayElementType = r.arrayElementType as string;
   }
   return out;
+}
+
+export function handleHelp(args: string[]): void {
+  if (!args.includes("--help") && !args.includes("-h")) return;
+  process.stdout.write(
+    "Usage: trails-tsc [tsc-options] [--schema <path>]\n\n" +
+      "  --schema <path>  Schema source: db/schema.ts (TypeScript) or a .json dump\n" +
+      "                   from trails-schema-dump. Drives attribute virtualization.\n\n" +
+      "  All other options are passed through to tsc. Run tsc --help for the full list.\n",
+  );
+  process.exit(0);
 }
 
 function handlePrintVirtualized(args: string[]): void {
@@ -276,6 +305,7 @@ function handleBuildMode(args: string[]): void {
 function main(): void {
   const args = process.argv.slice(2);
 
+  handleHelp(args);
   handlePrintVirtualized(args);
   handleBuildMode(args);
 
