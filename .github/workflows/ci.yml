@@ -516,11 +516,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - name: Create parallel test databases
-        run: |
-          for i in 2 3 4; do
-            PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE rails_js_test_$i;"
-          done
       - run: pnpm vitest run packages/activerecord
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
