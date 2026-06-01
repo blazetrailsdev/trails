@@ -27,9 +27,10 @@ describe("PoolConfig", () => {
       // trails resolver suite tests the resolver level (configs.resolve), so we
       // resolve + validate the config directly. An unknown adapter in the URL
       // (scheme "ridiculous" → adapter "ridiculous") fails adapter resolution.
-      await expect(
-        resolveDbConfig("ridiculous://foo?encoding=utf8").validateBang(),
-      ).rejects.toBeInstanceOf(AdapterNotFound);
+      const promise = resolveDbConfig("ridiculous://foo?encoding=utf8").validateBang();
+      await expect(promise).rejects.toBeInstanceOf(AdapterNotFound);
+      // Mirrors Rails' assert_match on the nonexistent-adapter message.
+      await expect(promise).rejects.toThrow(/nonexistent 'ridiculous' adapter/);
     });
 
     it("url from environment", () => {
