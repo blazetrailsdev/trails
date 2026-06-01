@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import {
   Base,
   transaction,
@@ -2408,6 +2408,18 @@ describe("SchemaAdapter TM delegation", () => {
   // spies leak into the next test in this file.
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  // These tests create rows in the shared `items` table (via createTestAdapter →
+  // shared pool) outside of any transactional rollback guard. In PG, adapters
+  // pointing at the same database share the defineSchema signature cache, so a
+  // later file's defineSchema(TEST_SCHEMA) is a cache hit and does NOT drop the
+  // table — leaving these rows visible to tests in other files (e.g. the
+  // `EachTest > findEach yields each record` case in batches.test.ts which
+  // expects an empty items table). Clean up unconditionally after all tests here.
+  afterAll(async () => {
+    const a = createTestAdapter();
+    await a.executeMutation("DELETE FROM items");
   });
 
   // SchemaAdapter.setup() calls execDdlWithSavepoint which issues
