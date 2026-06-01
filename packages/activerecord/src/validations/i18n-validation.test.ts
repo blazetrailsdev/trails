@@ -45,7 +45,9 @@ describe("I18nValidationTest", () => {
     const spy = vi.spyOn(ActiveModelError, "generateMessage");
     await topic.save();
     void topic.errors.messages;
+    // Rails' assert_called_with asserts exactly one call with these args.
     expect(spy).toHaveBeenCalledWith("title", "taken", topic, { value: "unique!" });
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   // Rails generates one test per COMMON_CASE via string interpolation; the
@@ -66,7 +68,9 @@ describe("I18nValidationTest", () => {
     const spy = vi.spyOn(ActiveModelError, "generateMessage");
     topic.isValid();
     void topic.errors.messages;
+    // Rails' assert_called_with asserts exactly one call with these args.
     expect(spy).toHaveBeenCalledWith("replies", "invalid", topic, { value: replies });
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it("validates associated finds custom model key translation", () => {
