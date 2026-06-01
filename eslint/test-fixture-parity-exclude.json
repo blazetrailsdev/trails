@@ -8,7 +8,6 @@
   "packages/activerecord/src/adapters/postgresql/timestamp.test.ts",
   "packages/activerecord/src/adapters/sqlite3/bind-parameter.test.ts",
   "packages/activerecord/src/adapters/sqlite3/copy-table.test.ts",
-  "packages/activerecord/src/adapters/sqlite3/explain.test.ts",
   "packages/activerecord/src/adapters/sqlite3/virtual-column.test.ts",
   "packages/activerecord/src/associations/callbacks.test.ts",
   "packages/activerecord/src/associations/extension.test.ts",

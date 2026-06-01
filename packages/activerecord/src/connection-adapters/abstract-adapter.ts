@@ -515,12 +515,16 @@ export class AbstractAdapter implements Quoting {
   lock: unknown = null;
 
   /**
-   * Default header prefix for `Relation#explain` output. Concrete
-   * adapters (PG: `"EXPLAIN (ANALYZE, VERBOSE) for:"`; SQLite:
-   * `"EXPLAIN QUERY PLAN for:"`; MySQL: `"EXPLAIN ANALYZE for:"`)
-   * override to include adapter-specific flags.
+   * Default header prefix for `Relation#explain` output. Concrete adapters
+   * (PG: `"EXPLAIN (ANALYZE, VERBOSE) for:"`; MySQL: `"EXPLAIN ANALYZE for:"`)
+   * override to include adapter-specific flags. SQLite has no override — it
+   * inherits this default `"EXPLAIN for:"` (the `EXPLAIN QUERY PLAN` keyword
+   * belongs to the executed plan query, not the printed header).
    *
-   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_explain_clause
+   * Mirrors Rails' `ActiveRecord::Explain#build_explain_clause` fallback:
+   * Rails' `AbstractAdapter` defines no `build_explain_clause`; the
+   * `"EXPLAIN for:"` default lives in the `ActiveRecord::Explain` module and
+   * only the PG/MySQL adapters carry a private override.
    */
   buildExplainClause(options: ExplainOption[] = []): string {
     if (options.length === 0) return "EXPLAIN for:";
