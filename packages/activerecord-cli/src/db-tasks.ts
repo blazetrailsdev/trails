@@ -179,7 +179,6 @@ export async function dbSchemaDump(cwd: string, _args: string[]): Promise<number
     console.error(`ar: failed to load config/database.ts — ${String(err)}`);
     return 1;
   }
-  await tryLoadModels(cwd);
 
   const env = DatabaseConfigurations.currentEnv();
   const configs = DatabaseTasks.configsFor(env);
@@ -188,8 +187,9 @@ export async function dbSchemaDump(cwd: string, _args: string[]): Promise<number
     return 1;
   }
   try {
-    // Mirrors Rails' `db:schema:dump` rake task: dump each config's schema
-    // inside a temporary pool so the dumper has a live connection.
+    // Mirrors Rails' `db:schema:dump` rake task (`task dump: :load_config`):
+    // no model/environment load — just dump each config's schema inside a
+    // temporary pool so the dumper has a live connection.
     await DatabaseTasks.withTemporaryPoolForEach(env, async (config) => {
       await DatabaseTasks.dumpSchema(config);
       const filename = DatabaseTasks.schemaDumpPath(config);
