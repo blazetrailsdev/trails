@@ -29,6 +29,7 @@
     "test:compare": "bash scripts/test-compare/run.sh",
     "test:deps": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/test-deps/rails-test-deps.ts",
     "fixture-baseline:refresh": "pnpm test:deps >/dev/null && pnpm tsx scripts/test-deps/build-fixture-baseline.ts",
+    "fixture-parity-baseline:refresh": "pnpm tsx scripts/generate-fixture-parity-exclude.ts",
     "test:stubs": "pnpm test:compare -- --missing --json && pnpm tsx scripts/test-compare/generate-stubs.ts",
     "stats:sync": "pnpm tsx scripts/sync-stats/sync.ts",
     "parity:validate": "ajv compile -s scripts/parity/canonical/schema.schema.json -s scripts/parity/canonical/query.schema.json --spec=draft2020",
