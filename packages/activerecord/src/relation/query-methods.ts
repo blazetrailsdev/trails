@@ -5,7 +5,11 @@
  * Mirrors: ActiveRecord::QueryMethods
  */
 import { Nodes, SelectManager, Table as ArelTable, sql as arelSql } from "@blazetrails/arel";
-import { Attribute, ValueType } from "@blazetrails/activemodel";
+import {
+  Attribute,
+  ValueType,
+  sanitizeForMassAssignment as sanitizeForbiddenAttributes,
+} from "@blazetrails/activemodel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import {
   ActiveRecordError,
@@ -723,6 +727,10 @@ export function buildWhereClause(
   opts: unknown,
   rest: unknown[] = [],
 ): WhereClause {
+  // Mirrors build_where_clause (query_methods.rb:1614): unwrap/forbid
+  // strong-params objects before any other handling.
+  opts = sanitizeForbiddenAttributes(opts as Record<string, unknown>);
+
   if (Array.isArray(opts)) {
     const [head, ...tail] = opts as unknown[];
     return buildWhereClause.call(this, head, [...tail, ...rest]);
@@ -1080,6 +1088,8 @@ function strictLoadingBang(this: QueryMethodsHost, value = true): any {
 
 function createWithBang(this: QueryMethodsHost, value: Record<string, unknown> | null): any {
   if (value) {
+    // Mirrors create_with! (query_methods.rb:1352): forbid un-permitted params.
+    value = sanitizeForbiddenAttributes(value);
     this._createWithAttrs = { ...this._createWithAttrs, ...value };
   } else {
     this._createWithAttrs = {};

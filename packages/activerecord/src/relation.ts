@@ -11,6 +11,7 @@ import {
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import { ConnectionNotEstablished, RecordNotSaved, RecordNotUnique } from "./errors.js";
+import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
 import { disallowRawSqlBang } from "./sanitization.js";
 import { sanitizeAsSqlComment } from "./connection-adapters/abstract/quoting.js";
 import {
@@ -418,6 +419,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#rewhere
    */
   rewhere(conditions: Record<string, unknown>): Relation<T> {
+    // Mirrors rewhere → build_where_clause (query_methods.rb:1065): unwrap/forbid
+    // strong-params, since trails inlines the clause build rather than delegating.
+    conditions = sanitizeForbiddenAttributes(conditions);
     const rel = this._clone();
     const keysToReplace = new Set(Object.keys(conditions));
     rel._whereClause = rel._whereClause.except(...keysToReplace);
@@ -703,6 +707,11 @@ export class Relation<T extends Base> {
   whereNot(conditions: Record<string, unknown>): Relation<T>;
   whereNot(cols: string[], tuples: unknown[][]): Relation<T>;
   whereNot(conditions: Record<string, unknown> | string[], tuples?: unknown[][]): Relation<T> {
+    // Mirrors WhereChain#not → build_where_clause: unwrap/forbid strong-params
+    // before deriving references or predicates.
+    conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>) as
+      | Record<string, unknown>
+      | string[];
     const rel = this._clone();
     for (const t of referencesFromConditions(conditions)) {
       if (!rel._referencesValues.includes(t)) rel._referencesValues.push(t);

@@ -107,6 +107,7 @@ import {
 import {
   runAllCallbacks as cbRunAll,
   runAfterCallbacksOnProto as cbRunAfter,
+  sanitizeForMassAssignment,
 } from "@blazetrails/activemodel";
 import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
 import {
@@ -2301,6 +2302,17 @@ export class Base extends Model {
 
   constructor(attrs: Record<string, unknown> = {}) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
+    // Forbid/unwrap strong-params before anything inspects the attribute bag.
+    // Mirrors the Rails construction path: ActiveModel::API#initialize skips
+    // assignment for a nil bag (`assign_attributes(attributes) if attributes`
+    // → blank record), and #assign_attributes returns before sanitizing an
+    // empty one (`return if new_attributes.empty?`) — so a nil or empty (even
+    // un-permitted) params object neither raises nor sanitizes. Only a
+    // non-empty bag is checked.
+    attrs ??= {};
+    if (Object.keys(attrs).length > 0) {
+      attrs = sanitizeForMassAssignment(attrs);
+    }
     // Split out constructor-form association values (e.g. `new Owner({items:
     // [...]})`) so super() never sees them as plain attributes. Dispatched
     // after super() so the association proxy exists on `this`.

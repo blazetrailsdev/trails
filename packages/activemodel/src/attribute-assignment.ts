@@ -3,6 +3,7 @@ import { UnknownAttributeError } from "./errors.js";
 
 interface PermittedAttributes {
   permitted?(): boolean;
+  toH?(): Record<string, unknown>;
 }
 
 export function assignAttributes(model: AttributeAssignment, newAttributes: unknown): void {
@@ -69,10 +70,16 @@ export function sanitizeForMassAssignment(
   attributes: Record<string, unknown>,
 ): Record<string, unknown> {
   const attrs = attributes as Record<string, unknown> & PermittedAttributes;
+  // Mirrors ActiveModel::ForbiddenAttributesProtection#sanitize_for_mass_assignment:
+  // params-style objects expose `permitted?` — raise unless permitted, then
+  // unwrap via `to_h` so the caller iterates a plain hash, not the wrapper.
+  // Rails calls `attributes.to_h` unconditionally; a permitted params object is
+  // expected to respond to it (a malformed one would NoMethodError there too).
   if (typeof attrs.permitted === "function") {
     if (!attrs.permitted()) {
       throw new ForbiddenAttributesError();
     }
+    return attrs.toH!();
   }
   return attributes;
 }

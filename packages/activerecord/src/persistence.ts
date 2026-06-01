@@ -6,7 +6,11 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { isDateInfinity, isDateNegativeInfinity } from "@blazetrails/activemodel";
+import {
+  isDateInfinity,
+  isDateNegativeInfinity,
+  sanitizeForMassAssignment,
+} from "@blazetrails/activemodel";
 import {
   InsertManager,
   UpdateManager,
@@ -719,6 +723,12 @@ export function valuesAt(this: AttributeIO, ...keys: string[]): unknown[] {
  * happen in a follow-up.)
  */
 export function assignAttributes(this: AttributeIO, attrs: Record<string, unknown>): void {
+  // Mirrors ActiveModel::AttributeAssignment#assign_attributes: bail before
+  // sanitizing so a blank strong-params object (always un-permitted) is a
+  // no-op rather than raising, then unwrap/forbid via sanitize_for_mass_assignment.
+  if (Object.keys(attrs).length === 0) return;
+  attrs = sanitizeForMassAssignment(attrs);
+
   if (hasMultiparameterKeys(attrs)) {
     const { multiparams, regular } = extractMultiparameterCallstack(attrs);
     // Assign regular attributes first (with existing error wrapping)
