@@ -302,8 +302,6 @@ export async function dbVersion(cwd: string, args: string[]): Promise<number> {
     console.error(`ar: failed to load config/database.ts — ${String(err)}`);
     return 1;
   }
-  await tryLoadModels(cwd);
-  loadMigrations(cwd);
 
   const env = DatabaseConfigurations.currentEnv();
   const configs = all

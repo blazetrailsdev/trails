@@ -26,11 +26,13 @@ describe("DbVersionTest", () => {
   let currentVersionSpy: ReturnType<typeof vi.fn>;
   let withTemporaryPoolFn: ReturnType<typeof vi.fn>;
   let priorDefaultEnv: string;
+  let priorTrailsEnv: string | undefined;
 
   beforeEach(() => {
     out = [];
     err = [];
     priorDefaultEnv = DatabaseConfigurations.defaultEnv;
+    priorTrailsEnv = process.env["TRAILS_ENV"];
     vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
     currentVersionSpy = vi.fn().mockResolvedValue(20260101000001);
@@ -46,6 +48,8 @@ describe("DbVersionTest", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     DatabaseConfigurations.defaultEnv = priorDefaultEnv;
+    if (priorTrailsEnv === undefined) delete process.env["TRAILS_ENV"];
+    else process.env["TRAILS_ENV"] = priorTrailsEnv;
     DatabaseTasks.databaseConfiguration = null;
     (DatabaseTasks as unknown as { _root: null })._root = null;
   });
@@ -95,6 +99,14 @@ describe("DbVersionTest", () => {
     const code = await run(["db:version"], dir);
     expect(code).toBe(1);
     expect(err.join("\n")).toContain("failed to load config/database.ts");
+  });
+
+  it("--env overrides TRAILS_ENV for the invocation", async () => {
+    const dir = await makeFakeProject();
+    delete process.env["TRAILS_ENV"];
+    DatabaseConfigurations.defaultEnv = "development";
+    await run(["db:version", "--env", "test"], dir);
+    expect(process.env["TRAILS_ENV"]).toBe("test");
   });
 
   it("--help prints usage", async () => {
