@@ -10,7 +10,6 @@
   "packages/activerecord/src/adapters/sqlite3/copy-table.test.ts",
   "packages/activerecord/src/adapters/sqlite3/explain.test.ts",
   "packages/activerecord/src/adapters/sqlite3/virtual-column.test.ts",
-  "packages/activerecord/src/annotate.test.ts",
   "packages/activerecord/src/associations/callbacks.test.ts",
   "packages/activerecord/src/associations/extension.test.ts",
   "packages/activerecord/src/associations/has-and-belongs-to-many-associations.test.ts",

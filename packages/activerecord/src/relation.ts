@@ -12,6 +12,7 @@ import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import { ConnectionNotEstablished, RecordNotSaved, RecordNotUnique } from "./errors.js";
 import { disallowRawSqlBang } from "./sanitization.js";
+import { sanitizeAsSqlComment } from "./connection-adapters/abstract/quoting.js";
 import {
   columnNameMatcher as abstractColumnNameMatcher,
   columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
@@ -2329,7 +2330,7 @@ export class Relation<T extends Base> {
 
     let sql = manager.toSql();
     if (this._annotations.length > 0) {
-      const comments = this._annotations.map((c) => `/* ${c} */`).join(" ");
+      const comments = this._annotationComments();
       sql = `${sql} ${comments}`;
     }
 
@@ -3723,7 +3724,7 @@ export class Relation<T extends Base> {
 
     let sql = this._compileSelectSql(manager);
     if (this._annotations.length > 0) {
-      const comments = this._annotations.map((c) => `/* ${c} */`).join(" ");
+      const comments = this._annotationComments();
       sql = `${sql} ${comments}`;
     }
     return sql;
@@ -3816,7 +3817,7 @@ export class Relation<T extends Base> {
 
     // Append SQL comments from annotate()
     if (this._annotations.length > 0) {
-      const comments = this._annotations.map((c) => `/* ${c} */`).join(" ");
+      const comments = this._annotationComments();
       sql = `${sql} ${comments}`;
     }
 
@@ -3856,6 +3857,23 @@ export class Relation<T extends Base> {
       if (e instanceof ConnectionNotEstablished) return null;
       throw e;
     }
+  }
+
+  /**
+   * Wrap each `annotate` value in a `/* … *\/` comment, sanitizing through the
+   * connection so the adapter's own comment-escaping rules apply — mirrors
+   * Rails' arel comment visitor, which delegates to
+   * `@connection.sanitize_as_sql_comment`. Falls back to the abstract helper
+   * when no connection is established (e.g. `toSql` on an unconnected model).
+   */
+  private _annotationComments(): string {
+    // Mirror `_selectVisitor`/`_arelVisitor`: tolerate a partial/mock adapter
+    // that satisfies the `DatabaseAdapter` cast but omits `sanitizeAsSqlComment`
+    // (as several fixture/schema test helpers do), degrading to the abstract
+    // helper instead of throwing. `?.bind` also handles the unconnected case.
+    const adapter = this._resolveAdapter();
+    const sanitize = adapter?.sanitizeAsSqlComment?.bind(adapter) ?? sanitizeAsSqlComment;
+    return this._annotations.map((c) => `/* ${sanitize(c)} */`).join(" ");
   }
 
   private _arelVisitor(): Visitors.ToSql {

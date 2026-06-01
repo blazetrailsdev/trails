@@ -69,6 +69,15 @@ export interface DatabaseAdapter {
   toSql(arel: unknown, binds?: unknown[]): string;
 
   /**
+   * Sanitize a string so it is safe to embed inside a `/* … *\/` SQL comment
+   * (e.g. for `annotate`). Routed through the connection so an adapter can
+   * override the comment-escaping rules.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#sanitize_as_sql_comment
+   */
+  sanitizeAsSqlComment(value: unknown): string;
+
+  /**
    * Begin a transaction.
    */
   beginTransaction(): Promise<void>;
