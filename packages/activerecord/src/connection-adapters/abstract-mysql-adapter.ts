@@ -1022,10 +1022,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       }
     }
 
-    // RETURNING is appended outside Rails' raw-alias-syntax branch, so it
-    // applies to the legacy path too (MariaDB >= 10.5 sets supportsInsertReturning).
-    const ret = insert.returning();
-    if (ret) sql += ` RETURNING ${ret}`;
+    // NB: Rails appends `RETURNING` here (outside the raw-alias branch), but
+    // trails `InsertAll#execute` consumes this SQL via `executeMutation`, which
+    // returns an affected-row count. The mysql2 driver returns a result set
+    // (no affectedRows) for a RETURNING statement, so emitting it would make
+    // `insertAll` return undefined on MariaDB >= 10.5. Surfacing MySQL RETURNING
+    // needs `execute` reworked to read the result set (Rails' exec_insert_all) —
+    // tracked separately. SQLite/PG carry the tail because their executeMutation
+    // tolerates RETURNING and still yields a count.
     return sql;
   }
 
