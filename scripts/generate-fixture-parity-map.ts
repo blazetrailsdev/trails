@@ -21,11 +21,13 @@
  *   without false-positives would require reading the trails sources — a
  *   separate change.
  *
- * Run: pnpm tsx scripts/generate-fixture-parity-map.ts  (commit the result).
+ * Run: pnpm tsx scripts/generate-fixture-parity-map.ts  (commit the result —
+ * output is prettier-canonical, so no separate format step is needed).
  */
 // fs/path bare per convention; sync fs acceptable in a one-shot CLI generator.
 import * as fs from "fs";
 import * as path from "path";
+import * as prettier from "prettier";
 
 const ROOT = path.resolve(__dirname, "..");
 const CASES_DIR = path.join(ROOT, "vendor/rails/activerecord/test/cases");
@@ -153,7 +155,7 @@ function walk(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-function main() {
+async function main() {
   if (!fs.existsSync(CASES_DIR)) {
     console.error(
       `[generate-fixture-parity-map] ${CASES_DIR} not found. Run pnpm vendor:fetch first.`,
@@ -172,7 +174,15 @@ function main() {
 
   const entries = Object.keys(out).length;
   const tests = Object.values(out).reduce((a, b) => a + b.length, 0);
-  fs.writeFileSync(OUT_FILE, JSON.stringify(out, null, 2) + "\n");
+  // Emit prettier-canonical JSON so `regenerate → commit` is a single
+  // reproducible step that passes CI's `prettier --check` (the file is not in
+  // .prettierignore). Raw JSON.stringify leaves single-element arrays expanded.
+  const config = await prettier.resolveConfig(OUT_FILE);
+  const formatted = await prettier.format(JSON.stringify(out), {
+    ...config,
+    filepath: OUT_FILE,
+  });
+  fs.writeFileSync(OUT_FILE, formatted);
   console.log(`Wrote ${OUT_FILE}: ${entries} files, ${tests} fixture-using tests`);
 }
 
