@@ -29,7 +29,15 @@ function mysqlUrlWithDb(url: string, dbName: string): string {
   return parsed.toString();
 }
 
-describe.skipIf(!MYSQL_URL)("mysql-happy-path E2E", () => {
+// This suite drives real MySQL: every `run([...])` does a cold connect +
+// CREATE/DROP DATABASE. On a heavily loaded MariaDB CI runner those round-trips
+// occasionally blow past vitest's defaults (5s test, 10s hook), surfacing as
+// "Hook timed out in 10000ms". The activerecord-cli suite runs under the
+// "other" vitest project, which doesn't bump timeouts. Give the body 30s (suite
+// option, mirrors #2758) and the afterEach teardown its own 30s below (suite
+// timeout doesn't reach hooks; matches the activerecord project's
+// hookTimeout: 30_000). Parity with postgres-happy-path.test.ts.
+describe.skipIf(!MYSQL_URL)("mysql-happy-path E2E", { timeout: 30_000 }, () => {
   let tmpDir: string;
   let dbUrl: string;
   let origTrailsEnv: string | undefined;
@@ -59,7 +67,10 @@ describe.skipIf(!MYSQL_URL)("mysql-happy-path E2E", () => {
     DatabaseTasks.registerMigrations([]);
     DatabaseTasks.seedLoader = null;
     await rm(tmpDir, { recursive: true, force: true });
-  });
+    // Per-hook timeout: the suite-level option above covers tests, not hooks,
+    // and db:drop here does the same cold connect + DROP DATABASE. See the
+    // describe block for the full rationale.
+  }, 30_000);
 
   it("init → db:create → generate:migration → db:migrate → db:version → db:migrate:status", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
