@@ -103,12 +103,16 @@ describe("ArInitTest", () => {
         "@blazetrails/activerecord-cli": "*",
         "better-sqlite3": "^12.6.2",
       },
+      devDependencies: {
+        "@blazetrails/trails-tsc": "*",
+      },
     };
     await writeFile(join(root, "package.json"), JSON.stringify(original, null, 2) + "\n", "utf8");
 
     const result = await init(root);
     expect(result.packageJsonUpdated!.added).toEqual([]);
     expect(result.packageJsonUpdated!.alreadyPresent).toContain("@blazetrails/activerecord");
+    expect(result.packageJsonUpdated!.alreadyPresent).toContain("@blazetrails/trails-tsc");
   });
 
   it("preserves tab indentation in an existing package.json", async () => {

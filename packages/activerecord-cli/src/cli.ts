@@ -288,7 +288,10 @@ export async function run(argv: string[], cwd: string): Promise<number> {
       return 1;
     }
     const force = rest.includes("--force");
-    const { created, skipped, packageJsonUpdated } = await init(cwd, { force, driver });
+    const { created, skipped, packageJsonUpdated, tsconfigMerged } = await init(cwd, {
+      force,
+      driver,
+    });
     for (const rel of created) console.log(`  create  ${rel}`);
     for (const rel of skipped) console.log(`  skip    ${rel} (already exists)`);
     if (packageJsonUpdated) {
@@ -302,6 +305,26 @@ export async function run(argv: string[], cwd: string): Promise<number> {
         );
       } else {
         console.log(`  skip    package.json (activerecord deps already present)`);
+      }
+    }
+    if (tsconfigMerged) {
+      if (tsconfigMerged.changed) {
+        const parts: string[] = [];
+        if (tsconfigMerged.added.length > 0) parts.push(`added ${tsconfigMerged.added.join(", ")}`);
+        if (tsconfigMerged.pluginAdded) parts.push("added trails-tsc plugin");
+        if (tsconfigMerged.includesAppended.length > 0)
+          parts.push(`appended include globs: ${tsconfigMerged.includesAppended.join(", ")}`);
+        console.log(`  update  tsconfig.json: ${parts.join("; ")}`);
+      } else {
+        console.log(`  skip    tsconfig.json (already compliant)`);
+      }
+      if (tsconfigMerged.conflicts.length > 0) {
+        console.log(`  warn    tsconfig.json has conflicting settings (resolve manually):`);
+        for (const { key, existing, required } of tsconfigMerged.conflicts) {
+          console.log(
+            `            ${key}: found ${JSON.stringify(existing)}, expected ${JSON.stringify(required)}`,
+          );
+        }
       }
     }
     console.log(

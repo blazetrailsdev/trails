@@ -75,6 +75,11 @@ const AR_DEPS = {
   "@blazetrails/activerecord-cli": "*",
 };
 
+// trails-tsc is a devDep: only needed for `ar typecheck` and the TS language service plugin.
+const AR_DEV_DEPS = {
+  "@blazetrails/trails-tsc": "*",
+};
+
 function freshPackageJson(name: string, driver: string): string {
   return (
     JSON.stringify(
@@ -88,6 +93,7 @@ function freshPackageJson(name: string, driver: string): string {
           ...AR_DEPS,
           ...(INIT_DRIVER_DEPS[driver] ?? INIT_DRIVER_DEPS["better-sqlite3"]),
         },
+        devDependencies: { ...AR_DEV_DEPS },
       },
       null,
       2,
@@ -141,9 +147,14 @@ export async function detectPackageManager(startDir: string): Promise<PackageMan
 export async function addDepsToPackageJson(
   pkgPath: string,
   deps: Record<string, string>,
+  devDeps: Record<string, string> = {},
 ): Promise<{ added: string[]; alreadyPresent: string[] }> {
   const raw = await readFile(pkgPath, "utf8");
-  const pkg = JSON.parse(raw) as { dependencies?: Record<string, string>; [k: string]: unknown };
+  const pkg = JSON.parse(raw) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+    [k: string]: unknown;
+  };
 
   const indentMatch = raw.match(/\n([ \t]+)/);
   const indent = indentMatch ? indentMatch[1] : "  ";
@@ -159,6 +170,18 @@ export async function addDepsToPackageJson(
     } else {
       pkg.dependencies[name] = version;
       added.push(name);
+    }
+  }
+
+  if (Object.keys(devDeps).length > 0) {
+    if (!pkg.devDependencies) pkg.devDependencies = {};
+    for (const [name, version] of Object.entries(devDeps)) {
+      if (Object.prototype.hasOwnProperty.call(pkg.devDependencies, name)) {
+        alreadyPresent.push(name);
+      } else {
+        pkg.devDependencies[name] = version;
+        added.push(name);
+      }
     }
   }
 
@@ -235,7 +258,7 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
         ...AR_DEPS,
         ...(INIT_DRIVER_DEPS[driver] ?? INIT_DRIVER_DEPS["better-sqlite3"]),
       };
-      packageJsonUpdated = await addDepsToPackageJson(pkgPath, deps);
+      packageJsonUpdated = await addDepsToPackageJson(pkgPath, deps, AR_DEV_DEPS);
     } else {
       const name = basename(root);
       const body = freshPackageJson(name, driver);

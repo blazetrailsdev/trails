@@ -96,6 +96,9 @@ function packageJson(appName: string, driver: Driver): string {
           "@blazetrails/activerecord-cli": "*",
           ...DRIVER_VERSIONS[driver],
         },
+        devDependencies: {
+          "@blazetrails/trails-tsc": "*",
+        },
       },
       null,
       2,
