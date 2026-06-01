@@ -9,6 +9,7 @@ import {
   type RegistryData,
   type IsJoinTableName,
 } from "./fixtures-registry.js";
+export type { FixtureName } from "./fixtures-registry.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import type { Base } from "../base.js";
 
@@ -30,7 +31,7 @@ export { FixtureSet } from "./fixture-set.js";
 type BaseClass = typeof Base;
 type FixtureAttrs = Record<string, unknown>;
 
-type FixtureMap = Record<string, [BaseClass, Record<string, FixtureAttrs>]>;
+export type FixtureMap = Record<string, [BaseClass, Record<string, FixtureAttrs>]>;
 
 /**
  * Internally-resolved fixture set. `model === null` marks a HABTM join-table set

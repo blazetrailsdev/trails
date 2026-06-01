@@ -28,6 +28,12 @@ await bootstrapTestHandler();
 if (process.env.AR_TEST_WORKER_DB && Base.connection.adapterName === "sqlite") {
   seedSchemaSignatures(Base.connection, TEST_SCHEMA);
 }
+if (process.env.AR_TEST_PG_TEMPLATE && Base.connection.adapterName === "postgres") {
+  seedSchemaSignatures(Base.connection, TEST_SCHEMA);
+}
+if (process.env.AR_TEST_MYSQL_TEMPLATE && Base.connection.adapterName === "mysql") {
+  seedSchemaSignatures(Base.connection, TEST_SCHEMA);
+}
 await defineSchema(TEST_SCHEMA);
 setCanonicalSchemaPreload(Base.connection);
 

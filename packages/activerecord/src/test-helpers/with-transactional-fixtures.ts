@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import { beforeAll, beforeEach, afterEach, afterAll, type TaskContext } from "vitest";
 import type { DatabaseAdapter } from "../adapter.js";
 import { resetTestAdapterState } from "../test-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
@@ -127,19 +127,46 @@ export interface WithTransactionalFixturesOptions {
    * re-introspection cost on every teardown.
    */
   invalidateSchemaCache?: boolean;
+
+  /**
+   * Test names that must NOT be wrapped in a transaction. Mirrors Rails'
+   * `uses_transaction :method_name` (`test_fixtures.rb:88-95`): those tests
+   * need to observe real commits (e.g. they test `after_commit` callbacks or
+   * concurrent-connection visibility) and therefore cannot run inside the
+   * rollback-on-teardown outer transaction.
+   *
+   * Match is against the bare `it()` label — the same string you pass to
+   * `it(...)`. Surrounding `describe` names are NOT included.
+   *
+   * @example
+   *   withTransactionalFixtures(() => adapter, {
+   *     usesTransaction: ["after commit callback fires"],
+   *   });
+   *   it("after commit callback fires", async () => { ... }); // no outer txn
+   */
+  usesTransaction?: string[];
 }
 
 export function withTransactionalFixtures(
   getAdapter: () => TransactionalFixturesAdapter,
   options: WithTransactionalFixturesOptions = {},
 ): void {
-  const { invalidateSchemaCache = true } = options;
+  const { invalidateSchemaCache = true, usesTransaction: usesTransactionNames = [] } = options;
   // Snapshots of defineSchema's per-adapter signature cache taken at the
   // start of each test. On rollback we restore — preserving signatures for
   // tables created outside the test transaction (e.g. in `beforeAll`) while
   // discarding signatures for any `defineSchema(...)` that ran inside the
   // `it()` body (whose DDL was rolled back at the DB).
   let outerSig: Map<string, string> | null = null;
+  // Tracks whether we opened an outer transaction for the current test.
+  // Tests in usesTransaction run without a wrapping transaction (Rails parity:
+  // test_fixtures.rb:108-110 run_in_transaction? returns false for these).
+  // Known gap vs Rails: Rails also subscribes to "!connection.active_record"
+  // to pin connection pools opened mid-test (test_fixtures.rb:183-200). We
+  // only pin the pool that exists at beforeEach time; pools opened during the
+  // test body are not pinned. Closing this gap requires adding a notification
+  // hook to ConnectionPool#newConnection (production code change).
+  let _txnOpenedForTest = false;
 
   beforeAll(() => {
     pushSkipGlobalReset();
@@ -152,7 +179,16 @@ export function withTransactionalFixtures(
     if (popSkipGlobalReset() === 0) await resetTestAdapterState();
   });
 
-  beforeEach(async () => {
+  beforeEach(async (ctx: TaskContext) => {
+    // Mirrors Rails test_fixtures.rb:108-110:
+    //   def run_in_transaction?
+    //     use_transactional_tests && !self.class.uses_transaction?(name)
+    //   end
+    if (usesTransactionNames.includes(ctx.task.name)) {
+      _txnOpenedForTest = false;
+      return;
+    }
+    _txnOpenedForTest = true;
     const adapter = getAdapter();
     outerSig = _snapshotAppliedSchemaSignaturesForAdapter(adapter);
     const pool = pooledAdapterPool(adapter);
@@ -180,6 +216,7 @@ export function withTransactionalFixtures(
   });
 
   afterEach(async () => {
+    if (!_txnOpenedForTest) return;
     const adapter = getAdapter();
     const pool = pooledAdapterPool(adapter);
     if (pool) {
