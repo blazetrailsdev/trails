@@ -61,8 +61,7 @@ export interface TsconfigMergeResult {
 function parseJsonc(text: string): unknown {
   const { config, error } = parseConfigFileTextToJson("<tsconfig.json>", text);
   if (error) {
-    // Fall back to plain JSON.parse if typescript's parser failed
-    return JSON.parse(text);
+    throw new SyntaxError(`tsconfig.json parse error: ${error.messageText}`);
   }
   return config;
 }
