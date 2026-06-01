@@ -15,11 +15,16 @@
 These are the only items below that can be picked up without waiting on an
 external blocker. Small; bundle toward the 300-LOC ceiling.
 
-- **DatabaseTasks P3-5** — `migrateStatus` stdout output (~30 LOC). Rails'
-  `migrate_status` prints a formatted table (database header + up/down rows);
-  our `migrateStatus()` returns structured data with no output. Add a
-  stdout-printing wrapper / `displayMigrateStatus` helper. Test: "migrate
-  status table".
+- **DatabaseTasks P3-5** — `migrateStatus` stdout fidelity (~20 LOC).
+  **Mostly addressed:** the formatted up/down table shipped at the
+  `activerecord-cli` layer (`ar db:migrate:status`, #2743). Residual
+  Rails-fidelity gap: Rails prints from `DatabaseTasks.migrate_status` itself
+  (`database_tasks.rb:302` — `puts "database: …"`, header, `puts` per
+  `migrations_status` row), whereas trails' `DatabaseTasks.migrateStatus()`
+  (`tasks/database-tasks.ts:911`) still only returns the structured array and
+  the formatting lives in the CLI. To match Rails exactly, move/duplicate the
+  `puts` formatting into `DatabaseTasks.migrateStatus()`. Test: "migrate status
+  table". Lower priority now that the user-facing table exists.
 - **Associations** — `~2 LOC`: fix the stale `inheritance.ts`
   `initializeInternalsCallback` JSDoc.
 - **Associations Track 9** (~10 scattered single-test gaps, ~10–40 LOC each):
@@ -111,6 +116,8 @@ connection-pool follow-ups listed above. **Do not reopen the wrapper.**
 ## DatabaseTasks — Phase 2/3 COMPLETE except P3-5
 
 Phase 1 (#2704–#2723) removed the `_adapterInstance`/`setAdapter` bypass and
-hit 100% api:compare on tasks files. Phase 2 (P2-1…P2-8) and Phase 3
-(P3-1/P3-2/P3-4) all shipped (#2706–#2734). Only **P3-5** (`migrateStatus`
-stdout, listed under "Unblocked" above) remains.
+hit 100% api:compare on tasks files. Phase 2 (P2-1…P2-8) shipped (#2729–#2737);
+Phase 3 P3-1/P3-2 (#2738) and P3-4 SCOPE filtering (#2740) shipped; the
+`migrate:status` table shipped at the CLI layer (#2743). Only the **P3-5**
+Rails-fidelity residual (move the `puts` into `DatabaseTasks.migrateStatus()`
+itself, listed under "Unblocked" above) remains.
