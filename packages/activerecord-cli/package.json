@@ -8,12 +8,17 @@
   "bin": {
     "ar": "./bin/ar.js",
     "trails-schema-dump": "./bin/trails-schema-dump.js",
-    "trails-models-dump": "./bin/trails-models-dump.js"
+    "trails-models-dump": "./bin/trails-models-dump.js",
+    "trails-tsc": "./bin/trails-tsc.js"
   },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./tsc": {
+      "types": "./dist/tsc-wrapper/index.d.ts",
+      "default": "./dist/tsc-wrapper/index.js"
     }
   },
   "scripts": {
@@ -27,6 +32,7 @@
   "dependencies": {
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/trails-tsc": "workspace:*",
     "typescript": "^5.9.3"
   }
 }

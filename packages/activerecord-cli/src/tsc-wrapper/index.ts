@@ -15,7 +15,7 @@ export { createArModelsPlugin, type ArModelsPluginOptions } from "./ar-models-pl
 // these are pure / framework-agnostic). The plugin-host primitives
 // (`createTrailsProgram`, `createTrailsSolutionBuilder`,
 // `buildCompilerHost`) are intentionally NOT re-exported from this
-// barrel — re-exporting them under `@blazetrails/activerecord/tsc`
+// barrel — re-exporting them under `@blazetrails/activerecord-cli/tsc`
 // would silently drop AR virtualization for callers expecting the
 // pre-extraction behavior. Import them from `@blazetrails/trails-tsc`
 // explicitly when raw access is needed.

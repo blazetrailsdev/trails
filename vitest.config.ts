@@ -126,6 +126,26 @@ const alias = {
     __dirname,
     "packages/activerecord/src/adapters/mysql2-adapter.ts",
   ),
+  "@blazetrails/activerecord/type-virtualization/virtualize.js": path.resolve(
+    __dirname,
+    "packages/activerecord/src/type-virtualization/virtualize.ts",
+  ),
+  "@blazetrails/activerecord/type-virtualization/synthesize.js": path.resolve(
+    __dirname,
+    "packages/activerecord/src/type-virtualization/synthesize.ts",
+  ),
+  "@blazetrails/activerecord/type-virtualization/transitive-extends-walker.js": path.resolve(
+    __dirname,
+    "packages/activerecord/src/type-virtualization/transitive-extends-walker.ts",
+  ),
+  "@blazetrails/activerecord/type-virtualization/walker.js": path.resolve(
+    __dirname,
+    "packages/activerecord/src/type-virtualization/walker.ts",
+  ),
+  "@blazetrails/activerecord/type-virtualization/resolve-target.js": path.resolve(
+    __dirname,
+    "packages/activerecord/src/type-virtualization/resolve-target.ts",
+  ),
   "@blazetrails/activerecord": path.resolve(__dirname, "packages/activerecord/src/index.ts"),
   "@blazetrails/rack": path.resolve(__dirname, "packages/rack/src/index.ts"),
   "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/src/index.ts"),

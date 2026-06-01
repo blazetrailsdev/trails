@@ -87,8 +87,7 @@ and re-exports, deleting its duplicate copies.
 
 ### 4.2 Dependency graph — acyclic; runtime vs tooling split
 
-Target end-state, **after relocating the AR tsc-wrapper + bins** into the CLI
-(see §4.8):
+Current end-state (tsc-wrapper + bins relocated into the CLI per §4.8):
 
 ```
 trails-tsc          (generic tsc-plugin framework; dep: tse-compiler — no AR dep)
@@ -110,11 +109,10 @@ Key facts:
 
 - `trails-tsc` is **generic** and does **not** import `activerecord` → no
   `activerecord ↔ trails-tsc` loop, regardless of where the AR wrapper lives.
-- **Today** the AR model-scanner + tsc-wrapper live in `activerecord`
-  (`src/tsc-wrapper/`), which is why `activerecord` currently depends on
-  `trails-tsc`. The plan **moves them to `activerecord-cli`** (§4.8), so
-  `activerecord` becomes pure runtime with one fewer dependency and the
-  scanner sits next to the generator that also needs it.
+- The AR model-scanner + tsc-wrapper live in `activerecord-cli`
+  (`src/tsc-wrapper/`, relocated by §4.8), so `activerecord` is pure runtime
+  with no `trails-tsc` dependency and the scanner sits next to the generator
+  that also needs it.
 - The only multi-edge node is `activerecord-cli` (→ `activerecord` +
   `trails-tsc`), which is honest: it's the tooling layer.
 
@@ -250,19 +248,12 @@ This reinforces the runtime/tooling split and the two-package story (zero-
 declare models _require_ the virtualizer, which now ships with the tooling
 package, exactly where it belongs).
 
-**One wrinkle to plan for — a dev-only cycle.** `activerecord`'s own
-`virtualized-dx-tests` are type-checked by the wrapper (today
-`packages/activerecord/dist/tsc-wrapper/cli.js`). After the move, that
-type-check consumes `activerecord-cli`, i.e. `activerecord` (devDependency) →
-`activerecord-cli` → `activerecord`. This never reaches published runtime
-deps — it's a monorepo dev-only edge that pnpm workspaces resolve fine — but
-the `test:types:virtualized` script must repoint to the relocated CLI, and
-`trailties` / any CI invoking `activerecord`'s old `trails-tsc` bin path must
-update. If we'd rather avoid even the dev cycle, the lighter variant is to
-relocate **only the bins** (thin wrappers) to `activerecord-cli` while leaving
-the wrapper _library_ in `activerecord` for self-test — at the cost of
-`activerecord` keeping its `trails-tsc` dep. The full move is the cleaner
-end-state; the bin-only move is the low-risk increment.
+**Dev-only cycle — resolved.** Shipped in #2748 (see post-merge follow-up
+queue). `activerecord`'s `virtualized-dx-tests` are type-checked by the
+relocated wrapper at `packages/activerecord-cli/dist/tsc-wrapper/cli.js`. The
+dev cycle (`activerecord` devDep → `activerecord-cli` → `activerecord`) is
+resolved via pnpm workspace resolution — no runtime impact. The
+`test:types:virtualized` script was repointed accordingly.
 
 ## 5. CLI surface (`activerecord-cli`)
 
@@ -364,6 +355,14 @@ reference (#2638).
       in-process instead of spawning a subprocess. Helpers (`introspectTables`,
       `generateModels`, etc.) added to `@blazetrails/activerecord`'s public
       exports so the relocated bins can import them by package name.
+- [x] Done (#2748) — **§4.8 trails-tsc full move**. Moved
+      `packages/activerecord/src/tsc-wrapper/` (AR virtualizer plugin,
+      `ar-program`, model-scanner, cli, tests, fixtures) and the `trails-tsc`
+      bin into `packages/activerecord-cli`. Dropped `@blazetrails/trails-tsc`
+      dep from `activerecord`; added to `activerecord-cli`. Dev cycle
+      (`activerecord` devDep → `activerecord-cli` → `activerecord`) resolved via
+      pnpm workspace resolution — no runtime impact. `test:types:virtualized`
+      repointed to `packages/activerecord-cli/dist/tsc-wrapper/cli.js`.
 
 **Larger / multi-PR:**
 

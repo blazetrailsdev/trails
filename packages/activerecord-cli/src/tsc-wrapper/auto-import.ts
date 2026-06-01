@@ -1,7 +1,11 @@
 import ts from "typescript";
 import * as path from "node:path";
-import { walk, type ClassInfo, type AssociationCall } from "../type-virtualization/walker.js";
-import { resolveAssociationTarget } from "../type-virtualization/resolve-target.js";
+import {
+  walk,
+  type ClassInfo,
+  type AssociationCall,
+} from "@blazetrails/activerecord/type-virtualization/walker.js";
+import { resolveAssociationTarget } from "@blazetrails/activerecord/type-virtualization/resolve-target.js";
 
 /**
  * For each file being virtualized, compute the set of target class

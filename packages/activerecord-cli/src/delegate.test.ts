@@ -34,7 +34,7 @@ describe("delegate subcommands", () => {
   it("typecheck delegates to trails-tsc and forwards extra args", async () => {
     const code = await run(["typecheck", "--noEmit"], ".");
     expect(code).toBe(0);
-    expect(mockDelegate).toHaveBeenCalledWith("@blazetrails/activerecord", "trails-tsc", [
+    expect(mockDelegate).toHaveBeenCalledWith("@blazetrails/activerecord-cli", "trails-tsc", [
       "--noEmit",
     ]);
   });

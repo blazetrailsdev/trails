@@ -1,7 +1,7 @@
 import type { TscPlugin, VirtualizeOutput } from "@blazetrails/trails-tsc";
-import { virtualize } from "../type-virtualization/virtualize.js";
+import { virtualize } from "@blazetrails/activerecord/type-virtualization/virtualize.js";
 import { resolveAutoImports } from "./auto-import.js";
-import type { SchemaColumnValue } from "../type-virtualization/synthesize.js";
+import type { SchemaColumnValue } from "@blazetrails/activerecord/type-virtualization/synthesize.js";
 
 const STATIC_BLOCK_PATTERN = /\bstatic\s*\{/;
 // Cheap pre-filter for files using top-level `include(...)` from

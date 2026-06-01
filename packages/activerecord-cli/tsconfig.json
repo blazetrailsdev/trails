@@ -6,5 +6,10 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "references": [{ "path": "../activerecord" }, { "path": "../activesupport" }]
+  "exclude": ["src/tsc-wrapper/__fixtures__"],
+  "references": [
+    { "path": "../activerecord" },
+    { "path": "../activesupport" },
+    { "path": "../trails-tsc" }
+  ]
 }
