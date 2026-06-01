@@ -22,6 +22,7 @@ export type {
 
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
+import type { InsertBuilder } from "./insert-all.js";
 
 /**
  * Database adapter interface — pluggable backends.
@@ -76,6 +77,15 @@ export interface DatabaseAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#sanitize_as_sql_comment
    */
   sanitizeAsSqlComment(value: unknown): string;
+
+  /**
+   * Assemble a dialect-specific INSERT statement from an InsertAll Builder.
+   * The base adapter handles plain inserts; adapters supporting upsert /
+   * skip-duplicates override this.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_insert_sql
+   */
+  buildInsertSql(insert: InsertBuilder): string;
 
   /**
    * Begin a transaction.

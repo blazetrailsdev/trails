@@ -7,6 +7,7 @@ import type {
 import { getSqlite } from "@blazetrails/activesupport/sqlite-adapter";
 import { Visitors } from "@blazetrails/arel";
 import type { DatabaseAdapter } from "../adapter.js";
+import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { SQLite3AdapterOptions } from "./pool-config.js";
@@ -1194,29 +1195,28 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  override buildInsertSql(insert: {
-    into?: string;
-    values_list?: string;
-    skip_duplicates?: boolean;
-    conflict_target?: string;
-    update?: string;
-    returning?: string;
-  }): string | null {
-    if (!insert.into) {
-      if (insert.skip_duplicates) return "OR IGNORE";
-      if (insert.update) return "ON CONFLICT DO UPDATE SET";
-      return null;
+  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#build_insert_sql.
+  override buildInsertSql(insert: InsertBuilder): string {
+    let sql = `INSERT ${insert.into()}`;
+
+    if (insert.skipDuplicates()) {
+      sql += ` ON CONFLICT ${insert.conflictTarget()} DO NOTHING`;
+    } else if (insert.updateDuplicates()) {
+      sql += ` ON CONFLICT ${insert.conflictTarget()} DO UPDATE SET `;
+      const raw = insert.rawUpdateSql();
+      if (raw) {
+        sql += raw.value;
+      } else {
+        const assignments: string[] = [];
+        const touch = insert.touchModelTimestampsUnless((col) => `${col} IS excluded.${col}`);
+        if (touch) assignments.push(touch);
+        for (const col of insert.updatableColumns()) assignments.push(`${col}=excluded.${col}`);
+        sql += assignments.join(",");
+      }
     }
 
-    let sql = `INSERT ${insert.into} ${insert.values_list ?? ""}`;
-    if (insert.skip_duplicates) {
-      sql += ` ON CONFLICT ${insert.conflict_target ?? ""} DO NOTHING`;
-    } else if (insert.update) {
-      sql += ` ON CONFLICT ${insert.conflict_target ?? ""} DO UPDATE SET ${insert.update}`;
-    }
-    if (insert.returning) {
-      sql += ` RETURNING ${insert.returning}`;
-    }
+    const ret = insert.returning();
+    if (ret) sql += ` RETURNING ${ret}`;
     return sql;
   }
 

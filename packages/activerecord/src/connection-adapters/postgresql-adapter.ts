@@ -36,6 +36,7 @@ import {
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { DatabaseAdapter } from "../adapter.js";
+import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import type { PostgreSQLAdapterOptions } from "./pool-config.js";
 import {
@@ -2286,6 +2287,36 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Feature support predicates
   // Mirrors: PostgreSQLAdapter supports_* methods
   // ---------------------------------------------------------------------------
+
+  // Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#build_insert_sql.
+  // Like the SQLite form, but the timestamp-touch guard uses
+  // `<table>.<col> IS NOT DISTINCT FROM excluded.<col>` (Rails qualifies the
+  // target with the table name and uses Postgres-correct NULL comparison).
+  override buildInsertSql(insert: InsertBuilder): string {
+    let sql = `INSERT ${insert.into()}`;
+
+    if (insert.skipDuplicates()) {
+      sql += ` ON CONFLICT ${insert.conflictTarget()} DO NOTHING`;
+    } else if (insert.updateDuplicates()) {
+      sql += ` ON CONFLICT ${insert.conflictTarget()} DO UPDATE SET `;
+      const raw = insert.rawUpdateSql();
+      if (raw) {
+        sql += raw.value;
+      } else {
+        const assignments: string[] = [];
+        const touch = insert.touchModelTimestampsUnless(
+          (col) => `${insert.quotedTableName()}.${col} IS NOT DISTINCT FROM excluded.${col}`,
+        );
+        if (touch) assignments.push(touch);
+        for (const col of insert.updatableColumns()) assignments.push(`${col}=excluded.${col}`);
+        sql += assignments.join(",");
+      }
+    }
+
+    const ret = insert.returning();
+    if (ret) sql += ` RETURNING ${ret}`;
+    return sql;
+  }
 
   /**
    * Fetch and cache the server version number. Called automatically on
