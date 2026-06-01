@@ -2,17 +2,11 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({ topics: { title: "string" } });
-});
+useHandlerFixtures({});
 
 describe("LengthValidationTest", () => {
   function makeModel() {
