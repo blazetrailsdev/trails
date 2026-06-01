@@ -1836,14 +1836,14 @@ describe("RelationTest", () => {
 
   it.skip("where id with delegated ar object", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — simple-delegator
-    // Rails: Author.where(id: SimpleDelegator.new(author)) — unwraps delegated objects.
-    // JS has no SimpleDelegator equivalent.
+    // Rails: Author.where(id: Class.new(SimpleDelegator).new(author)) — unwraps the delegated object.
+    // No idiomatic JS analog (a Proxy could forward, but query-builder unwrapping isn't warranted).
   });
 
   it.skip("where relation with delegated ar object", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — simple-delegator
-    // Rails: Post.where(author: SimpleDelegator.new(author)) — delegated AR object in assoc where.
-    // JS has no SimpleDelegator equivalent.
+    // Rails: Post.where(author: Class.new(SimpleDelegator).new(author)) — delegated AR object in assoc where.
+    // No idiomatic JS analog (a Proxy could forward, but query-builder unwrapping isn't warranted).
   });
 
   it("typecasting where with array", async () => {

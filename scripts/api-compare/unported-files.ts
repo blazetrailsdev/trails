@@ -339,12 +339,13 @@ export const UNPORTED_FILES: UnportedFile[] = [
   // --- Permanently not-portable: Ruby SimpleDelegator (Delegator/method_missing) ---
   {
     testFile: "relations_test.rb",
-    className: "RelationTest",
     tests: ["where id with delegated ar object", "where relation with delegated ar object"],
     reason:
-      "Rails passes a SimpleDelegator-wrapped AR object to where(); the query builder " +
-      "unwraps it via the delegator protocol. JS has no SimpleDelegator equivalent. " +
-      "The plain-object equivalent (find by with delegated ar object) is covered.",
+      "Rails wraps the AR object in Class.new(SimpleDelegator) and where() unwraps it via the " +
+      "delegator protocol (relations_test.rb:835-847). No idiomatic JS analog: a Proxy could " +
+      "forward method_missing, but the bespoke query-builder unwrapping isn't warranted for this " +
+      "niche case. (The find_by sibling at :849 uses SimpleDelegator too, but is currently matched " +
+      "by a plain-object trails test, so it stays counted — its delegation behavior is untested.)",
   },
   // --- Permanently not-portable: scattered YAML/Marshal serialization ---
   {
