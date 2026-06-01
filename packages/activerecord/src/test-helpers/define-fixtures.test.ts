@@ -5,7 +5,9 @@ import {
   isFixtureRef,
   defineFixtures,
   resolveModelForTable,
+  FixtureSetPrimaryKeyError,
 } from "./define-fixtures.js";
+import { primaryKeyErrorFixtureData } from "./fixtures/primary-key-error/primary-key-error.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { Base } from "../base.js";
 
@@ -426,5 +428,52 @@ describe("defineFixtures", () => {
       .find((s) => s.includes("INSERT INTO"));
     expect(insertSql).toContain("type");
     expect(insertSql).toContain("AdminUser");
+  });
+});
+
+describe("PrimaryKeyError", () => {
+  it("generates the correct value", async () => {
+    const adapter = {
+      adapterName: "sqlite" as const,
+      execute: vi.fn(async () => []),
+      executeMutation: vi.fn(async () => 0),
+      beginTransaction: vi.fn(async () => {}),
+      commit: vi.fn(async () => {}),
+      rollback: vi.fn(async () => {}),
+      createSavepoint: vi.fn(async () => {}),
+      releaseSavepoint: vi.fn(async () => {}),
+      rollbackToSavepoint: vi.fn(async () => {}),
+      isNoDatabaseError: () => false,
+      quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
+      quoteTableName: (n: string) => `"${n}"`,
+      quoteColumnName: (n: string) => `"${n}"`,
+    } as unknown as DatabaseAdapter;
+
+    // Mirror the Author model's ownedEssay belongs_to: primaryKey: "name", class_name: "Essay".
+    // Essay.primaryKey defaults to "id", so joinPrimaryKey ("name") !== klass.primaryKey ("id").
+    const AuthorModel = {
+      tableName: "authors",
+      primaryKey: "id",
+      _reflections: {
+        ownedEssay: {
+          macro: "belongsTo",
+          isPolymorphic: () => false,
+          joinPrimaryKey: "name",
+          klass: { primaryKey: "id" },
+          foreignKey: "owned_essay_id",
+        },
+      },
+      findBy: vi.fn(async () => null),
+    } as any;
+
+    await expect(defineFixtures(adapter, AuthorModel, primaryKeyErrorFixtureData)).rejects.toThrow(
+      FixtureSetPrimaryKeyError,
+    );
+
+    try {
+      await defineFixtures(adapter, AuthorModel, primaryKeyErrorFixtureData);
+    } catch (e: unknown) {
+      expect((e as Error).message).toContain("Unable to set");
+    }
   });
 });

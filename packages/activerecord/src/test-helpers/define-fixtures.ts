@@ -13,6 +13,26 @@ import { EncryptableRecord } from "../encryption/encryptable-record.js";
 import { Configurable } from "../encryption/configurable.js";
 import type { Type } from "@blazetrails/activemodel";
 
+/**
+ * Mirrors Rails' `ActiveRecord::FixtureSet::TableRow::PrimaryKeyError`.
+ * Raised when a fixture row uses an association name (e.g. `ownedEssay: "label"`)
+ * for a belongs_to whose `joinPrimaryKey` differs from the associated model's
+ * `primaryKey` — the loader cannot safely resolve the label to an FK value.
+ * @internal
+ */
+export class FixtureSetPrimaryKeyError extends Error {
+  constructor(label: string, associationName: string, value: unknown) {
+    super(
+      `Unable to set ${associationName} to ${String(value)} because the association has a ` +
+        `custom primary key that does not match the associated table's primary key.\n\n` +
+        `To fix this, change your fixture from\n\n` +
+        `  ${label}:\n    ${associationName}: ${String(value)}\n\n` +
+        `to use the explicit foreign key column instead.`,
+    );
+    this.name = "FixtureSetPrimaryKeyError";
+  }
+}
+
 const FIXTURE_MAX_ID = 2 ** 30 - 1;
 
 // Standard Rails timestamp columns, auto-filled at fixture insert when present and
@@ -484,6 +504,29 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
 
       // Evaluate poly once so both the ref guard and the expansion below share the result.
       const poly = findPolymorphicRef(ModelClass, col);
+
+      // Rails' resolve_sti_reflections: when col matches a belongs_to association
+      // name (not the FK column) and the association has a custom joinPrimaryKey
+      // that differs from the target model's primaryKey, raise PrimaryKeyError.
+      if (!poly) {
+        const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
+        const refl = reflections[col] as
+          | {
+              macro?: string;
+              isPolymorphic?: () => boolean;
+              joinPrimaryKey?: unknown;
+              klass?: { primaryKey?: unknown };
+              foreignKey?: string | string[];
+            }
+          | undefined;
+        if (refl && refl.macro === "belongsTo" && !refl.isPolymorphic?.()) {
+          const jpk = refl.joinPrimaryKey;
+          const klasspk = refl.klass?.primaryKey;
+          if (jpk !== undefined && klasspk !== undefined && jpk !== klasspk) {
+            throw new FixtureSetPrimaryKeyError(label, col, val);
+          }
+        }
+      }
 
       if (isFixtureRef(val)) {
         if (poly) {
