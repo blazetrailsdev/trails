@@ -4,18 +4,16 @@
  * Mirrors: activerecord/test/cases/locking_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import {
-  Base,
-  transaction,
-  registerModel,
-  StaleObjectError,
-  ReadonlyAttributeError,
-} from "./index.js";
+import { Base, registerModel, StaleObjectError, ReadonlyAttributeError } from "./index.js";
 import { Associations } from "./associations.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Person } from "./test-helpers/models/person.js";
+import { Frog } from "./test-helpers/models/frog.js";
 
 const TEST_SCHEMA = {
   people: { name: "string", first_name: "string", lock_version: "integer", updated_at: "datetime" },
@@ -701,23 +699,18 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
 });
 
 describe("PessimisticLockingTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
+  // Mirrors Rails `fixtures :people` — seed the canonical people rows and read
+  // them with `Person.find(people("michael").id)` (Rails' `Person.find(1)`)
+  // instead of constructing records inline. `schema` recreates the canonical
+  // `people` table so the full fixture columns (gender, *_id, counts) and the
+  // shared Person model resolve, regardless of any bespoke `people` a sibling
+  // file left in the shared worker DB.
+  const { people } = useHandlerFixtures(["people"], { schema: canonicalSchema });
 
   it("typical find with lock", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("name", "string");
-      }
-    }
-    const p = await Person.create({ name: "Test" });
-    await transaction(Person, async () => {
-      const locked = await Person.all().lock().find(p.id);
-      expect(locked.name).toBe("Test");
+    await Person.transaction(async () => {
+      const locked = await Person.all().lock().find(people("michael").id);
+      expect(locked.first_name).toBe("Michael");
     });
   });
 
@@ -726,71 +719,38 @@ describe("PessimisticLockingTest", () => {
   });
 
   it("lock does not raise when the object is not dirty", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("name", "string");
-      }
-    }
-    const person = await Person.create({ name: "Test" });
+    const person = await Person.find(people("michael").id);
     await person.lockBang();
   });
 
   it("lock raises when the record is dirty", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("first_name", "string");
-      }
-    }
-    const p = await Person.create({ first_name: "Test" });
-    p.first_name = "fooman";
-    await expect(p.lockBang()).rejects.toThrow(/Changed attributes: "first_name"/);
+    const person = await Person.find(people("michael").id);
+    person.first_name = "fooman";
+    await expect(person.lockBang()).rejects.toThrow(/Changed attributes: "first_name"/);
   });
 
   it("locking in after save callback", async () => {
-    class Frog extends Base {
-      static {
-        this._tableName = "frogs";
-        this.attribute("name", "string");
-        this.afterSave(async (record: any) => {
-          await record.lockBang();
-        });
-      }
-    }
     const frog = await Frog.create({ name: "Old Frog" });
     frog.name = "New Frog";
     await frog.saveBang();
   });
 
   it("with lock commits transaction", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("first_name", "string");
-      }
-    }
-    const person = await Person.create({ first_name: "original" });
+    const person = await Person.find(people("michael").id);
     await person.withLock(async () => {
       person.first_name = "fooman";
       await person.saveBang();
     });
     const reloaded = await Person.find(person.id);
-    expect((reloaded as any).first_name).toBe("fooman");
+    expect(reloaded.first_name).toBe("fooman");
   });
 
   it("with lock rolls back transaction", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("first_name", "string");
-      }
-    }
-    const person = await Person.create({ first_name: "original" });
-    const old = (person as any).first_name;
+    const person = await Person.find(people("michael").id);
+    const old = person.first_name;
     try {
       await person.withLock(async () => {
-        (person as any).first_name = "fooman";
+        person.first_name = "fooman";
         await person.saveBang();
         throw new Error("oops");
       });
@@ -798,18 +758,12 @@ describe("PessimisticLockingTest", () => {
       // expected
     }
     const reloaded = await Person.find(person.id);
-    expect((reloaded as any).first_name).toBe(old);
+    expect(reloaded.first_name).toBe(old);
   });
 
   it("with lock configures transaction", async () => {
     const adapter = Base.connection as any;
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("name", "string");
-      }
-    }
-    const p = await Person.create({ name: "Test" });
+    const p = await Person.find(people("michael").id);
     await Person.transaction(async () => {
       const outerTx = adapter.transactionManager.currentTransaction;
       expect((outerTx as any).joinable).toBe(true);
@@ -830,15 +784,9 @@ describe("PessimisticLockingTest", () => {
   });
 
   it("with lock locks with no args", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("name", "string");
-      }
-    }
-    const p = await Person.create({ name: "Test" });
+    const p = await Person.find(people("michael").id);
     await p.withLock(async () => {
-      expect(p.name).toBe("Test");
+      expect(p.first_name).toBe("Michael");
     });
   });
 
