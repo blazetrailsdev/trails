@@ -2630,8 +2630,7 @@ export class Base extends Model {
         return [table.get(c), val];
       });
       im.insert(insertValues);
-      const imVisitor = ctor.connection.visitor;
-      sql = imVisitor ? imVisitor.compile(im.ast) : im.toSql();
+      sql = ctor.connection.toSql(im);
     }
     this._pendingOperation = ctor.connection
       .execInsert(sql, `${ctor.name} Create`)
@@ -2774,9 +2773,8 @@ export class Base extends Model {
     }
     _Persistence.applyDefaultAndGlobalConstraints(um as any, ctor);
 
-    const umVisitor = ctor.connection.visitor;
     this._pendingOperation = ctor.connection
-      .execUpdate(umVisitor ? umVisitor.compile(um.ast) : um.toSql(), `${ctor.name} Update`)
+      .execUpdate(ctor.connection.toSql(um), `${ctor.name} Update`)
       .then((affected) => {
         if (ctor.lockingEnabled && affected === 0) {
           // Mirrors Rails _update_row rescue Exception: restore attribute snapshot so
@@ -2824,7 +2822,10 @@ export class Base extends Model {
         }
         _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
 
-        const affected = await ctor.connection.execDelete(dm.toSql(), `${ctor.name} Destroy`);
+        const affected = await ctor.connection.execDelete(
+          ctor.connection.toSql(dm),
+          `${ctor.name} Destroy`,
+        );
         if (ctor.lockingEnabled && affected === 0) {
           throw new StaleObjectError(this, "destroy");
         }
