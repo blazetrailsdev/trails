@@ -26,17 +26,10 @@ import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 // counterpart's `self.use_transactional_tests = false` — an outer
 // transactional-fixtures wrapper would itself materialize and skew the
 // materialization/restart event counts these tests assert on. The
-// canonical `Topic` model + `topics(...)` lookups match Rails' fixture
-// names verbatim (`first`, `fifth`); callback-leak tests keep a throwaway
-// subclass, exactly as Rails uses `Class.new`.
-//
-// Writes inside the transactions use `topics(...).touch()` rather than Rails'
-// `.update(title:)`: canonical `Topic` registers an async `beforeValidation`,
-// but `.save`/`.update` run the validation callback chain in strict-sync mode
-// (activemodel `isValid`), so an async before callback throws there. `.touch`
-// performs the same materializing write without validations — equivalent for
-// the materialization/outcome assertions these tests make, and the same call
-// Rails uses for the `start_transaction` cases.
+// canonical `Topic` model + `topics(...)` lookups + `.touch`/`.update(title:)`
+// writes match the Rails counterpart verbatim (fixture names `first`, `fifth`);
+// callback-leak tests keep a throwaway subclass, exactly as Rails uses
+// `Class.new`.
 async function freshIsolatedAdapter(): Promise<SQLite3Adapter> {
   const adapter = new SQLite3Adapter(":memory:");
   await defineSchema(adapter, { topics: canonicalSchema.topics });
@@ -71,6 +64,11 @@ describe("TransactionInstrumentationTest", () => {
     Topic.adapter = sharedAdapter;
     await Topic.loadSchema();
   });
+  // No `{ schema }` option here: that registers a `beforeAll` that defines the
+  // schema before `sharedAdapter` exists (it's created per-test in `beforeEach`
+  // for TM isolation). `freshIsolatedAdapter` already creates the full `topics`
+  // schema per test, and a fresh in-memory adapter per test has no cross-file
+  // contamination surface to defend against.
   const { topics } = useFixtures(["topics"], () => sharedAdapter, { schema: canonicalSchema });
   afterEach(() => {
     Notifications.unsubscribeAll();
@@ -138,7 +136,7 @@ describe("TransactionInstrumentationTest", () => {
     });
 
     await Topic.transaction(async () => {
-      await topics("fifth").touch();
+      await topics("fifth").update({ title: "Ruby on Rails" });
     });
 
     expect(events).toHaveLength(1);
@@ -154,7 +152,7 @@ describe("TransactionInstrumentationTest", () => {
     });
 
     await Topic.transaction(async () => {
-      await topics("fifth").touch();
+      await topics("fifth").update({ title: "Ruby on Rails" });
       throw new Rollback();
     });
 
@@ -171,10 +169,10 @@ describe("TransactionInstrumentationTest", () => {
     });
 
     await Topic.transaction(async () => {
-      await topics("fifth").touch();
+      await topics("fifth").update({ title: "Sinatra" });
       await Topic.transaction(
         async () => {
-          await topics("fifth").touch();
+          await topics("fifth").update({ title: "Ruby on Rails" });
         },
         { requiresNew: true },
       );
@@ -196,7 +194,7 @@ describe("TransactionInstrumentationTest", () => {
     await Topic.transaction(async () => {
       await Topic.transaction(
         async () => {
-          await topics("fifth").touch();
+          await topics("fifth").update({ title: "Ruby on Rails" });
         },
         { requiresNew: true },
       );
@@ -214,7 +212,7 @@ describe("TransactionInstrumentationTest", () => {
     await Topic.transaction(async () => {
       await Topic.transaction(
         async () => {
-          await topics("fifth").touch();
+          await topics("fifth").update({ title: "Ruby on Rails" });
           throw new Rollback();
         },
         { requiresNew: true },
@@ -253,7 +251,7 @@ describe("TransactionInstrumentationTest", () => {
     });
 
     await Topic.transaction(async () => {
-      await topics("fifth").touch();
+      await topics("fifth").update({ title: "Sinatra" });
       await Topic.transaction(
         async () => {
           throw new Rollback();
@@ -273,12 +271,12 @@ describe("TransactionInstrumentationTest", () => {
     });
 
     await Topic.transaction(async () => {
-      await topics("fifth").touch();
+      await topics("fifth").update({ title: "Sinatry" });
       await Topic.transaction(
         async () => {
           await Topic.transaction(
             async () => {
-              await topics("fifth").touch();
+              await topics("fifth").update({ title: "Ruby on Rails" });
               throw new Rollback();
             },
             { requiresNew: true },
@@ -302,7 +300,7 @@ describe("TransactionInstrumentationTest", () => {
     });
 
     await Topic.transaction(async () => {
-      await topics("fifth").touch();
+      await topics("fifth").update({ title: "Sinatra" });
       await Topic.transaction(async () => {}, { requiresNew: true });
     });
 
@@ -372,7 +370,7 @@ describe("TransactionInstrumentationTest", () => {
     });
 
     await Topic.transaction(async () => {
-      await topics("fifth").touch();
+      await topics("fifth").update({ title: "Ruby on Rails" });
       // Register directly on the transaction to avoid the save-path
       // ordering issue between state-restore and rolledbackBang callbacks.
       const txn = (sharedAdapter as any).transactionManager.currentTransaction as any;
@@ -398,7 +396,7 @@ describe("TransactionInstrumentationTest", () => {
 
     await expect(
       Topic.transaction(async () => {
-        await topics("fifth").touch();
+        await topics("fifth").update({ title: "Ruby on Rails" });
       }),
     ).rejects.toThrow(MyError);
 
@@ -442,7 +440,7 @@ describe("TransactionInstrumentationTest", () => {
 
     await expect(
       Topic.transaction(async () => {
-        await topics("fifth").touch();
+        await topics("fifth").update({ title: "Ruby on Rails" });
       }),
     ).rejects.toThrow(MyError);
 
