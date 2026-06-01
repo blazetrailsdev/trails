@@ -11,15 +11,14 @@ import type { SchemaColumnValue } from "@blazetrails/activerecord/type-virtualiz
 import { parseSchemaTs } from "./schema-ts-parser.js";
 
 /**
- * Load a schema-columns JSON file produced by the schema dumper.
+ * Load schema columns from a `--schema` file. Accepts:
+ *   - `.ts` / `.js` — TypeScript schema file (e.g. `db/schema.ts`); parsed by `parseSchemaTs`.
+ *   - `.json` — dump produced by `trails-schema-dump`. Column values take either shape:
+ *       `{ "<table>": { "<column>": "<rails_type>", ... }, ... }` — legacy
+ *       `{ "<table>": { "<column>": { "type": "<rails_type>", "null"?: boolean, "arrayElementType"?: string }, ... }, ... }` — rich
  *
- * Format (either shape per column, may mix in one file):
- *   `{ "<table>": { "<column>": "<rails_type>", ... }, ... }` — legacy
- *   `{ "<table>": { "<column>": { "type": "<rails_type>", "null"?: boolean, "arrayElementType"?: string }, ... }, ... }` — rich
- *
- * The rich shape — as emitted by `trails-schema-dump` — drives
- * nullability (`T | null`) and typed array elements (`ElementTsType[]`)
- * in the generated TypeScript declares.
+ * The rich JSON shape drives nullability (`T | null`) and typed array elements
+ * (`ElementTsType[]`) in the generated TypeScript declares.
  */
 type RichColumnValue = Extract<SchemaColumnValue, object>;
 

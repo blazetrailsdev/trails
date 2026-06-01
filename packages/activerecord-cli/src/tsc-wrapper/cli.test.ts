@@ -499,6 +499,18 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
     expect(result!.posts.published).toEqual({ type: "boolean", null: true });
   });
 
+  it("loadSchemaColumns: --schema <path>.js also routes through parseSchemaTs", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const schemaSrc = 'schema.createTable("tags", { id: false }, (t) => { t.string("name"); });';
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-js-"));
+    tmpDirs.push(dir);
+    const jsPath = path.join(dir, "schema.js");
+    fs.writeFileSync(jsPath, schemaSrc);
+    const result = loadSchemaColumns(["--schema", jsPath]);
+    expect(result).toBeDefined();
+    expect(result!.tags.name).toEqual({ type: "string", null: true });
+  });
+
   it(".ts schema drives the same virtualized declares as equivalent .json schema end-to-end", async () => {
     const { loadSchemaColumns } = await import("./cli.js");
     // null: false on all columns so the schema fixture consumer.ts type-checks (no | null widening).
