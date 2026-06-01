@@ -459,7 +459,7 @@ describe("PrimaryKeyError", () => {
           macro: "belongsTo",
           isPolymorphic: () => false,
           joinPrimaryKey: "name",
-          klass: { primaryKey: "id" },
+          klass: { primaryKey: "id", name: "Essay" },
           foreignKey: "owned_essay_id",
         },
       },
@@ -474,6 +474,8 @@ describe("PrimaryKeyError", () => {
       await defineFixtures(adapter, AuthorModel, primaryKeyErrorFixtureData);
     } catch (e: unknown) {
       expect((e as Error).message).toContain("Unable to set");
+      expect((e as Error).message).toContain("name");
+      expect((e as Error).message).toContain("Essay");
     }
   });
 });
