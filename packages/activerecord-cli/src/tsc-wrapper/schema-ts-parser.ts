@@ -1,7 +1,7 @@
 import ts from "typescript";
-import type { SchemaColumnValue } from "@blazetrails/activerecord/type-virtualization/synthesize.js";
+import type { DumpColumnSchema } from "@blazetrails/activerecord/schema-columns-dump";
 
-export type DumpColumnSchema = Extract<SchemaColumnValue, object>;
+export type { DumpColumnSchema };
 export type SchemaColumnsByTable = Record<string, Record<string, DumpColumnSchema>>;
 
 // Rails default PK is bigint (Rails 5.1+).
@@ -85,6 +85,10 @@ function parseColumnStatement(stmt: ts.Statement): { colName: string; col: DumpC
 
   const args = call.arguments;
 
+  // checkConstraint is emitted inside the createTable block by SchemaDumper
+  // (schema-dumper.ts:820) but is not a column — skip it explicitly.
+  if (method === "checkConstraint") return [];
+
   if (method === "timestamps") {
     return [
       { colName: "created_at", col: { type: "datetime", null: false } },
@@ -103,6 +107,12 @@ function parseColumnStatement(stmt: ts.Statement): { colName: string; col: DumpC
         ? (args[2] as ts.ObjectLiteralExpression)
         : undefined;
     const nullFalse = !!(optsNode && isFalse(objPropValue(optsNode, "null")));
+    const isArray = !!(
+      optsNode && objPropValue(optsNode, "array")?.kind === ts.SyntaxKind.TrueKeyword
+    );
+    if (isArray) {
+      return [{ colName, col: { type: "array", null: !nullFalse, arrayElementType: sqlType } }];
+    }
     const col: DumpColumnSchema = { type: sqlType, null: !nullFalse };
     return [{ colName, col }];
   }

@@ -83,6 +83,37 @@ describe("parseSchemaTs", () => {
     expect(result["widgets"]!["extra"]).toEqual({ type: "tsvector", null: true });
   });
 
+  it("t.column with array: true → type: array + arrayElementType", () => {
+    const source = `
+      export default async function defineSchema(ctx: MigrationContext) {
+        await ctx.createTable("things", { force: "cascade" }, (t) => {
+          t.column("labels", "citext", { array: true, null: false });
+        });
+      }
+    `;
+    const result = parseSchemaTs(source, FILE);
+    expect(result["things"]!["labels"]).toEqual({
+      type: "array",
+      null: false,
+      arrayElementType: "citext",
+    });
+  });
+
+  it("t.checkConstraint inside block does not become a phantom column", () => {
+    const source = `
+      export default async function defineSchema(ctx: MigrationContext) {
+        await ctx.createTable("products", { force: "cascade" }, (t) => {
+          t.decimal("price", { null: false });
+          t.checkConstraint("price > 0", { name: "chk_price" });
+        });
+      }
+    `;
+    const result = parseSchemaTs(source, FILE);
+    expect(Object.keys(result["products"]!)).not.toContain("price > 0");
+    expect(Object.keys(result["products"]!)).not.toContain("checkConstraint");
+    expect(result["products"]!["price"]).toEqual({ type: "decimal", null: false });
+  });
+
   it("id: false → no id column synthesized", () => {
     const source = `
       export default async function defineSchema(ctx: MigrationContext) {
