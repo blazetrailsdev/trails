@@ -78,15 +78,16 @@ Options:
 const INIT_HELP = `ar init — scaffold a standalone activerecord project
 
 Run in an existing project root to add @blazetrails/activerecord to it.
-Writes (or updates) package.json, config/database.ts (TRAILS_ENV-keyed),
+Writes (or updates) package.json, tsconfig.json, config/database.ts (TRAILS_ENV-keyed),
 db/migrate/, db/seeds.ts, app/models/index.ts (the generated manifest), and
-db.ts (bootstrap glue). Does NOT write tsconfig.json or .gitignore — bring
-your own, or use \`ar new\` to scaffold a complete greenfield project.
-Existing files are skipped by default; pass --force to overwrite them.
+db.ts (bootstrap glue). Does NOT write .gitignore — bring your own.
+If a tsconfig.json already exists, AR-required settings are merged in (JSONC-aware);
+conflicting keys are preserved and reported as warnings. Pass --force to overwrite instead.
+Existing scaffold files are skipped by default; pass --force to overwrite them.
 
 Options:
   --driver <name>   Database driver: better-sqlite3 (default), node-sqlite, pg, mysql2.
-  --force           Overwrite all existing scaffold files (package.json, config/database.ts, db.ts, etc.).`;
+  --force           Overwrite all existing scaffold files, including tsconfig.json.`;
 
 const DB_CREATE_HELP = `ar db:create — create the database for the current TRAILS_ENV
 

@@ -31,7 +31,7 @@ export const FRESH_TSCONFIG =
         rootDir: ".",
         plugins: [{ name: TRAILS_TSC_PLUGIN }],
       },
-      include: ["./**/*.ts"],
+      include: ["./**/*.ts", "app/models/**/*.ts", "db/migrate/**/*.ts"],
       exclude: ["node_modules", "dist"],
     },
     null,

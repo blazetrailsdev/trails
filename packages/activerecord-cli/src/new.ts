@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from "fs/promises";
 import { dirname, join } from "path";
 import { init } from "./init.js";
-import { FRESH_TSCONFIG } from "./tsconfig-merge.js";
 
 export type Driver = "better-sqlite3" | "node-sqlite" | "pg" | "mysql2";
 
@@ -150,8 +149,6 @@ export async function arNew(
   await write("package.json", packageJson(appName, driver));
   await write(".gitignore", GITIGNORE);
 
-  await write("tsconfig.json", FRESH_TSCONFIG);
-
   const overrides: Record<string, string> = {
     "config/database.ts": databaseConfig(appName, driver),
   };
@@ -163,7 +160,6 @@ export async function arNew(
     overrides,
     driver,
     skipPackageJson: true,
-    skipTsconfig: true,
   });
   for (const rel of initResult.created) created.push(rel);
   for (const rel of initResult.skipped) skipped.push(rel);
