@@ -163,11 +163,11 @@ avoids a second parse of the same source file.
    - Default `primaryKey` to `"id"` when absent.
    - Synthesize a constraint name when `name` is absent
      (`fk_rails_${fromTable}_${column}` is sufficient for codegen).
-   - Construct a `new ForeignKeyDefinition(fromTable, toTable, column,
-primaryKey, name, onDelete, onUpdate, deferrable, validate)` — use the
-     real class so the result is assignable to `ForeignKeyDefinition[]` without
-     casting. (`ForeignKeyDefinition` is a class with instance methods;
-     plain objects do not satisfy the type.)
+   - Construct `new ForeignKeyDefinition(fromTable, toTable, column, primaryKey,
+name, onDelete, onUpdate, deferrable, validate)` — use the real class so
+     the result is assignable to `ForeignKeyDefinition[]` without casting.
+     (`ForeignKeyDefinition` is a class with instance methods; plain objects
+     do not satisfy the type.)
    - Attach the `ForeignKeyDefinition` to the relevant `fromTable` entry.
 
 3. Return `IntrospectedTable[]` with one entry per `createTable` call,
@@ -184,13 +184,13 @@ Add a `--schema <path>` flag. When present:
 
 The `--database-url` / `$DATABASE_URL` path is **kept unchanged** for now.
 When neither `--schema` nor a DB URL is available, prefer auto-discovering
-`db/schema.ts` relative to CWD (see PR δ).
+`db/schema.ts` relative to CWD (see PR 4).
 
 ## Work breakdown (sized, sibling PRs off `main`)
 
 Per repo convention these are **non-overlapping sibling PRs**, not a stack.
 
-### PR α — Extend `schema-ts-parser.ts` with `parseSchemaForModels` (~150 LOC)
+### PR 1 — Extend `schema-ts-parser.ts` with `parseSchemaForModels` (~150 LOC)
 
 - Extend `synthesizePk`-family logic to capture composite PK column names
   from the `primaryKey: [...]` option literal array (~20 lines).
@@ -206,7 +206,7 @@ Per repo convention these are **non-overlapping sibling PRs**, not a stack.
 
 Dependency: PR A (#2761) merged (parser infrastructure lives there).
 
-### PR β — New `--schema` flag in `trails-models-dump` (~130 LOC)
+### PR 2 — New `--schema` flag in `trails-models-dump` (~130 LOC)
 
 - Add `schemaPath?: string` to `Args`; parse `--schema` / `--schema=<v>`
   (~20 lines).
@@ -221,9 +221,9 @@ Dependency: PR A (#2761) merged (parser infrastructure lives there).
   one FK to a tmpfile, run `trails-models-dump --schema <tmpfile>`, assert
   generated classes + `belongsTo`/`hasMany` are correct (~55 lines).
 
-Dependency: PR α merged.
+Dependency: PR 1 merged.
 
-### PR γ — Migrate consumers and docs (~50 LOC)
+### PR 3 — Migrate consumers and docs (~50 LOC)
 
 - `packages/activerecord-cli/README.md`: update the `ar models:dump` row in
   the Tooling table to show `--schema db/schema.ts` as the primary form;
@@ -234,9 +234,9 @@ Dependency: PR α merged.
   flag.
 - No production code changes in this PR.
 
-Dependency: PR β merged (so docs reflect real flags).
+Dependency: PR 2 merged (so docs reflect real flags).
 
-### PR δ — Convention default + live-DB deprecation (~60 LOC)
+### PR 4 — Convention default + live-DB deprecation (~60 LOC)
 
 Two changes, both in `trails-models-dump.ts`:
 
@@ -255,7 +255,7 @@ Two changes, both in `trails-models-dump.ts`:
    ```
    The tool still succeeds — this is informational only.
 
-Dependency: PR γ merged.
+Dependency: PR 3 merged.
 
 ## Parser-shape gaps (summary)
 
@@ -291,7 +291,7 @@ Dependency: PR γ merged.
 - **Users without `db/schema.ts` yet.** Projects that haven't run
   `ar db:schema:dump` have no schema.ts to point at. The live-DB path
   remains available for exactly this bootstrap case. The convention default
-  (PR δ) gracefully falls back rather than erroring.
+  (PR 4) gracefully falls back rather than erroring.
 
 - **MySQL spatial and other exotic types.** The schema-dumper emits these as
   `t.column("c", "geometry")` or via adapter-specific helpers. Both surface
@@ -332,13 +332,13 @@ Dependency: PR γ merged.
 
 - `ar models:dump --schema db/schema.ts` emits the same class/association
   structure as `ar models:dump --database-url <url>` against the same
-  underlying schema. Verified by the PR β integration test: a schema.ts
+  underlying schema. Verified by the PR 2 integration test: a schema.ts
   fixture with two tables and one FK produces the same output as running
   the live-DB path against a SQLite database built from the same DDL.
 - No `Base.establishConnection()` is called when `--schema` is the active
   path — confirmed by running `trails-models-dump --schema db/schema.ts`
   with `DATABASE_URL` unset and no DB running.
-- Convention default (PR δ): bare `ar models:dump` with `db/schema.ts`
+- Convention default (PR 4): bare `ar models:dump` with `db/schema.ts`
   present uses the schema path; without it, falls back to `DATABASE_URL`.
 - `--schema` tests pass for: two-table schema with one FK, composite-PK
   table, table with `id: false`, table with UUID PK.
