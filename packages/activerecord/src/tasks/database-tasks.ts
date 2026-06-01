@@ -917,6 +917,20 @@ export class DatabaseTasks {
     return migrator.migrationsStatus();
   }
 
+  /**
+   * Return the highest applied migration version, or 0 if no migrations
+   * have been run (or the schema_migrations table does not yet exist).
+   *
+   * Mirrors: `ActiveRecord::Base.connection_pool.migration_context.current_version`
+   * (called by `rails db:version`).
+   */
+  static async currentVersion(): Promise<number> {
+    const adapter = await this._migrationAdapter();
+    const { Migrator } = await import("../migration.js");
+    const migrator = new Migrator(adapter, this._migrations);
+    return migrator.currentVersionReadOnly();
+  }
+
   static async migrateAll(): Promise<void> {
     const configs = this.configsFor(this._normalizeEnv());
 

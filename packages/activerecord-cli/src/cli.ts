@@ -18,6 +18,7 @@ import {
   dbReset,
   dbPrepare,
   dbMigrateStatus,
+  dbVersion,
 } from "./db-tasks.js";
 import { dbAbortIfPendingMigrations } from "./pending-migrations.js";
 import { arConsole } from "./console.js";
@@ -43,6 +44,7 @@ Commands:
   db:drop                        Drop the database for the current TRAILS_ENV
   db:migrate                     Run pending migrations
   db:migrate:status              Show up/down status for each migration
+  db:version                     Print the current schema version
   db:rollback                    Roll back the last migration
   db:schema:load                 Load db/schema.ts into the database
   db:seed                        Load db/seeds.ts
@@ -104,6 +106,16 @@ Production environments are protected unless DISABLE_DATABASE_ENVIRONMENT_CHECK 
 
 Options:
   --all   Drop databases for all environments, not just the current one.`;
+
+const DB_VERSION_HELP = `ar db:version — print the current schema version
+
+Connects to the database for the current TRAILS_ENV and prints the highest
+applied migration version. Prints "Current version: 0" when no migrations have
+been run or the schema_migrations table does not yet exist.
+
+Options:
+  --all         Print version for all configured databases.
+  --env <name>  Override TRAILS_ENV for this invocation.`;
 
 const DB_MIGRATE_STATUS_HELP = `ar db:migrate:status — show up/down status for each migration
 
@@ -377,6 +389,13 @@ export async function run(argv: string[], cwd: string): Promise<number> {
       return 0;
     }
     return dbDrop(cwd, rest);
+  }
+  if (command === "db:version") {
+    if (wantsHelp(rest)) {
+      console.log(DB_VERSION_HELP);
+      return 0;
+    }
+    return dbVersion(cwd, rest);
   }
   if (command === "db:migrate:status") {
     if (wantsHelp(rest)) {

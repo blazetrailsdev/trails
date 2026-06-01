@@ -291,6 +291,48 @@ export async function dbPrepare(cwd: string, _args: string[]): Promise<number> {
   }
 }
 
+export async function dbVersion(cwd: string, args: string[]): Promise<number> {
+  const all = args.includes("--all");
+  const envFlag = flagValue(args, "--env");
+  if (envFlag) process.env["TRAILS_ENV"] = envFlag;
+
+  try {
+    await loadDatabaseConfig(cwd);
+  } catch (err) {
+    console.error(`ar: failed to load config/database.ts — ${String(err)}`);
+    return 1;
+  }
+
+  const env = DatabaseConfigurations.currentEnv();
+  const configs = all
+    ? (DatabaseTasks.databaseConfiguration?.configurations ?? [])
+    : DatabaseTasks.configsFor(env);
+
+  if (configs.length === 0) {
+    console.error(
+      all
+        ? "ar: no database configurations found"
+        : `ar: no database configuration found for environment "${env}"`,
+    );
+    return 1;
+  }
+
+  for (const config of configs) {
+    const dbName = config.database ?? config.envName ?? "(unknown)";
+    try {
+      await DatabaseTasks.withTemporaryPool(config, async () => {
+        const version = await DatabaseTasks.currentVersion();
+        if (all) console.log(`${dbName}: Current version: ${version}`);
+        else console.log(`Current version: ${version}`);
+      });
+    } catch (err) {
+      console.error(`ar: db:version failed for '${dbName}' — ${String(err)}`);
+      return 1;
+    }
+  }
+  return 0;
+}
+
 function center(s: string, width: number): string {
   const pad = width - s.length;
   const left = Math.floor(pad / 2);
