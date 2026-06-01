@@ -289,10 +289,17 @@ export default defineConfig(
   },
 
   // ── activerecord ──
+  // no-explicit-any is enabled as "warn" for staged adoption: the package
+  // carries ~8.4k existing `any` sites across src + tests, far past what one
+  // PR can drive to zero. "warn" surfaces every `as any` / bare `any` in lint
+  // output (and flags any NEW ones in review) while keeping CI green, since
+  // root `pnpm lint` runs without `--max-warnings`. Ratchet warn → error
+  // per-area as the count is driven down; see the campaign tracked in the
+  // enabling PR.
   {
     files: ["packages/activerecord/src/**/*.ts"],
     rules: {
-      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-this-alias": "off",
       "unused-imports/no-unused-vars": "off",
       "no-empty": "off",
