@@ -25,6 +25,7 @@ describe("DbTasksTest", () => {
   let err: string[];
   let createAll: ReturnType<typeof vi.fn>;
   let dropAll: ReturnType<typeof vi.fn>;
+  let dumpSchema: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     out = [];
@@ -34,8 +35,10 @@ describe("DbTasksTest", () => {
 
     createAll = vi.fn().mockResolvedValue(undefined);
     dropAll = vi.fn().mockResolvedValue(undefined);
+    dumpSchema = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(DatabaseTasks, "create").mockImplementation(createAll);
     vi.spyOn(DatabaseTasks, "drop").mockImplementation(dropAll);
+    vi.spyOn(DatabaseTasks, "dumpSchema").mockImplementation(dumpSchema);
     vi.spyOn(DatabaseTasks, "checkProtectedEnvironmentsBang").mockResolvedValue(undefined);
   });
 
@@ -75,6 +78,29 @@ describe("DbTasksTest", () => {
     const code = await run(["db:drop", "--all"], dir);
     expect(code).toBe(0);
     expect(dropAll).toHaveBeenCalledTimes(2);
+  });
+
+  it("db:schema:dump calls DatabaseTasks.dumpSchema for current env", async () => {
+    const dir = await makeFakeProject();
+    const code = await run(["db:schema:dump"], dir);
+    expect(code).toBe(0);
+    expect(dumpSchema).toHaveBeenCalledOnce();
+    expect(out.join("\n")).toContain("Dumped schema to");
+  });
+
+  it("db:schema:dump exits 1 when dumpSchema throws", async () => {
+    dumpSchema.mockRejectedValueOnce(new Error("boom"));
+    const dir = await makeFakeProject();
+    const code = await run(["db:schema:dump"], dir);
+    expect(code).toBe(1);
+    expect(err.join("\n")).toContain("db:schema:dump failed");
+  });
+
+  it("db:schema:dump exits 1 when config/database.ts is missing", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-db-tasks-noconfig-"));
+    const code = await run(["db:schema:dump"], dir);
+    expect(code).toBe(1);
+    expect(err.join("\n")).toContain("failed to load config/database.ts");
   });
 
   it("db:create exits 1 when config/database.ts is missing", async () => {

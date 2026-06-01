@@ -12,6 +12,7 @@ import {
   dbDrop,
   dbMigrate,
   dbRollback,
+  dbSchemaDump,
   dbSchemaLoad,
   dbSeed,
   dbSetup,
@@ -46,6 +47,7 @@ Commands:
   db:migrate:status              Show up/down status for each migration
   db:version                     Print the current schema version
   db:rollback                    Roll back the last migration
+  db:schema:dump                 Dump the current database schema to db/schema.ts
   db:schema:load                 Load db/schema.ts into the database
   db:seed                        Load db/seeds.ts
   db:setup                       Create, load schema, and seed
@@ -133,6 +135,8 @@ const DB_ROLLBACK_HELP = `ar db:rollback — roll back the last migration
 Options:
   --step <n>   Roll back N migrations (default: 1).`;
 
+const DB_SCHEMA_DUMP_HELP = `ar db:schema:dump — dump the current database schema to db/schema.ts`;
+
 const DB_SCHEMA_LOAD_HELP = `ar db:schema:load — load db/schema.ts into the database`;
 
 const DB_SEED_HELP = `ar db:seed — load db/seeds.ts (no-op if file is absent)`;
@@ -205,7 +209,7 @@ Options:
   --env <name>   Override TRAILS_ENV for this invocation.`;
 
 /** Commands recognized but deferred to a later slice (see proposal §5). */
-const NOT_IMPLEMENTED = new Set("db:schema:dump".split(" "));
+const NOT_IMPLEMENTED = new Set<string>();
 
 function wantsHelp(args: string[]): boolean {
   return args.includes("--help") || args.includes("-h");
@@ -441,6 +445,13 @@ export async function run(argv: string[], cwd: string): Promise<number> {
       return 0;
     }
     return dbRollback(cwd, rest);
+  }
+  if (command === "db:schema:dump") {
+    if (wantsHelp(rest)) {
+      console.log(DB_SCHEMA_DUMP_HELP);
+      return 0;
+    }
+    return dbSchemaDump(cwd, rest);
   }
   if (command === "db:schema:load") {
     if (wantsHelp(rest)) {

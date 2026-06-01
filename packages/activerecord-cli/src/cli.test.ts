@@ -38,9 +38,7 @@ describe("ArCliTest", () => {
     expect(out.join("\n")).toContain("create  db.ts");
   });
 
-  it("exits 1 for deferred commands and unknown commands", async () => {
-    expect(await run(["db:schema:dump"], ".")).toBe(1);
-    expect(err.join("\n")).toContain("not implemented");
+  it("exits 1 for unknown commands", async () => {
     expect(await run(["frobnicate"], ".")).toBe(1);
     expect(err.join("\n")).toContain('unknown command "frobnicate"');
   });
