@@ -31,8 +31,8 @@ stale** — e.g. `hash-config` showed 34 pending there but has **0** live
 `it.skip` today (shipped since). Authoritative source of truth:
 
 ```bash
-pnpm test:compare --cached --json --package activerecord     # matched/skipped/missing per file
-pnpm tsx scripts/test-compare/per-file-backlog.ts            # rendered per-file table
+pnpm test:compare --cached --json --package activerecord     # matched/skipped/missing per file (JSON)
+pnpm test:compare --package activerecord --incomplete        # rendered per-file table, complete files hidden
 grep -rn "BLOCKED:" packages/activerecord/src --include='*.test.ts' \
   | sed 's/.*BLOCKED: //' | cut -d' ' -f1 | sort | uniq -c | sort -rn   # category histogram
 ```
@@ -161,10 +161,11 @@ through the connection's visitor. Siblings off `main`, non-overlapping files,
   `<node>.toSql()` with `this.connection.toSql(<node>)` (connection in scope).
 - Done: DDL/metadata SQL is connection-derived; touched tests green.
 
-### Story 1.2 — Phase A2: persistence + base ternaries `[fidelity]` ~70 LOC · dep: none
+### Story 1.2 — Phase A2: persistence + base toSql callers `[fidelity]` ~70 LOC · dep: none
 
-- Ours: `persistence.ts:223,259,286,562,956,1001` (the
-  `adapter.toSql ? adapter.toSql(x) : x.toSql()` ternaries → unconditional
+- Ours: `persistence.ts:223,259,286,562,956,1001` (the `toSql()` callers —
+  `:259,286,956` are `adapter.toSql ? … : x.toSql()` ternaries, `:223` the
+  `connection.toSql ? …` form, `:562,1001` bare `x.toSql()` — all → unconditional
   `connection.toSql(x)`); `base.ts` `ctor.connection` toSql sites.
 - Done: no `: x.toSql()` fallback remains in persistence/base.
 
