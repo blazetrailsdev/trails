@@ -925,11 +925,11 @@ describe("TransactionTest", () => {
 
   it.skip("raising exception in callback rollbacks in save", () => {
     // BLOCKED: D-1 — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/connection-pooled-test-adapter-plan.md.
+    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
   });
   it.skip("update should rollback on failure!", () => {
     // BLOCKED: D-1 — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/connection-pooled-test-adapter-plan.md.
+    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
   });
   it("manually rolling back a transaction", async () => {
     class Topic extends Base {
@@ -1017,7 +1017,7 @@ describe("TransactionTest", () => {
 
   it.skip("restore frozen state after double destroy", () => {
     // BLOCKED: D-1 — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/connection-pooled-test-adapter-plan.md.
+    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
   });
 
   it("restore previously new record after double save", async () => {
@@ -1036,12 +1036,12 @@ describe("TransactionTest", () => {
 
   it.skip("restore composite id after rollback", () => {
     // BLOCKED: D-1 — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/connection-pooled-test-adapter-plan.md.
+    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
   });
 
   it.skip("restore custom primary key after rollback", () => {
     // BLOCKED: D-1 — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/connection-pooled-test-adapter-plan.md.
+    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
   });
 
   it("assign id after rollback", async () => {

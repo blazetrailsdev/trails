@@ -342,6 +342,27 @@ reference (#2638).
 
 **Ready now:**
 
+- [ ] **§4.8 full bin relocation (schema/models dumps)** — promote the
+      light delegation from #2709 to the documented end-state for the two
+      bins that can move now. Concretely: - Move `packages/activerecord/src/bin/trails-schema-dump.ts` (92 LOC)
+      and `packages/activerecord/src/bin/trails-models-dump.ts` (216 LOC)
+      into `packages/activerecord-cli/src/bin/`. - Drop the matching entries from `packages/activerecord/package.json`
+      `bin` (`trails-schema-dump`, `trails-models-dump`) and add them to
+      `packages/activerecord-cli/package.json`. - Replace the delegation paths in
+      `packages/activerecord-cli/src/delegate.ts` for these two with
+      direct imports of the relocated modules (`ar schema:dump` /
+      `ar models:dump` invoke them in-process, no child spawn). - `packages/activerecord/src/schema-dumper.ts` (the runtime library)
+      STAYS in `activerecord` — the bin is just an entry on top of it;
+      the relocated bin imports the library back from `activerecord`. - No code change needed in `trailties`; pnpm repoints the
+      `node_modules/.bin/trails-{schema,models}-dump` symlinks to the new
+      owner package automatically on next install. CI scripts that
+      invoke the bins by name continue to work.
+
+      `trails-tsc` full move stays gated on the dev-only cycle
+      (`activerecord` devDep → `activerecord-cli` → `activerecord`) — that
+      one is a follow-up. The two dump bins do not participate in the AR
+      virtualized-dx self-test, so they are safe to fully relocate now.
+
 - [x] Done (#2657) — **§6.2 `_abstractClass` own-property fix**. Routed the three
       un-guarded `_abstractClass` reads in `model-schema.ts` (`resetTableName` :392,
       `loadSchemaFromAdapter` :819, `loadSchemaFromCacheSync` :890) through

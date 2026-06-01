@@ -426,7 +426,7 @@ export function useFixtures(
   // TODO(fixtures-adoption Spike S1): seed once per worker in a global beforeAll
   // (before the pinned transaction opens) when useHandlerTransactionalFixtures is
   // active, falling back to this per-test seed otherwise. Deferred to a follow-up
-  // PR to keep this one under the LOC ceiling. See docs/activerecord/fixtures-adoption-plan.md.
+  // PR to keep this one under the LOC ceiling. See docs/activerecord/activerecord-index.md (fixtures-adoption note).
   beforeEach(async () => {
     // Resolve from the `keys` snapshot, not `fixturesOrNames`: a caller can mutate
     // the (mutable-assignable) array after this call, which would otherwise seed a

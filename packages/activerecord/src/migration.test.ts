@@ -1343,7 +1343,7 @@ describe("MigrationTest", () => {
 
   it.skip("migration instance has connection", () => {
     // BLOCKED: D-1 — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/connection-pooled-test-adapter-plan.md.
+    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
   });
 
   it("migration.connection returns _connectionOverride when set", () => {
