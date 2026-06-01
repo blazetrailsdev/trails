@@ -1,30 +1,34 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/explain_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { it, expect } from "vitest";
+import "../../index.js";
+import { describeIfSqlite } from "./test-helper.js";
+import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
+import { Author } from "../../test-helpers/models/author.js";
+import "../../test-helpers/models/post.js";
 
-let adapter: SQLite3Adapter;
-
-beforeEach(() => {
-  adapter = new SQLite3Adapter(":memory:");
-});
-
-afterEach(() => {
-  adapter.close();
-});
-
-// -- Rails test class: explain_test.rb --
-describe("SQLite3ExplainTest", () => {
-  it("explain for one query", async () => {
-    adapter.exec(`CREATE TABLE "explain_items" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    const result = await adapter.explain(`SELECT * FROM "explain_items" WHERE "id" = 1`);
-    expect(result).toBeDefined();
-    expect(result.length).toBeGreaterThan(0);
+// -- Rails test class: explain_test.rb (ActiveRecord::SQLite3TestCase) --
+// Pinned to the SQLite backend: the `EXPLAIN for: … "authors" …` header quoting
+// and the `SEARCH … authors USING … PRIMARY KEY` plan shape are SQLite-specific,
+// so this must skip when the handler connection is PG/MySQL in the CI matrix.
+describeIfSqlite("SQLite3ExplainTest", () => {
+  // Rails `fixtures :authors, :author_addresses`. `schema` recreates the
+  // canonical tables so the shared Author/Post models resolve regardless of
+  // any bespoke schema a sibling file left in the shared worker DB.
+  const { authors } = useHandlerFixtures(["authors", "authorAddresses"], {
+    schema: canonicalSchema,
   });
 
-  // null-overridden: needs eager loading + explain integration
-  // it.skip("explain with eager loading", () => {});
+  it("explain for one query", async () => {
+    const explain = await Author.where({ id: authors("david").id }).explain();
+    expect(explain).toMatch(
+      /EXPLAIN for: SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\? \[\["id", 1\]\]|1)/,
+    );
+    expect(explain).toMatch(/(SEARCH )?(TABLE )?authors USING (INTEGER )?PRIMARY KEY/);
+  });
+
   it.skip("explain with eager loading", () => {
     // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in explain
     // ROOT-CAUSE: adapters/sqlite3/explain.ts missing Rails parity

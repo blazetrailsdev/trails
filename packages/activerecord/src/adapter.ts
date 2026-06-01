@@ -211,12 +211,14 @@ export interface DatabaseAdapter {
 
   /**
    * Build the printed header prefix used by `Relation#explain` — e.g.
-   * `"EXPLAIN for:"` (default), `"EXPLAIN (ANALYZE, VERBOSE) for:"`
-   * (PG), `"EXPLAIN ANALYZE for:"` (MySQL), `"EXPLAIN QUERY PLAN for:"`
-   * (SQLite). Distinct from `explain()` itself — this builds the
-   * label row, not the actual SQL clause.
+   * `"EXPLAIN for:"` (default, inherited by SQLite),
+   * `"EXPLAIN (ANALYZE, VERBOSE) for:"` (PG), `"EXPLAIN ANALYZE for:"`
+   * (MySQL). Distinct from `explain()` itself — this builds the label
+   * row, not the actual SQL clause (SQLite's `EXPLAIN QUERY PLAN`
+   * keyword lives in `explain()`, never in this header).
    *
-   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_explain_clause
+   * Mirrors Rails' `ActiveRecord::Explain#build_explain_clause` fallback;
+   * only the PG/MySQL adapters carry a private override.
    */
   buildExplainClause?(options?: ExplainOption[]): string;
 

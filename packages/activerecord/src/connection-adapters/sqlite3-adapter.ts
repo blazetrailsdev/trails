@@ -514,15 +514,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /**
-   * Build the printed header prefix used by `Relation#explain`.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#build_explain_clause
-   */
-  override buildExplainClause(_options: ExplainOption[] = []): string {
-    return "EXPLAIN QUERY PLAN for:";
-  }
-
-  /**
    * Quote a value for inclusion in a SQL literal. SQLite uses plain
    * `'' ` string escaping (no backslash escapes), `1/0` for booleans,
    * and `x'hex'` for binary.
