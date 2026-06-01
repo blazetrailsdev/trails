@@ -238,13 +238,16 @@ export default defineConfig(
     },
   },
 
-  // ── test-fixture-parity: notice-only warn when a trails test whose Rails
-  //    counterpart uses fixtures lacks a useFixtures call in its describe scope.
-  //    Mapping: eslint/test-fixture-parity.json (committed). ──
+  // ── test-fixture-parity: hard-gate active tests whose Rails counterpart
+  //    uses fixtures but which call no fixture accessor in their it() body.
+  //    Skipped tests (it.skip/.todo, describe.skip) are exempt — they are the
+  //    migration backlog. Files not yet ported off inline models are listed in
+  //    eslint/test-fixture-parity-exclude.json and ratcheted down as porters
+  //    adopt useFixtures. Mapping: eslint/test-fixture-parity.json (committed). ──
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
     rules: {
-      "blazetrails/test-fixture-parity": "warn",
+      "blazetrails/test-fixture-parity": "error",
     },
   },
   {
