@@ -130,7 +130,7 @@ export class InsertAll {
     if (this.inserts.length === 0) return 0;
     const dialect = this.connection.adapterName;
     const builder = new Builder(this, dialect);
-    return this.connection.executeMutation(builder.toSql());
+    return this.connection.executeMutation(this.connection.toSql(builder));
   }
 
   updatableColumns(): string[] {

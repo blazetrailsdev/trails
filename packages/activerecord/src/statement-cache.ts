@@ -194,6 +194,7 @@ export class StatementCache {
   static create(
     connection: {
       cacheableQuery?(klass: unknown, arel: unknown): [unknown, unknown[]];
+      toSql(arel: unknown): string;
       preparedStatements?: boolean;
     },
     callable: (params: Params) => {
@@ -213,7 +214,7 @@ export class StatementCache {
         unknown[],
       ];
     } else {
-      const sql = arel.toSql();
+      const sql = connection.toSql(arel);
       queryBuilder = new Query(sql);
       binds = [];
     }
