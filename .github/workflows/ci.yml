@@ -92,7 +92,10 @@ jobs:
           # CLI + type-virtualization modules (see packages/activerecord/src/
           # tsc-wrapper, schema-columns-dump.test.ts), so trails-tsc changes
           # can fail AR vitest suites — include it in the gate.
-          AR_PKGS_RE='^packages/(activerecord|arel|activemodel|activesupport|globalid|did-you-mean|trails-tsc)/'
+          # activerecord-cli E2E suites run in the three AR DB jobs (its tests
+          # exercise the CLI against real DBs), so cli source changes must also
+          # flip activerecord_affected.
+          AR_PKGS_RE='^packages/(activerecord|activerecord-cli|arel|activemodel|activesupport|globalid|did-you-mean|trails-tsc)/'
           # actionpack_affected gates actionpack-tests. True for actionpack +
           # its runtime deps (actionview/activemodel/activesupport/rack/did-you-mean).
           AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|activesupport|rack|did-you-mean)/'
@@ -479,6 +482,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm vitest run packages/activerecord
+      - run: pnpm vitest run packages/activerecord-cli
 
   postgres-tests:
     name: PostgreSQL Tests
@@ -521,6 +525,9 @@ jobs:
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
           AR_DB_FORKS: 4
+      - run: pnpm vitest run packages/activerecord-cli
+        env:
+          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
 
   mariadb-tests:
     name: MariaDB Tests
@@ -563,6 +570,9 @@ jobs:
         env:
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
           AR_DB_FORKS: 4
+      # No MYSQL_TEST_URL: no mysql-happy-path E2E exists yet. This run
+      # covers the SQLite E2E until a mysql suite lands and can be wired up.
+      - run: pnpm vitest run packages/activerecord-cli
 
   website:
     name: Website
