@@ -14,7 +14,7 @@ const createBuilderWithArPlugin = createArSolutionBuilder;
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = path.resolve(CURRENT_DIR, "__fixtures__");
-const CLI_BIN_PATH = path.resolve(CURRENT_DIR, "../../../dist/tsc-wrapper/cli.js");
+const CLI_BIN_PATH = path.resolve(CURRENT_DIR, "../../dist/tsc-wrapper/cli.js");
 // CLI-binary tests skip when dist isn't built (CI jobs that skip
 // `pnpm build`). Probed at module load so test bodies stay conditional-free.
 const itIfCliBin = fs.existsSync(CLI_BIN_PATH) ? it : it.skip;
