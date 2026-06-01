@@ -111,9 +111,9 @@ export const ERB_SKIP_SENTINEL = "__ERB_SKIP__";
 // + 2 categories fixtures ported in Phase 4a
 // + 7 reserved_words/to_be_linked YAMLs ported in Phase 7 (missing: 18 → 11).
 // + 4 all/ fixtures ported in Phase 9 (missing: 5 → 1).
-// Phase 10 (primary_key_error/) will close the last missing YAML. Bump match when new
-// fixtures are ported; bump diff only for intentional accepted drifts.
-const CI_BASELINE = { match: 133, diff: 9, missing: 1 } as const;
+// + Phase 10 (primary_key_error/) — missing: 1 → 0; diff: 9 → 10 (intentional: negative-
+//   assertion fixture omits ownedEssay column by design, not a data parity gap).
+const CI_BASELINE = { match: 133, diff: 10, missing: 0 } as const;
 
 function parseArgs(argv: string[]): {
   pkg: string;
