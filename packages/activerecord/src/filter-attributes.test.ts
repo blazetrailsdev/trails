@@ -51,6 +51,9 @@ describe("FilterAttributesTest", () => {
   });
 
   it("filter_attributes", () => {
+    // Rails iterates `Admin::User.all` + `Admin::Account.all`; the Admin::User loop is
+    // dropped (model blocked, see header) and `admin/accounts` holds the single
+    // `signals37` row, so one fixture lookup is equivalent for the Account side.
     const account = accounts("signals37");
     expect(account.inspect()).toContain("name: [FILTERED]");
     expect(account.inspect().match(/\[FILTERED\]/g)?.length).toBe(1);
