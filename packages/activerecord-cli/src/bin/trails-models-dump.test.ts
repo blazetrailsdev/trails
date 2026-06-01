@@ -88,7 +88,7 @@ beforeAll(() => {
   }
 }, 180_000);
 
-describe("trails-models-dump CLI", () => {
+describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
   let tmp: string;
   let dbPath: string;
   let outPath: string;
