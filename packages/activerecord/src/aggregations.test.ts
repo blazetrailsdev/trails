@@ -8,13 +8,19 @@ import { Base, composedOf } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-import { useFixtures } from "./test-helpers/use-fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 // Aliased: a top-level `Customer` binding would make the bundler rename the inline
 // `class Customer extends Base` definitions below to `Customer2` (lexical-scope
 // de-clash), shifting their inferred table name to `customer2s` and breaking those
 // tests. The alias keeps the inline class names — and thus their table names — intact.
-import { Customer as CustomerModel, Money as MoneyClass } from "./test-helpers/models/customer.js";
+import {
+  Customer as CustomerModel,
+  Money as MoneyClass,
+  Address,
+  GpsLocation,
+  Fullname,
+} from "./test-helpers/models/customer.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -34,12 +40,7 @@ describe("AggregationsTest", () => {
     await defineSchema({
       customers: { name: "string", address_street: "string", address_city: "string" },
       locations: { name: "string", lat: "float", lng: "float" },
-      orders: { label: "string", price_amount: "float", price_currency: "string" },
-      readings: { label: "string", temp_degrees: "float" },
-      waypoints: { name: "string", latitude: "float", longitude: "float" },
       articles: { title: "string", tag_name: "string" },
-      accounts: { name: "string", balance_amount: "float" },
-      shapes: { name: "string", coord_x: "float", coord_y: "float" },
     });
   });
   // Rails: test_find_multiple_value_object
@@ -196,190 +197,6 @@ describe("AggregationsTest", () => {
     expect(addr).toBeInstanceOf(Address);
   });
 
-  // Rails: test_custom_converter
-  it("custom converter", async () => {
-    class Money {
-      constructor(
-        public amount: number,
-        public currency: string,
-      ) {}
-    }
-    class Order extends Base {
-      static {
-        this.attribute("label", "string");
-        this.attribute("price_amount", "float");
-        this.attribute("price_currency", "string");
-      }
-    }
-    composedOf(Order, "price", {
-      className: Money,
-      mapping: [
-        ["price_amount", "amount"],
-        ["price_currency", "currency"],
-      ],
-      converter: (v: unknown) => {
-        if (typeof v === "number") return new Money(v, "USD");
-        return v;
-      },
-    });
-
-    const o = await Order.create({ label: "Widget", price_amount: 9.99, price_currency: "USD" });
-    const price = (o as any).price;
-    expect(price).toBeInstanceOf(Money);
-    expect(price.amount).toBeCloseTo(9.99);
-    expect(price.currency).toBe("USD");
-
-    (o as any).price = 5.0;
-    expect(o.price_amount).toBe(5.0);
-    expect(o.price_currency).toBe("USD");
-  });
-
-  // Rails: test_custom_constructor
-  it("custom constructor", async () => {
-    class Temperature {
-      degrees: number;
-      constructor(degrees: number) {
-        this.degrees = degrees;
-      }
-    }
-    class Reading extends Base {
-      static {
-        this.attribute("label", "string");
-        this.attribute("temp_degrees", "float");
-      }
-    }
-    composedOf(Reading, "temperature", {
-      className: Temperature,
-      mapping: [["temp_degrees", "degrees"]],
-    });
-
-    const r = await Reading.create({ label: "Morning", temp_degrees: 72.5 });
-    const temp = (r as any).temperature;
-    expect(temp).toBeInstanceOf(Temperature);
-    expect(temp.degrees).toBeCloseTo(72.5);
-  });
-
-  // Rails: test_hash_mapping
-  it("hash mapping", async () => {
-    class Coord {
-      constructor(
-        public x: number,
-        public y: number,
-      ) {}
-    }
-    class Shape extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("coord_x", "float");
-        this.attribute("coord_y", "float");
-      }
-    }
-    composedOf(Shape, "origin", {
-      className: Coord,
-      mapping: [
-        ["coord_x", "x"],
-        ["coord_y", "y"],
-      ],
-    });
-
-    const s = await Shape.create({ name: "Square", coord_x: 1.0, coord_y: 2.0 });
-    const origin = (s as any).origin;
-    expect(origin.x).toBeCloseTo(1.0);
-    expect(origin.y).toBeCloseTo(2.0);
-  });
-
-  // Rails: test_value_object_with_hash_mapping_assignment_changes_model_attributes
-  it("value object with hash mapping assignment changes model attributes", async () => {
-    class Coord {
-      constructor(
-        public x: number,
-        public y: number,
-      ) {}
-    }
-    class Shape extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("coord_x", "float");
-        this.attribute("coord_y", "float");
-      }
-    }
-    composedOf(Shape, "origin", {
-      className: Coord,
-      mapping: [
-        ["coord_x", "x"],
-        ["coord_y", "y"],
-      ],
-    });
-
-    const s = await Shape.create({ name: "Circle", coord_x: 0.0, coord_y: 0.0 });
-    (s as any).origin = new Coord(5.5, 3.3);
-    expect(s.coord_x).toBeCloseTo(5.5);
-    expect(s.coord_y).toBeCloseTo(3.3);
-  });
-
-  // Rails: test_gps_equality
-  it("gps equality", async () => {
-    class GpsCoord {
-      constructor(
-        public latitude: number,
-        public longitude: number,
-      ) {}
-      equals(other: GpsCoord) {
-        return this.latitude === other.latitude && this.longitude === other.longitude;
-      }
-    }
-    class Waypoint extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("latitude", "float");
-        this.attribute("longitude", "float");
-      }
-    }
-    composedOf(Waypoint, "gps", {
-      className: GpsCoord,
-      mapping: [
-        ["latitude", "latitude"],
-        ["longitude", "longitude"],
-      ],
-    });
-
-    const w = await Waypoint.create({ name: "HQ", latitude: 37.7, longitude: -122.4 });
-    const gps1 = (w as any).gps;
-    const gps2 = (w as any).gps;
-    expect(gps1.equals(gps2)).toBe(true);
-  });
-
-  // Rails: test_gps_inequality
-  it("gps inequality", async () => {
-    class GpsCoord {
-      constructor(
-        public latitude: number,
-        public longitude: number,
-      ) {}
-      equals(other: GpsCoord) {
-        return this.latitude === other.latitude && this.longitude === other.longitude;
-      }
-    }
-    class Waypoint extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("latitude", "float");
-        this.attribute("longitude", "float");
-      }
-    }
-    composedOf(Waypoint, "gps", {
-      className: GpsCoord,
-      mapping: [
-        ["latitude", "latitude"],
-        ["longitude", "longitude"],
-      ],
-    });
-
-    const w1 = await Waypoint.create({ name: "A", latitude: 37.7, longitude: -122.4 });
-    const w2 = await Waypoint.create({ name: "B", latitude: 40.7, longitude: -74.0 });
-    expect((w1 as any).gps.equals((w2 as any).gps)).toBe(false);
-  });
-
   // Rails: test_immutable_value_objects
   it("immutable value objects", async () => {
     class Tag {
@@ -441,39 +258,15 @@ describe("AggregationsTest", () => {
     const addr2 = (c as any).address;
     expect(addr2.city).toBe("CHI");
   });
-
-  // Rails: test_inferred_mapping
-  it("inferred mapping", async () => {
-    class Balance {
-      constructor(public amount: number) {}
-    }
-    class Account extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("balance_amount", "float");
-      }
-    }
-    composedOf(Account, "balance", {
-      className: Balance,
-      mapping: [["balance_amount", "amount"]],
-    });
-
-    const acc = await Account.create({ name: "Savings", balance_amount: 100.0 });
-    const bal = (acc as any).balance;
-    expect(bal).toBeInstanceOf(Balance);
-    expect(bal.amount).toBeCloseTo(100.0);
-  });
 });
 
 // Fixture-backed AggregationsTest cases: mirror Rails' `fixtures :customers`
 // against the canonical Customer model + composed_of mappings, rather than the
 // ad-hoc inline Customer classes used elsewhere in this file.
 describe("AggregationsTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  // { schema } lets useFixtures derive + create only the tables these sets touch —
-  // no manual defineSchema slice to keep in sync with the fixture's columns.
-  const { customers } = useFixtures(["customers"], () => Base.connection, { schema: TEST_SCHEMA });
+  // Mirrors Rails `fixtures :customers` via the shared Customer model; `{ schema }`
+  // recreates the canonical `customers` table to survive sibling-file contamination.
+  const { customers } = useHandlerFixtures(["customers"], { schema: canonicalSchema });
 
   // Rails: test_find_single_value_object
   it("find single value object", () => {
@@ -496,6 +289,67 @@ describe("AggregationsTest", () => {
     david.nonBlankGpsLocation = null;
     expect(CustomerModel.gpsConversionWasRun).toBe(false);
   });
+
+  // Rails: test_inferred_mapping
+  it("inferred mapping", async () => {
+    const david = customers("david") as CustomerModel & { gpsLocation: GpsLocation };
+    expect(david.gpsLocation.latitude).toBe("35.544623640962634");
+    expect(david.gpsLocation.longitude).toBe("-105.9309951055148");
+
+    david.gpsLocation = new GpsLocation("39x-110");
+    expect(david.gpsLocation.latitude).toBe("39");
+    expect(david.gpsLocation.longitude).toBe("-110");
+
+    await david.save();
+    await david.reload();
+    expect(david.gpsLocation.latitude).toBe("39");
+    expect(david.gpsLocation.longitude).toBe("-110");
+  });
+
+  // Rails: test_gps_equality
+  it("gps equality", () => {
+    expect(new GpsLocation("39x110").isEqual(new GpsLocation("39x110"))).toBe(true);
+  });
+
+  // Rails: test_gps_inequality
+  it("gps inequality", () => {
+    expect(new GpsLocation("39x110").isEqual(new GpsLocation("39x111"))).toBe(false);
+  });
+
+  // Rails: test_custom_constructor
+  it("custom constructor", () => {
+    const barney = customers("barney") as CustomerModel & { fullname: Fullname };
+    expect(barney.fullname.toS).toBe("Barney GUMBLE");
+    expect(barney.fullname).toBeInstanceOf(Fullname);
+  });
+
+  // Rails: test_custom_converter
+  it("custom converter", () => {
+    const barney = customers("barney") as CustomerModel & { fullname: Fullname };
+    (barney as { fullname: unknown }).fullname = "Barnoit Gumbleau";
+    expect(barney.fullname.toS).toBe("Barnoit GUMBLEAU");
+    expect(barney.fullname).toBeInstanceOf(Fullname);
+  });
+
+  // Rails: test_hash_mapping
+  it("hash mapping", () => {
+    const barney = customers("barney") as CustomerModel & { addressHashMapping: Address };
+    expect(barney.addressHashMapping.street).toBe("Quiet Road");
+    expect(barney.addressHashMapping.city).toBe("Peaceful Town");
+    expect(barney.addressHashMapping.country).toBe("Tranquil Land");
+  });
+
+  // Rails: test_value_object_with_hash_mapping_assignment_changes_model_attributes
+  it("value object with hash mapping assignment changes model attributes", async () => {
+    const barney = customers("barney") as CustomerModel & { addressHashMapping: Address };
+    barney.addressHashMapping = new Address(
+      "Lively Street",
+      barney.readAttribute("address_city") as string,
+      barney.readAttribute("address_country") as string,
+    );
+    await barney.save();
+    expect(barney.readAttribute("address_street")).toBe("Lively Street");
+  });
 });
 
 describe("AggregationsTest", () => {
@@ -504,15 +358,8 @@ describe("AggregationsTest", () => {
   // Rails: test_nil_assignment_results_in_nil
   // Rails: test_allow_nil_address_set_to_nil
   // Rails: test_allow_nil_address_loaded_when_only_some_attributes_are_nil
-  // Rails: test_custom_converter
-  // Rails: test_custom_constructor
-  // Rails: test_hash_mapping
-  // Rails: test_value_object_with_hash_mapping_assignment_changes_model_attributes
-  // Rails: test_gps_equality
-  // Rails: test_gps_inequality
   // Rails: test_immutable_value_objects
   // Rails: test_reloaded_instance_refreshes_aggregations
-  // Rails: test_inferred_mapping
   it.skip("gps latitude", () => {
     // BLOCKED: relation — calculation / aggregation gap
     // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
