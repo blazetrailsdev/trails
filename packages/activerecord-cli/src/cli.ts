@@ -316,7 +316,7 @@ export async function run(argv: string[], cwd: string): Promise<number> {
         if (tsconfigMerged.includesAppended.length > 0)
           parts.push(`appended include globs: ${tsconfigMerged.includesAppended.join(", ")}`);
         console.log(`  update  tsconfig.json: ${parts.join("; ")}`);
-      } else {
+      } else if (tsconfigMerged.conflicts.length === 0) {
         console.log(`  skip    tsconfig.json (already compliant)`);
       }
       if (tsconfigMerged.conflicts.length > 0) {

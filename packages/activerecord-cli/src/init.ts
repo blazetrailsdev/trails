@@ -216,8 +216,8 @@ export interface InitOptions {
    */
   skipPackageJson?: boolean;
   /**
-   * Skip tsconfig.json management.
-   * Set by `ar new`, which handles tsconfig directly before calling init().
+   * Skip tsconfig.json management (creation and merge).
+   * Use when the caller has already written or merged tsconfig.json before delegating to init().
    */
   skipTsconfig?: boolean;
 }
