@@ -32,7 +32,7 @@ current state.
    `commands/console.ts`, `source-annotation-extractor.ts`. Cleanup
    tracked under "Async-fs rollout" in the code quality section.
 4. **No new third-party runtime deps in trailties.**
-5. **PR size ceiling: 300 LOC** (CLAUDE.md). Splits use the `<base>` / `<base>b` pattern.
+5. **PR size ceiling: 500 LOC** (CLAUDE.md). Splits use the `<base>` / `<base>b` pattern.
 6. **Test names match Rails verbatim** where Rails has tests (CLAUDE.md).
 7. **Every PR description** lists Rails source files referenced and which
    methods/initializers were intentionally skipped.

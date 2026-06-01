@@ -28,7 +28,7 @@
 > (Part 2). Residual blocked/done gap items live in
 > [`activerecord-gaps.md`](activerecord-gaps.md).
 
-The api:compare scoreboard is **closed**. Everything below is post-100% Rails-fidelity work — test:compare un-skips driven by audit clusters plus accumulated fidelity polish. PRs target ~250 LOC (CLAUDE.md hard ceiling 300; range 220–280).
+The api:compare scoreboard is **closed**. Everything below is post-100% Rails-fidelity work — test:compare un-skips driven by audit clusters plus accumulated fidelity polish. PRs target ~250 LOC (CLAUDE.md hard ceiling 500; range 220–280).
 
 Closed work lives in `git log` — `git log --grep "audit Slot\|fidelity\|un-skip" origin/main`.
 
@@ -50,7 +50,7 @@ For each `BLOCKED:` category, the plan has two phases:
 - Tier 3: mid-layer features — `transactions`, `migration`.
 - Tier 4 (do last): highly-integrated — `relation`, `STI`, `associations`. These touch everything; closing them earlier means re-opening them every time a Tier 1–3 fix lands.
 
-**PR sizing target: ~250 LOC** (range 220–280 within the 300-LOC hard ceiling from CLAUDE.md). No small PRs (review-cycle overhead per PR is fixed; 50-LOC PRs aren't worth it). No huge PRs (anything ≥300 needs to split). Bundle small adjacent gaps into ~250-LOC slots; split anything that overflows along a natural seam.
+**PR sizing target: ~250 LOC** (range 220–280, comfortably within the 500-LOC hard ceiling from CLAUDE.md). No small PRs (review-cycle overhead per PR is fixed; 50-LOC PRs aren't worth it). No huge PRs (anything ≥500 needs to split). Bundle small adjacent gaps into ~250-LOC slots; split anything that overflows along a natural seam.
 
 Use the **test:compare prompt template** (`$HOME/github/blazetrailsdev/test-compare-prompt-template.md`) when spawning un-skip agents.
 
@@ -660,7 +660,7 @@ Followup from #1878. ~30–60 LOC delegate `CollectionProxy#clear` and `#destroy
 
 ### Batch B164 — Phase 5 belongs-to-associations.test large describe migration (~250 LOC × 5-8 PRs, risk: low)
 
-Followup from #1873. File passes audit but fails `AR_NO_AUTO_SCHEMA=1` — large BelongsToAssociationsTest describe (line 81, ~146 tests, ~3660 LOC) needs `defineSchema` migration. Split into 5–8 cluster PRs at ~250 LOC each. Pattern guidance: use `freshAdapterWithSchema(schema)` per-describe (not file-global) so each describe brings its own models; stay under 300 LOC per PR.
+Followup from #1873. File passes audit but fails `AR_NO_AUTO_SCHEMA=1` — large BelongsToAssociationsTest describe (line 81, ~146 tests, ~3660 LOC) needs `defineSchema` migration. Split into 5–8 cluster PRs at ~250 LOC each. Pattern guidance: use `freshAdapterWithSchema(schema)` per-describe (not file-global) so each describe brings its own models; stay under 500 LOC per PR.
 
 ### Batch B1898 — MySQL precision helper extraction (~20 LOC, risk: low)
 

@@ -191,7 +191,7 @@ PR scope (in `blazetrailsdev/trails`):
 4. Leave `vars.RUNNER` unset on merge. The self-hosted path goes live
    only when we flip the variable.
 
-Diff size budget: well under the 300-LOC ceiling (composite + edits ≈ 60
+Diff size budget: well under the 500-LOC ceiling (composite + edits ≈ 60
 LOC).
 
 ## Deliverable 2 — runner image verification

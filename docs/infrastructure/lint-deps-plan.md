@@ -186,4 +186,4 @@ node to order by a specific value list.
 Phases 2–3 need per-slot triage to determine which are real behavior gaps
 vs acceptable idiom differences. Phase 4 slots are standalone implementations.
 
-Bundle by file adjacency toward the 300 LOC PR ceiling.
+Bundle by file adjacency toward the 500 LOC PR ceiling.

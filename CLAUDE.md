@@ -64,12 +64,13 @@ When NOT to use this:
   Code" lines to PR descriptions.
 - Tests live next to source files as `*.test.ts`.
 - Prefer small, focused modules.
-- **PR size ceiling: 300 LOC** (additions + deletions, excluding lockfiles,
+- **PR size ceiling: 500 LOC** (additions + deletions, excluding lockfiles,
   snapshots, and generated parity fixtures). Check before opening with
   `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**'`.
   Tests and fixtures count. The historical 20-method rule is a soft guide;
-  300 LOC is the hard one — review-cycle data shows PRs ≥400 LOC need 4–6
-  rounds minimum and ≥700 LOC need 13+. If a feature is larger, split via the
+  500 LOC is the hard one — review-cycle data shows PRs ≥400 LOC need 4–6
+  rounds minimum and ≥700 LOC need 13+, so 500 sits just above the 400-LOC
+  inflection and well below the 700-LOC danger zone. If a feature is larger, split via the
   `<base>` / `<base>b` / `<base>c` pattern before opening — these are sibling
   branches each off `main` with **non-overlapping files**, merged sequentially,
   **not** stacked branches (see "Do NOT stack PRs" below). Splitting heuristic,

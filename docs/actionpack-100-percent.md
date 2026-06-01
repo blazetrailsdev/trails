@@ -75,7 +75,7 @@ Chains of stories gated on one port. Most stories below cite one.
 
 ## Stories — API surface
 
-Sized to one PR (~250 LOC, 300 ceiling). Pick the top-listed item in each
+Sized to one PR (~250 LOC, 500 ceiling). Pick the top-listed item in each
 thread; dependencies marked **depends-on**.
 
 ### S4F — strong_parameters permit-dispatch wiring — AC (~50–100 LOC)

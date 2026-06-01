@@ -500,7 +500,7 @@ STI + non-preload (3, assoc track A5); `missing`-with-enum (5, → Story 3.PG-en
 
 ## Conventions (CLAUDE.md — apply to every story)
 
-- ≤300 LOC per PR; split via non-overlapping **sibling** branches off `main`
+- ≤500 LOC per PR; split via non-overlapping **sibling** branches off `main`
   (`<base>`/`<base>b`/`<base>c`), **not** stacked PRs.
 - Use `scripts/start-worktree.sh`; leave the default worktree for the user.
 - Open in draft; run `/link <PR#>` after opening; `/post-merge-findings` after merge.

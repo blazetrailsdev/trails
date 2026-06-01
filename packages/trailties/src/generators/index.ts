@@ -21,7 +21,7 @@ export type { GeneratorRunOptions } from "./rails/generator/generator-generator.
 export { GeneratedAttribute, GeneratorError } from "./generated-attribute.js";
 export type { AttrOptions, IndexType } from "./generated-attribute.js";
 // CreateMigration action deferred to a 1.12b follow-up PR to stay under the
-// 300 LOC ceiling — see docs/trailties-plan.md.
+// 500 LOC ceiling — see docs/trailties-plan.md.
 export { ActiveModel } from "./active-model.js";
 export { AppBase } from "./app-base.js";
 export type { AppBaseOptions } from "./app-base.js";

@@ -156,7 +156,7 @@ Carve-outs land in `scripts/api-compare/unported-files.ts` — **not** in `vendo
 
 ## Migration plan
 
-Sized so each PR fits the 300 LOC ceiling and is independently mergeable. Two tracks run in parallel after the bootstrap PRs.
+Sized so each PR fits the 500 LOC ceiling and is independently mergeable. Two tracks run in parallel after the bootstrap PRs.
 
 ### Bootstrap
 

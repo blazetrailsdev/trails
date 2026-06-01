@@ -221,7 +221,7 @@ package** — arel is a standalone, dialect-agnostic library; its own
 is **ActiveRecord injecting a dialect into that global** and depending on it.
 arel keeps a single, never-mutated default.
 
-### Plan (off `main`, ≤300 LOC each, non-overlapping files)
+### Plan (off `main`, ≤500 LOC each, non-overlapping files)
 
 **Phase A — route production callers through `connection.toSql`.** Replace
 `node.toSql()` with `connection.toSql(node)` (drop the `: x.toSql()` fallback)
@@ -379,7 +379,7 @@ ConnectionUrlResolver(url).toHash()` already produces a Rails-faithful
    so the conversion lives in one place (see Phase 1).
 4. (Stretch) `SQLite3Adapter` — see "SQLite sub-divergence" below.
 
-### Migration phases (each a PR off `main`, ≤300 LOC, non-overlapping files)
+### Migration phases (each a PR off `main`, ≤500 LOC, non-overlapping files)
 
 #### Phase 0 — Land #2700 first
 
@@ -409,7 +409,7 @@ same shape — there are four distinct patterns, each with its own transform:
 | computed URL `String(c.url)`, `url.toString()`, `postgresUrl(...)` (~10) | → wrap the computed string in the helper                  |
 | already-hash `{ uri: … }` / `{ connectionString: … }` (~20)              | leave as-is (driver-native), or normalize for consistency |
 
-Batch **by directory** so each PR stays ≤300 LOC and non-overlapping with
+Batch **by directory** so each PR stays ≤500 LOC and non-overlapping with
 sibling agents (avoids the rebase-chain hazard):
 
 1. **Production `DatabaseTasks` callers** (`tasks/database-tasks.ts`,

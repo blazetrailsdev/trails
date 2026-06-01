@@ -173,5 +173,5 @@ git add -A && git commit -m "feat(rack): <subject>" && git push -u origin <branc
 gh pr create --draft --title "..." --body "..."
 ```
 
-CLAUDE.md constraints apply (camelCase only; PR ≤ 300 LOC; mirror Rack
+CLAUDE.md constraints apply (camelCase only; PR ≤ 500 LOC; mirror Rack
 source first; this-typed mixin pattern; open PRs as draft; `/link` after).
