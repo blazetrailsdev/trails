@@ -20,9 +20,9 @@ Consequence: a Tier 1 here means _structurally mechanical to convert_, not _conf
 
 Of the 9 Tier 1 files, **4** already call `useFixtures` (converted in Phase B canaries) and **5** are unconverted Tier 1 (the Phase C sweep pool).
 
-## Comparison to phase-g-candidates.md (D-1 subset, 2026-05-26)
+## Comparison to the 2026-05-26 D-1 subset audit
 
-`phase-g-candidates.md` measured **0 YES / 3 PARTIAL / 62 NO** across the 65 then-D-1-pending files, matching the ~8% canary yield. That audit ran only on bypass files mid-D-1. This inventory runs on the full post-D-1 suite (every file now uses `Base.adapter` + transactional fixtures). The structural prerequisites are universal, but the bespoke-model reality the candidates doc found persists: see the Tier 3 share below.
+The prior D-1-subset audit measured **0 YES / 3 PARTIAL / 62 NO** across the 65 then-D-1-pending files, matching the ~8% canary yield. That audit ran only on bypass files mid-D-1. This inventory runs on the full post-D-1 suite (every file now uses `Base.adapter` + transactional fixtures). The structural prerequisites are universal, but the bespoke-model reality the candidates doc found persists: see the Tier 3 share below.
 
 ## Recommendation
 

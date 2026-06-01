@@ -14,24 +14,14 @@ sequencing, see `~/.btwhooks/data/github/blazetrailsdev/trails/audits/`
 - **api:compare**: 4969/4969 (100%) — public surface closed.
 - **test:compare**: 6669/7870 (84.7%), 1193 skipped (2026-05-22, cached).
 - **Type-audit**: Waves 1–3 shipped; W1b + small follow-ups + W4 remain.
-- **Test infra**: pool epic active (Phase B/C shipped, D in flight); TM
-  unification Phase 9b in progress; fixtures port data-complete.
+- **Test infra**: pool epic **complete** (all phases A–F shipped 2026-05-28); fixtures
+  port data-complete (`missing=0` across 146 YAMLs); adoption canary shipped (#2318, #2391).
 
 ## Phase ordering
 
-### Phase 1 — Test-infra critical path (active)
+### Phase 1 — Test-infra critical path — **Complete**
 
-Owner: [`connection-pooled-test-adapter-plan.md`](connection-pooled-test-adapter-plan.md) (TM unification plan completed, deleted). This is the live focus and the gate for most test:compare un-skips.
-
-- **Pool Phase D sweep** — migrate all `createTestAdapter()` consumers
-  to `createPooledTestAdapter()`. 1 batch in flight (#2250 / #2253);
-  expect 4–8 batches total at ~200–300 LOC each. **Main gate.**
-- **TM Phase 6 savepoint-tolerance fix** (~50–100 LOC) — unlocks the
-  `dependent:` cluster on MariaDB.
-
-TM Phase 9b-1 (PG visitor) and 9b-2a–e (MySQL visitor incl. Arel
-`Table.star`) already merged 2026-05-20→21. 9b-3 is closed
-(see Phase 2). 9b-4 is bundled with Pool Phase F (see Phase 2).
+Owner: [`connection-pooled-test-adapter-plan.md`](connection-pooled-test-adapter-plan.md) (pool epic complete 2026-05-28; TM unification plan also completed, deleted). Gate lifted for Phases 3b and 4.
 
 ### Phase 2 — Test-infra collapse — **Complete** (see [`connection-pooled-test-adapter-plan.md`](connection-pooled-test-adapter-plan.md) archive)
 
@@ -44,41 +34,18 @@ NO `_txLockStorage`/`_manualTxDepth`/AsyncContext filter, NO `recordDdlTracking`
 - **Pool Phase F** — shipped: F1 (#2537), F2 (#2538), F3 (in main), F4 (in main), F5 (#2545).
 - TM Phase 9b-3 (delete dormant fallback) remains **closed-don't-reopen** — live Rails-parity code for HABTM join models.
 
-### Phase 3 — Fixtures port strict-flip
+### Phase 3 — Fixtures port — **Complete**
 
-Owner: `fixtures-port-plan.md` (completed, deleted). Data substrate
-is complete (94/8 DIFF MATCH); only the strict-fail flip remains. Can
-run in parallel with Phase 1/2.
+`fixtures-port-plan.md` completed and deleted. `fixtures-compare` reports
+`missing=0` across all 146 YAMLs (Phases 7–10 shipped). Subdir slash-key
+registry + compare-script recursive scan shipped. Strict-fail flip live.
 
-- Compare-script enhancements (~150 LOC): enum-symbol comparator, HABTM
-  key handling, custom FK override map, datetime tolerance.
-- PR 7a — ~1.9k LOC waiver port of `fixtures_test.rb` +
-  `test_fixtures_test.rb` + `encryption/encrypted_fixtures_test.rb`.
-- PR 7b — ~30 LOC strict-fail flip + remove 4 `unported-files.ts` exclusions.
-- PR 8 — proof-of-concept conversion of one test file to `useFixtures(...)`.
+### Phase 3b — Fixtures adoption — **actively pickable**
 
-### Phase 3b — Fixtures adoption — **actively pickable** (Phase 2 gate lifted)
-
-Owner: [`fixtures-adoption-plan.md`](fixtures-adoption-plan.md). Migrates
-the existing AR test suite from inline `defineSchema()` + `Model.create`
-seeding to `useFixtures([...])` against the 122 ported fixtures.
-Rails-mirrored body rewrites against Rails counterparts, so this drives
-`test:compare` match-rate as a side effect (orthogonal to Phase 4
-un-skipping; both run in parallel once gated).
-
-- **Phase A — Inventory script** (~150–300 LOC, unblocked). Ships now,
-  parallel with Phases 1/2. Produces `docs/fixtures-adoption-inventory.md`
-  with per-file tier (1/2/3/4) classification.
-- **Spike S1 — worker-level fixture seed** (~100–150 LOC, standalone PR).
-  Ships before Phase B so the canary is pure conversion, not pattern+infra.
-- **Phase B — Canary conversion** (1 file, ≤300 LOC). Pool Phase E gate lifted.
-- **Phase C — Tier 1 sweep** (~12–18 batch PRs at the 300-LOC ceiling).
-- **Phase D — Loader gap PRs + Tier 2 → 1 promotion** (4 loader PRs +
-  4 batch PRs).
-- **Phase E — Tier 3 surgery** (per-file bespoke, ~10–20 small PRs).
-- **Phase F** — `blazetrails/prefer-fixtures` lint rule + CLAUDE.md update + retire `defineSchema()` per-file usage.
-
-Total ~30–45 PRs, ~2–4 weeks Phase C steady-state. Pool Phase E has landed.
+Owner: [`fixtures-adoption-plan.md`](fixtures-adoption-plan.md). Phases A + B
+(inventory script, canary conversions #2318/#2391) shipped. 5 unconverted Tier 1
+files remain; inventory recommends opportunistic adoption rather than a sweep.
+Outstanding: Phases C–F (Tier 1 sweep, loader gap PRs, Tier 3 surgery, lint rule).
 
 ### Phase 4 — test:compare drive — **actively pickable** (Phase 1/2 gate lifted)
 
