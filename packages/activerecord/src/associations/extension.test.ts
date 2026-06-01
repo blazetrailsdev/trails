@@ -10,10 +10,62 @@ import { HasMany } from "./builder/has-many.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
+
+registerModel(Post);
+registerModel(Comment);
+
+// has_many :comments extension tests — migrated to the canonical Post model
+// (whose `comments` association carries the Rails `find_most_recent` /
+// `with_content` extension block) + real posts/comments fixture lookups,
+// mirroring `AssociationsExtensionsTest` against `posts(:welcome).comments`.
+describe("AssociationsExtensionsTest", () => {
+  const { posts, comments } = useHandlerFixtures(["posts", "comments"], {
+    schema: canonicalSchema,
+  });
+
+  it("extension on has many", async () => {
+    const proxy = association(posts("welcome"), "comments") as unknown as {
+      findMostRecent: () => Promise<Base | null>;
+    };
+    expect((await proxy.findMostRecent())!.id).toBe(comments("more_greetings").id);
+  });
+
+  it("proxy association after scoped", async () => {
+    // Rails: `post.comments.the_association == post.association(:comments)`.
+    // `the_association` returns `proxy_association`; assert it exposes the
+    // owning record + reflection, and that a relation spawned off the proxy
+    // via `where("1=1")` still surfaces the extension method.
+    const post = posts("welcome");
+    const proxy = association(post, "comments") as unknown as CollectionProxy & {
+      theAssociation: () => { owner: Base; reflection: { name: string } };
+    };
+    expect(proxy).toBeInstanceOf(CollectionProxy);
+    expect(proxy.theAssociation().owner).toBe(post);
+    expect(proxy.theAssociation().reflection.name).toBe("comments");
+
+    const scoped = proxy.where("1=1") as unknown as {
+      theAssociation: () => { owner: Base; reflection: { name: string } };
+    };
+    expect(scoped.theAssociation().owner).toBe(post);
+    expect(scoped.theAssociation().reflection.name).toBe("comments");
+  });
+
+  it("extension with dirty target", async () => {
+    // `with_content` scans the loaded target — including the dirty (built but
+    // unsaved) record — so it returns the just-built comment by identity.
+    const proxy = association(posts("welcome"), "comments") as unknown as CollectionProxy & {
+      withContent: (content: string) => Promise<Base | null>;
+    };
+    const comment = proxy.build({ body: "New comment" });
+    expect(await proxy.withContent("New comment")).toBe(comment);
+  });
+});
 
 const TEST_SCHEMA: Schema = {
-  ext_posts: { title: "string" },
-  ext_comments: { body: "string", ext_post_id: "integer" },
   h_projects: { name: "string" },
   h_developers: { name: "string" },
   h_developers_h_projects: { h_developer_id: "integer", h_project_id: "integer" },
@@ -26,6 +78,8 @@ const TEST_SCHEMA: Schema = {
   nb_projects: { name: "string" },
   nb_developers: { name: "string" },
   nb_developers_nb_projects: { nb_developer_id: "integer", nb_project_id: "integer" },
+  ext_posts: { title: "string" },
+  ext_comments: { body: "string", ext_post_id: "integer" },
 };
 
 async function freshAdapter(): Promise<TestDatabaseAdapter> {
@@ -34,6 +88,10 @@ async function freshAdapter(): Promise<TestDatabaseAdapter> {
   return adapter;
 }
 
+// habtm + default-scope extension tests still ride inline models. These need a
+// fixture-seeded canonical Developer⇄Project HABTM (join-table fixtures) and a
+// Comment `OopsExtension` default scope respectively — both follow-up passes —
+// so this file stays on eslint/test-fixture-parity-exclude.json until then.
 describe("AssociationsExtensionsTest", () => {
   let extAdapter: TestDatabaseAdapter;
 
@@ -66,14 +124,6 @@ describe("AssociationsExtensionsTest", () => {
         const all = await this.toArray();
         return all[all.length - 1] ?? null;
       },
-      // Mirrors Rails `with_content` extension on `Post#comments`
-      // (`self.detect { |c| c.body == content }`): scans the loaded
-      // target — which includes dirty (built but unsaved) records.
-      withContent: async function (this: Relation<Base>, ...args: unknown[]) {
-        const content = args[0] as string;
-        const all = await this.toArray();
-        return all.find((c) => (c as { body?: string }).body === content) ?? null;
-      },
     };
     Associations.hasMany.call(ExtPost, "extComments", {
       foreignKey: "ext_post_id",
@@ -85,25 +135,17 @@ describe("AssociationsExtensionsTest", () => {
     return { ExtPost, ExtComment };
   }
 
-  it("extension on has many", async () => {
-    const { ExtPost, ExtComment } = setupExtModels();
-    const post = await ExtPost.create({ title: "ext test" });
-    await ExtComment.create({ body: "hello", ext_post_id: post.id });
-    const proxy = association(post, "extComments");
-    const results = await proxy.toArray();
-    expect(results.length).toBe(1);
-  });
-
   it("extension with scopes", async () => {
+    // Still inline: the canonical-Post port needs association `extend:`
+    // methods to survive a *named-scope* spawn (`comments.not_again.…`),
+    // which trails does not yet propagate (query-method spawns like
+    // `.offset(1)` already do). Pending that gap, this stays on bespoke
+    // models. Mirrors `posts(:welcome).comments.offset(1).find_most_recent`.
     const { ExtPost, ExtComment } = setupExtModels();
     const post = await ExtPost.create({ title: "scoped ext" });
     await ExtComment.create({ body: "a", ext_post_id: post.id });
     await ExtComment.create({ body: "b", ext_post_id: post.id });
     const proxy = association(post, "extComments");
-    // Mirrors Rails `posts(:welcome).comments.offset(1).find_most_recent`:
-    // the extension method must remain callable on a relation spawned off
-    // the proxy via a scope mutation. Order explicitly by PK so the
-    // offset is deterministic across adapters.
     const recent = await (
       proxy.order({ id: "asc" }).offset(1) as unknown as {
         findMostRecent: () => Promise<{ body: string } | null>;
@@ -120,16 +162,6 @@ describe("AssociationsExtensionsTest", () => {
     const proxy = association(post, "extComments");
     const all = await proxy.toArray();
     expect(all.length).toBe(1);
-  });
-
-  it("proxy association after scoped", async () => {
-    const { ExtPost, ExtComment } = setupExtModels();
-    const post = await ExtPost.create({ title: "after scoped" });
-    await ExtComment.create({ body: "x", ext_post_id: post.id });
-    const proxy = association(post, "extComments");
-    expect(proxy).toBeInstanceOf(CollectionProxy);
-    const count = await proxy.count();
-    expect(count).toBe(1);
   });
 
   it("extension on habtm", async () => {
@@ -302,18 +334,6 @@ describe("AssociationsExtensionsTest", () => {
     await proxy.push(p1, p2);
     expect((await proxy.findMostRecent())!.name).toBe("Last");
     expect((await proxy.findLeastRecent())!.name).toBe("First");
-  });
-  it("extension with dirty target", async () => {
-    const { ExtPost } = setupExtModels();
-    const post = await ExtPost.create({ title: "dirty target" });
-    const proxy = association(post, "extComments");
-    const comment = proxy.build({ body: "New comment" });
-    const found = await (
-      proxy as unknown as {
-        withContent: (content: string) => Promise<{ body: string } | null>;
-      }
-    ).withContent("New comment");
-    expect(found).toBe(comment);
   });
   it.skip("marshalling extensions", () => {
     // BLOCKED: associations — collection/singular feature gap
