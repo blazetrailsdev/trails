@@ -10,8 +10,11 @@ const ROOT = path.resolve(__dirname, "..");
 
 const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "test-fixture-parity-"));
 const TMP_MAP = path.join(TMP_DIR, "map.json");
+const TMP_EXCLUDE = path.join(TMP_DIR, "exclude.json");
 const _prevMapPath = process.env.TEST_FIXTURE_PARITY_MAP_PATH;
+const _prevExcludePath = process.env.TEST_FIXTURE_PARITY_EXCLUDE_PATH;
 process.env.TEST_FIXTURE_PARITY_MAP_PATH = TMP_MAP;
+process.env.TEST_FIXTURE_PARITY_EXCLUDE_PATH = TMP_EXCLUDE;
 
 const { default: rule } = await import("./test-fixture-parity.mjs");
 
@@ -21,14 +24,18 @@ beforeAll(() => {
     JSON.stringify({
       "aggregations.test.ts": ["find single value object", "find multiple value object"],
       "associations/eager.test.ts": ["eager loading"],
+      "excluded.test.ts": ["find single value object"],
     }),
   );
+  fs.writeFileSync(TMP_EXCLUDE, JSON.stringify(["packages/activerecord/src/excluded.test.ts"]));
 });
 
 afterAll(() => {
   fs.rmSync(TMP_DIR, { recursive: true, force: true });
   if (_prevMapPath === undefined) delete process.env.TEST_FIXTURE_PARITY_MAP_PATH;
   else process.env.TEST_FIXTURE_PARITY_MAP_PATH = _prevMapPath;
+  if (_prevExcludePath === undefined) delete process.env.TEST_FIXTURE_PARITY_EXCLUDE_PATH;
+  else process.env.TEST_FIXTURE_PARITY_EXCLUDE_PATH = _prevExcludePath;
 });
 
 const AR = (rel) => path.join(ROOT, "packages/activerecord/src", rel);
@@ -76,6 +83,31 @@ describe("test-fixture-parity rule", () => {
           code: `describe("T", () => { const { customers } = useFixtures(["c"], () => conn); it.skipIf(true)("find single value object", () => { customers("david"); }); });`,
         },
         {
+          name: "it.skip without accessor → exempt (skipped backlog)",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { it.skip("find single value object", () => { expect(1).toBe(1); }); });`,
+        },
+        {
+          name: "it.skipIf(cond) without accessor → exempt (skipped backlog)",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { it.skipIf(true)("find single value object", () => { expect(1).toBe(1); }); });`,
+        },
+        {
+          name: "it.todo without accessor → exempt (skipped backlog)",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { it.todo("find single value object"); });`,
+        },
+        {
+          name: "test.skip without accessor → exempt (skipped backlog)",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { test.skip("find single value object", () => { expect(1).toBe(1); }); });`,
+        },
+        {
+          name: "describe.skip wrapping an active it() → exempt (skipped scope)",
+          filename: AR("aggregations.test.ts"),
+          code: `describe.skip("T", () => { it("find single value object", () => { expect(1).toBe(1); }); });`,
+        },
+        {
           name: "describe.only recognized as scope",
           filename: AR("aggregations.test.ts"),
           code: `describe.only("T", () => { const { customers } = useFixtures(["c"], () => conn); it("find single value object", () => { customers("david"); }); });`,
@@ -94,6 +126,11 @@ describe("test-fixture-parity rule", () => {
           name: "non-activerecord file → ignored",
           filename: path.join(ROOT, "packages/arel/src/foo.test.ts"),
           code: `describe("X", () => { it("find single value object", () => {}); });`,
+        },
+        {
+          name: "excluded file (ratcheted backlog) → no warning",
+          filename: AR("excluded.test.ts"),
+          code: `describe("X", () => { it("find single value object", () => { expect(1).toBe(1); }); });`,
         },
       ],
       invalid: [
@@ -122,9 +159,9 @@ describe("test-fixture-parity rule", () => {
           errors: [{ messageId: "missing" }],
         },
         {
-          name: "it.skipIf without accessor call → warns",
+          name: "plain active it() without accessor call → warns",
           filename: AR("aggregations.test.ts"),
-          code: `describe("T", () => { it.skipIf(true)("find single value object", () => {}); });`,
+          code: `describe("T", () => { it("find single value object", () => {}); });`,
           errors: [{ messageId: "missing" }],
         },
       ],
