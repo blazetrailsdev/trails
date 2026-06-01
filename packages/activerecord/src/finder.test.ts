@@ -2623,7 +2623,11 @@ describe("FinderTest", () => {
     Item.attribute("name", "string");
     await Item.create({ name: "Widget" });
     await Item.create({ name: "Widget" });
-    await expect(Item.all().where({ name: "Widget" }).sole()).rejects.toThrow(SoleRecordExceeded);
+    const sole = Item.all().where({ name: "Widget" }).sole();
+    await expect(sole).rejects.toThrow(SoleRecordExceeded);
+    // Rails finder_test.rb#test_sole_failing_many asserts match: "Wanted only
+    // one Topic" — the message reads SoleRecordExceeded#record.name.
+    await expect(sole).rejects.toThrow("Wanted only one Item");
   });
 
   it("take() returns a record without ordering", async () => {
@@ -2685,7 +2689,11 @@ describe("FinderTest", () => {
     Item.attribute("name", "string");
     await Item.create({ name: "Dup" });
     await Item.create({ name: "Dup" });
-    await expect(Item.findSoleBy({ name: "Dup" })).rejects.toThrow(SoleRecordExceeded);
+    const sole = Item.findSoleBy({ name: "Dup" });
+    await expect(sole).rejects.toThrow(SoleRecordExceeded);
+    // Rails asserts find_sole_by raises with the same "Wanted only one …"
+    // message (finder_test.rb#test_sole_failing_many).
+    await expect(sole).rejects.toThrow("Wanted only one Item");
   });
 });
 
