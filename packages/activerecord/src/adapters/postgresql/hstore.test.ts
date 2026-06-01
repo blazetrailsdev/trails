@@ -411,9 +411,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((y as any).timezone).toBe("GMT");
     });
     it.skip("yaml round trip with store accessors", () => {
-      // BLOCKED: serialization — Ruby YAML/Marshal round-trip, no Node.js equivalent
-      // ROOT-CAUSE: Node.js has no YAML.dump/Marshal.dump for ActiveRecord instances.
-      // SCOPE: Permanent skip-list candidate; no faithful port is possible.
+      // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
+      // Node.js has no YAML.dump/Marshal.dump for ActiveRecord instances.
     });
     it("changes with store accessors", async () => {
       const HstoreWithAccessors = await freshStoreAccessorModel(adapter);

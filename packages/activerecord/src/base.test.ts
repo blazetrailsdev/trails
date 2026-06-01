@@ -2444,7 +2444,8 @@ describe("BasicsTest", () => {
     expect(result.columnTypes["test"]).toBeInstanceOf(IntegerType);
   });
   it.skip("connection_handler can be overridden", () => {
-    // BLOCKED: GVL — uses Ruby Thread.new to override connection_handler in a child thread and verify isolation; Node.js has no threads with shared object model
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
+    // Ruby Thread.new overrides connection_handler in a child thread and asserts isolation; Node.js has no threads with a shared object model.
   });
   it.skip("new threads get default the default connection handler", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl

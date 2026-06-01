@@ -218,10 +218,10 @@ describe("QueryCacheTest", () => {
   });
 
   it.skip("query cache with forked processes", () => {
-    // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   });
   it.skip("query cache across threads", () => {
-    // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   });
 
   it("middleware delegates", async () => {
@@ -571,7 +571,7 @@ describe("QueryCacheTest", () => {
   });
 
   it.skip("query caching is local to the current thread", () => {
-    // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   });
 
   it("query cache is enabled on all connection pools", async () => {
@@ -609,10 +609,10 @@ describe("QueryCacheTest", () => {
     });
   });
   it.skip("query cache is enabled in threads with shared connection", () => {
-    // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   });
   it.skip("query cache is cleared for all thread when a connection is shared", () => {
-    // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   });
 
   it("query cache uncached dirties", async () => {
@@ -813,7 +813,7 @@ describe("QueryCacheExpiryTest", () => {
   });
 
   it.skip("threads use the same connection", () => {
-    // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   });
 });
 

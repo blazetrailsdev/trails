@@ -48,8 +48,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
   }
 
   it.skip("multiple connections works in a threaded environment", () => {
-    // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-    // SCOPE: permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   });
   it.skip("loading relations with multi db connections", () => {
     // BLOCKED: connection-pool — needs AR model + lazy Relation loading across roles; Slot C-b
