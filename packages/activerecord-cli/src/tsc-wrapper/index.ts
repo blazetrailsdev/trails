@@ -10,6 +10,11 @@ export {
   type CreateArSolutionBuilderOptions,
 } from "./ar-program.js";
 export { createArModelsPlugin, type ArModelsPluginOptions } from "./ar-models-plugin.js";
+export {
+  parseSchemaTs,
+  type DumpColumnSchema,
+  type SchemaColumnsByTable,
+} from "./schema-ts-parser.js";
 
 // Re-export plugin types and remap helpers (no behavioral surprise:
 // these are pure / framework-agnostic). The plugin-host primitives
