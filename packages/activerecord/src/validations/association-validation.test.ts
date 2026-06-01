@@ -25,6 +25,8 @@ beforeAll(async () => {
     topic_w_a_ds: { title: "string" },
     reply_msgs: { title: "string" },
     reply_ctxs: { title: "string" },
+    reply_create_topics: { title: "string", content: "string" },
+    reply_creates: { title: "string", content: "string" },
   });
 });
 
@@ -216,9 +218,41 @@ describe("AssociationValidationTest", () => {
     expect(r.isValid("custom")).toBe(false);
     expect(r.errors.fullMessagesFor("topic")).toEqual(["Topic is invalid"]);
   });
-  it.skip("validates associated with create context", () => {
-    // BLOCKED: associations — CollectionProxy.create — Rails uses t.replies.create(...) which requires
-    // a live has_many CollectionProxy with .create support. The validation logic in
-    // associated.ts is correct; the blocker is CollectionProxy.create, not associated.ts.
+  it("validates associated with create context", async () => {
+    // Rails builds `r` via `t.replies.create(...)`; we construct the persisted
+    // records directly and wire the association cache, since the behavior under
+    // test is the `on: :create` gating, not CollectionProxy.create itself.
+    class ReplyCreateTopic extends Base {
+      static {
+        this._tableName = "reply_create_topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("content", "string");
+        this.validates("content", { presence: true, on: "create" });
+      }
+    }
+    class ReplyCreate extends Base {
+      static {
+        this._tableName = "reply_creates";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("content", "string");
+        this.validatesAssociated("topic", { on: "create" });
+      }
+    }
+    registerModel("ReplyCreateTopic", ReplyCreateTopic);
+    registerModel("ReplyCreate", ReplyCreate);
+
+    const t = await ReplyCreateTopic.create({ title: "uhoh", content: "stuff" });
+    // update! succeeds despite null content — presence is validated on :create only.
+    t.content = null;
+    expect(await t.save()).toBe(true);
+
+    const r = await ReplyCreate.create({ title: "A reply", content: "with content!" });
+    // NOTE: Does not pass along :create context from reply to Topic validation.
+    (r as any)._cachedAssociations = new Map([["topic", t]]);
+
+    expect(t.isValid()).toBe(true);
+    expect(r.isValid()).toBe(true);
   });
 });
