@@ -1,5 +1,9 @@
 name: AR PG Canary
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # Runs the subset of activerecord tests that have been migrated to the
 # transactional-fixtures architecture (useFixtures + withTransactionalFixtures,
 # no per-test defineSchema DDL). PostgreSQL only.

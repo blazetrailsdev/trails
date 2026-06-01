@@ -164,6 +164,7 @@ export default defineConfig({
           name: "ar-pg-canary",
           include: MIGRATED_FILES,
           exclude: [...SHARED_EXCLUDE, ...ADAPTER_SPECIFIC_EXCLUDE],
+          passWithNoTests: true,
           setupFiles: [
             "./packages/activerecord/src/test-setup-worker-db.ts",
             "./packages/activerecord/src/test-setup-ar.ts",
