@@ -62,11 +62,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - name: Create parallel test databases
-        run: |
-          for i in 2 3 4; do
-            PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE rails_js_test_$i;"
-          done
       - name: Run canary suite
         run: pnpm vitest run --config vitest.pg-canary.config.ts
         env:

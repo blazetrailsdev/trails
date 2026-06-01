@@ -4,7 +4,6 @@ import { Topic } from "../test-helpers/models/topic.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { useFixtures } from "../test-helpers/use-fixtures.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
@@ -25,7 +24,6 @@ const { topics } = useFixtures(
     ],
   },
   () => Base.connection,
-  { schema: TEST_SCHEMA },
 );
 
 describe("JSONTest", () => {

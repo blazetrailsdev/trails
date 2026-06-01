@@ -159,6 +159,7 @@ export default defineConfig({
         resolve: { alias },
         test: {
           name: "ar-pg-canary",
+          globalSetup: ["./packages/activerecord/src/test-helpers/pg-template-global-setup.ts"],
           include: MIGRATED_FILES,
           exclude: [...SHARED_EXCLUDE, ...ADAPTER_SPECIFIC_EXCLUDE],
           setupFiles: [
