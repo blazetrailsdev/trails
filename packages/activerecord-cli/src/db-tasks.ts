@@ -172,6 +172,36 @@ export async function dbSchemaLoad(cwd: string, _args: string[]): Promise<number
   }
 }
 
+export async function dbSchemaDump(cwd: string, _args: string[]): Promise<number> {
+  try {
+    await loadDatabaseConfig(cwd);
+  } catch (err) {
+    console.error(`ar: failed to load config/database.ts — ${String(err)}`);
+    return 1;
+  }
+  await tryLoadModels(cwd);
+
+  const env = DatabaseConfigurations.currentEnv();
+  const configs = DatabaseTasks.configsFor(env);
+  if (configs.length === 0) {
+    console.error(`ar: no database configuration found for environment "${env}"`);
+    return 1;
+  }
+  try {
+    // Mirrors Rails' `db:schema:dump` rake task: dump each config's schema
+    // inside a temporary pool so the dumper has a live connection.
+    await DatabaseTasks.withTemporaryPoolForEach(env, async (config) => {
+      await DatabaseTasks.dumpSchema(config);
+      const filename = DatabaseTasks.schemaDumpPath(config);
+      if (filename != null) console.log(`Dumped schema to ${filename}`);
+    });
+    return 0;
+  } catch (err) {
+    console.error(`ar: db:schema:dump failed — ${String(err)}`);
+    return 1;
+  }
+}
+
 export async function dbSeed(cwd: string, _args: string[]): Promise<number> {
   try {
     await loadDatabaseConfig(cwd);

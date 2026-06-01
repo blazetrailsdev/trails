@@ -1,7 +1,7 @@
 // First E2E suite for activerecord-cli. Pattern: in-process run() + tmp sqlite file. Extend with pg/mysql variants in follow-up PRs.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, readdir, rm, writeFile } from "fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "../cli.js";
@@ -49,7 +49,7 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it("init → db:create → generate:migration → db:migrate → db:version → db:migrate:status", async () => {
+  it("init → db:create → generate:migration → db:migrate → db:version → db:migrate:status → db:schema:dump", async () => {
     // Suppress noisy init/create/migrate console output — we only assert on
     // db:version and db:migrate:status below.
     vi.spyOn(console, "log").mockImplementation(() => {});
@@ -103,5 +103,13 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
     const statusText = statusLines.join("\n");
     expect(statusText).toContain("up");
     expect(statusText).toContain(version);
+
+    // 8. ar db:schema:dump — dumps the live schema to db/schema.ts
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const dumpCode = await run(["db:schema:dump"], tmpDir);
+    expect(dumpCode, "ar db:schema:dump should exit 0").toBe(0);
+    const schema = await readFile(join(tmpDir, "db", "schema.ts"), "utf8");
+    expect(schema).toContain("createTable");
+    expect(schema).toContain("users");
   });
 });

@@ -784,12 +784,28 @@ export class DatabaseTasks {
     return p.join ? p.join(this.dbDir, filename) : `${this.dbDir}/${filename}`;
   }
 
+  /**
+   * Resolve a schema-file path against `root`. Absolute paths pass through;
+   * a PathAdapter without `isAbsolute` (e.g. a VFS) is treated as already
+   * absolute. Shared by dumpSchema and loadSchema so dump/load agree.
+   *
+   * @internal
+   */
+  static _resolveSchemaPath(filename: string): string {
+    const path = getPath();
+    if (!path.isAbsolute) return filename;
+    return path.isAbsolute(filename) ? filename : (path.resolve?.(this.root, filename) ?? filename);
+  }
+
   static async dumpSchema(config: DatabaseConfig): Promise<void> {
     // Rails: `return unless db_config.schema_dump` — lets per-config
     // `schemaDump: false` (or null) suppress dumping.
     // schemaDumpPath() returns null when schemaDump is disabled.
-    const filename = this.schemaDumpPath(config);
-    if (filename == null) return;
+    const rawFilename = this.schemaDumpPath(config);
+    if (rawFilename == null) return;
+    // Resolve relative paths against `root` so the dump lands in the app's
+    // db/ dir regardless of process cwd — mirrors loadSchema's resolution.
+    const filename = this._resolveSchemaPath(rawFilename);
     if (this.schemaFormat === "sql") {
       const fs = getFs();
       const path = getPath();
@@ -839,11 +855,7 @@ export class DatabaseTasks {
     // Missing isAbsolute means the PathAdapter doesn't model relative vs.
     // absolute (e.g. a VFS) — treat the incoming filename as already
     // absolute in that case.
-    const absolute = path.isAbsolute
-      ? path.isAbsolute(filename)
-        ? filename
-        : path.resolve(this.root, filename)
-      : filename;
+    const absolute = this._resolveSchemaPath(filename);
     const href = path.pathToFileURL(absolute).href;
     const mod = (await import(href)) as {
       default?: (ctx: unknown) => Promise<void> | void;
