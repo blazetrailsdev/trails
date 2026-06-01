@@ -193,12 +193,14 @@ export class RecordNotDestroyed extends ActiveRecordError {
 export type { RecordInvalid } from "./validations.js";
 
 export class SoleRecordExceeded extends ActiveRecordError {
-  readonly model?: { name?: string };
+  // Rails names this reader `record` even though `sole`/`find_sole_by`
+  // pass the model class (see finder_methods.rb#sole). Match Rails.
+  readonly record?: { name?: string };
 
-  constructor(model?: { name?: string }) {
-    super(`Wanted only one ${model?.name ?? "record"}`);
+  constructor(record?: { name?: string }) {
+    super(`Wanted only one ${record?.name ?? "record"}`);
     this.name = "SoleRecordExceeded";
-    this.model = model;
+    this.record = record;
   }
 }
 
