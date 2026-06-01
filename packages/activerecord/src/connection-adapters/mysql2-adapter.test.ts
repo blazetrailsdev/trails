@@ -631,6 +631,18 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(nameCol?.sqlType?.startsWith("varchar")).toBe(true);
     });
 
+    it('columns() reflects an implicit DEFAULT NULL as a null default, not the string "NULL"', async () => {
+      // Regression: MariaDB reports a nullable no-default column's default as the bare
+      // string "NULL" in information_schema (MySQL returns a real SQL null). Without
+      // coercion a new record's attribute defaults to the 4-char string. `owner` is a
+      // nullable VARCHAR(255) with no explicit default; both engines must reflect null,
+      // and (matching the SHOW-FULL-FIELDS path + Rails) carry no defaultFunction.
+      const ownerCol = (await adapter.columns("widgets")).find((c) => c.name === "owner");
+      expect(ownerCol?.null).toBe(true);
+      expect(ownerCol?.default ?? null).toBeNull();
+      expect(ownerCol?.defaultFunction ?? null).toBeNull();
+    });
+
     it("indexes() returns user-created indexes and skips PRIMARY", async () => {
       const idx = await adapter.indexes("widgets");
       expect(idx).toEqual([

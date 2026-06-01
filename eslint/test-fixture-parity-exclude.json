@@ -23,7 +23,6 @@
   "packages/activerecord/src/encryption/encryptable-record-api.test.ts",
   "packages/activerecord/src/encryption/encryptable-record-message-pack-serialized.test.ts",
   "packages/activerecord/src/encryption/encryptable-record.test.ts",
-  "packages/activerecord/src/filter-attributes.test.ts",
   "packages/activerecord/src/log-subscriber.test.ts",
   "packages/activerecord/src/migration.test.ts",
   "packages/activerecord/src/query-cache.test.ts",
