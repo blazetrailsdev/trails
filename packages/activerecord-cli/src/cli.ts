@@ -80,15 +80,16 @@ Options:
 const INIT_HELP = `ar init — scaffold a standalone activerecord project
 
 Run in an existing project root to add @blazetrails/activerecord to it.
-Writes (or updates) package.json, config/database.ts (TRAILS_ENV-keyed),
+Writes (or updates) package.json, tsconfig.json, config/database.ts (TRAILS_ENV-keyed),
 db/migrate/, db/seeds.ts, app/models/index.ts (the generated manifest), and
-db.ts (bootstrap glue). Does NOT write tsconfig.json or .gitignore — bring
-your own, or use \`ar new\` to scaffold a complete greenfield project.
-Existing files are skipped by default; pass --force to overwrite them.
+db.ts (bootstrap glue). Does NOT write .gitignore — bring your own.
+If a tsconfig.json already exists, AR-required settings are merged in (JSONC-aware);
+conflicting keys are preserved and reported as warnings. Pass --force to overwrite instead.
+Existing scaffold files are skipped by default; pass --force to overwrite them.
 
 Options:
   --driver <name>   Database driver: better-sqlite3 (default), node-sqlite, pg, mysql2.
-  --force           Overwrite all existing scaffold files (package.json, config/database.ts, db.ts, etc.).`;
+  --force           Overwrite all existing scaffold files, including tsconfig.json.`;
 
 const DB_CREATE_HELP = `ar db:create — create the database for the current TRAILS_ENV
 
@@ -300,7 +301,10 @@ export async function run(argv: string[], cwd: string): Promise<number> {
       return 1;
     }
     const force = rest.includes("--force");
-    const { created, skipped, packageJsonUpdated } = await init(cwd, { force, driver });
+    const { created, skipped, packageJsonUpdated, tsconfigMerged } = await init(cwd, {
+      force,
+      driver,
+    });
     for (const rel of created) console.log(`  create  ${rel}`);
     for (const rel of skipped) console.log(`  skip    ${rel} (already exists)`);
     if (packageJsonUpdated) {
@@ -314,6 +318,26 @@ export async function run(argv: string[], cwd: string): Promise<number> {
         );
       } else {
         console.log(`  skip    package.json (activerecord deps already present)`);
+      }
+    }
+    if (tsconfigMerged) {
+      if (tsconfigMerged.changed) {
+        const parts: string[] = [];
+        if (tsconfigMerged.added.length > 0) parts.push(`added ${tsconfigMerged.added.join(", ")}`);
+        if (tsconfigMerged.pluginAdded) parts.push("added trails-tsc plugin");
+        if (tsconfigMerged.includesAppended.length > 0)
+          parts.push(`appended include globs: ${tsconfigMerged.includesAppended.join(", ")}`);
+        console.log(`  update  tsconfig.json: ${parts.join("; ")}`);
+      } else if (tsconfigMerged.conflicts.length === 0) {
+        console.log(`  skip    tsconfig.json (already compliant)`);
+      }
+      if (tsconfigMerged.conflicts.length > 0) {
+        console.log(`  warn    tsconfig.json has conflicting settings (resolve manually):`);
+        for (const { key, existing, required } of tsconfigMerged.conflicts) {
+          console.log(
+            `            ${key}: found ${JSON.stringify(existing)}, expected ${JSON.stringify(required)}`,
+          );
+        }
       }
     }
     console.log(

@@ -7,6 +7,7 @@ import { generateManifest } from "./generate-manifest.js";
 
 const EXPECTED = [
   "package.json",
+  "tsconfig.json",
   "config/database.ts",
   "db/migrate/.gitkeep",
   "db/seeds.ts",
@@ -49,9 +50,9 @@ describe("ArInitTest", () => {
     expect(await readFile(join(root, "config/database.ts"), "utf8")).toBe("// mine\n");
 
     const second = await init(root);
+    // tsconfig.json is merged (not skipped) on re-run; package.json is updated (not skipped).
     expect(second.created).toEqual([]);
-    // package.json now updated (not created) on second run, so it won't be in skipped
-    const expectedSkipped = EXPECTED.filter((r) => r !== "package.json");
+    const expectedSkipped = EXPECTED.filter((r) => r !== "package.json" && r !== "tsconfig.json");
     expect(second.skipped.sort()).toEqual([...expectedSkipped].sort());
   });
 
@@ -102,12 +103,16 @@ describe("ArInitTest", () => {
         "@blazetrails/activerecord-cli": "*",
         "better-sqlite3": "^12.6.2",
       },
+      devDependencies: {
+        "@blazetrails/trails-tsc": "*",
+      },
     };
     await writeFile(join(root, "package.json"), JSON.stringify(original, null, 2) + "\n", "utf8");
 
     const result = await init(root);
     expect(result.packageJsonUpdated!.added).toEqual([]);
     expect(result.packageJsonUpdated!.alreadyPresent).toContain("@blazetrails/activerecord");
+    expect(result.packageJsonUpdated!.alreadyPresent).toContain("@blazetrails/trails-tsc");
   });
 
   it("preserves tab indentation in an existing package.json", async () => {

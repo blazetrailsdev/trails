@@ -1,6 +1,7 @@
 import { access, mkdir, readFile, writeFile } from "fs/promises";
 import { basename, dirname, join } from "path";
 import { renderManifest } from "./generate-manifest.js";
+import { FRESH_TSCONFIG, mergeTsconfig, TsconfigMergeResult } from "./tsconfig-merge.js";
 
 // The files `ar init` writes, mirroring the §4.7 layout in the
 // standalone-activerecord-cli proposal. `db/migrate/` is a directory, kept
@@ -74,6 +75,11 @@ const AR_DEPS = {
   "@blazetrails/activerecord-cli": "*",
 };
 
+// trails-tsc is a devDep: only needed for `ar typecheck` and the TS language service plugin.
+const AR_DEV_DEPS = {
+  "@blazetrails/trails-tsc": "*",
+};
+
 function freshPackageJson(name: string, driver: string): string {
   return (
     JSON.stringify(
@@ -87,6 +93,7 @@ function freshPackageJson(name: string, driver: string): string {
           ...AR_DEPS,
           ...(INIT_DRIVER_DEPS[driver] ?? INIT_DRIVER_DEPS["better-sqlite3"]),
         },
+        devDependencies: { ...AR_DEV_DEPS },
       },
       null,
       2,
@@ -140,9 +147,14 @@ export async function detectPackageManager(startDir: string): Promise<PackageMan
 export async function addDepsToPackageJson(
   pkgPath: string,
   deps: Record<string, string>,
+  devDeps: Record<string, string> = {},
 ): Promise<{ added: string[]; alreadyPresent: string[] }> {
   const raw = await readFile(pkgPath, "utf8");
-  const pkg = JSON.parse(raw) as { dependencies?: Record<string, string>; [k: string]: unknown };
+  const pkg = JSON.parse(raw) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+    [k: string]: unknown;
+  };
 
   const indentMatch = raw.match(/\n([ \t]+)/);
   const indent = indentMatch ? indentMatch[1] : "  ";
@@ -161,6 +173,18 @@ export async function addDepsToPackageJson(
     }
   }
 
+  if (Object.keys(devDeps).length > 0) {
+    if (!pkg.devDependencies) pkg.devDependencies = {};
+    for (const [name, version] of Object.entries(devDeps)) {
+      if (Object.prototype.hasOwnProperty.call(pkg.devDependencies, name)) {
+        alreadyPresent.push(name);
+      } else {
+        pkg.devDependencies[name] = version;
+        added.push(name);
+      }
+    }
+  }
+
   if (added.length > 0) {
     await writeFile(pkgPath, JSON.stringify(pkg, null, indent) + "\n", "utf8");
   }
@@ -175,6 +199,8 @@ export interface InitResult {
   skipped: string[];
   /** Set when an existing package.json was updated (not created fresh). */
   packageJsonUpdated?: { added: string[]; alreadyPresent: string[] };
+  /** Set when an existing tsconfig.json was merged (not created fresh). */
+  tsconfigMerged?: TsconfigMergeResult;
 }
 
 export interface InitOptions {
@@ -189,6 +215,11 @@ export interface InitOptions {
    * Set by `ar new`, which writes its own package.json before calling init().
    */
   skipPackageJson?: boolean;
+  /**
+   * Skip tsconfig.json management (creation and merge).
+   * Use when the caller has already written or merged tsconfig.json before delegating to init().
+   */
+  skipTsconfig?: boolean;
 }
 
 /**
@@ -205,10 +236,12 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
     overrides = {},
     driver = "better-sqlite3",
     skipPackageJson = false,
+    skipTsconfig = false,
   } = opts;
   const created: string[] = [];
   const skipped: string[] = [];
   let packageJsonUpdated: InitResult["packageJsonUpdated"];
+  let tsconfigMerged: InitResult["tsconfigMerged"];
 
   if (!skipPackageJson) {
     const pkgPath = join(root, "package.json");
@@ -225,12 +258,40 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
         ...AR_DEPS,
         ...(INIT_DRIVER_DEPS[driver] ?? INIT_DRIVER_DEPS["better-sqlite3"]),
       };
-      packageJsonUpdated = await addDepsToPackageJson(pkgPath, deps);
+      packageJsonUpdated = await addDepsToPackageJson(pkgPath, deps, AR_DEV_DEPS);
     } else {
       const name = basename(root);
       const body = freshPackageJson(name, driver);
       await writeFile(pkgPath, body, { flag: force ? "w" : "wx" });
       created.push("package.json");
+    }
+  }
+
+  // tsconfig.json: merge into existing if present, else scaffold fresh.
+  if (!skipTsconfig && !Object.prototype.hasOwnProperty.call(overrides, "tsconfig.json")) {
+    const tsconfigPath = join(root, "tsconfig.json");
+    let tsconfigExists = false;
+    try {
+      await access(tsconfigPath);
+      tsconfigExists = true;
+    } catch {
+      // doesn't exist yet
+    }
+
+    if (tsconfigExists && !force) {
+      const existing = await readFile(tsconfigPath, "utf8");
+      tsconfigMerged = mergeTsconfig(existing);
+      if (tsconfigMerged.changed) {
+        await writeFile(tsconfigPath, tsconfigMerged.content, "utf8");
+      }
+    } else {
+      try {
+        await writeFile(tsconfigPath, FRESH_TSCONFIG, { flag: force ? "w" : "wx" });
+        created.push("tsconfig.json");
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+        skipped.push("tsconfig.json");
+      }
     }
   }
 
@@ -248,5 +309,5 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
       skipped.push(rel);
     }
   }
-  return { created, skipped, packageJsonUpdated };
+  return { created, skipped, packageJsonUpdated, tsconfigMerged };
 }

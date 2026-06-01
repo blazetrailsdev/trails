@@ -95,26 +95,15 @@ function packageJson(appName: string, driver: Driver): string {
           "@blazetrails/activerecord-cli": "*",
           ...DRIVER_VERSIONS[driver],
         },
+        devDependencies: {
+          "@blazetrails/trails-tsc": "*",
+        },
       },
       null,
       2,
     ) + "\n"
   );
 }
-
-const TSCONFIG = `{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "Node16",
-    "moduleResolution": "Node16",
-    "strict": true,
-    "outDir": "dist",
-    "rootDir": "."
-  },
-  "include": ["./**/*.ts"],
-  "exclude": ["node_modules", "dist"]
-}
-`;
 
 const GITIGNORE = `node_modules/
 dist/
@@ -158,7 +147,6 @@ export async function arNew(
   }
 
   await write("package.json", packageJson(appName, driver));
-  await write("tsconfig.json", TSCONFIG);
   await write(".gitignore", GITIGNORE);
 
   const overrides: Record<string, string> = {
@@ -167,7 +155,12 @@ export async function arNew(
   // node-sqlite must be explicitly registered before establishConnection().
   if (driver === "node-sqlite") overrides["db.ts"] = DB_GLUE_NODE_SQLITE;
 
-  const initResult = await init(appDir, { force, overrides, driver, skipPackageJson: true });
+  const initResult = await init(appDir, {
+    force,
+    overrides,
+    driver,
+    skipPackageJson: true,
+  });
   for (const rel of initResult.created) created.push(rel);
   for (const rel of initResult.skipped) skipped.push(rel);
 
