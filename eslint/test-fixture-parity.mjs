@@ -54,6 +54,48 @@ function rootCalleeName(callee) {
   return null;
 }
 
+// Modifiers that mark a test/describe as skipped — exempt from the parity check.
+// Skipped tests are the backlog; the mapping JSON is their canonical inventory.
+const SKIP_MODIFIERS = new Set(["skip", "skipIf", "todo"]);
+
+/**
+ * Collect the modifier property names off a callee chain. `rootCalleeName`
+ * collapses `it.skip` → "it", so we inspect the MemberExpression property to
+ * see the modifier. Handles chained/parameterized forms:
+ *   it.skip        → MemberExpression          → ["skip"]
+ *   it.skipIf(c)   → CallExpression(Member)    → ["skipIf"]
+ *   describe.todo  → MemberExpression          → ["todo"]
+ */
+function calleeModifierNames(callee, out = []) {
+  if (callee?.type === "MemberExpression") {
+    if (callee.property?.type === "Identifier") out.push(callee.property.name);
+    calleeModifierNames(callee.object, out);
+  } else if (callee?.type === "CallExpression") {
+    calleeModifierNames(callee.callee, out);
+  }
+  return out;
+}
+
+function hasSkipModifier(callee) {
+  return calleeModifierNames(callee).some((m) => SKIP_MODIFIERS.has(m));
+}
+
+/** True when `node` is lexically inside a `describe.skip` / `describe.todo` at any depth. */
+function isInSkippedDescribe(node) {
+  let cur = node.parent;
+  while (cur) {
+    if (
+      cur.type === "CallExpression" &&
+      rootCalleeName(cur.callee) === "describe" &&
+      hasSkipModifier(cur.callee)
+    ) {
+      return true;
+    }
+    cur = cur.parent;
+  }
+  return false;
+}
+
 function allEnclosingDescribeBodies(node) {
   const bodies = [];
   let cur = node.parent;
@@ -159,6 +201,10 @@ const rule = {
         }
 
         if (calleeName === "it" || calleeName === "test") {
+          // Skipped tests (it.skip / it.skipIf / it.todo / test.skip, or any
+          // test nested in a describe.skip / describe.todo) are the migration
+          // backlog — exempt them so active tests can be hard-gated.
+          if (hasSkipModifier(node.callee) || isInSkippedDescribe(node)) return;
           const firstArg = node.arguments[0];
           if (firstArg?.type !== "Literal" || typeof firstArg.value !== "string") return;
           const desc = normalizeDesc(firstArg.value);

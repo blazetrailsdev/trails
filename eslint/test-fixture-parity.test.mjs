@@ -76,6 +76,31 @@ describe("test-fixture-parity rule", () => {
           code: `describe("T", () => { const { customers } = useFixtures(["c"], () => conn); it.skipIf(true)("find single value object", () => { customers("david"); }); });`,
         },
         {
+          name: "it.skip without accessor → exempt (skipped backlog)",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { it.skip("find single value object", () => { expect(1).toBe(1); }); });`,
+        },
+        {
+          name: "it.skipIf(cond) without accessor → exempt (skipped backlog)",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { it.skipIf(true)("find single value object", () => { expect(1).toBe(1); }); });`,
+        },
+        {
+          name: "it.todo without accessor → exempt (skipped backlog)",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { it.todo("find single value object"); });`,
+        },
+        {
+          name: "test.skip without accessor → exempt (skipped backlog)",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { test.skip("find single value object", () => { expect(1).toBe(1); }); });`,
+        },
+        {
+          name: "describe.skip wrapping an active it() → exempt (skipped scope)",
+          filename: AR("aggregations.test.ts"),
+          code: `describe.skip("T", () => { it("find single value object", () => { expect(1).toBe(1); }); });`,
+        },
+        {
           name: "describe.only recognized as scope",
           filename: AR("aggregations.test.ts"),
           code: `describe.only("T", () => { const { customers } = useFixtures(["c"], () => conn); it("find single value object", () => { customers("david"); }); });`,
@@ -122,9 +147,9 @@ describe("test-fixture-parity rule", () => {
           errors: [{ messageId: "missing" }],
         },
         {
-          name: "it.skipIf without accessor call → warns",
+          name: "plain active it() without accessor call → warns",
           filename: AR("aggregations.test.ts"),
-          code: `describe("T", () => { it.skipIf(true)("find single value object", () => {}); });`,
+          code: `describe("T", () => { it("find single value object", () => {}); });`,
           errors: [{ messageId: "missing" }],
         },
       ],
