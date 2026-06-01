@@ -4,7 +4,7 @@
  * `*.test.ts` under `packages/activerecord/src` into a structural adoption
  * tier (1 mechanical / 2 loader-gap / 3 bespoke-or-hazard / 4 no-DB-ops)
  * and writes the doc below. Tier rules + scope caveats are documented in
- * the generated doc's header and in `fixtures-adoption-plan.md` Phase A.
+ * the generated doc's header and in `activerecord-index.md` (fixtures-adoption note).
  *
  *   pnpm fixtures:adoption:inventory
  *
