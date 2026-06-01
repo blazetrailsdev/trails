@@ -1,5 +1,5 @@
 import { getPathAsync } from "@blazetrails/activesupport";
-import { init } from "./init.js";
+import { init, detectPackageManager } from "./init.js";
 import { generateManifest } from "./generate-manifest.js";
 import { generateMigration, migrationTimestamp, parseFields } from "./generate-migration.js";
 import { generateModel } from "./generate-model.js";
@@ -77,9 +77,16 @@ Options:
 
 const INIT_HELP = `ar init — scaffold a standalone activerecord project
 
-Run in the project root. Writes config/database.ts (TRAILS_ENV-keyed),
+Run in an existing project root to add @blazetrails/activerecord to it.
+Writes (or updates) package.json, config/database.ts (TRAILS_ENV-keyed),
 db/migrate/, db/seeds.ts, app/models/index.ts (the generated manifest), and
-db.ts (bootstrap glue). Existing files are never overwritten.`;
+db.ts (bootstrap glue). Does NOT write tsconfig.json or .gitignore — bring
+your own, or use \`ar new\` to scaffold a complete greenfield project.
+Existing files are skipped by default; pass --force to overwrite them.
+
+Options:
+  --driver <name>   Database driver: better-sqlite3 (default), node-sqlite, pg, mysql2.
+  --force           Overwrite all existing scaffold files (package.json, config/database.ts, db.ts, etc.).`;
 
 const DB_CREATE_HELP = `ar db:create — create the database for the current TRAILS_ENV
 
@@ -263,12 +270,57 @@ export async function run(argv: string[], cwd: string): Promise<number> {
       console.log(INIT_HELP);
       return 0;
     }
-    const { created, skipped } = await init(cwd);
+    const driverIdx = rest.indexOf("--driver");
+    let rawDriver: string | undefined;
+    if (driverIdx >= 0) {
+      const next = rest[driverIdx + 1];
+      if (next === undefined || next.startsWith("-")) {
+        console.error("ar: --driver requires a value: better-sqlite3, node-sqlite, pg, or mysql2.");
+        return 1;
+      }
+      rawDriver = next;
+    }
+    const driver = parseDriver(rawDriver);
+    if (driver === null) {
+      console.error(
+        `ar: unknown driver "${rawDriver}". Valid options: better-sqlite3, node-sqlite, pg, mysql2.`,
+      );
+      return 1;
+    }
+    const force = rest.includes("--force");
+    const { created, skipped, packageJsonUpdated } = await init(cwd, { force, driver });
     for (const rel of created) console.log(`  create  ${rel}`);
     for (const rel of skipped) console.log(`  skip    ${rel} (already exists)`);
+    if (packageJsonUpdated) {
+      if (packageJsonUpdated.added.length > 0) {
+        const alreadyNote =
+          packageJsonUpdated.alreadyPresent.length > 0
+            ? ` (${packageJsonUpdated.alreadyPresent.join(", ")} already present)`
+            : "";
+        console.log(
+          `  update  package.json: added ${packageJsonUpdated.added.join(", ")}${alreadyNote}`,
+        );
+      } else {
+        console.log(`  skip    package.json (activerecord deps already present)`);
+      }
+    }
     console.log(
       `\nScaffolded ${created.length} file(s)${skipped.length ? `, skipped ${skipped.length}` : ""}.`,
     );
+    const pm = await detectPackageManager(cwd);
+    const installCmd =
+      pm === "pnpm"
+        ? "pnpm install"
+        : pm === "yarn"
+          ? "yarn"
+          : pm === "bun"
+            ? "bun install"
+            : "npm install";
+    console.log("\nNext steps:");
+    console.log(`  ${installCmd}`);
+    console.log("  ar generate:manifest");
+    console.log("  ar db:create");
+    console.log("  ar db:migrate");
     return 0;
   }
   if (command === "generate:manifest") {

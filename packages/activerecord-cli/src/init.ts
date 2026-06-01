@@ -1,5 +1,5 @@
-import { mkdir, writeFile } from "fs/promises";
-import { dirname, join } from "path";
+import { access, mkdir, readFile, writeFile } from "fs/promises";
+import { basename, dirname, join } from "path";
 import { renderManifest } from "./generate-manifest.js";
 
 // The files `ar init` writes, mirroring the §4.7 layout in the
@@ -61,11 +61,120 @@ const SCAFFOLD: ReadonlyArray<readonly [string, string]> = [
   ["db.ts", DB_GLUE],
 ];
 
+// Pinned driver peer versions — same values as new.ts to stay in sync.
+const INIT_DRIVER_DEPS: Record<string, Record<string, string>> = {
+  "better-sqlite3": { "better-sqlite3": "^12.6.2" },
+  "node-sqlite": {},
+  pg: { pg: "^8.19.0" },
+  mysql2: { mysql2: "^3.18.2" },
+};
+
+const AR_DEPS = {
+  "@blazetrails/activerecord": "*",
+  "@blazetrails/activerecord-cli": "*",
+};
+
+function freshPackageJson(name: string, driver: string): string {
+  return (
+    JSON.stringify(
+      {
+        name,
+        version: "0.1.0",
+        private: true,
+        type: "module",
+        scripts: { migrate: "ar db:migrate", seed: "ar db:seed", console: "ar console" },
+        dependencies: {
+          ...AR_DEPS,
+          ...(INIT_DRIVER_DEPS[driver] ?? INIT_DRIVER_DEPS["better-sqlite3"]),
+        },
+      },
+      null,
+      2,
+    ) + "\n"
+  );
+}
+
+export type PackageManager = "pnpm" | "yarn" | "bun" | "npm";
+
+const LOCKFILES: ReadonlyArray<[string, PackageManager]> = [
+  ["pnpm-lock.yaml", "pnpm"],
+  ["yarn.lock", "yarn"],
+  ["bun.lock", "bun"],
+  ["bun.lockb", "bun"],
+  ["package-lock.json", "npm"],
+];
+
+/** Detect the package manager by inspecting `packageManager` field then walking up for lockfiles. */
+export async function detectPackageManager(startDir: string): Promise<PackageManager> {
+  // packageManager field takes precedence over lockfile detection.
+  try {
+    const raw = await readFile(join(startDir, "package.json"), "utf8");
+    const pkg = JSON.parse(raw) as { packageManager?: unknown };
+    if (typeof pkg.packageManager === "string" && pkg.packageManager.length > 0) {
+      const pm = pkg.packageManager.split("@")[0] as PackageManager;
+      if (pm === "pnpm" || pm === "yarn" || pm === "bun" || pm === "npm") return pm;
+    }
+  } catch {
+    // no package.json or parse error → continue to lockfile walk
+  }
+
+  let dir = startDir;
+  for (;;) {
+    for (const [file, pm] of LOCKFILES) {
+      try {
+        await access(join(dir, file));
+        return pm;
+      } catch {
+        // not present here
+      }
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  return "npm";
+}
+
+/** Add deps to an existing package.json, preserving key order and indentation. */
+export async function addDepsToPackageJson(
+  pkgPath: string,
+  deps: Record<string, string>,
+): Promise<{ added: string[]; alreadyPresent: string[] }> {
+  const raw = await readFile(pkgPath, "utf8");
+  const pkg = JSON.parse(raw) as { dependencies?: Record<string, string>; [k: string]: unknown };
+
+  const indentMatch = raw.match(/\n([ \t]+)/);
+  const indent = indentMatch ? indentMatch[1] : "  ";
+
+  if (!pkg.dependencies) pkg.dependencies = {};
+
+  const added: string[] = [];
+  const alreadyPresent: string[] = [];
+
+  for (const [name, version] of Object.entries(deps)) {
+    if (Object.prototype.hasOwnProperty.call(pkg.dependencies, name)) {
+      alreadyPresent.push(name);
+    } else {
+      pkg.dependencies[name] = version;
+      added.push(name);
+    }
+  }
+
+  if (added.length > 0) {
+    await writeFile(pkgPath, JSON.stringify(pkg, null, indent) + "\n", "utf8");
+  }
+
+  return { added, alreadyPresent };
+}
+
 export interface InitResult {
   /** Paths (relative to root) that were written. */
   created: string[];
   /** Paths (relative to root) skipped because a file already existed. */
   skipped: string[];
+  /** Set when an existing package.json was updated (not created fresh). */
+  packageJsonUpdated?: { added: string[]; alreadyPresent: string[] };
 }
 
 export interface InitOptions {
@@ -73,16 +182,58 @@ export interface InitOptions {
   force?: boolean;
   /** Per-path content overrides (relative paths → body). `ar new` uses this to inject driver-specific config. */
   overrides?: Record<string, string>;
+  /** Driver peer to add to package.json (default: "better-sqlite3"). */
+  driver?: string;
+  /**
+   * Skip all package.json management (creation and dep injection).
+   * Set by `ar new`, which writes its own package.json before calling init().
+   */
+  skipPackageJson?: boolean;
 }
 
 /**
  * Scaffold a standalone-activerecord project under `root`. Existing files are
  * skipped by default; pass `force: true` to overwrite them.
+ *
+ * If a `package.json` already exists, its `dependencies` are updated in place
+ * instead of overwriting the file. Pass `force: true` to replace it with a
+ * fresh scaffold.
  */
 export async function init(root: string, opts: InitOptions = {}): Promise<InitResult> {
-  const { force = false, overrides = {} } = opts;
+  const {
+    force = false,
+    overrides = {},
+    driver = "better-sqlite3",
+    skipPackageJson = false,
+  } = opts;
   const created: string[] = [];
   const skipped: string[] = [];
+  let packageJsonUpdated: InitResult["packageJsonUpdated"];
+
+  if (!skipPackageJson) {
+    const pkgPath = join(root, "package.json");
+    let pkgExists = false;
+    try {
+      await access(pkgPath);
+      pkgExists = true;
+    } catch {
+      // doesn't exist yet
+    }
+
+    if (pkgExists && !force) {
+      const deps: Record<string, string> = {
+        ...AR_DEPS,
+        ...(INIT_DRIVER_DEPS[driver] ?? INIT_DRIVER_DEPS["better-sqlite3"]),
+      };
+      packageJsonUpdated = await addDepsToPackageJson(pkgPath, deps);
+    } else {
+      const name = basename(root);
+      const body = freshPackageJson(name, driver);
+      await writeFile(pkgPath, body, { flag: force ? "w" : "wx" });
+      created.push("package.json");
+    }
+  }
+
   for (const [rel, defaultBody] of SCAFFOLD) {
     const body = Object.prototype.hasOwnProperty.call(overrides, rel)
       ? overrides[rel]
@@ -97,5 +248,5 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
       skipped.push(rel);
     }
   }
-  return { created, skipped };
+  return { created, skipped, packageJsonUpdated };
 }
