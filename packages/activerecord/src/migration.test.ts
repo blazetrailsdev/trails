@@ -290,6 +290,7 @@ describe("MigrationTest", () => {
       executeMutation: async (sql: string) => {
         executed.push(sql);
       },
+      toSql: (node: { toSql(): string }) => node.toSql(),
       supportsIndexesInCreate: () => false,
       schemaCache: { clearDataSourceCacheBang: () => {} },
     } as unknown as DatabaseAdapter;

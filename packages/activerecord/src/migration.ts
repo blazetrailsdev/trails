@@ -1918,7 +1918,7 @@ export class MigrationContext {
       adapter: this.connection,
     });
     if (fn) fn(td);
-    await this.connection.executeMutation(td.toSql());
+    await this.connection.executeMutation(this.connection.toSql(td));
     if (options?.comment != null && options.comment.length > 0) {
       const adapterWithComments = this.connection as {
         supportsComments?: () => boolean;
