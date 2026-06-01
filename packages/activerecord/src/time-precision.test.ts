@@ -118,7 +118,7 @@ describe("TimePrecisionTest", () => {
   });
 
   it("formatting time according to precision", () => {
-    // BLOCKED: PlainTime WHERE-clause quoting needed + time.to_s Rails-format comparison
+    // BLOCKED: type — PlainTime WHERE-clause quoting needed + time.to_s Rails-format comparison
     // ROOT-CAUSE: ~20 LOC in connection-adapters/abstract/quoting.ts PlainTime quoting
   });
 
@@ -133,6 +133,6 @@ describe("TimePrecisionTest", () => {
   });
 
   it("time precision with zero should be dumped", () => {
-    // BLOCKED: postgres-only test (current_adapter?(:PostgreSQLAdapter))
+    // BLOCKED: adapter-pg — postgres-only test (current_adapter?(:PostgreSQLAdapter))
   });
 });

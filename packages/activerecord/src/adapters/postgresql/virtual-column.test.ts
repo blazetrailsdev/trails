@@ -102,7 +102,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("schema dumping", () => {
-      // BLOCKED: TS schema dumper emits TS DSL (t.string/t.integer) and does
+      // BLOCKED: schema — TS schema dumper emits TS DSL (t.string/t.integer) and does
       // not honor virtual-column options. The PG-specific prepareColumnOptions
       // (as/stored) is unreachable from emitTable's column rendering path.
       // ROOT-CAUSE: schema-dumper.ts emitTable bypasses connection-adapter

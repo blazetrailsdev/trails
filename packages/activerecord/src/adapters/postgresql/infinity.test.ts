@@ -114,7 +114,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("assigning 'infinity' on a datetime column with TZ aware attributes", () => {
-      // BLOCKED: missing InTimeZone test helper + Base.timeZoneAwareAttributes /
+      // BLOCKED: type — missing InTimeZone test helper + Base.timeZoneAwareAttributes /
       // reset_column_information lifecycle. Sentinels already unified; this
       // gap is purely about TZ-aware type wrapping + per-block time-zone state.
       // SCOPE: ~80 LOC — InTimeZone helper + TimeZoneConverter integration test plumbing

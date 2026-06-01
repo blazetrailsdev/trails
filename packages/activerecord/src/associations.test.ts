@@ -8406,7 +8406,7 @@ describe("PreloaderTest", () => {
     expect(spy).toHaveBeenCalledTimes(3);
   });
   it.skip("preload groups queries with same sql at second level", () => {
-    /* BLOCKED: needs `extending` association option to differentiate vs `same scope`. */
+    /* BLOCKED: associations — needs `extending` association option to differentiate vs `same scope`. */
   });
   it("preload with grouping sets inverse association", async () => {
     class IAAuthor extends Base {
@@ -8592,7 +8592,7 @@ describe("PreloaderTest", () => {
   // different databases. A single shared Base.adapter cannot express this
   // multi-database scenario.
   it.skip("multi database polymorphic preload with same table name", () => {
-    // BLOCKED: D-1 — this test bypassed the connection handler via direct adapter assignment (multi-DB pattern).
+    // BLOCKED: connection-pool — this test bypassed the connection handler via direct adapter assignment (multi-DB pattern).
     // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
   });
 

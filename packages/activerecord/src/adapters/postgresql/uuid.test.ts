@@ -940,7 +940,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLUUIDHasManyThroughDisableJoinsTest", () => {
     it.skip("uuid primary key and disable joins with delegate cache", () => {
-      // BLOCKED: hasManyThrough + disableJoins not implemented (not uuid-specific).
+      // BLOCKED: associations — hasManyThrough + disableJoins not implemented (not uuid-specific).
       // Separate PR effort; uuid PK emission verified by Slot A schema-dump tests above.
     });
   });

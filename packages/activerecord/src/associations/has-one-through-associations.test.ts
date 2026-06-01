@@ -807,11 +807,11 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("has one through proxy should not respond to private methods", () => {
-    // BLOCKED: unported — Ruby private-method visibility (NoMethodError on private) has no TS equivalent
+    // BLOCKED: unknown — Ruby private-method visibility (NoMethodError on private) has no TS equivalent
   });
 
   it.skip("has one through proxy should respond to private methods via send", () => {
-    // BLOCKED: unported — Ruby send / private-method dispatch has no TS equivalent
+    // BLOCKED: unknown — Ruby send / private-method dispatch has no TS equivalent
   });
 
   it.skip("assigning to has one through preserves decorated join record", () => {

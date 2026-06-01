@@ -217,7 +217,7 @@ describe("AssociationValidationTest", () => {
     expect(r.errors.fullMessagesFor("topic")).toEqual(["Topic is invalid"]);
   });
   it.skip("validates associated with create context", () => {
-    // BLOCKED: CollectionProxy.create — Rails uses t.replies.create(...) which requires
+    // BLOCKED: associations — CollectionProxy.create — Rails uses t.replies.create(...) which requires
     // a live has_many CollectionProxy with .create support. The validation logic in
     // associated.ts is correct; the blocker is CollectionProxy.create, not associated.ts.
   });

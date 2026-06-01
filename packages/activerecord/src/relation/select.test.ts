@@ -250,19 +250,19 @@ describe("SelectTest", () => {
   });
 
   it.skip("type casted extra select with eager loading", () => {
-    // BLOCKED: eager_load not yet supported
+    // BLOCKED: associations — eager_load not yet supported
   });
 
   it.skip("aliased select using as with joins and includes", () => {
-    // BLOCKED: joins + includes attribute key inspection not yet supported
+    // BLOCKED: associations — joins + includes attribute key inspection not yet supported
   });
 
   it.skip("aliased select not using as with joins and includes", () => {
-    // BLOCKED: joins + includes attribute key inspection not yet supported
+    // BLOCKED: associations — joins + includes attribute key inspection not yet supported
   });
 
   it.skip("star select with joins and includes", () => {
-    // BLOCKED: joins + includes attribute key inspection not yet supported
+    // BLOCKED: associations — joins + includes attribute key inspection not yet supported
   });
 
   it.skip("select without any arguments", () => {

@@ -57,7 +57,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("type cast binary column", async () => {
-      // BLOCKED: no test body — Rails checks column.type == :binary and
+      // BLOCKED: adapter-pg — no test body — Rails checks column.type == :binary and
       // typeForAttribute returns the Bytea OID subclass. columns() now
       // batch-loads all OIDs via loadAdditionalTypes before building Column
       // objects, so OID 17 is registered as Bytea in the type map and

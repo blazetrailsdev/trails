@@ -510,7 +510,7 @@ describe("QueryCacheTest", () => {
     });
   });
   it.skip("cache is available when using a not connected connection", () => {
-    // BLOCKED: in-memory DB cannot test lazy (not-yet-connected) connections
+    // BLOCKED: connection-pool — in-memory DB cannot test lazy (not-yet-connected) connections
   });
 
   it("query cache executes new queries within block", async () => {
