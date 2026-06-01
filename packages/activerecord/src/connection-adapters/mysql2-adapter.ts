@@ -1140,6 +1140,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // DEFAULT_GENERATED — are detectable from extra + default_value alone.
       let def: unknown = r.default_value ?? r.DEFAULT_VALUE ?? null;
       let defFn: string | null = null;
+      // MariaDB stores column defaults as expressions and reports a nullable column's
+      // implicit `DEFAULT NULL` as the bare string "NULL" in information_schema (MySQL
+      // returns a real SQL NULL). The abstract SHOW-CREATE path folds this via
+      // defaultType→:function; here we coerce it to an actual null so new records get a
+      // nil default instead of the 4-char string. A genuine string default is reported
+      // quoted ("'NULL'"), so matching the unquoted token is unambiguous.
+      if (def === "NULL") def = null;
       const onUpdateMatch = extraRaw.match(/on update (.+)$/i);
       if (
         semanticType === "datetime" &&

@@ -42,7 +42,10 @@ export const TEST_SCHEMA: Schema = {
   },
 
   admin_accounts: {
-    name: "string",
+    // Rails `t.string :name` is nullable; the bare-string shorthand would create a
+    // NOT NULL column, which on MySQL/MariaDB reflects an implicit `""` default and
+    // breaks `Admin::Account.new`'s nil `name` (filter_attributes "nil value" tests).
+    name: { type: "string", null: true },
   },
 
   admin_users: {
