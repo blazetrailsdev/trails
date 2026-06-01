@@ -12,9 +12,34 @@ import path from "path";
 // To run locally:
 //   PG_TEST_URL=postgres://... pnpm vitest run --config vitest.pg-canary.config.ts
 
-const MIGRATED_FILES: string[] = [
+const MIGRATED_FILES = [
   // Add migrated test files here, e.g.:
   // "packages/activerecord/src/aggregations.test.ts",
+];
+
+const SHARED_EXCLUDE = [
+  "**/node_modules/**",
+  "**/dist/**",
+  "packages/website/**",
+  "packages/*/dx-tests/**",
+];
+
+// This config always runs against postgresql; exclude sqlite3 and mysql
+// adapter-specific files so they don't accidentally land in MIGRATED_FILES
+// and run against the wrong adapter.
+const ADAPTER_SPECIFIC_EXCLUDE = [
+  "packages/activerecord/src/adapters/abstract-mysql-adapter/**",
+  "packages/activerecord/src/adapters/mysql2/**",
+  "packages/activerecord/src/connection-adapters/mysql/**",
+  "packages/activerecord/src/connection-adapters/mysql2-*.test.ts",
+  "packages/activerecord/src/connection-adapters/abstract-mysql-adapter.test.ts",
+  "packages/activerecord/src/connection-adapters/mysql-*.test.ts",
+  "packages/activerecord/src/tasks/mysql-*.test.ts",
+  "packages/activerecord/src/adapters/sqlite3/**",
+  "packages/activerecord/src/adapters/sqlite3-*.test.ts",
+  "packages/activerecord/src/connection-adapters/sqlite3/**",
+  "packages/activerecord/src/connection-adapters/sqlite3-*.test.ts",
+  "packages/activerecord/src/tasks/sqlite-*.test.ts",
 ];
 
 const alias = {
@@ -110,11 +135,16 @@ const alias = {
     "packages/activerecord/src/type-virtualization/resolve-target.ts",
   ),
   "@blazetrails/activerecord": path.resolve(__dirname, "packages/activerecord/src/index.ts"),
+  "@blazetrails/globalid/wire": path.resolve(__dirname, "packages/globalid/src/wire.ts"),
   "@blazetrails/globalid/signed-global-id": path.resolve(
     __dirname,
     "packages/globalid/src/signed-global-id.ts",
   ),
   "@blazetrails/globalid": path.resolve(__dirname, "packages/globalid/src/index.ts"),
+  "@blazetrails/rack": path.resolve(__dirname, "packages/rack/src/index.ts"),
+  "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/src/index.ts"),
+  "@blazetrails/actionpack": path.resolve(__dirname, "packages/actionpack/src/index.ts"),
+  "@blazetrails/tse-compiler": path.resolve(__dirname, "packages/tse-compiler/src/index.ts"),
   "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/src/index.ts"),
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/src/index.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/src/index.ts"),
@@ -133,6 +163,7 @@ export default defineConfig({
         test: {
           name: "ar-pg-canary",
           include: MIGRATED_FILES,
+          exclude: [...SHARED_EXCLUDE, ...ADAPTER_SPECIFIC_EXCLUDE],
           setupFiles: [
             "./packages/activerecord/src/test-setup-worker-db.ts",
             "./packages/activerecord/src/test-setup-ar.ts",

@@ -32,7 +32,7 @@ on:
 jobs:
   ar-pg-canary:
     name: AR PG Canary
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     services:
       postgres:
         image: postgres:17
