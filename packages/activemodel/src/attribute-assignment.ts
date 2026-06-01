@@ -73,11 +73,13 @@ export function sanitizeForMassAssignment(
   // Mirrors ActiveModel::ForbiddenAttributesProtection#sanitize_for_mass_assignment:
   // params-style objects expose `permitted?` — raise unless permitted, then
   // unwrap via `to_h` so the caller iterates a plain hash, not the wrapper.
+  // Rails calls `attributes.to_h` unconditionally; a permitted params object is
+  // expected to respond to it (a malformed one would NoMethodError there too).
   if (typeof attrs.permitted === "function") {
     if (!attrs.permitted()) {
       throw new ForbiddenAttributesError();
     }
-    return typeof attrs.toH === "function" ? attrs.toH() : { ...attributes };
+    return attrs.toH!();
   }
   return attributes;
 }

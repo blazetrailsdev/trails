@@ -418,6 +418,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#rewhere
    */
   rewhere(conditions: Record<string, unknown>): Relation<T> {
+    // Mirrors rewhere → build_where_clause (query_methods.rb:1065): unwrap/forbid
+    // strong-params, since trails inlines the clause build rather than delegating.
+    conditions = sanitizeForbiddenAttributes(conditions);
     const rel = this._clone();
     const keysToReplace = new Set(Object.keys(conditions));
     rel._whereClause = rel._whereClause.except(...keysToReplace);
