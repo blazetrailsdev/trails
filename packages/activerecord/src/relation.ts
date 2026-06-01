@@ -3867,10 +3867,12 @@ export class Relation<T extends Base> {
    * when no connection is established (e.g. `toSql` on an unconnected model).
    */
   private _annotationComments(): string {
+    // Mirror `_selectVisitor`/`_arelVisitor`: tolerate a partial/mock adapter
+    // that satisfies the `DatabaseAdapter` cast but omits `sanitizeAsSqlComment`
+    // (as several fixture/schema test helpers do), degrading to the abstract
+    // helper instead of throwing. `?.bind` also handles the unconnected case.
     const adapter = this._resolveAdapter();
-    const sanitize = adapter
-      ? (c: string) => adapter.sanitizeAsSqlComment(c)
-      : sanitizeAsSqlComment;
+    const sanitize = adapter?.sanitizeAsSqlComment?.bind(adapter) ?? sanitizeAsSqlComment;
     return this._annotations.map((c) => `/* ${sanitize(c)} */`).join(" ");
   }
 
