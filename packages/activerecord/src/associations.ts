@@ -1794,9 +1794,27 @@ export async function loadHabtm(
   assocName: string,
   options: AssociationOptions & { joinTable?: string },
 ): Promise<Base[]> {
-  // Check preloaded cache first
+  // Check preloaded cache first — an eager-loaded (preloaded) HABTM
+  // association is reachable without a strict-loading violation.
   if (record._preloadedAssociations?.has(assocName)) {
     return record._preloadedAssociations.get(assocName) as Base[];
+  }
+
+  // Lazily loading a HABTM on a strict-loading owner (or a reflection marked
+  // `strictLoading: true`) is a violation, just like the other macros.
+  //
+  // Ordering matches the sibling collection loaders (loadHasMany guards before
+  // its null-FK return): the guard runs ahead of the unsaved-owner / null-PK
+  // short-circuit below. Rails instead reaches `violates_strict_loading?` only
+  // from inside `find_target`, which `find_target?` gates on
+  // `!owner.new_record? || foreign_key_present?` — so a *new* strict owner with
+  // a plain HABTM returns `[]` without raising. Replicating that requires a
+  // `find_target?`-style new-record check ahead of this guard across all
+  // collection loaders; deferred (see the new-record bucket in the PR).
+  if (_violatesStrictLoading(record, options)) {
+    strictLoadingViolationBang(record, assocName, {
+      className: options.className ?? camelize(singularize(assocName)),
+    });
   }
 
   const ctor = record.constructor as typeof Base;
