@@ -228,7 +228,7 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("touch stale object", async () => {
-    const person = await Person.create({ first_name: "Mehmet Emin" });
+    const person = await Person.createBang({ first_name: "Mehmet Emin" });
     const stalePerson = await Person.find(person.id);
     await person.updateAttribute("gender", "M");
     await expect(stalePerson.touch()).rejects.toThrow(StaleObjectError);
@@ -487,7 +487,7 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("update without attributes does not only update lock version", async () => {
-    const p1 = await Person.create({ first_name: "anika" });
+    const p1 = await Person.createBang({ first_name: "anika" });
     const lockVersion = p1.lock_version;
     await p1.save();
     await p1.reload();
