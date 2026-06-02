@@ -1526,11 +1526,14 @@ describe("NestedThroughAssociationsTest", () => {
       sourceType: "Post",
     });
 
+    // The named-inner-join relation is the `other` argument: merge() clones the
+    // receiver first, so this is the path where mergeJoins must copy
+    // `_namedInnerJoins` over — the bug dropped them entirely from the result.
     const joined = (Author as any).joins("similarPosts");
-    const merged = joined.merge((Author as any).where({ name: "bob" }));
+    const merged = (Author as any).where({ name: "bob" }).merge(joined);
 
-    // The named inner joins survive the merge: both relations emit the same
-    // canonical-aliased INNER JOIN chain.
+    // The named inner joins survive the merge: the merged relation still emits the
+    // canonical-aliased INNER JOIN chain carried over from `other`.
     expect(merged.toSql()).toContain("taggings_authors_join");
     expect(merged.toSql()).toContain("INNER JOIN");
     expect(merged.toSql()).toContain('WHERE "authors"."name" = ');
