@@ -3822,6 +3822,18 @@ export class Relation<T extends Base> {
    * loads (LEFT OUTER JOINs + WHERE/ORDER + LIMIT/OFFSET). The toSql path
    * nests it inside `pk IN (...)`; the execution path runs it standalone to
    * materialize literal IDs (Rails' `distinct_relation_for_primary_key`).
+   *
+   * Two known limitations, both pre-existing (carried over verbatim from the
+   * former inline subquery) and not exercised by any active test:
+   * - Rails' `columns_for_distinct` also appends the `order_values` to the
+   *   SELECT list, because `SELECT DISTINCT id ... ORDER BY <col>` requires the
+   *   ordered column to be projected on PostgreSQL/MySQL. We project only the
+   *   pk, so a limited collection eager-load that orders on a *joined* column
+   *   (e.g. the still-skipped `order on join table with include and limit`,
+   *   ordering by `developers_projects.joined_on`) needs that handling first.
+   * - Single-column pk only: callers read `Object.values(row)[0]` and emit a
+   *   scalar `pk IN (...)`. Composite keys (Rails' `results.last(pk.length)` +
+   *   `zip`) are unhandled, matching the rest of this eager path (`basePk`).
    */
   private _buildEagerIdSubquery(jd: JoinDependency, basePk: string): SelectManager {
     const table = this._modelClass.arelTable;
