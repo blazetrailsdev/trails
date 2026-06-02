@@ -8,11 +8,11 @@ and trails-side canonicalizers must produce output that validates against it.
 
 ## Purpose
 
-Neither `ActiveRecord::SchemaDumper` (Rails) nor `trails-schema-dump` (trails)
+Neither `ActiveRecord::SchemaDumper` (Rails) nor `SchemaDumper` (trails)
 is "the truth." Both sides run a `canonicalize` step that lowers their native
 output into this format. This decouples parity tests from the internal shape of
-either dumper — a change to `dumpSchemaColumns` or `SchemaDumper` that doesn't
-affect semantic meaning won't break the diff.
+either dumper — a change to `SchemaDumper` that doesn't affect semantic meaning
+won't break the diff.
 
 ## Version policy (D9)
 

@@ -2,7 +2,7 @@
 
 The trails counterpart to Rails' `bin/rails` CLI for ActiveRecord workflows.
 Owns `ar init` / `ar new` / `ar generate:*` / `ar destroy:*` / `ar db:*` /
-`ar console` / `ar runner` / `ar typecheck` / `ar schema:dump` / `ar models:dump`.
+`ar console` / `ar runner` / `ar typecheck` / `ar models:dump`.
 It is the tooling layer on top of `@blazetrails/activerecord`; the runtime
 package carries no CLI dependency.
 
@@ -40,7 +40,7 @@ ar console
 | `config/database.ts`  | Connection config keyed by `TRAILS_ENV`                     |
 | `db/migrate/`         | Timestamped migration files                                 |
 | `db/seeds.ts`         | Seed data loaded by `ar db:seed`                            |
-| `db/schema.ts`        | Schema snapshot written by `ar schema:dump`                 |
+| `db/schema.ts`        | Schema snapshot written by `ar db:schema:dump`              |
 | `app/models/base.ts`  | Project `Base` subclass with `establishConnection()`        |
 | `app/models/index.ts` | Generated manifest — re-exported model classes              |
 | `db.ts`               | Two-line bootstrap: `establishConnection` + manifest import |
