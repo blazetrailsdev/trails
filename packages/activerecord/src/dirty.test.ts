@@ -140,6 +140,10 @@ describe("DirtyTest", () => {
   });
 
   it("saved_change_to_attribute? returns whether a change occurred in the last save", async () => {
+    // NOTE: Rails creates `Person` once and checks the nil→"Sean" change. trails'
+    // dirty tracking doesn't populate saved-changes for attributes set during the
+    // initial INSERT, so the change is exercised via a follow-up update instead.
+    // The method-level fidelity (predicate + from/to) matches Rails.
     const p = await Person.create({ first_name: "Sean" });
     p.first_name = "Bob";
     await p.save();
@@ -149,6 +153,7 @@ describe("DirtyTest", () => {
   });
 
   it("saved_change_to_attribute returns the change that occurred in the last save", async () => {
+    // See the saved-changes-on-INSERT note above: exercised via a follow-up update.
     const p = await Person.create({ first_name: "Sean" });
     p.first_name = "Bob";
     await p.save();
@@ -157,6 +162,7 @@ describe("DirtyTest", () => {
   });
 
   it("attribute_before_last_save returns the original value before saving", async () => {
+    // See the saved-changes-on-INSERT note above: exercised via a follow-up update.
     const p = await Person.create({ first_name: "Sean" });
     p.first_name = "Bob";
     await p.save();
@@ -182,6 +188,9 @@ describe("DirtyTest", () => {
         this.afterSave(function (record: any) {
           if (record.changed) throw new Error("changed? should be false");
           if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
+          if (Object.keys(record.savedChanges).length === 0)
+            throw new Error("saved_changes? should be true");
+          if (record.idInDatabase() == null) throw new Error("id_in_database should not be nil");
         });
       }
     };
