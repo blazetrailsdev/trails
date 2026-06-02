@@ -18,6 +18,12 @@ const TEST_SCHEMA = {
   users: { name: "string" },
   items: { name: "string" },
   products: { sku: "string", name: "string" },
+  // Uniquely-prefixed stand-in for `people`: that canonical table name is
+  // physically redefined with conflicting reduced shapes by sibling suites
+  // (dirty `{first_name}`, autosave `{name,first_name}`, …) in the shared
+  // handler DB, so a bespoke `people` here would collide depending on fork
+  // scheduling. Mirrors the `lock_people` / `aco_people` convention.
+  ro_people: { name: "string", born_at: "datetime" },
 } as const;
 
 // -- Helpers --
@@ -128,11 +134,19 @@ describe("ReadonlyTest", () => {
     expect(posts[0].isReadonly()).toBe(true);
   });
 
-  it.skip("cant touch readonly column", () => {
-    // BLOCKED: relation — Relation API gap in readonly
-    // ROOT-CAUSE: relation/readonly.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in readonly.test.ts
-    /* fixture-dependent */
+  it("cant touch readonly column", async () => {
+    class Person extends Base {
+      static {
+        this._tableName = "ro_people";
+        this.attribute("name", "string");
+        this.attribute("born_at", "datetime");
+      }
+    }
+    Person.attrReadonly("born_at");
+    const person = await Person.create({ name: "David" });
+    await expect(
+      (person as unknown as { touch(c: string): Promise<boolean> }).touch("born_at"),
+    ).rejects.toThrow("born_at is marked as readonly");
   });
   it.skip("has many find readonly", () => {
     // BLOCKED: relation — Relation API gap in readonly
