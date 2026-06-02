@@ -26,15 +26,22 @@ describe("DirtyTest", () => {
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     // Re-establish the canonical `people` shape (Rails' dirty_test.rb reads the
-    // shared `Person`). Using the canonical columns instead of a reduced bespoke
-    // `{first_name}` means this file no longer overwrites the worker DB's
-    // `people` table with a reduced shape — removing a cross-file collision that
-    // `locking.test.ts` guards against with `dropExisting`. `topics` stays a
-    // bespoke scratch table (separate convergence).
-    await defineSchema({
-      topics: { title: "string" },
-      people: canonicalSchema.people,
-    });
+    // shared `Person`). `dropExisting` is required, not optional: the worker's
+    // canonical schema preload keeps the `people` signature cache-warm, so a
+    // plain `defineSchema` is a no-op — meaning a sibling file that physically
+    // replaced `people` with a reduced bespoke shape lacking `first_name` (e.g.
+    // `callbacks`/`errors`/`migration`'s `people: { name }`) would survive into
+    // this suite and break our `first_name` INSERTs. `dropExisting` bypasses the
+    // signature cache and rebuilds `people` from the canonical schema verbatim,
+    // matching the shield `locking.test.ts` uses. `topics` stays a bespoke
+    // scratch table (separate convergence).
+    await defineSchema(
+      {
+        topics: { title: "string" },
+        people: canonicalSchema.people,
+      },
+      { dropExisting: true },
+    );
   });
   it("attribute changes", () => {
     class Topic extends Base {
