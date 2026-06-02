@@ -1217,14 +1217,18 @@ describe("MigrationTest", () => {
 
   it("create table raises if already exists", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("testings", { force: true }, (t) => {
-      t.string("foo");
-    });
-    await expect(
-      ctx.createTable("testings", {}, (t) => {
+    try {
+      await ctx.createTable("testings", { force: true }, (t) => {
         t.string("foo");
-      }),
-    ).rejects.toThrow(StatementInvalid);
+      });
+      await expect(
+        ctx.createTable("testings", {}, (t) => {
+          t.string("foo");
+        }),
+      ).rejects.toThrow(StatementInvalid);
+    } finally {
+      await ctx.dropTable("testings", { ifExists: true });
+    }
   });
 
   it("add column with if not exists set to true", () => {
