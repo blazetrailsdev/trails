@@ -1,12 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 
 import { LogSubscriber, setVerboseQueryLogs } from "./log-subscriber.js";
+import { Base } from "./index.js";
 import {
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent as Event,
   Logger,
 } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { Developer } from "./test-helpers/models/developer.js";
 
 const REGEXP_CLEAR_STR = `\\x1b\\[${BaseLogSubscriber.MODES.clear}m`;
 const REGEXP_BOLD_STR = `\\x1b\\[${BaseLogSubscriber.MODES.bold}m`;
@@ -93,6 +98,18 @@ class TestDebugLogSubscriber extends LogSubscriber {
 describe("LogSubscriberTest", () => {
   let mockLogger: MockLogger;
   let subscriber: TestDebugLogSubscriber;
+  let oldBaseLogger: typeof Base.logger;
+
+  // The DB-backed tests (basic/exists query logging) drive a real query
+  // through the auto-attached production LogSubscriber, which logs via
+  // ActiveRecord::Base.logger. A `developers` table is all those SELECTs need.
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema({
+      developers: { name: "string", lastName: "string", salary: "integer" },
+    });
+  });
 
   beforeEach(() => {
     mockLogger = new MockLogger();
@@ -100,10 +117,12 @@ describe("LogSubscriberTest", () => {
     TestDebugLogSubscriber.logger = mockLogger;
     LogSubscriber.colorizeLogging = true;
     subscriber = new TestDebugLogSubscriber();
+    oldBaseLogger = Base.logger;
   });
 
   afterEach(() => {
     LogSubscriber.logger = null;
+    Base.logger = oldBaseLogger;
     setVerboseQueryLogs(false);
   });
 
@@ -129,10 +148,13 @@ describe("LogSubscriberTest", () => {
     expect(subscriber.debugs[0]).toMatch(/ruby {3}rails/);
   });
 
-  it.skip("basic query logging", () => {
-    // BLOCKED: relation — log-subscriber feature gap
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts missing Rails parity for log_subscriber
-    // SCOPE: ~20–50 LOC fix in relation.ts or abstract-adapter.ts; affects ~1–2 tests in log-subscriber.test.ts
+  it("basic query logging", async () => {
+    Base.logger = mockLogger;
+    await Developer.all().load();
+    const debug = mockLogger.logged("debug");
+    expect(debug.length).toBe(1);
+    expect(debug[debug.length - 1]).toMatch(/Developer Load/);
+    expect(debug[debug.length - 1]).toMatch(/SELECT .*?FROM .?developers.?/i);
   });
 
   it("basic query logging coloration", () => {
@@ -279,10 +301,13 @@ describe("LogSubscriberTest", () => {
     );
   });
 
-  it.skip("exists query logging", () => {
-    // BLOCKED: relation — log-subscriber feature gap
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts missing Rails parity for log_subscriber
-    // SCOPE: ~20–50 LOC fix in relation.ts or abstract-adapter.ts; affects ~1–2 tests in log-subscriber.test.ts
+  it("exists query logging", async () => {
+    Base.logger = mockLogger;
+    await Developer.exists(1);
+    const debug = mockLogger.logged("debug");
+    expect(debug.length).toBe(1);
+    expect(debug[debug.length - 1]).toMatch(/Developer Exists/);
+    expect(debug[debug.length - 1]).toMatch(/SELECT .*?FROM .?developers.?/i);
   });
 
   it("verbose query logs", () => {

@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, ReadOnlyRecord } from "./index.js";
 import { ReadonlyAttributeError } from "./readonly-attributes.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
+import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
@@ -251,6 +251,17 @@ describe("ReadonlyTest", () => {
   // across handler-suite files so no sibling can define a conflicting `items`
   // shape in the worker's DB.
   useHandlerFixtures(["items"], { schema: canonicalSchema });
+  // Force-recreate `items` to the canonical shape. Under vitest's per-file
+  // module isolation the signature/schema caches reset to canonical each file,
+  // so `useHandlerFixtures`' own `defineSchema` sees a cache-hit and skips the
+  // repair — leaving a conflicting `items` shape (e.g. `items:{count}`) that a
+  // sibling handler-suite file co-scheduled earlier in the same fork wrote to
+  // the shared worker DB. `dropExisting` drops + recreates unconditionally, so
+  // the fixture INSERT below sees the `name` column it expects. Registered after
+  // `useHandlerFixtures` so this `beforeAll` runs last and wins.
+  beforeAll(async () => {
+    await defineSchema({ items: (canonicalSchema as Schema).items }, { dropExisting: true });
+  });
   it("marks loaded records as readonly", async () => {
     const items = await Item.all().readonly().toArray();
     expect(items[0].isReadonly()).toBe(true);
