@@ -4,6 +4,7 @@
  * Rails stores these as singleton_class.attr_accessor on the ActiveRecord
  * module itself (active_record.rb:321-322).
  */
+import { ArgumentError } from "@blazetrails/activemodel";
 
 /**
  * Provides a mapping between database protocols/DBMSs and the underlying
@@ -92,7 +93,7 @@ export let permanentConnectionCheckout: true | "deprecated" | "disallowed" = tru
 
 export function setPermanentConnectionCheckout(value: true | "deprecated" | "disallowed"): void {
   if (value !== true && value !== "deprecated" && value !== "disallowed") {
-    throw new Error(
+    throw new ArgumentError(
       "permanentConnectionCheckout must be one of: `true`, `'deprecated'` or `'disallowed'`",
     );
   }

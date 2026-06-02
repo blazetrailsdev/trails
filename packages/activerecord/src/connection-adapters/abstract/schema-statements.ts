@@ -235,9 +235,9 @@ export class SchemaStatements {
     type: ColumnType,
     options: ColumnOptions & { ifNotExists?: boolean } = {},
   ): Promise<void> {
-    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     const addColumnDef = await this.buildAddColumnDefinition(tableName, columnName, type, options);
     if (!addColumnDef) return;
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     await this.adapter.executeMutation(this.schemaCreation.accept(addColumnDef));
   }
 
