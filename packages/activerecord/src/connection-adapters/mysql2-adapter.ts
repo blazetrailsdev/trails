@@ -573,7 +573,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (this._isFakeConnection) throw new Error("Mysql2Adapter: fake connection has no client");
     const gen = this._connectGeneration;
     this._connectingPromiseGen = gen;
-    this._connectingPromise = Mysql2Adapter.newClient(this._poolConfig, this._buildInitSql()).then(
+    this._connectingPromise = Mysql2Adapter.newClient({
+      ...this._poolConfig,
+      initSql: this._buildInitSql(),
+    }).then(
       (conn): mysql.Connection | Promise<mysql.Connection> => {
         if (this._connectGeneration !== gen) {
           // disconnectBang()/close() happened while we were connecting. Clear
@@ -1642,7 +1645,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   static async newClient(
     config: mysql.PoolOptions & MysqlAdapterOptions,
-    initSql: string,
   ): Promise<mysql.Connection> {
     // With supportBigNumbers:true, mysql2 returns a decimal string for BIGINT
     // values with ≥15 digits (i.e. ≥ 10^14) where parseInt would lose precision,
@@ -1659,6 +1661,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       strict: _strict,
       waitTimeout: _wt,
       variables: _vars,
+      // Session init SQL is carried on the config (see MysqlAdapterOptions#initSql)
+      // and run below — strip it so it isn't passed to the mysql2 driver.
+      initSql,
       // Strip pool-only options — irrelevant for a single connection.
       connectionLimit: _connLimit,
       queueLimit: _queueLimit,
@@ -1685,12 +1690,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       typeCast: composedTypeCast,
     });
 
-    try {
-      await conn.query(initSql);
-    } catch (err) {
-      // Init SQL failed — close the socket so it isn't leaked, then rethrow.
-      conn.end().catch(() => {});
-      throw err;
+    if (initSql) {
+      try {
+        await conn.query(initSql);
+      } catch (err) {
+        // Init SQL failed — close the socket so it isn't leaked, then rethrow.
+        conn.end().catch(() => {});
+        throw err;
+      }
     }
     return conn;
   }

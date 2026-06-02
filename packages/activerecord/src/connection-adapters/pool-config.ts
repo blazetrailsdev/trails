@@ -295,6 +295,14 @@ export interface MysqlAdapterOptions extends TrailsAdapterOptions {
   waitTimeout?: number | string;
   // Mirrors: database.yml `variables:` — SET SESSION key = value on each new connection.
   variables?: Record<string, string | number | boolean | null | ":default" | "default">;
+  /**
+   * Session init SQL run on each new connection, derived from the other
+   * options by `buildInitSql`. Carried on the config (rather than a separate
+   * argument) so `newClient(config)` mirrors Rails' single-arg
+   * `new_client(config)` and the mysql2 gem's `config[:init_command]`.
+   * @internal
+   */
+  initSql?: string;
   /** @internal */
   _fakeConnection?: boolean;
 }
