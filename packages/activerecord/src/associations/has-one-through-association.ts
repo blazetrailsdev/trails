@@ -60,6 +60,43 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     }
     this.target = record;
     this.loadedBang();
+    if (record) this.eagerBuildThroughForNewOwner(record);
+  }
+
+  /**
+   * Rails' `create_through_record` builds the join record synchronously
+   * inside `replace`. We otherwise defer that DB work to `persistReplace`
+   * (TS writers are sync, DB ops async). But when the owner is a *new*
+   * record and the through is a `belongsTo`, the join op is a pure
+   * in-memory `build` — no query — so we can run it eagerly here, matching
+   * Rails. This makes `owner.through` a `new_record?` immediately after
+   * assignment (e.g. `MemberDetail.new(member_type: t).member`).
+   *
+   * Scoped to belongsTo throughs only: hasOne/hasMany throughs keep the
+   * deferred create path so their save semantics stay untouched.
+   * @internal
+   */
+  private eagerBuildThroughForNewOwner(record: Base): void {
+    if (!(this.owner as any).isNewRecord?.()) return;
+    const throughName = this.reflection.options.through as string | undefined;
+    if (!throughName) return;
+    const throughDef = (
+      this.owner.constructor as { _associations?: AssociationDefinition[] }
+    )._associations?.find((a) => a.name === throughName);
+    if (!throughDef || throughDef.type !== "belongsTo") return;
+
+    ensureNotNested(this);
+    const throughProxy = throughAssociation(this);
+    if (!throughProxy) return;
+    const attrs = constructJoinAttributes(this, record);
+    const throughRecord = (throughProxy as { target?: Base | null }).target ?? null;
+    if (throughRecord) {
+      if ((throughRecord as any).isNewRecord?.()) {
+        (throughRecord as any).assignAttributes?.(attrs);
+      }
+    } else {
+      (throughProxy as any).build?.(attrs);
+    }
   }
 
   /**
