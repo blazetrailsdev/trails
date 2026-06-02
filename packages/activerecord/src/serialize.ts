@@ -124,7 +124,11 @@ export function serialize(
   const { coder, coderIdentity, objectType } = resolveSerializer(attribute, options);
 
   modelClass.decorateAttributes([attribute], (name: string, castType: Type): Type => {
-    if (isTypeIncompatibleWithSerialize(castType, coderIdentity, objectType)) {
+    // `castType instanceof Json` (computed here, where Json is already imported)
+    // catches both Type::Json and its OID::Jsonb subclass — Rails' `is_a?(Json)`.
+    if (
+      isTypeIncompatibleWithSerialize(castType, coderIdentity, objectType, castType instanceof Json)
+    ) {
       throw new ColumnNotSerializableError(name, castType);
     }
     // Re-declaring serialize on the same attribute (e.g. switching coders)
