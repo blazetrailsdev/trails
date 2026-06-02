@@ -31,7 +31,6 @@ For the audit reports that produced the original sequencing, see
 | [`activerecord-type-audit.md`](activerecord-type-audit.md)                               | type cleanup (W1b, small follow-ups, W4)                                                                                                                    |
 | [`parity-verification.md`](parity-verification.md)                                       | reference: schema + query parity pipelines                                                                                                                  |
 | [`fixtures-adoption-inventory.md`](fixtures-adoption-inventory.md)                       | reference: script-generated fixture tiering                                                                                                                 |
-| [`trails-tsc-schema-ts-migration.md`](trails-tsc-schema-ts-migration.md)                 | plan: make `trails-tsc --schema` read `schema.ts`, then drop `trails-schema-dump` (4 sibling PRs)                                                           |
 | [`trails-models-dump-schema-ts-migration.md`](trails-models-dump-schema-ts-migration.md) | plan: make `trails-models-dump` derive models from committed `db/schema.ts` instead of a live DB                                                            |
 
 ## Focused work set (what's actually buildable)

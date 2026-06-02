@@ -57,8 +57,8 @@ export interface VirtualizeOptions extends WalkOptions {
    *
    * Each column's value is a `SchemaColumnValue` — either:
    *   - a Rails type string (legacy shape, e.g. `"string"`), or
-   *   - a rich object `{ type, null?, arrayElementType? }` as emitted
-   *     by `dumpSchemaColumns`. `null: false` renders `Type`;
+   *   - a rich object `{ type, null?, arrayElementType? }` as parsed
+   *     from `db/schema.ts`. `null: false` renders `Type`;
    *     `null: true` OR `null` omitted renders `Type | null` (Rails'
    *     conservative default — columns without a NOT NULL constraint
    *     are nullable). `arrayElementType` on an `array` column renders

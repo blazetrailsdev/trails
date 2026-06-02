@@ -95,7 +95,6 @@ environment in many setups. `ar` resolves `TRAILS_ENV → NODE_ENV → "developm
 | Command                                | Description                                                                                      |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `ar typecheck`                         | Type-check models via `trails-tsc`                                                               |
-| `ar schema:dump`                       | Dump current schema via `trails-schema-dump`                                                     |
 | `ar models:dump --schema db/schema.ts` | Dump model metadata from `db/schema.ts` (no DB needed); `--database-url` is the live-DB fallback |
 | `ar generate:manifest`                 | Regenerate `app/models/index.ts` (also listed under Scaffolding)                                 |
 

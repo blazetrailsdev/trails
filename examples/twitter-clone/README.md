@@ -74,11 +74,11 @@ A small `rails db:*`-style runner (`src/cli.ts`) wraps ActiveRecord's
 | ------------------------ | --------------------------------------------- |
 | `pnpm db:create`         | Create the database                           |
 | `pnpm db:drop`           | Delete the database                           |
-| `pnpm db:migrate`        | Run pending migrations, then dump the schema  |
+| `pnpm db:migrate`        | Run pending migrations                        |
 | `pnpm db:rollback [n]`   | Roll back the last `n` migrations (default 1) |
 | `pnpm db:migrate:status` | Show each migration's `up`/`down` state       |
 | `pnpm db:seed`           | Load `db/seeds.ts`                            |
-| `pnpm db:schema:dump`    | Regenerate `db/schema-columns.json`           |
+| `pnpm db:schema:dump`    | Dump the current schema to `db/schema.ts`     |
 | `pnpm db:setup`          | `create` + `migrate` + `seed`                 |
 | `pnpm db:prepare`        | Create if needed, migrate, seed when empty    |
 | `pnpm db:reset`          | `drop` + `setup`                              |
@@ -153,13 +153,12 @@ from? The **schema** — exactly like Rails, which reads them from the DB at
 boot:
 
 - **Types:** [`trails-tsc`](../../README.md#zero-declare-models--trails-tsc),
-  a drop-in `tsc` replacement, reads `db/schema-columns.json` (the
-  `--schema` flag in the `typecheck` script) and injects a `declare` member
-  per column, plus association proxies (`user.tweets`), scope readers
-  (`Tweet.recent()`), and target imports. `pnpm db:migrate` regenerates the
-  JSON automatically (or run `pnpm db:schema:dump`), just as Rails rewrites
-  `schema.rb` after migrating. In a real app you'd instead run
-  `trails-schema-dump --out db/schema-columns.json` against your live DB.
+  a drop-in `tsc` replacement, reads `db/schema.ts` (the `--schema` flag in
+  the `typecheck` script) and injects a `declare` member per column, plus
+  association proxies (`user.tweets`), scope readers (`Tweet.recent()`), and
+  target imports. After migrations, run `pnpm db:schema:dump` (which calls
+  `ar db:schema:dump`) to regenerate `db/schema.ts` and commit it — just as
+  Rails rewrites `schema.rb` after migrating.
 - **Runtime:** `loadModelSchemas()` (in `src/db.ts`) calls `Model.loadSchema()`
   for each model after connecting, reflecting the columns off the live
   database. (Rails does this lazily on first use; we warm it eagerly so the

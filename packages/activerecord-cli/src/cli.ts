@@ -5,7 +5,6 @@ import { generateMigration, migrationTimestamp, parseFields } from "./generate-m
 import { generateModel } from "./generate-model.js";
 import { destroyMigration, destroyModel } from "./destroy.js";
 import { delegateBin } from "./delegate.js";
-import { run as runSchemaDump } from "./bin/trails-schema-dump.js";
 import { run as runModelsDump } from "./bin/trails-models-dump.js";
 import {
   dbCreate,
@@ -39,7 +38,6 @@ Commands:
   destroy:migration <Name>       Delete the matching db/migrate/*_<snake_name>.ts
   destroy:model <Name>           Delete app/models/<snake>.ts + its create migration
   typecheck                      Type-check your models via trails-tsc
-  schema:dump                    Dump the current schema via trails-schema-dump
   models:dump                    Dump model metadata via trails-models-dump (--schema <path> for offline)
   db:create                      Create the database for the current TRAILS_ENV
   db:drop                        Drop the database for the current TRAILS_ENV
@@ -397,9 +395,6 @@ export async function run(argv: string[], cwd: string): Promise<number> {
   }
   if (command === "typecheck") {
     return delegateBin("@blazetrails/activerecord-cli", "trails-tsc", rest);
-  }
-  if (command === "schema:dump") {
-    return runSchemaDump(rest);
   }
   if (command === "models:dump") {
     return runModelsDump(rest);

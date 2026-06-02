@@ -352,8 +352,8 @@ Dependency: PR 3 merged.
 - Do **not** remove `introspectForeignKeys` / `introspectPrimaryKey` /
   `introspectColumns` from `@blazetrails/activerecord` — other consumers may
   exist and they belong in the runtime package regardless.
-- Do **not** touch `ar schema:dump` / `trails-schema-dump` — those are the
-  companion plan's territory.
+- Do **not** touch `ar db:schema:dump` — that is the companion plan's
+  territory and is unaffected by this work.
 
 ## Acceptance criteria
 
