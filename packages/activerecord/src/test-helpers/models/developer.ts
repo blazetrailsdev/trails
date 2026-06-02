@@ -86,8 +86,10 @@ export class Developer extends Base {
     } as any);
     this.validates("name", { length: { in: [3, 20] } });
 
-    this.beforeCreate(async function (this: Developer) {
-      (this as any).auditLogs.build({ message: "Computer created" });
+    // Rails: `before_create do |developer| developer.audit_logs.build ... end`
+    // — the record arrives as the callback argument, not `this`.
+    this.beforeCreate(async function (developer: Developer) {
+      (developer as any).auditLogs.build({ message: "Computer created" });
     });
 
     // Rails `attribute :last_name, :string` — there is no `last_name` column

@@ -9,6 +9,15 @@ import { Associations } from "../associations.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Project } from "../test-helpers/models/project.js";
+import { Developer, AuditLog } from "../test-helpers/models/developer.js";
+
+registerModel(Project);
+registerModel(Developer);
+// Developer#before_create builds an `audit_logs` record, autosaved on create.
+registerModel(AuditLog);
 
 // ==========================================================================
 // AssociationCallbacksTest — targets associations/callbacks_test.rb
@@ -175,34 +184,6 @@ describe("AssociationCallbacksTest", () => {
     return { Post, Comment };
   }
 
-  function makeHabtmWithCallbacks(callbacks: any) {
-    const idx = ++cbIdx;
-    const devName = `CBDev${idx}`;
-    const projName = `CBProj${idx}`;
-    class Developer extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Project extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    Developer.adapter = adapter;
-    Project.adapter = adapter;
-    registerModel(devName, Developer);
-    registerModel(projName, Project);
-    Associations.hasAndBelongsToMany.call(Project, "developers", {
-      className: devName,
-      joinTable: "cb_developers_projects",
-      foreignKey: "project_id",
-      associationForeignKey: "developer_id",
-      ...callbacks,
-    });
-    return { Project, Developer };
-  }
-
   beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
@@ -212,9 +193,6 @@ describe("AssociationCallbacksTest", () => {
       users: { name: "string" },
       clients: { name: "string", firm_id: "integer" },
       firms: { name: "string" },
-      developers: { name: "string" },
-      projects: { name: "string" },
-      cb_developers_projects: { project_id: "integer", developer_id: "integer" },
     });
   });
   withTransactionalFixtures(() => adapter);
@@ -578,134 +556,6 @@ describe("AssociationCallbacksTest", () => {
     expect(log).toEqual(["before_remove" + comment.id, "after_remove" + comment.id]);
   });
 
-  it("has and belongs to many add callback", async () => {
-    const log: string[] = [];
-    const { Project, Developer } = makeHabtmWithCallbacks({
-      beforeAdd: (_owner: any, record: any) => {
-        log.push("before_adding" + (record.id ?? "<new>"));
-      },
-      afterAdd: (_owner: any, record: any) => {
-        log.push("after_adding" + (record.id ?? "<new>"));
-      },
-    });
-    const ar = await Project.create({ name: "ActiveRecord" });
-    const david = await Developer.create({ name: "David" });
-    const proxy = association(ar, "developers");
-    await proxy.push(david);
-    expect(log).toEqual(["before_adding" + david.id, "after_adding" + david.id]);
-    await proxy.push(david);
-    expect(log).toEqual([
-      "before_adding" + david.id,
-      "after_adding" + david.id,
-      "before_adding" + david.id,
-      "after_adding" + david.id,
-    ]);
-  });
-
-  it("has and belongs to many before add called before save", async () => {
-    let dev: any = null;
-    let newDev: boolean | undefined;
-    const { Project, Developer } = makeHabtmWithCallbacks({
-      beforeAdd: (_o: any, r: any) => {
-        dev = r;
-        newDev = r.isNewRecord();
-      },
-    });
-    const rec = await Project.create({ name: "ActiveRecord" });
-    const alice = new (Developer as any)({ name: "alice" });
-    await association(rec, "developers").push(alice);
-    expect(dev).toBe(alice);
-    expect(newDev).toBe(true);
-    expect(alice.isNewRecord()).toBe(false);
-  });
-
-  it("has and belongs to many after add called after save", async () => {
-    const log: string[] = [];
-    const { Project, Developer } = makeHabtmWithCallbacks({
-      afterAdd: (_o: any, r: any) => {
-        log.push("after_adding" + (r.id ?? "<new>"));
-      },
-    });
-    const ar = await Project.create({ name: "ActiveRecord" });
-    const proxy = association(ar, "developers");
-
-    const alice = new (Developer as any)({ name: "alice" });
-    await proxy.push(alice);
-    expect(log[log.length - 1]).toBe("after_adding" + alice.id);
-
-    const bob = await proxy.create({ name: "bob" });
-    expect(log[log.length - 1]).toBe("after_adding" + bob.id);
-
-    proxy.build({ name: "charlie" });
-    expect(log[log.length - 1]).toBe("after_adding<new>");
-  });
-  it("has and belongs to many remove callback", async () => {
-    const log: string[] = [];
-    const { Project, Developer } = makeHabtmWithCallbacks({
-      beforeRemove: (_owner: any, record: any) => {
-        log.push("before_removing" + record.id);
-      },
-      afterRemove: (_owner: any, record: any) => {
-        log.push("after_removing" + record.id);
-      },
-    });
-    const activerecord = await Project.create({ name: "ActiveRecord" });
-    const david = await Developer.create({ name: "David" });
-    const jamis = await Developer.create({ name: "Jamis" });
-    const proxy = association(activerecord, "developers");
-    await proxy.push(david, jamis);
-    expect(log).toEqual([]);
-    await proxy.delete(david);
-    expect(log).toEqual(["before_removing" + david.id, "after_removing" + david.id]);
-
-    await proxy.delete(jamis);
-    expect(log).toEqual([
-      "before_removing" + david.id,
-      "after_removing" + david.id,
-      "before_removing" + jamis.id,
-      "after_removing" + jamis.id,
-    ]);
-  });
-
-  it("has and belongs to many does not fire callbacks on clear", async () => {
-    const log: string[] = [];
-    const { Project, Developer } = makeHabtmWithCallbacks({
-      beforeRemove: (_owner: any, record: any) => {
-        log.push("before_removing" + record.id);
-      },
-      afterRemove: (_owner: any, record: any) => {
-        log.push("after_removing" + record.id);
-      },
-    });
-    const activerecord = await Project.create({ name: "ActiveRecord" });
-    const david = await Developer.create({ name: "David" });
-    const jamis = await Developer.create({ name: "Jamis" });
-    const proxy = association(activerecord, "developers");
-    await proxy.push(david, jamis);
-    log.length = 0;
-    await proxy.clear();
-    expect(log).toEqual([]);
-  });
-  it("has and belongs to many callbacks for save on parent", async () => {
-    const log: string[] = [];
-    const { Project } = makeHabtmWithCallbacks({
-      beforeAdd: (_o: any, r: any) => {
-        log.push("before_adding" + (r.id ?? "<new>"));
-      },
-      afterAdd: (_o: any, r: any) => {
-        log.push("after_adding" + (r.id ?? "<new>"));
-      },
-    });
-    const project = new (Project as any)({ name: "Callbacks" });
-    const proxy = association(project, "developers");
-    proxy.build({ name: "Jack" });
-
-    const callbackLog = ["before_adding<new>", "after_adding<new>"];
-    expect(log).toEqual(callbackLog);
-    expect(await project.save()).toBe(true);
-    expect((await proxy.toArray()).length).toBe(1);
-    expect(log).toEqual(callbackLog);
-  });
   it("dont add if before callback raises exception", async () => {
     const log: string[] = [];
     const { Post, Comment } = makePostWithCallbacks({
@@ -723,5 +573,136 @@ describe("AssociationCallbacksTest", () => {
       // swallowed, like Rails' `rescue Exception`
     }
     expect((await proxy.toArray()).length).toBe(0);
+  });
+});
+
+// ==========================================================================
+// HABTM callback tests migrated to the canonical Project / Developer models
+// (whose `developersWithCallbacks` association carries the Rails before/after
+// add+remove callbacks logging to `developersLog`) + real projects/developers
+// fixture lookups, mirroring `AssociationCallbacksTest`'s
+// `developers(:david)` / `projects(:active_record)` rows joined via the
+// developers_projects fixtures.
+// ==========================================================================
+describe("AssociationCallbacksTest", () => {
+  const { projects, developers } = useHandlerFixtures(
+    ["projects", "developers", "developersProjects"],
+    { schema: canonicalSchema },
+  );
+  // The fixture-schema slice only creates the tables the fixtures touch;
+  // creating a Developer autosaves an `audit_logs` row (its `before_create`),
+  // so that table must exist too.
+  beforeAll(async () => {
+    await defineSchema(Base.connection as TestDatabaseAdapter, {
+      audit_logs: canonicalSchema.audit_logs,
+    });
+  });
+
+  it("has and belongs to many add callback", async () => {
+    const david = developers("david");
+    const ar = projects("active_record");
+    expect(ar.developersLog).toEqual([]);
+    const proxy = association(ar, "developersWithCallbacks");
+    await proxy.push(david);
+    expect(ar.developersLog).toEqual([`before_adding${david.id}`, `after_adding${david.id}`]);
+    await proxy.push(david);
+    expect(ar.developersLog).toEqual([
+      `before_adding${david.id}`,
+      `after_adding${david.id}`,
+      `before_adding${david.id}`,
+      `after_adding${david.id}`,
+    ]);
+  });
+
+  it("has and belongs to many before add called before save", async () => {
+    let dev: any = null;
+    let newDev: boolean | undefined;
+    // Rails uses a throwaway `Class.new(Project)` on the `projects` table with a
+    // closure-capturing before_add; the closure proves the added record is still
+    // new inside the callback but persisted afterwards.
+    class ProjectWithCallback extends Base {
+      static {
+        this.tableName = "projects";
+        this.attribute("name", "string");
+        this.hasAndBelongsToMany("developersWithCallbacks", {
+          className: "Developer",
+          joinTable: "developers_projects",
+          foreignKey: "project_id",
+          associationForeignKey: "developer_id",
+          beforeAdd: (_o: any, r: any) => {
+            dev = r;
+            newDev = r.isNewRecord();
+          },
+        });
+      }
+    }
+    registerModel("ProjectWithBeforeAddCallback", ProjectWithCallback);
+    const rec = await ProjectWithCallback.create({ name: "ActiveRecord" });
+    const alice = new Developer({ name: "alice" });
+    await association(rec, "developersWithCallbacks").push(alice);
+    expect(dev).toBe(alice);
+    expect(newDev).toBe(true);
+    expect(alice.isNewRecord()).toBe(false);
+  });
+
+  it("has and belongs to many after add called after save", async () => {
+    const ar = projects("active_record");
+    expect(ar.developersLog).toEqual([]);
+    const proxy = association(ar, "developersWithCallbacks");
+
+    const alice = new Developer({ name: "alice" });
+    await proxy.push(alice);
+    expect(ar.developersLog[ar.developersLog.length - 1]).toBe(`after_adding${alice.id}`);
+
+    const bob = await proxy.create({ name: "bob" });
+    expect(ar.developersLog[ar.developersLog.length - 1]).toBe(`after_adding${bob.id}`);
+
+    proxy.build({ name: "charlie" });
+    expect(ar.developersLog[ar.developersLog.length - 1]).toBe("after_adding<new>");
+  });
+
+  it("has and belongs to many remove callback", async () => {
+    const david = developers("david");
+    const jamis = developers("jamis");
+    const activerecord = projects("active_record");
+    expect(activerecord.developersLog).toEqual([]);
+    const proxy = association(activerecord, "developersWithCallbacks");
+    await proxy.delete(david);
+    expect(activerecord.developersLog).toEqual([
+      `before_removing${david.id}`,
+      `after_removing${david.id}`,
+    ]);
+
+    await proxy.delete(jamis);
+    expect(activerecord.developersLog).toEqual([
+      `before_removing${david.id}`,
+      `after_removing${david.id}`,
+      `before_removing${jamis.id}`,
+      `after_removing${jamis.id}`,
+    ]);
+  });
+
+  it("has and belongs to many does not fire callbacks on clear", async () => {
+    const activerecord = projects("active_record");
+    expect(activerecord.developersLog).toEqual([]);
+    const proxy = association(activerecord, "developersWithCallbacks");
+    // david + jamis (+ poor_jamis) are joined to active_record via the
+    // developers_projects fixtures, so clear() actually removes rows — and
+    // must do so without firing the before/after remove callbacks.
+    expect((await proxy.toArray()).length).toBeGreaterThan(0);
+    await proxy.clear();
+    expect(activerecord.developersLog).toEqual([]);
+  });
+
+  it("has and belongs to many callbacks for save on parent", async () => {
+    const project = new Project({ name: "Callbacks" });
+    const proxy = association(project, "developersWithCallbacks");
+    proxy.build({ name: "Jack", salary: 95000 });
+
+    const callbackLog = ["before_adding<new>", "after_adding<new>"];
+    expect(project.developersLog).toEqual(callbackLog);
+    expect(await project.save()).toBe(true);
+    expect((await proxy.toArray()).length).toBe(1);
+    expect(project.developersLog).toEqual(callbackLog);
   });
 });
