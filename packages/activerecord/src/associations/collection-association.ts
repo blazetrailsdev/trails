@@ -5,7 +5,8 @@ import { Association } from "./association.js";
 import { foreignKeyPresentFor } from "./foreign-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
 import type { AssociationReflection } from "../reflection.js";
-import { RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
+import { RecordNotSaved, Rollback } from "../errors.js";
+import { raiseNotFoundAll } from "../relation/finder-methods.js";
 
 /**
  * Base class for has_many and has_and_belongs_to_many associations.
@@ -102,16 +103,14 @@ export class CollectionAssociation extends Association {
     }
 
     // Rails: `if records.size != ids.size … raise_record_not_found_exception!`.
+    // Reuse the shared "Couldn't find all" builder (also used by performFind)
+    // so there is a single not-found message source.
     if (records.length !== filteredIds.length) {
-      const formatted = filteredIds
-        .map((id) => (Array.isArray(id) ? `[${id.join(", ")}]` : String(id)))
-        .join(", ");
-      throw new RecordNotFound(
-        `Couldn't find all ${Klass.name} with '${String(pk)}': (${formatted})`,
-        Klass.name,
-        String(pk),
-        filteredIds,
-      );
+      raiseNotFoundAll(Klass.name, pk, {
+        ids: filteredIds,
+        wantArray: true,
+        tuples: Array.isArray(pk) ? (filteredIds as unknown[][]) : null,
+      });
     }
 
     this.replace(records);
