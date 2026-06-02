@@ -47,9 +47,16 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
     configureEncryption();
     Configurable.config.supportUnencryptedData = true;
 
-    // Models are defined after configureEncryption so encrypts() builds the
-    // scheme against the configured key material (otherwise buildScheme falls
-    // back to the legacy AR_ENC placeholder encryptor).
+    // Models are defined inline (rather than via the makeEncryptedPost /
+    // makeEncryptedBook factories) because those factories pin `this.adapter`
+    // to a passed adapter, which bypasses the connection handler and would put
+    // writes outside the per-test BEGIN/ROLLBACK savepoint that
+    // useHandlerTransactionalFixtures relies on. The sibling handler-suite
+    // encryption test (uniqueness-validations.test.ts) hand-rolls models for
+    // the same reason. They are also defined after configureEncryption so
+    // encrypts() builds the scheme against the configured key material
+    // (otherwise buildScheme falls back to the legacy AR_ENC placeholder
+    // encryptor).
     EncryptedPost = class EncryptedPost extends Base {
       static {
         this._tableName = "encrypted_posts";
@@ -137,6 +144,13 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
   });
 
   it(".without_encryption doesn't raise on binary encoded data", async () => {
+    // Rails passes `"Dune".encode(Encoding::BINARY)` to exercise the
+    // NullEncryptor.isBinary() === false gate in encryptAsText. TS strings
+    // carry no binary encoding, so this payload is degenerate and the binary
+    // gate itself can't be meaningfully driven here — the actual binary-column
+    // encryption path is covered by makeEncryptedBookWithBinary in
+    // encryptable-record.test.ts. This test retains the name-for-name parity
+    // and still asserts the create-under-NullEncryptor path doesn't raise.
     await expect(
       Contexts.withoutEncryption(() => (EncryptedBook as any).createBang({ name: "Dune" })),
     ).resolves.toBeDefined();
@@ -153,6 +167,9 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
 
     await Contexts.protectingEncryptedData(async () => {
       const found = await (EncryptedBook as any).findBy({ name: "Dune" });
+      // Rails asserts `assert_equal book, find_by(...)`; AR record equality is
+      // class + id, so check both rather than id alone.
+      expect(found).toBeInstanceOf(EncryptedBook);
       expect(found?.id).toBe(book.id);
     });
   });
