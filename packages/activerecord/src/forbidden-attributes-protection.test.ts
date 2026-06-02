@@ -5,40 +5,26 @@
  * where.not all reject an un-permitted params object and unwrap a permitted
  * one. Uses the ProtectedParams stub (test-helpers/protected-params.ts),
  * mirroring Rails' test/support/stubs/strong_parameters.rb.
+ *
+ * Uses the canonical `Person` / `Company` models + `people`/`companies`
+ * fixtures (Rails reads `Person`/`Company` directly here) so this handler-suite
+ * file no longer writes a bespoke reduced `people` shape into the shared worker
+ * DB — eliminating the cross-file collision that `locking.test.ts` guards
+ * against with `dropExisting`.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { ForbiddenAttributesError } from "@blazetrails/activemodel";
-import { Base } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+// Side-effect: registers the Relation constructor on Base (the canonical models
+// import only base.js, which doesn't load relation.ts on its own).
+import "./index.js";
+import { Person } from "./test-helpers/models/person.js";
+import { Company } from "./test-helpers/models/company.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { ProtectedParams } from "./test-helpers/protected-params.js";
 
-class Person extends Base {
-  static {
-    this._tableName = "people";
-    this.attribute("first_name", "string");
-    this.attribute("gender", "string");
-  }
-}
-
-class Company extends Base {
-  static {
-    this._tableName = "companies";
-    this.attribute("name", "string");
-    this.attribute("type", "string");
-  }
-}
-
 describe("ForbiddenAttributesProtectionTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      people: { first_name: "string", gender: "string" },
-      companies: { name: "string", type: "string" },
-    });
-  });
+  useHandlerFixtures(["people", "companies"], { schema: canonicalSchema });
 
   it("forbidden attributes cannot be used for mass assignment", () => {
     const params = new ProtectedParams({ first_name: "Guille", gender: "m" });
