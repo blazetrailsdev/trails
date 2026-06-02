@@ -92,12 +92,6 @@ export function isJoinTableEntry(e: FixtureRegistryEntry): e is FixtureJoinTable
  * - `bad-posts`, `other-books`, `other-comments`, `other-posts`, `other-topics`
  *
  * **Category C — other blockers:**
- * - `developers` — `shared_computers` references a HABTM association name, not a column;
- *   loader can't resolve it.
- * - `developers-projects` — HABTM join table; `ref()`s `developers`, which isn't
- *   registerable yet (see `developers` above). The other three HABTM join sets
- *   (`categories-posts`, `parrots-pirates`, `peoples-treasures`) ref only loadable model
- *   sets and ARE registered.
  * - `cpk-reviews` — rows `ref("cpk_books", …)`, but `ref()` resolves to a single scalar
  *   (the CRC32 label id), not the book's generated composite `id` key component —
  *   composite-target ref resolution is a follow-up.
@@ -284,6 +278,14 @@ export const fixtureRegistry = {
   deadParrots: {
     model: () => import("./models/parrot.js").then((m) => m.DeadParrot),
     data: FixtureData.deadParrotFixtureData,
+  },
+  developers: {
+    model: () => import("./models/developer.js").then((m) => m.Developer),
+    data: FixtureData.developerFixtureData,
+  },
+  developersProjects: {
+    joinTable: "developers_projects",
+    data: FixtureData.developersProjectsFixtureData,
   },
   dogLovers: {
     model: () => import("./models/dog-lover.js").then((m) => m.DogLover),

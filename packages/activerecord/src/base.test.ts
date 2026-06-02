@@ -162,6 +162,24 @@ describe("BasicsTest", () => {
     expect(all.length).toBe(1);
   });
 
+  it("reflects schema columns when the only declared attribute is virtual", async () => {
+    // A model whose sole `attribute()` is virtual (Rails' `attribute :foo` on
+    // an ignored column) must still reflect its real DB columns from the schema
+    // cache. ensureSchemaLoaded used to short-circuit on any declared attribute,
+    // leaving such a model with only its virtual attr and no real columns.
+    class VirtualOnlyUser extends Base {
+      static {
+        this.tableName = "users";
+        this.attribute("displayTag", "string", { virtual: true });
+      }
+    }
+    const created = await VirtualOnlyUser.create({ name: "vname" });
+    const found = await VirtualOnlyUser.find(created.id);
+    expect((found as { readAttribute(n: string): unknown }).readAttribute("name")).toBe("vname");
+    expect(VirtualOnlyUser.columnNames()).toContain("name");
+    expect(VirtualOnlyUser.columnNames()).not.toContain("displayTag");
+  });
+
   it("null fields", async () => {
     class User extends Base {
       static {
