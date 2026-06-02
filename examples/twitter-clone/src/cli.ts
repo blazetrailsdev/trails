@@ -3,11 +3,10 @@
  *
  *   pnpm db:create          create the database
  *   pnpm db:drop            delete the database
- *   pnpm db:migrate         run pending migrations (then dump schema)
+ *   pnpm db:migrate         run pending migrations
  *   pnpm db:rollback [n]    roll back the last n migrations (default 1)
  *   pnpm db:migrate:status  show each migration's up/down state
  *   pnpm db:seed            load db/seeds.ts
- *   pnpm db:schema:dump     regenerate db/schema-columns.json
  *   pnpm db:setup           create + migrate + seed
  *   pnpm db:prepare         create if needed + migrate + seed if empty
  *   pnpm db:reset           drop + setup
@@ -17,7 +16,6 @@ import { dirname } from "node:path";
 import { connect, loadModelSchemas } from "./db.js";
 import { sqliteDatabasePath } from "./database-config.js";
 import { migrate, rollback, status } from "./migrator.js";
-import { dumpSchema } from "./schema-dump.js";
 import { User } from "./models/index.js";
 import { seed } from "../db/seeds.js";
 
@@ -45,7 +43,6 @@ function dropDatabase(): void {
 async function runMigrate(): Promise<void> {
   await connect();
   await migrate();
-  await dumpSchema(); // keep db/schema-columns.json in lock-step, like Rails' schema.rb
   console.log("Migrations complete.");
 }
 
@@ -78,7 +75,6 @@ async function main(): Promise<void> {
       }
       await connect();
       await rollback(step);
-      await dumpSchema();
       console.log(`Rolled back ${step} migration(s).`);
       break;
     case "db:migrate:status":
@@ -87,10 +83,6 @@ async function main(): Promise<void> {
       break;
     case "db:seed":
       await runSeed();
-      break;
-    case "db:schema:dump":
-      await connect();
-      await dumpSchema();
       break;
     case "db:setup":
       await createDatabase();

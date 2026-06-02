@@ -152,8 +152,7 @@ function parseArgs(argv: readonly string[]): Args | number {
   return out;
 }
 
-// Built-ins match trails-schema-dump — metadata tables Rails maintains
-// that users shouldn't be modelling.
+// Metadata tables Rails maintains that users shouldn't be modelling.
 const BUILTIN_IGNORE = new Set(["schema_migrations", "ar_internal_metadata"]);
 
 export async function run(argv: readonly string[]): Promise<number> {
