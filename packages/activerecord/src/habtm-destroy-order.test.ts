@@ -1,9 +1,12 @@
-import { describe, it, beforeAll } from "vitest";
-import { Base, association, registerModel } from "./index.js";
+import { describe, it, expect, beforeAll } from "vitest";
+import { Base, association, registerModel, Rollback } from "./index.js";
 import { Associations } from "./associations.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+
+// Mirrors vendor/rails/activerecord/test/models/lesson.rb — `class LessonError`.
+class LessonError extends Error {}
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
@@ -26,6 +29,13 @@ describe("HabtmDestroyOrderTest", () => {
     class Lesson extends Base {
       static {
         this.attribute("name", "string");
+        // Mirrors models/lesson.rb: before_destroy :ensure_no_students,
+        // which raises `unless students.empty?`. Because destroyAssociations
+        // (HABTM join cleanup) runs AFTER before_destroy, this callback still
+        // sees the students at destroy time.
+        this.beforeDestroy(async (r: any) => {
+          if (!(await association(r, "students").isEmpty())) throw new LessonError();
+        });
       }
     }
     registerModel("Student", Student);
@@ -41,11 +51,16 @@ describe("HabtmDestroyOrderTest", () => {
     return { Student, Lesson };
   }
 
-  it.skip("may not delete a lesson with students", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/habtm-destroy-order.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in habtm-destroy-order.test.ts
-    /* needs beforeDestroy to halt destroy and propagate errors */
+  it("may not delete a lesson with students", async () => {
+    const { Student, Lesson } = makeModels();
+    const sicp = await Lesson.create({ name: "SICP" });
+    const ben = await Student.create({ name: "Ben Bitdiddle" });
+    await association(sicp, "students").push(ben);
+
+    const before = Number(await Lesson.count());
+    await expect(sicp.destroy()).rejects.toThrow(LessonError);
+    expect(Number(await Lesson.count())).toBe(before);
+    expect(sicp.isDestroyed()).toBe(false);
   });
 
   it("should not raise error if have foreign key in the join table", async () => {
@@ -56,17 +71,31 @@ describe("HabtmDestroyOrderTest", () => {
     await student.destroy();
   });
 
-  it.skip("not destroying a student with lessons leaves student<=>lesson association intact", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/habtm-destroy-order.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in habtm-destroy-order.test.ts
-    /* needs beforeDestroy returning false to halt destroy */
+  it("not destroying a student with lessons leaves student<=>lesson association intact", async () => {
+    // test a normal before_destroy doesn't destroy the habtm joins
+    const { Student, Lesson } = makeModels();
+    // add a before destroy to student
+    Student.beforeDestroy(async (r: any) => {
+      if (!(await association(r, "lessons").isEmpty())) throw new Rollback();
+    });
+    const sicp = await Lesson.create({ name: "SICP" });
+    const ben = await Student.create({ name: "Ben Bitdiddle" });
+    await association(ben, "lessons").push(sicp);
+
+    await ben.destroy();
+    await ben.reload();
+    expect(await association(ben, "lessons").isEmpty()).toBe(false);
   });
 
-  it.skip("not destroying a lesson with students leaves student<=>lesson association intact", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/habtm-destroy-order.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in habtm-destroy-order.test.ts
-    /* needs beforeDestroy returning false to halt destroy */
+  it("not destroying a lesson with students leaves student<=>lesson association intact", async () => {
+    // test a more aggressive before_destroy doesn't destroy the habtm joins and still throws the exception
+    const { Student, Lesson } = makeModels();
+    const sicp = await Lesson.create({ name: "SICP" });
+    const ben = await Student.create({ name: "Ben Bitdiddle" });
+    await association(sicp, "students").push(ben);
+
+    await expect(sicp.destroy()).rejects.toThrow(LessonError);
+    await sicp.reload();
+    expect(await association(sicp, "students").isEmpty()).toBe(false);
   });
 });

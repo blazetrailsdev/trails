@@ -5,7 +5,6 @@ import {
   camelize,
   demodulize,
 } from "@blazetrails/activesupport";
-import { beforeDestroy } from "../../callbacks.js";
 import * as Reflection from "../../reflection.js";
 import { habtmTargetFk, joinHabtmTableNames } from "../../associations.js";
 import { CollectionAssociation as CollectionAssociationBuilder } from "./collection-association.js";
@@ -204,10 +203,9 @@ export class HasAndBelongsToMany {
     // module that overrides `destroy_associations` and chains with `super`.
     // Each HABTM declaration layers its own override; multiple HABTMs on
     // the same class chain naturally through the captured `prev` reference.
-    // Translation note: `destroyAssociations` isn't yet wired into the
-    // standard destroy flow (see Batch 37), so we still register a
-    // class-level `beforeDestroy` once that invokes it — this preserves
-    // current behavior while installing the Rails-shape override module.
+    // `destroyAssociations` is invoked by the standard destroy flow
+    // (`Base#_destroyRow` → after before_destroy, before the row delete), so
+    // this override is all that's needed — no `before_destroy` bridge.
     // Per-association guard: re-declaring the same HABTM (same `name` on
     // the same class) would otherwise layer a duplicate wrapper around the
     // existing chain, causing the join cleanup to run twice. Track the set
@@ -242,20 +240,6 @@ export class HasAndBelongsToMany {
           await prevDestroyAssociations.call(this);
         }
       };
-    }
-    const HABTM_DESTROY_INSTALLED = Symbol.for("blazetrails.habtm.destroyAssociations.installed");
-    // Use `in` (inheritance walk) rather than own-property: when a subclass
-    // declares its own HABTM, the parent already installed a bridge that the
-    // callback engine COW'd into the subclass's chain. Installing a second
-    // bridge on the subclass would dispatch `destroyAssociations` twice,
-    // running the full chained override stack twice (duplicate cleanup).
-    if (!(HABTM_DESTROY_INSTALLED in model)) {
-      Object.defineProperty(model, HABTM_DESTROY_INSTALLED, {
-        value: true,
-        configurable: true,
-        writable: false,
-      });
-      beforeDestroy(model, (record: any) => record.destroyAssociations());
     }
 
     // Tightened option set forwarded to the public HABTM reflection.
