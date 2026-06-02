@@ -527,6 +527,29 @@ export function symbolColumnToString(this: SchemaHost, name: string): string | u
 }
 
 /**
+ * Drop the connection's cached reflected columns for a model's table, matching
+ * the `schema_cache.clear_data_source_cache!(table_name)` step in Rails'
+ * `reset_column_information`. Best-effort: a model with no established
+ * connection (or no table) simply has nothing to clear.
+ */
+function clearAdapterDataSourceCache(host: SchemaHost): void {
+  let adapter: { schemaCache?: unknown } | null = null;
+  let table: string | undefined;
+  try {
+    adapter = (host as unknown as { connection?: { schemaCache?: unknown } }).connection ?? null;
+    table = (host as unknown as { tableName?: string }).tableName;
+  } catch {
+    return;
+  }
+  const cache = adapter?.schemaCache as
+    | { clearDataSourceCacheBang?: (connection: unknown, name: string) => void }
+    | undefined;
+  if (table && typeof cache?.clearDataSourceCacheBang === "function") {
+    cache.clearDataSourceCacheBang(adapter, table);
+  }
+}
+
+/**
  * Rails: clears column cache, schema cache, reloads schema.
  * Drops schema-sourced attribute defs so the next load re-reflects
  * them; user-declared defs (source === "user") are preserved, matching
@@ -573,6 +596,13 @@ export function resetColumnInformation(this: SchemaHost): void {
   this._schemaLoaded = false;
   (this as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
+  // Mirrors Rails reset_column_information's
+  // `schema_cache.clear_data_source_cache!(table_name)` (model_schema.rb): drop
+  // the connection's per-table reflected columns so the next load re-reads from
+  // the database. trails bakes the resolved cast type into each cached Column,
+  // so this is also what lets a toggled `emulate_booleans` re-resolve
+  // tinyint(1) columns; without it the stale boolean/integer type would survive.
+  clearAdapterDataSourceCache(this);
   if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) return;
   for (const [name, def] of Array.from(this._attributeDefinitions)) {
     if ((def.userProvided ?? true) === false || def.source === "schema") {

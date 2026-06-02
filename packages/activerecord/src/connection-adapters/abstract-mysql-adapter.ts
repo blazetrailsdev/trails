@@ -1086,15 +1086,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   set emulateBooleans(value: boolean) {
-    if (value === this._emulateBooleans) return;
     this._emulateBooleans = value;
-    this._typeMap = null; // invalidate cast-type map
-    // Reflected Column objects bake in `.type` at reflection time (unlike
-    // Rails, which re-resolves the cast type from the cached sql_type), so
-    // every cached `tinyint(1)` column would otherwise keep its stale
-    // boolean/integer type after the toggle. Drop the reflected-column cache
-    // so the next `columns()` re-resolves against the new type map.
-    this.schemaCache.clear();
+    // Rails' `emulate_booleans=` is a plain class_attribute; its type map is
+    // memoized per emulate_booleans value (EXTENDED_TYPE_MAPS). trails caches a
+    // single map, so drop it here to rebuild against the new setting. Reflected
+    // columns are invalidated separately by `resetColumnInformation` (the
+    // table-scoped `clear_data_source_cache!` Rails calls there) — the toggle's
+    // caller pairs the two, mirroring `mysql_boolean_test.rb`'s
+    // `emulate_booleans` helper.
+    this._typeMap = null;
   }
 
   get nativeTypeMap(): TypeMap {
