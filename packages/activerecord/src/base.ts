@@ -275,6 +275,7 @@ import {
   storeAccessor as _storeAccessorFunction,
   registerSerializeFn as _registerSerializeFn,
   localStoredAttributesMethod as _localStoredAttributesMethod,
+  storedAttributes as _storedAttributes,
   readStoreAttributeMethod as _readStoreAttributeMethod,
   writeStoreAttributeMethod as _writeStoreAttributeMethod,
   storeAccessorForMethod as _storeAccessorForMethod,
@@ -2386,6 +2387,24 @@ export class Base extends Model {
       // This matches Rails' Core#initialize order:
       //   init_internals → initialize_internals_callback → super → after_initialize
       const ctor2 = new.target as typeof Base;
+      // Separate store accessor keys (virtual, backed by a store column rather
+      // than a direct DB column) from regular column attrs. Store accessor attrs
+      // are assigned AFTER the clean re-snapshot so they appear as dirty for new
+      // records — matching Rails' new-record dirty semantics where assign_attributes
+      // runs after init_internals / initialize_internals_callback.
+      const _storeKeys = new Set(Object.values(_storedAttributes(ctor2)).flat());
+      const _storeAttrs: Record<string, unknown> = {};
+      let attrsForSuper = attrs;
+      if (_storeKeys.size > 0) {
+        for (const [k, v] of Object.entries(attrs)) {
+          if (_storeKeys.has(k)) _storeAttrs[k] = v;
+        }
+        if (Object.keys(_storeAttrs).length > 0) {
+          attrsForSuper = Object.fromEntries(
+            Object.entries(attrs).filter(([k]) => !_storeKeys.has(k)),
+          );
+        }
+      }
       const suppressor2 = ctor2 as typeof ctor2 & { _suppressInitializeCallback?: boolean };
       const hadOwn2 = Object.prototype.hasOwnProperty.call(
         suppressor2,
@@ -2394,7 +2413,7 @@ export class Base extends Model {
       const wasSuppressed2 = suppressor2._suppressInitializeCallback;
       suppressor2._suppressInitializeCallback = true;
       try {
-        super(attrs);
+        super(attrsForSuper);
       } finally {
         if (hadOwn2) {
           suppressor2._suppressInitializeCallback = wasSuppressed2;
@@ -2417,6 +2436,12 @@ export class Base extends Model {
         inheritanceInitializeInternalsCallback.call(this as any);
         // Re-snapshot so internals writes are part of the initial clean state.
         (this as any)._dirty.snapshot((this as any)._attributes);
+        // Assign store accessor keys after the clean baseline so they appear
+        // as dirty on new records (mirrors Rails: new-record attrs are changed
+        // relative to nil). writeAttribute routes them through their setters.
+        for (const [k, v] of Object.entries(_storeAttrs)) {
+          (this as any).writeAttribute(k, v);
+        }
         if (assocPending) {
           _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
           // belongsTo writers may write the owner FK; re-snapshot so

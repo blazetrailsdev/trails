@@ -118,6 +118,23 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
     }
     return; // silently skip — mirrors Rails' non-raising mode
   }
+  // Mirrors Rails' write_attribute → public_send("#{attr}=") fallback:
+  // if the canonical name is not a registered column attribute but has a
+  // prototype setter (store accessor, CPK-aliased id, etc.), dispatch
+  // through it so the write lands in the right place (e.g. the store hash
+  // rather than a standalone attribute slot).
+  const attrDefs = (ctor as any)._attributeDefinitions as Map<string, unknown> | undefined;
+  if (attrDefs && !attrDefs.has(canonical)) {
+    let proto = Object.getPrototypeOf(this);
+    while (proto !== null && proto !== Object.prototype) {
+      const desc = Object.getOwnPropertyDescriptor(proto, canonical);
+      if (desc?.set) {
+        desc.set.call(this, value);
+        return;
+      }
+      proto = Object.getPrototypeOf(proto);
+    }
+  }
   // `super` — route through Model's _writeAttribute with the already-resolved
   // canonical name, matching Rails' `super` into the underscore path.
   Model.prototype._writeAttribute.call(this, canonical, value);

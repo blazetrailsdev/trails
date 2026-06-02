@@ -313,6 +313,20 @@ export class StringKeyedHashAccessor extends HashAccessor {
   static override write(object: Base, attribute: string, key: unknown, value: unknown): void {
     super.write(object, attribute, String(key), value);
   }
+
+  /**
+   * Mirrors: ActiveRecord::Store::StringKeyedHashAccessor.prepare.
+   * Structured column types (hstore, jsonb) store native objects rather
+   * than JSON strings, so initialize a null/undefined value to an empty
+   * plain object `{}` instead of the JSON literal `"{}"` that HashAccessor
+   * uses for text-backed columns.
+   */
+  static override prepare(object: Base, attribute: string): void {
+    const val = object.readAttribute(attribute);
+    if (val === null || val === undefined || typeof val !== "object") {
+      object.writeAttribute(attribute, {});
+    }
+  }
 }
 
 export interface StoreOptions {
