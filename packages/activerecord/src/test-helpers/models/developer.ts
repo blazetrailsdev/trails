@@ -1,6 +1,7 @@
 // vendor/rails/activerecord/test/models/developer.rb
 import { StringType, typeRegistry } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
+import type { Relation } from "../../relation.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Developer extends Base {
@@ -10,13 +11,13 @@ export class Developer extends Base {
   // and `ProjectsAssociationExtension2 { def find_least_recent ... }`, mixed
   // onto the HABTM `projects*` proxies per AssociationsExtensionsTest.
   static projectsAssociationExtension = {
-    async findMostRecent(this: any) {
+    async findMostRecent(this: Relation<Base>) {
       return this.order("id DESC").first();
     },
   };
 
   static projectsAssociationExtension2 = {
-    async findLeastRecent(this: any) {
+    async findLeastRecent(this: Relation<Base>) {
       return this.order("id ASC").first();
     },
   };
@@ -29,7 +30,7 @@ export class Developer extends Base {
       associationForeignKey: "project_id",
       // Rails: `has_and_belongs_to_many :projects do def find_most_recent ... end`
       extend: {
-        async findMostRecent(this: any) {
+        async findMostRecent(this: Relation<Base>) {
           return this.order("id DESC").first();
         },
       },
@@ -74,7 +75,7 @@ export class Developer extends Base {
       extend: [
         Developer.projectsAssociationExtension,
         {
-          async findLeastRecent(this: any) {
+          async findLeastRecent(this: Relation<Base>) {
             return this.order("id ASC").first();
           },
         },
