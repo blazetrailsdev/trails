@@ -49,21 +49,26 @@ export async function touch(
   }
   const now = time;
   const aliases: Record<string, string> = (ctor as any)._attributeAliases ?? {};
+  const resolvedNames = names.map((name) => aliases[name] ?? name);
+
+  // Mirrors Rails' Persistence#touch: verify_readonly_attribute runs over the
+  // union of timestamp_attributes_for_update_in_model and the caller-supplied
+  // names — touching an attr_readonly column raises ActiveRecordError (distinct
+  // from the record-level ReadOnlyRecord guard above) and does so before any
+  // column is written.
+  const updateTimestampAttrs = timestampAttributesForUpdateInModel.call(
+    ctor as unknown as TimestampHost,
+  );
+  for (const name of new Set([...updateTimestampAttrs, ...resolvedNames])) {
+    if (ctor.readonlyAttributeQ(name)) {
+      throw new ActiveRecordError(`${name} is marked as readonly`);
+    }
+  }
+
   const touchColSet = new Set<string>();
   if (ctor._attributeDefinitions.has("updated_at")) touchColSet.add("updated_at");
-  for (const name of names) {
-    const resolved = aliases[name] ?? name;
-    // Mirrors Rails' verify_readonly_attribute: touching an attr_readonly
-    // column raises ActiveRecordError (distinct from the record-level
-    // ReadOnlyRecord guard above).
-    if (
-      (ctor as unknown as { readonlyAttributeQ?(n: string): boolean }).readonlyAttributeQ?.(
-        resolved,
-      )
-    ) {
-      throw new ActiveRecordError(`${resolved} is marked as readonly`);
-    }
-    if (ctor._attributeDefinitions.has(resolved)) touchColSet.add(resolved);
+  for (const name of resolvedNames) {
+    if (ctor._attributeDefinitions.has(name)) touchColSet.add(name);
   }
   const touchCols = Array.from(touchColSet);
 
