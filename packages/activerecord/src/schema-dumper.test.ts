@@ -889,6 +889,19 @@ describe("SchemaDumperAdapterTest", () => {
     expect(result).toMatch(/t\.datetime\("happened_at"[^}]*precision\s*:\s*null/);
   });
 
+  it("adapter-backed dump preserves explicit string limit through AdapterSchemaSource", async () => {
+    // Guards the U2 type/sqlType split: emitTable resolves the limit from the
+    // dsl/raw type carried by AdapterSchemaSource. A live introspected column's
+    // limit must survive the round-trip on the adapter path (not just the
+    // in-memory MigrationContext path).
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    await ctx.createTable("codes", {}, (t) => {
+      t.string("code", { limit: 10 });
+    });
+    const result = await TopLevelDumper.dump(adapter);
+    expect(result).toMatch(/t\.string\("code"[^}]*limit\s*:\s*10/);
+  });
+
   it("skips internal tables when dumping from adapter", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");

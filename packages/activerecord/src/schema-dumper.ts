@@ -34,7 +34,14 @@ async function loadSchemaIntrospection(): Promise<typeof SchemaIntrospectionModu
 
 export interface ColumnInfo {
   name: string;
+  /** DSL cast type (`"string"`, `"integer"`, `"datetime"` …) — what `schemaType` reads. */
   type: string;
+  /**
+   * Raw SQL type from the adapter (`"varchar(255)"`, `"timestamp"`, `"enum('a','b')"` …).
+   * Carried separately from {@link type} so dialect dumpers (`schemaType`/`schemaLimit`/
+   * `schemaPrecision`) can inspect the raw declaration on live columns.
+   */
+  sqlType?: string | null;
   primaryKey?: boolean;
   null?: boolean;
   default?: unknown;
@@ -408,7 +415,13 @@ class AdapterSchemaSource implements SchemaSource {
     const cols = await mod.introspectColumns(this._adapter, tableName);
     return cols.map((col) => ({
       name: col.name,
-      type: col.sqlType || col.type || "unknown",
+      // Carry the dsl cast type in `type` and the raw SQL type in `sqlType`
+      // (Epic 3.3-U2). schemaType/schemaLimit/schemaPrecision read the dsl
+      // type off `type` and inspect the raw declaration off `sqlType`. The
+      // legacy `emitTable` path tolerates a dsl `type` via sqlTypeToDsl and
+      // sources limit/precision/scale from the dedicated fields below.
+      type: col.type || col.sqlType || "unknown",
+      sqlType: col.sqlType ?? undefined,
       primaryKey: col.primaryKey,
       null: col.null,
       default: col.default,
