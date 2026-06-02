@@ -6,15 +6,29 @@ Make `ActiveRecord::QueryLogs` a real query transformer in trails: wired into
 the actual SQL-execution path so that **real model queries emit the comment**,
 backed by an `assertQueriesMatch` test helper, with
 `packages/activerecord/src/query-logs.test.ts` rewritten to mirror the Rails
-counterpart verbatim and dropped from `eslint/test-fixture-parity-exclude.json`.
+counterpart verbatim and the two skipped connection tests unskipped.
 
 Today the `QueryLogs` class is fully implemented and unit-tested, but it is
 **never invoked by the query pipeline**. The TS test exercises it as a pure
 unit (`logs.call("SELECT 1")`); the Rails test drives it through real queries
 (`Dashboard.first`, `connection.execute "SELECT 1"`) and asserts the appended
-comment via `assert_queries_match`. That gap is why every active test in the
-file is flagged by `test-fixture-parity` and why the file sits on the exclude
-baseline.
+comment via `assert_queries_match`. Two tests are `it.skip` for exactly this
+reason (`query-logs.test.ts:104,110` — `connection is passed to tagging proc`,
+`connection does not override already existing connection in context`).
+
+**Motivation (re-anchored post-#2790).** An earlier draft of this plan framed
+the goal as "drop `query-logs.test.ts` from
+`eslint/test-fixture-parity-exclude.json`." That premise is **stale**: PR #2790
+made the fixture-parity map precision-only and shrank the exclude baseline
+33→7. As of `main`, `query-logs.test.ts` is **not** on the exclude list and
+**not** in `eslint/test-fixture-parity.json`, and the rule passes clean on it
+(its active tests call `logs.call("SELECT 1")`, never a `dashboards(...)` row
+accessor). So there is no exclude-list step to perform. The real, still-true
+goals are: **(a) wire QueryLogs into the query pipeline so real model queries
+emit the comment, and (b) unskip the two connection tests** — a net test:compare
+gain. Note PR 5's rewrite to `useHandlerFixtures(["dashboards"])` +
+`dashboards(...)` accessors satisfies the parity rule by construction, so the
+file neither needs nor gains an exclude-list entry at any point.
 
 This is **feature work, not a fixture swap** — see the ordering finding in
 [Key architectural finding](#key-architectural-finding-instrumentation-ordering).
@@ -101,21 +115,37 @@ and therefore any `assertQueriesMatch` helper — would **not** see the comment.
 To match Rails we must instrument the **post-preprocess** SQL. Two options:
 
 - **Option A (Rails-faithful): move `log`/instrumentation into `rawExecute`.**
-  Highest fidelity, but ripples across every concrete adapter and every test
-  that asserts on `sql.active_record` payloads — large blast radius.
+  This is exactly where Rails' `log` block lives (`raw_execute`,
+  `database_statements.rb:552-559`), with `preprocess_query` run before it in
+  `internal_execute`. Highest fidelity; ripples across every concrete adapter's
+  `rawExecute`/instrumentation and every test that asserts on `sql.active_record`
+  payloads — larger blast radius.
 - **Option B (minimal): preprocess before instrumenting.** Hoist
   `preprocessQuery` so `logSql` receives the already-transformed SQL — e.g.
   `internalExecQuery` calls `preprocessQuery` and passes the processed SQL to
   `logSql`, with `internalExecute` not re-preprocessing. Smaller diff,
-  preserves the comment in the payload, but diverges from Rails' exact call
-  layout (acceptable — `api:compare` checks method _presence_, not internal
-  ordering).
+  preserves the comment in the payload.
 
-**Recommendation: Option B**, with a focused refactor so `preprocessQuery`
-runs exactly once per query. This is the load-bearing decision; it should be
-locked before the integration PRs land. This ordering subtlety — not the
-`QueryLogs` class itself — is the real work and the reason a "just add
-`useHandlerFixtures`" migration is impossible.
+**This is a Rails-fidelity trade-off, not just a blast-radius call — it
+requires the user's explicit sign-off.** Per CLAUDE.md, "deviation from Rails is
+almost always wrong; matching Rails is almost always right," so **Option A is
+the default recommendation**: it reproduces Rails' execution layout
+(`internal_execute → preprocess_query → raw_execute(log)`) faithfully.
+
+**What Option B diverges on, concretely:** Rails applies transformers inside
+`internal_execute` and logs inside `raw_execute`, so the transform attaches at
+the adapter boundary and _every_ path into `raw_execute` (including
+`execute_batch`, which calls `raw_execute` per statement) gets the comment. The
+proposed B reorder attaches the transform one level up in `internalExecQuery`,
+so any execution path that reaches `rawExecute`/`internalExecute` **without**
+going through `internalExecQuery` would silently skip the comment. Before
+choosing B, enumerate those paths and confirm none of the QueryLogs-relevant
+ones (`Dashboard.first`, `connection.execute`, `exists?`, `destroy`, `save`,
+`create`, `all.to_a` — the exact Rails test surface) are missed. If any are,
+Option A is required.
+
+This ordering subtlety — not the `QueryLogs` class itself — is the real work
+and the reason a "just add `useHandlerFixtures`" migration is impossible.
 
 ## Implementation plan (PR-sized, each branched from `main`, non-overlapping files)
 
@@ -148,15 +178,19 @@ sibling branches off `main` with non-overlapping files, merged sequentially.
 - **Files:** `activesupport/src/execution-context.ts` (+ test). Cross-package,
   but isolated — no overlap with PR 1/3.
 
-### PR 3 — Wire transformers into `preprocessQuery` + fix instrumentation ordering (Option B)
+### PR 3 — Wire transformers into `preprocessQuery` + fix instrumentation ordering
 
 - Add the transformer loop to `preprocessQuery`:
   `for (const t of queryTransformers) sql = t.call(sql, this);`
-- Apply the Option B reorder so `logSql` instruments the post-preprocess SQL
-  (preprocess once, before instrumentation).
-- **Files:** `src/connection-adapters/abstract/database-statements.ts` (+ its
-  test). This is the load-bearing PR — guard against double-preprocessing and
-  verify no existing `sql.active_record` assertions regress.
+- Apply the instrumentation reorder so the `sql.active_record` payload carries
+  the post-preprocess (commented) SQL. **Use the Option A vs. B decision locked
+  with the user** (default: Option A — instrument inside `rawExecute`, Rails-
+  faithful). Whichever is chosen, preprocess exactly once per query.
+- **Files:** Option A touches `src/connection-adapters/abstract/database-statements.ts`
+  **and concrete adapters' `rawExecute`/instrumentation** (larger); Option B
+  touches `database-statements.ts` only. This is the load-bearing PR — guard
+  against double-preprocessing and verify no existing `sql.active_record`
+  assertions regress.
 
 ### PR 4 — `assertQueriesMatch` test helper (`SQLCounter`)
 
@@ -166,9 +200,9 @@ sibling branches off `main` with non-overlapping files, merged sequentially.
 - **Files:** `src/test-helpers/assert-queries-match.ts` (+ test). Pure
   addition, no overlap.
 
-### PR 5 — Migrate `query-logs.test.ts` to Rails parity + drop from exclude list
+### PR 5 — Migrate `query-logs.test.ts` to Rails parity + unskip connection tests
 
-- Rewrite the fixture-flagged tests to drive real queries through the
+- Rewrite the query-driving tests to drive real queries through the
   canonical `Dashboard` model (`src/test-helpers/models/dashboard.ts`) +
   `useHandlerFixtures(["dashboards"])`, asserting the comment via
   `assertQueriesMatch` — mirroring `query_logs_test.rb` verbatim (test names,
@@ -177,21 +211,25 @@ sibling branches off `main` with non-overlapping files, merged sequentially.
 - Keep the genuinely-unit tests (`escaping good comment`, formatter classes,
   `GetKeyHandler`) as-is — their Rails counterparts use `send(:escape_sql_comment)`
   directly and don't touch fixtures.
-- Unskip `connection is passed to tagging proc` +
-  `connection does not override already existing connection in context`.
+- **Unskip** `connection is passed to tagging proc` +
+  `connection does not override already existing connection in context`
+  (`query-logs.test.ts:104,110`) — these are the concrete deliverable now that
+  the connection context (PR 1) and pipeline wiring (PR 3) exist.
 - Use `{ schema: canonicalSchema }` to defend against sibling-file schema
   contamination.
-- **Final step:** remove
-  `packages/activerecord/src/query-logs.test.ts` from
-  `eslint/test-fixture-parity-exclude.json`.
-- **Files:** `src/query-logs.test.ts`, `eslint/test-fixture-parity-exclude.json`.
+- **No exclude-list edit:** the file is not on
+  `eslint/test-fixture-parity-exclude.json` (post-#2790), and the
+  `useHandlerFixtures` rewrite satisfies `test-fixture-parity` by construction,
+  so nothing needs adding or removing there.
+- **Files:** `src/query-logs.test.ts` only.
 
 ## Verification (per PR and final)
 
 - `pnpm vitest run packages/activerecord/src/query-logs.test.ts` — green,
-  no skipped fixture-flagged tests.
-- `npx eslint packages/activerecord/src/query-logs.test.ts` — 0
-  `blazetrails/test-fixture-parity` errors after PR 5.
+  with the two connection tests **unskipped** and passing.
+- `npx eslint packages/activerecord/src/query-logs.test.ts` — stays at 0
+  `blazetrails/test-fixture-parity` errors (it already passes; the
+  `useHandlerFixtures` rewrite must not regress it).
 - `pnpm run api:compare --package activerecord` — `QueryLogs#call` /
   `query_transformers` surface covered.
 - Regression guard for PR 3: existing tests subscribing to
@@ -201,20 +239,31 @@ sibling branches off `main` with non-overlapping files, merged sequentially.
 
 ## Risks / open questions
 
-1. **Instrumentation reorder (PR 3)** is the highest-risk change. Lock Option
-   A vs. B before starting; B is recommended for blast radius.
+1. **Instrumentation reorder (PR 3)** is the highest-risk change and a
+   **Rails-fidelity decision requiring user sign-off**. Default to Option A
+   (Rails-faithful, instrument in `rawExecute`); choose B only if its skipped-path
+   audit (see Key architectural finding) comes back clean and the user accepts
+   the divergence for blast radius.
 2. **Global mutable registry + ExecutionContext** are process-global; tests
    must save/restore `queryTransformers`, `tags`, and clear `ExecutionContext`
    in `beforeEach`/`afterEach`, exactly as the Rails `setup`/`teardown` does.
 3. **`application: -> { "active_record" }` tagging** — Rails sets this default
    in `setup`; the TS port must register the same default taggings so
    `Dashboard.first` emits `/*application:active_record*/`.
-4. If PR 3's reorder proves too invasive, fall back to Option A (instrument in
-   `rawExecute`) as a larger, separately-scoped refactor — but that should not
-   block PRs 1, 2, 4, which are independently valuable.
+4. If Option A's `rawExecute` refactor proves too invasive across adapters,
+   Option B is the bounded fallback — but only after the skipped-path audit and
+   user sign-off on the divergence. Either way this should not block PRs 1, 2,
+   4, which are independently valuable.
 
 ## Sequencing
 
-PRs 1, 2, 4 are independent and can land in parallel (non-overlapping files).
-PR 3 depends on PR 1 (needs the registry). PR 5 depends on PRs 1–4. Merge
-order: {1, 2, 4} → 3 → 5.
+PRs 1, 2, 4 are independent and can be opened in parallel from `main`
+(non-overlapping files). Merge order: {1, 2, 4} → 3 → 5.
+
+**No-stacking discipline (CLAUDE.md).** PR 3 references the `queryTransformers`
+symbol from PR 1, and PR 5 depends on PRs 1–4. To avoid stacked branches, PR 3
+is **branched from `main` only after PR 1 merges**, and PR 5 only after PRs 1–4
+merge — "ship the first PR, wait for merge, then open the next from updated
+`main`." Do **not** open PR 3 or PR 5 in parallel against symbols not yet on
+`main`; that would either fail CI or make them de-facto stacked. Only the
+independent set {1, 2, 4} is opened concurrently.
