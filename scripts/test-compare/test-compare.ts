@@ -21,18 +21,24 @@
  *
  * Usage:
  *   npx tsx scripts/test-compare/test-compare.ts [--missing] [--json]
- *     [--incomplete] [--package activesupport]
+ *     [--incomplete] [--gates] [--package activesupport]
  *
  *   --incomplete  In the per-file table, hide files that are fully complete
  *                 (every Ruby test matched in the convention TS file, no
  *                 wrong-describe). Misplaced tests are not in this file's
  *                 match count, so a file with misplaced > 0 is always
  *                 incomplete and never hidden. Mirrors `api:compare --incomplete`.
+ *   --gates       Print the gate-mismatch report — matched tests whose Rails
+ *                 adapter/feature gate diverges from our TS gate (should-gate /
+ *                 missing-gate / wrong-gate / over-gated). Advisory: does not
+ *                 affect the matched/skipped/percent counts. Always emitted to
+ *                 the JSON artifact regardless of this flag.
  */
 
 import * as fs from "fs";
 import * as path from "path";
-import type { TestManifest } from "./types.js";
+import type { TestManifest, TestGate } from "./types.js";
+import { classifyGateMismatch, type GateMismatchKind } from "./gates.js";
 import { isTestCaseUnported, isTestFileUnported } from "../api-compare/unported-files.js";
 import { PACKAGES } from "../api-compare/config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
@@ -121,6 +127,14 @@ interface WrongDescribeTest {
   tsPath: string;
 }
 
+interface GateMismatch {
+  description: string;
+  rubyPath: string;
+  kind: GateMismatchKind;
+  railsGate?: TestGate;
+  tsGate?: TestGate;
+}
+
 interface ConventionFileResult {
   rubyFile: string;
   conventionTsFile: string;
@@ -134,6 +148,7 @@ interface ConventionFileResult {
   missingTests?: string[];
   misplacedTests?: MisplacedTest[];
   wrongDescribeTests?: WrongDescribeTest[];
+  gateMismatches?: GateMismatch[];
 }
 
 interface ConventionPackageResult {
@@ -146,6 +161,7 @@ interface ConventionPackageResult {
   totalMatchedSkipped: number;
   totalWrongDescribe: number;
   totalMisplaced: number;
+  totalGateMismatch: number;
   percent: number;
   files: ConventionFileResult[];
 }
@@ -157,6 +173,7 @@ interface TsTestInfo {
   path: string; // normalized full path
   desc: string; // normalized description
   pending: boolean;
+  gate?: TestGate; // adapter/feature gate emitted by the TS extractor
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +195,7 @@ function main() {
   const showMissing = args.includes("--missing");
   const jsonOutput = args.includes("--json");
   const showIncomplete = args.includes("--incomplete");
+  const showGates = args.includes("--gates");
 
   if (filterPkg && !PACKAGES.includes(filterPkg)) {
     const suggestions = new SpellChecker({ dictionary: PACKAGES }).correct(filterPkg);
@@ -235,7 +253,7 @@ function main() {
         const tc = file.testCases[i];
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
-        tests.push({ path: np, desc: nd, pending: !!tc.pending });
+        tests.push({ path: np, desc: nd, pending: !!tc.pending, gate: tc.gate });
         appendIndex(pathIdx, np, i);
         appendIndex(descIdx, nd, i);
 
@@ -298,6 +316,7 @@ function main() {
     let totalMatchedSkipped = 0;
     let totalWrongDescribe = 0;
     let totalMisplaced = 0;
+    let totalGateMismatch = 0;
     let tsMapped = 0;
     let tsUnmapped = 0;
 
@@ -328,6 +347,22 @@ function main() {
       const missingTests: string[] = [];
       const misplacedTests: MisplacedTest[] = [];
       const wrongDescribeTests: WrongDescribeTest[] = [];
+      const gateMismatches: GateMismatch[] = [];
+
+      // Flag a divergence between Rails' gate and our TS gate for a matched
+      // pair (advisory — does not affect the matched/skipped counts).
+      const recordGate = (rubyTc: (typeof file.testCases)[number], tsInfo: TsTestInfo) => {
+        const kind = classifyGateMismatch(rubyTc.gate, tsInfo.gate, tsInfo.pending);
+        if (!kind) return;
+        gateMismatches.push({
+          description: rubyTc.description,
+          rubyPath: normPath(rubyTc.ancestors, rubyTc.description),
+          kind,
+          railsGate: rubyTc.gate,
+          tsGate: tsInfo.gate,
+        });
+        totalGateMismatch++;
+      };
 
       // Pass 1: Path matches (exact ancestor + description match)
       for (let ri = 0; ri < file.testCases.length; ri++) {
@@ -345,6 +380,7 @@ function main() {
             matchedSkipped++;
             totalMatchedSkipped++;
           }
+          recordGate(tc, tsTests[tsIdx]);
         }
       }
 
@@ -379,6 +415,7 @@ function main() {
                 matchedSkipped++;
                 totalMatchedSkipped++;
               }
+              recordGate(tc, tsTests[idx]);
               break;
             }
           }
@@ -433,6 +470,7 @@ function main() {
             matchedSkipped++;
             totalMatchedSkipped++;
           }
+          recordGate(tc, tsTests[descIdx]);
           wrongDescribeTests.push({
             description: tc.description,
             rubyPath: np,
@@ -512,6 +550,7 @@ function main() {
         ...(showMissing ? { missingTests } : {}),
         ...(misplacedTests.length > 0 ? { misplacedTests } : {}),
         ...(wrongDescribeTests.length > 0 ? { wrongDescribeTests } : {}),
+        ...(gateMismatches.length > 0 ? { gateMismatches } : {}),
       });
     }
 
@@ -534,6 +573,7 @@ function main() {
       totalMatchedSkipped,
       totalWrongDescribe,
       totalMisplaced,
+      totalGateMismatch,
       percent,
       files: fileResults,
     });
@@ -557,6 +597,7 @@ function main() {
   let grandMatchedSkipped = 0;
   let grandWrongDescribe = 0;
   let grandMisplaced = 0;
+  let grandGateMismatch = 0;
   let grandFiles = 0;
   let grandMapped = 0;
 
@@ -566,6 +607,7 @@ function main() {
     grandMatchedSkipped += pkg.totalMatchedSkipped;
     grandWrongDescribe += pkg.totalWrongDescribe;
     grandMisplaced += pkg.totalMisplaced;
+    grandGateMismatch += pkg.totalGateMismatch;
     grandFiles += pkg.rubyFiles;
     grandMapped += pkg.tsMapped;
 
@@ -573,6 +615,7 @@ function main() {
     const details: string[] = [];
     if (pkg.totalMatchedSkipped > 0) details.push(`${pkg.totalMatchedSkipped} skipped`);
     if (pkg.totalWrongDescribe > 0) details.push(`${pkg.totalWrongDescribe} wrong describe`);
+    if (pkg.totalGateMismatch > 0) details.push(`${pkg.totalGateMismatch} gate-mismatch`);
     const detailStr = details.length > 0 ? ` (${details.join(", ")})` : "";
     console.log(`\n${"=".repeat(90)}`);
     console.log(
@@ -626,6 +669,24 @@ function main() {
       console.log("");
     }
 
+    // Gate mismatches: Rails-gated tests whose TS gate diverges. Shown only
+    // with --gates (advisory; does not affect the counts above).
+    const filesWithGateMismatch = pkg.files.filter(
+      (f) => f.gateMismatches && f.gateMismatches.length > 0,
+    );
+    if (showGates && filesWithGateMismatch.length > 0) {
+      console.log(`  GATE MISMATCHES (Rails gate vs our TS gate):`);
+      console.log(`  ${"-".repeat(86)}`);
+      for (const f of filesWithGateMismatch) {
+        console.log(`\n  ${f.conventionTsFile}  (${f.gateMismatches!.length})`);
+        for (const gm of f.gateMismatches!) {
+          console.log(`    [${gm.kind}] "${gm.description}"`);
+          console.log(`        rails: ${formatGate(gm.railsGate)}   ts: ${formatGate(gm.tsGate)}`);
+        }
+      }
+      console.log("");
+    }
+
     console.log(
       `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Skip".padStart(4)} ${"Desc".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Tot".padStart(4)}`,
     );
@@ -655,12 +716,25 @@ function main() {
   const grandDetails: string[] = [];
   if (grandMatchedSkipped > 0) grandDetails.push(`${grandMatchedSkipped} skipped`);
   if (grandWrongDescribe > 0) grandDetails.push(`${grandWrongDescribe} wrong describe`);
+  if (grandGateMismatch > 0) {
+    grandDetails.push(`${grandGateMismatch} gate-mismatch${showGates ? "" : " (see --gates)"}`);
+  }
   const grandDetailStr = grandDetails.length > 0 ? ` (${grandDetails.join(", ")})` : "";
   console.log(`\n${"=".repeat(90)}`);
   console.log(
     `  Overall: ${grandImplemented}/${grandRuby} tests (${grandPct}%)${grandDetailStr}  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`,
   );
   console.log(`${"=".repeat(90)}\n`);
+}
+
+/** Compact one-line rendering of a gate for the --gates report. */
+function formatGate(g?: TestGate): string {
+  if (!g) return "unconditional";
+  const parts: string[] = [];
+  if (g.adapters) parts.push(`adapters=[${[...g.adapters].sort().join(",")}]`);
+  if (g.features?.length) parts.push(`features=[${[...g.features].sort().join(",")}]`);
+  if (g.guards?.length) parts.push(`guards=[${[...g.guards].sort().join(",")}]`);
+  return parts.length ? parts.join(" ") : "unconditional";
 }
 
 /**
