@@ -170,7 +170,8 @@ function canonicalizeIpv6(value: string): string {
     // as-is and canonicalize only the 6-group hex prefix. Both PG and Ruby
     // IPAddr#to_s use mixed notation for IPv4-mapped addresses.
     ipv4Tail = value.slice(lastColon + 1);
-    // Substitute "0:0" for the IPv4 tail so the ::expansion logic sees 8 groups.
+    // Substitute "0:0" for the IPv4 tail so the :: expansion logic always sees
+    // 8 groups; the last two placeholder groups are discarded via slice(0, 6) below.
     head = value.slice(0, lastColon + 1) + "0:0";
   }
 
@@ -187,7 +188,17 @@ function canonicalizeIpv6(value: string): string {
 
   groups = groups.map((g) => parseInt(g, 16).toString(16));
 
-  // When an IPv4 tail is present, apply RFC 5952 to the first 6 groups only.
+  // For pure-hex IPv4-mapped addresses (::ffff:xxxx:xxxx with no IPv4 tail in
+  // the input string), Ruby's IPAddr#to_s outputs mixed notation (::ffff:a.b.c.d).
+  // Detect this case and synthesize the IPv4 tail so both textual forms
+  // canonicalize to the same string and don't produce spurious dirty marks.
+  if (!ipv4Tail && groups[5] === "ffff" && groups.slice(0, 5).every((g) => g === "0")) {
+    const g6 = parseInt(groups[6], 16);
+    const g7 = parseInt(groups[7], 16);
+    ipv4Tail = `${g6 >> 8}.${g6 & 0xff}.${g7 >> 8}.${g7 & 0xff}`;
+  }
+
+  // Apply RFC 5952 to the hex prefix only (6 groups when IPv4 tail, 8 otherwise).
   const activeGroups = ipv4Tail ? groups.slice(0, 6) : groups;
 
   let bestStart = -1;
