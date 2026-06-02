@@ -248,7 +248,15 @@ function removeTargetBang(assoc: HasOneAssociation, method: string): Promise<voi
   const target = assoc.target as Base | null;
   if (!target) return Promise.resolve();
   if (method === "delete") return (target as any).delete?.() ?? Promise.resolve();
-  if (method === "destroy") return (target as any).destroy?.() ?? Promise.resolve();
+  if (method === "destroy") {
+    // Mirrors Rails HasOneAssociation#remove_target!: tag the record with the
+    // association that is destroying it (so its own destroy callbacks can read
+    // `destroyed_by_association`) before destroying, and only destroy when the
+    // record is actually persisted.
+    (target as any).destroyedByAssociation = assoc.reflection;
+    if (target.isPersisted()) return (target as any).destroy?.() ?? Promise.resolve();
+    return Promise.resolve();
+  }
   if (method === "nullify") {
     if (target.isPersisted()) {
       (assoc as any).nullifyOwnerAttributes(target);

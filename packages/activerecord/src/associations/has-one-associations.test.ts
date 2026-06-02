@@ -1,5 +1,6 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 function epochMs(v: unknown): number {
   if (v instanceof Temporal.Instant) return v.epochMilliseconds;
@@ -85,6 +86,8 @@ const TEST_SCHEMA: Schema = {
   dep_halt_accounts: { firm_id: "integer", credit_limit: "integer" },
   ah_firms: { name: "string" },
   ah_accounts: { credit_limit: "integer", ah_firm_id: "integer" },
+  dba_authors: { name: "string" },
+  dba_books: { author_id: "integer" },
 };
 
 // ==========================================================================
@@ -1168,11 +1171,20 @@ describe("HasOneAssociationsTest", () => {
     // Requires polymorphic with custom column names
   });
 
-  it.skip("dangerous association name raises ArgumentError", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires reserved name validation
+  it("dangerous association name raises ArgumentError", () => {
+    // Rails iterates [:errors, "errors", :save, "save"]; symbols and strings
+    // collapse to the same names in TS. Each conflicts with an Active Record
+    // method, so declaring the association must raise.
+    for (const name of ["errors", "save"]) {
+      class DangerFirm extends Base {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      expect(() => {
+        Associations.hasOne.call(DangerFirm, name, { className: "Account" });
+      }).toThrow(ArgumentError);
+    }
   });
 
   it("has one with touch option on create", async () => {
@@ -1338,18 +1350,71 @@ describe("HasOneAssociationsTest", () => {
     // Requires enum + joins
   });
 
-  it.skip("destroyed_by_association set in child destroy callback on parent destroy", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires destroyed_by_association callback
+  // Mirrors Rails' DestroyByParentBook/DestroyByParentAuthor: the child aborts
+  // its own destroy UNLESS destroyed_by_association is set, so the book only
+  // disappears if the has_one correctly flags it before destroying.
+  it("destroyed_by_association set in child destroy callback on parent destroy", async () => {
+    class DbaParentAuthor extends Base {
+      static {
+        this._tableName = "dba_authors";
+        this.attribute("name", "string");
+      }
+    }
+    class DbaParentBook extends Base {
+      static {
+        this._tableName = "dba_books";
+        this.attribute("author_id", "integer");
+        // before_destroy :dont, unless: :destroyed_by_association
+        this.beforeDestroy((record: any) => {
+          if (!record.destroyedByAssociation) return false;
+        });
+      }
+    }
+    Associations.hasOne.call(DbaParentAuthor, "book", {
+      className: "DbaParentBook",
+      foreignKey: "author_id",
+      dependent: "destroy",
+    });
+    registerModel("DbaParentAuthor", DbaParentAuthor);
+    registerModel("DbaParentBook", DbaParentBook);
+    const author = await DbaParentAuthor.create({ name: "Test" });
+    const book = await DbaParentBook.create({ author_id: author.id });
+    await author.destroy();
+    expect(await DbaParentBook.findBy({ id: book.id })).toBeNull();
   });
 
-  it.skip("destroyed_by_association set in child destroy callback on replace", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires destroyed_by_association on replace
+  it("destroyed_by_association set in child destroy callback on replace", async () => {
+    class DbaReplAuthor extends Base {
+      static {
+        this._tableName = "dba_authors";
+        this.attribute("name", "string");
+      }
+    }
+    class DbaReplBook extends Base {
+      static {
+        this._tableName = "dba_books";
+        this.attribute("author_id", "integer");
+        // before_destroy :dont, unless: :destroyed_by_association
+        this.beforeDestroy((record: any) => {
+          if (!record.destroyedByAssociation) return false;
+        });
+      }
+    }
+    Associations.hasOne.call(DbaReplAuthor, "book", {
+      className: "DbaReplBook",
+      foreignKey: "author_id",
+      dependent: "destroy",
+    });
+    registerModel("DbaReplAuthor", DbaReplAuthor);
+    registerModel("DbaReplBook", DbaReplBook);
+    const author = await DbaReplAuthor.create({ name: "Test" });
+    const book = await DbaReplBook.create({ author_id: author.id });
+    // Load the existing target so replace knows the previous record to destroy.
+    await (author.association("book") as any).loadTarget();
+    const newBook = await DbaReplBook.create({});
+    (author.association("book") as any).writer(newBook);
+    await author.save();
+    expect(await DbaReplBook.findBy({ id: book.id })).toBeNull();
   });
 
   it("dependency should halt parent destruction", async () => {
