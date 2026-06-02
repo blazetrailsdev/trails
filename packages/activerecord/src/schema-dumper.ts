@@ -1192,6 +1192,36 @@ export class SchemaDumper {
       .join(", ");
   }
 
+  /**
+   * Rails-faithful raw colspec formatter — mirrors `SchemaDumper#format_colspec`,
+   * which joins `key: value` with the values emitted **verbatim** and recurses
+   * into nested objects as `{ … }` (the primary-key `id: { type:, … }` spec).
+   * The values produced by `columnSpec` / `prepareColumnOptions` are already
+   * fully-formatted TS-DSL text (`"false"`, `"255"`, `"null"`, `'"hello"'`,
+   * `'() => "now()"'`), so they must NOT be re-quoted the way
+   * {@link formatColspec} re-serializes native JS values. This is the formatter
+   * the `columnSpec`-routed emit path uses (Epic 3.3-U); `formatColspec` stays
+   * on the legacy inline path until `emitTable` is wired (Story 3.3-U3).
+   *
+   * Keys are interpolated raw (every colspec key is an identifier), matching
+   * Rails and the sibling `formatColspec`. The spec must be **compacted** —
+   * `prepareColumnOptions` only sets defined keys, mirroring Rails'
+   * `spec.compact!` before `format_colspec`; a stray `undefined`/`null` value
+   * would render literally.
+   * @internal
+   */
+  formatColspecRaw(colspec: Record<string, unknown>): string {
+    return Object.entries(colspec)
+      .map(([k, v]) => {
+        const value =
+          v && typeof v === "object" && !Array.isArray(v)
+            ? `{ ${this.formatColspecRaw(v as Record<string, unknown>)} }`
+            : String(v);
+        return `${k}: ${value}`;
+      })
+      .join(", ");
+  }
+
   /** @internal */
   formatOptions(options: Record<string, unknown>): string {
     const isIdent = /^[a-zA-Z_$][\w$]*$/;

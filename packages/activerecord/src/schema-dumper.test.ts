@@ -1067,3 +1067,29 @@ describe("cleanDefault", () => {
     expect(cleanDefault(undefined)).toBeUndefined();
   });
 });
+
+describe("formatColspecRaw", () => {
+  const dumper = SchemaDumper.create({
+    tables: () => [],
+    columns: () => [],
+    indexes: () => [],
+  });
+
+  it("emits values verbatim (Rails format_colspec), not re-quoted", () => {
+    expect(
+      dumper.formatColspecRaw({
+        null: "false",
+        limit: "255",
+        precision: "null",
+        default: '() => "now()"',
+        comment: '"a note"',
+      }),
+    ).toBe('null: false, limit: 255, precision: null, default: () => "now()", comment: "a note"');
+  });
+
+  it("recurses into nested objects (primary-key `id: { type:, … }` spec)", () => {
+    expect(
+      dumper.formatColspecRaw({ id: { type: '"uuid"', default: "null" }, force: '"cascade"' }),
+    ).toBe('id: { type: "uuid", default: null }, force: "cascade"');
+  });
+});
