@@ -985,8 +985,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     attribute: Nodes.Attribute,
     value: unknown,
   ): Promise<Nodes.Node> {
-    const column = await this.columnForAttribute(attribute);
-    if (column?.collation && !this.columnIsCaseSensitive(column)) {
+    const column = (await this.columnForAttribute(attribute)) as MysqlColumn | undefined;
+    if (column?.collation && !column.isCaseSensitive()) {
       return attribute.eq(new Nodes.Bin(attribute.quotedNode(value)));
     }
     return super.caseSensitiveComparison(attribute, value);
@@ -1002,28 +1002,16 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     attribute: Nodes.Attribute,
     value: unknown,
   ): Promise<Nodes.Node> {
-    const column = await this.columnForAttribute(attribute);
+    const column = (await this.columnForAttribute(attribute)) as MysqlColumn | undefined;
     if (column && this.canPerformCaseInsensitiveComparisonFor(column)) {
       return attribute.lower().eq((attribute.relation as any).lower(value));
     }
     return attribute.eq(value);
   }
 
-  /** @internal Mirrors: MySQL::Column#case_sensitive? */
-  private columnIsCaseSensitive(column: {
-    isCaseSensitive?: () => boolean;
-    collation?: string | null;
-  }): boolean {
-    if (typeof column.isCaseSensitive === "function") return column.isCaseSensitive();
-    return column.collation != null && !column.collation.endsWith("_ci");
-  }
-
   /** @internal Mirrors: AbstractMysqlAdapter#can_perform_case_insensitive_comparison_for? */
-  canPerformCaseInsensitiveComparisonFor(column: {
-    isCaseSensitive?: () => boolean;
-    collation?: string | null;
-  }): boolean {
-    return this.columnIsCaseSensitive(column);
+  canPerformCaseInsensitiveComparisonFor(column: MysqlColumn): boolean {
+    return column.isCaseSensitive();
   }
 
   columnsForDistinct(columns: string, orders: string[]): string {
