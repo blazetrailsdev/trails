@@ -365,20 +365,19 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation fires before after rollback callbacks", async () => {
+    const { Topic } = makeTopic(sharedAdapter);
     const order: string[] = [];
+
+    Topic.afterRollback(function () {
+      order.push("after_rollback");
+    });
 
     Notifications.subscribe("transaction.active_record", () => {
       order.push("notification");
     });
 
     await Topic.transaction(async () => {
-      await topics("fifth").update({ title: "Ruby on Rails" });
-      // Register directly on the transaction to avoid the save-path
-      // ordering issue between state-restore and rolledbackBang callbacks.
-      const txn = (sharedAdapter as any).transactionManager.currentTransaction as any;
-      txn?.afterRollback?.(() => {
-        order.push("after_rollback");
-      });
+      await Topic.create({ title: "test" });
       throw new Rollback();
     });
 
