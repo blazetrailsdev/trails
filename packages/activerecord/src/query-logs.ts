@@ -267,7 +267,8 @@ export class QueryLogs implements QueryTransformer {
       }
     }
     if (entries.length === 0) return null;
-    // Bytewise key order, matching Ruby's String#<=> in sort_by!.
+    // ASCII key order — `<` compares UTF-16 code units, which matches Ruby's
+    // String#<=> (UTF-8 bytewise) for the ASCII keys QueryLogs tags use.
     entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
     return this._formatter.join(entries.map(([key, value]) => this._formatter.format(key, value)));
   }

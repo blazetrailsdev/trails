@@ -346,11 +346,15 @@ describe("QueryLogsTest", () => {
   });
 
   // PostgreSQL validates query encoding; other adapters don't. Mirrors Rails'
-  // `unless current_adapter?(:PostgreSQLAdapter)` guard.
+  // `unless current_adapter?(:PostgreSQLAdapter)` guard. Rails' input is a lone
+  // 0xFF byte (invalid UTF-8); the JS analog is a lone surrogate `\uD800`, which
+  // cannot be encoded to valid UTF-8 either. The point (Rails: `assert_nothing_raised`)
+  // is that comment-appending survives an invalid-encoding query string — asserting
+  // the comment also confirms no error was raised.
   it.skipIf(adapterType === "postgres")("invalid encoding query", async () => {
     queryLogs.tags = ["application"];
     await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
-      await leaseConnection().execute("select 1 as 'ÿ'");
+      await leaseConnection().execute("select 1 as '\uD800'");
     });
   });
 
