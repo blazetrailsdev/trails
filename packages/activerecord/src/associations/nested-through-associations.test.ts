@@ -1488,6 +1488,59 @@ describe("NestedThroughAssociationsTest", () => {
     expect(a2).toEqual([]);
   });
 
+  // Regression for the #2808 / #2840 review follow-up: a nested-through
+  // `joins(:similar_posts)` routes through JoinDependency and lands in the
+  // `_namedInnerJoins` store (the 4th join store). `merge()` (the immutable
+  // relation-merge path in merger.ts#mergeJoins) must carry that store over —
+  // the original review found it was silently dropped, so a merged relation
+  // lost its INNER JOINs entirely. The merged SQL must still emit the
+  // canonical AliasTracker-aliased `taggings_authors_join` join.
+  it("merge preserves named inner joins from nested through", async () => {
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+    Associations.hasMany.call(Author, "similarPosts", {
+      className: "Post",
+      through: "tags",
+      source: "taggedPosts",
+    });
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Post, "taggings", { className: "Tagging", as: "taggable" });
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
+    Associations.belongsTo.call(Tagging, "taggable", {
+      polymorphic: true,
+      foreignKey: "taggable_id",
+    });
+    Associations.hasMany.call(Tag, "taggings", { className: "Tagging", foreignKey: "tag_id" });
+    Associations.hasMany.call(Tag, "taggedPosts", {
+      className: "Post",
+      through: "taggings",
+      source: "taggable",
+      sourceType: "Post",
+    });
+
+    // The named-inner-join relation is the `other` argument: merge() clones the
+    // receiver first, so this is the path where mergeJoins must copy
+    // `_namedInnerJoins` over — the bug dropped them entirely from the result.
+    const joined = (Author as any).joins("similarPosts");
+    const merged = (Author as any).where({ name: "bob" }).merge(joined);
+
+    // The named inner joins survive the merge: the merged relation still emits the
+    // canonical-aliased INNER JOIN chain carried over from `other`.
+    expect(merged.toSql()).toContain("taggings_authors_join");
+    expect(merged.toSql()).toContain("INNER JOIN");
+    // Quote char is adapter-specific (`"` on SQLite/PG, backtick on MySQL/MariaDB),
+    // so match the receiver's surviving WHERE without hard-coding the quoting.
+    expect(merged.toSql()).toMatch(/WHERE [`"]authors[`"]\.[`"]name[`"] = /);
+  });
+
   // Mirrors Rails test_nested_has_many_through_with_scope_on_polymorphic_reflection
   // (activerecord/test/cases/associations/nested_through_associations_test.rb:453).
   //

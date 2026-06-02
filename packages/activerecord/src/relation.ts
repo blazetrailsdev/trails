@@ -2324,17 +2324,24 @@ export class Relation<T extends Base> {
     // build_joins([]) processes left_outer_joins_values and extracts table names
     // from the resulting join nodes. We resolve via _resolveAssociationJoin to
     // get the actual table name (handles camelCase → snake_case mappings).
-    const leftOuterTables = this._leftOuterJoinsValues
-      .filter((v): v is string => typeof v === "string")
-      .flatMap((v) => {
-        const resolved = this._resolveAssociationJoin(v);
-        if (!resolved) return [v.toLowerCase()]; // fallback
-        const entries = Array.isArray(resolved) ? resolved : [resolved];
-        return entries.map((e) => e.table.toLowerCase());
-      });
+    const resolveAssocTables = (values: AssociationSpec[]): string[] =>
+      values
+        .filter((v): v is string => typeof v === "string")
+        .flatMap((v) => {
+          const resolved = this._resolveAssociationJoin(v);
+          if (!resolved) return [v.toLowerCase()]; // fallback
+          const entries = Array.isArray(resolved) ? resolved : [resolved];
+          return entries.map((e) => e.table.toLowerCase());
+        });
+    const leftOuterTables = resolveAssocTables(this._leftOuterJoinsValues);
+    // _namedInnerJoins holds association names too (joins(:assoc) routed through
+    // JoinDependency with InnerJoin). Resolve to table names so references to
+    // those tables don't spuriously promote includes to eager_load.
+    const namedInnerTables = resolveAssocTables(this._namedInnerJoins);
     const joinedTables = new Set<string>([
       ...this._joinClauses.map((j) => j.table.toLowerCase()),
       ...leftOuterTables,
+      ...namedInnerTables,
       ...this._joinValues.flatMap((v) => {
         if (typeof v === "string") {
           const join = new Nodes.StringJoin(new Nodes.SqlLiteral(v));
@@ -4749,6 +4756,7 @@ export class Relation<T extends Base> {
       this._joinClauses.length === 0 &&
       this._joinValues.length === 0 &&
       this._leftOuterJoinsValues.length === 0 &&
+      this._namedInnerJoins.length === 0 &&
       this._includesAssociations.length === 0 &&
       this._eagerLoadAssociations.length === 0 &&
       this._preloadAssociations.length === 0 &&
