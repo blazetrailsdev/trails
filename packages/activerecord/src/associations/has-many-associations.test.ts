@@ -1794,9 +1794,8 @@ describe("HasManyAssociationsTest", () => {
   });
 
   // -- Counter cache --
-  // Migrated to dedicated `HasManyAssociationsTestCounterCacheHead` describe
-  // at end of file (B1966c — defineSchema + shared adapter +
-  // withTransactionalFixtures).
+  // Migrated to a dedicated `HasManyAssociationsTest` describe at end of file
+  // (B1966c — defineSchema + shared adapter + withTransactionalFixtures).
 
   // -- Has many on new record --
 
@@ -8196,8 +8195,8 @@ describe("HasManyAssociationsTest", () => {
 
 // -- Counter cache (head describe migration — B1966c) --
 //
-// Extracted from the big `HasManyAssociationsTest` describe so the counter-
-// cache cluster can run under shared adapter + `defineSchema` upfront +
+// Counter-cache cluster: kept in its own `HasManyAssociationsTest` describe so
+// it can run under shared adapter + `defineSchema` upfront +
 // `withTransactionalFixtures` (mirrors #1938 / #1966 pilot pattern). Tests
 // re-declare local classes per `it()` (counter-cache options vary by test);
 // transactional fixtures roll rows back between tests while the schema
@@ -8208,7 +8207,7 @@ const COUNTER_CACHE_HEAD_SCHEMA: Schema = {
   posts: { author_id: "integer", title: "string" },
 };
 
-describe("HasManyAssociationsTestCounterCacheHead", () => {
+describe("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 

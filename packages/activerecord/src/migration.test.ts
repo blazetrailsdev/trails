@@ -16,6 +16,12 @@ import { Logger } from "@blazetrails/activesupport";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { Schema } from "./schema.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
+import {
+  describeIfMysql,
+  Mysql2Adapter,
+  MYSQL_TEST_URL,
+} from "./adapters/abstract-mysql-adapter/test-helper.js";
 
 // Tables some tests rely on existing before any migration runs. Under
 // AR_NO_AUTO_SCHEMA=1 the test adapter no longer auto-creates missing
@@ -2541,11 +2547,10 @@ describe("MigrationTest", () => {
       expect(rows.length).toBe(1);
     });
 
-    // "changing columns", "changing column null with default", and "default
-    // functions on columns" live in adapters/postgresql/change-schema.test.ts
-    // (describeIfPg) — they require PostgreSQL.
-    // "updating auto increment" lives in adapters/abstract-mysql-adapter/bulk-alter.test.ts
-    // (describeIfMysql) — it requires MySQL.
+    // "changing columns", "changing column null with default", "default
+    // functions on columns" (PostgreSQL) and "updating auto increment" (MySQL)
+    // are backend-specific; they live in the describeIfPg / describeIfMysql
+    // BulkAlterTableMigrationsTest blocks at the end of this file.
 
     it("changing index", async () => {
       // Create table with a non-unique index, then swap to a unique index
@@ -2787,6 +2792,98 @@ describe("MigrationTest", () => {
       });
     }); // MigrationValidationTest
   }); // CopyMigrationsTest
+});
+
+// BulkAlterTableMigrationsTest cases that exercise backend-specific schema
+// statements. PostgreSQL: ALTER COLUMN TYPE / DEFAULT functions; MySQL: AUTO
+// INCREMENT. SQLite can't run these, so they're gated to the live PG / MySQL
+// CI lanes via describeIfPg / describeIfMysql.
+describeIfPg("BulkAlterTableMigrationsTest", () => {
+  let adapter: PostgreSQLAdapter;
+  beforeEach(async () => {
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await adapter.exec("DROP TABLE IF EXISTS delete_me");
+  });
+  afterEach(async () => {
+    await adapter.exec("DROP TABLE IF EXISTS delete_me");
+    await adapter.close();
+  });
+
+  it("changing columns", async () => {
+    await adapter.exec(
+      `CREATE TABLE delete_me (id serial primary key, name varchar, birthdate date)`,
+    );
+    const ss = adapter.schemaStatements();
+    await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
+      t.change("name", "string", { default: "NONAME" });
+      t.change("birthdate", "datetime", { comment: "This is a comment" });
+    });
+    const cols = await adapter.columns("delete_me");
+    const name = cols.find((c) => c.name === "name")!;
+    const birthdate = cols.find((c) => c.name === "birthdate")!;
+    expect(String(name.default)).toBe("NONAME");
+    expect(birthdate.type).toBe("datetime");
+  });
+
+  it("changing column null with default", async () => {
+    await adapter.exec(
+      `CREATE TABLE delete_me (id serial primary key, name varchar, age integer, birthdate date)`,
+    );
+    const ss = adapter.schemaStatements();
+    await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
+      t.change("name", "string", { default: "NONAME" });
+      t.change("birthdate", "datetime");
+      t.changeNull("age", false, 0);
+    });
+    const cols = await adapter.columns("delete_me");
+    expect(String(cols.find((c) => c.name === "name")!.default)).toBe("NONAME");
+    expect(cols.find((c) => c.name === "birthdate")!.type).toBe("datetime");
+    expect(cols.find((c) => c.name === "age")!.null).toBe(false);
+  });
+
+  it("default functions on columns", async () => {
+    await adapter.exec(`CREATE TABLE delete_me (id serial primary key)`);
+    const ss = adapter.schemaStatements();
+    await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
+      t.string("name", { default: () => "gen_random_uuid()" });
+    });
+    const cols = await adapter.columns("delete_me");
+    const name = cols.find((c) => c.name === "name")!;
+    expect(name.default).toBeNull();
+    expect((name as any).defaultFunction).toBe("gen_random_uuid()");
+  });
+});
+
+describeIfMysql("BulkAlterTableMigrationsTest", () => {
+  let adapter: Mysql2Adapter;
+  beforeEach(async () => {
+    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    await adapter.exec("DROP TABLE IF EXISTS delete_me");
+    await adapter.exec("CREATE TABLE delete_me (id INT NOT NULL AUTO_INCREMENT, PRIMARY KEY (id))");
+  });
+  afterEach(async () => {
+    await adapter.exec("DROP TABLE IF EXISTS delete_me");
+    await adapter.close();
+  });
+
+  it("updating auto increment", async () => {
+    const isAutoIncrement = async (): Promise<boolean> => {
+      const cols = await adapter.columns("delete_me");
+      const id = cols.find((c) => c.name === "id");
+      return (id as { autoIncrement?: boolean })?.autoIncrement === true;
+    };
+
+    const ss = adapter.schemaStatements();
+    await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
+      t.change("id", "bigint", { autoIncrement: true });
+    });
+    expect(await isAutoIncrement()).toBe(true);
+
+    await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
+      t.change("id", "bigint", { autoIncrement: false });
+    });
+    expect(await isAutoIncrement()).toBe(false);
+  });
 });
 
 function mockMigration(): { migration: Migration; sql: string[] } {

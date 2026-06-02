@@ -124,7 +124,8 @@ function extractFileTests(filePath: string): TestFileInfo {
         if (
           funcName === "describe" ||
           funcName === "describeIfPg" ||
-          funcName === "describeIfMysql"
+          funcName === "describeIfMysql" ||
+          funcName === "describeIfSqlite"
         ) {
           const title = getFirstArgString(node);
           if (title) {
@@ -168,7 +169,8 @@ function extractFileTests(filePath: string): TestFileInfo {
           if (
             base.text === "describe" ||
             base.text === "describeIfPg" ||
-            base.text === "describeIfMysql"
+            base.text === "describeIfMysql" ||
+            base.text === "describeIfSqlite"
           ) {
             const title = getFirstArgString(node);
             if (title) {
