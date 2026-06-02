@@ -39,6 +39,51 @@ function runDump(args: string[], env: NodeJS.ProcessEnv = {}): RunResult {
   };
 }
 
+// In-process variant: call the exported `run()` directly instead of spawning
+// tsx. The `--schema` path is side-effect-free (pure file read + codegen, no
+// Base.establishConnection / global connection state), so it's safe to run in
+// the test worker — and it avoids a blocking `spawnSync` per case. That matters
+// because vitest's path filter sweeps this file into the large
+// `vitest run packages/activerecord` run; ~dozen sequential 2-4s subprocess
+// spawns there block the worker long enough to starve vitest's reporter RPC
+// ("Timeout calling onTaskUpdate"). Subprocess `runDump` is kept only for cases
+// that genuinely exercise the live-DB path (e.g. the live-vs-schema parity).
+async function runDumpInProcess(
+  args: string[],
+  env: Record<string, string> = {},
+): Promise<RunResult> {
+  // Dynamic import (not top-level) so the beforeAll dep-build still runs first;
+  // a static import would pull @blazetrails/activerecord at file-load time.
+  const { run } = await import("./trails-models-dump.js");
+  const outChunks: string[] = [];
+  const errChunks: string[] = [];
+  const origOut = process.stdout.write;
+  const origErr = process.stderr.write;
+  const envBackup: Record<string, string | undefined> = {};
+  for (const k of Object.keys(env)) envBackup[k] = process.env[k];
+  Object.assign(process.env, env);
+  process.stdout.write = ((s: string | Uint8Array): boolean => {
+    outChunks.push(s.toString());
+    return true;
+  }) as typeof process.stdout.write;
+  process.stderr.write = ((s: string | Uint8Array): boolean => {
+    errChunks.push(s.toString());
+    return true;
+  }) as typeof process.stderr.write;
+  let code: number;
+  try {
+    code = await run(args);
+  } finally {
+    process.stdout.write = origOut;
+    process.stderr.write = origErr;
+    for (const k of Object.keys(env)) {
+      if (envBackup[k] === undefined) delete process.env[k];
+      else process.env[k] = envBackup[k]!;
+    }
+  }
+  return { code, stdout: outChunks.join(""), stderr: errChunks.join("") };
+}
+
 function applySchema(dbPath: string, sql: string): void {
   const db = new Database(dbPath);
   try {
@@ -262,7 +307,7 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
     return schemaPath;
   }
 
-  it("generates a model module from a db/schema.ts with no database connection", () => {
+  it("generates a model module from a db/schema.ts with no database connection", async () => {
     // DATABASE_URL points at a path that does not exist and no DB is running:
     // if the --schema path reached Base.establishConnection() it would fail.
     const schemaPath = writeSchema(`
@@ -277,7 +322,7 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
         await ctx.addForeignKey("books", "authors", { column: "author_id" });
       }
     `);
-    const { code, stdout, stderr } = runDump(["--schema", schemaPath], {
+    const { code, stdout, stderr } = await runDumpInProcess(["--schema", schemaPath], {
       DATABASE_URL: "sqlite3:///nonexistent/should-never-connect.db",
     });
     expect(code, `stderr: ${stderr}\nstdout: ${stdout}`).toBe(0);
@@ -321,7 +366,7 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
     expect(offline.stdout).toBe(live.stdout);
   });
 
-  it("models a composite-primary-key table from --schema", () => {
+  it("models a composite-primary-key table from --schema", async () => {
     const schemaPath = writeSchema(`
       export default async function defineSchema(ctx) {
         await ctx.createTable("memberships", { primaryKey: ["user_id", "group_id"], id: false }, (t) => {
@@ -330,13 +375,17 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
         });
       }
     `);
-    const { code, stdout, stderr } = runDump(["--schema", schemaPath, "--no-header"]);
+    const { code, stdout, stderr } = await runDumpInProcess([
+      "--schema",
+      schemaPath,
+      "--no-header",
+    ]);
     expect(code, `stderr: ${stderr}`).toBe(0);
     expect(stdout).toMatch(/export class Membership extends Base \{/);
     expect(stdout).toMatch(/this\._primaryKey = \["user_id","group_id"\]/);
   });
 
-  it("models a UUID-primary-key table from --schema", () => {
+  it("models a UUID-primary-key table from --schema", async () => {
     const schemaPath = writeSchema(`
       export default async function defineSchema(ctx) {
         await ctx.createTable("widgets", { id: "uuid" }, (t) => {
@@ -344,12 +393,16 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
         });
       }
     `);
-    const { code, stdout, stderr } = runDump(["--schema", schemaPath, "--no-header"]);
+    const { code, stdout, stderr } = await runDumpInProcess([
+      "--schema",
+      schemaPath,
+      "--no-header",
+    ]);
     expect(code, `stderr: ${stderr}`).toBe(0);
     expect(stdout).toMatch(/export class Widget extends Base \{/);
   });
 
-  it("skips an id:false table with no primary key on the --schema path", () => {
+  it("skips an id:false table with no primary key on the --schema path", async () => {
     const schemaPath = writeSchema(`
       export default async function defineSchema(ctx) {
         await ctx.createTable("logs", { id: false }, (t) => {
@@ -360,13 +413,17 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
         });
       }
     `);
-    const { code, stdout, stderr } = runDump(["--schema", schemaPath, "--no-header"]);
+    const { code, stdout, stderr } = await runDumpInProcess([
+      "--schema",
+      schemaPath,
+      "--no-header",
+    ]);
     expect(code, `stderr: ${stderr}`).toBe(0);
     expect(stdout).toMatch(/export class User extends Base/);
     expect(stdout).not.toMatch(/class Log /);
   });
 
-  it("applies --only/--ignore filtering on the --schema path", () => {
+  it("applies --only/--ignore filtering on the --schema path", async () => {
     const schemaPath = writeSchema(`
       export default async function defineSchema(ctx) {
         await ctx.createTable("authors", { force: "cascade" }, (t) => {
@@ -377,36 +434,42 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
         });
       }
     `);
-    const { code, stdout } = runDump(["--schema", schemaPath, "--only", "books", "--no-header"]);
+    const { code, stdout } = await runDumpInProcess([
+      "--schema",
+      schemaPath,
+      "--only",
+      "books",
+      "--no-header",
+    ]);
     expect(code).toBe(0);
     expect(stdout).toMatch(/export class Book extends Base/);
     expect(stdout).not.toMatch(/export class Author extends Base/);
   });
 
-  it("exits 1 with a pointed error when the --schema file cannot be read", () => {
-    const { code, stderr } = runDump(["--schema", join(tmp, "does-not-exist.ts")]);
+  it("exits 1 with a pointed error when the --schema file cannot be read", async () => {
+    const { code, stderr } = await runDumpInProcess(["--schema", join(tmp, "does-not-exist.ts")]);
     expect(code).toBe(1);
     expect(stderr).toMatch(/cannot read schema file/);
   });
 
-  it("exits 1 with a file-pointed error when --schema has no createTable calls", () => {
+  it("exits 1 with a file-pointed error when --schema has no createTable calls", async () => {
     // A readable file that isn't a real schema.ts: the error must point at the
     // file, not misdirect the user to --only/--ignore.
     const schemaPath = writeSchema(`export default async function defineSchema() {}`);
-    const { code, stderr } = runDump(["--schema", schemaPath]);
+    const { code, stderr } = await runDumpInProcess(["--schema", schemaPath]);
     expect(code).toBe(1);
     expect(stderr).toMatch(/no createTable found/);
     expect(stderr).not.toMatch(/--only\/--ignore/);
   });
 
-  it("exits 1 when --schema= is passed an empty value", () => {
+  it("exits 1 when --schema= is passed an empty value", async () => {
     // Empty would be falsy and silently misroute to the live-DB branch.
-    const { code, stderr } = runDump(["--schema="]);
+    const { code, stderr } = await runDumpInProcess(["--schema="]);
     expect(code).toBe(1);
     expect(stderr).toMatch(/--schema expects a value/);
   });
 
-  it("warns and ignores --database-url when --schema is also given", () => {
+  it("warns and ignores --database-url when --schema is also given", async () => {
     // --schema wins per documented precedence; the explicit conflicting flag
     // is surfaced. DATABASE_URL points at an unconnectable path to prove the
     // DB branch is never taken.
@@ -417,7 +480,7 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
         });
       }
     `);
-    const { code, stdout, stderr } = runDump([
+    const { code, stdout, stderr } = await runDumpInProcess([
       "--schema",
       schemaPath,
       "--database-url",
@@ -429,7 +492,7 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
     expect(stdout).toMatch(/export class Item extends Base/);
   });
 
-  it("does not warn about an ambient DATABASE_URL on the --schema path", () => {
+  it("does not warn about an ambient DATABASE_URL on the --schema path", async () => {
     const schemaPath = writeSchema(`
       export default async function defineSchema(ctx) {
         await ctx.createTable("items", { force: "cascade" }, (t) => {
@@ -437,14 +500,14 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
         });
       }
     `);
-    const { code, stderr } = runDump(["--schema", schemaPath, "--no-header"], {
+    const { code, stderr } = await runDumpInProcess(["--schema", schemaPath, "--no-header"], {
       DATABASE_URL: "sqlite3:///nonexistent/should-never-connect.db",
     });
     expect(code, `stderr: ${stderr}`).toBe(0);
     expect(stderr).not.toMatch(/ignoring --database-url/);
   });
 
-  it("writes to --out on the --schema path", () => {
+  it("writes to --out on the --schema path", async () => {
     const schemaPath = writeSchema(`
       export default async function defineSchema(ctx) {
         await ctx.createTable("items", { force: "cascade" }, (t) => {
@@ -452,12 +515,12 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
         });
       }
     `);
-    const { code, stderr } = runDump(["--schema", schemaPath, "--out", outPath]);
+    const { code, stderr } = await runDumpInProcess(["--schema", schemaPath, "--out", outPath]);
     expect(code, `stderr: ${stderr}`).toBe(0);
     expect(readFileSync(outPath, "utf8")).toMatch(/export class Item extends Base/);
   });
 
-  it("uses the resolved schema path as the header sourceHint", () => {
+  it("uses the resolved schema path as the header sourceHint", async () => {
     const schemaPath = writeSchema(`
       export default async function defineSchema(ctx) {
         await ctx.createTable("items", { force: "cascade" }, (t) => {
@@ -465,7 +528,7 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
         });
       }
     `);
-    const { code, stdout } = runDump(["--schema", schemaPath]);
+    const { code, stdout } = await runDumpInProcess(["--schema", schemaPath]);
     expect(code).toBe(0);
     expect(stdout).toMatch(new RegExp(`from ${schemaPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
   });
