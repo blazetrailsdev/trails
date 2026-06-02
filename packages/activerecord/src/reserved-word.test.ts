@@ -16,6 +16,7 @@ import "./relation.js";
 import { Associations } from "./associations.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
 import { defineFixtures, defineJoinTableFixtures } from "./test-helpers/define-fixtures.js";
 import { reservedWordsGroupFixtureData } from "./test-helpers/fixtures/reserved-words/group.js";
 import { reservedWordsSelectFixtureData } from "./test-helpers/fixtures/reserved-words/select.js";
@@ -212,18 +213,14 @@ describe("ReservedWordTest", () => {
     expect(await Group.count()).toBe(3);
   });
 
-  it.skip("associations work with reserved words", async () => {
-    // BLOCKED: needs `assert_no_queries` (SQL-count monitoring) to prove the
-    // eager-loaded `groups` are not re-queried — the trails test harness has
-    // no query-count assertion yet (see transactions.test.ts skips).
+  it("associations work with reserved words", async () => {
     await createTestFixtures("select", "group");
     const selects = await Select.all().includes("groups").toArray();
-    for (const s of selects) {
-      // UNSKIP REQUIRES: wrap this loop in the (not-yet-available)
-      // `assert_no_queries` helper — Rails asserts the eager-loaded `groups`
-      // trigger zero queries here. Without it this test has no assertion and
-      // would pass vacuously, so do not unskip until the harness exists.
-      await (s as unknown as { groups: { toArray(): Promise<Group[]> } }).groups.toArray();
-    }
+    // Rails asserts the eager-loaded `groups` trigger zero queries here.
+    await assertNoQueries(false, async () => {
+      for (const s of selects) {
+        await (s as unknown as { groups: { toArray(): Promise<Group[]> } }).groups.toArray();
+      }
+    });
   });
 });

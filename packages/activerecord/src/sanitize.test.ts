@@ -3,7 +3,8 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect } from "vitest";
-import { Base, Range } from "./index.js";
+import { sql as arelSql } from "@blazetrails/arel";
+import { Base, Range, UnknownAttributeReference } from "./index.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 
 setupHandlerSuite();
@@ -102,17 +103,18 @@ describe("SanitizeTest", () => {
     expect(sql).toContain("off");
   });
 
-  it.skip("disallow raw sql with unknown attribute string", () => {
-    // BLOCKED: relation — SQL sanitization gap
-    // ROOT-CAUSE: relation.ts#sanitizeSql or Sanitization module not fully implementing Rails parity
-    // SCOPE: ~30 LOC fix in relation.ts; affects ~4 tests in sanitize.test.ts
-    /* fixture-dependent */
+  it("disallow raw sql with unknown attribute string", () => {
+    class Binary extends Base {
+      static _tableName = "binaries";
+    }
+    expect(() => Binary.disallowRawSqlBang(["field(id, ?)"])).toThrow(UnknownAttributeReference);
   });
-  it.skip("disallow raw sql with unknown attribute sql literal", () => {
-    // BLOCKED: relation — SQL sanitization gap
-    // ROOT-CAUSE: relation.ts#sanitizeSql or Sanitization module not fully implementing Rails parity
-    // SCOPE: ~30 LOC fix in relation.ts; affects ~4 tests in sanitize.test.ts
-    /* fixture-dependent */
+  it("disallow raw sql with unknown attribute sql literal", () => {
+    class Binary extends Base {
+      static _tableName = "binaries";
+    }
+    // An Arel.sql literal is trusted SQL — disallowRawSqlBang must not raise.
+    expect(() => Binary.disallowRawSqlBang([arelSql("field(id, ?)")])).not.toThrow();
   });
 
   it("bind arity", () => {
@@ -191,11 +193,17 @@ describe("SanitizeTest", () => {
     );
   });
 
-  it.skip("named bind with postgresql type casts", () => {
-    // BLOCKED: relation — SQL sanitization gap
-    // ROOT-CAUSE: relation.ts#sanitizeSql or Sanitization module not fully implementing Rails parity
-    // SCOPE: ~30 LOC fix in relation.ts; affects ~4 tests in sanitize.test.ts
-    /* fixture-dependent */
+  it("named bind with postgresql type casts", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    // `:a` is the only bind variable; `::integer` and `::date` are PostgreSQL
+    // type casts and must be left untouched.
+    const a = Post.connection;
+    const result = Post.sanitizeSqlArray(":a::integer '2009-01-01'::date", { a: "10" });
+    expect(result).toBe(`${a.quote("10")}::integer '2009-01-01'::date`);
   });
 
   it("named bind with literal colons", () => {
