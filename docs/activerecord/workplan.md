@@ -1,10 +1,20 @@
 # activerecord — prioritized work plan (test:compare 100% + Rails fidelity)
 
-> **Snapshot 2026-06-01.** A prioritized, dependency-sensitive, **executable**
-> ordering of the PRs that close `test:compare` to 100% and finish
-> Rails-fidelity cleanup. Each story carries our source anchors (`file:line`),
-> the Rails source reference, the tests it moves, an LOC estimate,
-> dependencies, and an acceptance line.
+> **Snapshot 2026-06-02 (refreshed).** A prioritized, dependency-sensitive,
+> **executable** ordering of the PRs that close `test:compare` to 100% and
+> finish Rails-fidelity cleanup. Each story carries our source anchors
+> (`file:line`), the Rails source reference, the tests it moves, an LOC
+> estimate, dependencies, and an acceptance line.
+>
+> **2026-06-02 refresh:** Waves 0–1 (Phase A) shipped; Wave 2 shipped; most of
+> Wave 3's PG/MySQL type families + 3.1/3.misc shipped. Of the four architectural
+> blockers (the canonical numbered list lives in §"The dependency spine"),
+> **three of four are satisfied on `main`** — #1 ConnectionHandler (Story 4.1),
+> #2 AliasTracker / join-table aliasing (Story 7.2), and #4 global Arel-visitor
+> removal (Phase A, Stories 1.1–1.4); **#3, the `type_for_attribute` cast refactor
+> (Story 3.PG-enum), is still open and still gating.** Separately, the Wave-7
+> infra stories 7.1/7.3 landed and 7.4/7.5 were pre-shipped/no-ops. See per-wave
+> headers for the PR list and the remaining follow-ups discovered post-merge.
 >
 > **Anchor verification status:** Waves 0–3 `file:line` anchors were verified
 > against the tree on 2026-06-01. Waves 4–7 anchors are doc-sourced and **to be
@@ -71,17 +81,31 @@ step, and this plan schedules it explicitly.
 ## Current state
 
 - **api:compare**: 100% — not a goal.
-- **test:compare**: 6826/7867 (86.8%), ~1034 skipped (refresh — stale).
-- **In flight**: only PR #2762 (schema.ts parser PR B). The rest of the
-  backlog below is open.
+- **test:compare** (cached, 2026-06-02): 6917/7856 passing-matched (**88%**),
+  ~932 skipped, 4 misplaced. Up from 6826/7867 (86.8%) / ~1034 skipped on
+  2026-06-01: **+91 passing, −102 skipped** across the Wave 0–7-blocker merges.
+- **In flight / recently merged**: Waves 0–2, Phase A of Wave 1, the Wave-3
+  PG/MySQL type families, and the Wave-7 infra stories (7.1/7.2/7.3, plus
+  7.4/7.5 pre-shipped/no-op) all landed 2026-06-01→02. Open work: Wave 1 Phase
+  B/C, Wave 3 schema-dumper subtrack + 3.PG-enum (BLOCKER #3, still gating),
+  Waves 4.2/4.3/5.2/6, and the Wave 7 campaigns.
 
-### Live skip-annotation histogram (ground truth, 2026-06-01)
+### Live skip-annotation histogram (ground truth, 2026-06-02)
 
 ```
-associations 285 │ relation 199 │ adapter-pg 185 │ schema 119 │ adapter-mysql 62
-connection-pool 60 │ fixture 36 │ transactions 32 │ migration 15 │ type 14
-GVL 8 │ query-cache 4 │ i18n 4 │ serialization 3 │ adapter-sqlite 2   (+~40 malformed)
+associations 277 │ relation 178 │ adapter-pg 173 │ schema 112 │ connection-pool 69
+adapter-mysql 42 │ fixture 39 │ migration 27 │ transactions 18 │ type 14
+unknown 8 │ query-cache 4 │ serialize 3 │ serialization 2 │ nested-attributes 2
+adapter-sqlite 2   (+~10 residual 1-off malformed tags: the/needs/STI/SQLite/…)
 ```
+
+Delta vs 2026-06-01: associations 285→277, relation 199→178, adapter-pg 185→173
+(PG type-family un-skips), adapter-mysql 62→42 (MySQL un-skips), schema 119→112,
+transactions 32→18 (Story 5.1). GVL is gone (reclassified by Story 0.1); the ~40
+malformed bucket dropped to ~10 1-offs (Story 0.2). Note **connection-pool 60→69
+and migration 15→27 went UP** — newly-ported stubs landed as skips faster than
+they were cleared; those are the next campaigns. (This run is on `main` after
+#2811/#2814/#2826 merged.)
 
 ## The dependency spine (why this order)
 
@@ -90,17 +114,24 @@ touch everything, so closing them early means re-opening them every time a
 lower-tier fix lands. The two biggest buckets (285 + 199 ≈ 44% of all skips)
 come **last**.
 
-Four hard architectural blockers gate the most downstream work — the critical path:
+Four hard architectural blockers gate the most downstream work — the critical
+path. **As of 2026-06-02, three of four are satisfied:**
 
-1. **ConnectionHandler P9 port** → gates connection-pool (60) + per-thread
-   query-cache + multi-db. _Lead PR: Story 4.1._
-2. **AliasTracker / join-table aliasing** → gates nested-through / eager /
-   join-model un-skips. _Lead PR: Story 7.2._
+1. ✅ **ConnectionHandler P9 port** (was: gates connection-pool 60 + per-thread
+   query-cache + multi-db). Story 4.1 was a **no-op** — handler 23/23 +
+   merge-and-resolve skips already unblocked on `main`. Waves 4.2/4.3/6 are now
+   dep-clear.
+2. ✅ **AliasTracker / join-table aliasing** (gates nested-through / eager /
+   join-model). Resolved by Story 7.2 (#2808) — routed nested-through INNER
+   joins through JoinDependency. **⚠ review fixes did not land in the merge —
+   see the ~60 LOC follow-up under Story 7.2.** 1 cross-arg-collision skip
+   remains.
 3. **`type_for_attribute` cast refactor** (>300 LOC) → gates enum write-casting
-   - several relation/type tests. _Lead PR: Story 3.PG-enum._
-4. **Global Arel visitor removal** → not a test:compare blocker, but de-risks
-   all adapter/SQL work and kills the per-file `syncHandlerVisitor` dance
-   (~635 sites). _Lead PRs: Stories 1.1–1.6._
+   - several relation/type tests. _Lead PR: Story 3.PG-enum — still open._
+4. ✅ **Global Arel visitor removal** — Phase A (Stories 1.1–1.4) shipped
+   (#2768/#2769/#2774/#2810); zero production `<node>.toSql()` with a connection
+   in scope remains. Phase B/C (1.5/1.6, the `syncHandlerVisitor` dance) still
+   open but now dep-clear.
 
 **Externally blocked — do NOT schedule:**
 
@@ -115,38 +146,28 @@ Permanent skips (`load_async`, GVL, Marshal/YAML, rake/dbconsole) are
 
 ---
 
-## Wave 0 — Free denominator + tracking hygiene (tests-only, no deps, do first)
+## Wave 0 — Free denominator + tracking hygiene ✅ shipped (#2777, #2778)
 
-### Story 0.1 — Reclassify permanent-skips into `unported-files.ts` `[port-meta]` ~60 LOC · dep: none
+Both stories landed 2026-06-01:
 
-- Ours: `scripts/api-compare/unported-files.ts` — add entries. Shape (verified):
-  whole-file `{ testFile: "<ruby>_test.rb" }`, or per-test
-  `{ testFile, tests: ["test_name", …], className?: string }`.
-- Targets: `relation/load_async_test.rb` + `FutureResult` (28), GVL/thread
-  (`grep -rn "BLOCKED: GVL" …`, 8), Marshal/YAML/`serialization` (3 + scattered),
-  `SimpleDelegator where` (2).
-- Rails: n/a (these have no JS analog — Ruby thread pool / Marshal / GVL).
-- Done: the named tests drop from BOTH the Ruby denominator and the skipped
-  backlog; `pnpm test:compare --json` total Ruby count decreases by ~40.
+- **Story 0.1** — reclassify permanent-skips (`load_async`/`FutureResult`, GVL,
+  Marshal/YAML, `SimpleDelegator`) into `scripts/api-compare/unported-files.ts`
+  — **#2777**. GVL bucket gone from the histogram.
+- **Story 0.2** — normalize malformed `BLOCKED:` tags to the canonical
+  vocabulary — **#2778**. The ~40 malformed bucket dropped to ~10 1-offs.
 
-### Story 0.2 — BLOCKED-annotation normalization sweep `[tests-only]` ~tests · dep: none
-
-- Ours: the ~40 malformed tags surfaced by the histogram (`needs`, `requires`,
-  `F2`, `D-1`, `Same`, `same`, `no`, `TS`, `trails`, `Migrator`,
-  `postgres-only`, `pin_connection!/unpin_connection!`, …). Re-tag to the
-  canonical `BLOCKED: <category>` vocabulary (100-plan "BLOCKED vocabulary").
-- Done: histogram has zero non-vocabulary buckets; the grep contract is sound.
-  Prereq for trusting every count below.
+**Follow-up bullet (from #2779 finding):** the `resolver.test.ts` "url missing
+scheme" divergence is a documented JS-vs-Ruby behavior gap (trails has no
+symbols; scheme-less string → env lookup → `AdapterNotSpecified`, pinned by
+`connection-handling.test.ts`). Move it from a live `it.skip` into
+`unported-files.ts` as a documented divergence (~5 LOC) so it stops counting as
+a live skip.
 
 ---
 
 ## Wave 1 — Fidelity foundation: global Arel visitor removal (de-risks Waves 2–3)
 
-Supersedes #2600. **57** production (non-test) `.toSql()` callers remain
-(`grep -rn "\.toSql()" packages/activerecord/src --include='*.ts'
---exclude='*.test.ts' | grep -v "connection.toSql\|adapter.toSql"`). Route each
-through the connection's visitor. Siblings off `main`, non-overlapping files,
-**A → B → C**.
+Supersedes #2600. Siblings off `main`, non-overlapping files, **A → B → C**.
 
 - Rails reference (all of Phase A): adapters own their visitor —
   `vendor/rails/activerecord/lib/active_record/connection_adapters/abstract_adapter.rb`
@@ -155,36 +176,32 @@ through the connection's visitor. Siblings off `main`, non-overlapping files,
   process-global visitor. Our analog already exists:
   `connection-adapters/abstract/database-statements.ts` `toSql(arel)`.
 
-### Story 1.1 — Phase A1: DDL/metadata callers `[fidelity]` ~80 LOC · dep: none
+### Phase A (Stories 1.1–1.4) ✅ shipped (#2768, #2769, #2774, #2810)
 
-- Ours: `schema-migration.ts`, `internal-metadata.ts`, `migration.ts` — replace
-  `<node>.toSql()` with `this.connection.toSql(<node>)` (connection in scope).
-- Done: DDL/metadata SQL is connection-derived; touched tests green.
+Route all production `<node>.toSql()` callers through the connection's visitor:
 
-### Story 1.2 — Phase A2: persistence + base toSql callers `[fidelity]` ~70 LOC · dep: none
+- **1.1** — DDL/metadata callers — **#2768** (scope was smaller than estimated:
+  only `migration.ts:1921` `createTable` actually remained).
+- **1.2** — persistence + base callers — **#2769** (all 6 persistence + 3 base
+  sites converted; no `: x.toSql()` fallback remains).
+- **1.3** — calculations + statement-cache + insert-all — **#2774**.
+- **1.4** — grep-sweep remainder — **#2810**. Done-criteria met: **zero
+  production `<arel-node>.toSql()` with a connection in scope remains.**
 
-- Ours: `persistence.ts:223,259,286,562,956,1001` (the `toSql()` callers —
-  `:259,286,956` are `adapter.toSql ? … : x.toSql()` ternaries, `:223` the
-  `connection.toSql ? …` form, `:562,1001` bare `x.toSql()` — all → unconditional
-  `connection.toSql(x)`); `base.ts` `ctor.connection` toSql sites.
-- Done: no `: x.toSql()` fallback remains in persistence/base.
+**Follow-up bullets:**
 
-### Story 1.3 — Phase A3: calculations + statement-cache + insert-all `[fidelity]` ~70 LOC · dep: none
+- (from #2768) latent ~250+ LOC: a genuine `SchemaCreation` port so the adapter
+  owns the DDL visitor (Rails `schema_creation.accept(td)`), instead of
+  `TableDefinition.toSql()` self-compiling. Only if full DDL-compilation
+  fidelity becomes a goal; `schema-statements.ts:164` `createTable` correctly
+  stays on `td.toSql()` (a `TableDefinition`, never touched the global visitor).
+- (from #2810) the order-array fallback (`query-methods.ts:416,499`) +
+  `BoundSqlLiteral` baking (`:1465,1485`) deliberately stay on arel-default
+  `ToSql` — a direct `.connection` there can throw `ConnectionNotEstablished` in
+  adapter-less join-model contexts. Revisit only if Phase B exposes a
+  never-throw connection accessor.
 
-- Ours: `relation/calculations.ts` (sites at 228, 265, 302, 390, 399, 415, 434,
-  437, 448, 460, 739 — note `:225` already routes through
-  `connection.visitor.compile`, mirror it), `statement-cache.ts` (`connection`
-  param in scope), `insert-all.ts:133`.
-- Done: calculation/insert SQL connection-derived.
-
-### Story 1.4 — Phase A4: grep-sweep remainder `[fidelity]` ~60 LOC · dep: 1.1–1.3
-
-- Ours: remaining hits from the 57-caller grep above. Any genuinely
-  adapter-less caller stays on the arel default `ToSql` (acceptable — a
-  dialect-agnostic context).
-- Done: zero production `<node>.toSql()` with a connection in scope.
-
-### Story 1.5 — Phase B: drop AR's global-sync sites `[fidelity]` ~30 LOC · dep: 1.4
+### Story 1.5 — Phase B: drop AR's global-sync sites `[fidelity]` ~30 LOC · dep: 1.4 ✅ (deps satisfied)
 
 - Ours: `base.ts:979` (`setToSqlVisitor(…)` in the `Base.adapter =` setter) —
   delete; `test-setup-ar.ts` reset becomes a no-op.
@@ -211,52 +228,68 @@ overloads (`relation.ts:~822,941` `as any`).
 
 ---
 
-## Wave 2 — Tier 1 isolated un-skips (low-dep, high mechanical yield)
+## Wave 2 — Tier 1 isolated un-skips ✅ shipped (#2779, #2784, #2785, #2796)
 
-All siblings off `main`. **Refresh each count first** — several 2026-05-18
-numbers have already dropped.
+All four stories landed 2026-06-01. Several files turned out already-ported
+(the 2026-05-18 counts were stale — the actual work was un-skipping, not
+porting). Per-story status + the post-merge remainders:
 
-### Story 2.1 — DB-config cluster `[un-skip + port]` ~250 LOC · dep: none
+### Story 2.1 — DB-config cluster ✅ shipped (#2779)
 
-- Ours: `database-configurations/resolver.test.ts` (live 3 skips; snapshot said
-  16 — many were `missing`, port them), `database-selector.test.ts` (live 1),
-  `database-configurations/hash-config.test.ts` (live **0** — likely done,
-  verify), `url-config.test.ts` (live 0).
-- Rails: `vendor/rails/activerecord/test/cases/database_configurations/resolver_test.rb`,
-  `database_selector_test.rb`, `…/hash_config_test.rb`, `…/url_config_test.rb`;
-  impl in `lib/active_record/database_configurations/…`.
-- Defer: `merge-and-resolve-default-url-config.test.ts` 7 skips — gated on
-  ConnectionHandler P9 (Wave 4).
-- Done: each file at matched==total, 0 skipped, 0 missing.
+- `resolver.test.ts` un-skipped 2/3; `hash-config` (was 34) + `url-config` were
+  already 100% (0 skip / 0 missing). Test-only.
+- **Stale-count correction:** `merge-and-resolve-default-url-config.test.ts` has
+  **1** remaining skip, not the 7 the plan claimed (gated on Wave 4 / ConnectionHandler — but 4.1 is a no-op, so this is now dep-clear).
+- **Follow-up (separate impl story, NOT a one-liner):** `database-selector.test.ts`
+  "preventing writes works in a threaded environment" (BLOCKED: async-isolation).
+  `connectedToStack` is a mutable array shallow-copied by
+  `IsolatedExecutionState.scope`, so concurrent async tasks bleed `preventWrites`
+  across each other. Needs per-scope array instances (Ruby uses thread-local).
 
-### Story 2.2 — forbidden-attributes + view `[un-skip/port]` ~200 LOC · dep: none
+### Story 2.2 — forbidden-attributes + view ✅ partially shipped (#2784)
 
-- Ours: `forbidden-attributes-protection.test.ts` (16), `view.test.ts` (21).
-- Rails: `test/cases/forbidden_attributes_protection_test.rb`, `view_test.rb`.
-- Done: both files at 100%.
+- **forbidden-attributes-protection.test.ts: 13/16** (the story's first half).
+  `view.test.ts` (21) was **deferred entirely (0/21)**.
+- **Follow-up — "view-a" PR (~200 LOC, feasible now):** `createView`/`dropView`
+  not yet in `connection-adapters/abstract/schema-statements.ts` (`views()` +
+  `viewExists()` already exist). Ship ~15 feasible tests; leave 6 cross-blocked:
+  `does not dump view as table` (×2, **gated on Story 3.4**); `UpdateableViewTest`
+  (×4, PG/MySQL-only → needs a second named pool / multi-adapter run).
+- **Follow-up — 3 remaining forbidden-attributes skips:** `sti inheritance column`
+  needs STI dispatch at `new` wired (`subclassFromAttributes` exists at
+  `inheritance.ts:596` but isn't called from the ctor; ~40 LOC + careful
+  regression — naïve wiring regressed `inheritance.test.ts`). The 2
+  strong-params nested-association cases are **Phase-G** (immediate in-memory
+  nested build; `ship-part.ts` also missing `acceptsNestedAttributesFor`).
 
-### Story 2.3 — validations root + i18n `[port + un-skip]` ~250 LOC · dep: none
+### Story 2.3 — validations root + i18n ✅ shipped (#2785)
 
-- Ours: `validations/validations.test.ts` (Batch Audit-V1: ~19 **missing**
-  Rails bodies — `validate`/`validate!`, `save_without_validation`, numericality
-  edges, `validators` introspection), `validations/i18n-validation.test.ts` (4),
-  `validations/association-validation.test.ts` (1).
-- Rails: `test/cases/validations_test.rb`, `validations/i18n_validation_test.rb`,
-  `validations/association_validation_test.rb`.
-- Note: `pnpm test:stubs` generates the missing stubs for `validations_test.rb`.
-- Done: validations files at 100%.
+- All three target files at 100%. The convention root
+  `packages/activerecord/src/validations.test.ts` was already 21/21 (the plan's
+  "~19 missing" claim was stale); work was un-skipping i18n + association-validation.
+- **Follow-up (tidy, ~2 tests):** delete the redundant subdir file
+  `packages/activerecord/src/validations/validations.test.ts` (not
+  test:compare-mapped; duplicates 2 tests in the root file).
+- **Deviation (own story if `valid?` fidelity matters):** trails `valid?` does
+  NOT run uniqueness synchronously (registered into `_asyncValidations`, run on
+  save) — JS can't block on the async DB query.
 
-### Story 2.4 — type cluster + shared InTimeZone helper `[impl + un-skip]` ~180 LOC · dep: none
+### Story 2.4 — type cluster + shared InTimeZone helper ✅ shipped (#2796)
 
-- Ours: port the `InTimeZone` test helper **once** (Batch 65/86a both need it;
-  ROOT-CAUSE notes `date-time-precision.test.ts` "timeZoneAwareAttributes not
-  yet wired"). Wire `Base.timeZoneAwareAttributes` read path + `TimeZoneConverter`
-  serialize/deserialize. Then un-skip `numeric-data.test.ts` (4), `date.test.ts`
-  (1), `attribute-methods.test.ts:908,912` (BLOCKED: type), PG
-  `timestamp.test.ts:140,149`.
-- Rails: `test/cases/numeric_data_test.rb`, `date_test.rb`,
-  `attribute_methods_test.rb`; impl `lib/active_record/attribute_methods/time_zone_conversion.rb`.
-- Done: BLOCKED:type histogram bucket → near 0.
+- Shipped the reusable `test-helpers/in-time-zone.ts` + two small real fixes;
+  un-skipped the type cluster. **BLOCKED:type 20→14**, adapter-pg 201→199. The
+  `BLOCKED: type` annotations were stale — `timeZoneAwareAttributes` +
+  `TimeZoneConverter` were already wired.
+- **Follow-ups now unblocked by the shipped `InTimeZone` helper** (left out to
+  keep the PR focused): `date-time-precision.test.ts:139` "formatting datetime …
+  when time zone aware"; `adapters/postgresql/infinity.test.ts:117` "assigning
+  'infinity' on a datetime column with TZ aware attributes".
+- **Follow-up (~medium, fold into Story 3.PG-\* type work):** NaN decimal support
+  (`numeric fields with nan`) — `DecimalType` has no NaN representation;
+  BigDecimal-NaN sentinel + `'NaN'::numeric` serialization needed.
+- **Follow-up (~15 LOC):** give `buildDateTime` (and time/timestamp paths) the
+  same `Time`-rollover guard `buildDate` got — needs the datetime overflow tests
+  to prove it (none un-skipped yet).
 
 ---
 
@@ -265,33 +298,31 @@ numbers have already dropped.
 After Wave 1 (connection-derived SQL). PG/MySQL type files are independent
 siblings; the schema-dumper subtrack is ordered.
 
-### Story 3.1 — KNOWN_DSL_TYPES expansion `[impl]` ~30 LOC · dep: none
+### Story 3.1 — KNOWN_DSL_TYPES expansion ✅ shipped (#2794)
 
-- Ours: `schema-dumper.ts:163` `KNOWN_DSL_TYPES` (12 entries) doesn't cover all
-  `DSL_HELPER_METHODS` (`:187`); `sqlTypeToDsl` (`:229`) falls through for
-  `timestamptz`, `citext`, `jsonb`, `uuid`, `hstore`, `ltree`, `tsvector`,
-  `inet`, `macaddr`, `xml`, `money`, `int4range`…`daterange`. Expand to cover
-  `DSL_HELPER_METHODS` (or add the SQL types to `SQL_TYPE_MAP`).
-- Done: CTAS/SchemaDumper round-trips those types; prereq for 3.2.
+- Expanded `schema-dumper.ts` `KNOWN_DSL_TYPES` (+ case-insensitive
+  `KNOWN_DSL_TYPES_BY_LOWER` lookup) to cover the PG range/network/timestamptz
+  types. One real behavioral fix (`bitVarying` no longer falls through to the
+  `enum` catch-all); rest is drift-prevention. Prereq for 3.2/3.3 — now unblocked.
+- **Follow-ups (pre-existing skips in `schema-dumper.test.ts`, ~Story 3.2):**
+  "schema dump with timestamptz datetime format" (~80 LOC — Rails maps
+  timestamptz to `:datetime` with precision); "interval type" + "oid type"
+  (~30–50 LOC, still generic `t.column`); PG extension dumping (alphabetic
+  order); array/limit/enum dump gaps (float4 limit, array limit, decimal array
+  defaults, enum-with-comma).
 
-### Story 3.2 — schema-dumper table/partition/comment polish `[impl + un-skip]` ~80 LOC · dep: 3.1
+### Story 3.2 — schema-dumper table/partition/comment polish ✅ shipped (#1458, #1469, #1665)
 
-- Ours: `schema-dumper.ts` `emitTable` (~913) — wire `tableOptions()` (make the
-  dump loop async), forward `comment` (emit `COMMENT ON TABLE`), wire
-  `tablePartitionDefinition`.
-- Rails: `lib/active_record/connection_adapters/abstract/schema_dumper.rb`.
-- Tests: `schema-dumper.test.ts` (live 31), PG `SchemaCreateTableOptionsTest`
-  partition tests.
-- Done: dumper round-trip tests green.
+- **No-op** per `project_story_3_2_schema_dumper_polish_already_done` —
+  `tableOptions`/`comment`/`partition` shipped earlier; `SchemaCreateTableOptionsTest`
+  5/5 green. Do not re-spawn.
 
-### Story 3.3 — route `emitTable` through the `columnSpec` hook `[impl, architectural]` ~50 LOC · dep: 3.1
+### Story 3.3 — route `emitTable` through the `columnSpec` hook → **re-scoped to Epic 3.3-U** `[impl, architectural]` · dep: 3.1 ✅
 
 - Ours: `connection-adapters/abstract/schema-dumper.ts:33` `columnSpec` / `:53`
   `prepareColumnOptions` are **dead vs live dumps** — `schema-dumper.ts`
   `emitTable` (~943) builds `colspec` inline and never calls them, so every
   adapter's `prepareColumnOptions` override is unreachable (#1723).
-- Done: `emitTable` calls `columnSpec`; PG/SQLite/MySQL snapshots updated;
-  unblocks per-adapter dumper fidelity.
 - **Re-scoped (not a ~50 LOC wiring).** The abstract/dialect `columnSpec`
   helpers emit Ruby `schema.rb` strings (`precision: nil`, `-> { … }`,
   virtual `type: :integer`, `size: :tiny`) while the live `emitTable` emits
@@ -302,27 +333,26 @@ siblings; the schema-dumper subtrack is ordered.
   resolve the dsl helper. A faithful wire is the **representation-unification
   epic** below, not a single PR.
 
-### Epic 3.3-U — schema-dumper representation unification `[architectural, multi-PR]` · dep: 3.1
+### Epic 3.3-U — schema-dumper representation unification `[architectural, multi-PR]` · dep: 3.1 ✅
 
 Route live dumps through the Rails-shaped `columnSpec` hook so per-adapter
 `prepareColumnOptions` overrides take effect. Split into non-overlapping
 sibling PRs (CLAUDE.md heuristic: prep the surface, then privates follow):
 
-- **Story 3.3-U1 — TS-emittable columnSpec helpers + raw colspec formatter**
-  `[impl]` ~80 LOC · dep: none. Make the _abstract base_ dumper helpers emit
+- **Story 3.3-U1 — TS-emittable columnSpec helpers + raw colspec formatter ✅ shipped (#2826)**
+  `[impl]` ~80 LOC. Made the _abstract base_ dumper helpers emit
   directly-emittable TypeScript-DSL text (`schemaPrecision` datetime-nil
-  `"nil"`→`"null"`; `schemaExpression` `-> { … }`→`() => …`), and add a
+  `"nil"`→`"null"`; `schemaExpression` `-> { … }`→`() => …`), and added a
   Rails-faithful **raw** colspec formatter (`formatColspecRaw`, mirrors Rails
   `format_colspec` — values emitted verbatim, not re-quoted by `formatColspec`).
   `columnSpec` stays unwired (no live-output change); fully unit-verifiable on
   SQLite, no live DB. **Files: `connection-adapters/abstract/schema-dumper.ts`,
   `schema-dumper.ts` + their `*.test.ts` only** (no dialect files → no conflict
-  with sibling PG/MySQL agents). Done: `columnSpec` output, fed through
-  `formatColspecRaw`, round-trips as valid TS-DSL.
+  with sibling PG/MySQL agents).
 - **Story 3.3-U2 — AdapterSchemaSource resolves dsl-type + raw sqlType**
-  `[impl]` ~90 LOC · dep: U1. `AdapterSchemaSource.columns()` currently maps
-  `col.sqlType` into `ColumnInfo.type`. Carry the dsl cast type in `type` and
-  the raw SQL type in a new `sqlType` field so `schemaType`/`schemaLimit`/
+  `[impl]` ~90 LOC · dep: U1 ✅ (deps satisfied). `AdapterSchemaSource.columns()`
+  currently maps `col.sqlType` into `ColumnInfo.type`. Carry the dsl cast type in
+  `type` and the raw SQL type in a new `sqlType` field so `schemaType`/`schemaLimit`/
   `schemaPrecision` work on live columns. Convert **all remaining dialect
   Ruby-isms** to TS text + update their unit tests: virtual `type: :sym` /
   `size: :sym` outputs **and** `mysql/schema-dumper.ts` `schemaPrecision`
@@ -334,8 +364,11 @@ sibling PRs (CLAUDE.md heuristic: prep the surface, then privates follow):
   `spec["default"] ??= "nil"` Ruby-ism (explicit-PK-default path) → `"null"`;
   update round-trip snapshots; verify live PG/MySQL in CI (needs
   `TEST_ADAPTER=postgresql`/`mysql2`).
+- **U3 still gates:** PG serial dump logic (currently in base `emitTable`, folds
+  into PG subclass once U3 lands — #2816 finding); `comment.test.ts` dump-bearing
+  tests; `type_to_sql` unmapped-type uppercasing (#2824 finding, RISKY).
 
-### Story 3.4 — SchemaDumpingHelper port + charset-collation dump `[impl + port]` ~165 LOC · dep: 3.3
+### Story 3.4 — SchemaDumpingHelper port + charset-collation dump `[impl + port]` ~165 LOC · dep: 3.3 (Epic 3.3-U / U3)
 
 - Ours: port `SchemaDumpingHelper#dump_table_schema` (live-DB schema-dump →
   string). Then Batch 52: `charset-collation.test.ts` "schema dump includes
@@ -344,17 +377,39 @@ sibling PRs (CLAUDE.md heuristic: prep the surface, then privates follow):
 charset_collation_test.rb:79-84`.
 - Done: charset-collation + the SchemaDumpingHelper-gated schema un-skips green.
 
-### Story 3.PG-\* — PostgreSQL type families `[un-skip + impl]` ~200–250 LOC each · dep: 3.3 for dump-bearing ones
+### Story 3.PG-\* — PostgreSQL type families `[un-skip + impl]` — mostly shipped · dep: 3.3 (Epic 3.3-U) for dump-bearing ones
 
-One sibling PR per family (adapter-pg = 185 skips). Each: our
-`adapters/postgresql/<x>.test.ts` ↔ Rails
-`vendor/rails/.../test/cases/adapters/postgresql/<x>_test.rb`; impl in
-`lib/active_record/connection_adapters/postgresql/oid/<x>.rb`.
+One sibling PR per family. **adapter-pg histogram 185→173.** Per-family status:
 
-- `serial` (12, Audit-PG1), `array` (8), `hstore` (9), `range`, `interval`,
-  `uuid` (3), `money` (3), `bytea` (3), `network`/`cidr`/`inet` (Batch 132/57),
-  oid families, `timestamp` (7, reuses InTimeZone from 2.4).
-- Done per file: matched==total.
+| Family                  | Status   | Notes                                                                                                                                                               |
+| ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `serial` (12)           | ✅ #2816 | 12/12; serial dump logic in base `emitTable`, folds into PG subclass when 3.3-U3 lands                                                                              |
+| `array` (8→6)           | ✅ #2813 | un-skipped 2 + fixed insertFixture/truncate execute binds; 6 remain (serialize machinery, DDL exception translation, hstore[], TimeZone registry, timestamp[] usec) |
+| `uuid` (3)              | ✅ #2812 | un-skipped disable-joins-through; 3 remain (uuid migration + 2 legacy-migrator dump — migration framework + 3.3)                                                    |
+| `money` (3)             | ✅ #2817 | 3/3 via MoneyDecoder OID-790 wiring                                                                                                                                 |
+| `bytea` (3→6 skip)      | ✅ #2818 | un-skipped 2 via-to-sql; `serialize` remains (general write-path, see follow-up); 5 trails-invented skips have no Rails counterpart                                 |
+| `timestamp` (7)         | ✅ #2822 | un-skipped 4/6; 2 remain (`timestamp migration`, no Rails counterpart + should be deleted; `group by date`, needs fixtures framework)                               |
+| `hstore` (9)            | ✅ #2814 | un-skipped 3 DDL; 6 remain (2 permanent YAML/Marshal, 1 no-Rails-counterpart, 1 Wave-8 migration, 2 serialize-coder)                                                |
+| `network`/`cidr`/`inet` | ✅ no-op | shipped #1812/#1553; network 8/8 + cidr 3/3, zero skips. Don't re-spawn                                                                                             |
+| `range`/`multirange`    | ✅ no-op | shipped #1383 etc.; 46/46, zero skips. Don't re-spawn                                                                                                               |
+| `interval`              | ✅ no-op | shipped #1687/#1727; 7 tests, zero skips. Don't re-spawn                                                                                                            |
+| `oid` families          | ✅ no-op | entire `postgresql/` tree has zero real skips; no `oid_test.rb` in Rails. Don't re-spawn                                                                            |
+
+**Cross-cutting follow-ups surfaced by these PRs (each its own story):**
+
+- **General serialize write-path (~150–300 LOC)** — wire `Base.serialize` to
+  decorate the cast type with `Type::Serialized` (exists at `type/serialized.ts`,
+  currently unused) instead of the read-only `readAttribute` monkey-patch in
+  `serialize.ts`. Fixes dump-on-write for json/yaml/array/hash/binary at once;
+  unblocks bytea `serialize` + the 2 hstore serialize-coder skips (#2818, #2814).
+- **General pluck/calculate result type-casting (~80–150 LOC)** — `pluck` casts
+  nothing, `sum` only numerically; cast via `Result.columnTypes` (OID-based) per
+  Rails `type_cast_pluck_values`/`type_cast_calculated_value` (#2817).
+- **Fixture::FixtureError port (~30 LOC)** — `insertFixture` silently ignores
+  unknown fixture columns; Rails raises (#2813).
+- **CI gap (infra):** `adapters/postgresql/**` is NEVER run by CI (needs
+  `TEST_ADAPTER=postgresql` + live PG). All the PG un-skips above were verified
+  locally only. Worth a CI lane.
 
 ### Story 3.PG-enum — enum write-casting (`type_for_attribute` refactor) `[impl, BLOCKER #3]` >300 LOC, split · dep: none
 
@@ -366,46 +421,71 @@ One sibling PR per family (adapter-pg = 185 skips). Each: our
 - Tests: `relation` "missing with enum\*" (5), enum where-casting cases.
 - Done: string-label enum predicates cast correctly; the 5 relation enum skips green.
 
-### Story 3.MY-\* — MySQL adapter fidelity `[un-skip + impl]` ~250 LOC bundles · dep: none
+### Story 3.MY-\* — MySQL adapter fidelity `[un-skip + impl]` — partially shipped · dep: none
 
-- Ours/Rails: `adapters/abstract-mysql-adapter/*` ↔
-  `test/cases/adapters/abstract_mysql_adapter/*_test.rb`; impl
-  `mysql2-adapter.ts`, `connection-adapters/abstract_mysql_adapter.rb`.
-- Bundles: Audit-M1 `adapter-prevent-writes` (11), `case-sensitivity` (7),
-  `bind-parameter` (6), B110/B131/B49 (column-metadata + default parsing —
-  `mysql2-adapter.ts#columns` ~1082, `new_column_from_field` parity),
-  `mysql-boolean` (6), `mysql-enum` (3).
-- Done: adapter-mysql histogram bucket → near 0.
+Ours/Rails: `adapters/abstract-mysql-adapter/*` ↔
+`test/cases/adapters/abstract_mysql_adapter/*_test.rb`. **adapter-mysql
+histogram 62→45.** Per-bundle status:
 
-### Story 3.misc — generic adapter + comment `[un-skip + port]` ~250 LOC · dep: 3.3 for comment
+| Bundle                                  | Status      | Notes                                                                                                                                                                               |
+| --------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adapter-prevent-writes` (Audit-M1, 11) | ✅ #2823    | 12/12; guard on `execute`/`executeMutation`/`execQuery`                                                                                                                             |
+| `bind-parameter` (6)                    | ✅ #2815    | 10/10; adapter-level coercion (no relation-layer string-quoting at this layer)                                                                                                      |
+| `mysql-boolean` (6)                     | ✅ #2820    | 6/6; `resetColumnInformation` now clears table-scoped schema cache for all adapters                                                                                                 |
+| `mysql-enum` (3)                        | ⚠ 2/3 #2821 | end-anchored the `unsigned?` regex; 3rd ("enum with attribute") blocked on **general enum label mass-assignment** (writeAttribute bypasses the enum macro setter — NOT a MySQL gap) |
+| `case-sensitivity` (7)                  | open        | —                                                                                                                                                                                   |
+| B110/B131/B49 column-metadata           | open        | `mysql2-adapter.ts#columns`, `new_column_from_field` parity                                                                                                                         |
 
-- Ours: `adapter.test.ts` (live ~70 — split into clusters), `comment.test.ts`
-  (17, table/column comments).
-- Rails: `test/cases/adapter_test.rb`, `comment_test.rb`.
+**Follow-ups (cross-adapter, from #2823):**
+
+- ~1 LOC: PG `execQuery` override (`postgresql-adapter.ts:732`) is still unguarded
+  for prevent-writes — add `checkIfWriteQuery` to match MySQL.
+- ~5 LOC: `ReadOnlyError` message diverges from Rails (`"…while in readonly
+mode: #{sql}"`); align across PG/SQLite/MySQL.
+
+**Follow-up (from #2796):** MySQL `decimal(N,0)` now reflects as
+`DecimalWithoutScale` (precision/scale extraction fix) — may unblock/affect
+MySQL decimal expectations; scan when picking up the remaining bundles.
+
+**CI gap:** MySQL adapter tests need `TEST_ADAPTER=mysql2` + live MariaDB (port
+13306); CI does not exercise them. `mysql2-adapter.test.ts` "throws for invalid
+charset" is a pre-existing failure under MariaDB 11.8 (not introduced by #2823).
+
+### Story 3.misc — generic adapter + comment ✅ partially shipped (#2824) · dep: 3.3 (Epic 3.3-U) for comment
+
+- Un-skipped 4 `adapter_test.rb` tests (`isValidType`/`valid_type?`,
+  `tableAliasFor`/`tableAliasLength`); 18→22 matched. **~53 skips remain**,
+  clustered:
+  - **comment.test.ts (17, deferred)** — `CommentTest` gated on
+    `supports_comments?` (false on SQLite); needs live PG/MySQL **plus 3.3-U3's
+    columnSpec/dumper hook** for dump-bearing tests.
+  - **schema cluster (~6)** — `remove index when name and wrong column name` (×2,
+    needs accounts fixture + ArgumentError); exception-translation;
+    `type_to_sql for unmapped types` (RISKY — same native-type-unification as 3.3).
+  - **fixture cluster (~20)** — needs accounts/posts/subscribers/authors/Event/Book
+    fixtures wired into `adapter.test.ts`.
+  - **adapter-mysql / adapter-pg / transactions / connection-pool / query-cache**
+    clusters — blocked on their respective frameworks / `TEST_ADAPTER`.
 
 ---
 
 ## Wave 4 — connection-pool / multi-db (gated cluster, 60)
 
-### Story 4.1 — ConnectionHandler P9 port `[impl, BLOCKER #1]` ~250 LOC, split · dep: none
+### Story 4.1 — ConnectionHandler P9 port ✅ no-op (already on `main`) `[BLOCKER #1 satisfied]`
 
-- Ours: `connection-handling.ts`, `connection-adapters/connection-handler.ts`
-  surface — full `ConnectionHandler` port.
-- Rails: `lib/active_record/connection_adapters/abstract/connection_handler.rb`,
-  `…/connection_pool.rb`.
-- Unblocks: `merge-and-resolve-default-url-config.test.ts` (7), zero-arg
-  `run()` / `complete()` follow-ups (gaps doc), pool-attachment query-cache
-  tests (Wave 6).
-- Done: ConnectionHandler tests green; the 7 merge-and-resolve skips un-blocked.
+- Per `project_story_4_1_connectionhandler_already_done`: handler 23/23 +
+  merge-and-resolve skips were **already unblocked on `main`**. The full
+  `ConnectionHandler` surface is present; no PR needed. Don't re-spawn.
+- This satisfies BLOCKER #1 — Waves 4.2/4.3/6 are now dep-clear.
 
-### Story 4.2 — second named pool (ARUnit2Model) `[impl + un-skip]` ~150 LOC · dep: 4.1
+### Story 4.2 — second named pool (ARUnit2Model) `[impl + un-skip]` ~150 LOC · dep: 4.1 ✅ (deps satisfied)
 
 - Ours: add a second named connection pool to test infra (Rails' `ARUnit2Model`).
 - Rails: `test/cases/helper.rb` (`ARUnit2Model`), `multiple_db_test.rb`.
 - Unblocks: `MultiDbMigratorTest` ×7, `PrimaryClassTest` ×2,
   `multiple-db.test.ts` (11).
 
-### Story 4.3 — pool/handler file campaign `[un-skip]` ~250 LOC × N · dep: 4.1
+### Story 4.3 — pool/handler file campaign `[un-skip]` ~250 LOC × N · dep: 4.1 ✅ (deps satisfied)
 
 - Ours/Rails: `connection-adapters/connection-handler.test.ts` (11),
   `connection-pool.test.ts` (10), `connection-management.test.ts` (11),
@@ -417,14 +497,30 @@ One sibling PR per family (adapter-pg = 185 skips). Each: our
 
 ## Wave 5 — Tier 3 transactions + migration (32 + 15)
 
-### Story 5.1 — transaction callbacks + isolation `[un-skip + impl]` ~250 LOC · dep: none
+### Story 5.1 — transaction callbacks + isolation ✅ shipped (#2797)
 
-- Ours: `transaction-callbacks.test.ts` (15), `transaction-isolation.test.ts`,
-  `transaction-instrumentation.test.ts` (2), `transactions.test.ts` (1);
-  Batch 80 (`update()` calls property setters), Batch 81 (new-record rollback
-  dirty-tracking — snapshot DB-original values; **high risk**).
-- Rails: `test/cases/transaction_callbacks_test.rb`, `transactions_test.rb`;
-  impl `lib/active_record/transactions.rb`.
+- Test-only PR: un-skipped 6 Rails-faithful tests (5 in
+  `transaction-callbacks.test.ts`, 1 in `transactions.test.ts`) against the
+  existing `transactions.ts` impl. **transactions histogram 32→18.** Batch 81
+  (new-record rollback dirty-tracking) was already implemented; the 4
+  `transaction-isolation.test.ts` "skips" are adapter-capability gates, not
+  actionable.
+- **Follow-ups (each needs production work, out of 5.1 scope):**
+  - **HIGH RISK / own story** — touch → transactional commit/rollback callbacks
+    (3 tests): `timestamp.ts` `touch` builds a direct UPDATE, fires only
+    after_touch; wiring `withTransactionReturningStatus` risks regressing many
+    touch tests.
+  - **Needs ordering-flag decision** — after_commit reverse-ordering; our impl
+    runs commit callbacks in definition order (pinned by `CallbackOrderTest`);
+    `run_after_transaction_callbacks_in_order_defined=false` would conflict.
+  - **~focused PR + regression** — Batch 80 (`update()`/`updateBang()` →
+    property setters; deliberately uses a raw `writeAttribute` loop today).
+  - Plus: `belongs_to touch:true` parent callbacks; before_commit DB-write in
+    same tx; deprecated `run_commit_callbacks_on_first_saved_instances_in_transaction`
+    flag (2 tests); create-through-association; "call after rollback when commit
+    fails" (needs a test-layer commit-monkeypatch hook).
+  - 2 instrumentation skips are genuine env gaps (reconnect-with-restore;
+    in-memory SQLite can't fail rollback) — left as-is.
 
 ### Story 5.2 — migration runner `[un-skip + impl]` ~200 LOC · dep: none
 
@@ -439,7 +535,7 @@ One sibling PR per family (adapter-pg = 185 skips). Each: our
 
 ## Wave 6 — query-cache (gated on Wave 4)
 
-### Story 6.1 — query-cache un-skips `[un-skip + impl]` ~120 LOC · dep: 4.1
+### Story 6.1 — query-cache un-skips `[un-skip + impl]` ~120 LOC · dep: 4.1 ✅ (deps satisfied)
 
 - Ours: `query-cache.test.ts` (live ~25; live mixin shipped #2662/#2672/#2684).
   Remaining is per-thread architecture depending on the pool — Batch 64 wiring
@@ -459,66 +555,92 @@ the audit as the campaign's first task.
 
 ### Association infra (unblocks the campaigns)
 
-#### Story 7.1 — wire `destroyAssociations` `[impl]` ~40 LOC · dep: none
+#### Story 7.1 — wire `destroyAssociations` ✅ shipped (#2800)
 
-- Ours: `persistence.ts:1313` `destroyAssociations(this): void {}` is an **empty
-  stub**. Wire into the `destroy()` flow; then delete the HABTM `beforeDestroy`
-  bridge + `HABTM_DESTROY_INSTALLED` flag in
-  `associations/builder/has-and-belongs-to-many.ts`.
-- Rails: `lib/active_record/associations.rb` (`dependent`), HABTM destroy path.
-- Unblocks: Batch 37 HABTM structural; `habtm-destroy-order.test.ts`.
+- Wired the empty `destroyAssociations` hook into the destroy flow (mirrors
+  Rails ordering: before_destroy → destroy_associations → destroy_row); removed
+  the HABTM `beforeDestroy` bridge + `HABTM_DESTROY_INSTALLED` flag.
+  `habtm-destroy-order.test.ts` now 4/4. **Unblocks the habtm campaign.**
+- **Follow-up (~5 LOC, optional, low priority):** drop the `"delete"` alias in
+  favor of `"deleteAll"` only, to match Rails `:delete_all` naming — only worth
+  doing inside a broader `:dependent`-naming cleanup, NOT standalone.
 
-#### Story 7.2 — AliasTracker port `[impl, BLOCKER #2]` ~280 LOC, split · dep: none
+#### Story 7.2 — join-table aliasing ✅ shipped (#2808) `[BLOCKER #2 satisfied]`
 
-- Ours: port `AliasTracker` so `_addThroughAssociation` emits Rails-canonical
-  aliases (`taggings_authors_join`, …); `join-dependency.ts` consumers; add
-  schema-qualified-name helper (B35).
-- Rails: `vendor/rails/activerecord/lib/active_record/associations/alias_tracker.rb`.
-- Tests: `nested-through-associations.test.ts:1405` ("a table referenced
-  multiple times") + `:1450` ("scope on polymorphic reflection"); risk: ~30
-  currently-green nested-through join tests must stay green.
-- Unblocks: alias-naming skips across `eager`, `join-model`, `nested-through`.
+- Per `project_story_7_2_aliastracker_already_done`: the `AliasTracker` class was
+  already on `main`; the real gap was the INNER `joins()` nested-through-source
+  resolver. Fixed by routing nested-through INNER joins through `JoinDependency`
+  with `InnerJoin` (`constructJoinDependency` joinType + `_namedInnerJoins`);
+  un-skipped the 2 named nested-through tests (65/1). **Satisfies BLOCKER #2 —
+  unblocks eager / join-model / cascaded-eager / nested-through campaigns.**
+- **⚠ HIGHEST-PRIORITY FOLLOW-UP (~60 LOC, #2808 finding): the review fixes did
+  NOT land in the merged commit** (merge raced ahead of the review-response
+  commit). 5 fixes + a regression test were implemented & verified locally but
+  are absent from `main`. They share one root cause — `_namedInnerJoins` is a
+  new (4th) join store and several sites that enumerate join stores weren't
+  updated:
+  1. **(HIGH, user-visible bug)** `relation/merger.ts#mergeJoins` drops
+     `_namedInnerJoins` on the immutable `merge()` path.
+  2. `or` structural-compat omits `_namedInnerJoins` (`STRUCTURAL_FIELDS` in
+     `relation/query-methods.ts`).
+  3. `relation.ts#isEmptyScope` omits `_namedInnerJoins`.
+  4. `relation.ts#referencesEagerLoadedTables` can't see named-inner-join table
+     aliases (spurious eager-load promotion).
+  5. (defensive) unbounded recursion guard in `relation.ts#_throughChainHasNestedSource`.
+     Open one small follow-up PR with fixes 1–5 + the regression test from a fresh
+     branch off updated `main`.
+- **Follow-up (~80–150 LOC):** un-skip `"polymorphic has many through joined
+different table twice"` (1 remaining cross-arg-collision skip) — different
+  shape (two separate `joins()` args colliding on `chefs`); needs a set-level
+  collision check.
 
-#### Story 7.3 — composite-FK HMT write (Batch 20) `[impl]` ~150 LOC · dep: none
+#### Story 7.3 — composite-FK HMT write (Batch 20) ✅ shipped (#2806)
 
-- Ours: auto-derive composite FK `[shop_id, order_id]` from CPK parents.
-- Rails: `test/cases/associations/…` `Cpk::Order has_many :order_agreements`.
-- Unblocks: Batch 14 CPK `setIds`.
+- Consolidated the has_many ids-writer onto a single Rails-faithful
+  `CollectionAssociation#idsWriter` (composite-PK via per-tuple `findBy`,
+  simple-PK via one `where`+index_by; raises `RecordNotFound`). `setIds` is now a
+  thin delegate. Un-skipped 2 CPK write tests in `autosave-association.test.ts`.
+- **Follow-up (unblocked by this PR):** Batch 14 CPK `ids=`/`setIds` sweep — grep
+  for remaining CPK ids skips and un-skip those that pass.
 
-#### Story 7.4 — JoinDependency HABTM + whereBang references (Batch 74) `[impl]` ~60 LOC · dep: 7.2
+#### Story 7.4 — JoinDependency HABTM + whereBang references (Batch 74) ✅ impl pre-shipped `[impl]` · dep: 7.2 ✅ (deps satisfied)
 
-- Ours: `JoinDependency.addAssociation` returns null for `hasAndBelongsToMany` —
-  add `_addHabtmAssociation`; `query-methods.ts#whereBang` call
-  `PredicateBuilder.references(opts)` for hash args.
-- Rails: `lib/active_record/associations/join_dependency.rb`, `relation/query_methods.rb` (`where!`).
-- Unblocks: `Song.includes(:albums).where(...)` form.
+- Per `project_story_7_4_jd_habtm_wherebang_already_done`: impl already on `main`
+  (#2521 `_addThroughViaJoinAssociation` + #2608 whereBang references at
+  `query-methods.ts:774`). The test-only un-skip lands 2 Rails-mirrored HABTM
+  eager tests via canonical fixtures.
+- **Follow-up (1 deferred test):** `conditions-on-join-table` blocked by
+  `Developer.lastName` virtual-attr SELECT + unregistered `developers` fixtures.
 
-#### Story 7.5 — collection-target dedup / inverse-of (B119) `[impl]` ~120 LOC · dep: none
+#### Story 7.5 — collection-target dedup / inverse-of (B119) ✅ shipped (#2583 impl + #2811 un-skips)
 
-- Ours: `collection-association.ts` `replaceOnTarget` (~748) accept `inversing`
-  - hold `_replacedOrAddedTargets` WeakSet; dedup `<<`/`build`/`load`.
-- Rails: `lib/active_record/associations/collection_association.rb`,
-  `inverse_of` wiring.
-- Unblocks: `inverse-associations.test.ts` (23).
+- Per `project_story_7_5_collection_dedup_already_done`: the inverse-of
+  `_replacedOrAddedTargets` WeakSet dedup shipped in **#2583** on the live
+  CollectionProxy path (impl was already on `main`). Follow-up **#2811** then
+  un-skipped 5 portable `inverse-associations.test.ts` tests against it.
+  Remaining skips are other features. **Satisfies the `inverse` campaign's 7.5 dep.**
 
 ### Association + relation campaigns (audit-gated)
 
 Each row: schedule `/audit-report <slug>` → triage into ~250-LOC slots → un-skip.
-Ours ↔ Rails (`vendor/rails/activerecord/test/cases/<ruby>`):
+Ours ↔ Rails (`vendor/rails/activerecord/test/cases/<ruby>`). **As of 2026-06-02
+all four infra deps (7.1/7.2/7.4-impl/7.5) are satisfied — every "Needs 7.x" row
+below is dep-clear and ready to audit** (subject to the 7.2 review-fix follow-up
+landing for `merge()`-bearing eager cases):
 
 | Campaign         | Ours                                                        | Rails                                                       | ~skips | Needs                       |
 | ---------------- | ----------------------------------------------------------- | ----------------------------------------------------------- | -----: | --------------------------- |
-| eager            | `associations/eager.test.ts`                                | `associations/eager_test.rb`                                |     70 | 7.2, 7.4                    |
-| join-model       | `associations/join-model.test.ts`                           | `associations/join_model_test.rb`                           |     41 | 7.2; DidYouMean (B1972)     |
+| eager            | `associations/eager.test.ts`                                | `associations/eager_test.rb`                                |     70 | 7.2 ✅, 7.4 ✅              |
+| join-model       | `associations/join-model.test.ts`                           | `associations/join_model_test.rb`                           |     41 | 7.2 ✅; DidYouMean (B1972)  |
 | strict-loading   | `strict-loading.test.ts`                                    | `strict_loading_test.rb`                                    |     30 | —                           |
 | has-one          | `associations/has-one-associations.test.ts`                 | `associations/has_one_associations_test.rb`                 |     28 | fixture data folded in      |
 | relation-scoping | `scoping/relation-scoping.test.ts`                          | `scoping/relation_scoping_test.rb`                          |     28 | STI type-constraint (#1983) |
-| inverse          | `associations/inverse-associations.test.ts`                 | `associations/inverse_associations_test.rb`                 |     23 | 7.5                         |
-| habtm            | `associations/has-and-belongs-to-many-associations.test.ts` | `associations/has_and_belongs_to_many_associations_test.rb` |     23 | 7.1                         |
+| inverse          | `associations/inverse-associations.test.ts`                 | `associations/inverse_associations_test.rb`                 |     23 | 7.5 ✅                      |
+| habtm            | `associations/has-and-belongs-to-many-associations.test.ts` | `associations/has_and_belongs_to_many_associations_test.rb` |     23 | 7.1 ✅                      |
 | where            | `relation/where.test.ts`                                    | `relation/where_test.rb`                                    |     23 | polymorphic fixtures        |
-| cascaded-eager   | `associations/cascaded-eager-loading.test.ts`               | `associations/cascaded_eager_loading_test.rb`               |     18 | 7.2                         |
+| cascaded-eager   | `associations/cascaded-eager-loading.test.ts`               | `associations/cascaded_eager_loading_test.rb`               |     18 | 7.2 ✅                      |
 | has-one-through  | `associations/has-one-through-associations.test.ts`         | `associations/has_one_through_associations_test.rb`         |     16 | —                           |
-| nested-through   | `associations/nested-through-associations.test.ts`          | `associations/nested_through_associations_test.rb`          |     12 | 7.2                         |
+| nested-through   | `associations/nested-through-associations.test.ts`          | `associations/nested_through_associations_test.rb`          |     12 | 7.2 ✅                      |
 | where-chain      | `relation/where-chain.test.ts`                              | `relation/where_chain_test.rb`                              |     12 | join aliasing               |
 | callbacks        | `associations/callbacks.test.ts`                            | `associations/callbacks_test.rb`                            |     12 | —                           |
 | counter-cache    | `counter-cache.test.ts`                                     | `counter_cache_test.rb`                                     |      5 | Batch 134                   |
@@ -535,8 +657,10 @@ STI + non-preload (3, assoc track A5); `missing`-with-enum (5, → Story 3.PG-en
 1. **Wave 0** trims the target (reclassify permanent-skips; normalize tags).
 2. **Waves 2–3** are the highest mechanical yield (~280 isolated skips) and the
    safest to parallelize across agents.
-3. **Waves 4 & 7.1–7.5** clear the four architectural blockers everything else
-   waits on.
+3. **Three of the four architectural blockers are now satisfied** (#1
+   ConnectionHandler/4.1, #2 AliasTracker/7.2, #4 Arel-removal/Wave 1 Phase A);
+   **#3 `type_for_attribute` (Story 3.PG-enum) is the last one open.** The
+   Wave-7 infra stories (7.1/7.3/7.4/7.5) the campaigns wait on are also done.
 4. **Wave 7 campaigns** are the long tail (~300 association+relation skips),
    each opened by a read-only audit, executed last.
 
