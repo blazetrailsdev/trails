@@ -146,12 +146,37 @@ function isCoerceNumericTypeName(name: string | undefined): boolean {
   );
 }
 
-function buildAggNode(table: any, fn: AggFn, column: string, distinct: boolean): any {
+function buildAggNode(
+  rel: CalculationRelation,
+  table: any,
+  fn: AggFn,
+  column: string,
+  distinct: boolean,
+): any {
   const sqlName = SQL_FN_NAMES[fn];
   if (column === "*") {
     return new Nodes.NamedFunction(sqlName, [new Nodes.SqlLiteral("*")], undefined, distinct);
   }
-  const attr = table.get(column);
+  // Mirrors Rails' arel_column (query_methods.rb): the column-vs-expression
+  // decision is columns-first — a known column (after attribute-alias
+  // resolution) is always a column reference, so an unusual-but-valid name
+  // like "first name" is still quoted, never emitted as raw SQL. Only when
+  // the model has no such column do we fall through: a bare or table-qualified
+  // identifier stays a quoted reference (preserving prior behaviour), and any
+  // other string (e.g. "id * wealth") passes through as raw SQL so
+  // SUM(id * wealth) is emitted, not a quoted pseudo-column.
+  //
+  // APPROXIMATION: a qualified "table.column" resolves against the model's own
+  // table (not through join dependencies, unlike Rails' arel_column_with_table)
+  // and a schema-qualified "schema.table.column" falls through to raw SQL.
+  // Neither is exercised by current callers.
+  const aliases = (rel._modelClass as { _attributeAliases?: Record<string, string> })
+    ._attributeAliases;
+  const isColumn = isAllAttributes(rel, [column]);
+  if (!isColumn && !/^[A-Za-z_]\w*(\.[A-Za-z_]\w*)?$/.test(column)) {
+    return new Nodes.NamedFunction(sqlName, [new Nodes.SqlLiteral(column)], undefined, distinct);
+  }
+  const attr = table.get(isColumn ? (aliases?.[column] ?? column) : column);
   if (distinct) {
     return new Nodes.NamedFunction(sqlName, [attr], undefined, true);
   }
@@ -256,7 +281,7 @@ async function singleAggregate(
   // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
   rel._checkEagerLoadable();
   const table = rel._modelClass.arelTable;
-  const aggNode = buildAggNode(table, fn, column, rel._isDistinct);
+  const aggNode = buildAggNode(rel, table, fn, column, rel._isDistinct);
   const projection = aggNode.as("val");
   const manager = table.project(projection);
   rel._applyJoinsToManager(manager);
@@ -289,7 +314,7 @@ async function groupedAggregate(
   const table = rel._modelClass.arelTable;
   const groupCol = rel._groupColumns[0];
   const groupNode = groupColumnToArel(groupCol, table);
-  const aggNode = buildAggNode(table, fn, column, rel._isDistinct);
+  const aggNode = buildAggNode(rel, table, fn, column, rel._isDistinct);
   const groupKeyAlias = new Nodes.As(groupNode, new Nodes.SqlLiteral("group_key"));
   const manager = table.project(groupKeyAlias, aggNode.as("val"));
   rel._applyJoinsToManager(manager);
