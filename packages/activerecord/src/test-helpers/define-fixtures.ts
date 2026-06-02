@@ -721,17 +721,23 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   // Postgres serial sequences are NOT advanced by explicit-id inserts (unlike
   // SQLite rowids and MySQL AUTO_INCREMENT, which self-adjust), so a record
   // created after fixtures load would draw a value the fixtures already used
-  // and hit a duplicate-PK error. Mirror Rails' `reset_pk_sequence!` by syncing
-  // the `id` sequence to MAX(id) once the rows are in.
+  // and hit a duplicate-PK error. Mirror Rails' `reset_pk_sequence!`
+  // (postgresql/schema_statements.rb) by syncing the `id` sequence to MAX(id)
+  // once the rows are in. Resolve the sequence first and only `setval` when it
+  // exists — an `id` PK without a serial sequence (UUID / explicit PK) yields a
+  // NULL sequence, and `setval(NULL, …)` would raise and poison the surrounding
+  // per-test transaction (a swallowed JS catch can't un-abort it).
   if (adapter.adapterName === "postgres" && pkCol === "id") {
-    const qt = adapter.quoteTableName(tableName);
-    try {
+    const seqRows = await adapter.execute(`SELECT pg_get_serial_sequence($1, 'id') AS seq`, [
+      tableName,
+    ]);
+    const sequence = seqRows[0]?.seq as string | null | undefined;
+    if (sequence) {
+      const qt = adapter.quoteTableName(tableName);
       await adapter.executeMutation(
-        `SELECT setval(pg_get_serial_sequence($1, 'id'), GREATEST(COALESCE(MAX(id), 0), 1), COALESCE(MAX(id), 0) <> 0) FROM ${qt}`,
-        [tableName],
+        `SELECT setval($1, GREATEST(COALESCE(MAX(id), 0), 1), COALESCE(MAX(id), 0) <> 0) FROM ${qt}`,
+        [sequence],
       );
-    } catch {
-      // Table may have no serial sequence on `id` (e.g. UUID / explicit PK).
     }
   }
 
