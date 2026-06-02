@@ -2,7 +2,8 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/bytea_test.rb
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import pg from "pg";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Bytea } from "../../connection-adapters/postgresql/oid/bytea.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
@@ -233,19 +234,47 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(Buffer.from((record as any).payload as Uint8Array)).toEqual(data);
     });
 
-    it.skip("via to sql", () => {
-      // BLOCKED: adapter-pg — AR query building not wired to parameterized bytea WHERE
-      // ROOT-CAUSE: Base.where({ payload: data }).select("payload").toSql() requires
-      // Relation#toSql() to be wired; the predicate builder would need to encode
-      // Buffer values as bytea literals via quoter.quoteBinary(). Both are open gaps.
-      // SCOPE: Relation#toSql wiring + quoter.quoteBinary integration; ~50–100 LOC cross-file.
+    // Mirrors Rails' test_via_to_sql body; the "complicating connection" test
+    // re-runs it after another session disables standard_conforming_strings.
+    async function runViaToSql(): Promise<void> {
+      class ByteaDataType extends Base {
+        static tableName = "bytea_data_type";
+      }
+      await ByteaDataType.loadSchema();
+      // Rails data = "'\\" — a quote, a unit-separator, and a backslash:
+      // bytes chosen to stress SQL-literal quoting of bytea.
+      const data = Buffer.from([0x27, 0x1f, 0x5c]);
+      await (ByteaDataType as any).create({ payload: data });
+      const sql = (ByteaDataType as any).where({ payload: data }).select("payload").toSql();
+      const result = (await adapter.execute(sql)) as Array<{ payload: Uint8Array }>;
+      // Rails asserts [[data]] — a single row whose payload round-trips to data.
+      expect(result.length).toBe(1);
+      expect(Buffer.from(result[0].payload)).toEqual(data);
+    }
+
+    it("via to sql", async () => {
+      await runViaToSql();
     });
 
-    it.skip("via to sql with complicating connection", () => {
-      // BLOCKED: adapter-pg — same as "via to sql"; additionally requires session-level
-      // standard_conforming_strings=off handling which affects escape-string syntax.
-      // ROOT-CAUSE: Relation#toSql not wired + session-level PG config interplay.
-      // SCOPE: Same as "via to sql" plus session config; no additional impl needed beyond that.
+    it("via to sql with complicating connection", async () => {
+      // Rails sets these flags on a SEPARATE thread-leased connection, never on
+      // the @connection that builds/runs the query — PG's escape_bytea reads the
+      // *query* connection's standard_conforming_strings, so the off-settings are
+      // deliberately isolated from the connection under test. We mirror that: the
+      // flags go on a throwaway connection that is closed before runViaToSql, so
+      // the main `adapter` connection's quoting is what's exercised. Do NOT "fix"
+      // this by SET-ing the main connection — that would test a scenario Rails
+      // specifically avoids. The guard proves our hex `\x` bytea literals are
+      // immune to another session's string settings either way.
+      const other = new pg.Client({ connectionString: PG_TEST_URL });
+      await other.connect();
+      try {
+        await other.query("SET standard_conforming_strings = off");
+        await other.query("SET escape_string_warning = off");
+      } finally {
+        await other.end();
+      }
+      await runViaToSql();
     });
 
     it("write binary", async () => {
@@ -261,13 +290,17 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("serialize", () => {
-      // BLOCKED: adapter-pg — AR serialize :column, coder: round-trip through bytea
-      // ROOT-CAUSE: serialize() wires a coder's dump/load around attribute read/write,
-      // but Bytea#deserialize returns a Buffer (not a string) for stored binary values.
-      // A passthrough coder (dump/load identity) therefore returns a Buffer on reload
-      // instead of the original string. Needs explicit string↔Buffer codec bridging in
-      // the serialize integration when the underlying column type is binary.
-      // SCOPE: ~30 LOC in serialize.ts + bytea integration; affects bytea serialize tests.
+      // BLOCKED: serialize write-path — NOT bytea-specific.
+      // ROOT-CAUSE: Base.serialize (serialize.ts) only decorates readAttribute to
+      // run coder.load; it never dumps on write. So a saved serialized value is
+      // never encoded — it persists as NULL for ANY column type (verified on a
+      // plain string column with the json coder, not just bytea). Rails instead
+      // decorates the attribute's cast type with Type::Serialized (which wraps the
+      // subtype's serialize/deserialize), so dump-on-write and the binary string↔
+      // Buffer bridge both fall out for free. Trails already has Type::Serialized
+      // (type/serialized.ts) but Base.serialize doesn't wire it in.
+      // SCOPE: general serialize-subsystem refactor (json/yaml/array/hash + binary),
+      // a separate story — out of scope for the bytea OID family.
     });
 
     it("schema dumping", async () => {
