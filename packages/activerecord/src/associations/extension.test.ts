@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, CollectionProxy, Relation, association, registerModel } from "../index.js";
+import { Base, CollectionProxy, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { HasMany } from "./builder/has-many.js";
 
@@ -90,6 +90,26 @@ describe("AssociationsExtensionsTest", () => {
     expect(await proxy.withContent("New comment")).toBe(comment);
   });
 
+  it("extension with scopes", async () => {
+    // Mirrors `posts(:welcome).comments.offset(1).find_most_recent` and
+    // `posts(:welcome).comments.not_again.find_most_recent`: the extension
+    // method survives both a query-method spawn (`offset`) and a *named-scope*
+    // spawn (`not_again`, a Comment scope dispatched through the proxy's
+    // `scope()`). posts(:welcome).comments = [greetings(1), more_greetings(2)];
+    // find_most_recent orders id DESC, so offset(1) lands on greetings, and
+    // not_again — filtering out the "again"-bodied more_greetings — leaves only
+    // greetings.
+    const post = posts("welcome");
+    const offsetScoped = (association(post, "comments") as any).offset(1) as {
+      findMostRecent: () => Promise<Base | null>;
+    };
+    expect((await offsetScoped.findMostRecent())!.id).toBe(comments("greetings").id);
+    const namedScoped = (association(post, "comments") as any).notAgain() as {
+      findMostRecent: () => Promise<Base | null>;
+    };
+    expect((await namedScoped.findMostRecent())!.id).toBe(comments("greetings").id);
+  });
+
   // HABTM extension tests — migrated to the canonical Developer model (whose
   // `projects*` associations carry the Rails `find_most_recent` /
   // `find_least_recent` extensions) + real developers/projects/developers_projects
@@ -141,12 +161,13 @@ async function freshAdapter(): Promise<TestDatabaseAdapter> {
   return adapter;
 }
 
-// `extension with scopes` and `association with default scope` still ride
-// inline models. The former needs association `extend:` methods to survive a
-// *named-scope* spawn (`comments.not_again.find_most_recent`), which trails
-// does not yet propagate; the latter needs a Comment `OopsExtension` default
-// scope override of `destroyAll`. Both are follow-up passes, so this file
-// stays on eslint/test-fixture-parity-exclude.json until then.
+// `association with default scope` still rides inline models: it needs a
+// Comment `OopsExtension` default scope whose `destroyAll` override raises
+// `OopsError` through `posts(:welcome).comments.destroy_all`, which trails does
+// not yet propagate (relation `extending` in a default scope). That is a
+// follow-up pass, so this file stays on eslint/test-fixture-parity-exclude.json
+// until then. (`extension with scopes` migrated to canonical Post + comments
+// fixtures once `scope()` began carrying the association's `extend:` modules.)
 describe("AssociationsExtensionsTest", () => {
   let extAdapter: TestDatabaseAdapter;
 
@@ -171,44 +192,14 @@ describe("AssociationsExtensionsTest", () => {
         this.adapter = extAdapter;
       }
     }
-    const findMostRecent = {
-      // Typed as the base Relation, not CollectionProxy: this extension is
-      // also invoked on relations spawned off the proxy (e.g. after
-      // `.offset(1)`), which are plain Relations.
-      findMostRecent: async function (this: Relation<Base>) {
-        const all = await this.toArray();
-        return all[all.length - 1] ?? null;
-      },
-    };
     Associations.hasMany.call(ExtPost, "extComments", {
       foreignKey: "ext_post_id",
       className: "ExtComment",
-      extend: findMostRecent,
     });
     registerModel("ExtPost", ExtPost);
     registerModel("ExtComment", ExtComment);
     return { ExtPost, ExtComment };
   }
-
-  it("extension with scopes", async () => {
-    // Still inline: the canonical-Post port needs association `extend:`
-    // methods to survive a *named-scope* spawn (`comments.not_again.…`),
-    // which trails does not yet propagate (query-method spawns like
-    // `.offset(1)` already do). Pending that gap, this stays on bespoke
-    // models. Mirrors `posts(:welcome).comments.offset(1).find_most_recent`.
-    const { ExtPost, ExtComment } = setupExtModels();
-    const post = await ExtPost.create({ title: "scoped ext" });
-    await ExtComment.create({ body: "a", ext_post_id: post.id });
-    await ExtComment.create({ body: "b", ext_post_id: post.id });
-    const proxy = association(post, "extComments");
-    const recent = await (
-      proxy.order({ id: "asc" }).offset(1) as unknown as {
-        findMostRecent: () => Promise<{ body: string } | null>;
-      }
-    ).findMostRecent();
-    expect(recent).not.toBeNull();
-    expect(recent!.body).toBe("b");
-  });
 
   it("association with default scope", async () => {
     const { ExtPost, ExtComment } = setupExtModels();
