@@ -94,6 +94,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.addColumn("hstores", "permissions", "hstore", {
         default: '"users"=>"read", "articles"=>"write"',
       });
+      // Mirrors Rails' Hstore.reset_column_information: drop the cached
+      // reflection so loadSchema re-reads the live table with `permissions`.
+      adapter.schemaCache?.clear();
       class Hstores extends Base {
         static tableName = "hstores";
       }
