@@ -718,6 +718,23 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     throw err;
   }
 
+  // Postgres serial sequences are NOT advanced by explicit-id inserts (unlike
+  // SQLite rowids and MySQL AUTO_INCREMENT, which self-adjust), so a record
+  // created after fixtures load would draw a value the fixtures already used
+  // and hit a duplicate-PK error. Mirror Rails' `reset_pk_sequence!` by syncing
+  // the `id` sequence to MAX(id) once the rows are in.
+  if (adapter.adapterName === "postgres" && pkCol === "id") {
+    const qt = adapter.quoteTableName(tableName);
+    try {
+      await adapter.executeMutation(
+        `SELECT setval(pg_get_serial_sequence($1, 'id'), GREATEST(COALESCE(MAX(id), 0), 1), COALESCE(MAX(id), 0) <> 0) FROM ${qt}`,
+        [tableName],
+      );
+    } catch {
+      // Table may have no serial sequence on `id` (e.g. UUID / explicit PK).
+    }
+  }
+
   // Reload persisted instances so AR attribute casting is applied. Reload runs
   // `unscoped` so a model default_scope (e.g. Bulb's `where(name: "defaulty")`)
   // can't hide a just-seeded row — fixtures bypass default scopes in Rails too.

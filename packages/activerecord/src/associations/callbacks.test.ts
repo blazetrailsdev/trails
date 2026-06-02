@@ -12,13 +12,12 @@ import { withTransactionalFixtures } from "../test-helpers/with-transactional-fi
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Project } from "../test-helpers/models/project.js";
-import { Developer, AuditLog, AuditLogRequired } from "../test-helpers/models/developer.js";
+import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 
 registerModel(Project);
 registerModel(Developer);
 // Developer#before_create builds an `audit_logs` record, autosaved on create.
 registerModel(AuditLog);
-registerModel(AuditLogRequired);
 
 // ==========================================================================
 // AssociationCallbacksTest — targets associations/callbacks_test.rb
