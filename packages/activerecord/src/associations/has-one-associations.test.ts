@@ -1349,8 +1349,10 @@ describe("HasOneAssociationsTest", () => {
     // Requires enum + joins
   });
 
+  // Mirrors Rails' DestroyByParentBook/DestroyByParentAuthor: the child aborts
+  // its own destroy UNLESS destroyed_by_association is set, so the book only
+  // disappears if the has_one correctly flags it before destroying.
   it("destroyed_by_association set in child destroy callback on parent destroy", async () => {
-    let captured: unknown = undefined;
     class DbaParentAuthor extends Base {
       static {
         this._tableName = "dba_authors";
@@ -1361,8 +1363,9 @@ describe("HasOneAssociationsTest", () => {
       static {
         this._tableName = "dba_books";
         this.attribute("author_id", "integer");
+        // before_destroy :dont, unless: :destroyed_by_association
         this.beforeDestroy((record: any) => {
-          captured = record.destroyedByAssociation;
+          if (!record.destroyedByAssociation) return false;
         });
       }
     }
@@ -1377,10 +1380,6 @@ describe("HasOneAssociationsTest", () => {
     const book = await DbaParentBook.create({ author_id: author.id });
     await author.destroy();
     expect(await DbaParentBook.findBy({ id: book.id })).toBeNull();
-    // The destroyed_by_association reflection must be set while the child's
-    // own before_destroy callback runs.
-    expect(captured).not.toBeUndefined();
-    expect(captured).not.toBeNull();
   });
 
   it("destroyed_by_association set in child destroy callback on replace", async () => {
@@ -1394,6 +1393,10 @@ describe("HasOneAssociationsTest", () => {
       static {
         this._tableName = "dba_books";
         this.attribute("author_id", "integer");
+        // before_destroy :dont, unless: :destroyed_by_association
+        this.beforeDestroy((record: any) => {
+          if (!record.destroyedByAssociation) return false;
+        });
       }
     }
     Associations.hasOne.call(DbaReplAuthor, "book", {
