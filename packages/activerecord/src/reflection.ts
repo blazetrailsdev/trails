@@ -1197,6 +1197,7 @@ export class ThroughReflection extends AbstractReflection {
   private _throughReflectionCache: AssociationReflection | ThroughReflection | null | undefined =
     undefined;
   private _sourceReflectionNameCache: string | null | undefined = undefined;
+  private _klassCache: typeof Base | null = null;
 
   constructor(delegate: AssociationReflection) {
     super();
@@ -1237,11 +1238,36 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get className(): string {
-    return this.delegateReflection.className;
+    // Rails AbstractReflection#class_name:
+    //   @class_name ||= options[:class_name] || derive_class_name
+    // and ThroughReflection#derive_class_name:
+    //   options[:source_type] || source_reflection.class_name
+    // i.e. an explicit class_name wins, else resolve via the source reflection
+    // rather than the through association's own name (`noJoinsComments` would
+    // otherwise singularize to a nonexistent `NoJoinsComment`, while its source
+    // is `Comment`).
+    //
+    // The trailing `delegateReflection.className` fallback is deliberately
+    // NON-Rails: when the source can't be resolved Rails raises (nil.class_name
+    // inside derive_class_name); we instead return the delegate's own
+    // singularized name so `_klass` produces the informative "Model
+    // 'NoJoinsComment' not found" error rather than "Model '' not found". This
+    // is a best-effort error-message path, not a resolution path — it only
+    // triggers when the source genuinely can't be resolved.
+    return (
+      (this.options.className as string | undefined) ||
+      this.deriveClassName() ||
+      this.delegateReflection.className
+    );
   }
 
   get klass(): typeof Base {
-    return this._delegate.klass;
+    // Rails: @klass ||= delegate_reflection._klass(class_name), where @klass is
+    // seeded with options[:anonymous_class] in the constructor.
+    if (this._klassCache) return this._klassCache;
+    const anonymousClass = this._delegate.options.anonymousClass as typeof Base | undefined;
+    this._klassCache = anonymousClass ?? this._delegate._klass(this.className);
+    return this._klassCache;
   }
 
   isThroughReflection(): boolean {
