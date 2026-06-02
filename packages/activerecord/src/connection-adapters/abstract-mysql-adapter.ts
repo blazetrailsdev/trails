@@ -10,6 +10,7 @@
 
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
+import { isWriteQuery as mysqlIsWriteQuery } from "./mysql/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
@@ -850,6 +851,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
     return arelSql("CURRENT_TIMESTAMP(6)");
+  }
+
+  /** Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#write_query? */
+  isWriteQuery(sql: string): boolean {
+    return mysqlIsWriteQuery(sql);
   }
 
   castBoundValue(value: unknown): unknown {

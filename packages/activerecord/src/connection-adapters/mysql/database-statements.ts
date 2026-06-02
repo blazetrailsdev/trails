@@ -30,9 +30,20 @@ export interface DatabaseStatements {
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral;
 }
 
-// MySQL-specific read-query pattern.
+// MySQL-specific read-query pattern. Mirrors Rails'
+// `AbstractAdapter.build_read_query_regexp(:desc, :describe, :set, :show, :use,
+// :kill)` unioned with DEFAULT_READ_QUERY (:begin, :commit, :explain, :release,
+// :rollback, :savepoint, :select, :with). The leading group consumes any mix of
+// "(", whitespace, and SQL comments before the first keyword, so a
+// comment/paren-prefixed SELECT (e.g. a query-log-tagged read) still classifies
+// as a read.
 // Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements::READ_QUERY
-const READ_QUERY = /^\s*(SELECT|SHOW|EXPLAIN|DESCRIBE|DESC|SET|USE|KILL)\b/i;
+const COMMENT_REGEX = String.raw`(?:--.*\n)|/\*(?:[^*]|\*[^/])*\*/`;
+const READ_QUERY = new RegExp(
+  `^(?:[(\\s]|${COMMENT_REGEX})*` +
+    `(?:desc|describe|set|show|use|kill|begin|commit|explain|release|rollback|savepoint|select|with)`,
+  "i",
+);
 
 /**
  * Returns true when sql is NOT a read query (i.e., is a write).
