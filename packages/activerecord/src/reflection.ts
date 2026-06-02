@@ -1238,20 +1238,28 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get className(): string {
-    // Rails: ThroughReflection#class_name == derive_class_name
-    //   (= options[:source_type] || source_reflection.class_name).
-    // Resolve via the source reflection rather than the through association's
-    // own name — `noJoinsComments` would otherwise singularize to a
-    // nonexistent `NoJoinsComment`, while its source is `Comment`. Falls back
-    // to the delegate's class name when the source can't be resolved so error
-    // paths still report something meaningful.
-    return this.deriveClassName() || this.delegateReflection.className;
+    // Rails AbstractReflection#class_name:
+    //   @class_name ||= options[:class_name] || derive_class_name
+    // and ThroughReflection#derive_class_name:
+    //   options[:source_type] || source_reflection.class_name
+    // i.e. an explicit class_name wins, else resolve via the source reflection
+    // rather than the through association's own name (`noJoinsComments` would
+    // otherwise singularize to a nonexistent `NoJoinsComment`, while its source
+    // is `Comment`). The trailing fallback only fires when the source can't be
+    // resolved, preserving the old error message instead of an empty class name.
+    return (
+      (this.options.className as string | undefined) ||
+      this.deriveClassName() ||
+      this.delegateReflection.className
+    );
   }
 
   get klass(): typeof Base {
-    // Rails: @klass ||= delegate_reflection._klass(class_name).
+    // Rails: @klass ||= delegate_reflection._klass(class_name), where @klass is
+    // seeded with options[:anonymous_class] in the constructor.
     if (this._klassCache) return this._klassCache;
-    this._klassCache = this._delegate._klass(this.className);
+    const anonymousClass = this._delegate.options.anonymousClass as typeof Base | undefined;
+    this._klassCache = anonymousClass ?? this._delegate._klass(this.className);
     return this._klassCache;
   }
 
