@@ -527,25 +527,31 @@ export function symbolColumnToString(this: SchemaHost, name: string): string | u
 }
 
 /**
- * Drop the connection's cached reflected columns for a model's table, matching
- * the `schema_cache.clear_data_source_cache!(table_name)` step in Rails'
- * `reset_column_information`. Best-effort: a model with no established
- * connection (or no table) simply has nothing to clear.
+ * Drop the cached reflected columns for a model's table, matching the
+ * `schema_cache.clear_data_source_cache!(table_name)` step in Rails'
+ * `reset_column_information` (model_schema.rb).
+ *
+ * Resolved WITHOUT leasing a connection — Rails keeps `reset_column_information`
+ * inert (`active_connection&.`, schema_cache reached via the pool). We prefer a
+ * directly-assigned adapter (`Base.adapter=` bypasses the pool), else the
+ * pool-level schema cache; both skip `leaseConnection()`. Best-effort: a model
+ * with no pool/table simply has nothing to clear.
  */
 function clearAdapterDataSourceCache(host: SchemaHost): void {
-  let adapter: { schemaCache?: unknown } | null = null;
+  type Cache = { clearDataSourceCacheBang?: (connection: unknown, name: string) => void };
+  let cache: Cache | undefined;
   let table: string | undefined;
   try {
-    adapter = (host as unknown as { connection?: { schemaCache?: unknown } }).connection ?? null;
     table = (host as unknown as { tableName?: string }).tableName;
+    const direct = (host as unknown as { _adapter?: { schemaCache?: Cache } })._adapter;
+    cache =
+      direct?.schemaCache ??
+      (host as unknown as { schemaCache?: () => Cache | undefined }).schemaCache?.();
   } catch {
     return;
   }
-  const cache = adapter?.schemaCache as
-    | { clearDataSourceCacheBang?: (connection: unknown, name: string) => void }
-    | undefined;
   if (table && typeof cache?.clearDataSourceCacheBang === "function") {
-    cache.clearDataSourceCacheBang(adapter, table);
+    cache.clearDataSourceCacheBang(null, table);
   }
 }
 
