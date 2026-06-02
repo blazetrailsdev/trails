@@ -227,7 +227,12 @@ export class QueryLogs implements QueryTransformer {
     if (connection !== undefined && context.connection == null) {
       (context as Record<string, unknown>).connection = connection;
     }
-    const pairs: string[] = [];
+    // Collect [key, value] then sort by key, mirroring Rails' rebuild_handlers
+    // (query_logs.rb:177) `handlers.sort_by! { |(key, _)| key.to_s }` — multi-tag
+    // comments are emitted in alphabetical key order, independent of how the
+    // tags were declared. Rails sorts the handler list once at `tags=` time; we
+    // sort the resolved entries here, which yields the same ordering.
+    const entries: [string, TagValue][] = [];
     for (const tag of this._tags) {
       if (typeof tag === "string") {
         // Dispatch via the pre-built GetKeyHandler (rebuilt in `tags=`),
@@ -245,24 +250,26 @@ export class QueryLogs implements QueryTransformer {
         }
         const value = handler.call(context);
         if (value != null) {
-          pairs.push(this._formatter.format(tag, value));
+          entries.push([tag, value]);
         }
       } else if (typeof tag === "function") {
         const value = tag(context);
         if (value != null) {
-          pairs.push(this._formatter.format("custom", value));
+          entries.push(["custom", value]);
         }
       } else if (typeof tag === "object") {
         for (const [key, handler] of Object.entries(tag)) {
           const value = typeof handler === "function" ? handler(context) : handler;
           if (value != null) {
-            pairs.push(this._formatter.format(key, value));
+            entries.push([key, value]);
           }
         }
       }
     }
-    if (pairs.length === 0) return null;
-    return this._formatter.join(pairs);
+    if (entries.length === 0) return null;
+    // Bytewise key order, matching Ruby's String#<=> in sort_by!.
+    entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return this._formatter.join(entries.map(([key, value]) => this._formatter.format(key, value)));
   }
 
   /**

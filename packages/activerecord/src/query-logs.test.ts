@@ -286,17 +286,13 @@ describe("QueryLogsTest", () => {
     );
   });
 
-  // Rails' `rebuild_handlers` sorts tags by name, so the comment reads
-  // `another_proc,application,custom_proc`. trails' live `tagContent` emits tags
-  // in insertion order (alphabetical sorting is an open QueryLogs gap), so this
-  // asserts each pair is present rather than the exact ordering.
   it("multiple custom tags", async () => {
     queryLogs.tags = [
       "application",
       { custom_proc: () => "test content", another_proc: () => "more test content" },
     ];
     await assertQueriesMatch(
-      /(?=.*another_proc:more test content)(?=.*application:active_record)(?=.*custom_proc:test content)/,
+      /\/\*another_proc:more test content,application:active_record,custom_proc:test content\*\//,
       undefined,
       false,
       async () => {
@@ -305,8 +301,6 @@ describe("QueryLogsTest", () => {
     );
   });
 
-  // Order-independent: see "multiple custom tags". Verifies sqlcommenter
-  // URL-encoding of the values.
   it("sqlcommenter format value", async () => {
     queryLogs.formatter = "sqlcommenter";
     queryLogs.tags = [
@@ -314,7 +308,7 @@ describe("QueryLogsTest", () => {
       { tracestate: "congo=t61rcWkgMzE,rojo=00f067aa0ba902b7", custom_proc: () => "Joe's Shack" },
     ];
     await assertQueriesMatch(
-      /(?=.*custom_proc='Joe%27s%20Shack')(?=.*tracestate='congo%3Dt61rcWkgMzE%2Crojo%3D00f067aa0ba902b7')/,
+      /custom_proc='Joe%27s%20Shack',tracestate='congo%3Dt61rcWkgMzE%2Crojo%3D00f067aa0ba902b7'\*\//,
       undefined,
       false,
       async () => {
@@ -323,7 +317,6 @@ describe("QueryLogsTest", () => {
     );
   });
 
-  // Order-independent: see "multiple custom tags".
   it("sqlcommenter format allows string keys", async () => {
     queryLogs.formatter = "sqlcommenter";
     queryLogs.tags = [
@@ -335,7 +328,7 @@ describe("QueryLogsTest", () => {
       },
     ];
     await assertQueriesMatch(
-      /(?=.*custom_proc='Joe%27s%20Shack')(?=.*string='value')(?=.*tracestate='congo%3Dt61rcWkgMzE%2Crojo%3D00f067aa0ba902b7')/,
+      /custom_proc='Joe%27s%20Shack',string='value',tracestate='congo%3Dt61rcWkgMzE%2Crojo%3D00f067aa0ba902b7'\*\//,
       undefined,
       false,
       async () => {
@@ -399,11 +392,13 @@ describe("GetKeyHandler", () => {
     // tagContent must survive callers that mutate the live tags
     // array directly — the handler cache is populated lazily on
     // first access so we can't crash on a missing map entry.
+    // Output is alphabetical by key (action < controller), matching Rails'
+    // sorted rebuild_handlers.
     const logs = new QueryLogs();
     logs.tags = ["controller"];
     logs.tags.push("action");
     logs.updateContext({ controller: "Users", action: "index" });
-    expect(logs.tagContent()).toBe("controller:Users,action:index");
+    expect(logs.tagContent()).toBe("action:index,controller:Users");
   });
 });
 
