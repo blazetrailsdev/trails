@@ -5,6 +5,7 @@
  * Mirrors: ActiveRecord::Associations::Builder::Association
  */
 
+import { ArgumentError } from "@blazetrails/activemodel";
 import * as Reflection from "../../reflection.js";
 import { beforeDestroy } from "../../callbacks.js";
 
@@ -92,7 +93,7 @@ export class Association {
       typeof model.isDangerousAttributeMethod === "function" &&
       model.isDangerousAttributeMethod(name)
     ) {
-      throw new Error(
+      throw new ArgumentError(
         `You tried to define an association named ${name} on the model ${model.name}, but ` +
           `this will conflict with a method ${name} already defined by Active Record. ` +
           `Please choose a different association name.`,

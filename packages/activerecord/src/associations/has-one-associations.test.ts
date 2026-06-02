@@ -1,5 +1,6 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 function epochMs(v: unknown): number {
   if (v instanceof Temporal.Instant) return v.epochMilliseconds;
@@ -1182,7 +1183,7 @@ describe("HasOneAssociationsTest", () => {
       }
       expect(() => {
         Associations.hasOne.call(DangerFirm, name, { className: "Account" });
-      }).toThrow();
+      }).toThrow(ArgumentError);
     }
   });
 
