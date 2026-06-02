@@ -1197,6 +1197,7 @@ export class ThroughReflection extends AbstractReflection {
   private _throughReflectionCache: AssociationReflection | ThroughReflection | null | undefined =
     undefined;
   private _sourceReflectionNameCache: string | null | undefined = undefined;
+  private _klassCache: typeof Base | null = null;
 
   constructor(delegate: AssociationReflection) {
     super();
@@ -1237,11 +1238,21 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get className(): string {
-    return this.delegateReflection.className;
+    // Rails: ThroughReflection#class_name == derive_class_name
+    //   (= options[:source_type] || source_reflection.class_name).
+    // Resolve via the source reflection rather than the through association's
+    // own name — `noJoinsComments` would otherwise singularize to a
+    // nonexistent `NoJoinsComment`, while its source is `Comment`. Falls back
+    // to the delegate's class name when the source can't be resolved so error
+    // paths still report something meaningful.
+    return this.deriveClassName() || this.delegateReflection.className;
   }
 
   get klass(): typeof Base {
-    return this._delegate.klass;
+    // Rails: @klass ||= delegate_reflection._klass(class_name).
+    if (this._klassCache) return this._klassCache;
+    this._klassCache = this._delegate._klass(this.className);
+    return this._klassCache;
   }
 
   isThroughReflection(): boolean {

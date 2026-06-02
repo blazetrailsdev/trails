@@ -894,6 +894,46 @@ describe("ReflectionTest", () => {
     expect(ref.throughReflection).not.toBeNull();
     expect(ref.throughReflection!.name).toBe("posts");
   });
+  it("has many through reflection resolves klass via source", () => {
+    // Mirrors Rails ThroughReflection#class_name == derive_class_name:
+    // the target class comes from the source reflection, not the through
+    // association's own name. `noJoinComments` singularizes to a nonexistent
+    // `NoJoinComment`, so resolving from the name would fail; the source
+    // `trComments` → `TrComment` must win.
+    class TrAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class TrPost extends Base {
+      static {
+        this.attribute("tr_author_id", "integer");
+      }
+    }
+    class TrComment extends Base {
+      static {
+        this.attribute("tr_post_id", "integer");
+      }
+    }
+    registerModel("TrAuthor", TrAuthor);
+    registerModel("TrPost", TrPost);
+    registerModel("TrComment", TrComment);
+    Associations.hasMany.call(TrAuthor, "trPosts", {
+      className: "TrPost",
+      foreignKey: "tr_author_id",
+    });
+    Associations.hasMany.call(TrPost, "trComments", {
+      className: "TrComment",
+      foreignKey: "tr_post_id",
+    });
+    Associations.hasMany.call(TrAuthor, "noJoinComments", {
+      through: "trPosts",
+      source: "trComments",
+    });
+    const ref = reflectOnAssociation(TrAuthor, "noJoinComments") as ThroughReflection;
+    expect(ref.className).toBe("TrComment");
+    expect(ref.klass).toBe(TrComment);
+  });
   it.skip("has many through conditions when using a custom foreign key", () => {
     // BLOCKED: associations — reflection feature gap (macros / options inspection)
     // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
