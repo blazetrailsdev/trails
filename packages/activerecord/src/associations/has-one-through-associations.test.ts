@@ -930,12 +930,27 @@ describe("HasOneThroughAssociationsTest", () => {
       static {
         this._tableName = "adt_organizations";
         this.attribute("name", "string");
+        this.hasMany("adtMemberDetails", {
+          className: "AdtMemberDetail",
+          foreignKey: "organization_id",
+        });
+        this.hasMany("adtMembers", {
+          className: "AdtMember",
+          through: "adtMemberDetails",
+          source: "adtMember",
+        });
       }
     }
     class AdtMember extends Base {
       static {
         this._tableName = "members";
         this.attribute("name", "string");
+        this.hasOne("adtMemberDetail", { className: "AdtMemberDetail", foreignKey: "member_id" });
+        this.hasOne("organization", {
+          className: "AdtOrganization",
+          through: "adtMemberDetail",
+          source: "organization",
+        });
       }
     }
     class AdtMemberDetail extends Base {
@@ -944,37 +959,16 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("member_id", "integer");
         this.attribute("organization_id", "integer");
         this.attribute("extra_data", "string");
+        this.belongsTo("adtMember", { className: "AdtMember", foreignKey: "member_id" });
+        this.belongsTo("organization", {
+          className: "AdtOrganization",
+          foreignKey: "organization_id",
+        });
       }
     }
     registerModel("AdtOrganization", AdtOrganization);
     registerModel("AdtMember", AdtMember);
     registerModel("AdtMemberDetail", AdtMemberDetail);
-    Associations.hasOne.call(AdtMember, "adtMemberDetail", {
-      className: "AdtMemberDetail",
-      foreignKey: "member_id",
-    });
-    Associations.hasOne.call(AdtMember, "organization", {
-      className: "AdtOrganization",
-      through: "adtMemberDetail",
-      source: "organization",
-    });
-    Associations.belongsTo.call(AdtMemberDetail, "adtMember", {
-      className: "AdtMember",
-      foreignKey: "member_id",
-    });
-    Associations.belongsTo.call(AdtMemberDetail, "organization", {
-      className: "AdtOrganization",
-      foreignKey: "organization_id",
-    });
-    Associations.hasMany.call(AdtOrganization, "adtMemberDetails", {
-      className: "AdtMemberDetail",
-      foreignKey: "organization_id",
-    });
-    Associations.hasMany.call(AdtOrganization, "adtMembers", {
-      className: "AdtMember",
-      through: "adtMemberDetails",
-      source: "adtMember",
-    });
     const organization = await AdtOrganization.create({ name: "NSA" });
     const member = await AdtMember.create({ name: "Groucho" });
     const beforeCount = (await AdtMemberDetail.count()) as number;
@@ -1149,44 +1143,32 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("writer_type", "string");
         this.attribute("category_id", "string");
         this.attribute("author_id", "string");
+        this.belongsTo("writer", { polymorphic: true, primaryKey: "name" });
+        this.belongsTo("category", {
+          className: "PkCategory",
+          foreignKey: "category_id",
+          primaryKey: "name",
+        });
+        this.hasOne("owner", { className: "PkOwner", foreignKey: "essay_id", primaryKey: "name" });
       }
     }
     class PkAuthor extends Base {
       static {
         this._tableName = "pk_authors";
         this.attribute("name", "string");
+        this.hasOne("essay", { className: "PkEssay", primaryKey: "name", as: "writer" });
+        this.hasOne("essayCategory", {
+          className: "PkCategory",
+          through: "essay",
+          source: "category",
+        });
+        this.hasOne("essayOwner", { className: "PkOwner", through: "essay", source: "owner" });
       }
     }
     registerModel("PkCategory", PkCategory);
     registerModel("PkOwner", PkOwner);
     registerModel("PkEssay", PkEssay);
     registerModel("PkAuthor", PkAuthor);
-    Associations.belongsTo.call(PkEssay, "writer", { polymorphic: true, primaryKey: "name" });
-    Associations.belongsTo.call(PkEssay, "category", {
-      className: "PkCategory",
-      foreignKey: "category_id",
-      primaryKey: "name",
-    });
-    Associations.hasOne.call(PkEssay, "owner", {
-      className: "PkOwner",
-      foreignKey: "essay_id",
-      primaryKey: "name",
-    });
-    Associations.hasOne.call(PkAuthor, "essay", {
-      className: "PkEssay",
-      primaryKey: "name",
-      as: "writer",
-    });
-    Associations.hasOne.call(PkAuthor, "essayCategory", {
-      className: "PkCategory",
-      through: "essay",
-      source: "category",
-    });
-    Associations.hasOne.call(PkAuthor, "essayOwner", {
-      className: "PkOwner",
-      through: "essay",
-      source: "owner",
-    });
     const general = await PkCategory.create({ name: "General" });
     const david = await PkAuthor.create({ name: "David" });
     await PkEssay.create({
@@ -1227,32 +1209,32 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("writer_type", "string");
         this.attribute("category_id", "string");
         this.attribute("author_id", "string");
+        this.belongsTo("category", {
+          className: "PkCategory",
+          foreignKey: "category_id",
+          primaryKey: "name",
+        });
       }
     }
     class PkAuthor extends Base {
       static {
         this._tableName = "pk_authors";
         this.attribute("name", "string");
+        this.hasOne("essayTwo", {
+          className: "PkEssay",
+          primaryKey: "name",
+          foreignKey: "author_id",
+        });
+        this.hasOne("essayCategory2", {
+          className: "PkCategory",
+          through: "essayTwo",
+          source: "category",
+        });
       }
     }
     registerModel("PkCategory", PkCategory);
     registerModel("PkEssay", PkEssay);
     registerModel("PkAuthor", PkAuthor);
-    Associations.belongsTo.call(PkEssay, "category", {
-      className: "PkCategory",
-      foreignKey: "category_id",
-      primaryKey: "name",
-    });
-    Associations.hasOne.call(PkAuthor, "essayTwo", {
-      className: "PkEssay",
-      primaryKey: "name",
-      foreignKey: "author_id",
-    });
-    Associations.hasOne.call(PkAuthor, "essayCategory2", {
-      className: "PkCategory",
-      through: "essayTwo",
-      source: "category",
-    });
     const general = await PkCategory.create({ name: "General" });
     const david = await PkAuthor.create({ name: "David" });
     await PkEssay.create({ name: "Stay Home", author_id: "David", category_id: "General" });
@@ -1270,6 +1252,13 @@ describe("HasOneThroughAssociationsTest", () => {
       static {
         this._tableName = "ds_authors";
         this.attribute("name", "string");
+        this.hasOne("firstPost", { className: "DsPost", foreignKey: "author_id" });
+        this.hasOne("commentOnFirstPost", {
+          className: "DsComment",
+          through: "firstPost",
+          source: "dsComments",
+          scope: (rel: any) => rel.order("ds_posts.id DESC, ds_comments.id ASC"),
+        });
       }
     }
     class DsPost extends Base {
@@ -1277,6 +1266,7 @@ describe("HasOneThroughAssociationsTest", () => {
         this._tableName = "ds_posts";
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
+        this.hasMany("dsComments", { className: "DsComment", foreignKey: "post_id" });
       }
     }
     class DsComment extends Base {
@@ -1289,20 +1279,6 @@ describe("HasOneThroughAssociationsTest", () => {
     registerModel("DsAuthor", DsAuthor);
     registerModel("DsPost", DsPost);
     registerModel("DsComment", DsComment);
-    Associations.hasMany.call(DsPost, "dsComments", {
-      className: "DsComment",
-      foreignKey: "post_id",
-    });
-    Associations.hasOne.call(DsAuthor, "firstPost", {
-      className: "DsPost",
-      foreignKey: "author_id",
-    });
-    Associations.hasOne.call(DsAuthor, "commentOnFirstPost", {
-      className: "DsComment",
-      through: "firstPost",
-      source: "dsComments",
-      scope: (rel: any) => rel.order("ds_posts.id DESC, ds_comments.id ASC"),
-    });
     const david = await DsAuthor.create({ name: "David" });
     const welcome = await DsPost.create({ author_id: david.id, title: "Welcome" });
     // Two comments so the `ds_comments.id ASC` ordering is load-bearing (mirrors Rails
@@ -1439,30 +1415,24 @@ describe("HasOneThroughAssociationsTest", () => {
         this.attribute("member_id", "integer");
         this.attribute("club_id", "integer");
         this.defaultScope((rel: any) => rel.select("'1' as foo"));
+        this.belongsTo("club", { className: "CssClub", foreignKey: "club_id" });
       }
     }
     class CssMember extends Base {
       static {
         this._tableName = "css_members";
         this.attribute("name", "string");
+        this.hasOne("selectedMembership", { className: "CssMembership", foreignKey: "member_id" });
+        this.hasOne("selectedClub", {
+          className: "CssClub",
+          through: "selectedMembership",
+          source: "club",
+        });
       }
     }
     registerModel("CssClub", CssClub);
     registerModel("CssMembership", CssMembership);
     registerModel("CssMember", CssMember);
-    Associations.belongsTo.call(CssMembership, "club", {
-      className: "CssClub",
-      foreignKey: "club_id",
-    });
-    Associations.hasOne.call(CssMember, "selectedMembership", {
-      className: "CssMembership",
-      foreignKey: "member_id",
-    });
-    Associations.hasOne.call(CssMember, "selectedClub", {
-      className: "CssClub",
-      through: "selectedMembership",
-      source: "club",
-    });
     const boringClub = await CssClub.create({ name: "Boring Club" });
     const groucho = await CssMember.create({ name: "Groucho" });
     await CssMembership.create({ member_id: groucho.id, club_id: boringClub.id });
@@ -1504,31 +1474,28 @@ describe("HasOneThroughAssociationsTest", () => {
           const cur = (CcCustomerCarrier as any).currentCustomer;
           return cur ? rel.where({ customer_id: cur.id }) : rel;
         });
+        this.belongsTo("carrier", { className: "CcCarrier", foreignKey: "carrier_id" });
       }
     }
     class CcShopAccount extends Base {
       static {
         this._tableName = "cc_shop_accounts";
         this.attribute("customer_carrier_id", "integer");
+        this.belongsTo("customerCarrier", {
+          className: "CcCustomerCarrier",
+          foreignKey: "customer_carrier_id",
+        });
+        this.hasOne("carrier", {
+          className: "CcCarrier",
+          through: "customerCarrier",
+          source: "carrier",
+        });
       }
     }
     registerModel("CcCustomer", CcCustomer);
     registerModel("CcCarrier", CcCarrier);
     registerModel("CcCustomerCarrier", CcCustomerCarrier);
     registerModel("CcShopAccount", CcShopAccount);
-    Associations.belongsTo.call(CcCustomerCarrier, "carrier", {
-      className: "CcCarrier",
-      foreignKey: "carrier_id",
-    });
-    Associations.belongsTo.call(CcShopAccount, "customerCarrier", {
-      className: "CcCustomerCarrier",
-      foreignKey: "customer_carrier_id",
-    });
-    Associations.hasOne.call(CcShopAccount, "carrier", {
-      className: "CcCarrier",
-      through: "customerCarrier",
-      source: "carrier",
-    });
     const customer = await CcCustomer.create({});
     const carrier = await CcCarrier.create({});
     const customerCarrier = await CcCustomerCarrier.create({
