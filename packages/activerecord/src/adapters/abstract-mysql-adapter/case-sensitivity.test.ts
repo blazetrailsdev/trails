@@ -23,6 +23,10 @@ describeIfMysql("Mysql2Adapter", () => {
         t.string("string_ci_column", { limit: 1, collation: "utf8mb4_general_ci" });
         t.binary("binary_column", { limit: 1 });
       });
+      // Warm the schema cache so `column_for_attribute` resolves collations.
+      // A pooled connection populates this via reflection; this bare-adapter
+      // setup (`Model.adapter = adapter`, no pool) primes it explicitly.
+      adapter.schemaCache.setColumns("collation_tests", await adapter.columns("collation_tests"));
     });
     afterEach(async () => {
       await adapter.dropTable("collation_tests", { ifExists: true });

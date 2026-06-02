@@ -2015,15 +2015,7 @@ export class AbstractAdapter implements Quoting {
     name: string;
   }): Promise<import("./column.js").Column | undefined> {
     const hash = await (this.schemaCache as any).columnsHash(this.pool, attribute.relation.name);
-    if (hash) return hash[attribute.name];
-    // Pool-less adapters (test setups using `Model.adapter = adapter` rather
-    // than a connection pool) have no schema cache to consult — fall back to
-    // the adapter's own introspection.
-    if (typeof this.columns === "function") {
-      const cols = await this.columns(attribute.relation.name).catch(() => undefined);
-      return cols?.find((c) => c.name === attribute.name);
-    }
-    return undefined;
+    return hash?.[attribute.name];
   }
 
   /** @internal Mirrors: AbstractAdapter#collector */
