@@ -678,6 +678,180 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "packages/globalid/src/verifier.test.ts asserting char-class absence " +
       "rather than exact bytes.",
   },
+
+  // === TC100 Phase 0 Story H-3: residual JS-runtime-impossible skips ===
+  // These are live `it.skip` in otherwise-portable AR test files whose
+  // underlying behavior cannot exist in a single-threaded JS runtime:
+  // Ruby Marshal binary serialization, cross-version Psych/YAML schema-cache
+  // deserialization, Thread.new/Thread.kill concurrency, fork()/pid, Ruby
+  // String encoding (invalid byte sequences), plus one documented
+  // JS-vs-Ruby behavioral divergence (resolver scheme parsing). Each was
+  // source-verified against vendor/rails before reclassifying — the portable
+  // siblings in the same files stay counted.
+
+  // --- Ruby Marshal of association/extension caches ---
+  {
+    testFile: "associations/extension_test.rb",
+    tests: ["marshalling extensions", "marshalling named extensions"],
+    reason:
+      "Marshal.dump/load round-trip of an AR record carrying an extended " +
+      "association proxy (extension_test.rb:46-65). Ruby Marshal binary " +
+      "serialization has no Node.js equivalent.",
+  },
+  {
+    testFile: "associations/has_many_through_associations_test.rb",
+    tests: ["marshal dump"],
+    reason:
+      "Marshal.load(Marshal.dump(preloaded)) of a loaded has-many-through " +
+      "collection. Ruby Marshal binary serialization has no Node.js equivalent.",
+  },
+  {
+    testFile: "associations/has_one_associations_test.rb",
+    tests: ["can marshal has one association with nil target"],
+    reason:
+      "Marshal.load(Marshal.dump(firm)) of an AR record with a loaded has-one " +
+      "association cache. Ruby Marshal binary serialization has no Node.js equivalent.",
+  },
+  // --- Cross-version Psych/YAML schema-cache deserialization ---
+  {
+    testFile: "connection_adapters/schema_cache_test.rb",
+    tests: ["yaml loads 5 1 dump", "yaml loads 5 1 dump without indexes still queries for indexes"],
+    reason:
+      "Loads a fixed Rails-5.1-era YAML schema-cache dump asset and deserializes " +
+      "it via Psych (schema_cache_test.rb:124-142). Psych's Ruby-object-tagged " +
+      "YAML format and its cross-version compatibility shims have no Node.js " +
+      "equivalent; the live schema-cache JSON path is exercised by the portable " +
+      "tests in the same file.",
+  },
+  // --- Thread.new / Thread.kill / GVL concurrency ---
+  {
+    testFile: "prepared_statement_status_test.rb",
+    tests: ["prepared statement status is thread and instance specific"],
+    reason:
+      "Spawns two Ruby Threads and asserts PreparedStatementStatus is isolated " +
+      "per thread+instance via fiber-local state under the GVL " +
+      "(prepared_statement_status_test.rb:9-40). Node.js has no shared-memory " +
+      "Thread model; worker threads use isolated heaps.",
+  },
+  {
+    testFile: "transactions_test.rb",
+    tests: [
+      "transaction per thread",
+      "rollback when thread killed",
+      "connection removed from pool when thread killed in begin after successfully beginning a transaction",
+    ],
+    reason:
+      "Thread.new + Thread#kill to assert per-thread transaction isolation and " +
+      "connection-pool cleanup on thread death. Ruby Thread.kill and the " +
+      "shared-memory Thread model have no Node.js equivalent.",
+  },
+  {
+    testFile: "database_selector_test.rb",
+    tests: ["preventing writes works in a threaded environment"],
+    reason:
+      "Spawns concurrent Ruby Threads to assert write-prevention state is " +
+      "thread-isolated (database_selector_test.rb:226-244). GVL / shared-memory " +
+      "Thread semantics have no Node.js equivalent.",
+  },
+  {
+    testFile: "encryption/concurrency_test.rb",
+    reason:
+      "Encrypts/decrypts records across concurrent Ruby Threads to assert the " +
+      "encryption context is thread-local. The entire file is a Thread.new " +
+      "concurrency test with no single-threaded JS equivalent.",
+  },
+  {
+    testFile: "adapters/abstract_mysql_adapter/count_deleted_rows_with_lock_test.rb",
+    tests: ["delete and create in different threads synchronize correctly"],
+    reason:
+      "Two Ruby Threads racing a DELETE and CREATE under a row lock to assert " +
+      "MySQL-side synchronization. GVL / shared-memory Thread model has no " +
+      "Node.js equivalent.",
+  },
+  // --- Concurrent-thread deadlock detection ---
+  // Listed in both the MySQL and PostgreSQL sibling files so the shared-test
+  // detector keeps them balanced (an asymmetric exclusion would mis-flag the
+  // surviving sibling as "misplaced").
+  {
+    testFile: "adapters/abstract_mysql_adapter/nested_deadlock_test.rb",
+    tests: [
+      "deadlock correctly raises Deadlocked inside nested SavepointTransaction",
+      "deadlock inside nested SavepointTransaction is recoverable",
+    ],
+    reason:
+      "Provokes a real database deadlock by running competing transactions on " +
+      "two Ruby Threads (nested_deadlock_test.rb:36-160). A deadlock requires " +
+      "genuine concurrency; single-threaded JS cannot reproduce it.",
+  },
+  {
+    testFile: "adapters/postgresql/transaction_nested_test.rb",
+    tests: [
+      "deadlock inside nested SavepointTransaction is recoverable",
+      "deadlock raises Deadlocked inside nested SavepointTransaction",
+    ],
+    reason:
+      "Provokes a PostgreSQL deadlock across two Ruby Threads inside nested " +
+      "savepoints. A deadlock requires genuine concurrency; single-threaded JS " +
+      "cannot reproduce it.",
+  },
+  {
+    testFile: "adapters/abstract_mysql_adapter/transaction_test.rb",
+    tests: ["raises Deadlocked when a deadlock is encountered"],
+    reason:
+      "Provokes a MySQL deadlock across two Ruby Threads " +
+      "(transaction_test.rb:38-60). A deadlock requires genuine concurrency; " +
+      "single-threaded JS cannot reproduce it.",
+  },
+  {
+    testFile: "adapters/postgresql/transaction_test.rb",
+    tests: ["raises Deadlocked when a deadlock is encountered"],
+    reason:
+      "Provokes a PostgreSQL deadlock across two Ruby Threads " +
+      "(transaction_test.rb:38-50). A deadlock requires genuine concurrency; " +
+      "single-threaded JS cannot reproduce it.",
+  },
+  // --- fork() / pid ---
+  // Both the SQLite and PostgreSQL statement_pool files define this fork test;
+  // exclude both so neither surviving sibling is mis-flagged as "misplaced".
+  {
+    testFile: "adapters/sqlite3/statement_pool_test.rb",
+    tests: ["cache is per pid"],
+    reason:
+      "Forks a child process and asserts the statement cache is keyed per pid " +
+      "(statement_pool_test.rb:6-18, guarded by Process.respond_to?(:fork)). " +
+      "Process forking has no Node.js equivalent.",
+  },
+  {
+    testFile: "adapters/postgresql/statement_pool_test.rb",
+    tests: ["cache is per pid"],
+    reason:
+      "Forks a child process and asserts the statement cache is keyed per pid " +
+      "(statement_pool_test.rb:27-40, guarded by Process.respond_to?(:fork)). " +
+      "Process forking has no Node.js equivalent.",
+  },
+  // --- Ruby String encoding (invalid byte sequences) ---
+  {
+    testFile: "adapter_prevent_writes_test.rb",
+    tests: ["doesnt error when a select query has encoding errors"],
+    reason:
+      "Sends `SELECT '\\xC8'` (an invalid UTF-8 byte) and asserts the " +
+      "write-prevention regex match does not raise a Ruby " +
+      "Encoding::CompatibilityError (adapter_prevent_writes_test.rb:54-72). " +
+      "JS strings are UTF-16 with no invalid-byte-sequence concept; the " +
+      "write-prevention behavior itself is covered by the portable tests in " +
+      "the same file.",
+  },
+  // --- Documented JS-vs-Ruby divergence (workplan Wave 0) ---
+  {
+    testFile: "database_configurations/resolver_test.rb",
+    tests: ["url missing scheme"],
+    reason:
+      "DIVERGES (documented): Rails parses every string config arg as a URL and " +
+      'raises InvalidConfigurationError for a bare `"foo"`; Trails treats ' +
+      "non-URL strings as environment-name lookups (the role Ruby Symbols play " +
+      'in Rails), so `"foo"` is a missing-env lookup, not a malformed URL. ' +
+      "See packages/activerecord/src/database-configurations/resolver.test.ts.",
+  },
 ];
 
 export function isSourceUnported(file: string, pkg?: string): boolean {
