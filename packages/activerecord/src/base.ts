@@ -1034,10 +1034,13 @@ export class Base extends Model {
    * Lazily reflect the schema from the configured adapter the first time
    * the query/persistence path needs it, so consumers can drop the
    * explicit `loadSchema` step. Only reflects when the model has no
-   * attribute definitions yet — a model that declared attributes (via
-   * `attribute()`) or already reflected once knows its schema, so this is
-   * a no-op for it (matching the pre-lazy-reflection behavior and avoiding
-   * a needless schema round-trip on the hot query path). Idempotent.
+   * *concrete* (non-virtual) attribute definitions yet — a model that
+   * declared a real `attribute()` or already reflected once knows its schema,
+   * so this is a no-op for it (matching the pre-lazy-reflection behavior and
+   * avoiding a needless schema round-trip on the hot query path). A model
+   * whose only declared attributes are virtual (Rails' `attribute :foo` on an
+   * ignored column) still reflects, since it relies on the schema for its real
+   * columns. Idempotent.
    *
    * Async analogue of Rails' synchronous `method_missing` schema load —
    * queries are already async, so awaiting here is fully contained. The
