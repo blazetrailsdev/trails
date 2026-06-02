@@ -416,6 +416,7 @@ export function flattenIncludedMethodInfos(
   entityFqn: string,
   rubyPkg: PackageInfo,
   moduleFqnByShort: Map<string, string[]>,
+  pkg?: string,
 ): { instance: MethodInfo[]; klass: MethodInfo[] } {
   const instance: MethodInfo[] = [...entity.instanceMethods];
   const klass: MethodInfo[] = [...entity.classMethods];
@@ -428,6 +429,12 @@ export function flattenIncludedMethodInfos(
       visited.add(fqn);
       const mod = rubyPkg.modules[fqn] as unknown as ClassInfo | undefined;
       if (!mod) continue;
+      // A module whose source file we've explicitly declined to port should
+      // not contribute its methods to includers either — otherwise an
+      // unported mixin (e.g. Railties::ControllerRuntime, included into
+      // ActionController via an `on_load` block, not into Railtie itself)
+      // leaks expected methods onto the host. See UNPORTED_FILES.
+      if (mod.file && isSourceUnported(mod.file, pkg)) continue;
       const sink = asClassMethods ? klass : instance;
       for (const m of mod.instanceMethods) sink.push(m);
       for (const inc of mod.includes ?? []) walk(inc, asClassMethods, fqn);
@@ -948,7 +955,7 @@ function main() {
       // `invert`). Count once.
       const seen = new Map<string, { rubyName: string; rubyModule: string }>();
       for (const item of items) {
-        const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort);
+        const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
         for (const rm of rubyMethods) {
           if (!methodMatchesMode(rm)) continue;

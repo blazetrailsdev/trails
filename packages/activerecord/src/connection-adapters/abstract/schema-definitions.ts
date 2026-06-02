@@ -120,7 +120,15 @@ export class ForeignKeyDefinition {
   }
 
   get isCustomPrimaryKey(): boolean {
-    return this.primaryKey !== "id";
+    return this.primaryKey !== this.defaultPrimaryKey;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition#default_primary_key
+   * @internal
+   */
+  get defaultPrimaryKey(): string {
+    return "id";
   }
 
   get isValidate(): boolean {

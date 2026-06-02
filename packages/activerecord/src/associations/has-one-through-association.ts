@@ -86,9 +86,7 @@ async function createThroughRecord(
 ): Promise<Base | null> {
   ensureNotNested(assoc);
 
-  const throughName = assoc.reflection.options.through as string | undefined;
-  if (!throughName) return null;
-  const throughProxy = (assoc.owner as any).association?.(throughName);
+  const throughProxy = throughAssociation(assoc);
   if (!throughProxy) return null;
 
   let throughRecord = await throughProxy.loadTarget?.();
@@ -170,6 +168,20 @@ function throughReflection(assoc: HasOneThroughAssociation): unknown {
     refl = refl.throughReflection;
   }
   return refl;
+}
+
+/**
+ * Returns the live Association wrapper that owns the join model — i.e.,
+ * `owner.association(throughReflection.name)`.
+ *
+ * Mirrors: ActiveRecord::Associations::ThroughAssociation#through_association
+ *
+ * @internal
+ */
+function throughAssociation(assoc: HasOneThroughAssociation): any {
+  const tr = throughReflection(assoc) as { name?: string } | null;
+  if (!tr?.name) return null;
+  return (assoc.owner as any).association?.(tr.name);
 }
 
 /**

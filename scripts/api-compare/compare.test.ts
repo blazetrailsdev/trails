@@ -414,6 +414,34 @@ describe("flattenIncludedMethodInfos", () => {
     expect(f.instance.map((m) => m.name)).toEqual(["first"]);
   });
 
+  it("skips included modules whose source file is unported", () => {
+    // A module we've explicitly declined to port (matches an UNPORTED_FILES
+    // pattern) must not leak its methods onto includers. Mirrors
+    // Railties::ControllerRuntime — included into ActionController via an
+    // `on_load` block, not into Railtie — which otherwise leaked
+    // `initialize`/`process_action` onto the Railtie host.
+    const ported = mod("Ported", ["keep_me"]);
+    const unported = mod("Promise", ["value", "then"]); // file: promise.rb (unported)
+    const host: ClassInfo = {
+      name: "Host",
+      file: "host.rb",
+      includes: ["Ported", "Promise"],
+      extends: [],
+      instanceMethods: [im("own")],
+      classMethods: [],
+    };
+    const pkg: PackageInfo = {
+      classes: {},
+      modules: { Ported: ported, Promise: unported },
+    };
+    const byShort = new Map([
+      ["Ported", ["Ported"]],
+      ["Promise", ["Promise"]],
+    ]);
+    const f = flattenIncludedMethodInfos(host, "Host", pkg, byShort, "activerecord");
+    expect(f.instance.map((m) => m.name).sort()).toEqual(["keep_me", "own"]);
+  });
+
   it("guards against include cycles between modules", () => {
     const a = mod("A", ["a1"], ["B"]);
     const b = mod("B", ["b1"], ["A"]);
