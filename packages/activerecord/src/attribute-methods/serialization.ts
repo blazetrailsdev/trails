@@ -53,8 +53,12 @@ export class ColumnSerializer {
   }
 }
 
-/** @internal */
-function isTypeIncompatibleWithSerialize(
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::Serialization::ClassMethods#type_incompatible_with_serialize?
+ *
+ * @internal
+ */
+export function isTypeIncompatibleWithSerialize(
   castType: unknown,
   coder: unknown,
   type: unknown,

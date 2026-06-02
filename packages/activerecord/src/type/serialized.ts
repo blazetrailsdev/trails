@@ -1,5 +1,22 @@
 import { Type, ValueType, BinaryData } from "@blazetrails/activemodel";
 
+/**
+ * Structural JSON key used to compare a value against the coder's default.
+ * Unwraps objects that expose `toHash()` (the HashWithIndifferentAccess
+ * interface) so their contents — not their Map-backed internal shape — drive
+ * the comparison. Mirrors Rails comparing `value == coder.load(nil)` by value
+ * rather than by identity/`JSON.stringify`.
+ *
+ * @internal
+ */
+function canonicalKey(value: unknown): string {
+  return JSON.stringify(value, (_k, v) =>
+    v && typeof v === "object" && typeof (v as { toHash?: unknown }).toHash === "function"
+      ? (v as { toHash(): unknown }).toHash()
+      : v,
+  );
+}
+
 export interface Coder {
   dump(value: unknown): string | null;
   load(value: unknown): unknown;
@@ -29,7 +46,7 @@ export class Serialized extends ValueType {
     this._defaultValue = coder.load(null);
     if (typeof this._defaultValue === "object" && this._defaultValue !== null) {
       try {
-        this._defaultValueJson = JSON.stringify(this._defaultValue);
+        this._defaultValueJson = canonicalKey(this._defaultValue);
       } catch {
         this._defaultValueJson = undefined;
       }
@@ -47,7 +64,16 @@ export class Serialized extends ValueType {
   }
 
   cast(value: unknown): unknown {
-    return this.deserialize(value);
+    // A string (or null) is treated as an already-encoded payload and
+    // deserialized directly. A structured value (Hash/Array/coder object) is
+    // round-tripped through the coder — `deserialize(serialize(value))` — so
+    // assigning e.g. a class-coder instance loads back through the coder.
+    // Mirrors ActiveModel::Type::Helpers::Mutable#cast for the structured case
+    // while still accepting pre-serialized string assignments.
+    if (value === null || value === undefined || typeof value === "string") {
+      return this.deserialize(value);
+    }
+    return this.deserialize(this.serialize(value));
   }
 
   serialize(value: unknown): unknown {
@@ -91,7 +117,7 @@ export class Serialized extends ValueType {
       return this._defaultValue === null || this._defaultValue === undefined;
     if (typeof value === "object" && this._defaultValueJson !== undefined) {
       try {
-        return JSON.stringify(value) === this._defaultValueJson;
+        return canonicalKey(value) === this._defaultValueJson;
       } catch {
         return false;
       }
@@ -116,7 +142,7 @@ export function encoded(serialized: Serialized, value: unknown): unknown {
   if (value === defaultVal) return undefined;
   if (typeof value === "object" && value !== null && s._defaultValueJson !== undefined) {
     try {
-      if (JSON.stringify(value) === s._defaultValueJson) return undefined;
+      if (canonicalKey(value) === s._defaultValueJson) return undefined;
     } catch {
       // non-serializable; treat as non-default
     }

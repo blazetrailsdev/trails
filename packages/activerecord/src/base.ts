@@ -1551,7 +1551,7 @@ export class Base extends Model {
    */
   static serialize(
     attribute: string,
-    options?: { coder?: unknown; type?: "Array" | "Hash" },
+    options?: { coder?: unknown; type?: "Array" | "Hash" | (new (...args: any[]) => any) },
   ): void {
     _serializeAttribute(this, attribute, options as any);
   }

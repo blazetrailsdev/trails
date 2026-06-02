@@ -12,7 +12,21 @@ import { SchemaDumper } from "../../schema-dumper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
-import { Base } from "../../index.js";
+import { Base, serialize } from "../../index.js";
+
+// Rails: TagCollection class-coder (load/dump) used by the serialize tests.
+class TagCollection {
+  constructor(private readonly hash: Record<string, string | null>) {}
+  toHash(): Record<string, string | null> {
+    return this.hash;
+  }
+  static load(hash: unknown): TagCollection {
+    return new TagCollection((hash ?? {}) as Record<string, string | null>);
+  }
+  static dump(value: unknown): unknown {
+    return value instanceof TagCollection ? value.toHash() : value;
+  }
+}
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -66,6 +80,18 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
     await HstoreWithAccessors.loadSchema();
     return HstoreWithAccessors;
+  }
+
+  async function freshSerializeModel(a: PostgreSQLAdapter): Promise<any> {
+    class HstoreWithSerialize extends Base {
+      static tableName = "hstores";
+      static {
+        this.adapter = a;
+      }
+    }
+    await HstoreWithSerialize.loadSchema();
+    serialize(HstoreWithSerialize, "tags", { coder: TagCollection });
+    return HstoreWithSerialize;
   }
 
   async function assertArrayCycle(array: Array<Record<string, string | null>>): Promise<void> {
@@ -583,16 +609,21 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(parseHstore(serializeHstore(input))).toEqual(input);
     });
 
-    it.skip("hstore with serialized attributes", () => {
-      // BLOCKED: serialization — serialize-coder: Base.serialize({ coder: ... }) not implemented
-      // ROOT-CAUSE: Rails wraps the hstore attribute with a coder that implements .load/.dump;
-      //   Base.serialize(col, coder:) in base.ts does not wire the encode/decode lifecycle.
-      // SCOPE: ~50 LOC in base.ts serialize decorator + integration with attribute-set lifecycle.
+    it("hstore with serialized attributes", async () => {
+      // Rails: serialize :tags, coder: TagCollection wraps the hstore type with
+      // a class-coder; create + reload round-trips through Type::Serialized.
+      const HstoreWithSerialize = await freshSerializeModel(adapter);
+      await HstoreWithSerialize.createBang({ tags: new TagCollection({ one: "two" }) });
+      const record = await HstoreWithSerialize.first();
+      expect(record.tags).toBeInstanceOf(TagCollection);
+      expect((record.tags as TagCollection).toHash()).toEqual({ one: "two" });
     });
-    it.skip("clone hstore with serialized attributes", () => {
-      // BLOCKED: serialization — serialize-coder: same as "hstore with serialized attributes"
-      // ROOT-CAUSE: dup/clone of a coder-wrapped hstore also needs the coder path wired.
-      // SCOPE: Unblocked automatically once "hstore with serialized attributes" passes.
+    it("clone hstore with serialized attributes", async () => {
+      const HstoreWithSerialize = await freshSerializeModel(adapter);
+      await HstoreWithSerialize.createBang({ tags: new TagCollection({ one: "two" }) });
+      const record = await HstoreWithSerialize.first();
+      const dupe = record.dup();
+      expect((dupe.tags as TagCollection).toHash()).toEqual({ one: "two" });
     });
     it.skip("supports to unsafe h values", () => {
       // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — protected-params
