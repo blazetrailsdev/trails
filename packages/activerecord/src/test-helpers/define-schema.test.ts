@@ -331,6 +331,29 @@ describe("defineSchema", () => {
       const rows = await adapter.execute(`SELECT * FROM "items"`);
       expect(rows).toHaveLength(0);
     });
+
+    it("dropExisting with mismatched schema still drops and recreates", async () => {
+      await defineSchema(adapter, { items: { name: "string" } });
+      await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('old')`);
+
+      const spy = vi.spyOn(adapter, "executeMutation");
+      // Different schema: add a column → cannot reuse existing table.
+      await defineSchema(
+        adapter,
+        { items: { name: "string", count: "integer" } },
+        { dropExisting: true },
+      );
+
+      const { creates, drops } = ddlCounts(spy.mock.calls.map((c) => c[0] as string));
+      expect(drops).toBeGreaterThanOrEqual(1);
+      expect(creates).toBeGreaterThanOrEqual(1);
+      // Table is empty and the new column is present (INSERT succeeds).
+      const rows = await adapter.execute(`SELECT * FROM "items"`);
+      expect(rows).toHaveLength(0);
+      await expect(
+        adapter.executeMutation(`INSERT INTO "items" ("name","count") VALUES ('new',42)`),
+      ).resolves.toBeDefined();
+    });
   });
 
   it("dropExisting drops first then creates", async () => {
