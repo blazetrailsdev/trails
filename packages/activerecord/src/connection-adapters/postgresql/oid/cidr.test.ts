@@ -46,8 +46,8 @@ describe("PostgreSQL::OID::Cidr", () => {
     expect(type.castValue("::1")?.address).toBe("::1");
     expect(type.castValue("::")?.address).toBe("::");
     expect(type.castValue("0:0:0:0:0:0:0:0")?.address).toBe("::");
-    // IPv4-tailed forms convert to all-hex (Ruby IPAddr#to_s behavior).
-    expect(type.castValue("::ffff:192.168.0.1")?.address).toBe("::ffff:c0a8:1");
+    // IPv4-tailed forms are kept in mixed notation (PG + Ruby IPAddr#to_s behavior).
+    expect(type.castValue("::ffff:192.168.0.1")?.address).toBe("::ffff:192.168.0.1");
     // Single zero groups are not compressed (RFC 5952: run must be ≥ 2).
     expect(type.castValue("2001:db8:0:1:1:1:1:1")?.address).toBe("2001:db8:0:1:1:1:1:1");
   });
