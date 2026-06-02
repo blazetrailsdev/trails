@@ -6,9 +6,16 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { defineSchema } from "../test-helpers/define-schema.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
+import { Categorization } from "../test-helpers/models/categorization.js";
+import { Category } from "../test-helpers/models/category.js";
 
 describe("CascadedEagerLoadingTest", () => {
   setupHandlerSuite();
@@ -31,18 +38,6 @@ describe("CascadedEagerLoadingTest", () => {
     });
   });
 
-  it.skip("eager association loading with cascaded two levels", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
-  });
-  it.skip("eager association loading with cascaded two levels and one level", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
-  });
   it.skip("eager association loading with hmt does not table name collide when joining associations", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
@@ -104,24 +99,6 @@ describe("CascadedEagerLoadingTest", () => {
     expect(authors.length).toBe(1);
     const children = (authors[0] as any)._preloadedAssociations?.get("enChildren") ?? [];
     expect(children.length).toBe(0);
-  });
-  it.skip("eager association loading with cascaded two levels with two has many associations", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
-  });
-  it.skip("eager association loading with cascaded two levels and self table reference", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
-  });
-  it.skip("eager association loading with cascaded two levels with condition", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
   });
   it.skip("eager association loading with cascaded three levels by ping pong", () => {
     // BLOCKED: associations — eager-loading feature gap
@@ -336,12 +313,6 @@ describe("CascadedEagerLoadingTest", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
-  it.skip("eager association loading with cascaded interdependent one level and two levels", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
-    /* fixture-dependent */
-  });
   it("preloaded records are not duplicated", async () => {
     class PDAuthor extends Base {
       static {
@@ -383,5 +354,128 @@ describe("CascadedEagerLoadingTest", () => {
     // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
+  });
+});
+
+// ==========================================================================
+// CascadedEagerLoadingTest (canonical fixtures) — the cascaded Author → posts →
+// comments / categorizations tests use the canonical Author/Post/Comment/
+// Categorization models + real authors/posts/comments/categorizations fixtures,
+// so they need the fixture-backed handler suite (mirrors EagerAssociationTest in
+// eager.test.ts). The block above declares ad-hoc per-test models against a
+// local synthetic schema.
+// ==========================================================================
+describe("CascadedEagerLoadingTest", () => {
+  const { authors } = useHandlerFixtures([
+    "authors",
+    "posts",
+    "comments",
+    "categorizations",
+    "categories",
+  ]);
+  // Force-recreate the canonical tables with `dropExisting` (mirrors
+  // named-scoping.test.ts / EagerAssociationTest). The per-worker SQLite DB is
+  // shared across files, and sibling files define a `posts` table without the
+  // columns these fixtures seed; the signature cache is primed at worker boot,
+  // so a plain `defineSchema` would cache-hit and skip recreation.
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection as Parameters<typeof defineSchema>[0],
+      {
+        authors: canonicalSchema.authors,
+        posts: canonicalSchema.posts,
+        comments: canonicalSchema.comments,
+        categorizations: canonicalSchema.categorizations,
+        categories: canonicalSchema.categories,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Author);
+  registerModel(Post);
+  registerModel(Comment);
+  registerModel(Categorization);
+  registerModel(Category);
+
+  const targetArr = (rec: Base, name: string): Base[] =>
+    (rec.association(name).target as Base[]) ?? [];
+  const commentCount = (posts: Base[]): number =>
+    posts.reduce((sum, p) => sum + targetArr(p, "comments").length, 0);
+
+  it("eager association loading with cascaded two levels", async () => {
+    // Rails uses `.order(:id)` here (rb:21); the preload path queries only the
+    // authors table, so the bare `id` is unambiguous — mirrors the symbol form.
+    const loaded = await Author.all().includes({ posts: "comments" }).order("id").toArray();
+    expect(loaded).toHaveLength(3);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
+    expect(targetArr(loaded[1], "posts")).toHaveLength(3);
+    expect(commentCount(targetArr(loaded[0], "posts"))).toBe(11);
+  });
+
+  it("eager association loading with cascaded two levels and one level", async () => {
+    // Rails uses `.order(:id)` here (rb:29); preload queries only authors, so
+    // the bare `id` is unambiguous — mirrors the symbol form.
+    const loaded = await Author.all()
+      .includes({ posts: "comments" }, "categorizations")
+      .order("id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
+    expect(targetArr(loaded[1], "posts")).toHaveLength(3);
+    expect(commentCount(targetArr(loaded[0], "posts"))).toBe(11);
+    expect(targetArr(loaded[0], "categorizations")).toHaveLength(1);
+    expect(targetArr(loaded[1], "categorizations")).toHaveLength(2);
+  });
+
+  it("eager association loading with cascaded two levels with two has many associations", async () => {
+    const loaded = await Author.all()
+      .includes({ posts: ["comments", "categorizations"] })
+      .order("authors.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
+    expect(targetArr(loaded[1], "posts")).toHaveLength(3);
+    expect(commentCount(targetArr(loaded[0], "posts"))).toBe(11);
+  });
+
+  it("eager association loading with cascaded two levels and self table reference", async () => {
+    const loaded = await Author.all()
+      .includes({ posts: ["comments", "author"] })
+      .order("authors.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
+    expect((loaded[0] as any).name).toBe((authors("david") as any).name);
+    const postAuthorNames = new Set(
+      targetArr(loaded[0], "posts").map((p) => (p.association("author").target as any)?.name),
+    );
+    expect([...postAuthorNames]).toEqual([(authors("david") as any).name]);
+  });
+
+  it("eager association loading with cascaded two levels with condition", async () => {
+    const loaded = await Author.all()
+      .includes({ posts: "comments" })
+      .where("authors.id=1")
+      .order("authors.id")
+      .toArray();
+    expect(loaded).toHaveLength(1);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
+  });
+
+  it("eager association loading with cascaded interdependent one level and two levels", async () => {
+    const loaded = await Author.all()
+      .includes("comments", { posts: "categorizations" })
+      .order("authors.id")
+      .toArray();
+    expect(loaded).toHaveLength(3);
+    expect(targetArr(loaded[0], "comments")).toHaveLength(11);
+    expect(targetArr(loaded[1], "comments")).toHaveLength(1);
+    expect(targetArr(loaded[0], "posts")).toHaveLength(5);
+    expect(targetArr(loaded[1], "posts")).toHaveLength(3);
+    const catSum = targetArr(loaded[0], "posts").reduce(
+      (sum, p) => sum + targetArr(p, "categorizations").length,
+      0,
+    );
+    expect(catSum).toBe(3);
   });
 });
