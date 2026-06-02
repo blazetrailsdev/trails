@@ -95,6 +95,18 @@ const TEST_SCHEMA = {
     cpk_club2_region_id: "integer",
     cpk_club2_id: "integer",
   },
+  mv_minivans: {
+    columns: { minivan_id: "string", name: "string", speedometer_id: "string" },
+    primaryKey: ["minivan_id"],
+  },
+  mv_speedometers: {
+    columns: { speedometer_id: "string", name: "string", dashboard_id: "string" },
+    primaryKey: ["speedometer_id"],
+  },
+  mv_dashboards: {
+    columns: { dashboard_id: "string", name: "string" },
+    primaryKey: ["dashboard_id"],
+  },
 } satisfies Schema;
 
 describe("HasOneThroughAssociationsTest", () => {
@@ -892,8 +904,65 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(loaded).toBeNull();
   });
 
-  it.skip("value is properly quoted", () => {
-    // BLOCKED: fixture — Minivan / Dashboard / Speedometer fixture models not defined in test suite
+  it("value is properly quoted", async () => {
+    // Minivan has a string primary key ("m1"); has_one :dashboard, through: :speedometer
+    // must quote that string value correctly in the through query.
+    class MvDashboard extends Base {
+      static {
+        this._tableName = "mv_dashboards";
+        this.primaryKey = "dashboard_id";
+        this.attribute("dashboard_id", "string");
+        this.attribute("name", "string");
+      }
+    }
+    class MvSpeedometer extends Base {
+      static {
+        this._tableName = "mv_speedometers";
+        this.primaryKey = "speedometer_id";
+        this.attribute("speedometer_id", "string");
+        this.attribute("name", "string");
+        this.attribute("dashboard_id", "string");
+      }
+    }
+    class MvMinivan extends Base {
+      static {
+        this._tableName = "mv_minivans";
+        this.primaryKey = "minivan_id";
+        this.attribute("minivan_id", "string");
+        this.attribute("name", "string");
+        this.attribute("speedometer_id", "string");
+      }
+    }
+    registerModel(MvDashboard);
+    registerModel(MvSpeedometer);
+    registerModel(MvMinivan);
+    Associations.belongsTo.call(MvSpeedometer, "dashboard", {
+      className: "MvDashboard",
+      foreignKey: "dashboard_id",
+    });
+    Associations.belongsTo.call(MvMinivan, "speedometer", {
+      className: "MvSpeedometer",
+      foreignKey: "speedometer_id",
+    });
+    Associations.hasOne.call(MvMinivan, "dashboard", {
+      className: "MvDashboard",
+      through: "speedometer",
+      source: "dashboard",
+    });
+
+    await MvDashboard.create({ dashboard_id: "d1", name: "my_dashboard" });
+    await MvSpeedometer.create({
+      speedometer_id: "s1",
+      name: "my_speedometer",
+      dashboard_id: "d1",
+    });
+    await MvMinivan.create({ minivan_id: "m1", name: "my_minivan", speedometer_id: "s1" });
+
+    const minivan = await MvMinivan.find("m1");
+    // The point of the Rails test: loading must not raise (string PK quoting).
+    const dashboard = await minivan.loadHasOne("dashboard");
+    expect(dashboard).not.toBeNull();
+    expect((dashboard as any).name).toBe("my_dashboard");
   });
 
   it.skip("has one through polymorphic with primary key option", () => {
