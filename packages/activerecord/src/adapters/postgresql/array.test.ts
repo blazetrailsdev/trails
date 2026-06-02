@@ -97,15 +97,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       await PgArraySerialized.loadSchema();
       serialize(PgArraySerialized, "tags", { coder: MyTags });
 
-      await PgArraySerialized.create({ tags: new MyTags(["one", "two", "three"]) } as any);
+      await PgArraySerialized.create({ tags: new MyTags(["one", "two"]) } as any);
       const record = (await PgArraySerialized.first())!;
       expect(record.tags).toBeInstanceOf(MyTags);
-      expect((record.tags as MyTags).toArray()).toEqual(["one", "two", "three"]);
+      expect((record.tags as MyTags).toArray()).toEqual(["one", "two"]);
 
-      (record as any).tags = new MyTags(["four", "five"]);
+      (record as any).tags = new MyTags(["three", "four"]);
       await record.save();
-      const reloaded = (await PgArraySerialized.first())!;
-      expect((reloaded.tags as MyTags).toArray()).toEqual(["four", "five"]);
+      await (record as any).reload();
+      expect((record.tags as MyTags).toArray()).toEqual(["three", "four"]);
     });
     it("default", async () => {
       await adapter.addColumn("pg_arrays", "score", "integer", { array: true, default: [4, 4, 2] });

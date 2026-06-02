@@ -1,12 +1,33 @@
 import { Type, ValueType, BinaryData } from "@blazetrails/activemodel";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { IndifferentHashAccessor } from "../store.js";
+
+/**
+ * Whether a value is compared against the coder default by structural value
+ * rather than identity. Rails' `default_value?` is `value == coder.load(nil)`:
+ * built-in collection defaults (`Array`/`Hash`, and our store's
+ * `HashWithIndifferentAccess`) have value-based `==`, but an arbitrary coder
+ * object (e.g. a custom class coder's `object_class` instance) has no `==` and
+ * so falls back to identity. We mirror that — only plain arrays/objects and
+ * HWIA are value-compared; everything else uses reference equality.
+ *
+ * @internal
+ */
+function isValueComparable(value: unknown): boolean {
+  if (Array.isArray(value)) return true;
+  if (value instanceof HashWithIndifferentAccess) return true;
+  if (value !== null && typeof value === "object") {
+    const proto = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
+  }
+  return false;
+}
 
 /**
  * Structural JSON key used to compare a value against the coder's default.
  * Unwraps objects that expose `toHash()` (the HashWithIndifferentAccess
  * interface) so their contents — not their Map-backed internal shape — drive
- * the comparison. Mirrors Rails comparing `value == coder.load(nil)` by value
- * rather than by identity/`JSON.stringify`.
+ * the comparison.
  *
  * @internal
  */
@@ -45,7 +66,7 @@ export class Serialized extends ValueType {
     this.subtype = subtype;
     this.coder = coder;
     this._defaultValue = coder.load(null);
-    if (typeof this._defaultValue === "object" && this._defaultValue !== null) {
+    if (isValueComparable(this._defaultValue)) {
       try {
         this._defaultValueJson = canonicalKey(this._defaultValue);
       } catch {

@@ -21,8 +21,16 @@ export interface Serialization {
  * Mirrors: ActiveRecord::AttributeMethods::Serialization::ColumnNotSerializableError
  */
 export class ColumnNotSerializableError extends Error {
-  constructor(attributeName: string) {
-    super(`Column \`${attributeName}\` of type binary is not serializable.`);
+  constructor(name: string, type?: unknown) {
+    const typeName =
+      type == null
+        ? "unknown"
+        : ((type as { constructor?: { name?: string } }).constructor?.name ?? String(type));
+    super(
+      `Column \`${name}\` of type ${typeName} does not support \`serialize\` feature.\n` +
+        `Usually it means that you are trying to use \`serialize\`\n` +
+        `on a column that already implements serialization natively.`,
+    );
     this.name = "ColumnNotSerializableError";
   }
 }

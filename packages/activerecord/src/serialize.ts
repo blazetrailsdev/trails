@@ -2,10 +2,10 @@ import type { Base } from "./base.js";
 import type { Type } from "@blazetrails/activemodel";
 import { Json } from "./type/json.js";
 import { Serialized, type Coder } from "./type/serialized.js";
-import { ColumnSerializer } from "./coders/column-serializer.js";
 import {
   ColumnNotSerializableError,
   isTypeIncompatibleWithSerialize,
+  buildColumnSerializer,
 } from "./attribute-methods/serialization.js";
 
 interface InnerCoder {
@@ -38,7 +38,7 @@ const JSON_INNER: InnerCoder = {
  *
  * @internal
  */
-class HashObject {
+export class HashObject {
   constructor() {
     return {};
   }
@@ -55,49 +55,47 @@ export interface SerializeOptions {
 }
 
 /**
- * Resolves the `coder`/`type` options to the underlying coder, the JS class
- * the value is expected to be an instance of (Rails' `object_class`), and the
- * coder used for the `type_incompatible_with_serialize?` check. Mirrors the
- * `coder`/`type` handling of Rails' `build_column_serializer`; the
+ * Maps the `coder`/`type` options to Rails' `serialize(attr, coder:, type:)`
+ * shape, then delegates to the canonical `build_column_serializer`. The
  * string-keyed `coder: "json" | "array" | "hash"` forms are a trails
- * convenience for `coder: JSON, type: Array | Hash`.
+ * convenience for `coder: JSON, type: Array | Hash`. Returns the built coder
+ * plus the `(coder, type)` pair used by `type_incompatible_with_serialize?`.
  */
-function resolveCoder(options: SerializeOptions): {
-  inner: InnerCoder;
-  objectClass: (new (...args: any[]) => any) | undefined;
-} {
+function resolveSerializer(
+  attribute: string,
+  options: SerializeOptions,
+): { coder: Coder; coderIdentity: unknown; objectType: unknown } {
   const { coder: coderOpt } = options;
 
-  let inner: InnerCoder = JSON_INNER;
-  let objectClass: (new (...args: any[]) => any) | undefined;
+  let rawCoder: unknown = JSON_INNER;
+  // Identity passed to type_incompatible_with_serialize?; the JSON arm fires
+  // for `coder == ::JSON`, so default/"json" report as the global JSON.
+  let coderIdentity: unknown = globalThis.JSON;
+  let objectType: unknown = Object;
 
   if (!coderOpt || coderOpt === "json") {
     // default JSON coder
   } else if (coderOpt === "array") {
-    objectClass = globalThis.Array;
+    objectType = globalThis.Array;
   } else if (coderOpt === "hash") {
-    objectClass = HashObject;
-  } else if (
-    typeof (coderOpt as InnerCoder).load === "function" &&
-    typeof (coderOpt as InnerCoder).dump === "function"
-  ) {
-    // A coder object/class with `load` + `dump` (Rails' `coder: MyTags`).
-    inner = coderOpt as InnerCoder;
-  } else if (typeof coderOpt === "function") {
-    inner = coderOpt as unknown as InnerCoder;
+    objectType = HashObject;
+  } else {
+    rawCoder = coderOpt;
+    coderIdentity = coderOpt;
   }
 
   // An explicit `type:` constrains the object class (Rails `serialize :x, type: Array`).
   const t = options.type;
   if (t === globalThis.Array || t === "Array") {
-    objectClass = globalThis.Array;
+    objectType = globalThis.Array;
   } else if (t === "Hash") {
-    objectClass = HashObject;
+    objectType = HashObject;
   } else if (typeof t === "function" && t !== Object) {
-    objectClass = t as new (...args: any[]) => any;
+    objectType = t;
   }
 
-  return { inner, objectClass };
+  const coder = buildColumnSerializer(attribute, rawCoder, objectType) as Coder;
+  return { coder, coderIdentity, objectType };
 }
 
 /**
@@ -123,19 +121,11 @@ export function serialize(
   attribute: string,
   options: SerializeOptions = {},
 ): void {
-  const { inner, objectClass } = resolveCoder(options);
-
-  // Mirrors Rails' build_column_serializer: wrap in a ColumnSerializer (which
-  // enforces object_class and supplies the empty-collection default) only when
-  // a non-Object type is requested; otherwise use the coder directly.
-  const coder: Coder =
-    objectClass !== undefined
-      ? (new ColumnSerializer(attribute, inner, objectClass) as unknown as Coder)
-      : (inner as Coder);
+  const { coder, coderIdentity, objectType } = resolveSerializer(attribute, options);
 
   modelClass.decorateAttributes([attribute], (name: string, castType: Type): Type => {
-    if (isTypeIncompatibleWithSerialize(castType, inner, objectClass)) {
-      throw new ColumnNotSerializableError(name);
+    if (isTypeIncompatibleWithSerialize(castType, coderIdentity, objectType)) {
+      throw new ColumnNotSerializableError(name, castType);
     }
     // Re-declaring serialize on the same attribute (e.g. switching coders)
     // must wrap the underlying cast type, not stack a second Serialized.

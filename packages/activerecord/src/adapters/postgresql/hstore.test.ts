@@ -617,6 +617,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       const record = await HstoreWithSerialize.first();
       expect(record.tags).toBeInstanceOf(TagCollection);
       expect((record.tags as TagCollection).toHash()).toEqual({ one: "two" });
+      // Rails asserts the write-path-on-update leg: reassign → save → reload.
+      (record as any).tags = new TagCollection({ three: "four" });
+      await record.save();
+      const reloaded = await HstoreWithSerialize.first();
+      expect((reloaded.tags as TagCollection).toHash()).toEqual({ three: "four" });
     });
     it("clone hstore with serialized attributes", async () => {
       const HstoreWithSerialize = await freshSerializeModel(adapter);
