@@ -74,7 +74,8 @@ export interface DefineSchemaOpts {
  * Cumulative counters for `dropExisting:true` calls in the current worker.
  * `skipped` = tables whose schema matched → truncated instead of dropped.
  * `executed` = tables that were actually dropped + recreated.
- * Reset between runs if needed; exported for measurement only.
+ * Accumulates across the worker lifetime; take a before/after delta to
+ * measure a single run.
  *
  * @internal
  */
@@ -601,7 +602,8 @@ async function _defineSchemaImpl(
       }
     }
     // Truncate schema-matched tables: clear rows without touching the schema.
-    for (const table of order) {
+    // Reverse order matches the drop loop's FK-safe intent (children before parents).
+    for (const table of [...order].reverse()) {
       if (!truncateOnly.has(table)) continue;
       await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
       const pk = primaryKeyOf(schema[table]);
