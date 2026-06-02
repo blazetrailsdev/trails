@@ -829,18 +829,11 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "(statement_pool_test.rb:27-40, guarded by Process.respond_to?(:fork)). " +
       "Process forking has no Node.js equivalent.",
   },
-  // --- Ruby String encoding (invalid byte sequences) ---
-  {
-    testFile: "adapter_prevent_writes_test.rb",
-    tests: ["doesnt error when a select query has encoding errors"],
-    reason:
-      "Sends `SELECT '\\xC8'` (an invalid UTF-8 byte) and asserts the " +
-      "write-prevention regex match does not raise a Ruby " +
-      "Encoding::CompatibilityError (adapter_prevent_writes_test.rb:54-72). " +
-      "JS strings are UTF-16 with no invalid-byte-sequence concept; the " +
-      "write-prevention behavior itself is covered by the portable tests in " +
-      "the same file.",
-  },
+  // NOTE: adapter_prevent_writes_test.rb "doesnt error when a select query has
+  // encoding errors" is intentionally NOT reclassified — the non-PostgreSQL
+  // (SQLite) variant is portable and already implemented+passing
+  // (adapter-prevent-writes.test.ts:60); only the PG `assert_raises` variant is
+  // skipped, and that is an adapter behavior, not a JS-runtime impossibility.
   // --- Documented JS-vs-Ruby divergence (workplan Wave 0) ---
   {
     testFile: "database_configurations/resolver_test.rb",
