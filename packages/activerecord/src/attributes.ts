@@ -29,6 +29,8 @@ interface AttributeDefinition {
   userProvided?: boolean;
   source?: "user" | "schema";
   limit?: number | null;
+  /** Declared via `attribute(name, type, { virtual: true })` — not DB-backed. */
+  virtual?: boolean;
 }
 
 /**

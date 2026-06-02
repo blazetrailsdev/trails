@@ -170,11 +170,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
     if (!assocDef) continue;
 
     // Resolve target model
-    const className =
-      assocDef.options.className ??
-      (assocDef.type === "hasMany" || assocDef.type === "hasAndBelongsToMany"
-        ? camelize(singularize(assocName))
-        : camelize(assocName));
+    const className = collectionAssociationClassName(assocDef, assocName);
 
     const targetModel = modelRegistry.get(className);
     if (!targetModel) continue;
@@ -463,10 +459,90 @@ export function assignNestedAttributesForCollectionAssociation(
 
   checkRecordLimitBang(config?.options.limit, attrs);
 
+  // Rails `assign_nested_attributes_for_collection_association` marks matching
+  // records for destruction *in memory* at assign time, so validations run
+  // against the post-destroy graph (e.g. the association-aware length validator
+  // excludes records marked for destruction). The actual DELETE still flows
+  // through the post-save flush in `processNestedAttributes`, which only runs
+  // when `save` succeeds — so an invalidated graph leaves the rows untouched,
+  // matching Rails.
+  //
+  // KNOWN LIMITATION vs Rails (nested_attributes.rb:510-515): Rails computes
+  // `existing_records` as `association.loaded? ? target : scope.where(pk => ids)`
+  // — i.e. it queries the DB when the association isn't loaded. We only mark
+  // already-loaded records (the sync setter can't perform trails' async load).
+  // This stays internally consistent: `readAttributeForValidation` also reads
+  // only the loaded proxy, so an unloaded collection is neither validated
+  // against nor marked here. The DB rows are still correctly destroyed by the
+  // post-save flush; only the pre-save size-validation interaction is skipped
+  // for the unloaded case (not exercised by any test).
+  if (config?.options.allowDestroy) {
+    const loaded = loadedCollectionTarget(record, associationName);
+    if (loaded.length > 0) {
+      const targetModel = resolveCollectionTargetModel(record, associationName);
+      if (targetModel) {
+        for (const a of attrs) {
+          const id = (a as Record<string, unknown>).id;
+          if (id != null && id !== "" && hasDestroyFlag(a)) {
+            const existing = findRecordById(targetModel, loaded, id);
+            if (existing) markForDestruction(existing);
+          }
+        }
+      }
+    }
+  }
+
   if (!(record as any)._pendingNestedAttributes) {
     (record as any)._pendingNestedAttributes = new Map();
   }
   (record as any)._pendingNestedAttributes.set(associationName, attrs);
+}
+
+/**
+ * The in-memory target of a loaded collection proxy, or `[]` when the
+ * association has not been loaded. Mirrors the read path in
+ * `readAttributeForValidation` so destruction marking and validation see the
+ * same record instances.
+ * @internal
+ */
+function loadedCollectionTarget(record: Base, associationName: string): Base[] {
+  const proxy = (record as any)._collectionProxies?.get?.(associationName) as
+    | { target?: unknown[] }
+    | undefined;
+  return Array.isArray(proxy?.target) ? (proxy!.target as Base[]) : [];
+}
+
+/**
+ * Class name backing a collection association: explicit `className` option, else
+ * the camelized singular of the association name. Single source of truth for
+ * `processNestedAttributes` and `resolveCollectionTargetModel`.
+ * @internal
+ */
+function collectionAssociationClassName(assocDef: any, associationName: string): string {
+  return (
+    assocDef.options.className ??
+    (assocDef.type === "hasMany" || assocDef.type === "hasAndBelongsToMany"
+      ? camelize(singularize(associationName))
+      : camelize(associationName))
+  );
+}
+
+/**
+ * Resolve the model class backing a collection association via the registry,
+ * mirroring the className resolution in `processNestedAttributes`.
+ * @internal
+ */
+function resolveCollectionTargetModel(
+  record: Base,
+  associationName: string,
+): typeof Base | undefined {
+  const ctor = record.constructor as typeof Base;
+  const associations: any[] = (ctor as any)._associations ?? [];
+  const assocDef = associations.find((a: any) => a.name === associationName);
+  if (!assocDef) return undefined;
+  return modelRegistry.get(collectionAssociationClassName(assocDef, associationName)) as
+    | typeof Base
+    | undefined;
 }
 
 export const InstanceMethods = {
