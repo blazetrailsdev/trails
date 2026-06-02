@@ -160,21 +160,6 @@ const SQL_TYPE_MAP: Record<string, DslMapping> = {
   "integer primary key autoincrement": { dslType: "integer" },
 };
 
-const KNOWN_DSL_TYPES = new Set([
-  "string",
-  "text",
-  "integer",
-  "bigint",
-  "float",
-  "decimal",
-  "boolean",
-  "date",
-  "datetime",
-  "timestamp",
-  "binary",
-  "char",
-]);
-
 /**
  * DSL methods that actually exist as helpers on TableDefinition —
  * either the abstract base (connection-adapters/abstract/schema-definitions.ts)
@@ -226,6 +211,47 @@ const DSL_HELPER_METHODS = new Set([
   "circle",
 ]);
 
+/**
+ * dsl type names `sqlTypeToDsl` may resolve to that must round-trip to
+ * themselves when they re-appear as a bare SQL type — e.g. a SchemaDumper
+ * second pass, or CTAS where SQLite preserves the dumped DSL name as the
+ * column's declared type. Without this safety net such a name falls through
+ * to the `{ dslType: "enum" }` catch-all; since these columns are not
+ * `isEnum`, the emitter then routes them through the generic
+ * `t.column(name, sqlType)` path (`t.enum(...)` is only emitted when
+ * `col.isEnum`), silently losing the matching DSL helper.
+ *
+ * Derived from `DSL_HELPER_METHODS` (so every helper is covered by
+ * construction) plus the non-helper dsl types `sqlTypeToDsl`/`SQL_TYPE_MAP`
+ * also produce (`timestamptz`, `uuid`, `interval`, `oid`, `serial`,
+ * `bigserial`, `char`).
+ *
+ * Caveat (consistent with `SQL_TYPE_MAP`'s existing behavior): a PG enum
+ * type whose name collides with one of these (e.g. an enum literally named
+ * `point` or `bitvarying`) resolves to the helper rather than `t.enum`.
+ * Every `SQL_TYPE_MAP` key already carries this collision; this set only
+ * adds `bitvarying` to it.
+ */
+const KNOWN_DSL_TYPES = new Set<string>([
+  ...DSL_HELPER_METHODS,
+  "timestamptz",
+  "uuid",
+  "interval",
+  "oid",
+  "serial",
+  "bigserial",
+  "char",
+]);
+
+/**
+ * Case-insensitive index into {@link KNOWN_DSL_TYPES}. `sqlTypeToDsl`
+ * normalizes the incoming SQL type to lowercase, but dsl names like
+ * `bitVarying` are camelCase — a plain `Set.has(lowercased)` would miss them.
+ */
+const KNOWN_DSL_TYPES_BY_LOWER = new Map(
+  [...KNOWN_DSL_TYPES].map((dslType) => [dslType.toLowerCase(), dslType]),
+);
+
 function sqlTypeToDsl(sqlType: string): DslMapping {
   const normalized = sqlType.toLowerCase().trim();
   const isArray = normalized.endsWith("[]");
@@ -270,8 +296,8 @@ function sqlTypeToDsl(sqlType: string): DslMapping {
         result = { dslType: "bit" };
       } else if (/^(?:bit varying|varbit)\(\d+\)$/.test(baseType)) {
         result = { dslType: "bitVarying" };
-      } else if (KNOWN_DSL_TYPES.has(baseType)) {
-        result = { dslType: baseType };
+      } else if (KNOWN_DSL_TYPES_BY_LOWER.has(baseType)) {
+        result = { dslType: KNOWN_DSL_TYPES_BY_LOWER.get(baseType)! };
       } else {
         result = { dslType: "enum", extraOpts: { enum_type: baseType } };
       }

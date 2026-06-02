@@ -439,6 +439,79 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain(`() => "gen_random_uuid()"`);
   });
 
+  it("schema dump round-trips PG range/network/bit-varying types via DSL helpers", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const source = {
+      tables: () => ["dsl_types"],
+      columns: () => [
+        { name: "id", type: "integer", primaryKey: true },
+        { name: "r1", type: "int4range" },
+        { name: "r2", type: "int8range" },
+        { name: "r3", type: "numrange" },
+        { name: "r4", type: "daterange" },
+        { name: "r5", type: "tsrange" },
+        { name: "r6", type: "tstzrange" },
+        { name: "n1", type: "inet" },
+        { name: "n2", type: "cidr" },
+        { name: "n3", type: "macaddr" },
+        // camelCase dsl name re-fed as a SQL type — previously fell through to
+        // the `enum` catch-all and was emitted via the generic
+        // `t.column("bv", "bitvarying")` path; must now resolve back to the
+        // bitVarying helper. This `bv` row is the one assertion that actually
+        // pins this PR's behavioral change — the range/network types below are
+        // SQL_TYPE_MAP keys and emit helpers before and after this change.
+        { name: "bv", type: "bitVarying" },
+      ],
+      indexes: () => [],
+    };
+    const output = TopLevelDumper.dump(source) as string;
+    for (const helper of [
+      "int4range",
+      "int8range",
+      "numrange",
+      "daterange",
+      "tsrange",
+      "tstzrange",
+      "inet",
+      "cidr",
+      "macaddr",
+      "bitVarying",
+    ]) {
+      expect(output).toContain(`t.${helper}(`);
+    }
+    // The fix specifically: `bv` must NOT take the generic column fallback.
+    expect(output).toContain('t.bitVarying("bv")');
+    expect(output).not.toContain('t.column("bv"');
+    expect(output).not.toContain("t.enum(");
+    expect(output).not.toContain('"enum"');
+  });
+
+  it("schema dump round-trips timestamptz/uuid/interval/oid without misclassifying as enum", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const source = {
+      tables: () => ["non_helper_types"],
+      columns: () => [
+        { name: "id", type: "integer", primaryKey: true },
+        { name: "ts", type: "timestamptz" },
+        { name: "guid", type: "uuid" },
+        { name: "span", type: "interval" },
+        { name: "obj_id", type: "oid" },
+      ],
+      indexes: () => [],
+    };
+    const output = TopLevelDumper.dump(source) as string;
+    // Regression guard for pre-existing behavior (these are all SQL_TYPE_MAP
+    // keys, unaffected by this PR's fallback change): they have no
+    // TableDefinition helper, so they round-trip through the generic
+    // `t.column(name, sqlType)` path — keeping their own type name rather than
+    // collapsing to the `enum` fallback.
+    expect(output).toContain('t.column("ts", "timestamptz"');
+    expect(output).toContain('t.column("guid", "uuid"');
+    expect(output).toContain('t.column("span", "interval"');
+    expect(output).toContain('t.column("obj_id", "oid"');
+    expect(output).not.toContain("t.enum(");
+  });
+
   it("indexParts emits include for covering indexes", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
     const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
