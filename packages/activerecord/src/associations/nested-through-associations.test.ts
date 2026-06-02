@@ -1536,7 +1536,9 @@ describe("NestedThroughAssociationsTest", () => {
     // canonical-aliased INNER JOIN chain carried over from `other`.
     expect(merged.toSql()).toContain("taggings_authors_join");
     expect(merged.toSql()).toContain("INNER JOIN");
-    expect(merged.toSql()).toContain('WHERE "authors"."name" = ');
+    // Quote char is adapter-specific (`"` on SQLite/PG, backtick on MySQL/MariaDB),
+    // so match the receiver's surviving WHERE without hard-coding the quoting.
+    expect(merged.toSql()).toMatch(/WHERE [`"]authors[`"]\.[`"]name[`"] = /);
   });
 
   // Mirrors Rails test_nested_has_many_through_with_scope_on_polymorphic_reflection
