@@ -123,8 +123,24 @@ beforeAll(async () => {
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
+  // Several describes here mutate the connection's search_path (SchemaTest,
+  // DefaultsUsingMultipleSchemasAndDomainTest, SchemaWithDotsTest) and point
+  // it at schemas they later drop in teardown. Because the PG connection is
+  // shared per worker, a leaked search_path pointing at a dropped schema makes
+  // any later unqualified `CREATE TABLE` fail with "no schema has been selected
+  // to create in" — both for sibling describes in this file and for sibling
+  // adapter-test files in the same worker. Capture the default once and restore
+  // it after every test so the path never leaks. Mirrors Rails' schema_test.rb
+  // saving/restoring @schema_search_path in setup/teardown.
+  let defaultSearchPath: string;
+  beforeAll(async () => {
+    defaultSearchPath = await (Base.connection as PostgreSQLAdapter).schemaSearchPath();
+  });
   beforeEach(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
+  });
+  afterEach(async () => {
+    await adapter.setSchemaSearchPath(defaultSearchPath);
   });
 
   describe("SchemaTest", () => {

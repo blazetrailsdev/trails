@@ -41,9 +41,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       ctx.skip();
       return;
     }
-    await defineSchema({
-      professors: { name: { type: "string", null: false } },
-    });
+    await defineSchema(
+      {
+        professors: { name: { type: "string", null: false } },
+      },
+      { dropExisting: true },
+    );
     await adapter.exec(
       `CREATE SERVER foreign_server FOREIGN DATA WRAPPER postgres_fdw ` +
         `OPTIONS (host ${quoteLit(fdwHost)}, port ${quoteLit(fdwPort)}, dbname ${quoteLit(fdwDb)})`,
