@@ -2292,9 +2292,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Set the collection to exactly the records identified by ids.
+   * Set the collection to exactly the records identified by ids, e.g.
+   * `order.book_ids = [...]`.
    *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#ids=
+   * Mirrors: ActiveRecord::Associations::CollectionAssociation#ids_writer
+   * (collection_association.rb) — the target of the generated
+   * `<name>_ids=` writer. Resolves the child records by their
+   * `association_primary_key` (the target model's PK), raising
+   * `RecordNotFound` when not every id resolves, then `replace`s.
    */
   async setIds(ids: (number | string | (number | string)[])[]): Promise<void> {
     const targetModel = this.model as typeof Base;
@@ -2306,6 +2311,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (Array.isArray(pk)) {
       // Composite-PK child: each id is a tuple aligned with the PK columns, so
       // resolve via a per-column lookup rather than the single-column `find`.
+      // Mirrors ids_writer's `klass.composite_primary_key?` branch
+      // (`klass.where(primary_key => ids)` matched back to each id).
       records = (
         await Promise.all(
           cleanIds.map((id) => {
@@ -2318,6 +2325,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           }),
         )
       ).filter((r): r is T => r != null);
+      // Rails: `if records.size != ids.size ... raise_record_not_found_exception!`.
+      if (records.length !== cleanIds.length) {
+        raiseNotFoundAll(targetModel.name, pk, {
+          ids: cleanIds,
+          wantArray: true,
+          tuples: cleanIds as unknown[][],
+        });
+      }
     } else {
       records = (await Promise.all(cleanIds.map((id) => targetModel.find(Number(id))))) as T[];
     }
