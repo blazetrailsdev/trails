@@ -1,16 +1,15 @@
 /**
  * Shared adapter-introspection helpers used by schema dumpers.
  *
- * Both `SchemaDumper` (DSL output — schema.ts/schema.js) and
- * `dumpSchemaColumns` (JSON output for trails-tsc --schema) need the
- * same "prefer the adapter's own tables() / columns() when available,
- * fall back to the portable SchemaStatements queries otherwise"
- * pattern. PostgreSQL and SQLite adapters implement these with
- * adapter-specific semantics (e.g. PG respects the current
- * `search_path`); SchemaStatements is the portable fallback.
+ * Adapter-introspection helpers used by `SchemaDumper` (DSL output —
+ * `db/schema.ts`) and related tooling. Adapters prefer their own
+ * `tables()` / `columns()` implementations when available and fall back
+ * to the portable `SchemaStatements` queries otherwise. PostgreSQL and
+ * SQLite adapters implement these with adapter-specific semantics
+ * (e.g. PG respects the current `search_path`).
  *
  * Keeping this in one module means future changes to introspection
- * semantics stay in one place and can't drift between the two dumpers.
+ * semantics stay in one place.
  */
 
 import type { DatabaseAdapter } from "./adapter.js";

@@ -1,7 +1,10 @@
 import ts from "typescript";
-import type { DumpColumnSchema } from "@blazetrails/activerecord/schema-columns-dump";
 
-export type { DumpColumnSchema };
+export interface DumpColumnSchema {
+  type: string;
+  null: boolean;
+  arrayElementType?: string;
+}
 export type SchemaColumnsByTable = Record<string, Record<string, DumpColumnSchema>>;
 
 // Rails default PK is bigint (Rails 5.1+).

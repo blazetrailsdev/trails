@@ -29,12 +29,12 @@ const INDENT = "  ";
 const AR_IMPORT = `import("@blazetrails/activerecord")`;
 
 /**
- * Column value in a schema-columns JSON map. Either:
+ * Column value in a schema map. Either:
  *   - a plain Rails type string (legacy shape, e.g. `"string"`), or
- *   - a rich shape with nullability and array element info, emitted by
- *     `dumpSchemaColumns`. trails-tsc renders `Type | null` for
- *     nullable columns and `ElementTsType[]` for array columns when
- *     an `arrayElementType` is supplied.
+ *   - a rich shape with nullability and array element info parsed from
+ *     `db/schema.ts`. trails-tsc renders `Type | null` for nullable
+ *     columns and `ElementTsType[]` for array columns when an
+ *     `arrayElementType` is supplied.
  */
 export type SchemaColumnValue =
   | string

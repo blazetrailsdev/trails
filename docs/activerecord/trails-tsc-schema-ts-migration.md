@@ -1,6 +1,6 @@
 # Migrate `trails-tsc` to `schema.ts`, then drop `trails-schema-dump`
 
-**Status:** proposed
+**Status:** complete
 **Owner:** activerecord-cli
 **Related:** PR #2759 (wired up `ar db:schema:dump`)
 
@@ -142,7 +142,7 @@ open question Q1.
 
 Per repo convention these are **non-overlapping sibling PRs**, not a stack.
 
-### PR A — schema.ts parser in activerecord-cli (~220 LOC, impl + unit tests)
+### PR A — schema.ts parser in activerecord-cli (~220 LOC, impl + unit tests) ✅ obsolete — trails-tsc no longer consumes schema; parser shipped as TMD PR 1 (#2851)
 
 - New `packages/activerecord-cli/src/tsc-wrapper/schema-ts-parser.ts`:
   `parseSchemaTs(source: string, filePath: string): SchemaColumnsByTable`.
@@ -154,7 +154,7 @@ Per repo convention these are **non-overlapping sibling PRs**, not a stack.
 - **No wiring yet** — ships the parser standalone behind its export so it can
   be reviewed in isolation.
 
-### PR B — wire `--schema *.ts` into trails-tsc (~120 LOC)
+### PR B — wire `--schema *.ts` into trails-tsc (~120 LOC) ✅ obsolete — trails-tsc no longer consumes schema; parser shipped as TMD PR 1 (#2851)
 
 - `loadSchemaColumns`: dispatch on file extension; `.ts`/`.js` → `parseSchemaTs`,
   `.json` → existing path.
@@ -162,7 +162,7 @@ Per repo convention these are **non-overlapping sibling PRs**, not a stack.
   (extend `tsc-wrapper/cli.test.ts`).
 - Decide JSON deprecation per Q1.
 
-### PR C — migrate consumers + docs (~80 LOC, mostly deletions/doc)
+### PR C — migrate consumers + docs (~80 LOC, mostly deletions/doc) ✅ folded into PR D
 
 - `examples/twitter-clone`: `typecheck` script `--schema db/schema-columns.json`
   → `--schema db/schema.ts`; `db:schema:dump` npm script (currently aliases
@@ -173,9 +173,11 @@ Per repo convention these are **non-overlapping sibling PRs**, not a stack.
 - `scripts/parity/canonical/README.md`, `docs/activerecord/standalone-activerecord-cli-proposal.md`:
   update references.
 
-### PR D — delete `trails-schema-dump` (~120 LOC deletions)
+### PR D — delete `trails-schema-dump` (~120 LOC deletions) ✅ shipped
 
-Gated on A–C merged so nothing is left pointing at the removed bin.
+Folded PR C into this PR; A and B became obsolete (trails-tsc now consumes
+`schema.ts` directly; parser was shipped as part of the existing
+`tsc-wrapper/schema-ts-parser.ts` in the main branch).
 
 - Remove bin: `package.json` `"trails-schema-dump"` entry,
   `src/bin/trails-schema-dump.ts`, `src/bin/trails-schema-dump-bin.ts`.

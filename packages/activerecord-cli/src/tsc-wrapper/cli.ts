@@ -13,7 +13,7 @@ import { parseSchemaTs } from "./schema-ts-parser.js";
 /**
  * Load schema columns from a `--schema` file. Accepts:
  *   - `.ts` / `.js` — TypeScript schema file (e.g. `db/schema.ts`); parsed by `parseSchemaTs`.
- *   - `.json` — dump produced by `trails-schema-dump`. Column values take either shape:
+ *   - `.json` — legacy column-dump. Column values take either shape:
  *       `{ "<table>": { "<column>": "<rails_type>", ... }, ... }` — legacy
  *       `{ "<table>": { "<column>": { "type": "<rails_type>", "null"?: boolean, "arrayElementType"?: string }, ... }, ... }` — rich
  *
@@ -78,7 +78,7 @@ export function loadSchemaColumns(
   if (ext !== ".json" && ext !== "") {
     process.stderr.write(
       `trails-tsc: --schema: extension "${ext}" is not supported. ` +
-        `Use db/schema.ts (TypeScript) or a .json dump from trails-schema-dump.\n`,
+        `Use db/schema.ts (TypeScript) or a legacy .json column-dump.\n`,
     );
     process.exit(1);
   }
@@ -132,9 +132,8 @@ function validateSchemaShape(
 
 /**
  * A column value can be either a Rails type string (legacy) or a rich
- * object `{ type, null?, arrayElementType? }` emitted by
- * `dumpSchemaColumns`. Reject anything else with a targeted message so
- * users see the actual problem instead of a downstream crash.
+ * object `{ type, null?, arrayElementType? }`. Reject anything else with
+ * a targeted message so users see the actual problem instead of a crash.
  */
 function validateColumnValue(
   raw: unknown,
@@ -182,8 +181,8 @@ export function handleHelp(args: string[]): void {
   if (!args.includes("--help") && !args.includes("-h")) return;
   process.stdout.write(
     "Usage: trails-tsc [tsc-options] [--schema <path>]\n\n" +
-      "  --schema <path>  Schema source: db/schema.ts (TypeScript) or a .json dump\n" +
-      "                   from trails-schema-dump. Drives attribute virtualization.\n\n" +
+      "  --schema <path>  Schema source: db/schema.ts (TypeScript) or a legacy .json\n" +
+      "                   column-dump. Drives attribute virtualization.\n\n" +
       "  All other options are passed through to tsc. Run tsc --help for the full list.\n",
   );
   process.exit(0);

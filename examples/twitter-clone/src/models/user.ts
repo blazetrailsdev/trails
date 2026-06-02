@@ -5,7 +5,7 @@ import { Base } from "@blazetrails/activerecord";
  *
  * Zero-declare AND zero-attribute: no `declare` fields, no `this.attribute`
  * calls, no `import type { Tweet }`. Attribute types come from
- * `db/schema-columns.json` (regenerate with `pnpm db:schema:dump`), which
+ * `db/schema.ts` (regenerate with `pnpm db:schema:dump`), which
  * `trails-tsc` reads to inject the `declare` members; at runtime the
  * columns are reflected from the live DB (see db.ts). Associations and
  * scopes still come from the runtime macros below. This mirrors a Rails
