@@ -1039,9 +1039,16 @@ describe("TransactionTest", () => {
     // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
   });
 
-  it.skip("restore custom primary key after rollback", () => {
-    // BLOCKED: connection-pool — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
+  it("restore custom primary key after rollback", async () => {
+    const { Movie } = makeSQLiteMovie();
+    const movie = Movie.new({ name: "foo" }) as any;
+
+    await Movie.transaction(async () => {
+      await movie.saveBang();
+      throw new Rollback();
+    });
+
+    expect(movie.movieid).toBeNull();
   });
 
   it("assign id after rollback", async () => {

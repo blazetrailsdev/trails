@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, transaction, beforeCommit } from "./index.js";
+import { Base, transaction, beforeCommit, currentTransaction, Rollback } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -26,11 +26,19 @@ beforeAll(async () => {
 });
 
 describe("TransactionCallbacksTest", () => {
-  it.skip("before commit exception should pop transaction stack", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-    /* fixture-dependent */
+  it("before commit exception should pop transaction stack", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    beforeCommit(Topic, function () {
+      throw new Error("better pop this txn from the stack!");
+    });
+    const originalTxn = currentTransaction();
+    const t = new Topic({ title: "x" });
+    await expect(t.saveBang()).rejects.toThrow("better pop this txn from the stack!");
+    expect(currentTransaction()).toBe(originalTxn);
   });
 
   it("dont call any callbacks after transaction commits for invalid record", async () => {
@@ -169,10 +177,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it.skip("only call after commit on create after transaction commits for new record if create succeeds creating through association", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-    /* fixture-dependent */
+    // DEFERRED: needs has_many `.create` on an association whose target model
+    // declares `validates(content, presence)` so the create fails validation
+    // and the after_create_commit callback never fires (empty history).
   });
   it("no after commit on destroy after transaction commits for destroyed new record", async () => {
     class Topic extends Base {
@@ -212,16 +219,15 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it.skip("only call after commit on update after transaction commits for existing record on touch", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-    /* fixture-dependent */
+    // DEFERRED: `touch` builds a direct UPDATE and fires only after_touch — it
+    // does not enroll in the transactional-callback machinery
+    // (withTransactionReturningStatus / _triggerUpdateCallback), so it never
+    // fires after_update_commit. Wiring touch through transactions is its own story.
   });
   it.skip("only call after commit on top level transactions", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-    /* fixture-dependent */
+    // DEFERRED: drives the assertion via `touch` inside a requires_new savepoint;
+    // blocked by the same touch gap (touch does not fire transactional commit
+    // callbacks). See "…for existing record on touch" above.
   });
 
   it("call after rollback after transaction rollsback", async () => {
@@ -264,10 +270,8 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it.skip("only call after rollback on update after transaction rollsback for existing record on touch", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-    /* fixture-dependent */
+    // DEFERRED: same touch gap — `touch` does not enroll in the transactional
+    // callback machinery, so after_rollback(on: :update) never fires.
   });
 
   it("only call after rollback on destroy after transaction rollsback for destroyed record", async () => {
@@ -310,22 +314,83 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it.skip("call after rollback when commit fails", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-    /* fixture-dependent */
+    // DEFERRED: requires monkeypatching the current transaction's `commit` to
+    // raise (Rails redefines `tx.commit`), exercising the rollback-on-failed-commit
+    // path. No test-layer hook exposes the live transaction object for this.
   });
-  it.skip("only call after rollback on records rolled back to a savepoint", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-    /* fixture-dependent */
+  it("only call after rollback on records rolled back to a savepoint", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    // Pre-create the records before registering callbacks so their create
+    // commits are not counted (mirrors Rails using fixture records + per-record
+    // instance blocks registered after the records already exist).
+    const first = (await Topic.create({ title: "first" })) as any;
+    const second = (await Topic.create({ title: "second" })) as any;
+    Topic.afterRollback(function (record: any) {
+      record.rollbacks = (record.rollbacks ?? 0) + 1;
+    });
+    Topic.afterCommit(function (record: any) {
+      record.commits = (record.commits ?? 0) + 1;
+    });
+
+    await transaction(Topic, async () => {
+      first.title = "first-updated";
+      await first.saveBang();
+      await Topic.transaction(
+        async () => {
+          second.title = "second-updated";
+          await second.saveBang();
+          throw new Rollback();
+        },
+        { requiresNew: true },
+      );
+    });
+
+    expect(first.commits).toBe(1);
+    expect(first.rollbacks ?? 0).toBe(0);
+    expect(second.commits ?? 0).toBe(0);
+    expect(second.rollbacks).toBe(1);
   });
-  it.skip("only call after rollback on records rolled back to a savepoint when release savepoint fails", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-    /* fixture-dependent */
+  it("only call after rollback on records rolled back to a savepoint when release savepoint fails", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    const first = (await Topic.create({ title: "first" })) as any;
+    Topic.afterRollback(function (record: any) {
+      record.rollbacks = (record.rollbacks ?? 0) + 1;
+    });
+    Topic.afterCommit(function (record: any) {
+      record.commits = (record.commits ?? 0) + 1;
+    });
+
+    await transaction(Topic, async () => {
+      first.title = "outer";
+      await first.save();
+      await Topic.transaction(
+        async () => {
+          first.title = "sp1";
+          await first.saveBang();
+          throw new Rollback();
+        },
+        { requiresNew: true },
+      );
+      await Topic.transaction(
+        async () => {
+          first.title = "sp2";
+          await first.saveBang();
+          throw new Rollback();
+        },
+        { requiresNew: true },
+      );
+    });
+
+    expect(first.commits).toBe(1);
+    expect(first.rollbacks).toBe(2);
   });
 
   it("after commit callback should not swallow errors", async () => {
@@ -402,11 +467,34 @@ describe("TransactionCallbacksTest", () => {
     expect(all.length).toBe(1);
   });
 
-  it.skip("after rollback callback when raise should restore state", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-    /* fixture-dependent */
+  it("after rollback callback when raise should restore state", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    const ErrorClass = class extends Error {};
+    Topic.afterRollback(function () {
+      throw new ErrorClass();
+    });
+    const first = new Topic({});
+    const second = new Topic({});
+    try {
+      await transaction(Topic, async () => {
+        await first.saveBang();
+        expect(first.id).not.toBeNull();
+        await second.saveBang();
+        expect(second.id).not.toBeNull();
+        throw new Rollback();
+      });
+    } catch (e) {
+      // Mirror Rails' `rescue error_class`: only swallow the error the rollback
+      // callback raised. Re-throw anything else so a failure in the state-restore
+      // path can't hide behind a blanket catch.
+      if (!(e instanceof ErrorClass)) throw e;
+    }
+    expect(first.id).toBeNull();
+    expect(second.id).toBeNull();
   });
   it("after rollback callbacks should validate on condition", async () => {
     class Topic extends Base {
@@ -450,10 +538,8 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it.skip("saving a record with a belongs to that specifies touching the parent should call callbacks on the parent object", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-    /* fixture-dependent */
+    // DEFERRED: needs belongs_to `touch: true` so saving the child enqueues a
+    // parent touch that fires the parent's after_commit callback.
   });
 
   it("saving two records that override object id should run after commit callbacks for both", async () => {
@@ -596,11 +682,50 @@ describe("TransactionCallbacksTest", () => {
     expect(history).toEqual(["destroy_commit"]);
   });
 
-  it.skip("save in after create commit wont invoke extra after create commit", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-    /* needs transactional callback deduplication */
+  it("save in after create commit wont invoke extra after create commit", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    // Full mirror of Rails' add_transaction_execution_blocks: all six
+    // commit/rollback blocks. Only the create + update commit blocks fire in
+    // this all-commit path; the destroy/rollback blocks are inert here.
+    Topic.afterCreateCommit(function (record: any) {
+      (record.history ??= []).push("commit_on_create");
+    });
+    Topic.afterUpdateCommit(function (record: any) {
+      (record.history ??= []).push("commit_on_update");
+    });
+    Topic.afterDestroyCommit(function (record: any) {
+      (record.history ??= []).push("commit_on_destroy");
+    });
+    Topic.afterRollback(
+      function (record: any) {
+        (record.history ??= []).push("rollback_on_create");
+      },
+      { on: "create" },
+    );
+    Topic.afterRollback(
+      function (record: any) {
+        (record.history ??= []).push("rollback_on_update");
+      },
+      { on: "update" },
+    );
+    Topic.afterRollback(
+      function (record: any) {
+        (record.history ??= []).push("rollback_on_destroy");
+      },
+      { on: "destroy" },
+    );
+    // Re-save inside the create-commit callback: must fire commit_on_update
+    // exactly once, and must NOT re-invoke the create-commit callback.
+    Topic.afterCreateCommit(async function (record: any) {
+      await record.saveBang();
+    });
+    const newRecord = new Topic({ title: "New topic" });
+    await newRecord.saveBang();
+    expect((newRecord as any).history).toEqual(["commit_on_create", "commit_on_update"]);
   });
 
   describe("CallbackOrderTest", () => {
@@ -742,17 +867,16 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it.skip("before commit actions", () => {
-      // BLOCKED: transactions — transaction / savepoint / isolation gap
-      // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-      // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-      /* fixture-dependent */
+      // DEFERRED: the Rails assertion depends on after_commit callbacks running
+      // in REVERSE definition order; our impl runs them in definition order
+      // (pinned by the CallbackOrderTest below), so the verbatim assertion
+      // cannot pass without changing global callback-ordering semantics.
     });
 
     it.skip("before commit update in same transaction", () => {
-      // BLOCKED: transactions — transaction / savepoint / isolation gap
-      // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-      // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-      /* fixture-dependent */
+      // DEFERRED: needs a before_commit callback that issues an `update` writing
+      // to the DB inside the still-open committing transaction, with the new
+      // value surviving to `reload`.
     });
   }); // CallbacksOnMultipleActionsTest
 
@@ -1006,10 +1130,9 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it.skip("updated callback called on first to save when followed in transaction by destroy from separate instance with old configuration", () => {
-      // BLOCKED: transactions — transaction / savepoint / isolation gap
-      // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-      // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-      /* fixture-dependent */
+      // DEFERRED: needs the deprecated
+      // `run_commit_callbacks_on_first_saved_instances_in_transaction` flag plus
+      // multiple instances of the same row participating in one transaction.
     });
 
     it("destroyed callbacks called on destroyed instance even when followed by update from separate instances in a transaction", async () => {
@@ -1036,10 +1159,9 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it.skip("destroyed callbacks called on first saved instance in transaction with old configuration", () => {
-      // BLOCKED: transactions — transaction / savepoint / isolation gap
-      // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-      // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
-      /* fixture-dependent */
+      // DEFERRED: needs the deprecated
+      // `run_commit_callbacks_on_first_saved_instances_in_transaction` flag plus
+      // multiple instances of the same row participating in one transaction.
     });
   }); // CallbacksOnMultipleInstancesInATransactionTest
 
