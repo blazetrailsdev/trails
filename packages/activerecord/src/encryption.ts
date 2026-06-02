@@ -362,6 +362,10 @@ export async function encryptRecord(record: any): Promise<void> {
   const encryptedAttrs: Set<string> = klass._encryptedAttributes ?? new Set();
   if (encryptedAttrs.size === 0) return;
 
+  // Mirrors Rails encrypt_attributes' first line (encryptable_record.rb:188):
+  // raises Errors::Configuration when the context is frozen (protected mode).
+  EncryptableRecord.validateEncryptionAllowed(record);
+
   // Save plaintext values before calling updateColumns, which would overwrite
   // in-memory attributes with the ciphertext (since updateColumns uses cast()).
   const plaintextValues: Record<string, unknown> = {};
@@ -400,6 +404,10 @@ export async function decryptRecord(record: any): Promise<void> {
   const klass = record.constructor as any;
   const encryptedAttrs: Set<string> = klass._encryptedAttributes ?? new Set();
   if (encryptedAttrs.size === 0) return;
+
+  // Mirrors Rails decrypt_attributes' first line (encryptable_record.rb:194):
+  // raises Errors::Configuration when the context is frozen (protected mode).
+  EncryptableRecord.validateEncryptionAllowed(record);
 
   const assignments: Record<string, unknown> = {};
   for (const attr of encryptedAttrs) {

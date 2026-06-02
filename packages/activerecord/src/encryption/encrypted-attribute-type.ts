@@ -3,11 +3,10 @@ import { Serialized } from "../type/serialized.js";
 import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
 import type { WrappedType } from "./wrapped-type.js";
-import { isEncryptionDisabled, isProtectedMode } from "./context.js";
+import { getEncryptionContext } from "./context.js";
 import { Configurable } from "./configurable.js";
 import {
   Encoding as EncodingError,
-  Encryption as EncryptionError,
   Decryption as DecryptionError,
   Base as BaseEncryptionError,
 } from "./errors.js";
@@ -98,18 +97,12 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   deserialize(value: unknown): unknown {
     if (value === null || value === undefined) return value;
-    if (isEncryptionDisabled()) return value;
-    if (isProtectedMode()) return value;
     const decrypted = this.decrypt(value);
     return this.castType.deserialize?.(decrypted) ?? decrypted;
   }
 
   serialize(value: unknown): unknown {
     if (value === null || value === undefined) return null;
-    if (isEncryptionDisabled()) return this.castType.serialize?.(value) ?? value;
-    if (isProtectedMode() && !this.deterministic) {
-      throw new EncryptionError("Can't write encrypted attribute in protected mode");
-    }
     if (this.isSerializeWithOldest()) return this.serializeWithOldest(value);
     return this.serializeWithCurrent(value);
   }
@@ -127,7 +120,11 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   isEncrypted(value: unknown): boolean {
     if (typeof value !== "string") return false;
-    return this.scheme.withContext(() => this._encryptor.isEncrypted(value));
+    // Mirrors Rails encrypted?(value) → with_context { encryptor.encrypted? value }
+    // (encrypted_attribute_type.rb:48): the encryptor is resolved from the current
+    // context, so under a swapped NullEncryptor/EncryptingOnlyEncryptor this reports
+    // false — same as the decrypt/encrypt text paths.
+    return this.scheme.withContext(() => this.encryptor.isEncrypted(value));
   }
 
   // Delegate store accessor dispatch to the castType so store_accessor works
@@ -236,7 +233,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
           }
         }
 
-        return this._encryptor.decrypt(ciphertext, this.decryptionOptions());
+        return this.encryptor.decrypt(ciphertext, this.decryptionOptions());
       });
     } catch (error) {
       if (!(error instanceof BaseEncryptionError)) throw error;
@@ -309,10 +306,10 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   /** @internal */
   private encryptAsText(value: string): string {
     return this.scheme.withContext(() => {
-      if (this._encryptor.isBinary() && !this.castType.isBinary()) {
+      if (this.encryptor.isBinary() && !this.castType.isBinary()) {
         throw new EncodingError("Binary encoded data can only be stored in binary columns");
       }
-      return this._encryptor.encrypt(value, this.encryptionOptions());
+      return this.encryptor.encrypt(value, this.encryptionOptions());
     });
   }
 
@@ -322,7 +319,11 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private get encryptor(): EncryptorLike {
-    return this._encryptor;
+    // Mirrors Rails EncryptedAttributeType#encryptor → ActiveRecord::Encryption.encryptor
+    // (== context.encryptor). The TS default context carries no encryptor, so fall
+    // back to the scheme's. Resolved inside the existing scheme.withContext wrapper, so
+    // a scheme override has already been pushed onto the context before this reads it.
+    return (getEncryptionContext().encryptor as EncryptorLike | undefined) ?? this._encryptor;
   }
 
   /** @internal */

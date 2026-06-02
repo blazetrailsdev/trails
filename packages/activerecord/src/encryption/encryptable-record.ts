@@ -1,5 +1,10 @@
 import { Scheme, type SchemeOptions } from "./scheme.js";
-import { getEncryptionContext, withoutEncryption as _withoutEncryption } from "./context.js";
+import {
+  getEncryptionContext,
+  withoutEncryption as _withoutEncryption,
+  setEncryptingOnlyEncryptorFactory,
+} from "./context.js";
+import { EncryptingOnlyEncryptor } from "./encrypting-only-encryptor.js";
 import { Configuration as ConfigurationError } from "./errors.js";
 import { LengthValidator } from "@blazetrails/activemodel";
 import { EncryptedAttributeType, setGlobalPreviousSchemesFn } from "./encrypted-attribute-type.js";
@@ -90,6 +95,12 @@ function schemeFor(options: SchemeOptions): Scheme {
 // Called at module load time — always runs before any EncryptedAttributeType
 // accesses previousTypes because this module is loaded via encryption.ts first.
 setGlobalPreviousSchemesFn(globalPreviousSchemesFor);
+
+// Register the EncryptingOnlyEncryptor factory so protectingEncryptedData can
+// construct it without an eval-time import cycle. This module is loaded via
+// encryption.ts before any protectingEncryptedData call, and after Configurable
+// is fully defined (so the Encryptor import chain resolves cleanly).
+setEncryptingOnlyEncryptorFactory(() => new EncryptingOnlyEncryptor());
 
 const ORIGINAL_ATTRIBUTE_PREFIX = "original_";
 
