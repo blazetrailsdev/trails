@@ -277,10 +277,12 @@ describe("InverseBelongsToTests", () => {
   });
 
   it.skip("recursive inverse on recursive model has many inversing", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs deep recursive inverse */
+    // BLOCKED: the InverseOfAssociationRecursiveError class + the
+    // checkValidityOfInverseBang recursion check both exist (reflection.ts:234),
+    // but checkValidityBang is only invoked for through-reflections + join
+    // dependency — never on the direct belongs_to/has_many access path. So
+    // `topic.branch.branch` never raises. Needs the validity check wired into
+    // single-association access (Rails reflection.rb check_validity!).
   });
   it("unscope does not set inverse when incorrect", async () => {
     class Human extends Base {
@@ -501,10 +503,9 @@ describe("InverseHasManyTests", () => {
   });
 
   it.skip("parent instance should be shared with every child on find for sti", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs STI support */
+    // BLOCKED: non-STI parent-sharing on find works, but the STI scoped
+    // collection (`special_posts`, class_name SpecialPost) returns 0 rows when
+    // loaded via loadHasMany — STI association-scope gap, not an inverse-of gap.
   });
 
   it("parent instance should be shared with eager loaded children", async () => {
@@ -660,11 +661,13 @@ describe("InverseHasManyTests", () => {
     expect((found as Base).topic).toBe("boats");
   });
 
-  it.skip("find on child instance with id should not load all child records", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs query counting */
+  it("find on child instance with id should not load all child records", async () => {
+    const { Man, Interest } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    const interest = await Interest.create({ topic: "trains", man_id: m.id });
+    const proxy = association(m, "interests");
+    await proxy.find(interest.id as number);
+    expect(proxy.loaded).toBe(false);
   });
 
   it("find on child instance with id should set inverse instances", async () => {
@@ -777,16 +780,14 @@ describe("InverseHasManyTests", () => {
   });
 
   it.skip("inverse instance should be set before find callbacks are run", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs callback integration */
+    // BLOCKED: afterFind callbacks exist, but the has_many inverse is wired
+    // AFTER the child's find callbacks fire (loadHasMany post-processes the
+    // loaded set), so an afterFind hook sees the inverse uncached. Rails sets
+    // the inverse inside the load block, before run_callbacks(:find).
   });
   it.skip("inverse instance should be set before initialize callbacks are run", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs callback integration */
+    // BLOCKED: same ordering gap as the find-callbacks case — the inverse is
+    // wired after the child's after_initialize fires, not before.
   });
 
   it("inverse works when the association self references the same object", async () => {
@@ -819,10 +820,10 @@ describe("InverseHasManyTests", () => {
   });
 
   it.skip("changing the association id makes the inversed association target stale", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs stale detection */
+    // BLOCKED: the staleState/isStale mechanism exists (association.ts:72), but
+    // the functional loadBelongsTo helper returns the _cachedAssociations value
+    // without consulting it, so a post-cache FK change isn't detected. Needs
+    // loadBelongsTo to honor staleness (small, but live-helper change).
   });
 });
 
@@ -923,10 +924,9 @@ describe("AutomaticInverseFindingTests", () => {
   });
 
   it.skip("has many and belongs to should find inverse automatically for model in module", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs module/namespace support */
+    // NOT PORTABLE: automaticInverseOf demodulizes the class name, but trails
+    // has no Ruby module system and JS class names cannot contain "::", so the
+    // Admin::Account / Admin::User namespaced scenario isn't representable.
   });
 
   it("has one and belongs to should find inverse automatically", () => {
@@ -963,17 +963,61 @@ describe("AutomaticInverseFindingTests", () => {
     expect(manAssocs.find((a: any) => a.name === "interests").options.inverseOf).toBe("man");
   });
 
-  it.skip("has many and belongs to should find inverse automatically for extension block", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs extension blocks */
+  it("has many and belongs to should find inverse automatically for extension block", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    class Comment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("post_id", "integer");
+      }
+    }
+    // The extension block (Rails `has_many :comments do ... end`) must not
+    // prevent automatic inverse detection.
+    Associations.hasMany.call(Post, "comments", { extend: { latest() {} } });
+    Associations.belongsTo.call(Comment, "post", {});
+    registerModel(Post);
+    registerModel(Comment);
+    const commentReflection = (Comment as any)._reflectOnAssociation("post");
+    const postReflection = (Post as any)._reflectOnAssociation("comments");
+    expect(postReflection.hasInverse()).toBe(true);
+    // Rails asserts reflection equality (Reflection#== compares name +
+    // active_record); inverseOf() returns the same reflection instance, so
+    // identity is the strongest faithful form.
+    expect(postReflection.inverseOf()).toBe(commentReflection);
   });
-  it.skip("has many and belongs to should find inverse automatically for sti", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs STI */
+  it("has many and belongs to should find inverse automatically for sti", () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Post extends Base {
+      static {
+        this.inheritanceColumn = "type";
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+      }
+    }
+    class SpecialPost extends Post {}
+    Associations.hasMany.call(Author, "posts", {});
+    // Rails infers the class from `:special_posts` → SpecialPost; rely on the
+    // same inference here rather than an explicit className.
+    Associations.hasMany.call(Author, "specialPosts", {});
+    Associations.belongsTo.call(Post, "author", {});
+    registerModel(Author);
+    registerModel(Post);
+    registerModel(SpecialPost);
+    const authorReflection = (Author as any)._reflectOnAssociation("posts");
+    const authorChildReflection = (Author as any)._reflectOnAssociation("specialPosts");
+    const postReflection = (Post as any)._reflectOnAssociation("author");
+    expect(authorReflection.hasInverse()).toBe(true);
+    expect(authorReflection.inverseOf()).toBe(postReflection);
+    expect(authorChildReflection.hasInverse()).toBe(true);
+    expect(authorChildReflection.inverseOf()).toBe(postReflection);
   });
   it("has one and belongs to with non default foreign key should not find inverse automatically", () => {
     // Rails: options[:foreign_key] present → can_find_inverse_of_automatically? returns false.
@@ -1431,23 +1475,72 @@ describe("InversePolymorphicBelongsToTests", () => {
     const cached = (m2 as any)._cachedAssociations?.get("tags") as Base[];
     expect(cached).toEqual([t]);
   });
-  it.skip("inversed instance should not be reloaded after stale state changed", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs stale state tracking */
+  it("inversed instance should not be reloaded after stale state changed", async () => {
+    class Man extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Face extends Base {
+      static {
+        this.attribute("description", "string");
+        this.attribute("man_id", "integer");
+      }
+    }
+    Associations.hasOne.call(Man, "face", { inverseOf: "man", foreignKey: "man_id" });
+    Associations.belongsTo.call(Face, "man", { inverseOf: "face", foreignKey: "man_id" });
+    registerModel(Man);
+    registerModel(Face);
+    const newMan = new Man({ name: "Gordon" });
+    const face = new Face({ description: "Smiling" });
+    await setHasOne(newMan, "face", face, { inverseOf: "man", foreignKey: "man_id" });
+    const oldInversedMan = await loadBelongsTo(face, "man", {
+      inverseOf: "face",
+      foreignKey: "man_id",
+    });
+    await (newMan as any).save();
+    const newInversedMan = await loadBelongsTo(face, "man", {
+      inverseOf: "face",
+      foreignKey: "man_id",
+    });
+    expect(newInversedMan).toBe(oldInversedMan);
   });
-  it.skip("inversed instance should not be reloaded after stale state changed with validation", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs stale state tracking */
+  it("inversed instance should not be reloaded after stale state changed with validation", async () => {
+    class Man extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Face extends Base {
+      static {
+        this.attribute("description", "string");
+        this.attribute("man_id", "integer");
+      }
+    }
+    Associations.hasOne.call(Man, "face", { inverseOf: "man", foreignKey: "man_id" });
+    Associations.belongsTo.call(Face, "man", { inverseOf: "face", foreignKey: "man_id" });
+    registerModel(Man);
+    registerModel(Face);
+    const face = new Face({ description: "Smiling" });
+    setBelongsTo(face, "man", new Man({ name: "Gordon" }), {
+      inverseOf: "face",
+      foreignKey: "man_id",
+    });
+    const oldInversedMan = await loadBelongsTo(face, "man", {
+      inverseOf: "face",
+      foreignKey: "man_id",
+    });
+    await (face as any).save();
+    const newInversedMan = await loadBelongsTo(face, "man", {
+      inverseOf: "face",
+      foreignKey: "man_id",
+    });
+    expect(newInversedMan).toBe(oldInversedMan);
   });
   it.skip("inversed instance should load after autosave if it is not already loaded", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs autosave */
+    // BLOCKED: needs the autosave path to load the (not-yet-loaded) inverse
+    // has_one after the owner save (Rails autosave_association loads + saves the
+    // inverse). Distinct from the other inverse tests; unverified scope.
   });
 
   it("should not try to set inverse instances when the inverse is a has many", async () => {
