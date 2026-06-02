@@ -16,6 +16,7 @@ import { Logger } from "@blazetrails/activesupport";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { Schema } from "./schema.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 import {
   describeIfMysql,
@@ -2184,7 +2185,7 @@ describe("MigrationTest", () => {
     },
   );
 
-  it.skipIf(adapterType === "sqlite")("migrator generates valid lock id", async () => {
+  itIfSupports("advisory_locks", "migrator generates valid lock id", async () => {
     const { adapter: realAdapter } = createSidecarTestAdapter();
     const migrator = new Migrator(realAdapter, []);
     const lockId = await migrator.generateMigratorAdvisoryLockId();
@@ -2199,7 +2200,7 @@ describe("MigrationTest", () => {
     }
   });
 
-  it.skipIf(adapterType === "sqlite")("generate migrator advisory lock id", async () => {
+  itIfSupports("advisory_locks", "generate migrator advisory lock id", async () => {
     // SchemaAdapter now forwards currentDatabase() — no need to bypass the wrapper
     const testAdapter = createTestAdapter();
     const migrator = new Migrator(testAdapter, []);

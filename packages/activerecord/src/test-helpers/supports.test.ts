@@ -15,6 +15,13 @@ describe("adapterSupports", () => {
     expect(adapterSupports("insert_conflict_target")).toBe(adapterType !== "mysql");
     // Rails `supports_json?` is `!mariadb?` — false on the MariaDB mysql lane.
     expect(adapterSupports("json")).toBe(adapterType !== "mysql");
+    // advisory_locks: PG + MySQL, not SQLite (mirrors the old skipIf(=== sqlite)).
+    expect(adapterSupports("advisory_locks")).toBe(adapterType !== "sqlite");
+    // exclusion/unique constraints: PG only (mirrors skipIf(!== postgres)).
+    expect(adapterSupports("exclusion_constraints")).toBe(adapterType === "postgres");
+    expect(adapterSupports("unique_constraints")).toBe(adapterType === "postgres");
+    // expression_index: PG + SQLite, not MariaDB mysql lane (mirrors skipIf(=== mysql)).
+    expect(adapterSupports("expression_index")).toBe(adapterType !== "mysql");
   });
 
   it("throws on an unknown feature key (catches typos)", () => {
