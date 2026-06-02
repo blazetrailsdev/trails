@@ -1198,7 +1198,8 @@ export class SchemaDumper {
           return `${k}: () => ${JSON.stringify((v as () => unknown)())}`;
         }
         if (v && typeof v === "object" && !Array.isArray(v)) {
-          return `${k}: { ${this.formatColspec(v as Record<string, unknown>)} }`;
+          const inner = this.formatColspec(v as Record<string, unknown>);
+          return `${k}: ${inner ? `{ ${inner} }` : "{}"}`;
         }
         return `${k}: ${JSON.stringify(v)}`;
       })

@@ -313,6 +313,20 @@ export class StringKeyedHashAccessor extends HashAccessor {
   static override write(object: Base, attribute: string, key: unknown, value: unknown): void {
     super.write(object, attribute, String(key), value);
   }
+
+  /**
+   * TS-specific override: the base HashAccessor.prepare writes `"{}"` (a JSON
+   * string) for null values, which the hstore parser rejects as invalid hstore
+   * format. Write `{}` (plain object) instead. Rails' StringKeyedHashAccessor
+   * does not override prepare — it inherits HashAccessor.prepare which writes
+   * an empty Ruby Hash; TS needs this override because the base writes a string.
+   */
+  static override prepare(object: Base, attribute: string): void {
+    const val = object.readAttribute(attribute);
+    if (val === null || val === undefined || typeof val !== "object") {
+      object.writeAttribute(attribute, {});
+    }
+  }
 }
 
 export interface StoreOptions {

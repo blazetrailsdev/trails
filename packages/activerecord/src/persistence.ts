@@ -741,6 +741,24 @@ export function valuesAt(this: AttributeIO, ...keys: string[]): unknown[] {
 }
 
 /**
+ * Walk the prototype chain of `instance` to find a setter descriptor for
+ * `key`. Returns the setter function, or undefined if none exists.
+ *
+ * Used by assignAttributes to mirror Rails' public_send("#{k}=", v)
+ * dispatch — store accessor setters write to the store hash rather than a
+ * standalone attribute slot, so they must be called via the descriptor path.
+ */
+function findPrototypeSetter(instance: object, key: string): ((v: unknown) => void) | undefined {
+  let proto = Object.getPrototypeOf(instance);
+  while (proto !== null && proto !== Object.prototype) {
+    const desc = Object.getOwnPropertyDescriptor(proto, key);
+    if (desc?.set) return desc.set;
+    proto = Object.getPrototypeOf(proto);
+  }
+  return undefined;
+}
+
+/**
  * Mirrors: ActiveRecord::AttributeAssignment#assign_attributes. Rails'
  * version lets setter exceptions propagate raw; ours additionally wraps
  * them in AttributeAssignmentError with the offending key/value for
@@ -768,7 +786,12 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
           )
         )
           continue;
-        this.writeAttribute(key, value);
+        const setter = findPrototypeSetter(this, key);
+        if (setter) {
+          setter.call(this, value);
+        } else {
+          this.writeAttribute(key, value);
+        }
       } catch (e) {
         let repr: string;
         try {
@@ -798,7 +821,16 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
         )
       )
         continue;
-      this.writeAttribute(key, value);
+      // Mirrors Rails' _assign_attribute: dispatch through the public setter
+      // when one exists (store accessors write to the store hash, not a
+      // standalone attribute slot). Falls back to writeAttribute for plain
+      // columns and unknown keys.
+      const setter = findPrototypeSetter(this, key);
+      if (setter) {
+        setter.call(this, value);
+      } else {
+        this.writeAttribute(key, value);
+      }
     } catch (e) {
       let repr: string;
       try {
