@@ -25,6 +25,11 @@ import {
   composedOf,
 } from "./index.js";
 import { Associations, resolveAssocClass } from "./associations.js";
+import {
+  belongsToCounterCacheColumn,
+  counterCacheColumnOption,
+  resolveAliasedColumn,
+} from "./reflection.js";
 import { Table } from "@blazetrails/arel";
 
 import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
@@ -2824,5 +2829,30 @@ describe("ReflectionTest", () => {
     // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
     // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
     /* fixture-dependent */
+  });
+
+  it("counter cache column option extracts the explicit column from raw forms", () => {
+    expect(counterCacheColumnOption(true)).toBeNull();
+    expect(counterCacheColumnOption("custom_count")).toBe("custom_count");
+    expect(counterCacheColumnOption({ column: "custom_count" })).toBe("custom_count");
+    expect(counterCacheColumnOption({ active: true, column: null })).toBeNull();
+    expect(counterCacheColumnOption(undefined)).toBeNull();
+  });
+
+  it("belongs_to counter cache column demodulizes a namespaced owner", () => {
+    // Rails: active_record.name.demodulize.underscore.pluralize + _count
+    expect(belongsToCounterCacheColumn(true, "Comment")).toBe("comments_count");
+    expect(belongsToCounterCacheColumn(true, "Admin::Post")).toBe("posts_count");
+    expect(belongsToCounterCacheColumn("legacy_comments_count", "Comment")).toBe(
+      "legacy_comments_count",
+    );
+    expect(belongsToCounterCacheColumn(false, "Comment")).toBeNull();
+  });
+
+  it("resolves a snake_case counter column through a camelCase attribute alias", () => {
+    const model = { _attributeAliases: { commentsCount: "legacy_comments_count" } };
+    expect(resolveAliasedColumn(model, "comments_count")).toBe("legacy_comments_count");
+    expect(resolveAliasedColumn(model, "replies_count")).toBe("replies_count");
+    expect(resolveAliasedColumn(undefined, "comments_count")).toBe("comments_count");
   });
 });
