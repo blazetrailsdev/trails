@@ -77,11 +77,13 @@ port 13306 via `docker-compose`; CI uses 3306). CI now runs `mysql:8` (changed f
 3. **Bounded framework clusters in parallel** (Phase 2) — pool, migration,
    transactions, query-cache, nested-attributes, insert_all, fixtures. Each is
    self-contained and CI-runnable.
-4. **Adapter type-families** (Phase 3): the `adapters/<db>/**` dirs were excluded
-   from all core CI jobs (no `TEST_ADAPTER=postgresql`/`mysql2` lane), so they
-   were local-verify-only until **Story I-5** (✅ shipped) added the dedicated
-   `postgres-adapter-tests` / `mariadb-adapter-tests` jobs. The un-skip work is
-   now CI-gated.
+4. **Adapter type-families** (Phase 3): the PG/MySQL `adapters/<db>/**` dirs are
+   excluded from all core CI jobs (no `TEST_ADAPTER=postgresql`/`mysql2` lane),
+   so they are local-verify-only. **Story I-5** (below) prototyped enabling them
+   and found ~38 pre-existing failures; the CI-coverage + remediation work is now
+   tracked in
+   [`adapter-test-ci-coverage-plan.md`](adapter-test-ci-coverage-plan.md).
+   (SQLite adapter dirs already run in `sqlite-tests`.)
 5. **≤500 LOC per PR**, split via non-overlapping **sibling** branches off
    `main` (`<base>`/`<base>b`/`<base>c`), never stacked. (CLAUDE.md)
 6. **Never rename a Rails-derived test name.** Fix the implementation.
@@ -176,11 +178,17 @@ cast path remains).
 
 **I-4 shipped #2868** (`pluck()` now type-casts positionally through `Result#columnTypes`; `pluck with serialization` un-skipped; `ensureSchemaLoaded()` guard added). Follow-up: serialize write-side coder dump — see Discovered Follow-ups.
 
-### Story I-5 — add a `TEST_ADAPTER=postgresql`/`mysql2` CI job `[infra]` ~40 LOC ci.yml · dep: none — ✅ **SHIPPED**
+### Story I-5 — run the PG/MySQL `adapters/<db>/**` dirs in CI `[infra]` · dep: none — 🔬 **RE-SCOPED**
 
-**Shipped:** `postgres-adapter-tests` + `mariadb-adapter-tests` jobs in
-`ci.yml` set `TEST_ADAPTER` + the live-backend URL and run only the adapter
-dirs (path-filtered). Wired into the `ci` aggregate `needs` + skip allow-list.
+**Re-scoped → [`adapter-test-ci-coverage-plan.md`](adapter-test-ci-coverage-plan.md).**
+The ~40-LOC wiring was prototyped on the exploratory branch
+`tc100-i5-test-compare-100-phase-1-story` (PR #2863, **do not merge**). Enabling
+the dirs surfaced ~38 pre-existing failures (PG cross-file isolation; MySQL
+MariaDB-vs-MySQL dialect divergence; a few real impl/test bugs). The owner's
+direction: **extend the existing `postgres-tests`/`mariadb-tests` jobs** (add a
+`TEST_ADAPTER` step) rather than a separate job path, and fix the failure
+backlog first. Full inventory + ordered remediation stories live in the new
+plan doc.
 
 **Source-verified gap.** The `postgres-tests`/`mysql-tests` jobs run the _core_
 suite against a live backend. The `ADAPTER_SPECIFIC_EXCLUDE` block was dropped in
