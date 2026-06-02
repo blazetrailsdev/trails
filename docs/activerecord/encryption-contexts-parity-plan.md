@@ -65,13 +65,15 @@ Order matters — each step is independently testable. File paths are relative t
 **File:** `encryption/encrypted-attribute-type.ts`
 
 The private `decrypt`/`encrypt` text paths use the scheme encryptor
-`this._encryptor` (lines ~239 `decryptAsText`, ~312–315 `encryptAsText`, and the
-`private get encryptor()` at line ~324). Change them to read the **current
-context** encryptor, falling back to the scheme encryptor when no context
-override is active:
+`this._encryptor` directly (the `this._encryptor.decrypt(...)` call at line 239
+inside `decryptAsText` — method starts at line 219; the `this._encryptor.encrypt(...)`
+and `this._encryptor.isBinary()` calls at lines 315/312 inside `encryptAsText` —
+method starts at line 310; and the `private get encryptor()` at line 324). Change
+the call sites to read through a getter that resolves the **current context**
+encryptor, falling back to the scheme encryptor when no context override is active:
 
 ```ts
-// replace the `private get encryptor()` body (line ~324)
+// replace the `private get encryptor()` body (line 324)
 import { getEncryptionContext } from "./context.js";
 // ...
 private get encryptor(): EncryptorLike {
@@ -81,24 +83,50 @@ private get encryptor(): EncryptorLike {
 }
 ```
 
-Then make `decryptAsText` (line ~239) and `encryptAsText` (line ~312) call
-`this.encryptor.decrypt(...)` / `this.encryptor.encrypt(...)` and
+Then make `decryptAsText` (line 239) and `encryptAsText` (lines 312/315) call
+`this.encryptor.decrypt(...)` / `this.encryptor.encrypt(...)` /
 `this.encryptor.isBinary()` instead of `this._encryptor.*`.
 
-**Why the `?? this._encryptor` fallback is correct (and not a hack):** in Rails
-the default `Context` ships an `Encryptor.new`; in TS the default context is `{}`
-and per-attribute encryptors (compressor / custom encryptor / message
-serializer) live on the **scheme**. `Scheme#withContext`
-(`encryption/scheme.ts:~100`) already pushes the scheme's encryptor onto the
-context _only when the scheme has an override_ — exactly Rails'
-`@context_properties.present?` gate. So:
+**Critical: the `scheme.withContext` wrapper is already in the path — do NOT add
+a second one.** Both `decryptAsText` (line 221) and `encryptAsText` (line 311)
+already wrap their bodies in `this.scheme.withContext(() => { … })`, exactly
+mirroring Rails, where `decrypt_as_text`/`encrypt_as_text` run inside
+`with_context` (`encrypted_attribute_type.rb:84,136`) and `with_context` delegates
+to `scheme.with_context` (`encrypted_attribute_type.rb:15`). The getter above is
+evaluated **inside** that closure, so the scheme's own encryptor (if any) has
+already been pushed before `encryptor` resolves. The only change is swapping
+`this._encryptor` → `this.encryptor` at the call sites; the wrapper stays.
 
-- plain `encrypts :title` (no scheme override) → `scheme.withContext` pushes
-  nothing → `encryptor` reads context (or falls back to scheme default). Under
-  `without_encryption`/`protecting`, the context holds the Null/EncryptingOnly
-  encryptor → correct.
-- `encrypts :name, compressor: …` → `scheme.withContext` pushes the custom
-  encryptor on top → wins, matching Rails' innermost-context precedence.
+**Why this produces Rails-correct precedence (incl. override attrs under a
+swapped context):** in Rails the default `Context` ships an `Encryptor.new`; in TS
+the default context is `{}` and per-attribute encryptors (compressor / custom
+encryptor / message serializer) live on the **scheme**. `Scheme#withContext`
+(`encryption/scheme.ts:103-109`) pushes the scheme's encryptor onto the context
+_only when the scheme has an override_ (`ctx.encryptor = this._encryptor`) —
+exactly Rails' `@context_properties.present?` gate (`scheme.rb:70-72`, with the
+compressor/`compress:false` case setting `@context_properties[:encryptor]` at
+`scheme.rb:32-33`). Walking the cases with the getter resolving inside the
+existing wrapper:
+
+- **plain `encrypts :title`, default context** → `scheme.withContext` pushes
+  nothing → `getEncryptionContext().encryptor` is `undefined` → falls back to
+  `this._encryptor` (scheme default). ✓
+- **plain `encrypts :title` under `without_encryption`/`protecting`** →
+  `scheme.withContext` pushes nothing → getter reads the outer context encryptor
+  (Null/EncryptingOnly). ✓
+- **override attr (`encrypts :name, compressor: X`), default context** →
+  `scheme.withContext` pushes `{encryptor: schemeEncryptor}` → getter reads it →
+  scheme encryptor. ✓
+- **override attr under `without_encryption`** (the case finding 1 of the review
+  worried inverts) → outer context = `{encryptor: NullEncryptor}`, then
+  `scheme.withContext` pushes `{encryptor: schemeEncryptor}` **on top** → getter
+  reads top of stack = **scheme encryptor wins**, matching Rails' innermost-context
+  precedence. The fallback never sees the NullEncryptor here because the wrapper
+  shadows it. ✓
+
+(The earlier review premise — "the serialize/decrypt path does not call
+`scheme.withContext` at all" — does not hold against the current source: lines
+221 and 311 are the wrappers. No new wrapper is needed.)
 
 ### Change B — drop the flag short-circuits in serialize/deserialize
 
@@ -206,6 +234,27 @@ called for multiple attributes — see how `validateColumnSize` dedupes via
 `_validators`). This makes `post.save()`/`update` in protected mode add an error
 on each changed encrypted attribute → the bang variant throws `RecordInvalid`.
 
+> **Registration-locus divergence (intentional, note it):** Rails declares this
+> validation **once at concern inclusion** for every `EncryptableRecord`
+> (`encryptable_record.rb:13`), relying entirely on the `if:` guard
+> (`has_encrypted_attributes?`) to no-op for unencrypted models. The plan instead
+> registers it lazily inside `encrypts` setup. Behavior is equivalent because the
+> guard is identical, but two things must hold:
+>
+> 1. **Dedup keys on the model, not the attribute** — a model with N encrypted
+>    attributes must register exactly one validator (otherwise an invalid save
+>    adds N duplicate errors / runs the callback N times). `validateColumnSize`
+>    dedupes per-attribute (correct for _it_, since it's a length validator on each
+>    column); this one must dedupe per-model. Use a `WeakSet<modelClass>` or a
+>    `static` flag on the class, not `_validators[attr]`.
+> 2. **The `if:` closure is evaluated live, per save** (not snapshotted at
+>    registration). The context must be read inside the closure at validation
+>    time. Verify the activemodel runner invokes `ConditionalOptions.if` on each
+>    `validate(context)` call — the `() => … getEncryptionContext().frozenEncryption`
+>    form is correct only if the framework doesn't cache the boolean at register
+>    time. (Confirm via an activemodel conditional-validation test before relying
+>    on it.)
+
 ### Change E — confirm encrypt/decrypt raise `Configuration` in protected mode
 
 **File:** `encryption/encryptable-record.ts` — **no code change expected.**
@@ -255,6 +304,16 @@ suite + canonical models (gold standard: `encryption/encrypted-fixtures.test.ts`
     `assertEncryptedAttribute(await post.reload(), "title", titleCleartext)`.
   - `nested multiple times` → assert `Configurable.encryptor === e1/e2/e3` at each level.
   - `without_encryption won't decrypt …` → `assertNotEncryptedAttribute` after write (**add this helper** to `encryption/test-helpers.ts` — it has `assertEncryptedAttribute` but not the negative).
+  - `.without_encryption doesn't raise on binary encoded data` (`contexts_test.rb:64-70`)
+    → `withoutEncryption(() => EncryptedBook.create({ name: <binary string> }))`, assert
+    it does not throw. **This is the Change-A binary-path verification gate:** post-Change-A,
+    `encryptAsText` consults `this.encryptor.isBinary()` on the swapped `NullEncryptor`
+    (not the scheme encryptor), and the binary-column guard
+    (`encrypted_attribute_type.rb:137-139`) raises only when `isBinary() && !castType.isBinary()`.
+    Confirmed: TS `NullEncryptor.isBinary()` returns `false`
+    (`null-encryptor.ts:20-22`, mirrors Rails `null_encryptor.rb:20-22` `binary? → false`),
+    so the guard is skipped and the assertion stays green. If Change A regressed the
+    encryptor to anything binary-capable here, this test would flip.
   - `protecting … don't decrypt` / `allows db-queries on deterministic attributes`
     (use `EncryptedBook.findBy({ name: "Dune" })`).
   - `can't encrypt or decrypt in protected mode` → `expect(post.encrypt()).rejects` / `decrypt()` → `Errors::Configuration` (Change E).
@@ -277,12 +336,18 @@ suite + canonical models (gold standard: `encryption/encrypted-fixtures.test.ts`
 2. **Regression focus** (Change B/C touch the shared read/write path): the whole
    `encryption/` folder + `encryption.test.ts` + `encryption-hooks.test.ts`. CI
    runs the full suite; locally run the encryption files as a group.
-3. **Target test:** `pnpm vitest run packages/activerecord/src/encryption/contexts.test.ts` green.
-4. **Lint:** `npx eslint packages/activerecord/src/encryption/contexts.test.ts`
+3. **Change-A encryptor-precedence gates** (the cases where wrong precedence would
+   surface): the binary test `.without_encryption doesn't raise on binary encoded
+data` and `.protecting_encrypted_data allows db-queries on deterministic
+attributes`, plus any compressor/custom-encryptor scheme exercised under
+   `without_encryption` (`encryptable-record.test.ts`, `encryption-schemes.test.ts`).
+   These are the tests that flip if the getter resolves to the wrong encryptor.
+4. **Target test:** `pnpm vitest run packages/activerecord/src/encryption/contexts.test.ts` green.
+5. **Lint:** `npx eslint packages/activerecord/src/encryption/contexts.test.ts`
    → 0 `blazetrails/test-fixture-parity` errors.
-5. **Remove** `"packages/activerecord/src/encryption/contexts.test.ts"` from
+6. **Remove** `"packages/activerecord/src/encryption/contexts.test.ts"` from
    `eslint/test-fixture-parity-exclude.json` (final commit).
-6. `pnpm api:compare --package activerecord` (the new `Configurable.encryptor`
+7. `pnpm api:compare --package activerecord` (the new `Configurable.encryptor`
    getter and any `@internal` JSDoc the lint rule wants).
 
 ## 5. Risks / open questions
@@ -293,15 +358,26 @@ suite + canonical models (gold standard: `encryption/encrypted-fixtures.test.ts`
   (2) `contexts.test.ts` rewrite + exclude-list removal. PR 2 depends on PR 1
   merging first (it asserts behavior PR 1 ships) — ship sequentially, do **not**
   stack.
-- **`isEncrypted` under a swapped context.** Rails' `encrypted?` also reads the
-  context encryptor; under `NullEncryptor` it returns `false`. Decide whether
-  `EncryptedAttributeType.isEncrypted` (line ~128, currently
-  `scheme.withContext(() => this._encryptor.isEncrypted(...))`) should switch to
-  the context encryptor. Switching is Rails-faithful but can ripple into
-  `support_unencrypted_data` detection and `EncryptableRecord.isEncryptedAttribute`
-  — verify `encrypted-fixtures.test.ts` and `unencrypted-attributes.test.ts`
-  before changing. Recommendation: leave `isEncrypted` on the scheme encryptor
-  unless a test demands otherwise, and note the divergence.
+- **`isEncrypted` is a _known, pre-existing_ divergence from Rails
+  `encrypted?` — flagged, not neutral.** Rails' `encrypted?` reads the **context**
+  encryptor inside `with_context` (`encrypted_attribute_type.rb:48`:
+  `with_context { encryptor.encrypted? value }`); under a swapped `NullEncryptor`
+  it returns `false`. The current TS already diverges: `isEncrypted`
+  (`encrypted-attribute-type.ts:128-130`) wraps in `this.scheme.withContext(...)`
+  but then reads `this._encryptor` directly, ignoring the context the wrapper just
+  pushed. Change A does **not** touch `isEncrypted` (it edits only the
+  decrypt/encrypt text paths), so this divergence persists by default. Decision
+  for the impl PR: leave it as-is for scope control, but record it explicitly as a
+  divergence from `encrypted_attribute_type.rb:48`. Note the **free fix once Change A
+  lands**: since Change A introduces the context-resolving `this.encryptor` getter,
+  the Rails-faithful form is simply
+  `this.scheme.withContext(() => this.encryptor.isEncrypted(value))` (swap
+  `this._encryptor` → `this.encryptor`, identical to the decrypt/encrypt edit).
+  Defer it only because flipping `encrypted?` to `false` under a swapped
+  `NullEncryptor` feeds `support_unencrypted_data` detection and
+  `EncryptableRecord.isEncryptedAttribute` — verify `encrypted-fixtures.test.ts`
+  and `unencrypted-attributes.test.ts` stay green before adopting it, ideally as a
+  follow-up once the context tests pass.
 - **`update` vs `update!` semantics.** Confirm the throwing update path raises
   `RecordInvalid` when a `validate` callback adds an error (Change D); if only
   `save!`/`create!` throw, the ported test must use the bang form.
