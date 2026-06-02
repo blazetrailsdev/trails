@@ -19,7 +19,8 @@ import {
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Base } from "./base.js";
 // Registers _RelationCtor so Model.first()/.all()/.where() etc. work in
-// adapter-step test files that import base.js directly rather than index.js.
+// test files that import base.js directly rather than index.js (which
+// re-exports relation.js as a side effect).
 import "./relation.js";
 
 await bootstrapTestHandler();
