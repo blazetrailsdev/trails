@@ -1905,7 +1905,12 @@ export class MigrationContext {
     if (options?.ifNotExists && this.tableExists(name)) {
       return;
     }
-    const td = new TableDefinition(name, {
+    // Rails: `td = create_table_definition(...)` — dispatch to the adapter's
+    // dialect-specific TableDefinition (e.g. PostgreSQL::TableDefinition with
+    // range/hstore/jsonb column methods) instead of constructing the abstract
+    // one inline. Fall back to the abstract TableDefinition for minimal adapters
+    // (test mocks) that don't expose createTableDefinition.
+    const tdOptions = {
       id: options?.as != null ? false : options?.id,
       primaryKey: options?.primaryKey,
       default: options?.default,
@@ -1916,7 +1921,14 @@ export class MigrationContext {
       as: options?.as,
       adapterName: this._adapterName,
       adapter: this.connection,
-    });
+    };
+    const adapterCtd = this.connection as unknown as {
+      createTableDefinition?(n: string, o: Record<string, unknown>): TableDefinition;
+    };
+    const td =
+      typeof adapterCtd.createTableDefinition === "function"
+        ? adapterCtd.createTableDefinition(name, tdOptions)
+        : new TableDefinition(name, tdOptions as ConstructorParameters<typeof TableDefinition>[1]);
     if (fn) fn(td);
     await this.connection.executeMutation(this.connection.toSql(td));
     if (options?.comment != null && options.comment.length > 0) {

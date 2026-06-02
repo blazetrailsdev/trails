@@ -1216,21 +1216,15 @@ describe("MigrationTest", () => {
   });
 
   it("create table raises if already exists", async () => {
-    // Body-level Rails fidelity (second createTable should raise per
-    // activerecord/test/cases/migration_test.rb:158) is blocked by the
-    // shared test adapter, which rewrites every CREATE TABLE into
-    // CREATE TABLE IF NOT EXISTS (test-adapter.ts:812-814). Until that
-    // rewrite is gated, this stays a smoke test for create-then-insert.
-    // D-1 carve-out: uses own freshAdapterWithSchema() for DDL isolation.
-    const adp = await freshAdapterWithSchema();
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adp;
-      }
-    }
-    const post = await Post.create({ title: "first" });
-    expect(post.id).toBeDefined();
+    const { ctx } = freshContext();
+    await ctx.createTable("testings", {}, (t) => {
+      t.string("foo");
+    });
+    await expect(
+      ctx.createTable("testings", {}, (t) => {
+        t.string("foo");
+      }),
+    ).rejects.toThrow();
   });
 
   it("add column with if not exists set to true", () => {
@@ -1584,11 +1578,16 @@ describe("MigrationTest", () => {
     expect(ctx.columnExists("users", "name")).toBe(true);
   });
 
-  it.skip("method missing delegates to connection", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires method_missing pattern (not idiomatic in TS)
+  it("method missing delegates to connection", () => {
+    class M extends Migration {
+      override get connection(): DatabaseAdapter {
+        return { createTable: () => "hi mom!" } as unknown as DatabaseAdapter;
+      }
+      async up() {}
+      async down() {}
+    }
+    const migration = new M();
+    expect(migration.methodMissing("createTable")).toBe("hi mom!");
   });
 
   it("filtering migrations", async () => {
