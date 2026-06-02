@@ -73,11 +73,13 @@ export class Column extends BaseColumn {
     return super.type ?? "";
   }
 
+  // Mirrors Rails Column#serial? — returns the stored flag, which the adapter
+  // computes by matching the `nextval()` default's sequence against the
+  // conventional `<table>_<column>_seq` name (see
+  // PostgreSQLAdapter#serialFromDefaultFunction). An explicit
+  // `default: -> { "nextval('some_seq')" }` is NOT serial.
   get isSerial(): boolean {
-    return (
-      this.serial ||
-      (typeof this.defaultFunction === "string" && this.defaultFunction.startsWith("nextval("))
-    );
+    return this.serial;
   }
 
   // Mirrors: Column#identity? — truthy when attidentity is "a" or "d"

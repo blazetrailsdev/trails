@@ -3140,7 +3140,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       const defaultFunction = attgenerated ? rawDefault : (splitDefault?.fn ?? null);
       const rawLiteral = attgenerated ? null : (splitDefault?.literal ?? null);
       const literal = rawLiteral !== null ? castType.deserialize(rawLiteral) : null;
-      const isSerial = typeof rawDefault === "string" && rawDefault.startsWith("nextval(");
+      const isSerial = this.serialFromDefaultFunction(tableName, r.name as string, defaultFunction);
 
       return new Column(
         r.name as string,
@@ -3494,6 +3494,26 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return `${singularize(table)}_${columnName}`;
   }
 
+  /**
+   * Mirrors Rails `new_column_from_field`'s serial detection: a column is
+   * serial only when its `nextval()` default references the very sequence name
+   * `sequenceNameFromParts` would generate for this table+column. A plain
+   * `default: -> { "nextval('some_seq')" }` whose sequence doesn't follow the
+   * `<table>_<column>_seq` convention is NOT serial.
+   * @internal
+   */
+  serialFromDefaultFunction(
+    tableName: string,
+    columnName: string,
+    defaultFunction: string | null,
+  ): boolean {
+    if (defaultFunction == null) return false;
+    const match = /^nextval\('"?(.+_(seq\d*))"?'::regclass\)$/.exec(defaultFunction);
+    if (!match) return false;
+    const [, sequenceName, suffix] = match;
+    return this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
+  }
+
   /** @internal */
   sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string {
     const maxLen = 63;
@@ -3505,7 +3525,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       const colMaxLen = Math.floor((maxLen - suffix.length - 2) / 2);
       const newColLen = Math.min(colMaxLen, col.length);
       overLength -= col.length - newColLen;
-      col = col.slice(0, newColLen - Math.max(overLength, 0));
+      // Mirrors Ruby's `column_name[0, column_name_length - [over_length, 0].min]`:
+      // when over_length is still positive the column is kept full (min → 0) and
+      // the table is truncated below instead; only a negative over_length (the
+      // column was over-truncated) adds characters back.
+      col = col.slice(0, newColLen - Math.min(overLength, 0));
     }
     if (overLength > 0) {
       tbl = tbl.slice(0, tbl.length - overLength);
@@ -4737,7 +4761,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     field: unknown[],
     _definitions: unknown,
   ): Promise<Column> {
-    void tableName;
     const [col, type, raw, notnull, oid, fmod, , , identity, gen] = field as [
       string,
       string,
@@ -4773,7 +4796,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       !notnull,
       {
         defaultFunction: (gen ? raw : split?.fn) ?? undefined,
-        serial: typeof raw === "string" && raw.startsWith("nextval("),
+        serial: this.serialFromDefaultFunction(tableName, col, (gen ? raw : split?.fn) ?? null),
         array: type.endsWith("[]"),
         identity: identity || null,
         generated: gen || null,
