@@ -14,6 +14,12 @@ import { Associations, association, loadHasMany, loadHasManyThrough } from "../a
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { assertNoQueries } from "../testing/query-assertions.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Category } from "../test-helpers/models/category.js";
+import { Categorization } from "../test-helpers/models/categorization.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -2981,11 +2987,6 @@ describe("EagerAssociationTest", () => {
     expect((posts[1] as any)._preloadedAssociations.get("habtmLimCategories")).toHaveLength(1);
     expect((posts[2] as any)._preloadedAssociations.get("habtmLimCategories")).toHaveLength(0);
   });
-  it.skip("has and belongs to many should not instantiate same records multiple times", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
-  });
   it.skip("eager with has many and limit and conditions on the eagers", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
@@ -4001,9 +4002,15 @@ describe("EagerAssociationTest", () => {
     expect(loaded.title).toBe("T");
   });
   it.skip("conditions on join table with include and limit", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+    // BLOCKED: the canonical Developer model's schema columns don't reach the
+    // model in the handler/fixtures path when running among other tests
+    // (Developer.columns() falls back to the declared virtual `lastName`, so
+    // SELECT emits `developers.lastName` → "no such column"). #2830/#2831 fixed
+    // the lastName-virtual + fixture-registration sub-blockers, but the deeper
+    // Developer schema-cache reflection bug remains (see assoc/callbacks.test.ts).
+    // Passes in isolation, not in the full file; needs the framework fix first.
+    // Form: Developer.includes("projects")
+    //   .where({ "developers_projects.access_level": 1 }).limit(5) → 3.
   });
   it.skip("dont create temporary active record instances", () => {
     // BLOCKED: associations — eager-loading feature gap
@@ -4279,11 +4286,6 @@ describe("EagerAssociationTest", () => {
       .toArray();
     expect(result).toHaveLength(1);
     expect(result[0]._preloadedAssociations.get("jeeoComments")).toHaveLength(1);
-  });
-  it.skip("deep including through habtm", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
   it("eager load multiple associations with references", async () => {
     class ElmarMentor extends Base {
@@ -5577,6 +5579,95 @@ describe("EagerLoadingTooManyIdsTest", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (HABTM, canonical fixtures) — `Post has_and_belongs_to_many
+// :categories` / `Category has_and_belongs_to_many :posts` use the canonical
+// Post/Category/Categorization models + real categories/posts/categories_posts/
+// categorizations fixtures, so they need the fixture-backed handler suite. The
+// main block above declares ad-hoc per-test models against a local schema.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  const { posts, categories } = useHandlerFixtures([
+    "categories",
+    "posts",
+    "categoriesPosts",
+    "categorizations",
+  ]);
+  // Force-recreate the canonical HABTM tables with `dropExisting` (mirrors
+  // named-scoping.test.ts). The per-worker SQLite DB is shared across files
+  // (`file:trails_test_${VITEST_POOL_ID}?mode=memory&cache=shared`), and sibling
+  // files (e.g. has-many-associations.test.ts) define a `posts` table WITHOUT a
+  // `body` column. The signature cache is primed at worker boot
+  // (template-global-setup.ts), so a plain `defineSchema` would cache-hit and
+  // skip recreation — leaving the fixture seed to hit the wrong columns
+  // (`table posts has no column named body`). `dropExisting` bypasses the cache.
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection as Parameters<typeof defineSchema>[0],
+      {
+        categories: canonicalSchema.categories,
+        posts: canonicalSchema.posts,
+        categories_posts: canonicalSchema.categories_posts,
+        categorizations: canonicalSchema.categorizations,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Post);
+  registerModel(Category);
+  registerModel(Categorization);
+
+  it("has and belongs to many should not instantiate same records multiple times", async () => {
+    // Rails (eager_test.rb): eager-loading `welcome` through two different HABTM
+    // owners (general.posts and technology.posts) must reuse one instance
+    // (`assert_same post1, post2`). categories_posts seeds both general_welcome
+    // and technology_welcome, so welcome is genuinely reachable via two owners.
+    const welcome = posts("welcome");
+    const loaded = await Category.all().includes("posts").toArray();
+
+    const general = loaded.find((c) => c.id === categories("general").id) as Category;
+    const technology = loaded.find((c) => c.id === categories("technology").id) as Category;
+
+    const generalPosts = general.association("posts").target as Base[];
+    const technologyPosts = technology.association("posts").target as Base[];
+    const post1 = generalPosts.find((p) => p.id === welcome.id);
+    const post2 = technologyPosts.find((p) => p.id === welcome.id);
+
+    expect(post1).toBeDefined();
+    expect(post1).toBe(post2);
+  });
+
+  it("deep including through habtm", async () => {
+    // Rails (eager_test.rb): `includes(categories: :categorizations)` preloads
+    // two levels — Post HABTM categories, each Category has_many categorizations
+    // — so the nested reads fire no further queries (Rails wraps each in
+    // `assert_no_queries`).
+    const loaded = await Post.all()
+      .includes({ categories: "categorizations" })
+      .order("posts.id")
+      .toArray();
+
+    await assertNoQueries(false, async () => {
+      // Posts are positional (explicitly `order("posts.id")`); categories are
+      // looked up by fixture identity rather than position — the HABTM preload
+      // query carries no ORDER BY (preloader/association.ts:470; the through
+      // preloader only sorts when the association scope has `orderValues`,
+      // through-association.ts:91-94), so `WHERE id IN (...)` row order isn't
+      // guaranteed cross-adapter. Rails relies on the same implicit order via
+      // `categories[0]`/`[1]`; we assert the same counts without depending on it.
+      const categoryOf = (post: Base, categoryId: unknown): Base =>
+        (post.association("categories").target as Base[]).find((c) => c.id === categoryId)!;
+      const categorizationCount = (c: Base): number =>
+        (c.association("categorizations").target as Base[]).length;
+
+      // welcome → general (2 categorizations) + technology (1); thinking → general (2).
+      expect(categorizationCount(categoryOf(loaded[0], categories("general").id))).toBe(2);
+      expect(categorizationCount(categoryOf(loaded[0], categories("technology").id))).toBe(1);
+      expect(categorizationCount(categoryOf(loaded[1], categories("general").id))).toBe(2);
+    });
   });
 });
 
