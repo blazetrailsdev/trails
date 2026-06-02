@@ -26,6 +26,18 @@ describe("AssociationsExtensionsTest", () => {
   const { posts, comments } = useHandlerFixtures(["posts", "comments"], {
     schema: canonicalSchema,
   });
+  // Force-recreate `posts`/`comments` to the canonical shape. Under vitest's
+  // per-file module isolation the signature/schema caches reset to canonical
+  // each file, so `useHandlerFixtures`' own `defineSchema` sees a cache-hit and
+  // skips the repair — leaving a reduced `posts:{title}` shape (no `body`) that
+  // a sibling handler-suite file co-scheduled earlier in the same fork wrote to
+  // the shared worker DB. `dropExisting` drops + recreates unconditionally, so
+  // the posts fixture INSERT (which carries a `body` value) finds the column.
+  // Registered after `useHandlerFixtures` so this `beforeAll` runs last and wins.
+  beforeAll(async () => {
+    const s = canonicalSchema as Schema;
+    await defineSchema({ posts: s.posts, comments: s.comments }, { dropExisting: true });
+  });
 
   it("extension on has many", async () => {
     const proxy = association(posts("welcome"), "comments") as unknown as {
