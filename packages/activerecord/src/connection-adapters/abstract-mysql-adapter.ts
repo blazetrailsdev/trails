@@ -854,7 +854,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#write_query? */
-  isWriteQuery(sql: string): boolean {
+  override isWriteQuery(sql: string): boolean {
     return mysqlIsWriteQuery(sql);
   }
 

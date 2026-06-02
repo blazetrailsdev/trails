@@ -500,6 +500,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     binds?: unknown[],
     options?: { prepare?: boolean },
   ): Promise<Result> {
+    this.checkIfWriteQuery(sql);
     await this.materializeTransactions();
     this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
