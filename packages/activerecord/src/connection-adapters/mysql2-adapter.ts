@@ -1111,10 +1111,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // DATA_TYPE ("float") correctly yields limit=24 matching Rails' native_database_types.
       const charLimitVal = charLen != null ? Number(charLen) : null;
       // lookupCastType always returns a Type (falls back to ValueType with name "value").
-      // We preserve baseType for unregistered types so callers see the raw DATA_TYPE
-      // rather than the opaque "value" sentinel.
-      const castType = this.lookupCastType(baseType);
-      const typeMapLimit = charLimitVal == null ? (castType.limit ?? null) : null;
+      // Key the cast lookup on the full COLUMN_TYPE (e.g. "tinyint(1)") so the
+      // emulate_booleans override (/^tinyint\(1\)/i → Boolean) can fire — Rails'
+      // new_column_from_field likewise keys on the full sql_type. The limit,
+      // however, comes from a DATA_TYPE-keyed lookup: on MariaDB a bare FLOAT
+      // normalizes its COLUMN_TYPE to "double" (limit 53), whereas DATA_TYPE
+      // "float" correctly yields limit 24 to match Rails native_database_types.
+      const castType = this.lookupCastType(sqlType);
+      const baseCastType = this.lookupCastType(baseType);
+      const typeMapLimit = charLimitVal == null ? (baseCastType.limit ?? null) : null;
       // Map DATA_TYPE ("varchar") to the Rails semantic type ("string") via the type map.
       // MysqlDateTimeType.name is "datetime" for both "datetime" and "timestamp" DATA_TYPEs.
       const castName = castType.name;
