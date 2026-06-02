@@ -511,7 +511,10 @@ function main() {
             conventionTsFile: conventionTs,
           });
         } else if (otherLocations.length >= 1) {
-          // Shared test — count as matched
+          // Shared test — count as matched. Gate mismatches are intentionally
+          // NOT checked here: the test lives in a non-convention file, so the
+          // owning TS gate is ambiguous. Gate diagnostics cover the three
+          // direct convention-file match passes only.
           matched++;
           totalMatched++;
           // Check if all matching instances in other files are pending.

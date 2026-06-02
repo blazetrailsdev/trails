@@ -22,6 +22,17 @@ describe("classifyGateMismatch", () => {
 
   it("over-gated: Rails runs it everywhere, we gate it", () => {
     expect(classifyGateMismatch(undefined, pgWrapper, false)).toBe("over-gated");
+    // all-adapters Rails gate is effectively unconditional → still over-gated
+    expect(classifyGateMismatch(allThree, pgWrapper, false)).toBe("over-gated");
+  });
+
+  it("stays silent when Rails has only an incomparable guard but we gate", () => {
+    // e.g. Rails `skip if supports_transaction_isolation?` → guards:["no_…"],
+    // our TS gates [sqlite]. Real-but-incomparable Rails restriction → not over-gated.
+    const negFeatureGuard: TestGate = { guards: ["no_transaction_isolation"], source: ["class"] };
+    expect(
+      classifyGateMismatch(negFeatureGuard, { adapters: ["sqlite"], source: ["test"] }, false),
+    ).toBeNull();
   });
 
   it("wrong-gate: both gate it, but to different sets", () => {

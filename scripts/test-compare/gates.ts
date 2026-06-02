@@ -162,6 +162,17 @@ function comparable(g: TestGate | undefined): boolean {
   return !!g && (restrictsByAdapter(g) || (g.features?.length ?? 0) > 0);
 }
 
+/**
+ * Is the gate effectively "runs everywhere"? True when absent, or when it
+ * names all adapters with no feature/guard restriction. A *guard-only* gate
+ * (e.g. `skip if supports_transaction_isolation?` → `guards:["no_…"]`) is a
+ * real-but-incomparable restriction, so it is NOT unconditional — flagging
+ * `over-gated` against it would be a false positive.
+ */
+function effectivelyUnconditional(g: TestGate | undefined): boolean {
+  return !g || (!comparable(g) && (g.guards?.length ?? 0) === 0);
+}
+
 function adapterFeatureKey(g: TestGate): string {
   // All-adapters or absent → "*" ("runs on all"); an empty set → "" ("runs
   // nowhere"), kept distinct. Features sorted; guards/source ignored.
@@ -186,6 +197,9 @@ export function classifyGateMismatch(
     return adapterFeatureKey(rails!) === adapterFeatureKey(ts!) ? null : "wrong-gate";
   }
   if (railsGated) return tsPending ? "should-gate" : "missing-gate";
-  if (tsGated) return "over-gated";
+  // We gate it but Rails doesn't comparably. Only call it over-gated when Rails
+  // is effectively unconditional; if Rails has an incomparable guard, we can't
+  // tell, so stay silent.
+  if (tsGated) return effectivelyUnconditional(rails) ? "over-gated" : null;
   return null;
 }
