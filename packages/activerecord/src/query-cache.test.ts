@@ -773,17 +773,87 @@ describe("QueryCacheExpiryTest", () => {
     expect(store.enabled).toBe(false);
   });
 
-  it.skip("insert all bang", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+  it("update", async () => {
+    const { cached, Task } = await setup();
+    const task = await Task.create({ title: "a" });
+    await cached.cache(async () => {
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      (task as any).title = "b";
+      await (task as any).save();
+      expect(cached.queryCache.empty).toBe(true);
+    });
   });
-  it.skip("upsert all", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+  it("destroy", async () => {
+    const { cached, Task } = await setup();
+    const task = await Task.create({ title: "a" });
+    await cached.cache(async () => {
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await (task as any).destroy();
+      expect(cached.queryCache.empty).toBe(true);
+    });
+  });
+  it("insert", async () => {
+    const { cached, Task } = await setup();
+    await cached.cache(async () => {
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await Task.create({ title: "a" });
+      expect(cached.queryCache.empty).toBe(true);
+    });
+  });
+  it("insert all", async () => {
+    const { cached, Task } = await setup();
+    await cached.cache(async () => {
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await Task.insert({ title: "a" });
+      expect(cached.queryCache.empty).toBe(true);
+
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await Task.insertAll([{ title: "b" }]);
+      expect(cached.queryCache.empty).toBe(true);
+    });
+  });
+  it("insert all bang", async () => {
+    const { cached, Task } = await setup();
+    await cached.cache(async () => {
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await Task.insertBang({ title: "a" });
+      expect(cached.queryCache.empty).toBe(true);
+
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await Task.insertAllBang([{ title: "b" }]);
+      expect(cached.queryCache.empty).toBe(true);
+    });
+  });
+  it("upsert all", async () => {
+    const { cached, Task } = await setup();
+    await cached.cache(async () => {
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await Task.upsert({ title: "a" });
+      expect(cached.queryCache.empty).toBe(true);
+
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await Task.upsertAll([{ title: "b" }]);
+      expect(cached.queryCache.empty).toBe(true);
+    });
   });
   it.skip("cache is expired by habtm update", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+    // BLOCKED: needs habtm association setup (Post<=>Category collection proxy
+    // <<) in the raw-adapter harness; the per-thread wiring is now in place
+    // (see "insert all bang" / "upsert all"). Deferred — follow-up.
   });
   it.skip("cache is expired by habtm delete", () => {
-    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
+    // BLOCKED: needs habtm association setup (Post<=>Category collection proxy
+    // delete_all) in the raw-adapter harness; the per-thread wiring is now in
+    // place (see "insert all bang" / "upsert all"). Deferred — follow-up.
   });
 
   it("store checkVersion clears cache on version increment", async () => {
