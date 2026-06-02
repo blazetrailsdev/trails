@@ -22,7 +22,9 @@ import {
   ConnectionNotEstablished,
   ConfigurationError,
   NotImplementedError,
+  ActiveRecordError,
 } from "./errors.js";
+import { permanentConnectionCheckout } from "./ar-config.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   connectedToStack,
@@ -362,12 +364,24 @@ export function isConnectedQ(this: typeof Base): boolean {
 
 export const isConnected = isConnectedQ;
 
+const CONNECTION_DEPRECATION_MSG =
+  "Called deprecated `ActiveRecord::Base.connection` method. " +
+  "Either use `with_connection` or `lease_connection`.";
+
 export function connection(this: typeof Base): DatabaseAdapter {
   // Fast path: directly assigned via `Model.adapter = x` (tests + simple setups)
   if ((this as any)._adapter) return (this as any)._adapter;
   const pool = connectionPool.call(this);
-  if (pool.isPermanentLease()) return pool.leaseConnection();
-  return pool.activeConnection ?? pool.leaseConnection();
+  if (pool.isPermanentLease()) {
+    const setting = permanentConnectionCheckout;
+    if (setting === "deprecated") {
+      console.warn("DEPRECATION WARNING: " + CONNECTION_DEPRECATION_MSG);
+    } else if (setting === "disallowed") {
+      throw new ActiveRecordError(CONNECTION_DEPRECATION_MSG);
+    }
+    return pool.leaseConnection();
+  }
+  return pool.activeConnection!;
 }
 
 export function isPrimaryClass(this: typeof Base): boolean {
