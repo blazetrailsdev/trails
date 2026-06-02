@@ -107,6 +107,14 @@ const TEST_SCHEMA = {
     columns: { dashboard_id: "string", name: "string" },
     primaryKey: ["dashboard_id"],
   },
+  md_member_types: { name: "string" },
+  md_members: {
+    name: "string",
+    member_type_id: "integer",
+    admittable_id: "integer",
+    admittable_type: "string",
+  },
+  md_member_details: { member_id: "integer" },
 } satisfies Schema;
 
 describe("HasOneThroughAssociationsTest", () => {
@@ -236,12 +244,81 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(through.readAttribute("member_id")).toBeNull();
   });
 
-  it.skip("building multiple associations builds through record", () => {
-    // BLOCKED: fixture — MemberDetail (member_type_id + admittable polymorphic) model not defined in test suite
+  it("building multiple associations builds through record", async () => {
+    // member_type = MemberType.create!
+    // member = Member.create!
+    // member_detail_with_one_association = MemberDetail.new(member_type: member_type)
+    // assert_predicate member_detail_with_one_association.member, :new_record?
+    // member_detail_with_two_associations = MemberDetail.new(member_type: member_type, admittable: member)
+    // assert_predicate member_detail_with_two_associations.member, :new_record?
+    class MdMemberType extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class MdMember extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("member_type_id", "integer");
+        this.attribute("admittable_id", "integer");
+        this.attribute("admittable_type", "string");
+      }
+    }
+    class MdMemberDetail extends Base {
+      static {
+        this.attribute("member_id", "integer");
+      }
+    }
+    registerModel(MdMemberType);
+    registerModel(MdMember);
+    registerModel(MdMemberDetail);
+    Associations.belongsTo.call(MdMember, "memberType", {
+      className: "MdMemberType",
+      foreignKey: "member_type_id",
+    });
+    Associations.belongsTo.call(MdMember, "admittable", { polymorphic: true });
+    Associations.belongsTo.call(MdMemberDetail, "member", {
+      className: "MdMember",
+      foreignKey: "member_id",
+    });
+    Associations.hasOne.call(MdMemberDetail, "memberType", {
+      className: "MdMemberType",
+      through: "member",
+      source: "memberType",
+    });
+    Associations.hasOne.call(MdMemberDetail, "admittable", {
+      className: "MdMember",
+      through: "member",
+      source: "admittable",
+      sourceType: "MdMember",
+    });
+
+    await MdMemberType.create({ name: "Standard" });
+    const memberType = await MdMemberType.create({ name: "Premium" });
+    const member = await MdMember.create({ name: "Joe" });
+
+    const memberDetailWithOneAssociation = new MdMemberDetail({ memberType });
+    expect((memberDetailWithOneAssociation as any).association("member").target.isNewRecord()).toBe(
+      true,
+    );
+
+    const memberDetailWithTwoAssociations = new MdMemberDetail({ memberType, admittable: member });
+    expect(
+      (memberDetailWithTwoAssociations as any).association("member").target.isNewRecord(),
+    ).toBe(true);
   });
 
-  it.skip("building works with has one through belongs to", () => {
-    // BLOCKED: fixture — current_membership / has_one :through :belongs_to chain fixture setup not defined
+  it("building works with has one through belongs to", async () => {
+    // new_member = Member.create!(name: "Joe")
+    // new_member.create_current_membership!
+    // new_club = new_member.build_club
+    // assert_equal(new_member.club, new_club)
+    const newMember = await Member.create({ name: "Joe" });
+    // create_current_membership! — persist the through record
+    await Membership.create({ member_id: newMember.id });
+    const assoc = (newMember as any).association("club");
+    const newClub = assoc.build();
+    expect(assoc.reader).toBe(newClub);
   });
 
   it("creating multiple associations creates through record", async () => {

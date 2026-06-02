@@ -60,6 +60,56 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     }
     this.target = record;
     this.loadedBang();
+    if (record) this.eagerBuildThroughForNewOwner(record);
+  }
+
+  /**
+   * Rails' `create_through_record` builds the join record synchronously
+   * inside `replace`. We otherwise defer that DB work to `persistReplace`
+   * (TS writers are sync, DB ops async). But when the owner is a *new*
+   * record and the through is a `belongsTo`, the join op is a pure
+   * in-memory `build` — no query — so we can run it eagerly here, matching
+   * Rails. This makes `owner.through` a `new_record?` immediately after
+   * assignment (e.g. `MemberDetail.new(member_type: t).member`).
+   *
+   * Scoped to belongsTo throughs only: hasOne/hasMany throughs keep the
+   * deferred create path so their save semantics stay untouched. The
+   * through macro is read off the resolved reflection (same registry as
+   * `throughReflection`/`ensureMutable`) rather than the per-class
+   * `_associations` array, so it survives class inheritance and stays
+   * consistent with the rest of this file.
+   * @internal
+   */
+  private eagerBuildThroughForNewOwner(record: Base): void {
+    if (!(this.owner as any).isNewRecord?.()) return;
+    const tr = throughReflection(this) as {
+      macro?: string;
+      isBelongsTo?: () => boolean;
+    } | null;
+    const throughIsBelongsTo = tr?.isBelongsTo?.() ?? tr?.macro === "belongsTo";
+    if (!throughIsBelongsTo) return;
+
+    ensureNotNested(this);
+    const throughProxy = throughAssociation(this);
+    if (!throughProxy) return;
+    const attrs = constructJoinAttributes(this, record);
+    // For a new owner the through has no PK, so `load_target` (Rails) could
+    // not run a query — reading the in-memory `target` is equivalent and
+    // avoids the async hop. This equivalence relies on the isNewRecord gate
+    // above; loosening it would require `loadTarget()` to avoid a stale read.
+    const throughRecord = (throughProxy as { target?: Base | null }).target ?? null;
+    if (throughRecord) {
+      // Only the new-record arm runs synchronously here. A *persisted*
+      // through on a new owner is Rails' `through_record.update(attributes)`
+      // — that's a DB write, so we intentionally leave it to the deferred
+      // `persistReplace` → `createThroughRecord` path (which `update`s a
+      // loaded persisted through), consistent with this file's async model.
+      if ((throughRecord as any).isNewRecord?.()) {
+        (throughRecord as any).assignAttributes?.(attrs);
+      }
+    } else {
+      (throughProxy as any).build?.(attrs);
+    }
   }
 
   /**
