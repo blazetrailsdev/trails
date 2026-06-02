@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { Base } from "./base.js";
-import { ReadOnlyRecord, StaleObjectError } from "./errors.js";
+import { ActiveRecordError, ReadOnlyRecord, StaleObjectError } from "./errors.js";
 import { UpdateManager, Nodes } from "@blazetrails/arel";
 import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
 import { runAfterCallbacksOnProto } from "@blazetrails/activemodel";
@@ -53,6 +53,16 @@ export async function touch(
   if (ctor._attributeDefinitions.has("updated_at")) touchColSet.add("updated_at");
   for (const name of names) {
     const resolved = aliases[name] ?? name;
+    // Mirrors Rails' verify_readonly_attribute: touching an attr_readonly
+    // column raises ActiveRecordError (distinct from the record-level
+    // ReadOnlyRecord guard above).
+    if (
+      (ctor as unknown as { readonlyAttributeQ?(n: string): boolean }).readonlyAttributeQ?.(
+        resolved,
+      )
+    ) {
+      throw new ActiveRecordError(`${resolved} is marked as readonly`);
+    }
     if (ctor._attributeDefinitions.has(resolved)) touchColSet.add(resolved);
   }
   const touchCols = Array.from(touchColSet);
