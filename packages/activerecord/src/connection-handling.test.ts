@@ -1,5 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
+import { setPermanentConnectionCheckout } from "./ar-config.js";
+import { ActiveRecordError } from "./errors.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
@@ -29,6 +31,7 @@ describe("ConnectionHandlingTest", () => {
   afterEach(() => {
     connectedToStack().length = 0;
     Base.connectionHandler.clearAllConnectionsBang();
+    setPermanentConnectionCheckout(true);
   });
 
   it("#with_connection lease the connection for the duration of the block", async () => {
@@ -50,10 +53,15 @@ describe("ConnectionHandlingTest", () => {
     Base.releaseConnection();
   });
 
-  it.skip("#lease_connection makes the lease permanent even inside #with_connection(prevent_permanent_checkout: true)", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handling
-    // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for ConnectionHandlingTest
-    // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-handling.test.ts
+  it("#lease_connection makes the lease permanent even inside #with_connection(prevent_permanent_checkout: true)", async () => {
+    Base.releaseConnection();
+    await Base.withConnection(
+      async (connection) => {
+        expect(Base.leaseConnection()).toBe(connection);
+      },
+      { preventPermanentCheckout: true },
+    );
+    expect(Base.connectionPool().activeConnection).toBeNull();
   });
 
   it("#with_connection use the already leased connection if available", async () => {
@@ -72,30 +80,84 @@ describe("ConnectionHandlingTest", () => {
     });
   });
 
-  it.skip("#connection is a soft-deprecated alias to #lease_connection", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handling
-    // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for ConnectionHandlingTest
-    // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-handling.test.ts
+  it("#connection is a soft-deprecated alias to #lease_connection", async () => {
+    setPermanentConnectionCheckout(true);
+    Base.releaseConnection();
+    expect(Base.connectionPool().activeConnection).toBeNull();
+
+    let conn: unknown;
+    await Base.withConnection(async (connection) => {
+      conn = connection;
+      expect(Base.connectionPool().activeConnection).toBeTruthy();
+      expect(Base.connection).toBe(connection);
+      expect(Base.connection).toBe(connection);
+    });
+
+    expect(Base.connectionPool().activeConnection).toBeTruthy();
+    expect(Base.connection).toBe(conn);
+    Base.releaseConnection();
   });
-  it.skip("#connection emits a deprecation warning if ActiveRecord.permanent_connection_checkout == :deprecated", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handling
-    // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for ConnectionHandlingTest
-    // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-handling.test.ts
+
+  it("#connection emits a deprecation warning if ActiveRecord.permanent_connection_checkout == :deprecated", async () => {
+    setPermanentConnectionCheckout("deprecated");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      Base.releaseConnection();
+
+      void Base.connection;
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      warnSpy.mockClear();
+
+      void Base.connection;
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      Base.releaseConnection();
+
+      void Base.connection;
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      warnSpy.mockClear();
+      Base.releaseConnection();
+
+      await Base.withConnection(() => {
+        void Base.connection;
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+      });
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
-  it.skip("#connection raises an error if ActiveRecord.permanent_connection_checkout == :disallowed", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handling
-    // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for ConnectionHandlingTest
-    // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-handling.test.ts
+
+  it("#connection raises an error if ActiveRecord.permanent_connection_checkout == :disallowed", async () => {
+    setPermanentConnectionCheckout("disallowed");
+    Base.releaseConnection();
+
+    expect(() => Base.connection).toThrow(ActiveRecordError);
+
+    await Base.withConnection(() => {
+      expect(() => Base.connection).toThrow(ActiveRecordError);
+    });
+
+    Base.leaseConnection();
+    expect(() => Base.connection).not.toThrow();
+    Base.releaseConnection();
   });
-  it.skip("#connection doesn't make the lease permanent if inside #with_connection(prevent_permanent_checkout: true)", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handling
-    // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for ConnectionHandlingTest
-    // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-handling.test.ts
+
+  it("#connection doesn't make the lease permanent if inside #with_connection(prevent_permanent_checkout: true)", async () => {
+    setPermanentConnectionCheckout("disallowed");
+    Base.releaseConnection();
+
+    await Base.withConnection(
+      async (connection) => {
+        expect(Base.connection).toBe(connection);
+      },
+      { preventPermanentCheckout: true },
+    );
+
+    expect(Base.connectionPool().activeConnection).toBeNull();
   });
+
   it.skip("common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handling
-    // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for ConnectionHandlingTest
-    // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-handling.test.ts
+    // BLOCKED: needs DB-backed model operations (Post.create/first/count) via withConnection path
   });
 
   it("connected_to switches role for block", () => {

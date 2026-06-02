@@ -644,10 +644,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(order).toEqual(["clear:accounts_people", "sql"]);
   });
 
-  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
-  // abstract/schema-statements.ts SchemaStatements#renameTable (both old AND new name,
-  // matching Rails PG/MySQL/SQLite adapter overrides which clear both)
-  it.skip("renameTable clears schema cache entry for both old and new name", async () => {
+  it("renameTable clears schema cache entry for both old and new name", async () => {
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("id", "integer")]);
     // Pre-seed new name too (could be stale from a previous run)
@@ -660,10 +657,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(cache.isCached("articles")).toBe(false);
   });
 
-  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
-  // abstract/schema-statements.ts SchemaStatements#createTable (non-force branch,
-  // matching Rails abstract/schema_statements.rb:306)
-  it.skip("createTable clears schema cache entry (non-force branch)", async () => {
+  it("createTable clears schema cache entry (non-force branch)", async () => {
     const cache = new SchemaCache();
     // Stale entry from a prior create (e.g. after resetTestAdapterState dropped the table)
     cache.setColumns("posts", [makeColumn("id", "integer")]);
@@ -674,9 +668,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(cache.isCached("posts")).toBe(false);
   });
 
-  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
-  // abstract/schema-statements.ts SchemaStatements#addColumn
-  it.skip("addColumn clears schema cache entry", async () => {
+  it("addColumn clears schema cache entry", async () => {
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("id", "integer")]);
 
@@ -686,9 +678,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(cache.isCached("posts")).toBe(false);
   });
 
-  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
-  // abstract/schema-statements.ts SchemaStatements#removeColumn
-  it.skip("removeColumn clears schema cache entry", async () => {
+  it("removeColumn clears schema cache entry", async () => {
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
 
@@ -698,9 +688,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(cache.isCached("posts")).toBe(false);
   });
 
-  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
-  // abstract/schema-statements.ts SchemaStatements#addIndex
-  it.skip("addIndex clears schema cache entry", async () => {
+  it("addIndex clears schema cache entry", async () => {
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
 
@@ -710,9 +698,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(cache.isCached("posts")).toBe(false);
   });
 
-  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
-  // abstract/schema-statements.ts SchemaStatements#removeIndex
-  it.skip("removeIndex clears schema cache entry", async () => {
+  it("removeIndex clears schema cache entry", async () => {
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
 
@@ -722,9 +708,7 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(cache.isCached("posts")).toBe(false);
   });
 
-  // BLOCKED: schema — needs inline schemaCache.clearDataSourceCacheBang at
-  // abstract/schema-statements.ts SchemaStatements#changeColumn
-  it.skip("changeColumn clears schema cache entry", async () => {
+  it("changeColumn clears schema cache entry", async () => {
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
 
