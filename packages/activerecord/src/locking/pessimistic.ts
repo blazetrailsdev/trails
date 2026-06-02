@@ -30,7 +30,7 @@ export async function lockBang<T extends Base>(
     .where((ctor as any)._buildPkWhereNode(this.id))
     .lock(lockClause);
   const conn = ctor.connection;
-  const sql = conn.visitor?.compile(sm.ast) ?? sm.toSql();
+  const sql = conn.toSql(sm);
   const rows = await conn.execute(sql);
 
   if (rows.length === 0) {
