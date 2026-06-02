@@ -35,6 +35,7 @@ interface ComposedOfOptions {
   mapping: [string, string][];
   constructorFn?: (...args: any[]) => any;
   converter?: (value: unknown) => unknown;
+  allowNil?: boolean;
 }
 
 /**
@@ -67,7 +68,14 @@ export function composedOf(
   );
 
   readerMethod(modelClass, name, options.mapping, options.className, options.constructorFn);
-  writerMethod(modelClass, name, options.mapping, options.className, options.converter);
+  writerMethod(
+    modelClass,
+    name,
+    options.mapping,
+    options.className,
+    options.converter,
+    options.allowNil,
+  );
 }
 
 /**
@@ -109,6 +117,7 @@ function writerMethod(
   mapping: [string, string][],
   klass: new (...args: any[]) => any,
   converter?: (value: unknown) => unknown,
+  allowNil?: boolean,
 ): void {
   const existing = Object.getOwnPropertyDescriptor(modelClass.prototype, name);
   Object.defineProperty(modelClass.prototype, name, {
@@ -116,7 +125,10 @@ function writerMethod(
     get: existing?.get,
     set(this: Base, value: unknown): void {
       const cache = getAggregationCache(this);
-      if (value === null || value === undefined) {
+      // nil with allow_nil: clear all mapped columns.
+      // nil without allow_nil: fall through so decomposition raises naturally
+      // (mirrors Rails: nil.send(:method) → NoMethodError).
+      if ((value === null || value === undefined) && allowNil !== false) {
         for (const [modelAttr] of mapping) this.writeAttribute(modelAttr, null);
         cache.delete(name);
         return;
@@ -145,6 +157,20 @@ function writerMethod(
             ),
           );
         }
+        return;
+      }
+      // Non-klass, no converter: decompose by reading each mapped attribute.
+      // Mirrors Rails: part.send(value_attr) raises NoMethodError when the
+      // method doesn't exist; we throw if the property is absent.
+      for (const [modelAttr, valueAttr] of mapping) {
+        const prop = (value as any)[valueAttr];
+        const result = typeof prop === "function" ? (prop as () => unknown).call(value) : prop;
+        if (result === undefined) {
+          throw new TypeError(
+            `Cannot decompose ${klass.name} from assigned value: '${valueAttr}' is not a property`,
+          );
+        }
+        this.writeAttribute(modelAttr, result);
       }
     },
     configurable: true,

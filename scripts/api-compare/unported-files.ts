@@ -238,6 +238,23 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Tests `rails dbconsole` PTY/exec invocation for SQLite. " +
       "Spawning a PTY-backed interactive subprocess has no Node.js equivalent.",
   },
+  // --- Permanently not-portable: hot schema compatibility (DDL mid-request) ---
+  {
+    testFile: "hot_compatibility_test.rb",
+    tests: [
+      "insert after remove_column",
+      "update after remove_column",
+      "cleans up after prepared statement failure in a transaction",
+      "cleans up after prepared statement failure in nested transactions",
+    ],
+    reason:
+      "Tests Rails' schema-cache hot-reload and PostgreSQL prepared-statement " +
+      "cache cleanup when DDL runs mid-transaction (remove_column / add_column " +
+      "from a second connection). Requires two live DB connections + DDL-between-" +
+      "queries semantics that don't translate to single-connection better-sqlite3. " +
+      "The prepared-statement cases also gate on current_adapter?(:PostgreSQLAdapter) " +
+      "and prepared_statements=true, which is never set in our CI SQLite lane.",
+  },
   // --- Permanently not-portable: single-process SQLite driver limits ---
   {
     testFile: "adapters/sqlite3/transaction_test.rb",
