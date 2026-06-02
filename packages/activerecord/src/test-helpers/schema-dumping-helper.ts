@@ -21,7 +21,13 @@ import type { SchemaSource } from "../schema-dumper.js";
  */
 export async function dumpTableSchema(source: SchemaSource, ...tables: string[]): Promise<string> {
   const oldIgnoreTables = SchemaDumper.ignoreTables;
-  const dataSources = await source.tables();
+  // Rails: `connection.data_sources - tables` (tables + views). Prefer the
+  // adapter's `dataSources()` so views are also ignored; fall back to `tables()`
+  // for a bare `SchemaSource` that only enumerates base tables.
+  const enumerated = source as SchemaSource & { dataSources?: () => Promise<string[]> };
+  const dataSources = enumerated.dataSources
+    ? await enumerated.dataSources()
+    : await source.tables();
   SchemaDumper.ignoreTables = dataSources.filter((name) => !tables.includes(name));
   try {
     return await SchemaDumper.dump(source);
