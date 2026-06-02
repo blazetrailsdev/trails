@@ -20,6 +20,8 @@ import { assertNoQueries } from "../testing/query-assertions.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
+import { Developer } from "../test-helpers/models/developer.js";
+import { Project } from "../test-helpers/models/project.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -4001,17 +4003,6 @@ describe("EagerAssociationTest", () => {
     expect(loaded).not.toBeNull();
     expect(loaded.title).toBe("T");
   });
-  it.skip("conditions on join table with include and limit", () => {
-    // BLOCKED: the canonical Developer model's schema columns don't reach the
-    // model in the handler/fixtures path when running among other tests
-    // (Developer.columns() falls back to the declared virtual `lastName`, so
-    // SELECT emits `developers.lastName` → "no such column"). #2830/#2831 fixed
-    // the lastName-virtual + fixture-registration sub-blockers, but the deeper
-    // Developer schema-cache reflection bug remains (see assoc/callbacks.test.ts).
-    // Passes in isolation, not in the full file; needs the framework fix first.
-    // Form: Developer.includes("projects")
-    //   .where({ "developers_projects.access_level": 1 }).limit(5) → 3.
-  });
   it.skip("dont create temporary active record instances", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
@@ -5668,6 +5659,50 @@ describe("EagerAssociationTest", () => {
       expect(categorizationCount(categoryOf(loaded[0], categories("technology").id))).toBe(1);
       expect(categorizationCount(categoryOf(loaded[1], categories("general").id))).toBe(2);
     });
+  });
+});
+
+// ==========================================================================
+// EagerAssociationTest (HABTM, canonical Developer fixtures) — the
+// `conditions on join table` test eager-loads `Developer has_and_belongs_to_many
+// :projects` and filters on a column of the `developers_projects` join table.
+// It needs the canonical Developer/Project models + real developers/projects/
+// developers_projects fixtures, so it lives in its own fixture-backed handler
+// suite (the main block above declares ad-hoc per-test models). Same describe
+// name as the other EagerAssociationTest blocks so test:compare matches it to
+// the Rails `EagerAssociationTest` class.
+// ==========================================================================
+describe("EagerAssociationTest", () => {
+  useHandlerFixtures(["developers", "projects", "developersProjects"]);
+  // Force-recreate the canonical tables with `dropExisting` (mirrors the
+  // EagerAssociationTest block above). Sibling files share the per-worker SQLite
+  // DB and define `developers`/`projects` with different column sets, and the
+  // signature cache is primed at worker boot — a plain `defineSchema` would
+  // cache-hit and skip recreation, leaving the fixture seed to hit stale columns.
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection as Parameters<typeof defineSchema>[0],
+      {
+        developers: canonicalSchema.developers,
+        projects: canonicalSchema.projects,
+        developers_projects: canonicalSchema.developers_projects,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Developer);
+  registerModel(Project);
+
+  it("conditions on join table with include and limit", async () => {
+    // Rails (eager_test.rb): three developers (david, jamis, poor_jamis) have a
+    // developers_projects row with the default access_level of 1; limit 5 doesn't
+    // trim the set, so the eager + join-condition query returns 3 distinct rows.
+    const developers = await Developer.all()
+      .includes("projects")
+      .where({ "developers_projects.access_level": 1 })
+      .limit(5)
+      .toArray();
+    expect(developers).toHaveLength(3);
   });
 });
 

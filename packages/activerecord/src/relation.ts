@@ -2426,7 +2426,23 @@ export class Relation<T extends Base> {
       return;
     }
 
-    const manager = this._buildEagerJoinManager(jd, basePk);
+    // For collection (non-limitable) eager loads with a LIMIT/OFFSET, Rails
+    // (distinct_relation_for_primary_key) runs a separate DISTINCT-pk query to
+    // materialize the limited parent IDs, then re-queries with `pk IN (ids)`.
+    // This avoids `IN (SELECT ... LIMIT n)`, which MariaDB does not support.
+    let limitedIds: unknown[] | undefined;
+    const hasLimit = this._limitValue !== null || this._offsetValue !== null;
+    if (hasLimit && jd.nodes.some((n) => n.assocType === "hasMany")) {
+      const idSql = this._modelClass.connection.toSql(this._buildEagerIdSubquery(jd, basePk));
+      const idRows = await this._modelClass.connection.execute(idSql);
+      limitedIds = (idRows as Record<string, unknown>[]).map((row) => Object.values(row)[0]);
+      if (limitedIds.length === 0) {
+        this._records = [];
+        return;
+      }
+    }
+
+    const manager = this._buildEagerJoinManager(jd, basePk, limitedIds);
 
     let sql = this._modelClass.connection.toSql(manager);
     if (this._annotations.length > 0) {
@@ -3770,7 +3786,11 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#apply_join_dependency +
    *          ActiveRecord::Associations::JoinDependency#apply_column_aliases
    */
-  private _buildEagerJoinManager(jd: JoinDependency, basePk: string): SelectManager {
+  private _buildEagerJoinManager(
+    jd: JoinDependency,
+    basePk: string,
+    limitedIds?: unknown[],
+  ): SelectManager {
     const table = this._modelClass.arelTable;
 
     const manager = table.project(...jd.buildSelectArel());
@@ -3797,25 +3817,53 @@ export class Relation<T extends Base> {
       if (isLimitable) {
         if (this._limitValue !== null) manager.take(this._limitValue);
         if (this._offsetValue !== null) manager.skip(this._offsetValue);
+      } else if (limitedIds !== undefined) {
+        // Execution path: the limited parent IDs were materialized in a
+        // separate query (mirrors Rails' distinct_relation_for_primary_key),
+        // so embed them as a literal `pk IN (...)` list — no nested LIMIT
+        // subquery. MariaDB rejects `IN (SELECT ... LIMIT n)` (ER_NOT_SUPPORTED_YET).
+        manager.where(table.get(basePk).in(limitedIds));
       } else {
-        // Build a parent-ID subquery using Arel nodes so quoting is consistent.
-        const pkAttr = table.get(basePk);
-        const idSubquery = table.project(pkAttr);
-        idSubquery.distinct();
-        for (const node of jd.nodes) {
-          idSubquery.appendJoinNode(node.arelJoin!);
-        }
-        this._applyJoinsToManager(idSubquery);
-        this._applyWheresToManager(idSubquery, table);
-        this._applyOrderToManager(idSubquery, table);
-        if (this._limitValue !== null) idSubquery.take(this._limitValue);
-        if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
-        // pkAttr.in(subquery) produces "table"."pk" IN (SELECT ...) via Arel
-        manager.where(pkAttr.in(idSubquery));
+        // toSql/synchronous path: no separate query is possible, so emit the
+        // parent-ID subquery inline (`pk IN (SELECT DISTINCT ... LIMIT n)`).
+        manager.where(table.get(basePk).in(this._buildEagerIdSubquery(jd, basePk)));
       }
     }
 
     return manager;
+  }
+
+  /**
+   * Builds the DISTINCT-primary-key subquery used to limit collection eager
+   * loads (LEFT OUTER JOINs + WHERE/ORDER + LIMIT/OFFSET). The toSql path
+   * nests it inside `pk IN (...)`; the execution path runs it standalone to
+   * materialize literal IDs (Rails' `distinct_relation_for_primary_key`).
+   *
+   * Two known limitations, both pre-existing (carried over verbatim from the
+   * former inline subquery) and not exercised by any active test:
+   * - Rails' `columns_for_distinct` also appends the `order_values` to the
+   *   SELECT list, because `SELECT DISTINCT id ... ORDER BY <col>` requires the
+   *   ordered column to be projected on PostgreSQL/MySQL. We project only the
+   *   pk, so a limited collection eager-load that orders on a *joined* column
+   *   (e.g. the still-skipped `order on join table with include and limit`,
+   *   ordering by `developers_projects.joined_on`) needs that handling first.
+   * - Single-column pk only: callers read `Object.values(row)[0]` and emit a
+   *   scalar `pk IN (...)`. Composite keys (Rails' `results.last(pk.length)` +
+   *   `zip`) are unhandled, matching the rest of this eager path (`basePk`).
+   */
+  private _buildEagerIdSubquery(jd: JoinDependency, basePk: string): SelectManager {
+    const table = this._modelClass.arelTable;
+    const idSubquery = table.project(table.get(basePk));
+    idSubquery.distinct();
+    for (const node of jd.nodes) {
+      idSubquery.appendJoinNode(node.arelJoin!);
+    }
+    this._applyJoinsToManager(idSubquery);
+    this._applyWheresToManager(idSubquery, table);
+    this._applyOrderToManager(idSubquery, table);
+    if (this._limitValue !== null) idSubquery.take(this._limitValue);
+    if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
+    return idSubquery;
   }
 
   // Mirrors: ActiveRecord::Relation#to_sql when eager_loading? — builds the
