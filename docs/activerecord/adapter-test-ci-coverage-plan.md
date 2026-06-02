@@ -121,10 +121,10 @@ re-measure as bucket-fixes land — the backlog is shrinking on its own:
   network (1), P-9 schema-dump shorthand — `serial` (4), `array` (1),
   `bit-string` (1). All reproduce **standalone** (the isolation buckets are
   gone), so these are genuine impl/feature gaps.
-- **MariaDB — 6 failed:** the dialect cluster only — M-1 collation (×3:
-  `charset-collation`, `case-sensitivity` ×2), M-2 warnings (×1), M-3
-  temp-table DDL + M-1 `active-schema` (×1), M-4 `_buildInitSql` throw (×1).
-  Gated on the §6.1 MariaDB-vs-`mysql:8` decision.
+- **MariaDB — 6 failed:** the dialect cluster only, spanning M-1 collation
+  (`charset-collation`, `case-sensitivity`), M-2 warnings, M-3 temp-table DDL
+  (`active-schema`), and M-4 `_buildInitSql` throw (`mysql2-adapter`). Gated on
+  the §6.1 MariaDB-vs-`mysql:8` decision.
 
 Counts are de-duplicated vitest "Failed Tests" totals (the raw logs inflate
 ~3× via `retry: 2`). Re-run after any adapter-relevant merge.
