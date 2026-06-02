@@ -1,7 +1,8 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { loadBelongsTo, resolveModel } from "../associations.js";
-import { underscore, pluralize } from "@blazetrails/activesupport";
+import { underscore } from "@blazetrails/activesupport";
+import { belongsToCounterCacheColumn, resolveAliasedColumn } from "../reflection.js";
 import { SingularAssociation } from "./singular-association.js";
 
 /**
@@ -367,16 +368,16 @@ export class BelongsToAssociation extends SingularAssociation {
   }
 
   /**
-   * Resolve the counter cache column name. In Rails, for a belongs_to :author
-   * on Post, the counter column on Author is `posts_count` (pluralized
-   * owner model name, snake_case, + _count).
+   * Resolve the counter cache column name via the shared derivation helper
+   * (mirrors Rails `reflection.counter_cache_column`), so the logic lives in
+   * exactly one place. Unlike the previous inline version, this honors the
+   * explicit `counterCache: "<column>"` / `{ column }` forms.
    */
   private counterCacheColumn(): string | null {
-    const cc = this.reflection.options.counterCache;
-    if (!cc) return null;
-    if (typeof cc === "string") return cc;
-    const ownerCtor = this.owner.constructor as any;
-    return `${pluralize(underscore(ownerCtor.name))}_count`;
+    return belongsToCounterCacheColumn(
+      this.reflection.options.counterCache,
+      this.owner.constructor.name,
+    );
   }
 
   private async updateCounters(by: number): Promise<void> {
@@ -404,10 +405,15 @@ export class BelongsToAssociation extends SingularAssociation {
       }
     }
 
-    // Mirror the updated value in-memory if target is loaded
+    // Mirror the updated value in-memory if target is loaded. Rails calls
+    // `target.increment!(counter_cache_column, by)` (belongs_to_association.rb),
+    // which resolves the column through alias_attribute; resolve here too so an
+    // aliased counter updates the real in-memory column rather than writing a
+    // stray snake-named property.
     if (this.target && !this.isStaleTarget()) {
-      const current = (this.target as any)[counterCol] ?? 0;
-      (this.target as any)[counterCol] = current + by;
+      const col = resolveAliasedColumn(this.target.constructor as any, counterCol);
+      const current = (this.target as any)[col] ?? 0;
+      (this.target as any)[col] = current + by;
     }
   }
 

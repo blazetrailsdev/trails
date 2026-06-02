@@ -64,6 +64,7 @@ import {
   batchOnUnloadedRelation as _batchOnUnloadedRelation,
 } from "./relation/batches.js";
 import { wrapWithScopeProxy } from "./relation/delegation.js";
+import { resolveAliasedColumn } from "./reflection.js";
 import { InsertAll, type InsertAllOptions } from "./insert-all.js";
 import { ScopeRegistry } from "./scoping.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
@@ -4494,10 +4495,14 @@ export class Relation<T extends Base> {
     const updates: Record<string, unknown> = {};
 
     for (const [counterName, value] of Object.entries(counters)) {
-      updates[counterName] = this._incrementAttribute(
-        this._modelClass.arelTable.get(counterName),
-        value,
+      // Mirror Rails Relation#update_counters: `attr = table[counter_name]` →
+      // `updates[attr.name] = _increment_attribute(attr, value)` (relation.rb:930).
+      // resolveAliasedColumn bridges a counter cache on an aliased column to the
+      // real column (Rails resolves it inside Arel::Table#[]).
+      const attr = this._modelClass.arelTable.get(
+        resolveAliasedColumn(this._modelClass, counterName),
       );
+      updates[attr.name] = this._incrementAttribute(attr, value);
     }
 
     if (options?.touch) {
