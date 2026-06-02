@@ -19,16 +19,24 @@ import { adapterType } from "../test-adapter.js";
  * test converts directly to `itIfSupports("<key>", …)`. Add a key when a
  * suite first gates on it; an unknown key throws rather than silently running
  * everywhere — catching typos and undocumented capability assumptions.
+ *
+ * The table mirrors Rails' `supports_<feature>?` *for the matrix versions* —
+ * it bakes in Rails' `mariadb?` / `database_version` branching (the `mysql`
+ * lane is MariaDB 11), so it tracks the fixed CI backends, not the live
+ * predicate. Match Rails here (not our own adapter, which may differ) so the
+ * gate-mismatch diagnostics compare like with like.
  */
 const ALL = ["postgres", "mysql", "sqlite"] as const;
 type Backend = (typeof ALL)[number];
 
 const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // Available on every backend we test (pg17 / mariadb11 / recent sqlite).
-  json: ALL,
   savepoints: ALL,
   foreign_keys: ALL,
   check_constraints: ALL,
+  // Rails `supports_json?` is `!mariadb? && …`; the `mysql` lane is MariaDB
+  // (JSON there is a LONGTEXT alias), so Rails reports false → exclude it.
+  json: ["postgres", "sqlite"],
   // SQL-standard COMMENT ON / inline column comments — not SQLite.
   comments: ["postgres", "mysql"],
   // SQLite's in-memory shared-cache connection can't run truly concurrently.

@@ -6,13 +6,15 @@ import { adapterSupports, describeIfSupports, itIfSupports } from "./supports.js
 // (sqlite / postgres / mariadb), not just the default sqlite run.
 describe("adapterSupports", () => {
   it("is true for capabilities available on every backend", () => {
-    expect(adapterSupports("json")).toBe(true);
     expect(adapterSupports("savepoints")).toBe(true);
+    expect(adapterSupports("foreign_keys")).toBe(true);
   });
 
   it("reflects the active adapter for backend-specific capabilities", () => {
     expect(adapterSupports("comments")).toBe(adapterType !== "sqlite");
     expect(adapterSupports("insert_conflict_target")).toBe(adapterType !== "mysql");
+    // Rails `supports_json?` is `!mariadb?` — false on the MariaDB mysql lane.
+    expect(adapterSupports("json")).toBe(adapterType !== "mysql");
   });
 
   it("throws on an unknown feature key (catches typos)", () => {
@@ -29,6 +31,6 @@ describeIfSupports("comments", "comments-gated suite", () => {
   });
 });
 
-itIfSupports("json", "json gate runs on every backend", () => {
+itIfSupports("json", "json gate runs where json is supported", () => {
   expect(adapterSupports("json")).toBe(true);
 });
