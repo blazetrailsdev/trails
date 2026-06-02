@@ -1,6 +1,6 @@
 # Migrate `trails-models-dump` to consume `schema.ts`
 
-**Status:** proposed
+**Status:** in progress — PR 1 ✅ #2851, PR 2 ✅ #2861; PRs 3–4 open
 **Owner:** activerecord-cli
 **Related:** PR #2759 (wired up `ar db:schema:dump`), PR #2761 (parseSchemaTs — PR A), companion plan `trails-tsc-schema-ts-migration.md`
 
@@ -211,45 +211,7 @@ When neither `--schema` nor a DB URL is available, prefer auto-discovering
 
 Per repo convention these are **non-overlapping sibling PRs**, not a stack.
 
-### PR 1 — New `schema-ts-model-parser.ts` with `parseSchemaForModels` (~160 LOC)
-
-- Export the four reusable AST helpers (`strLiteral`, `objPropValue`,
-  `parseCreateTable`, `walkBody`) from `schema-ts-parser.ts` so the sibling
-  file can import them. These stay pure — **no AR value import added to
-  `schema-ts-parser.ts`** (see "Why a sibling file" above) (~5 lines).
-- New file `schema-ts-model-parser.ts`:
-  - Composite-PK capture: read the `primaryKey: [...]` literal array from
-    `createTable` options (the existing `synthesizePk` returns the sentinel
-    `"composite"` and discards the names — capture them here) (~20 lines).
-  - New `visitAddForeignKey` visitor over top-level `addForeignKey` calls,
-    constructing `ForeignKeyDefinition` instances (~55 lines).
-  - `parseSchemaForModels` assembling `IntrospectedTable[]` (~25 lines).
-- Unit tests: composite PKs, FKs with and without explicit options,
-  FK column default inference, tables with `id: false`, multiple tables
-  with cross-table FKs (~60 lines).
-- **`parseSchemaTs` and `SchemaColumnsByTable` keep their behavior** (only
-  helper visibility changes) — zero behavioral risk to the `trails-tsc` path.
-
-Dependency: PR A (#2761) merged (parser infrastructure lives there).
-
-### PR 2 — New `--schema` flag in `trails-models-dump` (~130 LOC)
-
-- Add `schemaPath?: string` to `Args`; parse `--schema` / `--schema=<v>`
-  (~20 lines).
-- Update `usage()` string (~5 lines).
-- New branch in `run()`: when `--schema` given, read file via `getFsAsync` +
-  `parseSchemaForModels` → `IntrospectedTable[]` → apply existing
-  `BUILTIN_IGNORE` / `--only` / `--ignore` filtering → `generateModels`
-  (~50 lines). No `Base.establishConnection()`. The `--only`/`--ignore`/
-  `--strip-prefix`/`--strip-suffix`/`--no-header`/`--format` flags all
-  apply identically to both paths.
-- Integration test: write a minimal inline `schema.ts` with two tables and
-  one FK to a tmpfile, run `trails-models-dump --schema <tmpfile>`, assert
-  generated classes + `belongsTo`/`hasMany` are correct (~55 lines).
-
-Dependency: PR 1 merged.
-
-### PR 3 — Migrate consumers and docs (~50 LOC)
+### PR 3 — Migrate consumers and docs (~50 LOC) `[open]`
 
 - `packages/activerecord-cli/README.md`: update the `ar models:dump` row in
   the Tooling table to show `--schema db/schema.ts` as the primary form;
@@ -260,9 +222,9 @@ Dependency: PR 1 merged.
   flag.
 - No production code changes in this PR.
 
-Dependency: PR 2 merged (so docs reflect real flags).
+Dependency: PR 2 merged ✅ #2861.
 
-### PR 4 — Convention default + live-DB deprecation (~60 LOC)
+### PR 4 — Convention default + live-DB deprecation (~60 LOC) `[open]`
 
 Two changes, both in `trails-models-dump.ts`:
 
