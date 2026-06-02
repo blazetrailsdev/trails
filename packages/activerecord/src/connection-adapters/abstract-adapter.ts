@@ -321,6 +321,7 @@ export interface AbstractAdapter {
     fn?: (t: Table) => void | Promise<void>,
   ): Promise<void>;
   tableAliasFor(tableName: string): string;
+  nativeDatabaseTypes(): Record<string, unknown>;
   dataSources(): Promise<string[]>;
   isDataSourceExists(name: string): Promise<boolean>;
   // --- DatabaseStatements ---
@@ -994,7 +995,7 @@ export class AbstractAdapter implements Quoting {
   // --- Capability introspection ---
 
   isValidType(type: string | null | undefined): boolean {
-    return type != null && type !== "";
+    return type != null && this.nativeDatabaseTypes()[type] != null;
   }
 
   isReplica(): boolean {

@@ -795,7 +795,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   // --- Database info ---
 
-  get nativeDatabaseTypes(): Record<string, { name: string; limit?: number }> {
+  nativeDatabaseTypes(): Record<string, { name: string; limit?: number }> {
     return {
       primary_key: { name: "integer" },
       string: { name: "varchar", limit: 255 },
@@ -1239,7 +1239,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   private typeToSql(type: string, options?: Record<string, unknown>): string {
-    const raw = this.nativeDatabaseTypes[type]?.name ?? type.toUpperCase();
+    const raw = this.nativeDatabaseTypes()[type]?.name ?? type.toUpperCase();
     // Validate: only allow safe SQL type identifiers (letters, digits, underscores, spaces)
     if (!/^[A-Za-z_][A-Za-z0-9_ ]*$/.test(raw)) {
       throw new Error(`Invalid SQL type: ${raw}`);
