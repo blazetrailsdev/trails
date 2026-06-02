@@ -459,10 +459,10 @@ for `merge()`-bearing eager cases):
 
 | Campaign         | Ours                                                        | Rails                                                       | ~skips | Needs                           |
 | ---------------- | ----------------------------------------------------------- | ----------------------------------------------------------- | -----: | ------------------------------- |
-| eager            | `associations/eager.test.ts`                                | `associations/eager_test.rb`                                |     69 | 7.2 ✅, 7.4 ✅ (#2841)          |
+| eager            | `associations/eager.test.ts`                                | `associations/eager_test.rb`                                |     59 | 7.2 ✅, 7.4 ✅ (#2841)          |
 | join-model       | `associations/join-model.test.ts`                           | `associations/join_model_test.rb`                           |     41 | 7.2 ✅; DidYouMean (B1972)      |
 | strict-loading   | `strict-loading.test.ts`                                    | `strict_loading_test.rb`                                    |     14 | batch 1 landed; rest dep-clear  |
-| has-one          | `associations/has-one-associations.test.ts`                 | `associations/has_one_associations_test.rb`                 |     23 | batch 1 ✅ #2843; batch 2 ↓     |
+| has-one          | `associations/has-one-associations.test.ts`                 | `associations/has_one_associations_test.rb`                 |     24 | batch 1 ✅ #2843; batch 2 ↓     |
 | relation-scoping | `scoping/relation-scoping.test.ts`                          | `scoping/relation_scoping_test.rb`                          |     28 | STI type-constraint (#1983)     |
 | inverse          | `associations/inverse-associations.test.ts`                 | `associations/inverse_associations_test.rb`                 |     23 | 7.5 ✅                          |
 | habtm            | `associations/has-and-belongs-to-many-associations.test.ts` | `associations/has_and_belongs_to_many_associations_test.rb` |     23 | 7.1 ✅                          |
