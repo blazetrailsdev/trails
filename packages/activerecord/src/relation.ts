@@ -2889,8 +2889,13 @@ export class Relation<T extends Base> {
     for (const col of rel._groupColumns) manager.group(groupColumnToArel(col, table));
     if (!rel._havingClause.isEmpty()) manager.having(rel._havingClause.ast);
     manager.take(1);
+    // Name the probe `<Model> Exists?` so LogSubscriber tags it like Rails'
+    // `select_rows(relation.arel, "#{model.name} Exists?")` rather than the
+    // adapter's generic "SQL" default.
     const rows = await rel._modelClass.connection.execute(
       rel._modelClass.connection.toSql(manager),
+      [],
+      `${rel._modelClass.name} Exists?`,
     );
     return rows.length > 0;
   }
