@@ -143,6 +143,7 @@ import {
   attributesForUpdate as _attributesForUpdate,
   attributeNames as _attributeNames,
   isAttributeMethod as _isAttributeMethod,
+  isDangerousAttributeMethod as _isDangerousAttributeMethod,
   attributesWithValues as _attributesWithValues,
   formatForInspect as _formatForInspect,
   pkAttribute as _pkAttribute,
@@ -3463,6 +3464,10 @@ extend(Base, {
   defineAttribute: _defineAttribute,
   _defaultAttributes: _arDefaultAttributes,
 });
+// AttributeMethods class method — gates association/attribute names that would
+// clash with an Active Record instance method (Rails: dangerous_attribute_method?).
+// Consumed by Associations::Builder::Association#build to reject e.g. `has_one :save`.
+extend(Base, { isDangerousAttributeMethod: _isDangerousAttributeMethod });
 extend(Base, {
   // ConnectionHandling.ClassMethods does not include resolveConfigForConnection
   // (it's a standalone export, not in the ClassMethods object), so wire it here.
