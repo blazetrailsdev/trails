@@ -90,11 +90,19 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].data_type).toBe("USER-DEFINED");
     });
 
-    it.skip("default", async () => {
-      // BLOCKED: schema — add_column with hstore default not yet wired
-      // ROOT-CAUSE: postgresql/schema-statements.ts addColumn does not call columnDefaults
-      //   to resolve hstore defaults via the OID type map.
-      // SCOPE: ~10 LOC in schema-statements.ts; add columnDefaults support for hstore columns.
+    it("default", async () => {
+      await adapter.addColumn("hstores", "permissions", "hstore", {
+        default: '"users"=>"read", "articles"=>"write"',
+      });
+      class Hstores extends Base {
+        static tableName = "hstores";
+      }
+      await Hstores.loadSchema();
+      expect((Hstores as any).columnDefaults["permissions"]).toEqual({
+        users: "read",
+        articles: "write",
+      });
+      expect((new Hstores() as any).permissions).toEqual({ users: "read", articles: "write" });
     });
     it.skip("change column default with hstore", async () => {
       // BLOCKED: schema — changeColumnDefault for hstore-typed columns
@@ -362,17 +370,21 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows).toHaveLength(1);
     });
 
-    it.skip("disable enable hstore", () => {
-      // BLOCKED: schema — enableExtension/disableExtension not implemented
-      // ROOT-CAUSE: adapter does not expose enableExtension("hstore") / disableExtension("hstore");
-      //   Rails uses `@connection.enable_extension` / `@connection.disable_extension`.
-      // SCOPE: ~20 LOC in connection-adapters/postgresql/schema-statements.ts.
+    it("disable enable hstore", async () => {
+      expect(await adapter.extensionEnabled("hstore")).toBe(true);
+      await adapter.disableExtension("hstore", { force: "cascade" });
+      expect(await adapter.extensionEnabled("hstore")).toBe(false);
+      await adapter.enableExtension("hstore");
+      expect(await adapter.extensionEnabled("hstore")).toBe(true);
     });
-    it.skip("change table supports hstore", () => {
-      // BLOCKED: schema — changeTable t.hstore not wired
-      // ROOT-CAUSE: change_table DSL in schema-statements.ts does not register hstore as a column
-      //   type that can be added via t.hstore(...).
-      // SCOPE: ~10 LOC in schema-statements.ts; pairs with hstore migration support.
+    it("change table supports hstore", async () => {
+      await adapter.changeTable("hstores", async (t) => {
+        await t.column("users", "hstore", { default: "" });
+      });
+      const cols = await adapter.columns("hstores");
+      const col = cols.find((c) => c.name === "users")!;
+      expect(col).toBeDefined();
+      expect(col.type).toBe("hstore");
     });
     it("cast value on write", async () => {
       const x = HstoreModel.new({ tags: { bool: true, number: 5 } });
