@@ -39,6 +39,25 @@ const UNIVERSAL_AUTOSAVE_SCHEMA: Schema = {
     primaryKey: ["shop_id", "id"],
   },
   cpk_book_fks: { order_id: "integer", title: "string" },
+  ai_cpk_orders: {
+    columns: { shop_id: "integer", id: "integer", status: "string" },
+    primaryKey: ["shop_id", "id"],
+  },
+  ai_cpk_order_agreements: { order_id: "integer", signature: "string" },
+  ai_cpk_two_orders: {
+    columns: { shop_id: "integer", id: "integer", status: "string" },
+    primaryKey: ["shop_id", "id"],
+  },
+  ai_cpk_two_books: {
+    columns: {
+      author_id: "integer",
+      id: "integer",
+      title: "string",
+      order_id: "integer",
+      shop_id: "integer",
+    },
+    primaryKey: ["author_id", "id"],
+  },
   aid_firms: { name: "string" },
   aid_contracts: { aid_firm_id: "integer", aid_developer_id: "integer" },
   aid_developers: { name: "string" },
@@ -768,17 +787,103 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const ids = clients.map((c) => c.id).sort();
     expect(ids).toEqual([c1.id, c2.id].sort());
   });
-  it.skip("assign ids with belongs to cpk model", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* cpk not fully supported */
+  it("assign ids with belongs to cpk model", async () => {
+    // Rails: order has a CPK [shop_id, id]; order_agreements is a single-column
+    // FK has_many keyed on the "id" component (primaryKey: :id). Assigning the
+    // child ids must populate order_id with the owner's "id" component.
+    class AiCpkOrder extends Base {
+      static {
+        this._tableName = "ai_cpk_orders";
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this.primaryKey = ["shop_id", "id"];
+      }
+    }
+    class AiCpkOrderAgreement extends Base {
+      static {
+        this._tableName = "ai_cpk_order_agreements";
+        this.attribute("order_id", "integer");
+        this.attribute("signature", "string");
+      }
+    }
+    Associations.hasMany.call(AiCpkOrder, "orderAgreements", {
+      className: "AiCpkOrderAgreement",
+      foreignKey: "order_id",
+      primaryKey: "id",
+    });
+    Associations.belongsTo.call(AiCpkOrderAgreement, "order", {
+      className: "AiCpkOrder",
+      primaryKey: "id",
+    });
+    registerModel("AiCpkOrder", AiCpkOrder);
+    registerModel("AiCpkOrderAgreement", AiCpkOrderAgreement);
+
+    const order = await AiCpkOrder.create({ shop_id: 1, id: 1, status: "paid" });
+    const a1 = await AiCpkOrderAgreement.create({ signature: "signed" });
+    const a2 = await AiCpkOrderAgreement.create({ signature: "signed" });
+    const orderAgreements = [a1.id, a2.id];
+
+    const proxy = association(order, "orderAgreements");
+    expect(await proxy.toArray()).toHaveLength(0);
+
+    await proxy.setIds(orderAgreements as number[]);
+    await order.save();
+    await order.reload();
+
+    expect(await order.orderAgreementIds).toEqual(orderAgreements);
+    expect(await association(order, "orderAgreements").toArray()).toHaveLength(2);
   });
-  it.skip("assign ids with cpk for two models", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* cpk not fully supported */
+  it("assign ids with cpk for two models", async () => {
+    // Rails: order has a CPK [shop_id, id]; books is a composite-FK has_many
+    // keyed on [shop_id, order_id] auto-derived from the owner's CPK. The child
+    // (book) is itself CPK [author_id, id], so its ids arrive as tuples.
+    class AiCpkTwoOrder extends Base {
+      static {
+        this._tableName = "ai_cpk_two_orders";
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this.primaryKey = ["shop_id", "id"];
+      }
+    }
+    class AiCpkTwoBook extends Base {
+      static {
+        this._tableName = "ai_cpk_two_books";
+        this.attribute("author_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("order_id", "integer");
+        this.attribute("shop_id", "integer");
+        this.primaryKey = ["author_id", "id"];
+      }
+    }
+    Associations.hasMany.call(AiCpkTwoOrder, "books", {
+      className: "AiCpkTwoBook",
+      foreignKey: ["shop_id", "order_id"],
+    });
+    Associations.belongsTo.call(AiCpkTwoBook, "order", {
+      className: "AiCpkTwoOrder",
+      foreignKey: ["shop_id", "order_id"],
+      primaryKey: ["shop_id", "id"],
+    });
+    registerModel("AiCpkTwoOrder", AiCpkTwoOrder);
+    registerModel("AiCpkTwoBook", AiCpkTwoBook);
+
+    const order = await AiCpkTwoOrder.create({ shop_id: 1, id: 1, status: "paid" });
+    const b1 = await AiCpkTwoBook.create({ author_id: 1, id: 1, title: "First" });
+    const b2 = await AiCpkTwoBook.create({ author_id: 1, id: 2, title: "Second" });
+    const bookIds = [b1.id, b2.id];
+
+    const proxy = association(order, "books");
+    expect(await proxy.toArray()).toHaveLength(0);
+
+    await proxy.setIds(bookIds as number[][]);
+    await order.save();
+    await order.reload();
+
+    expect(await order.bookIds).toEqual(bookIds);
+    expect(await association(order, "books").toArray()).toHaveLength(2);
   });
   it("has one cpk has one autosave with id", async () => {
     // Rails: test "has_one cpk has_one autosave with id" — when the parent has a CPK

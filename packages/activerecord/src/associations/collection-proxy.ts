@@ -2296,10 +2296,31 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#ids=
    */
-  async setIds(ids: (number | string)[]): Promise<void> {
+  async setIds(ids: (number | string | (number | string)[])[]): Promise<void> {
     const targetModel = this.model as typeof Base;
-    const cleanIds = ids.filter((id) => id !== null && id !== undefined && id !== "");
-    const records = (await Promise.all(cleanIds.map((id) => targetModel.find(Number(id))))) as T[];
+    const pk = targetModel.primaryKey ?? "id";
+    const cleanIds = (Array.isArray(ids) ? ids : [ids]).filter(
+      (id) => id !== null && id !== undefined && id !== "",
+    );
+    let records: T[];
+    if (Array.isArray(pk)) {
+      // Composite-PK child: each id is a tuple aligned with the PK columns, so
+      // resolve via a per-column lookup rather than the single-column `find`.
+      records = (
+        await Promise.all(
+          cleanIds.map((id) => {
+            const parts = Array.isArray(id) ? id : [id];
+            const conditions: Record<string, unknown> = {};
+            pk.forEach((col, i) => {
+              conditions[col] = parts[i];
+            });
+            return targetModel.findBy(conditions);
+          }),
+        )
+      ).filter((r): r is T => r != null);
+    } else {
+      records = (await Promise.all(cleanIds.map((id) => targetModel.find(Number(id))))) as T[];
+    }
     await this.replace(records);
   }
 
