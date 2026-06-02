@@ -1090,4 +1090,10 @@ describe("formatColspecRaw", () => {
   it("quotes non-identifier keys", () => {
     expect(dumper.formatColspecRaw({ "enum-type": '"mood"' })).toBe('"enum-type": "mood"');
   });
+
+  it("recurses into nested objects (primary-key `id: { type:, … }` spec)", () => {
+    expect(
+      dumper.formatColspecRaw({ id: { type: '"uuid"', default: "null" }, force: '"cascade"' }),
+    ).toBe('id: { type: "uuid", default: null }, force: "cascade"');
+  });
 });

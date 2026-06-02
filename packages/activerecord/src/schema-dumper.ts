@@ -1168,8 +1168,9 @@ export class SchemaDumper {
 
   /**
    * Rails-faithful raw colspec formatter — mirrors `SchemaDumper#format_colspec`,
-   * which joins `key: value` with the values emitted **verbatim**. The values
-   * produced by `columnSpec` / `prepareColumnOptions` are already
+   * which joins `key: value` with the values emitted **verbatim** and recurses
+   * into nested objects as `{ … }` (the primary-key `id: { type:, … }` spec).
+   * The values produced by `columnSpec` / `prepareColumnOptions` are already
    * fully-formatted TS-DSL text (`"false"`, `"255"`, `"null"`, `'"hello"'`,
    * `'() => "now()"'`), so they must NOT be re-quoted the way
    * {@link formatColspec} re-serializes native JS values. This is the formatter
@@ -1177,10 +1178,17 @@ export class SchemaDumper {
    * on the legacy inline path until `emitTable` is wired (Story 3.3-U3).
    * @internal
    */
-  formatColspecRaw(colspec: Record<string, string>): string {
+  formatColspecRaw(colspec: Record<string, unknown>): string {
     const isIdent = /^[a-zA-Z_$][\w$]*$/;
     return Object.entries(colspec)
-      .map(([k, v]) => `${isIdent.test(k) ? k : JSON.stringify(k)}: ${v}`)
+      .map(([k, v]) => {
+        const key = isIdent.test(k) ? k : JSON.stringify(k);
+        const value =
+          v && typeof v === "object" && !Array.isArray(v)
+            ? `{ ${this.formatColspecRaw(v as Record<string, unknown>)} }`
+            : String(v);
+        return `${key}: ${value}`;
+      })
       .join(", ");
   }
 
