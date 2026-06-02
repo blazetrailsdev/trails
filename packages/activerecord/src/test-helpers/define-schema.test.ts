@@ -317,7 +317,7 @@ describe("defineSchema", () => {
       expect(createsP).toHaveLength(1);
     });
 
-    it("dropExisting skips DROP+CREATE and truncates when schemas match", async () => {
+    it("dropExisting forces full drop+recreate even when schemas match", async () => {
       await defineSchema(adapter, { items: { name: "string" } });
       await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('before')`);
 
@@ -325,9 +325,8 @@ describe("defineSchema", () => {
       await defineSchema(adapter, { items: { name: "string" } }, { dropExisting: true });
 
       const { creates, drops } = ddlCounts(spy.mock.calls.map((c) => c[0] as string));
-      // Schema matches: skip DROP+CREATE, issue DELETE instead.
-      expect(drops).toBe(0);
-      expect(creates).toBe(0);
+      expect(creates).toBeGreaterThanOrEqual(1);
+      expect(drops).toBeGreaterThanOrEqual(1);
       const rows = await adapter.execute(`SELECT * FROM "items"`);
       expect(rows).toHaveLength(0);
     });
