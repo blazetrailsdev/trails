@@ -44,6 +44,17 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // `ON CONFLICT (target)` — Postgres/SQLite only; MySQL has no conflict
   // target. Matches `adapterType !== "mysql"` in insert-all.test.ts.
   insert_conflict_target: ["postgres", "sqlite"],
+  // Rails `supports_advisory_locks?`: PostgreSQL + MySQL true, SQLite false
+  // (abstract default). (postgresql_adapter.rb:420, abstract_mysql_adapter.rb:161)
+  advisory_locks: ["postgres", "mysql"],
+  // `supports_exclusion_constraints?` / `supports_unique_constraints?`:
+  // PostgreSQL only (postgresql_adapter.rb:224/228; abstract default false).
+  exclusion_constraints: ["postgres"],
+  unique_constraints: ["postgres"],
+  // `supports_expression_index?`: PostgreSQL + SQLite≥3.9; MySQL is
+  // `!mariadb? && >= 8.0.13` — our `mysql` lane is MariaDB, so false there.
+  // (postgresql_adapter.rb:208, sqlite3_adapter.rb:155, abstract_mysql_adapter.rb:104)
+  expression_index: ["postgres", "sqlite"],
 };
 
 /** Does the active backend support Rails' `supports_<feature>?` capability? */
