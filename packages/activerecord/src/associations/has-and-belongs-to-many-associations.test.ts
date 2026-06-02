@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/associations/has_and_belongs_to_many_associations_test.rb
  */
 import { describe, it, expect, beforeEach, beforeAll } from "vitest";
-import { Base, registerModel, AssociationTypeMismatch } from "../index.js";
+import { Base, registerModel, AssociationTypeMismatch, ReadOnlyRecord } from "../index.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import {
@@ -621,80 +621,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(proj1).not.toBeNull();
   });
 
-  it("associations with conditions", async () => {
-    // Scope lambda filters the collection by a WHERE condition.
-    const dev = await Developer.create({ name: "CondDev", salary: 80000 });
-    const keep = await Project.create({ name: "Keep" });
-    const drop = await Project.create({ name: "Drop" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: keep.id });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: drop.id });
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-      foreignKey: "developer_id",
-      scope: (r: any) => r.where({ name: "Keep" }),
-    });
-    expect(projects.length).toBe(1);
-    expect((projects[0] as any).name).toBe("Keep");
-  });
-
-  it("find with merged options", async () => {
-    // Scope where + order both apply to the loaded relation.
-    const dev = await Developer.create({ name: "MergeDev", salary: 80000 });
-    const a = await Project.create({ name: "M-A" });
-    const b = await Project.create({ name: "M-B" });
-    const c = await Project.create({ name: "Other" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: a.id });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: b.id });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: c.id });
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-      foreignKey: "developer_id",
-      scope: (r: any) => r.where("name LIKE ?", "M-%").order("name DESC"),
-    });
-    expect(projects.length).toBe(2);
-    expect((projects[0] as any).name).toBe("M-B");
-    expect((projects[1] as any).name).toBe("M-A");
-  });
-
-  it("dynamic find should respect association order", async () => {
-    // Scope-supplied order survives all the way to the executed query.
-    const dev = await Developer.create({ name: "OrderDev", salary: 80000 });
-    const p1 = await Project.create({ name: "Bravo" });
-    const p2 = await Project.create({ name: "Alpha" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-      foreignKey: "developer_id",
-      scope: (r: any) => r.order("name ASC"),
-    });
-    expect(projects.map((p: any) => p.name)).toEqual(["Alpha", "Bravo"]);
-  });
-
-  it("find should append to association order", async () => {
-    // Multiple order() calls on the scope chain compose left-to-right.
-    // Two records share a name so the secondary `id DESC` ordering is
-    // observable as a tiebreaker (without ties, the second order() is a
-    // no-op and the test would pass even if composition were broken).
-    const dev = await Developer.create({ name: "AppendOrderDev", salary: 80000 });
-    const p1 = await Project.create({ name: "Bravo" });
-    const p2 = await Project.create({ name: "Alpha" });
-    const p3 = await Project.create({ name: "Alpha" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p3.id });
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-      foreignKey: "developer_id",
-      scope: (r: any) => r.order("name ASC").order("id DESC"),
-    });
-    expect(projects.map((p: any) => p.id)).toEqual([p3.id, p2.id, p1.id]);
-  });
-
   it("habtm builder forwards `scope:` onto the reflection (macro-time scope)", async () => {
     // Mirrors Rails' `has_and_belongs_to_many(name, scope = nil, **options)`
     // signature (vendor/rails/activerecord/lib/active_record/associations.rb:1870-1871):
@@ -737,25 +663,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // Pre-fix this was `null`; post-fix it carries the macro-time scope
     // exactly as Rails' HasAndBelongsToManyReflection does.
     expect(reflection.scope).toBe(macroScope);
-  });
-
-  it("dynamic find all should respect readonly access", async () => {
-    // Verifies the load-path piece of the readonly story: an `options.scope`
-    // that calls `readonlyBang()` propagates `_readonly = true` to every
-    // record returned by `loadHabtm` via Relation (relation.ts:1962-1967).
-    // The companion macro-time wiring is covered by the "habtm builder
-    // forwards `scope:` onto the reflection" test above.
-    const dev = await Developer.create({ name: "ROAccess", salary: 90000 });
-    const proj = await Project.create({ name: "ROProj" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-      foreignKey: "developer_id",
-      scope: (rel: any) => rel.readonlyBang(),
-    });
-    expect(projects.length).toBe(1);
-    expect((projects[0] as any).isReadonly()).toBe(true);
   });
 
   it("new with values in collection", async () => {
@@ -1813,6 +1720,114 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(Object.keys((first as any).attributes).sort()).toEqual(
       (CanonicalProject.columnNames() as string[]).slice().sort(),
     );
+  });
+
+  it("associations with conditions", async () => {
+    const activeRecord = projects("active_record");
+    const david = developers("david");
+    expect(await association<CanonicalDeveloper>(activeRecord, "developers").size()).toBe(3);
+    expect(await association<CanonicalDeveloper>(activeRecord, "developersNamedDavid").size()).toBe(
+      1,
+    );
+    expect(
+      await association<CanonicalDeveloper>(
+        activeRecord,
+        "developersNamedDavidWithHashConditions",
+      ).size(),
+    ).toBe(1);
+
+    expect(
+      (
+        (await association<CanonicalDeveloper>(activeRecord, "developersNamedDavid").find(
+          david.id,
+        )) as CanonicalDeveloper
+      ).id,
+    ).toBe(david.id);
+    expect(
+      (
+        (await association<CanonicalDeveloper>(
+          activeRecord,
+          "developersNamedDavidWithHashConditions",
+        ).find(david.id)) as CanonicalDeveloper
+      ).id,
+    ).toBe(david.id);
+    expect(
+      (
+        (await association<CanonicalDeveloper>(activeRecord, "salariedDevelopers").find(
+          david.id,
+        )) as CanonicalDeveloper
+      ).id,
+    ).toBe(david.id);
+
+    await association<CanonicalDeveloper>(activeRecord, "developersNamedDavid").clear();
+    await association<CanonicalDeveloper>(activeRecord, "developers").reload();
+    expect(await association<CanonicalDeveloper>(activeRecord, "developers").size()).toBe(2);
+  });
+
+  it("find with merged options", async () => {
+    const activeRecord = projects("active_record");
+    expect(await association<CanonicalDeveloper>(activeRecord, "limitedDevelopers").size()).toBe(1);
+    expect(
+      (await association<CanonicalDeveloper>(activeRecord, "limitedDevelopers").toArray()).length,
+    ).toBe(1);
+    expect(
+      (
+        await (association<CanonicalDeveloper>(activeRecord, "limitedDevelopers") as any)
+          .limit(null)
+          .toArray()
+      ).length,
+    ).toBe(3);
+  });
+
+  it("dynamic find should respect association order", async () => {
+    // Developers are ordered 'name DESC, id DESC', so a freshly-created Jamis
+    // (the highest id) sorts ahead of the fixture Jamises. Rails probes with
+    // `merge(where:).first` + the `find_by_name` dynamic finder; we lack those
+    // surfaces, so `where(...).first()` / `findBy({ name })` stand in — both
+    // ride the association's order_values, which is what the test exercises.
+    const activeRecord = projects("active_record");
+    const highIdJamis = await (
+      association<CanonicalDeveloper>(activeRecord, "developers") as any
+    ).create({ name: "Jamis" });
+
+    const merged = (await association<CanonicalDeveloper>(activeRecord, "developers")
+      .where("name = 'Jamis'")
+      .first()) as CanonicalDeveloper;
+    expect(merged.id).toBe(highIdJamis.id);
+
+    const byName = (await (
+      association<CanonicalDeveloper>(activeRecord, "developers") as any
+    ).findBy({ name: "Jamis" })) as CanonicalDeveloper;
+    expect(byName.id).toBe(highIdJamis.id);
+  });
+
+  it("find should append to association order", async () => {
+    const activeRecord = projects("active_record");
+    const orderedDevelopers = (
+      association<CanonicalDeveloper>(activeRecord, "developers") as any
+    ).order("projects.id");
+    expect(orderedDevelopers.orderValues).toEqual([
+      "developers.name desc, developers.id desc",
+      "projects.id",
+    ]);
+  });
+
+  it("dynamic find all should respect readonly access", async () => {
+    const activeRecord = projects("active_record");
+    for (const d of await association<CanonicalDeveloper>(
+      activeRecord,
+      "readonlyDevelopers",
+    ).toArray()) {
+      if (d.isValid()) {
+        await expect((d as any).saveBang()).rejects.toThrow(ReadOnlyRecord);
+      }
+    }
+    for (const d of await association<CanonicalDeveloper>(
+      activeRecord,
+      "readonlyDevelopers",
+    ).toArray()) {
+      (d as any).isReadonly();
+    }
   });
 });
 
