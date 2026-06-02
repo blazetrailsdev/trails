@@ -147,6 +147,10 @@ export class SchemaStatements {
       return;
     }
 
+    if (!options.force) {
+      this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, name);
+    }
+
     // Rails: `td = create_table_definition(...)` — dispatches to the adapter's
     // dialect-specific TableDefinition (e.g. PostgreSQL::TableDefinition with
     // range/hstore/jsonb column methods). Every real adapter mixes in
@@ -233,6 +237,7 @@ export class SchemaStatements {
   ): Promise<void> {
     const addColumnDef = await this.buildAddColumnDefinition(tableName, columnName, type, options);
     if (!addColumnDef) return;
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     await this.adapter.executeMutation(this.schemaCreation.accept(addColumnDef));
   }
 
@@ -245,6 +250,7 @@ export class SchemaStatements {
     if (options.ifExists && !(await this.columnExists(tableName, columnName))) {
       return;
     }
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qi(tableName)} DROP COLUMN ${this._qi(columnName)}`,
     );
@@ -261,6 +267,7 @@ export class SchemaStatements {
     columns: string | string[],
     options: AddIndexOptions = {},
   ): Promise<void> {
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     const createIndex = this.buildCreateIndexDefinition(
       tableName,
       columns,
@@ -273,6 +280,7 @@ export class SchemaStatements {
     tableName: string,
     options: { column?: string | string[]; name?: string } = {},
   ): Promise<void> {
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     let indexName: string;
     if (options.name) {
       indexName = options.name;
@@ -298,6 +306,7 @@ export class SchemaStatements {
     type: ColumnType,
     options: ColumnOptions = {},
   ): Promise<void> {
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     const sqlType = this.schemaCreation.typeToSql(type, options);
     const table = this._qi(tableName);
     const col = this._qi(columnName);
@@ -331,6 +340,8 @@ export class SchemaStatements {
   }
 
   async renameTable(oldName: string, newName: string): Promise<void> {
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, oldName);
+    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, newName);
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qi(oldName)} RENAME TO ${this._qi(newName)}`,
     );

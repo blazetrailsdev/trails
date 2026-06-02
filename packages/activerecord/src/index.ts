@@ -132,6 +132,8 @@ export {
   setDisablePreparedStatements,
   actionOnStrictLoadingViolation,
   setActionOnStrictLoadingViolation,
+  permanentConnectionCheckout,
+  setPermanentConnectionCheckout,
 } from "./ar-config.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export {

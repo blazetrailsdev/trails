@@ -4,6 +4,7 @@
  * Rails stores these as singleton_class.attr_accessor on the ActiveRecord
  * module itself (active_record.rb:321-322).
  */
+import { ArgumentError } from "@blazetrails/activemodel";
 
 /**
  * Provides a mapping between database protocols/DBMSs and the underlying
@@ -73,6 +74,30 @@ export let schemaCacheIgnoredTables: ReadonlyArray<string | RegExp> = [];
 /** @internal */
 export function setSchemaCacheIgnoredTables(value: ReadonlyArray<string | RegExp>): void {
   schemaCacheIgnoredTables = value;
+}
+
+/**
+ * Controls what happens when `connection` (the soft-deprecated checkout alias)
+ * is called on a model that has not yet made the lease permanent.
+ *
+ * - `true` (default): `connection` behaves exactly like `leaseConnection`.
+ * - `'deprecated'`: emits a deprecation warning on the first checkout, then
+ *   behaves like `leaseConnection`.
+ * - `'disallowed'`: raises `ActiveRecordError` if the lease is not yet
+ *   permanent (i.e. the caller should use `withConnection` or
+ *   `leaseConnection` explicitly).
+ *
+ * Mirrors `ActiveRecord.permanent_connection_checkout` (active_record.rb:310).
+ */
+export let permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
+
+export function setPermanentConnectionCheckout(value: true | "deprecated" | "disallowed"): void {
+  if (value !== true && value !== "deprecated" && value !== "disallowed") {
+    throw new ArgumentError(
+      "permanentConnectionCheckout must be one of: `true`, `'deprecated'` or `'disallowed'`",
+    );
+  }
+  permanentConnectionCheckout = value;
 }
 
 /**
