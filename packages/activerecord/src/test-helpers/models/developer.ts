@@ -6,12 +6,33 @@ import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 export class Developer extends Base {
   static instanceCount: number | undefined;
 
+  // Rails `module ProjectsAssociationExtension { def find_most_recent ... }`
+  // and `ProjectsAssociationExtension2 { def find_least_recent ... }`, mixed
+  // onto the HABTM `projects*` proxies per AssociationsExtensionsTest.
+  static projectsAssociationExtension = {
+    async findMostRecent(this: any) {
+      return this.order("id DESC").first();
+    },
+  };
+
+  static projectsAssociationExtension2 = {
+    async findLeastRecent(this: any) {
+      return this.order("id ASC").first();
+    },
+  };
+
   static {
     this.ignoredColumns = ["first_name", "last_name"];
 
     this.hasAndBelongsToMany("projects", {
       joinTable: "developers_projects",
       associationForeignKey: "project_id",
+      // Rails: `has_and_belongs_to_many :projects do def find_most_recent ... end`
+      extend: {
+        async findMostRecent(this: any) {
+          return this.order("id DESC").first();
+        },
+      },
     });
 
     this.belongsTo("mentor");
@@ -33,18 +54,31 @@ export class Developer extends Base {
       className: "Project",
       joinTable: "developers_projects",
       associationForeignKey: "project_id",
+      // Rails: `-> { extending(ProjectsAssociationExtension) }`
+      extend: Developer.projectsAssociationExtension,
     });
 
     this.hasAndBelongsToMany("projectsExtendedByNameTwice", {
       className: "Project",
       joinTable: "developers_projects",
       associationForeignKey: "project_id",
+      // Rails: `-> { extending(ProjectsAssociationExtension, ProjectsAssociationExtension2) }`
+      extend: [Developer.projectsAssociationExtension, Developer.projectsAssociationExtension2],
     });
 
     this.hasAndBelongsToMany("projectsExtendedByNameAndBlock", {
       className: "Project",
       joinTable: "developers_projects",
       associationForeignKey: "project_id",
+      // Rails: `-> { extending(ProjectsAssociationExtension) } do def find_least_recent ... end`
+      extend: [
+        Developer.projectsAssociationExtension,
+        {
+          async findLeastRecent(this: any) {
+            return this.order("id ASC").first();
+          },
+        },
+      ],
     });
 
     this.hasAndBelongsToMany("strictLoadingProjects", {
