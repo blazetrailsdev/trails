@@ -222,8 +222,18 @@ export async function executeBatch(
   statements: string[],
   name?: string | null,
 ): Promise<void> {
-  const sql = statements.join(";\n");
-  await this.executeMutation(sql, [], name ?? "SQL");
+  // Match Rails' execute_batch → raw_execute, which skips the query_transformers
+  // pass: batch statements carry no QueryLogs comment. Flag the call so
+  // preprocessQuery skips the transformer pass (write-checks still run); the flag
+  // is consumed synchronously there before any await, so it never spans the await.
+  const host = this as ExecuteBatchHost & { _inQueryTransformers?: boolean };
+  host._inQueryTransformers = true;
+  try {
+    const sql = statements.join(";\n");
+    await this.executeMutation(sql, [], name ?? "SQL");
+  } finally {
+    host._inQueryTransformers = false;
+  }
 }
 
 /** @internal */

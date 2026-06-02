@@ -24,6 +24,7 @@ import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { TransactionManager } from "./transaction.js";
 import { Result } from "../../result.js";
 import { isWriteQuerySql } from "../sql-classification.js";
+import { queryTransformers } from "../../query-transformers.js";
 
 /**
  * A single entry in `Relation#explain`'s options list. Either a bare
@@ -122,6 +123,8 @@ export interface DatabaseStatementsHost {
   primaryKey?(table: string): string | null;
   /** @internal */
   preprocessQuery?(sql: string): string;
+  /** @internal Re-entrancy guard for the queryTransformers loop in preprocessQuery. */
+  _inQueryTransformers?: boolean;
 }
 
 /**
@@ -1661,7 +1664,27 @@ function affectedRows(rawResult: any): never {
 }
 
 /**
- * Checks write guards, marks the transaction written, and returns the sql unchanged.
+ * Checks write guards, marks the transaction written, and applies the global
+ * `queryTransformers` (e.g. `QueryLogs`) before the SQL is executed and
+ * instrumented — mirroring Rails'
+ * `ActiveRecord.query_transformers.each { |t| sql = t.call(sql, self) }`.
+ *
+ * Concrete adapters call this at the top of `execute`/`executeMutation`, so the
+ * `sql.active_record` notification payload carries the post-transform
+ * (commented) SQL — the Rails-faithful ordering where `preprocess_query` runs
+ * in `internal_execute`, before `raw_execute`'s `log` block.
+ *
+ * `_inQueryTransformers` is a one-shot "skip the transformer pass" flag.
+ * `executeBatch` sets it before each statement so batch SQL stays uncommented —
+ * matching Rails, whose `execute_batch` calls `raw_execute` directly and so
+ * skips the `query_transformers` loop. (Unlike Rails' `raw_execute`, the
+ * write-checks above still run for batch statements; only the transformer pass
+ * is suppressed.) The flag is **consumed synchronously here, before any await**,
+ * so it can never span an await boundary and bleed into a concurrent query on
+ * the same adapter. It also short-circuits a synchronous re-entrant call (a
+ * transformer that itself runs SQL); real, async, DB-issuing transformers don't
+ * hit this — by the time their query runs, the flag is already cleared, so they
+ * transform normally, exactly as in Rails (which has no guard at all).
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#preprocess_query
  * @internal
@@ -1669,6 +1692,19 @@ function affectedRows(rawResult: any): never {
 export function preprocessQuery(this: DatabaseStatementsHost, sql: string): string {
   this.checkIfWriteQuery?.(sql);
   markTransactionWrittenIfWrite.call(this, sql);
+  const host = this as DatabaseStatementsHost & { _inQueryTransformers?: boolean };
+  if (host._inQueryTransformers) {
+    host._inQueryTransformers = false;
+    return sql;
+  }
+  host._inQueryTransformers = true;
+  try {
+    for (const t of queryTransformers) {
+      sql = t.call(sql, this);
+    }
+  } finally {
+    host._inQueryTransformers = false;
+  }
   return sql;
 }
 
@@ -1712,8 +1748,20 @@ export async function executeBatch(
   statements: string[],
   name?: string | null,
 ): Promise<void> {
+  // Rails' execute_batch calls raw_execute directly, so batch statements skip the
+  // query_transformers pass and carry no QueryLogs comment. trails routes batches
+  // through executeMutation (which preprocesses), so flag each statement to
+  // suppress the transformer pass (write-checks still run). The flag is consumed
+  // synchronously inside preprocessQuery before any await — so it never spans the
+  // await — and the finally clears it if executeMutation throws before consuming.
+  const host = this as DatabaseStatementsHost & { _inQueryTransformers?: boolean };
   for (const statement of statements) {
-    await (this as any).executeMutation(statement);
+    host._inQueryTransformers = true;
+    try {
+      await (this as any).executeMutation(statement);
+    } finally {
+      host._inQueryTransformers = false;
+    }
   }
 }
 
