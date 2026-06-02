@@ -60,5 +60,24 @@ describe("classifyGateMismatch", () => {
   it("distinguishes an empty 'runs nowhere' set from all-adapters", () => {
     // contradictory Rails gate ([]) vs our unconditional run → mismatch
     expect(classifyGateMismatch(nowhere, undefined, false)).toBe("missing-gate");
+    // TS-side nowhere vs Rails [pg] → both comparable, keys differ → wrong-gate
+    expect(classifyGateMismatch(pg, nowhere, false)).toBe("wrong-gate");
+  });
+
+  it("ignores tsPending when both sides are comparably gated", () => {
+    // already has a gate (just the wrong one) → wrong-gate, never should-gate
+    expect(classifyGateMismatch(pg, mysql, true)).toBe("wrong-gate");
+  });
+
+  it("compares the combined adapter+feature key (both dimensions)", () => {
+    const pgJson: TestGate = { adapters: ["postgresql"], features: ["json"], source: ["class"] };
+    const mysqlJson: TestGate = { adapters: ["mysql"], features: ["json"], source: ["wrapper"] };
+    // same feature, different adapter → wrong-gate
+    expect(classifyGateMismatch(pgJson, mysqlJson, false)).toBe("wrong-gate");
+    // cross-dimension: Rails adapter-gated [pg] vs TS feature-gated [json]
+    // → keys "postgresql|" vs "*|json" → wrong-gate
+    expect(classifyGateMismatch(pg, jsonTs, false)).toBe("wrong-gate");
+    // same adapter AND same feature → agree
+    expect(classifyGateMismatch(pgJson, { ...pgJson, source: ["wrapper"] }, false)).toBeNull();
   });
 });

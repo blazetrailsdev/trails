@@ -185,6 +185,13 @@ function adapterFeatureKey(g: TestGate): string {
  * Classify the gate divergence for a matched Rails↔TS test pair, or `null` when
  * they agree (or neither is comparably gated — e.g. both unconditional, or a
  * genuine `it.skip` TODO of a test Rails also runs unconditionally).
+ *
+ * `tsPending` is consulted ONLY when Rails is comparably gated and the TS side
+ * is not — to split `should-gate` (we TODO-skip it) from `missing-gate` (we run
+ * it unconditionally). When the TS side is itself comparably gated, `tsPending`
+ * is irrelevant: the test already has a gate, so the only question is whether it
+ * matches Rails' (`wrong-gate`) — e.g. `classifyGateMismatch(pg, mysql, true)`
+ * is `wrong-gate`, not `should-gate`.
  */
 export function classifyGateMismatch(
   rails: TestGate | undefined,

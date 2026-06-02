@@ -618,7 +618,9 @@ function main() {
     const details: string[] = [];
     if (pkg.totalMatchedSkipped > 0) details.push(`${pkg.totalMatchedSkipped} skipped`);
     if (pkg.totalWrongDescribe > 0) details.push(`${pkg.totalWrongDescribe} wrong describe`);
-    if (pkg.totalGateMismatch > 0) details.push(`${pkg.totalGateMismatch} gate-mismatch`);
+    if (pkg.totalGateMismatch > 0) {
+      details.push(`${pkg.totalGateMismatch} gate-mismatch${showGates ? "" : " (see --gates)"}`);
+    }
     const detailStr = details.length > 0 ? ` (${details.join(", ")})` : "";
     console.log(`\n${"=".repeat(90)}`);
     console.log(
@@ -734,7 +736,10 @@ function main() {
 function formatGate(g?: TestGate): string {
   if (!g) return "unconditional";
   const parts: string[] = [];
-  if (g.adapters) parts.push(`adapters=[${[...g.adapters].sort().join(",")}]`);
+  // Empty adapters = "runs on no adapter" — render as [none] rather than a
+  // bare [] so the report reads clearly.
+  if (g.adapters)
+    parts.push(`adapters=[${g.adapters.length ? [...g.adapters].sort().join(",") : "none"}]`);
   if (g.features?.length) parts.push(`features=[${[...g.features].sort().join(",")}]`);
   if (g.guards?.length) parts.push(`guards=[${[...g.guards].sort().join(",")}]`);
   return parts.length ? parts.join(" ") : "unconditional";
