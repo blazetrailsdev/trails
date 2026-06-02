@@ -118,12 +118,19 @@ a live skip.
 
 ## Wave 1 — global Arel visitor removal (tail)
 
-### Story 1.6 — Phase C: delete the `syncHandlerVisitor` test dance `[tests-only]` ~per-grep · dep-clear
+### Story 1.6 — Phase C: delete the `syncHandlerVisitor` test dance — DONE (no-op) ✅
 
-- Ours: ~635 `syncHandlerVisitor`/`setupHandlerSuite` sites
-  (`grep -rn "syncHandlerVisitor\|setupHandlerSuite" packages/activerecord/src`).
-  With the global no longer dialect-synced these `beforeEach` calls are dead.
-- Done: grep returns zero; full AR suite green in CI.
+The actual dead arel-visitor helper, `syncHandlerVisitor`, is **already gone**:
+`grep -rn syncHandlerVisitor packages/activerecord/src` returns **zero**. The
+~640 `setupHandlerSuite` hits the grep also matched are a **false positive** —
+that helper was repurposed long ago and is now **live, load-bearing** test
+infrastructure (`test-helpers/setup-handler-suite.ts`): it calls
+`bootstrapTestHandler()` (establishes `Base.connectionHandler` for the worker)
+and `pushSkipGlobalReset()` (keeps shared-DB schema built in `beforeAll` alive
+across tests in the file). It never touches the arel global. Empirically
+confirmed: deleting `setupHandlerSuite()` from `boolean.test.ts` flips it from
+`5 passed` to `1 failed / 5 skipped` (the `beforeAll` throws — no connection).
+Do **not** mechanically delete these calls. Nothing to ship.
 
 **Follow-up bullets:**
 
