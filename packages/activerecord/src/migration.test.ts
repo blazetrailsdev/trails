@@ -4,7 +4,7 @@
  *          activerecord/test/cases/invertible_migration_test.rb
  */
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
-import { Base, MigrationContext, MigrationRunner, Migrator } from "./index.js";
+import { Base, MigrationContext, MigrationRunner, Migrator, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { ConcurrentMigrationError } from "./migration.js";
@@ -1217,14 +1217,14 @@ describe("MigrationTest", () => {
 
   it("create table raises if already exists", async () => {
     const { ctx } = freshContext();
-    await ctx.createTable("testings", {}, (t) => {
+    await ctx.createTable("testings", { force: true }, (t) => {
       t.string("foo");
     });
     await expect(
       ctx.createTable("testings", {}, (t) => {
         t.string("foo");
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(StatementInvalid);
   });
 
   it("add column with if not exists set to true", () => {
