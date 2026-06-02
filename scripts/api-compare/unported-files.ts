@@ -717,11 +717,21 @@ export const UNPORTED_FILES: UnportedFile[] = [
     testFile: "connection_adapters/schema_cache_test.rb",
     tests: ["yaml loads 5 1 dump", "yaml loads 5 1 dump without indexes still queries for indexes"],
     reason:
-      "Loads a fixed Rails-5.1-era YAML schema-cache dump asset and deserializes " +
-      "it via Psych (schema_cache_test.rb:124-142). Psych's Ruby-object-tagged " +
-      "YAML format and its cross-version compatibility shims have no Node.js " +
-      "equivalent; the live schema-cache JSON path is exercised by the portable " +
-      "tests in the same file.",
+      "Loads the fixed Rails-5.1-era schema-cache dump asset " +
+      "(test/assets/schema_dump_5_1.yml) and deserializes it via Psych " +
+      "(schema_cache_test.rb:124-142). Note this is NOT covered by our YAML " +
+      "syntax support (the `yaml` package backing coders/yaml-column.ts): the " +
+      "asset is a Psych object graph of `!ruby/object:ActiveRecord::" +
+      "ConnectionAdapters::{SchemaCache,Column,SqlTypeMetadata}` tags with Ruby " +
+      "symbol values and anchors. Loading it requires (a) unsafe-load " +
+      "reconstruction of Ruby class instances from `!ruby/object:` tags — the " +
+      "same Psych machinery already documented as having no JS analog in the " +
+      "coders/yaml_column.rb and attribute_set/yaml_encoder.rb entries — and " +
+      "(b) the 5.1→current legacy-format migration handled by " +
+      "legacy_yaml_adapter.rb (itself unported above). Our `yaml` parser yields " +
+      "plain tagged nodes, not SchemaCache instances. The live schema-cache " +
+      "round-trip is exercised by the portable tests in the same file " +
+      "(test_yaml_dump_and_load[_with_gzip], which use our own dump path).",
   },
   // --- Thread.new / Thread.kill / GVL concurrency ---
   {
