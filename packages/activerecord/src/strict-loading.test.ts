@@ -1769,14 +1769,15 @@ describe("StrictLoadingTest", () => {
     ElslidLog.strictLoadingByDefault = true;
     try {
       const dev = await ElslidDev.create({ name: "D" });
-      await ElslidLog.create({ message: "M1", elslid_dev_id: dev.id });
-      await ElslidLog.create({ message: "M2", elslid_dev_id: dev.id });
+      for (let i = 0; i < 3; i++) {
+        await ElslidLog.create({ message: "I am message", elslid_dev_id: dev.id });
+      }
       const loaded = await ElslidDev.all().eagerLoad("elslidLogs").toArray();
-      expect((loaded[0] as any)._strictLoading).toBe(false);
-      expect(((await ElslidLog.last()) as any)?._strictLoading).toBe(true);
+      expect(loaded[0].isStrictLoading()).toBe(false);
+      expect((await ElslidLog.last())?.isStrictLoading()).toBe(true);
       const logs = (loaded[0] as any)._preloadedAssociations?.get("elslidLogs") ?? [];
-      expect(logs).toHaveLength(2);
-      expect(logs.every((l: any) => l._strictLoading)).toBe(true);
+      expect(logs).toHaveLength(3);
+      expect(logs.every((l: Base) => l.isStrictLoading())).toBe(true);
     } finally {
       ElslidLog.strictLoadingByDefault = false;
     }
@@ -1943,12 +1944,12 @@ describe("StrictLoadingTest", () => {
         this.attribute("ehosd_dev_id", "integer");
       }
     }
-    registerModel("EhosdDev", EhosdDev);
-    registerModel("EhosdProfile", EhosdProfile);
     Associations.hasOne.call(EhosdDev, "ehosdProfile", {
       className: "EhosdProfile",
       foreignKey: "ehosd_dev_id",
     });
+    registerModel("EhosdDev", EhosdDev);
+    registerModel("EhosdProfile", EhosdProfile);
     EhosdDev.strictLoadingByDefault = true;
     try {
       const created = await EhosdDev.create({ name: "D" });
@@ -1979,16 +1980,18 @@ describe("StrictLoadingTest", () => {
         this.attribute("ehmd_dev_id", "integer");
       }
     }
-    registerModel("EhmdDev", EhmdDev);
-    registerModel("EhmdLog", EhmdLog);
     Associations.hasMany.call(EhmdDev, "ehmdLogs", {
       className: "EhmdLog",
       foreignKey: "ehmd_dev_id",
     });
+    registerModel("EhmdDev", EhmdDev);
+    registerModel("EhmdLog", EhmdLog);
     EhmdDev.strictLoadingByDefault = true;
     try {
       const created = await EhmdDev.create({ name: "D" });
-      await EhmdLog.create({ message: "M", ehmd_dev_id: created.id });
+      for (let i = 0; i < 3; i++) {
+        await EhmdLog.create({ message: "I am message", ehmd_dev_id: created.id });
+      }
       // Mirror `Developer.includes(:audit_logs).first`: the real includes path
       // populates the preloaded cache, so accessing it on a strict owner does
       // not raise.
@@ -1998,7 +2001,7 @@ describe("StrictLoadingTest", () => {
         className: "EhmdLog",
         foreignKey: "ehmd_dev_id",
       });
-      expect(loaded).toHaveLength(1);
+      expect(loaded).toHaveLength(3);
     } finally {
       EhmdDev.strictLoadingByDefault = false;
     }
