@@ -196,7 +196,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     // Rails: assert_equal BigDecimal("123.45"), PostgresqlMoney.sum("id * wealth")
     // The aggregate is over a raw SQL expression (id * wealth), whose result
-    // column is the PG money type — MoneyDecoder casts it to a number.
+    // column is the PG money type — MoneyDecoder deserializes it to the decimal
+    // string "123.45"; sum's numeric coercion then yields the number.
     it("sum with type cast", async () => {
       await adapter.executeMutation(
         `INSERT INTO "postgresql_moneys" ("id", "wealth") VALUES (1, '123.45'::money)`,

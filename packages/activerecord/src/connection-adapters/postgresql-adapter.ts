@@ -377,9 +377,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             if ((oid === OID_JSON || oid === OID_JSONB) && format !== "binary")
               return (v: unknown) => v;
             // PG money (OID 790): the wire format is locale-formatted text
-            // ("$123.45"). Decode to a number via MoneyDecoder so result
-            // values from raw expressions (SUM(id * wealth), pluck(Arel.sql))
-            // carry a numeric value — mirrors Rails' money type-map coder.
+            // ("$123.45"). Decode to the deserialized decimal string via the
+            // Money type so result values from raw expressions
+            // (SUM(id * wealth), pluck(Arel.sql)) come back as the bare number
+            // string — mirrors Rails' money type-map coder.
             if (oid === OID_MONEY && format !== "binary")
               return (v: unknown) => (typeof v === "string" ? MoneyDecoder.decode(v) : v);
             return oid === 1082 && !PostgreSQLAdapter.decodeDates
@@ -477,9 +478,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             const fallback = (v: unknown) => v;
             return userGetTypeParser?.(oid, format) ?? fallback;
           }
-          // PG money (OID 790): decode locale-formatted text ("$123.45") to a
-          // number so SUM(id * wealth) / pluck(Arel.sql(...)) carry numeric
-          // values — mirrors Rails' money type-map coder.
+          // PG money (OID 790): decode locale-formatted text ("$123.45") to the
+          // deserialized decimal string via the Money type so SUM(id * wealth)
+          // / pluck(Arel.sql(...)) come back as the bare number string —
+          // mirrors Rails' money type-map coder.
           if (oid === OID_MONEY && format !== "binary") {
             const fallback = (v: unknown) => (typeof v === "string" ? MoneyDecoder.decode(v) : v);
             return userGetTypeParser?.(oid, format) ?? fallback;
