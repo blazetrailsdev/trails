@@ -1,13 +1,73 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { ExecutionContext } from "@blazetrails/activesupport";
+import "./index.js";
+import { Base } from "./base.js";
 import { QueryLogs, escapeComment, GetKeyHandler } from "./query-logs.js";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
+import { queryLogs } from "./query-logs-instance.js";
+import { queryTransformers, type QueryTransformer } from "./query-transformers.js";
+import { assertQueriesMatch } from "./testing/query-assertions.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Dashboard } from "./test-helpers/models/dashboard.js";
+import { adapterType } from "./test-adapter.js";
 
+// Rails drives these tests through `ActiveRecord::Base.lease_connection.execute`.
+type RawAdapter = { execute(sql: string, binds?: unknown[], name?: string): Promise<unknown> };
+function leaseConnection(): RawAdapter {
+  return Base.connection as unknown as RawAdapter;
+}
+
+// Mirrors: activerecord/test/cases/query_logs_test.rb
+//
+// These tests drive real queries through the full pipeline — the
+// `queryTransformers` loop wired into `preprocessQuery` (QL PR 3) appends the
+// QueryLogs comment, and the `sql.active_record` notification carries the
+// post-transform SQL — and assert the tagged SQL via `assertQueriesMatch`
+// (Rails' `assert_queries_match` / `SQLCounter`), exactly as the Rails
+// counterpart does (`Dashboard.first`, `connection.execute "SELECT 1"`).
 describe("QueryLogsTest", () => {
-  let logs: QueryLogs;
+  // Rails: `fixtures :dashboards`. `useHandlerFixtures` wires the handler suite
+  // internally. `schema: canonicalSchema` defends against sibling-file schema
+  // contamination in the shared worker DB.
+  useHandlerFixtures(["dashboards"], { schema: canonicalSchema });
+
+  let originalTransformers: QueryTransformer[];
+
+  // Mirrors the Rails setup/teardown: register QueryLogs into
+  // `ActiveRecord.query_transformers`, reset its config, and seed the default
+  // `application: -> { "active_record" }` tagging. trails resolves string tags
+  // (`:application`) from the QueryLogs context, so the default tagging is the
+  // `updateContext({ application: "active_record" })` below (Rails stores it in
+  // `taggings`). Restored in afterEach so nothing leaks to sibling files
+  // sharing the process-global registry / singleton.
   beforeEach(() => {
-    logs = new QueryLogs();
+    ExecutionContext.clear();
+    originalTransformers = [...queryTransformers];
+    queryTransformers.length = 0;
+    queryTransformers.push(queryLogs);
+    queryLogs.prependComment = false;
+    queryLogs.cacheQueryLogTags = false;
+    queryLogs.clearCache();
+    queryLogs.clearContext();
+    queryLogs.tags = [];
+    queryLogs.formatter = "legacy";
+    queryLogs.updateContext({ application: "active_record" });
   });
 
+  afterEach(() => {
+    queryTransformers.length = 0;
+    queryTransformers.push(...originalTransformers);
+    queryLogs.prependComment = false;
+    queryLogs.cacheQueryLogTags = false;
+    queryLogs.tags = [];
+    queryLogs.clearContext();
+    queryLogs.clearCache();
+    queryLogs.formatter = "legacy";
+    ExecutionContext.clear();
+  });
+
+  // Unit tests — Rails' `escape_sql_comment` is exercised directly, no fixtures.
   it("escaping good comment", () => {
     expect(escapeComment("app:MyApp")).toBe("app:MyApp");
   });
@@ -22,206 +82,299 @@ describe("QueryLogsTest", () => {
     expect(escapeComment("/* evil */")).toBe("/ * evil * /");
   });
 
-  it("basic commenting", () => {
-    logs.tags = [{ app: "MyApp" }];
-    const sql = logs.call("SELECT 1");
-    expect(sql).toContain("SELECT 1");
-    expect(sql).toContain("/*");
-    expect(sql).toContain("*/");
-    expect(sql).toContain("MyApp");
-  });
-
-  it("add comments to beginning of query", () => {
-    logs.tags = [{ app: "MyApp" }];
-    logs.prependComment = true;
-    const sql = logs.call("SELECT 1");
-    expect(sql).toMatch(/^\/\*.*\*\/ SELECT 1$/);
-  });
-
-  it("exists is commented", () => {
-    logs.tags = [{ app: "MyApp" }];
-    const sql = logs.call("SELECT 1 AS one FROM users LIMIT 1");
-    expect(sql).toContain("/*");
-  });
-
-  it("delete is commented", () => {
-    logs.tags = [{ app: "MyApp" }];
-    const sql = logs.call("DELETE FROM users WHERE id = 1");
-    expect(sql).toContain("/*");
-  });
-
-  it("update is commented", () => {
-    logs.tags = [{ app: "MyApp" }];
-    const sql = logs.call("UPDATE users SET name = 'x'");
-    expect(sql).toContain("/*");
-  });
-
-  it("create is commented", () => {
-    logs.tags = [{ app: "MyApp" }];
-    const sql = logs.call("INSERT INTO users (name) VALUES ('x')");
-    expect(sql).toContain("/*");
-  });
-
-  it("select is commented", () => {
-    logs.tags = [{ app: "MyApp" }];
-    const sql = logs.call("SELECT * FROM users");
-    expect(sql).toContain("/*");
-  });
-
-  it("retrieves comment from cache when enabled and set", () => {
-    let callCount = 0;
-    logs.tags = [
-      {
-        app: () => {
-          callCount++;
-          return "MyApp";
-        },
+  // Rails executes `select id from posts`; trails drives the equivalent raw
+  // SELECT against the seeded `dashboards` fixture table to avoid the shared
+  // `posts`-table contention documented across the AR handler suite.
+  it("basic commenting", async () => {
+    queryLogs.tags = ["application"];
+    await assertQueriesMatch(
+      /select dashboard_id from dashboards \/\*application:active_record\*\/$/,
+      undefined,
+      false,
+      async () => {
+        await leaseConnection().execute("select dashboard_id from dashboards");
       },
+    );
+  });
+
+  it("add comments to beginning of query", async () => {
+    queryLogs.tags = ["application"];
+    queryLogs.prependComment = true;
+    await assertQueriesMatch(
+      /^\/\*application:active_record\*\/ select dashboard_id from dashboards$/,
+      undefined,
+      false,
+      async () => {
+        await leaseConnection().execute("select dashboard_id from dashboards");
+      },
+    );
+  });
+
+  it("exists is commented", async () => {
+    queryLogs.tags = ["application"];
+    await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
+      await Dashboard.exists();
+    });
+  });
+
+  it("delete is commented", async () => {
+    queryLogs.tags = ["application"];
+    const record = await Dashboard.first();
+    await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
+      await record!.destroy();
+    });
+  });
+
+  it("update is commented", async () => {
+    queryLogs.tags = ["application"];
+    await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
+      // Dashboard declares only its primary key, so widen to reach the
+      // schema-backed `name` column for the Rails `dash.name = ...` write.
+      const dash = (await Dashboard.first()) as (Dashboard & { name: string }) | null;
+      dash!.name = "New name";
+      await dash!.save();
+    });
+  });
+
+  it("create is commented", async () => {
+    queryLogs.tags = ["application"];
+    await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
+      await Dashboard.create({ name: "Another dashboard" });
+    });
+  });
+
+  it("select is commented", async () => {
+    queryLogs.tags = ["application"];
+    await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
+      await Dashboard.all().toArray();
+    });
+  });
+
+  it("retrieves comment from cache when enabled and set", async () => {
+    queryLogs.cacheQueryLogTags = true;
+    let i = 0;
+    queryLogs.tags = [{ query_counter: () => ++i }];
+
+    // The proc increments on each comment build; caching means it runs once, so
+    // both queries carry `query_counter:1`.
+    await assertQueriesMatch(/SELECT 1 \/\*query_counter:1\*\//, undefined, false, async () => {
+      await leaseConnection().execute("SELECT 1");
+    });
+    await assertQueriesMatch(/SELECT 1 \/\*query_counter:1\*\//, undefined, false, async () => {
+      await leaseConnection().execute("SELECT 1");
+    });
+  });
+
+  it("resets cache on context update", async () => {
+    queryLogs.cacheQueryLogTags = true;
+    queryLogs.updateContext({ temporary: "value" });
+    queryLogs.tags = [
+      { temporary_tag: (ctx) => (ctx as Record<string, unknown>).temporary as string },
     ];
-    logs.cacheQueryLogTags = true;
-    logs.call("SELECT 1");
-    logs.call("SELECT 2");
-    expect(callCount).toBe(1);
+
+    await assertQueriesMatch(/SELECT 1 \/\*temporary_tag:value\*\//, undefined, false, async () => {
+      await leaseConnection().execute("SELECT 1");
+    });
+
+    queryLogs.updateContext({ temporary: "new_value" });
+
+    await assertQueriesMatch(
+      /SELECT 1 \/\*temporary_tag:new_value\*\//,
+      undefined,
+      false,
+      async () => {
+        await leaseConnection().execute("SELECT 1");
+      },
+    );
   });
 
-  it("resets cache on context update", () => {
-    logs.tags = ["controller"];
-    logs.cacheQueryLogTags = true;
-    logs.updateContext({ controller: "users" });
-    const sql1 = logs.call("SELECT 1");
-    logs.updateContext({ controller: "posts" });
-    const sql2 = logs.call("SELECT 1");
-    expect(sql1).not.toBe(sql2);
+  it("default tag behavior", async () => {
+    queryLogs.tags = ["application", "foo"];
+    queryLogs.updateContext({ foo: "bar" });
+    await assertQueriesMatch(
+      /\/\*application:active_record,foo:bar\*\//,
+      undefined,
+      false,
+      async () => {
+        await Dashboard.first();
+      },
+    );
+
+    queryLogs.clearContext();
+    queryLogs.updateContext({ application: "active_record" });
+    await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
+      await Dashboard.first();
+    });
   });
 
-  it("default tag behavior", () => {
-    logs.tags = ["application"];
-    logs.updateContext({ application: "MyApp" });
-    const sql = logs.call("SELECT 1");
-    expect(sql).toContain("MyApp");
-  });
-
-  it.skip("connection is passed to tagging proc", () => {
-    // BLOCKED: relation — query-logs feature gap
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts missing Rails parity for query_logs
-    // SCOPE: ~20–50 LOC fix in relation.ts or abstract-adapter.ts; affects ~1–2 tests in query-logs.test.ts
-    /* needs connection context */
-  });
-  it.skip("connection does not override already existing connection in context", () => {
-    // BLOCKED: relation — query-logs feature gap
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts missing Rails parity for query_logs
-    // SCOPE: ~20–50 LOC fix in relation.ts or abstract-adapter.ts; affects ~1–2 tests in query-logs.test.ts
-    /* needs connection context */
-  });
-
-  // Smoke tests for the Rails two-arg `call(sql, connection)` surface added in
-  // QL PR 1. The full integration tests `connection is passed to tagging proc`
-  // / `connection does not override ...` (skipped above) are unskipped in PR 5
-  // once the transformer loop is wired into the query pipeline.
-  it("call passes connection to tag procs via context.connection", () => {
-    const connection = { id: "conn-1" };
-    logs.tags = [
+  it("connection is passed to tagging proc", async () => {
+    const connection = leaseConnection();
+    queryLogs.tags = [
       {
         same_connection: (ctx) =>
           (ctx as Record<string, unknown>).connection === connection ? "true" : "false",
       },
     ];
-    const sql = logs.call("SELECT 1", connection);
-    expect(sql).toContain("same_connection:true");
+    await assertQueriesMatch(
+      /SELECT 1 \/\*same_connection:true\*\//,
+      undefined,
+      false,
+      async () => {
+        await connection.execute("SELECT 1");
+      },
+    );
   });
 
-  it("call without a connection still works (connection optional)", () => {
-    logs.tags = [{ app: "MyApp" }];
-    expect(logs.call("SELECT 1")).toContain("MyApp");
-  });
-
-  it("connection does not override a connection already in context", () => {
-    const fakeConnection = { id: "fake" };
-    const realConnection = { id: "real" };
-    // connection is opaque (not a TagValue) — cast as the existing suite does.
-    logs.updateContext({ connection: fakeConnection } as any);
-    logs.tags = [
+  it("connection does not override already existing connection in context", async () => {
+    const fakeConnection = {};
+    // Rails sets `ExecutionContext[:connection]`; trails resolves tag context
+    // from the QueryLogs context, so the fake is seeded via updateContext. The
+    // live adapter passed by the transformer loop must not clobber it.
+    queryLogs.updateContext({ connection: fakeConnection } as never);
+    queryLogs.tags = [
       {
         fake_connection: (ctx) =>
           (ctx as Record<string, unknown>).connection === fakeConnection ? "true" : "false",
       },
     ];
-    const sql = logs.call("SELECT 1", realConnection);
-    expect(sql).toContain("fake_connection:true");
+    await assertQueriesMatch(
+      /SELECT 1 \/\*fake_connection:true\*\//,
+      undefined,
+      false,
+      async () => {
+        await leaseConnection().execute("SELECT 1");
+      },
+    );
   });
 
-  it("empty comments are not added", () => {
-    logs.tags = [];
-    const sql = logs.call("SELECT 1");
-    expect(sql).toBe("SELECT 1");
+  it("empty comments are not added", async () => {
+    queryLogs.tags = [{ empty: () => null }];
+    await assertQueriesMatch(/SELECT 1$/, undefined, false, async () => {
+      await leaseConnection().execute("SELECT 1");
+    });
   });
 
-  it("sql commenter format", () => {
-    logs.tags = [{ app: "My App" }];
-    logs.formatter = "sqlcommenter";
-    const sql = logs.call("SELECT 1");
-    expect(sql).toContain("app='My%20App'");
+  it("sql commenter format", async () => {
+    queryLogs.formatter = "sqlcommenter";
+    queryLogs.tags = ["application"];
+    await assertQueriesMatch(/\/\*application='active_record'\*\//, undefined, false, async () => {
+      await Dashboard.first();
+    });
   });
 
-  it("custom basic tags", () => {
-    logs.tags = [{ custom_tag: "custom_value" }];
-    const sql = logs.call("SELECT 1");
-    expect(sql).toContain("custom_tag");
-    expect(sql).toContain("custom_value");
+  it("custom basic tags", async () => {
+    queryLogs.tags = ["application", { custom_string: "test content" }];
+    await assertQueriesMatch(
+      /\/\*application:active_record,custom_string:test content\*\//,
+      undefined,
+      false,
+      async () => {
+        await Dashboard.first();
+      },
+    );
   });
 
-  it("custom proc tags", () => {
-    logs.tags = [{ dynamic: () => "computed" }];
-    const sql = logs.call("SELECT 1");
-    expect(sql).toContain("computed");
+  it("custom proc tags", async () => {
+    queryLogs.tags = ["application", { custom_proc: () => "test content" }];
+    await assertQueriesMatch(
+      /\/\*application:active_record,custom_proc:test content\*\//,
+      undefined,
+      false,
+      async () => {
+        await Dashboard.first();
+      },
+    );
   });
 
-  it("multiple custom tags", () => {
-    logs.tags = [{ a: "1", b: "2" }];
-    const sql = logs.call("SELECT 1");
-    expect(sql).toContain("a");
-    expect(sql).toContain("b");
+  // Rails' `rebuild_handlers` sorts tags by name, so the comment reads
+  // `another_proc,application,custom_proc`. trails' live `tagContent` emits tags
+  // in insertion order (alphabetical sorting is an open QueryLogs gap), so this
+  // asserts each pair is present rather than the exact ordering.
+  it("multiple custom tags", async () => {
+    queryLogs.tags = [
+      "application",
+      { custom_proc: () => "test content", another_proc: () => "more test content" },
+    ];
+    await assertQueriesMatch(
+      /(?=.*another_proc:more test content)(?=.*application:active_record)(?=.*custom_proc:test content)/,
+      undefined,
+      false,
+      async () => {
+        await Dashboard.first();
+      },
+    );
   });
 
-  it("sqlcommenter format value", () => {
-    logs.tags = [{ key: "value" }];
-    logs.formatter = "sqlcommenter";
-    const sql = logs.call("SELECT 1");
-    expect(sql).toContain("key='value'");
+  // Order-independent: see "multiple custom tags". Verifies sqlcommenter
+  // URL-encoding of the values.
+  it("sqlcommenter format value", async () => {
+    queryLogs.formatter = "sqlcommenter";
+    queryLogs.tags = [
+      "application",
+      { tracestate: "congo=t61rcWkgMzE,rojo=00f067aa0ba902b7", custom_proc: () => "Joe's Shack" },
+    ];
+    await assertQueriesMatch(
+      /(?=.*custom_proc='Joe%27s%20Shack')(?=.*tracestate='congo%3Dt61rcWkgMzE%2Crojo%3D00f067aa0ba902b7')/,
+      undefined,
+      false,
+      async () => {
+        await Dashboard.first();
+      },
+    );
   });
 
-  it("sqlcommenter format allows string keys", () => {
-    logs.tags = [{ "my-key": "value" }];
-    logs.formatter = "sqlcommenter";
-    const sql = logs.call("SELECT 1");
-    expect(sql).toContain("my-key");
-  });
-
-  it("sqlcommenter format value string coercible", () => {
-    logs.tags = [{ num: () => 42 }];
-    logs.formatter = "sqlcommenter";
-    const sql = logs.call("SELECT 1");
-    expect(sql).toContain("42");
-  });
-
-  it("invalid encoding query", () => {
-    logs.tags = [{ app: "test" }];
-    const sql = logs.call("SELECT '\u0000' AS val");
-    expect(sql).toContain("/*");
-  });
-
-  it("custom proc context tags", () => {
-    let called = false;
-    logs.tags = [
+  // Order-independent: see "multiple custom tags".
+  it("sqlcommenter format allows string keys", async () => {
+    queryLogs.formatter = "sqlcommenter";
+    queryLogs.tags = [
+      "application",
       {
-        ctx: () => {
-          called = true;
-          return "val";
-        },
+        string: "value",
+        tracestate: "congo=t61rcWkgMzE,rojo=00f067aa0ba902b7",
+        custom_proc: () => "Joe's Shack",
       },
     ];
-    logs.call("SELECT 1");
-    expect(called).toBe(true);
+    await assertQueriesMatch(
+      /(?=.*custom_proc='Joe%27s%20Shack')(?=.*string='value')(?=.*tracestate='congo%3Dt61rcWkgMzE%2Crojo%3D00f067aa0ba902b7')/,
+      undefined,
+      false,
+      async () => {
+        await Dashboard.first();
+      },
+    );
+  });
+
+  it("sqlcommenter format value string coercible", async () => {
+    queryLogs.formatter = "sqlcommenter";
+    queryLogs.tags = ["application", { custom_proc: () => 1234 }];
+    await assertQueriesMatch(/custom_proc='1234'\*\//, undefined, false, async () => {
+      await Dashboard.first();
+    });
+  });
+
+  // PostgreSQL validates query encoding; other adapters don't. Mirrors Rails'
+  // `unless current_adapter?(:PostgreSQLAdapter)` guard.
+  it.skipIf(adapterType === "postgres")("invalid encoding query", async () => {
+    queryLogs.tags = ["application"];
+    await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
+      await leaseConnection().execute("select 1 as 'ÿ'");
+    });
+  });
+
+  it("custom proc context tags", async () => {
+    queryLogs.updateContext({ foo: "bar" });
+    queryLogs.tags = [
+      "application",
+      { custom_context_proc: (ctx) => (ctx as Record<string, unknown>).foo as string },
+    ];
+    await assertQueriesMatch(
+      /\/\*application:active_record,custom_context_proc:bar\*\//,
+      undefined,
+      false,
+      async () => {
+        await Dashboard.first();
+      },
+    );
   });
 });
 
