@@ -903,6 +903,7 @@ const STRUCTURAL_FIELDS: ReadonlyArray<[string, keyof QueryMethodsHost]> = [
   ["joins", "_joinClauses"],
   ["joinValues", "_joinValues"],
   ["leftOuterJoinsValues", "_leftOuterJoinsValues"],
+  ["namedInnerJoins", "_namedInnerJoins"],
   ["limit", "_limitValue"],
   ["offset", "_offsetValue"],
   ["lock", "_lockValue"],
