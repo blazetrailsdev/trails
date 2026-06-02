@@ -169,8 +169,7 @@ export async function run(argv: readonly string[]): Promise<number> {
   };
 
   // Resolve the source of truth into IntrospectedTable[] + a sourceHint for
-  // the header. `--schema` reads a committed db/schema.ts offline; otherwise
-  // we connect to a live DB and introspect.
+  // the header. Precedence: --schema > auto-discovered db/schema.ts > live DB.
   let introspected: IntrospectedTable[];
   let sourceHint: string;
 

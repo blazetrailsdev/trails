@@ -569,34 +569,16 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
     expect(stderr).not.toMatch(/warning:/);
   });
 
-  it("emits a deprecation warning when falling through to the live-DB path", () => {
-    // REPO_ROOT has no db/schema.ts → auto-discovery misses → live-DB path with warning.
+  it("emits a deprecation warning when falling through to the live-DB path", async () => {
+    // tmp has no db/schema.ts → auto-discovery misses → live-DB path with warning.
     applySchema(dbPath, `CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT);`);
-    const { code, stdout, stderr } = runDump(["--no-header"], {
-      DATABASE_URL: `sqlite3://${dbPath}`,
-    });
+    const { code, stdout, stderr } = await withCwd(tmp, () =>
+      runDumpInProcess(["--no-header"], { DATABASE_URL: `sqlite3://${dbPath}` }),
+    );
     expect(code, `stderr: ${stderr}`).toBe(0);
     expect(stdout).toMatch(/export class Item extends Base/);
     expect(stderr).toMatch(
       /warning: generating from a live DB connection; consider committing db\/schema\.ts/,
     );
-  });
-
-  it("does not emit a deprecation warning on the auto-discovered schema path", async () => {
-    writeConventionSchema(
-      tmp,
-      `
-      export default async function defineSchema(ctx) {
-        await ctx.createTable("items", { force: "cascade" }, (t) => {
-          t.string("name");
-        });
-      }
-    `,
-    );
-    const { code, stderr } = await withCwd(tmp, () =>
-      runDumpInProcess(["--no-header"], { DATABASE_URL: "" }),
-    );
-    expect(code, `stderr: ${stderr}`).toBe(0);
-    expect(stderr).not.toMatch(/warning:/);
   });
 });
