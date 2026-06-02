@@ -25,28 +25,47 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
     restoreEncryption?.();
   });
 
-  const { encryptedBooks } = useFixtures(["encryptedBooks"], () => Base.adapter);
+  const { encryptedBooks } = useFixtures(["encryptedBooks"], () => Base.adapter, {
+    schema: TEST_SCHEMA,
+  });
 
   it("fixtures get encrypted automatically", async () => {
     const { EncryptableRecord } = await import("./encryptable-record.js");
     expect(EncryptableRecord.isEncryptedAttribute(encryptedBooks("awdr"), "name")).toBe(true);
   });
+});
 
-  // encryptedBookThatIgnoresCases and encryptedBooks both map to the same table;
-  // loading both in one describe would have the second seeder wipe the first set.
-  // Port `preserved columns due to ignore_case: true gets encrypted automatically`
-  // in its own nested describe to isolate the seeders.
-  describe("preserved columns due to ignore_case: true gets encrypted automatically", () => {
-    const { encryptedBookThatIgnoresCases } = useFixtures(
-      ["encryptedBookThatIgnoresCases"],
-      () => Base.adapter,
-    );
+// encryptedBookThatIgnoresCases and encryptedBooks both map to the same table;
+// loading both under one handler would have the second seeder wipe the first
+// set. A second EncryptableFixtureTest describe (its own handler suite) isolates
+// the seeders while keeping the Rails-matching describe path flat.
+describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
 
-    it("preserved columns due to ignore_case: true gets encrypted automatically", async () => {
-      const book = encryptedBookThatIgnoresCases("rfr");
-      expect((book as any).name).toBe("Ruby for Rails");
-      const { EncryptableRecord } = await import("./encryptable-record.js");
-      expect(EncryptableRecord.isEncryptedAttribute(book, "name")).toBe(true);
-    });
+  let restoreEncryption: (() => void) | undefined;
+  beforeAll(async () => {
+    const { configureEncryption, snapshotEncryptionConfig, restoreEncryptionConfig } =
+      await import("./test-helpers.js");
+    const snapshot = snapshotEncryptionConfig();
+    configureEncryption();
+    restoreEncryption = () => restoreEncryptionConfig(snapshot);
+    await defineSchema(TEST_SCHEMA);
+  });
+  afterAll(() => {
+    restoreEncryption?.();
+  });
+
+  const { encryptedBookThatIgnoresCases } = useFixtures(
+    ["encryptedBookThatIgnoresCases"],
+    () => Base.adapter,
+    { schema: TEST_SCHEMA },
+  );
+
+  it("preserved columns due to ignore_case: true gets encrypted automatically", async () => {
+    const book = encryptedBookThatIgnoresCases("rfr");
+    expect((book as any).name).toBe("Ruby for Rails");
+    const { EncryptableRecord } = await import("./encryptable-record.js");
+    expect(EncryptableRecord.isEncryptedAttribute(book, "name")).toBe(true);
   });
 });

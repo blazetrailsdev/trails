@@ -1097,98 +1097,99 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       });
     });
-    describe("db_warnings_action", () => {
-      let savedAction: typeof PostgreSQLAdapter.dbWarningsAction;
-      let savedIgnore: typeof PostgreSQLAdapter.dbWarningsIgnore;
-      beforeEach(() => {
-        savedAction = PostgreSQLAdapter.dbWarningsAction;
-        savedIgnore = PostgreSQLAdapter.dbWarningsIgnore;
-      });
-      afterEach(() => {
-        PostgreSQLAdapter.dbWarningsAction = savedAction;
-        PostgreSQLAdapter.dbWarningsIgnore = savedIgnore;
-        vi.restoreAllMocks();
-      });
-
-      it("ignores warnings when behaviour ignore", async () => {
-        PostgreSQLAdapter.dbWarningsAction = "ignore";
-        const rows = await adapter.execute("do $$ BEGIN RAISE WARNING 'foo'; END; $$");
-        expect(rows).toEqual([]);
-      });
-
-      it("logs warnings when behaviour log", async () => {
-        PostgreSQLAdapter.dbWarningsAction = "log";
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-        await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
-        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("PostgreSQL SQL warning"));
-      });
-
-      it("raises warnings when behaviour raise", async () => {
-        PostgreSQLAdapter.dbWarningsAction = "raise";
-        await expect(
-          adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$"),
-        ).rejects.toBeInstanceOf(SQLWarning);
-      });
-
-      it("reports when behaviour report", async () => {
-        const { ErrorReporter, setErrorReporter } = await import("@blazetrails/activesupport");
-        PostgreSQLAdapter.dbWarningsAction = "report";
-        const reporter = new ErrorReporter();
-        const events: Array<{ error: Error; handled: boolean }> = [];
-        reporter.subscribe({
-          report: ({ error, handled }) => {
-            events.push({ error, handled });
-          },
-        });
-        setErrorReporter(reporter);
-        try {
-          await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
-          expect(events).toHaveLength(1);
-          expect(events[0].error).toBeInstanceOf(SQLWarning);
-          expect(events[0].error.message).toBe("PostgreSQL SQL warning");
-          expect(events[0].handled).toBe(true);
-        } finally {
-          setErrorReporter(null);
-        }
-      });
-
-      it("warnings behaviour can be customized with a proc", async () => {
-        let captured: SQLWarning | null = null;
-        PostgreSQLAdapter.dbWarningsAction = (w) => {
-          captured = w as SQLWarning;
-        };
-        await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
-        expect(captured).toBeInstanceOf(SQLWarning);
-        expect((captured as unknown as SQLWarning).message).toBe("PostgreSQL SQL warning");
-        expect((captured as unknown as SQLWarning).level).toBe("WARNING");
-      });
-
-      it("allowlist of warnings to ignore", async () => {
-        PostgreSQLAdapter.dbWarningsAction = "raise";
-        PostgreSQLAdapter.dbWarningsIgnore = [/PostgreSQL SQL warning/];
-        const rows = await adapter.execute(
-          "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
-        );
-        expect(rows).toEqual([]);
-      });
-
-      it("allowlist of warning codes to ignore", async () => {
-        PostgreSQLAdapter.dbWarningsAction = "raise";
-        PostgreSQLAdapter.dbWarningsIgnore = ["01000"];
-        const rows = await adapter.execute(
-          "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
-        );
-        expect(rows).toEqual([]);
-      });
-
-      it("does not raise notice level warnings", async () => {
-        PostgreSQLAdapter.dbWarningsAction = "raise";
-        // DROP TABLE IF EXISTS fires a NOTICE (not WARNING) — must not raise
-        await expect(
-          adapter.execute("DROP TABLE IF EXISTS non_existent_table_xyz_warnings"),
-        ).resolves.toBeDefined();
-      });
+    // db_warnings_action tests — flat under PostgreSQLAdapterTest to mirror
+    // Rails (no sub-context). Hooks save/restore the static warnings config.
+    let savedWarningsAction: typeof PostgreSQLAdapter.dbWarningsAction;
+    let savedWarningsIgnore: typeof PostgreSQLAdapter.dbWarningsIgnore;
+    beforeEach(() => {
+      savedWarningsAction = PostgreSQLAdapter.dbWarningsAction;
+      savedWarningsIgnore = PostgreSQLAdapter.dbWarningsIgnore;
     });
+    afterEach(() => {
+      PostgreSQLAdapter.dbWarningsAction = savedWarningsAction;
+      PostgreSQLAdapter.dbWarningsIgnore = savedWarningsIgnore;
+      vi.restoreAllMocks();
+    });
+
+    it("ignores warnings when behaviour ignore", async () => {
+      PostgreSQLAdapter.dbWarningsAction = "ignore";
+      const rows = await adapter.execute("do $$ BEGIN RAISE WARNING 'foo'; END; $$");
+      expect(rows).toEqual([]);
+    });
+
+    it("logs warnings when behaviour log", async () => {
+      PostgreSQLAdapter.dbWarningsAction = "log";
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("PostgreSQL SQL warning"));
+    });
+
+    it("raises warnings when behaviour raise", async () => {
+      PostgreSQLAdapter.dbWarningsAction = "raise";
+      await expect(
+        adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$"),
+      ).rejects.toBeInstanceOf(SQLWarning);
+    });
+
+    it("reports when behaviour report", async () => {
+      const { ErrorReporter, setErrorReporter } = await import("@blazetrails/activesupport");
+      PostgreSQLAdapter.dbWarningsAction = "report";
+      const reporter = new ErrorReporter();
+      const events: Array<{ error: Error; handled: boolean }> = [];
+      reporter.subscribe({
+        report: ({ error, handled }) => {
+          events.push({ error, handled });
+        },
+      });
+      setErrorReporter(reporter);
+      try {
+        await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
+        expect(events).toHaveLength(1);
+        expect(events[0].error).toBeInstanceOf(SQLWarning);
+        expect(events[0].error.message).toBe("PostgreSQL SQL warning");
+        expect(events[0].handled).toBe(true);
+      } finally {
+        setErrorReporter(null);
+      }
+    });
+
+    it("warnings behaviour can be customized with a proc", async () => {
+      let captured: SQLWarning | null = null;
+      PostgreSQLAdapter.dbWarningsAction = (w) => {
+        captured = w as SQLWarning;
+      };
+      await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
+      expect(captured).toBeInstanceOf(SQLWarning);
+      expect((captured as unknown as SQLWarning).message).toBe("PostgreSQL SQL warning");
+      expect((captured as unknown as SQLWarning).level).toBe("WARNING");
+    });
+
+    it("allowlist of warnings to ignore", async () => {
+      PostgreSQLAdapter.dbWarningsAction = "raise";
+      PostgreSQLAdapter.dbWarningsIgnore = [/PostgreSQL SQL warning/];
+      const rows = await adapter.execute(
+        "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
+      );
+      expect(rows).toEqual([]);
+    });
+
+    it("allowlist of warning codes to ignore", async () => {
+      PostgreSQLAdapter.dbWarningsAction = "raise";
+      PostgreSQLAdapter.dbWarningsIgnore = ["01000"];
+      const rows = await adapter.execute(
+        "do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$",
+      );
+      expect(rows).toEqual([]);
+    });
+
+    it("does not raise notice level warnings", async () => {
+      PostgreSQLAdapter.dbWarningsAction = "raise";
+      // DROP TABLE IF EXISTS fires a NOTICE (not WARNING) — must not raise
+      await expect(
+        adapter.execute("DROP TABLE IF EXISTS non_existent_table_xyz_warnings"),
+      ).resolves.toBeDefined();
+    });
+
     it("date decoding enabled", async () => {
       await adapter.exec(`CREATE TABLE "ex_dates" ("id" SERIAL PRIMARY KEY, "d" DATE)`);
       await adapter.exec(`INSERT INTO "ex_dates" ("d") VALUES ('2023-06-15')`);
