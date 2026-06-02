@@ -14,10 +14,9 @@ import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.
  * `:integer`, `:datetime` …) and `column.sqlType` is the raw SQL type from the
  * adapter (`"varchar(255)"`, `"timestamp"`, `"enum('a','b')"` …).
  *
- * Note: `AdapterSchemaSource.columns()` currently maps `col.sqlType` into
- * `ColumnInfo.type` and does not pass `sqlType` separately; extending that
- * mapping to also include `sqlType` is a follow-up task required to wire this
- * dumper to live adapter output.
+ * `AdapterSchemaSource.columns()` carries the dsl type in `ColumnInfo.type` and
+ * the raw SQL type in `ColumnInfo.sqlType` (Epic 3.3-U2), so these dialect hooks
+ * see both on live adapter output.
  */
 interface MysqlColumn extends ColumnInfo {
   /** Raw SQL type from the adapter (e.g. `"varchar(255)"`, `"timestamp"`). */
@@ -111,7 +110,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
       const size = (sizeMatch.groups["size"] as string).toLowerCase();
       const rest = { ...spec };
       Object.keys(spec).forEach((k) => delete spec[k]);
-      Object.assign(spec, { size: `:${size}` }, rest);
+      // Rails dumps the symbol `size: :medium`; the TS DSL takes a string size
+      // (typeWithSizeToSql), so emit `size: "medium"`.
+      Object.assign(spec, { size: JSON.stringify(size) }, rest);
     }
 
     if (column.virtual) {
@@ -162,8 +163,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /**
    * Mirrors Rails' `MySQL::SchemaDumper#schema_precision`: a bare `datetime`
-   * (introspected precision 0) dumps as `precision: nil`, while a bare
-   * `timestamp`/`time` (precision 0) omits precision entirely.
+   * (introspected precision 0) dumps as `precision: null` (Rails' `nil`), while
+   * a bare `timestamp`/`time` (precision 0) omits precision entirely.
    * @internal
    */
   protected override mapDatetimePrecisionForDump(
@@ -179,7 +180,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     const sqlType = (column.sqlType ?? "").toLowerCase();
     if (/^time(?:stamp)?\b/.test(sqlType) && column.precision === 0) return undefined;
     if (column.type === "datetime")
-      return column.precision === 0 ? "nil" : super.schemaPrecision(column);
+      return column.precision === 0 ? "null" : super.schemaPrecision(column);
     return super.schemaPrecision(column);
   }
 

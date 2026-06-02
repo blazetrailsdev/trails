@@ -230,6 +230,19 @@ Route live dumps through the Rails-shaped `columnSpec` hook so per-adapter
   (`cleanDefault`→`schemaDefault`), incl. the abstract `columnSpecForPrimaryKey`
   `spec["default"] ??= "nil"` Ruby-ism → `"null"`; update round-trip snapshots;
   verify live PG/MySQL in CI (`TEST_ADAPTER=postgresql`/`mysql2`).
+  - **PREREQUISITE (land just ahead of, or fold into, U3):** the SQLite type map
+    must extract column limits. Today the legacy `emitTable` re-parses the limit
+    out of the raw `"varchar(10)"` string via `sqlTypeToDsl`, so U2 dumps are
+    correct — but once `emitTable` reads `schemaLimit(column)` (which returns
+    `String(column.limit)`), a live SQLite `varchar(N)`/`char(N)` will drop its
+    `limit: N`, because `sqlite3-adapter.ts` registers `m.registerType(/char/i,
+undefined, () => new StringType())` (limit-less) so `column.limit` is `null`.
+    Rails instead uses `register_class_with_limit m, %r(char)i, Type::String`
+    (`extract_limit` = `$1.to_i if sql_type =~ /\((.*)\)/`). Switch the SQLite
+    `/char/i` (and `/binary/i`, `/text/i`) registrations to
+    `register_class_with_limit`/`register_class_with_precision` semantics first.
+    The U2 `SchemaDumperAdapterTest` "preserves explicit string limit" case is
+    the regression guard for this.
 - **U3 still gates:** PG serial dump logic (currently in base `emitTable`, folds
   into PG subclass once U3 lands — #2816 finding); `comment.test.ts`
   dump-bearing tests; the `id: { type, collation }` PK wrapping +

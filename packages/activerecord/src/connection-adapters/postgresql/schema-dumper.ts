@@ -30,8 +30,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
       // enum_type must be set before the early return — Rails adds it after the virtual
       // block but doesn't early-return, so a virtual enum column gets both attributes.
       if (column.isEnum) spec["enum_type"] = JSON.stringify(column.sqlType);
-      // Rails: { type: schema_type(column).inspect } — symbol inspect gives ":bigserial"
-      return { type: `:${this.schemaType(column)}`, ...spec };
+      // Rails dumps the symbol `type: :bigserial`; the TS DSL takes a string
+      // ColumnType, so emit `type: "bigserial"` (consumed verbatim by
+      // formatColspecRaw on the U3 columnSpec path).
+      return { type: JSON.stringify(this.schemaType(column)), ...spec };
     }
 
     if (column.isEnum) spec["enum_type"] = JSON.stringify(column.sqlType);
