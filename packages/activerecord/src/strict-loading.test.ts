@@ -1773,8 +1773,7 @@ describe("StrictLoadingTest", () => {
       await ElslidLog.create({ message: "M2", elslid_dev_id: dev.id });
       const loaded = await ElslidDev.all().eagerLoad("elslidLogs").toArray();
       expect((loaded[0] as any)._strictLoading).toBe(false);
-      const last = await ElslidLog.all().toArray();
-      expect((last[last.length - 1] as any)._strictLoading).toBe(true);
+      expect(((await ElslidLog.last()) as any)?._strictLoading).toBe(true);
       const logs = (loaded[0] as any)._preloadedAssociations?.get("elslidLogs") ?? [];
       expect(logs).toHaveLength(2);
       expect(logs.every((l: any) => l._strictLoading)).toBe(true);
@@ -1954,10 +1953,11 @@ describe("StrictLoadingTest", () => {
     try {
       const created = await EhosdDev.create({ name: "D" });
       const profile = await EhosdProfile.create({ bio: "I am bio", ehosd_dev_id: created.id });
-      const dev = await EhosdDev.find(created.id);
+      // Mirror `Developer.includes(:ship).first`: the real includes path
+      // populates the preloaded cache, so accessing it on a strict owner does
+      // not raise.
+      const dev = (await EhosdDev.all().includes("ehosdProfile").toArray())[0];
       expect(dev.isStrictLoading()).toBe(true);
-      // Eager-loaded (preloaded) has_one does not raise even on a strict owner.
-      (dev as any)._preloadedAssociations = new Map([["ehosdProfile", profile]]);
       const loaded = await loadHasOne(dev, "ehosdProfile", {
         className: "EhosdProfile",
         foreignKey: "ehosd_dev_id",
@@ -1988,11 +1988,12 @@ describe("StrictLoadingTest", () => {
     EhmdDev.strictLoadingByDefault = true;
     try {
       const created = await EhmdDev.create({ name: "D" });
-      const log = await EhmdLog.create({ message: "M", ehmd_dev_id: created.id });
-      const dev = await EhmdDev.find(created.id);
+      await EhmdLog.create({ message: "M", ehmd_dev_id: created.id });
+      // Mirror `Developer.includes(:audit_logs).first`: the real includes path
+      // populates the preloaded cache, so accessing it on a strict owner does
+      // not raise.
+      const dev = (await EhmdDev.all().includes("ehmdLogs").toArray())[0];
       expect(dev.isStrictLoading()).toBe(true);
-      // Eager-loaded (preloaded) has_many does not raise even on a strict owner.
-      (dev as any)._preloadedAssociations = new Map([["ehmdLogs", [log]]]);
       const loaded = await loadHasMany(dev, "ehmdLogs", {
         className: "EhmdLog",
         foreignKey: "ehmd_dev_id",
