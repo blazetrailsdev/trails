@@ -1,6 +1,6 @@
 # Migrate `trails-models-dump` to consume `schema.ts`
 
-**Status:** in progress — PR 1 ✅ #2851, PR 2 ✅ #2861, PR 3 open #2889; PR 4 open
+**Status:** COMPLETE — PRs 1–4 shipped (#2851/#2861/#2889/#2895); live-DB path dropped in follow-up (#2896)
 **Owner:** activerecord-cli
 **Related:** PR #2759 (wired up `ar db:schema:dump`), PR #2761 (parseSchemaTs — PR A), companion plan `trails-tsc-schema-ts-migration.md`
 

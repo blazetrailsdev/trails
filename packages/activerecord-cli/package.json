@@ -7,7 +7,6 @@
   "types": "dist/index.d.ts",
   "bin": {
     "ar": "./bin/ar.js",
-    "trails-models-dump": "./bin/trails-models-dump.js",
     "trails-tsc": "./bin/trails-tsc.js"
   },
   "exports": {

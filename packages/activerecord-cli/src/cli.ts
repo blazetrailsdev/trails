@@ -38,7 +38,7 @@ Commands:
   destroy:migration <Name>       Delete the matching db/migrate/*_<snake_name>.ts
   destroy:model <Name>           Delete app/models/<snake>.ts + its create migration
   typecheck                      Type-check your models via trails-tsc
-  models:dump                    Dump model metadata via trails-models-dump (--schema <path> for offline)
+  models:dump                    Dump models from db/schema.ts (run ar db:schema:dump first)
   db:create                      Create the database for the current TRAILS_ENV
   db:drop                        Drop the database for the current TRAILS_ENV
   db:migrate                     Run pending migrations
