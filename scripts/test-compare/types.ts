@@ -1,5 +1,46 @@
 // Shared types for test comparison pipeline
 
+// --- Test gating (adapter / feature conditionals) ---
+
+/** Normalized adapter family a gate restricts a test to. */
+export type GateAdapter = "postgresql" | "mysql" | "sqlite";
+
+/**
+ * A test's gating condition — the static answer to "under which adapters /
+ * DB features does this test run?". Extracted from both Rails
+ * (`current_adapter?` / `skip unless supports_X?` / directory layout) and TS
+ * (`describeIfPg` / `describeIfSupports` / `it.skipIf`). Absent (`undefined`)
+ * means the test runs unconditionally on every adapter.
+ *
+ * `pending` (it.skip/it.todo) is deliberately NOT a gate — it is the TODO
+ * signal. A gate says "Rails itself only runs this conditionally"; pending
+ * says "we haven't implemented this yet."
+ */
+export interface TestGate {
+  /**
+   * Positive adapter set: the test runs only on these adapters. Absent means
+   * not adapter-restricted. Sorted, de-duplicated.
+   */
+  adapters?: GateAdapter[];
+  /**
+   * Required DB-feature keys (Rails `supports_X?` → `"X"`). The test runs only
+   * when every listed feature is supported. Sorted, de-duplicated.
+   */
+  features?: string[];
+  /**
+   * Other runtime guards we recognize but don't resolve to an adapter/feature
+   * set: `"mariadb"`, `"in_memory_db"`, `"version"`, or `"unknown"` for an
+   * unrecognized `skipIf`/`runIf` expression. Informational only.
+   */
+  guards?: string[];
+  /**
+   * Where each part of the gate came from. Ruby emits `"dir"`, `"class"` (any
+   * `if/unless current_adapter?` wrapping, block or modifier), `"body-skip"`.
+   * `"test"`/`"wrapper"` are reserved for the TS extractor.
+   */
+  source: ("dir" | "class" | "test" | "body-skip" | "wrapper")[];
+}
+
 // --- Extracted test manifest ---
 
 export interface TestCaseInfo {
@@ -19,6 +60,11 @@ export interface TestCaseInfo {
   assertions: string[];
   /** Whether the test is pending/skipped */
   pending?: boolean;
+  /**
+   * Adapter/feature gating condition, if the test runs conditionally. Absent
+   * means unconditional. See {@link TestGate}.
+   */
+  gate?: TestGate;
 }
 
 export interface TestFileInfo {
