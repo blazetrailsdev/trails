@@ -1,5 +1,19 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/bind_parameter_test.rb
+ *
+ * Tested at the adapter (`?`-bind / driver) layer — the convention for this
+ * file and its sqlite3/postgresql siblings. Rails' `assert_quoted_as` pins a
+ * *relation-layer* property: `Post.where("title = ?", value).to_sql` quotes a
+ * typed value against a string column as a string literal (`0.0` → `'0.0'`,
+ * `false` → `'0'`) so it does NOT match numerically. That type-aware quoting
+ * happens in Arel, which knows `title`'s column type; the raw `?`-bind path
+ * here has no such knowledge, so mysql2 sends a JS number as a numeric literal
+ * and MySQL coerces. The `where with …` cases therefore assert coercion-based
+ * matching, not Arel string-quoting — a faithful `match: 0` quoting assertion
+ * is unreachable at this layer (it would need a relation-level `to_sql` test).
+ * The `boolean` case is the closest to Rails' intent: it exercises the real
+ * `mysqlBinds` `false → 0` normalization. `rational` has no JS equivalent, so
+ * it degrades to a string-equality bind.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
