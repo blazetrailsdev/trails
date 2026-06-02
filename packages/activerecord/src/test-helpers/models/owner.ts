@@ -25,8 +25,8 @@ export class Owner extends Base {
         )
         .includes("lastPet"),
     );
-    this.afterCommit(async function (this: Owner) {
-      await this.executeBlocks();
+    this.afterCommit(async (owner: Owner) => {
+      await owner.executeBlocks();
     });
   }
 
