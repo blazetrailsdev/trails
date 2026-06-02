@@ -709,6 +709,34 @@ function _assertEncryptedAttributeOnModel(
 }
 
 /**
+ * Mirrors Rails' assert_not_encrypted_attribute (helper.rb:36-39):
+ *   assert_equal expected_value, model.send(attribute_name)
+ *   assert_equal expected_value, model.read_attribute_before_type_cast(attribute_name)
+ * The read value equals the expected plaintext AND the raw (before-type-cast)
+ * stored value also equals it — i.e. the attribute was stored unencrypted.
+ */
+export function assertNotEncryptedAttribute(
+  model: any,
+  attrName: string,
+  expectedValue: unknown,
+): void {
+  const readValue = model[attrName];
+  if (!_valuesEqual(readValue, expectedValue)) {
+    throw new Error(
+      `assertNotEncryptedAttribute: expected ${attrName} to read as ` +
+        `${JSON.stringify(expectedValue)}, got ${JSON.stringify(readValue)}`,
+    );
+  }
+  const rawValue = model.readAttributeBeforeTypeCast(attrName);
+  if (!_valuesEqual(rawValue, expectedValue)) {
+    throw new Error(
+      `assertNotEncryptedAttribute: expected before-type-cast ${attrName} to equal ` +
+        `${JSON.stringify(expectedValue)} (stored as plaintext), got ${JSON.stringify(rawValue)}`,
+    );
+  }
+}
+
+/**
  * Returns a freshly-serialized (encrypted) form of the attribute's current value.
  *
  * For deterministic encryption, serialize() is idempotent so this equals the
