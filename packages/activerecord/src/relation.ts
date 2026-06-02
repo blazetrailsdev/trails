@@ -3042,6 +3042,14 @@ export class Relation<T extends Base> {
   ): Promise<unknown[]> {
     if (this._isNone) return [];
 
+    // Reflect the schema before casting results so the model's attribute
+    // types are available — Rails' type_cast_pluck_values reads
+    // model.attribute_types, which runs load_schema first. pluck issues a
+    // raw query (no toArray()), so it must trigger the load itself.
+    await (
+      this._modelClass as unknown as { ensureSchemaLoaded(): Promise<void> }
+    ).ensureSchemaLoaded();
+
     // Mirrors Rails' disallow_raw_sql! check on pluck arguments.
     // Uses the broader column_name_matcher (allows functions like UPPER(col))
     // rather than column_name_with_order_matcher (which is stricter, for order).

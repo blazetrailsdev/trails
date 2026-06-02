@@ -42,6 +42,7 @@ describe("CalculationsTest", () => {
         credits: "integer",
         firm_id: "integer",
         name: "string",
+        verified: "boolean",
       },
       posts: {
         category: "string",
@@ -1686,12 +1687,34 @@ describe("CalculationsTest", () => {
       }
     }
     serialize(Account, "name");
+    // Rails' test passes the Hash and the coder dumps it on write; trails'
+    // `serialize` (serialize.ts) only wraps the read side, so we store the
+    // already-dumped string. This isolates the behavior under test — that
+    // pluck deserializes through the same coder a record read does — from
+    // the separate, pre-existing write-side-dump gap.
     await Account.create({ name: JSON.stringify({ foo: "bar" }) });
-    // pluck deserializes through the serialized attribute's coder, matching
-    // what reading the attribute off a loaded record returns.
     const loaded = await Account.all().first();
     expect(await Account.all().pluck("name")).toEqual([loaded?.name]);
     expect(await Account.all().pluck("name")).toEqual([{ foo: "bar" }]);
+  });
+
+  it("pluck type casts on a schema-reflected model", async () => {
+    // Write through a model with declared attributes...
+    class AccountWriter extends Base {
+      static _tableName = "accounts";
+      static {
+        this.attribute("name", "string");
+        this.attribute("verified", "boolean");
+      }
+    }
+    await AccountWriter.create({ name: "reflected", verified: true });
+    // ...then pluck through a fresh model whose columns come only from DB
+    // reflection. pluck is its first operation, so without an explicit
+    // schema load the boolean would fall through uncast (raw 0/1 on SQLite).
+    class AccountReader extends Base {
+      static _tableName = "accounts";
+    }
+    expect(await AccountReader.all().pluck("verified")).toEqual([true]);
   });
 });
 
