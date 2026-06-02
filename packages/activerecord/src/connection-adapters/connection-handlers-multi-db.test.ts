@@ -149,10 +149,14 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   it("switching connections with database hash uses passed role and database", () => {
+    // Distinct database paths (as in Rails: test/db/primary.sqlite3 vs
+    // …/animals.sqlite3) so the configuration_hash assertion below actually
+    // discriminates that `primary` — not `animals` — was selected. The pools
+    // are never connected (connectsTo is lazy), so no sqlite files are created.
     const config = {
       default_env: {
-        animals: { adapter: "sqlite3", database: ":memory:" },
-        primary: { adapter: "sqlite3", database: ":memory:" },
+        animals: { adapter: "sqlite3", database: "animals.sqlite3" },
+        primary: { adapter: "sqlite3", database: "primary.sqlite3" },
       },
     };
     withBaseConfigs(
@@ -167,7 +171,8 @@ describe("ConnectionHandlersMultiDbTest", () => {
 
         const pool = handler.retrieveConnectionPool("Base");
         expect(pool).not.toBeNull();
-        expect(pool!.dbConfig.configurationHash).toMatchObject(config.default_env.primary);
+        expect(pool!.dbConfig.name).toBe("primary");
+        expect(pool!.dbConfig.configurationHash).toEqual(config.default_env.primary);
       },
       { defaultEnv: "default_env" },
     );

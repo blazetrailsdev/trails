@@ -8614,6 +8614,7 @@ describe("PreloaderTest", () => {
       className: "PPAuthor",
       through: "ppAuthorFavorites",
       source: "ppFavoriteAuthor",
+      scope: (rel: any) => rel.order("name"),
     });
     registerModel("PPAuthor", PPAuthor);
     registerModel("PPPost", PPPost);
