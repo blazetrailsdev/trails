@@ -29,6 +29,7 @@ import {
   columnNameWithOrderMatcher as pgColumnNameWithOrderMatcher,
 } from "./postgresql/quoting.js";
 import { TypeMapInitializer, type PgTypeRow } from "./postgresql/oid/type-map-initializer.js";
+import { Money } from "./postgresql/oid/money.js";
 import {
   initializeInstanceTypeMap,
   initializeTypeMap as staticInitializeTypeMap,
@@ -75,6 +76,7 @@ const getTemporalTypeParser = makeGetTypeParser(pg.types);
 const TEMPORAL_OIDS = new Set([1082, 1083, 1114, 1184, 1266]);
 const OID_INTERVAL = 1186;
 const OID_INTERVAL_ARRAY = 1187;
+const OID_MONEY = 790;
 import {
   READ_QUERY,
   executeBatch as pgExecuteBatch,
@@ -374,6 +376,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             if (oid === OID_INTERVAL_ARRAY && format !== "binary") return (v: unknown) => v;
             if ((oid === OID_JSON || oid === OID_JSONB) && format !== "binary")
               return (v: unknown) => v;
+            // PG money (OID 790): the wire format is locale-formatted text
+            // ("$123.45"). Decode to the deserialized decimal string via the
+            // Money type so result values from raw expressions
+            // (SUM(id * wealth), pluck(Arel.sql)) come back as the bare number
+            // string — mirrors Rails' money type-map coder.
+            if (oid === OID_MONEY && format !== "binary")
+              return (v: unknown) => (typeof v === "string" ? MoneyDecoder.decode(v) : v);
             return oid === 1082 && !PostgreSQLAdapter.decodeDates
               ? format === "binary"
                 ? pg.types.getTypeParser(oid, "binary")
@@ -467,6 +476,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           }
           if ((oid === OID_JSON || oid === OID_JSONB) && format !== "binary") {
             const fallback = (v: unknown) => v;
+            return userGetTypeParser?.(oid, format) ?? fallback;
+          }
+          // PG money (OID 790): decode locale-formatted text ("$123.45") to the
+          // deserialized decimal string via the Money type so SUM(id * wealth)
+          // / pluck(Arel.sql(...)) come back as the bare number string —
+          // mirrors Rails' money type-map coder.
+          if (oid === OID_MONEY && format !== "binary") {
+            const fallback = (v: unknown) => (typeof v === "string" ? MoneyDecoder.decode(v) : v);
             return userGetTypeParser?.(oid, format) ?? fallback;
           }
           if (oid === 1082 && !PostgreSQLAdapter.decodeDates) {
@@ -5394,20 +5411,19 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
 }
 
 /**
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter::MoneyDecoder
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter::MoneyDecoder.
+ *
+ * Registered as the result-set coder for OID 790 (PG money). Rails defines
+ * `TYPE = OID::Money.new` and `decode(value) = TYPE.deserialize(value)`; we
+ * delegate to the same Money type so locale-formatted money text — US
+ * ("$123.45"), EU grouping ("$12.345.678,12"), and accounting parentheses —
+ * deserializes exactly as the Money attribute type, not via ad-hoc stripping.
  */
 export class MoneyDecoder {
-  static decode(value: string): number {
-    let str = value.trim();
-    let negative = false;
-    if (str.startsWith("(") && str.endsWith(")")) {
-      negative = true;
-      str = str.slice(1, -1).trim();
-    }
-    const cleaned = str.replace(/[$,\s]/g, "");
-    const num = parseFloat(cleaned);
-    if (isNaN(num)) return NaN;
-    return negative ? -num : num;
+  static readonly TYPE = new Money();
+
+  static decode(value: string): string | null {
+    return MoneyDecoder.TYPE.deserialize(value) as string | null;
   }
 }
 
