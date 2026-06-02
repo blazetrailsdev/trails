@@ -12,6 +12,7 @@ import { Nodes, Table } from "@blazetrails/arel";
 import { BigIntegerType } from "@blazetrails/activemodel";
 import type { AdapterName } from "../adapter.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
+import { columnType, type ColumnType, type Result } from "../result.js";
 import { buildJoinDependencies } from "./query-methods.js";
 
 /**
@@ -40,6 +41,9 @@ interface CalculationRelation {
     arelTable: any;
     primaryKey: string | string[];
     name: string;
+    typeForAttribute?(name: string): ColumnType;
+    _attributeDefinitions?: { has(name: string): boolean };
+    _serializedAttributes?: { get(name: string): { load(raw: unknown): unknown } | undefined };
     connection: {
       adapterName: AdapterName;
       visitor?: { compile(node: any): string };
@@ -714,17 +718,65 @@ export function lookupCastTypeFromJoinDependencies(
   return null;
 }
 
-/** @internal */
+/**
+ * Cast each plucked value through the type of its result column, mirroring
+ * Rails `Calculations#type_cast_pluck_values`. The cast type for column `i`
+ * resolves in Rails' priority order: the model's own attribute type, then a
+ * type discovered through the join dependencies, then the driver's OID-based
+ * `Result#column_types`, then identity. `Result#castValues` returns a flat
+ * array for a single column and an array-of-rows for several, matching
+ * `pluck`'s contract.
+ *
+ * APPROXIMATION: Arel attribute `type_caster`s are not consulted — our
+ * projection nodes don't carry one, and the model-attribute-type path covers
+ * the same columns.
+ *
+ * @internal
+ */
 export function typeCastPluckValues(
-  result: unknown[][],
-  columns: string[],
-  rel?: CalculationRelation,
-): unknown[][] {
-  return result.map((row) =>
-    row.map((val, i) =>
-      castAggValue(val, "sum" as any, rel ? resolveColType(rel, columns[i] ?? "") : null, false),
-    ),
-  );
+  result: Result,
+  columns: Array<string | Nodes.Node | unknown>,
+  rel: CalculationRelation,
+): unknown[] {
+  if (result.columns.length !== columns.length) {
+    // Column/projection count mismatch (Rails falls back to attribute_types):
+    // cast by name through the model's attribute types where known.
+    const overrides: Record<string, ColumnType> = {};
+    for (const name of result.columns) {
+      const type = pluckCastTypeForKnownColumn(rel, name);
+      if (type) overrides[name] = type;
+    }
+    return result.castValues(overrides);
+  }
+  const castTypes = result.columns.map((name, i) => pluckCastType(rel, name, i, result));
+  return result.castValues(castTypes);
+}
+
+function pluckCastType(
+  rel: CalculationRelation,
+  name: string,
+  index: number,
+  result: Result,
+): ColumnType {
+  const known = pluckCastTypeForKnownColumn(rel, name);
+  if (known) return known;
+  const joinType = lookupCastTypeFromJoinDependencies(rel, name) as ColumnType | null;
+  if (joinType) return joinType;
+  // Driver OID type (e.g. PostgreSQL) or identity fallback.
+  return columnType(name, index, {}, result.columnTypes);
+}
+
+/**
+ * The cast type for a column the model owns: a serialized attribute's coder
+ * (Rails wraps these in a Serialized type) or the declared attribute type.
+ * Returns null when the model has no such attribute.
+ */
+function pluckCastTypeForKnownColumn(rel: CalculationRelation, name: string): ColumnType | null {
+  const model = rel._modelClass;
+  if (!model._attributeDefinitions?.has(name)) return null;
+  const coder = model._serializedAttributes?.get(name);
+  if (coder) return { deserialize: (value) => coder.load(value) };
+  return model.typeForAttribute?.(name) ?? null;
 }
 
 /** @internal */
