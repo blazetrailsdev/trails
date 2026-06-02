@@ -355,7 +355,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   supportsExpressionIndex(): boolean {
-    if (this._mariadb) return this._databaseVersion?.gte("10.6") === true;
+    // Mirror Rails `!mariadb? && database_version >= "8.0.13"`
+    // (abstract_mysql_adapter.rb:104) — MariaDB is excluded.
+    if (this._mariadb) return false;
     return this._databaseVersion?.gte("8.0.13") === true;
   }
 
@@ -438,7 +440,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   supportsJson(): boolean {
-    if (this._mariadb) return this._databaseVersion?.gte("10.2.7") === true;
+    // Mirror Rails `!mariadb? && database_version >= "5.7.8"`
+    // (mysql2_adapter.rb:70 / trilogy_adapter.rb:95) — MariaDB JSON is a
+    // LONGTEXT alias, so Rails reports it unsupported.
+    if (this._mariadb) return false;
     return this._databaseVersion?.gte("5.7.8") === true;
   }
 
