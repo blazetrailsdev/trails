@@ -177,6 +177,8 @@ export { QueryCache } from "./query-cache.js";
 export { Store as QueryCacheStore } from "./connection-adapters/abstract/query-cache.js";
 export { QueryLogs, escapeComment, LegacyFormatter, SQLCommenter } from "./query-logs.js";
 export type { TagValue, TagHandler, TagDefinition, QueryLogsFormatter } from "./query-logs.js";
+export { queryTransformers } from "./query-transformers.js";
+export type { QueryTransformer } from "./query-transformers.js";
 export {
   StatementCache,
   Substitute,

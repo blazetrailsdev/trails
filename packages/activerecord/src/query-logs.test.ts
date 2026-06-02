@@ -114,6 +114,42 @@ describe("QueryLogsTest", () => {
     /* needs connection context */
   });
 
+  // Smoke tests for the Rails two-arg `call(sql, connection)` surface added in
+  // QL PR 1. The full integration tests `connection is passed to tagging proc`
+  // / `connection does not override ...` (skipped above) are unskipped in PR 5
+  // once the transformer loop is wired into the query pipeline.
+  it("call passes connection to tag procs via context.connection", () => {
+    const connection = { id: "conn-1" };
+    logs.tags = [
+      {
+        same_connection: (ctx) =>
+          (ctx as Record<string, unknown>).connection === connection ? "true" : "false",
+      },
+    ];
+    const sql = logs.call("SELECT 1", connection);
+    expect(sql).toContain("same_connection:true");
+  });
+
+  it("call without a connection still works (connection optional)", () => {
+    logs.tags = [{ app: "MyApp" }];
+    expect(logs.call("SELECT 1")).toContain("MyApp");
+  });
+
+  it("connection does not override a connection already in context", () => {
+    const fakeConnection = { id: "fake" };
+    const realConnection = { id: "real" };
+    // connection is opaque (not a TagValue) — cast as the existing suite does.
+    logs.updateContext({ connection: fakeConnection } as any);
+    logs.tags = [
+      {
+        fake_connection: (ctx) =>
+          (ctx as Record<string, unknown>).connection === fakeConnection ? "true" : "false",
+      },
+    ];
+    const sql = logs.call("SELECT 1", realConnection);
+    expect(sql).toContain("fake_connection:true");
+  });
+
   it("empty comments are not added", () => {
     logs.tags = [];
     const sql = logs.call("SELECT 1");

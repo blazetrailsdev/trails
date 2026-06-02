@@ -10,6 +10,7 @@
 import { ConfigurationError } from "./errors.js";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";
+import type { QueryTransformer } from "./query-transformers.js";
 
 export { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 export type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";
@@ -36,7 +37,7 @@ export class GetKeyHandler {
 /**
  * QueryLogs configuration and SQL comment generation.
  */
-export class QueryLogs {
+export class QueryLogs implements QueryTransformer {
   private _tags: TagDefinition[] = [];
   private _tagsFormatter: "legacy" | "sqlcommenter" = "legacy";
   private _formatter: QueryLogsFormatter = LegacyFormatter;
@@ -162,10 +163,17 @@ export class QueryLogs {
 
   /**
    * Annotate a SQL query with comment tags.
+   *
+   * The `connection` argument mirrors Rails' two-arg `call(sql, connection)`
+   * (query_logs.rb:139): it is threaded down to `tagContent()` so tag procs
+   * can read `context.connection`. It is optional here so the existing
+   * single-arg unit tests keep working; the query pipeline passes the live
+   * adapter once the transformer loop is wired (PR 3).
+   *
    * Mirrors: ActiveRecord::QueryLogs.call
    */
-  call(sql: string): string {
-    const comment = this.comment();
+  call(sql: string, connection?: unknown): string {
+    const comment = this.comment(connection);
     if (!comment) return sql;
     return this._prependComment ? `${comment} ${sql}` : `${sql} ${comment}`;
   }
@@ -201,11 +209,24 @@ export class QueryLogs {
 
   /**
    * Build the tag content string from current tags and context.
+   *
+   * Mirrors Rails' `tag_content(connection)` (query_logs.rb:226): it works on
+   * a per-call copy of the context and injects `context[:connection] ||=
+   * connection`, so tag procs can read `context.connection` without the
+   * passed connection clobbering one already present in the context.
+   *
    * Mirrors: ActiveRecord::QueryLogs.tag_content
    *
    * @internal
    */
-  tagContent(): string | null {
+  tagContent(connection?: unknown): string | null {
+    // Per-call copy so the injected connection never leaks into the
+    // persistent _context. `connection` is opaque (not a TagValue), hence the
+    // local widening to Record<string, unknown> for the assignment.
+    const context: Record<string, TagValue> = { ...this._context };
+    if (connection !== undefined && context.connection == null) {
+      (context as Record<string, unknown>).connection = connection;
+    }
     const pairs: string[] = [];
     for (const tag of this._tags) {
       if (typeof tag === "string") {
@@ -222,18 +243,18 @@ export class QueryLogs {
           handler = new GetKeyHandler(tag);
           this._keyHandlers.set(tag, handler);
         }
-        const value = handler.call(this._context);
+        const value = handler.call(context);
         if (value != null) {
           pairs.push(this._formatter.format(tag, value));
         }
       } else if (typeof tag === "function") {
-        const value = tag(this._context);
+        const value = tag(context);
         if (value != null) {
           pairs.push(this._formatter.format("custom", value));
         }
       } else if (typeof tag === "object") {
         for (const [key, handler] of Object.entries(tag)) {
-          const value = typeof handler === "function" ? handler(this._context) : handler;
+          const value = typeof handler === "function" ? handler(context) : handler;
           if (value != null) {
             pairs.push(this._formatter.format(key, value));
           }
@@ -250,19 +271,19 @@ export class QueryLogs {
    *
    * @internal
    */
-  comment(): string | null {
+  comment(connection?: unknown): string | null {
     if (this._cacheEnabled && this._cachedComment !== undefined) {
       return this._cachedComment;
     }
-    const result = this.uncachedComment();
+    const result = this.uncachedComment(connection);
     if (this._cacheEnabled) {
       this._cachedComment = result;
     }
     return result;
   }
 
-  private uncachedComment(): string | null {
-    const content = this.tagContent();
+  private uncachedComment(connection?: unknown): string | null {
+    const content = this.tagContent(connection);
     if (!content) return null;
     return `/*${this.escapeSqlComment(content)}*/`;
   }
