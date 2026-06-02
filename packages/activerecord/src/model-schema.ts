@@ -807,6 +807,17 @@ function applyColumnsHash(
         configurable: true,
       });
     }
+    // Per-attribute *BeforeTypeCast accessor — mirrors Rails' attribute_method_suffix
+    // "_before_type_cast" in ActiveRecord::AttributeMethods::BeforeTypeCast.
+    const btcName = `${name}BeforeTypeCast`;
+    if (!Object.prototype.hasOwnProperty.call(proto, btcName)) {
+      Object.defineProperty(proto, btcName, {
+        get(this: { readAttributeBeforeTypeCast(n: string): unknown }) {
+          return this.readAttributeBeforeTypeCast(name);
+        },
+        configurable: true,
+      });
+    }
   }
 
   type CacheBag = {
