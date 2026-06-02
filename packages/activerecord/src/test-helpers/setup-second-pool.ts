@@ -1,5 +1,4 @@
 import { Base } from "../base.js";
-import { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
 import { registerModel } from "../associations.js";
 import { defineSchema, type Schema } from "./define-schema.js";
 import { defineFixtures, isFixtureRef } from "./define-fixtures.js";
@@ -51,7 +50,7 @@ export async function setupSecondPool(): Promise<void> {
 
   // The primary database owns only `entrants`; remove the canonical schema's
   // `arunit2`-only tables so the two pools stay disjoint.
-  const ss = primary.schemaStatements ? primary.schemaStatements() : new SchemaStatements(primary);
+  const ss = primary.schemaStatements!();
   await ss.dropTable("courses", { ifExists: true });
   await ss.dropTable("colleges", { ifExists: true });
 

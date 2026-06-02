@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { getEnv } from "@blazetrails/activesupport";
 import "./index.js";
 import { Base } from "./base.js";
 import { StatementInvalid } from "./errors.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { setupSecondPool } from "./test-helpers/setup-second-pool.js";
+import { isSqliteRun } from "./test-helpers/sqlite-template.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Course } from "./test-helpers/models/course.js";
 import { College } from "./test-helpers/models/college.js";
@@ -14,9 +14,7 @@ import { Bird } from "./test-helpers/models/bird.js";
 // Rails runs MultipleDbTest against two real databases (arunit / arunit2). We
 // reproduce the split with a second in-memory SQLite pool on ARUnit2Model. The
 // PG/MySQL suites don't provision a second named database, so gate to SQLite.
-const SQLITE_ONLY = !getEnv("PG_TEST_URL") && !getEnv("MYSQL_TEST_URL");
-
-describe.skipIf(!SQLITE_ONLY)("MultipleDbTest", () => {
+describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
   // Rails sets `self.use_transactional_tests = false`; setupHandlerSuite pins
   // the schema/fixtures across the file (skips the global per-test reset).
   setupHandlerSuite();
@@ -76,6 +74,10 @@ describe.skipIf(!SQLITE_ONLY)("MultipleDbTest", () => {
   });
 
   it("course connection should survive reloads", async () => {
+    // Rails removes the Course constant and `load`s models/course.rb again, then
+    // re-checks the connection. ESM can't hot-reload a module, so a re-import
+    // returns the same cached `Course` class — this asserts the connection still
+    // resolves through ARUnit2Model rather than a literal reload.
     expect(Course.leaseConnection()).toBeTruthy();
     const reloaded = (await import("./test-helpers/models/course.js")).Course;
     expect(reloaded.leaseConnection()).toBeTruthy();
@@ -111,6 +113,13 @@ describe.skipIf(!SQLITE_ONLY)("MultipleDbTest", () => {
     expect(Entrant.leaseConnection()).not.toBe(Course.leaseConnection());
   });
 
+  // Rails guards these two with `unless in_memory_db?` (multiple_db_test.rb): its
+  // in-memory harness can't give arunit2 a genuinely separate pool, so College
+  // would resolve to Base's connection. setupSecondPool establishes an explicitly
+  // independent arunit2 pool (its own `:memory:` DB), so the assertions hold and we
+  // run them. This differs from the primary-class pair, which stay skipped because
+  // `connects_to(arunit/arunit)` is *expected* to share Base's connection — which
+  // independent in-memory DBs can't do.
   it("count on custom connection", async () => {
     expect(ARUnit2Model.leaseConnection()).toBe(College.leaseConnection());
     expect(Base.leaseConnection()).not.toBe(College.leaseConnection());
