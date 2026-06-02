@@ -1782,9 +1782,12 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("dynamic find should respect association order", async () => {
     // Developers are ordered 'name DESC, id DESC', so a freshly-created Jamis
     // (the highest id) sorts ahead of the fixture Jamises. Rails probes with
-    // `merge(where:).first` + the `find_by_name` dynamic finder; we lack those
-    // surfaces, so `where(...).first()` / `findBy({ name })` stand in — both
-    // ride the association's order_values, which is what the test exercises.
+    // `merge(where: ...).first` + the `find_by_name` dynamic finder. The Hash
+    // form of `merge` routes through HashMerger (spawn_methods.rb:44), i.e. it
+    // is just `where(...)` — trails' `merge` only takes a Relation — so
+    // `.where(...).first()` is the exact equivalent. `findBy({ name })` stands
+    // in for the unported dynamic attribute finder. Both ride the association's
+    // order_values, which is what the test exercises.
     const activeRecord = projects("active_record");
     const highIdJamis = await (
       association<CanonicalDeveloper>(activeRecord, "developers") as any
