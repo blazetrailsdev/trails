@@ -141,7 +141,7 @@ describe("PostgreSQL::SchemaDumper", () => {
       const spec = dumper.prepareColumnOptions(col);
       expect(spec["as"]).toBe(JSON.stringify("(a + b)"));
       expect(spec["stored"]).toBe(true);
-      expect(spec["type"]).toBe(":integer");
+      expect(spec["type"]).toBe('"integer"');
     });
 
     it("adds enum_type even for virtual enum columns (Rails continues after virtual block)", () => {

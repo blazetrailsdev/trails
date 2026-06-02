@@ -66,12 +66,12 @@ describe("MySQL::SchemaDumper", () => {
           col({ type: "datetime", sqlType: "timestamp", precision: 0 }),
         ),
       ).toBeUndefined());
-    it("datetime precision 0 → 'nil'", () =>
+    it("datetime precision 0 → 'null'", () =>
       expect(
         (make() as any).schemaPrecision(
           col({ type: "datetime", sqlType: "datetime", precision: 0 }),
         ),
-      ).toBe("nil"));
+      ).toBe("null"));
     it("datetime precision 3 → '3'", () =>
       expect(
         (make() as any).schemaPrecision(
@@ -143,7 +143,7 @@ describe("MySQL::SchemaDumper", () => {
     it("prepends size key for tinytext", () => {
       const opts = (make() as any).prepareColumnOptions(col({ sqlType: "tinytext" }));
       expect(Object.keys(opts)[0]).toBe("size");
-      expect(opts["size"]).toBe(":tiny");
+      expect(opts["size"]).toBe('"tiny"');
     });
     it("virtual column: emits type prefix, as, and stored", () => {
       const d = make();
