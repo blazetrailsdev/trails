@@ -37,61 +37,52 @@ describe("SuppressorTest", () => {
     expect(await Post.count()).toBe(0);
   });
 
-  // D-Y-INCOMPATIBLE: canonical posts table has `body NOT NULL`; creating Post
-  // without body fails. defineSchema fast-path reuses the canonical table.
-  // Phase G: supply body in creates or migrate to useFixtures().
-  it.skip("suppresses update", async () => {
-    class Post extends Base {
+  it("suppresses update", async () => {
+    class Widget extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("name", "string");
       }
     }
-    const post = await Post.create({ title: "original" });
-    await Post.suppress(async () => {
-      post.title = "changed";
-      await post.save();
+    const widget = await Widget.create({ name: "original" });
+    await Widget.suppress(async () => {
+      widget.name = "changed";
+      await widget.save();
     });
-    const found = await Post.find(post.id);
-    expect(found.title).toBe("original");
+    const found = await Widget.find(widget.id);
+    expect(found.name).toBe("original");
   });
 
-  // D-Y-INCOMPATIBLE: same body NOT NULL constraint as above.
-  it.skip("suppresses create in callback", async () => {
-    // Comment kept inline: ported models/comment.ts targets a full Rails
-    // schema (label enum column, multiple FK columns) that exceeds this
-    // test's minimal { body: "string" } schema. Will consume the ported
-    // model once the fixture schema is unified (Phase G).
-    class Comment extends Base {
+  it("suppresses create in callback", async () => {
+    class Gizmo extends Base {
       static {
-        this.attribute("body", "string");
+        this.attribute("name", "string");
       }
     }
-    class Post extends Base {
+    class Widget extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("name", "string");
         this.afterCreate(async function (this: any) {
-          await Comment.suppress(async () => {
-            await Comment.create({ body: "auto-comment" });
+          await Gizmo.suppress(async () => {
+            await Gizmo.create({ name: "auto-gizmo" });
           });
         });
       }
     }
-    await Post.create({ title: "hello" });
-    expect(await Comment.count()).toBe(0);
+    await Widget.create({ name: "hello" });
+    expect(await Gizmo.count()).toBe(0);
   });
 
-  // D-Y-INCOMPATIBLE: same body NOT NULL constraint as above.
-  it.skip("resumes saving after suppression complete", async () => {
-    class Post extends Base {
+  it("resumes saving after suppression complete", async () => {
+    class Widget extends Base {
       static {
-        this.attribute("title", "string");
+        this.attribute("name", "string");
       }
     }
-    await Post.suppress(async () => {
-      await Post.create({ title: "suppressed" });
+    await Widget.suppress(async () => {
+      await Widget.create({ name: "suppressed" });
     });
-    await Post.create({ title: "not suppressed" });
-    expect(await Post.count()).toBe(1);
+    await Widget.create({ name: "not suppressed" });
+    expect(await Widget.count()).toBe(1);
   });
 
   it("suppresses validations on create", async () => {

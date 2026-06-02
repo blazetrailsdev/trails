@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { Base, composedOf } from "./index.js";
+import { Base, composedOf, reflectOnAggregation } from "./index.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -127,6 +127,7 @@ describe("AggregationsTest", () => {
         ["address_street", "street"],
         ["address_city", "city"],
       ],
+      allowNil: true,
     });
 
     const c = await Customer.create({
@@ -161,6 +162,7 @@ describe("AggregationsTest", () => {
         ["lat", "lat"],
         ["lng", "lng"],
       ],
+      allowNil: true,
     });
 
     const loc = await Location.create({ name: "HQ", lat: 37.7, lng: -122.4 });
@@ -350,110 +352,92 @@ describe("AggregationsTest", () => {
     await barney.save();
     expect(barney.readAttribute("address_street")).toBe("Lively Street");
   });
-});
 
-describe("AggregationsTest", () => {
-  // Rails: test_find_multiple_value_object
-  // Rails: test_change_single_value_object
-  // Rails: test_nil_assignment_results_in_nil
-  // Rails: test_allow_nil_address_set_to_nil
-  // Rails: test_allow_nil_address_loaded_when_only_some_attributes_are_nil
-  // Rails: test_immutable_value_objects
-  // Rails: test_reloaded_instance_refreshes_aggregations
-  it.skip("gps latitude", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-  });
-  it.skip("gps longitude", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-  });
-  it.skip("responds to constructor", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-  });
-  it.skip("hash should be the same for objects with the same values", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-  });
-  it.skip("hash should be different for objects with different values", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-  });
-  it.skip("mapping with custom constructor and target object that does not respond to to a", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-  });
-  it.skip("attributes after initialize", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-  });
-  it.skip("name mapping", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-  });
-  it.skip("ensure_custom_mapping", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-  });
-  it.skip("composite value", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  // Rails: test_allow_nil_gps_set_to_nil
+  it("allow nil gps set to nil", async () => {
+    const david = customers("david") as CustomerModel & { gpsLocation: GpsLocation | null };
+    david.gpsLocation = null;
+    await david.save();
+    await david.reload();
+    expect(david.gpsLocation).toBeNull();
   });
 
-  it.skip("allow nil gps set to nil", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  // Rails: test_allow_nil_set_address_attributes_to_nil
+  it("allow nil set address attributes to nil", () => {
+    const zaphod = customers("zaphod") as CustomerModel & { address: Address | null };
+    zaphod.address = null;
+    expect(zaphod.readAttribute("address_street")).toBeNull();
+    expect(zaphod.readAttribute("address_city")).toBeNull();
+    expect(zaphod.readAttribute("address_country")).toBeNull();
   });
-  it.skip("allow nil set address attributes to nil", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+
+  // Rails: test_nil_raises_error_when_allow_nil_is_false
+  it("nil raises error when allow nil is false", () => {
+    const david = customers("david") as CustomerModel;
+    expect(() => {
+      (david as any).balance = null;
+    }).toThrow();
   });
-  it.skip("nil raises error when allow nil is false", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+
+  // Rails: test_nil_return_from_converter_is_respected_when_allow_nil_is_true
+  it("nil return from converter is respected when allow nil is true", async () => {
+    CustomerModel.gpsConversionWasRun = false;
+    const david = customers("david") as CustomerModel & { nonBlankGpsLocation: GpsLocation | null };
+    (david as any).nonBlankGpsLocation = "";
+    await david.save();
+    await david.reload();
+    expect(david.nonBlankGpsLocation).toBeNull();
   });
-  it.skip("nil return from converter is respected when allow nil is true", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+
+  // Rails: test_nil_return_from_converter_results_in_failure_when_allow_nil_is_false
+  it("nil return from converter results in failure when allow nil is false", () => {
+    const barney = customers("barney") as CustomerModel & { gpsLocation: GpsLocation | null };
+    expect(() => {
+      (barney as any).gpsLocation = "";
+    }).toThrow();
   });
-  it.skip("nil return from converter results in failure when allow nil is false", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+
+  // Rails: test_assigning_hash_to_custom_converter
+  it("assigning hash to custom converter", () => {
+    const barney = customers("barney") as CustomerModel & { fullname: Fullname };
+    (barney as any).fullname = { first: "Barney", last: "Stinson" };
+    expect(barney.readAttribute("name")).toBe("Barney STINSON");
   });
-  it.skip("assigning hash to custom converter", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-  });
-  it.skip("assigning hash without custom converter", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+
+  // Rails: test_assigning_hash_without_custom_converter
+  it("assigning hash without custom converter", () => {
+    const barney = customers("barney") as CustomerModel;
+    const hash = { first: "Barney", last: "Stinson" };
+    (barney as any).fullnameNoConverter = hash;
+    expect(barney.readAttribute("name")).toBe(String(hash));
   });
 });
 
 describe("OverridingAggregationsTest", () => {
-  it.skip("composed of aggregation redefinition reflections should differ and not inherited", () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-    /* fixture-dependent */
+  // Rails: test_composed_of_aggregation_redefinition_reflections_should_differ_and_not_inherited
+  it("composed of aggregation redefinition reflections should differ and not inherited", () => {
+    class DifferentName {}
+    class PersonBase extends Base {
+      static {
+        composedOf(this, "composedOf", {
+          className: DifferentName,
+          mapping: [["person_first_name", "firstName"]],
+        });
+      }
+    }
+    class DifferentPerson extends PersonBase {
+      static {
+        composedOf(this, "composedOf", {
+          className: DifferentName,
+          mapping: [["different_person_first_name", "firstName"]],
+        });
+      }
+    }
+    const personRef = reflectOnAggregation(PersonBase, "composedOf");
+    const differentRef = reflectOnAggregation(DifferentPerson, "composedOf");
+    expect(personRef).not.toBeNull();
+    expect(differentRef).not.toBeNull();
+    expect(personRef).not.toBe(differentRef);
   });
 });
 
