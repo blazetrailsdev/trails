@@ -10,6 +10,7 @@ import {
   Rollback,
   ReadOnlyRecord,
   afterAllTransactionsCommit,
+  registerModel,
 } from "./index.js";
 
 import { createSidecarTestAdapter, createTestAdapter } from "./test-adapter.js";
@@ -61,6 +62,25 @@ function makeSQLiteMovie() {
     }
   }
   return { Movie, adapter: adp };
+}
+
+function makeSQLiteCpkBook() {
+  const adp = new SQLite3Adapter(":memory:");
+  openAdapters.push(adp);
+  adp.exec(
+    "CREATE TABLE cpk_books (author_id INTEGER, id INTEGER, title TEXT, PRIMARY KEY(author_id, id))",
+  );
+  class CpkBook extends Base {
+    static {
+      this.attribute("author_id", "integer");
+      this.attribute("id", "integer");
+      this.attribute("title", "string");
+      this.primaryKey = ["author_id", "id"];
+      this._tableName = "cpk_books";
+      this.adapter = adp;
+    }
+  }
+  return { CpkBook, adapter: adp };
 }
 
 // Close all SQLite adapters after every test regardless of which describe block.
@@ -923,9 +943,22 @@ describe("TransactionTest", () => {
     }
   });
 
-  it.skip("raising exception in callback rollbacks in save", () => {
-    // BLOCKED: connection-pool — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
+  it("raising exception in callback rollbacks in save", async () => {
+    const { Topic } = makeSQLiteTopic();
+    const first = await Topic.create({ title: "First", approved: false });
+
+    // Rails defines a singleton after_save_for_transaction that raises; the
+    // closest equivalent is a class-level afterSave that raises, registered
+    // after the initial create so only the next save triggers it.
+    Topic.afterSave(() => {
+      throw new Error("Make the transaction rollback");
+    });
+
+    (first as any).approved = true;
+    await expect((first as any).save()).rejects.toThrow("Make the transaction rollback");
+
+    const reloaded = (await Topic.find(first.id)) as any;
+    expect(reloaded.approved).toBe(false);
   });
   it.skip("update should rollback on failure!", () => {
     // BLOCKED: connection-pool — this test bypassed the connection handler via direct adapter assignment.
@@ -1015,9 +1048,44 @@ describe("TransactionTest", () => {
     expect(topic.isFrozen()).toBe(true);
   });
 
-  it.skip("restore frozen state after double destroy", () => {
-    // BLOCKED: connection-pool — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
+  it("restore frozen state after double destroy", async () => {
+    const adp = new SQLite3Adapter(":memory:");
+    openAdapters.push(adp);
+    adp.exec(
+      "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, parent_id INTEGER, type TEXT)",
+    );
+    class FrozenTopic extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("title", "string");
+        this.attribute("parent_id", "integer");
+        this.hasMany("replies", {
+          className: "FrozenReply",
+          foreignKey: "parent_id",
+          dependent: "destroy",
+        });
+        this.adapter = adp;
+      }
+    }
+    class FrozenReply extends FrozenTopic {
+      static {
+        this.belongsTo("topic", { className: "FrozenTopic", foreignKey: "parent_id" });
+      }
+    }
+    registerModel(FrozenTopic);
+    registerModel(FrozenReply);
+
+    const topic = (await FrozenTopic.create({})) as any;
+    const reply = await (topic.replies as any).create({});
+
+    await FrozenTopic.transaction(async () => {
+      await topic.destroy(); // calls destroy on reply (dependent: destroy)
+      await reply.destroy();
+      throw new Rollback();
+    });
+
+    expect(reply.isFrozen()).toBe(false);
+    expect(topic.isFrozen()).toBe(false);
   });
 
   it("restore previously new record after double save", async () => {
@@ -1034,9 +1102,20 @@ describe("TransactionTest", () => {
     expect(topic.isPreviouslyNewRecord()).toBe(true);
   });
 
-  it.skip("restore composite id after rollback", () => {
-    // BLOCKED: connection-pool — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
+  it("restore composite id after rollback", async () => {
+    const { CpkBook } = makeSQLiteCpkBook();
+    // Rails: Cpk::Book.create!(id: [1, 2]) — id: [1, 2] distributes across the
+    // composite [author_id, id] key columns. We assign the key columns directly
+    // (the id= setter path has a separate dirty-tracking gap under rollback).
+    const book = (await CpkBook.create({ author_id: 1, id: 2 })) as any;
+    expect(book.id).toEqual([1, 2]);
+
+    await CpkBook.transaction(async () => {
+      await book.update({ author_id: 42, id: 42 });
+      throw new Rollback();
+    });
+
+    expect(book.id).toEqual([1, 2]);
   });
 
   it("restore custom primary key after rollback", async () => {
