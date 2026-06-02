@@ -1,12 +1,34 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_and_belongs_to_many_associations_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll } from "vitest";
 import { Base, registerModel, AssociationTypeMismatch } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { Associations, loadHasMany, loadHabtm, association } from "../associations.js";
+import {
+  Associations,
+  loadHasMany,
+  loadHabtm,
+  association,
+  modelRegistry,
+} from "../associations.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
+import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Project as CanonicalProject } from "../test-helpers/models/project.js";
+import { Developer as CanonicalDeveloper, AuditLog } from "../test-helpers/models/developer.js";
+
+// The sibling inline describe re-declares HABTMs on classes it also names
+// `Developer`/`Project` with the same association names, so its
+// `${name}::HABTM_${Assoc}` join-model registry keys collide with and clobber
+// the canonical models'. Capture the canonical join models at module load
+// (before any `beforeEach` runs) so the fixture-backed describe can restore
+// them. See has-and-belongs-to-many.ts:172-185.
+const canonicalHabtmJoinModels = {
+  "Developer::HABTM_Projects": modelRegistry.get("Developer::HABTM_Projects"),
+  "Project::HABTM_Developers": modelRegistry.get("Project::HABTM_Developers"),
+};
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -616,62 +638,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((projects[0] as any).name).toBe("Keep");
   });
 
-  it("find in association", async () => {
-    const dev = await Developer.create({ name: "FindDev", salary: 65000 });
-    const p1 = await Project.create({ name: "FindP1" });
-    const p2 = await Project.create({ name: "FindP2" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-      foreignKey: "developer_id",
-    });
-    const found = projects.find((p: any) => p.name === "FindP2");
-    expect(found).toBeDefined();
-    expect((found as any).name).toBe("FindP2");
-  });
-
-  it("include uses array include after loaded", async () => {
-    const dev = await Developer.create({ name: "InclDev", salary: 60000 });
-    const proj = await Project.create({ name: "InclProj" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-      foreignKey: "developer_id",
-    });
-    // Check that the loaded array includes the project by id
-    const included = projects.some((p: any) => p.id === proj.id);
-    expect(included).toBe(true);
-  });
-
-  it("include checks if record exists if target not loaded", async () => {
-    const dev = await Developer.create({ name: "IncludeCheck", salary: 80000 });
-    const proj = await Project.create({ name: "IncludeProj" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
-    const proxy = association<Project>(dev, "projects");
-    expect(proxy.loaded).toBe(false);
-    const result = await proxy.isInclude(proj);
-    expect(result).toBe(true);
-    expect(proxy.loaded).toBe(false);
-  });
-
-  it("include returns false for non matching record to verify scoping", async () => {
-    const dev = await Developer.create({ name: "ScopeDev", salary: 60000 });
-    const proj = await Project.create({ name: "ScopeProj" });
-    const otherProj = await Project.create({ name: "OtherProj" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-      foreignKey: "developer_id",
-    });
-    // otherProj is not associated with dev
-    const included = projects.some((p: any) => p.id === otherProj.id);
-    expect(included).toBe(false);
-  });
-
   it("find with merged options", async () => {
     // Scope where + order both apply to the loaded relation.
     const dev = await Developer.create({ name: "MergeDev", salary: 80000 });
@@ -805,23 +771,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     });
     expect(projects.length).toBe(1);
     expect((projects[0] as any).name).toBe("NewProj");
-  });
-
-  it("find in association with options", async () => {
-    // Scope-applied WHERE filters which associated records load.
-    const dev = await Developer.create({ name: "FindOptDev", salary: 70000 });
-    const p1 = await Project.create({ name: "F1" });
-    const p2 = await Project.create({ name: "F2" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-      foreignKey: "developer_id",
-      scope: (r: any) => r.where({ name: "F2" }),
-    });
-    expect(projects.length).toBe(1);
-    expect((projects[0] as any).id).toBe(p2.id);
   });
 
   it("association with extend option", async () => {
@@ -976,22 +925,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((projects[0] as any).name).toBeNull();
   });
 
-  it("habtm selects all columns by default", async () => {
-    // Verify that loaded HABTM records have all attributes
-    const dev = await Developer.create({ name: "SelectAll", salary: 95000 });
-    const proj = await Project.create({ name: "AllCols" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-      foreignKey: "developer_id",
-    });
-    expect(projects.length).toBe(1);
-    const p = projects[0] as any;
-    expect(p.name).toBe("AllCols");
-    expect(p.id).toBe(proj.id);
-  });
-
   it("habtm respects select query method", async () => {
     // .select() chained inside the scope lambda is forwarded into the join
     // query. Selecting only `name` (not `id`) proves the SELECT clause is
@@ -1106,57 +1039,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       scope: (r: any) => r.group("approved").having("count(*) >= 2").select("approved"),
     });
     expect(groups.length).toBe(1);
-  });
-
-  it("get ids", async () => {
-    const dev = await Developer.create({ name: "IdsDev", salary: 70000 });
-    const p1 = await Project.create({ name: "IdsP1" });
-    const p2 = await Project.create({ name: "IdsP2" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-      foreignKey: "developer_id",
-    });
-    const ids = projects.map((p: any) => p.id);
-    expect(ids).toContain(p1.id);
-    expect(ids).toContain(p2.id);
-    expect(ids.length).toBe(2);
-  });
-
-  it("get ids for loaded associations", async () => {
-    const dev = await Developer.create({ name: "LoadedIdsDev", salary: 70000 });
-    const p1 = await Project.create({ name: "LI1" });
-    const p2 = await Project.create({ name: "LI2" });
-    const p3 = await Project.create({ name: "LI3" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p3.id });
-    const projects = await loadHabtm(dev, "projects", {
-      className: "Project",
-      joinTable: "developer_projects",
-      foreignKey: "developer_id",
-    });
-    const ids = projects.map((p: any) => p.id);
-    expect(ids.length).toBe(3);
-    expect(ids).toContain(p1.id);
-    expect(ids).toContain(p2.id);
-    expect(ids).toContain(p3.id);
-  });
-
-  it("get ids for unloaded associations does not load them", async () => {
-    const dev = await Developer.create({ name: "UnloadedIdsDev", salary: 70000 });
-    const p1 = await Project.create({ name: "UI1" });
-    const p2 = await Project.create({ name: "UI2" });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
-    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
-    const proxy = association(dev, "projects");
-    expect(proxy.loaded).toBe(false);
-    const ids = await (dev as any).projectIds;
-    expect(ids).toContain(p1.id);
-    expect(ids).toContain(p2.id);
-    expect(proxy.loaded).toBe(false);
   });
 
   it.skip("assign ids", async () => {
@@ -1800,6 +1682,137 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // Two distinct middle hasMany associations should be visited — one
     // from parent's HABTM override, one from child's, chained via super.
     expect(new Set(calls).size).toBe(2);
+  });
+});
+
+// ==========================================================================
+// Canonical-model + fixture migration of the read-path HABTM tests. Mirrors
+// has_and_belongs_to_many_associations_test.rb's `developers(:david)` /
+// `projects(:active_record)` rows joined via the developers_projects fixtures,
+// using the shared Developer/Project models instead of bespoke inline classes.
+// ==========================================================================
+describe("HasAndBelongsToManyAssociationsTest", () => {
+  const { developers, projects } = useHandlerFixtures(
+    ["developers", "projects", "developersProjects"],
+    { schema: canonicalSchema },
+  );
+  // Creating a Developer autosaves an `audit_logs` row (its `before_create`),
+  // so that table must exist alongside the fixture-touched tables.
+  beforeAll(async () => {
+    await defineSchema(Base.connection as TestDatabaseAdapter, {
+      audit_logs: canonicalSchema.audit_logs,
+    });
+  });
+  // The sibling inline describe re-registers its own `Developer`/`Project`
+  // under the same names in its `beforeEach`; re-assert the canonical models
+  // so association className resolution sees them inside this block.
+  beforeEach(() => {
+    registerModel("Developer", CanonicalDeveloper);
+    registerModel("Project", CanonicalProject);
+    registerModel("AuditLog", AuditLog);
+    // Restore the canonical HABTM join models the inline describe clobbered
+    // (its `Developer.projects` / `Project.developers` share the same registry
+    // keys but point at a different `developer_projects` join table).
+    for (const [key, model] of Object.entries(canonicalHabtmJoinModels)) {
+      if (model) modelRegistry.set(key, model);
+    }
+  });
+
+  it("find in association", async () => {
+    const david = developers("david");
+    const activeRecord = projects("active_record");
+    // Using sql
+    const proxy = association<CanonicalDeveloper>(activeRecord, "developers");
+    expect(((await proxy.find(david.id)) as CanonicalDeveloper).id).toBe(david.id);
+    // Using ruby (reloaded target)
+    await proxy.reload();
+    expect(((await proxy.find(david.id)) as CanonicalDeveloper).id).toBe(david.id);
+  });
+
+  it("find in association with options", async () => {
+    const activeRecord = projects("active_record");
+    const devs = await association<CanonicalDeveloper>(activeRecord, "developers").toArray();
+    expect(devs.length).toBe(3);
+    const poorJamis = developers("poor_jamis");
+    const first = (await association<CanonicalDeveloper>(activeRecord, "developers")
+      .where("salary < 10000")
+      .first()) as CanonicalDeveloper;
+    expect(first.id).toBe(poorJamis.id);
+  });
+
+  it("include uses array include after loaded", async () => {
+    const activeRecord = projects("active_record");
+    const proxy = association<CanonicalDeveloper>(activeRecord, "developers");
+    const loaded = await proxy.load();
+    const developer = loaded[0];
+    await assertNoQueries(false, async () => {
+      expect(proxy.loaded).toBe(true);
+      expect(await proxy.isInclude(developer)).toBe(true);
+    });
+  });
+
+  it("include checks if record exists if target not loaded", async () => {
+    const activeRecord = projects("active_record");
+    // `david` is a developers_projects member of active_record; probing with the
+    // fixture keeps the proxy unloaded (Rails uses developers.first + reload).
+    const david = developers("david");
+    const proxy = association<CanonicalDeveloper>(activeRecord, "developers");
+    expect(proxy.loaded).toBe(false);
+    await assertQueriesCount(1, false, async () => {
+      expect(await proxy.isInclude(david)).toBe(true);
+    });
+    expect(proxy.loaded).toBe(false);
+  });
+
+  it("include returns false for non matching record to verify scoping", async () => {
+    const activeRecord = projects("active_record");
+    const bryan = await CanonicalDeveloper.create({ name: "Bryan", salary: 50000 });
+    const proxy = association<CanonicalDeveloper>(activeRecord, "developers");
+    expect(proxy.loaded).toBe(false);
+    expect(await proxy.isInclude(bryan)).toBe(false);
+  });
+
+  it("get ids", async () => {
+    const david = developers("david");
+    const jamis = developers("jamis");
+    const activeRecord = projects("active_record");
+    const actionController = projects("action_controller");
+    const davidIds = [...((await (david as any).projectIds) as number[])].sort((a, b) => a - b);
+    expect(davidIds).toEqual(
+      [activeRecord.id, actionController.id].map(Number).sort((a, b) => a - b),
+    );
+    expect(await (jamis as any).projectIds).toEqual([activeRecord.id]);
+  });
+
+  it("get ids for loaded associations", async () => {
+    const developer = developers("david");
+    await association<CanonicalProject>(developer, "projects").reload();
+    // Once loaded, `projectIds` reads the in-memory target and issues no SQL.
+    await assertNoQueries(false, async () => {
+      await (developer as any).projectIds;
+      await (developer as any).projectIds;
+    });
+  });
+
+  it("get ids for unloaded associations does not load them", async () => {
+    const developer = developers("david");
+    const activeRecord = projects("active_record");
+    const actionController = projects("action_controller");
+    const proxy = association<CanonicalProject>(developer, "projects");
+    expect(proxy.loaded).toBe(false);
+    const ids = [...((await (developer as any).projectIds) as number[])].sort((a, b) => a - b);
+    expect(ids).toEqual([activeRecord.id, actionController.id].map(Number).sort((a, b) => a - b));
+    expect(proxy.loaded).toBe(false);
+  });
+
+  it("habtm selects all columns by default", async () => {
+    const david = developers("david");
+    const first = (
+      await association<CanonicalProject>(david, "projects").toArray()
+    )[0] as CanonicalProject;
+    expect(Object.keys((first as any).attributes).sort()).toEqual(
+      (CanonicalProject.columnNames() as string[]).slice().sort(),
+    );
   });
 });
 
