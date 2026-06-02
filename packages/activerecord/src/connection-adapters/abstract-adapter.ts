@@ -416,6 +416,8 @@ export interface AbstractAdapter {
   ): Promise<unknown>;
   /** @internal */
   executeBatch(statements: string[], name?: string | null): Promise<void>;
+  /** @internal */
+  preprocessQuery(sql: string): string;
 
   // --- Members previously only on DatabaseAdapter interface ---
   // Declaring them here makes AbstractAdapter a structural superset of

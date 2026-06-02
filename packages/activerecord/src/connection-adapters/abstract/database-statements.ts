@@ -24,6 +24,7 @@ import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { TransactionManager } from "./transaction.js";
 import { Result } from "../../result.js";
 import { isWriteQuerySql } from "../sql-classification.js";
+import { queryTransformers } from "../../query-transformers.js";
 
 /**
  * A single entry in `Relation#explain`'s options list. Either a bare
@@ -122,6 +123,8 @@ export interface DatabaseStatementsHost {
   primaryKey?(table: string): string | null;
   /** @internal */
   preprocessQuery?(sql: string): string;
+  /** @internal Re-entrancy guard for the queryTransformers loop in preprocessQuery. */
+  _inQueryTransformers?: boolean;
 }
 
 /**
@@ -1661,7 +1664,20 @@ function affectedRows(rawResult: any): never {
 }
 
 /**
- * Checks write guards, marks the transaction written, and returns the sql unchanged.
+ * Checks write guards, marks the transaction written, and applies the global
+ * `queryTransformers` (e.g. `QueryLogs`) before the SQL is executed and
+ * instrumented — mirroring Rails'
+ * `ActiveRecord.query_transformers.each { |t| sql = t.call(sql, self) }`.
+ *
+ * Concrete adapters call this at the top of `execute`/`executeMutation`, so the
+ * `sql.active_record` notification payload carries the post-transform
+ * (commented) SQL — the Rails-faithful ordering where `preprocess_query` runs
+ * in `internal_execute`, before `raw_execute`'s `log` block.
+ *
+ * The re-entrancy guard ensures the transformer loop runs at most once per
+ * logical query: a transformer that itself issues a query on this connection
+ * (or any other nested execution) reuses the already-transformed SQL rather
+ * than re-commenting it.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#preprocess_query
  * @internal
@@ -1669,6 +1685,16 @@ function affectedRows(rawResult: any): never {
 export function preprocessQuery(this: DatabaseStatementsHost, sql: string): string {
   this.checkIfWriteQuery?.(sql);
   markTransactionWrittenIfWrite.call(this, sql);
+  const host = this as DatabaseStatementsHost & { _inQueryTransformers?: boolean };
+  if (host._inQueryTransformers) return sql;
+  host._inQueryTransformers = true;
+  try {
+    for (const t of queryTransformers) {
+      sql = t.call(sql, this);
+    }
+  } finally {
+    host._inQueryTransformers = false;
+  }
   return sql;
 }
 
