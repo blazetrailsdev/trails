@@ -527,7 +527,14 @@ export class SchemaStatements {
   async addCheckConstraint(
     tableName: string,
     expression: string,
-    options: { name?: string; validate?: boolean } = {},
+    // Rails forwards unrecognized options (`**options`) rather than rejecting
+    // them; only :name / :validate are consumed here.
+    options: {
+      name?: string;
+      validate?: boolean;
+      ifNotExists?: boolean;
+      [key: string]: unknown;
+    } = {},
   ): Promise<void> {
     const adapter = this.adapter as any;
     if (
