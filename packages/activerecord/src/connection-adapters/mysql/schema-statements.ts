@@ -180,7 +180,10 @@ export function newColumnFromField(
   return new Column(fieldName, def, meta, field["Null"] === "YES", {
     defaultFunction: defFn ?? undefined,
     collation: field["Collation"] ?? null,
-    unsigned: /\bunsigned(?: zerofill)?$/i.test(field["Type"] ?? ""),
+    // Literal port of Rails MySQL::Column#unsigned? (`/\bunsigned(?: zerofill)?\z/`); end-anchored
+    // so the modifier isn't matched inside an enum/set value list. No /i flag, as in Rails — SHOW
+    // FIELDS reports the `Type` column lowercased.
+    unsigned: /\bunsigned(?: zerofill)?$/.test(field["Type"] ?? ""),
     autoIncrement: /auto_increment/i.test(field["Extra"] ?? ""),
     virtual: /(virtual|stored|persistent)\s+generated/i.test(field["Extra"] ?? ""),
     onUpdate: onUpdateForColumn,

@@ -1193,11 +1193,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           defaultFunction: defFn,
           primaryKey: colKey === "PRI",
           autoIncrement: extra === "auto_increment",
-          // End-anchored to mirror Rails MySQL::Column#unsigned? (`/\bunsigned(?: zerofill)?\z/`):
-          // the modifier only ever trails the column_type, so anchoring avoids a false match on
-          // the literal "unsigned" appearing inside an enum/set value list, e.g.
-          // enum('unsigned','bigint').
-          unsigned: /\bunsigned(?: zerofill)?$/i.test(sqlType),
+          // Literal port of Rails MySQL::Column#unsigned? (`/\bunsigned(?: zerofill)?\z/`).
+          // End-anchored (JS `$` without /m ≡ Ruby `\z`): the modifier only ever trails the
+          // column_type, so anchoring avoids a false match on the literal "unsigned" inside an
+          // enum/set value list, e.g. enum('unsigned','bigint'). No /i flag, as in Rails — MySQL
+          // reports information_schema COLUMN_TYPE lowercased.
+          unsigned: /\bunsigned(?: zerofill)?$/.test(sqlType),
           virtual: /\b(?:virtual|stored|persistent)\b/i.test(extra),
           onUpdate: onUpdateForColumn,
         },
