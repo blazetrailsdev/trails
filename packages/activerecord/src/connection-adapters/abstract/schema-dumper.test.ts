@@ -79,3 +79,37 @@ describe("SchemaDumper schemaDefault with adapter type deserialize", () => {
     expect(result).toContain("uuid()");
   });
 });
+
+// Story 3.3-U1: columnSpec must emit directly-emittable TypeScript-DSL text
+// (not Ruby schema.rb syntax) so a later story (3.3-U3) can route emitTable
+// through it via formatColspecRaw. These pin the prerequisite.
+describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
+  const dumper = SchemaDumper.create(emptySource) as any;
+
+  it("schemaPrecision emits TS `null` (not Ruby `nil`) for datetime without precision", () => {
+    expect(dumper.schemaPrecision({ type: "datetime", precision: null })).toBe("null");
+  });
+
+  it("schemaExpression emits a TS arrow (not a Ruby lambda) for a default function", () => {
+    expect(dumper.schemaExpression({ defaultFunction: "now()" })).toBe('() => "now()"');
+  });
+
+  it("columnSpec output round-trips through formatColspecRaw as valid TS-DSL", () => {
+    const [type, spec] = dumper.columnSpec({
+      type: "datetime",
+      precision: null,
+      null: false,
+      hasDefault: true,
+      default: null,
+      defaultFunction: "now()",
+    });
+    expect(type).toBe("datetime");
+    const text = dumper.formatColspecRaw(spec);
+    expect(text).toContain("precision: null");
+    expect(text).toContain("null: false");
+    expect(text).toContain('default: () => "now()"');
+    // No Ruby-isms leak into the emittable text.
+    expect(text).not.toContain("nil");
+    expect(text).not.toContain("-> {");
+  });
+});
