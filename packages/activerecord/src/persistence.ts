@@ -500,6 +500,26 @@ function assertLockingColumnNotExplicitly(
  * rollback, composite PKs and other attributes modified by the assignment are
  * restored to their pre-update values.
  */
+/**
+ * Assign one key during `#update` / `#update!`. Mirrors Rails `assign_attributes`,
+ * which routes every key through `public_send("#{key}=")`. We keep the raw
+ * `writeAttribute` path for plain columns (it preserves original error classes —
+ * see {@link update}), but nested-attribute writers (`<assoc>Attributes=`,
+ * installed by `acceptsNestedAttributesFor`) must go through their generated
+ * setter so records are built / marked-for-destruction in memory before save.
+ * @internal
+ */
+function assignUpdateAttribute(self: any, key: string, value: unknown): void {
+  const configs = self.constructor?._nestedAttributeConfigs as
+    | { associationName: string }[]
+    | undefined;
+  if (configs?.some((c) => `${c.associationName}Attributes` === key)) {
+    self[key] = value;
+    return;
+  }
+  self.writeAttribute(key, value);
+}
+
 export async function update<T extends UpdateRecord>(
   this: T,
   attrs: Record<string, unknown>,
@@ -513,7 +533,7 @@ export async function update<T extends UpdateRecord>(
     // than Rails. Use a raw writeAttribute loop here to preserve original error
     // classes (pre-extraction behavior; closer to Rails than wrapping).
     for (const [key, value] of Object.entries(attrs)) {
-      self.writeAttribute(key, value);
+      assignUpdateAttribute(self, key, value);
     }
     return self.save() as Promise<boolean>;
   }) as Promise<boolean>;
@@ -531,9 +551,10 @@ export async function updateBang<T extends UpdateRecord>(
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
     // See update(): raw loop preserves original error classes (matches Rails,
-    // avoids Base#assignAttributes's AttributeAssignmentError wrap).
+    // avoids Base#assignAttributes's AttributeAssignmentError wrap); nested
+    // attribute writers still route through their setter.
     for (const [key, value] of Object.entries(attrs)) {
-      self.writeAttribute(key, value);
+      assignUpdateAttribute(self, key, value);
     }
     return self.saveBang() as Promise<true>;
   }) as Promise<true>;

@@ -463,10 +463,68 @@ export function assignNestedAttributesForCollectionAssociation(
 
   checkRecordLimitBang(config?.options.limit, attrs);
 
+  // Rails `assign_nested_attributes_for_collection_association` marks matching
+  // already-loaded records for destruction *in memory* at assign time, so
+  // validations run against the post-destroy graph (e.g. the association-aware
+  // length validator excludes records marked for destruction). The actual
+  // DELETE still flows through the post-save flush in `processNestedAttributes`,
+  // which only runs when `save` succeeds — so an invalidated graph leaves the
+  // rows untouched, matching Rails.
+  if (config?.options.allowDestroy) {
+    const loaded = loadedCollectionTarget(record, associationName);
+    if (loaded.length > 0) {
+      const targetModel = resolveCollectionTargetModel(record, associationName);
+      if (targetModel) {
+        for (const a of attrs) {
+          const id = (a as Record<string, unknown>).id;
+          if (id != null && id !== "" && hasDestroyFlag(a)) {
+            const existing = findRecordById(targetModel, loaded, id);
+            if (existing) markForDestruction(existing);
+          }
+        }
+      }
+    }
+  }
+
   if (!(record as any)._pendingNestedAttributes) {
     (record as any)._pendingNestedAttributes = new Map();
   }
   (record as any)._pendingNestedAttributes.set(associationName, attrs);
+}
+
+/**
+ * The in-memory target of a loaded collection proxy, or `[]` when the
+ * association has not been loaded. Mirrors the read path in
+ * `readAttributeForValidation` so destruction marking and validation see the
+ * same record instances.
+ * @internal
+ */
+function loadedCollectionTarget(record: Base, associationName: string): Base[] {
+  const proxy = (record as any)._collectionProxies?.get?.(associationName) as
+    | { target?: unknown[] }
+    | undefined;
+  return Array.isArray(proxy?.target) ? (proxy!.target as Base[]) : [];
+}
+
+/**
+ * Resolve the model class backing a collection association via the registry,
+ * mirroring the className resolution in `processNestedAttributes`.
+ * @internal
+ */
+function resolveCollectionTargetModel(
+  record: Base,
+  associationName: string,
+): typeof Base | undefined {
+  const ctor = record.constructor as typeof Base;
+  const associations: any[] = (ctor as any)._associations ?? [];
+  const assocDef = associations.find((a: any) => a.name === associationName);
+  if (!assocDef) return undefined;
+  const className =
+    assocDef.options.className ??
+    (assocDef.type === "hasMany" || assocDef.type === "hasAndBelongsToMany"
+      ? camelize(singularize(associationName))
+      : camelize(associationName));
+  return modelRegistry.get(className) as typeof Base | undefined;
 }
 
 export const InstanceMethods = {

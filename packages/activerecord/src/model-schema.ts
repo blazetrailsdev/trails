@@ -116,7 +116,16 @@ export function buildPkWhereNode(
  */
 export function columnNames(this: typeof Base): string[] {
   const ignored = new Set(this.ignoredColumns ?? []);
-  return Array.from(this._attributeDefinitions.keys()).filter((name) => !ignored.has(name));
+  // Virtual attributes (`attribute(name, type, { virtual: true })`) are not
+  // DB-backed — Rails' `column_names` comes from the schema, so they never
+  // appear here and are excluded from INSERT/UPDATE column lists.
+  const out: string[] = [];
+  for (const [name, def] of this._attributeDefinitions) {
+    if (ignored.has(name)) continue;
+    if ((def as { virtual?: boolean }).virtual) continue;
+    out.push(name);
+  }
+  return out;
 }
 
 /**
