@@ -4,14 +4,18 @@
  * hasMany associations inferred from foreign keys.
  *
  * Usage:
- *   trails-models-dump [--database-url <url>] [--out <path>]
+ *   trails-models-dump [--schema <path>] [--database-url <url>] [--out <path>]
  *                      [--ignore t1,t2] [--only t1,t2]
  *                      [--strip-prefix <str>] [--strip-suffix <str>]
  *                      [--no-header] [--format]
  *
- * The database URL is taken from, in order:
- *   1. --database-url <url>
- *   2. $DATABASE_URL
+ * Source of the schema, in order:
+ *   1. --schema <path>     parse a committed db/schema.ts (no DB connection)
+ *   2. --database-url <url>
+ *   3. $DATABASE_URL
+ *
+ * The `--schema` path is a pure file read + codegen — it never calls
+ * `Base.establishConnection()` and needs no reachable database.
  *
  * Output:
  *   --out <path>   writes a .ts module to the given file
@@ -34,7 +38,10 @@ import {
   type IntrospectedTable,
 } from "@blazetrails/activerecord";
 
+import { parseSchemaForModels } from "../tsc-wrapper/schema-ts-model-parser.js";
+
 interface Args {
+  schemaPath?: string;
   databaseUrl?: string;
   outPath?: string;
   ignore: readonly string[];
@@ -47,7 +54,7 @@ interface Args {
 
 function usage(stream: NodeJS.WriteStream): void {
   stream.write(
-    "Usage: trails-models-dump [--database-url <url>] [--out <path>]\n" +
+    "Usage: trails-models-dump [--schema <path>] [--database-url <url>] [--out <path>]\n" +
       "                         [--ignore t1,t2] [--only t1,t2]\n" +
       "                         [--strip-prefix <str>] [--strip-suffix <str>]\n" +
       "                         [--no-header] [--format]\n",
@@ -56,6 +63,7 @@ function usage(stream: NodeJS.WriteStream): void {
 
 function parseArgs(argv: readonly string[]): Args | number {
   const out: {
+    schemaPath?: string;
     databaseUrl?: string;
     outPath?: string;
     ignore: string[];
@@ -76,7 +84,20 @@ function parseArgs(argv: readonly string[]): Args | number {
       i++;
       return next;
     };
-    if (a === "--database-url") {
+    if (a === "--schema") {
+      const v = readValue("--schema");
+      if (typeof v === "number") return v;
+      out.schemaPath = v;
+    } else if (a.startsWith("--schema=")) {
+      const v = a.slice("--schema=".length);
+      // An empty value would be falsy and silently misroute to the live-DB
+      // branch; reject it the way readValue rejects the space form.
+      if (!v) {
+        process.stderr.write("trails-models-dump: --schema expects a value.\n");
+        return 1;
+      }
+      out.schemaPath = v;
+    } else if (a === "--database-url") {
       const v = readValue("--database-url");
       if (typeof v === "number") return v;
       out.databaseUrl = v;
@@ -140,58 +161,98 @@ export async function run(argv: readonly string[]): Promise<number> {
   if (typeof parsed === "number") return parsed;
   const args = parsed;
 
-  const url = args.databaseUrl ?? process.env.DATABASE_URL;
-  if (!url) {
-    process.stderr.write(
-      "trails-models-dump: no database URL — pass --database-url or set DATABASE_URL.\n",
-    );
-    return 1;
-  }
-
-  await Base.establishConnection(url);
-  const adapter = Base.connection;
-
-  const allTables = await introspectTables(adapter);
   const ignoreSet = new Set([...BUILTIN_IGNORE, ...args.ignore]);
   const onlySet = args.only.length > 0 ? new Set(args.only) : null;
   const keep = (name: string): boolean => {
     if (onlySet) return onlySet.has(name);
     return !ignoreSet.has(name);
   };
-  const tableNames = allTables.filter(keep);
 
-  if (tableNames.length === 0) {
+  // Resolve the source of truth into IntrospectedTable[] + a sourceHint for
+  // the header. `--schema` reads a committed db/schema.ts offline; otherwise
+  // we connect to a live DB and introspect.
+  let introspected: IntrospectedTable[];
+  let sourceHint: string;
+
+  if (args.schemaPath) {
+    // An explicit --database-url alongside --schema is a conflicting signal;
+    // --schema wins (documented precedence), so flag the ignored flag. We do
+    // NOT warn on an ambient $DATABASE_URL — that's the common offline case
+    // --schema exists to serve, and warning on it would be pure noise.
+    if (args.databaseUrl) {
+      process.stderr.write("trails-models-dump: --schema given; ignoring --database-url.\n");
+    }
+    const path = await getPathAsync();
+    const fs = await getFsAsync();
+    const resolved = path.resolve(args.schemaPath);
+    let source: string;
+    try {
+      source = fs.readFileSync(resolved, "utf8");
+    } catch {
+      process.stderr.write(`trails-models-dump: cannot read schema file: ${resolved}\n`);
+      return 1;
+    }
+    sourceHint = resolved;
+    // No Base.establishConnection() on this path — pure file read + codegen.
+    const parsedTables = parseSchemaForModels(source, resolved);
+    if (parsedTables.length === 0) {
+      // Distinguish "wrong/empty file" from the post-filter "--only/--ignore
+      // matched nothing" case handled by the shared check below.
+      process.stderr.write(
+        `trails-models-dump: no createTable found in ${resolved} — is it a db/schema.ts?\n`,
+      );
+      return 1;
+    }
+    introspected = parsedTables.filter((t) => keep(t.name));
+  } else {
+    const url = args.databaseUrl ?? process.env.DATABASE_URL;
+    if (!url) {
+      process.stderr.write(
+        "trails-models-dump: no database URL — pass --database-url or set DATABASE_URL.\n",
+      );
+      return 1;
+    }
+
+    await Base.establishConnection(url);
+    const adapter = Base.connection;
+
+    const allTables = await introspectTables(adapter);
+    const tableNames = allTables.filter(keep);
+    sourceHint = url;
+
+    // Assemble IntrospectedTable[] — run the four introspection helpers per
+    // table in parallel. generateModels requires primaryKey / foreignKeys /
+    // columns; we pass columns through for polymorphic + STI detection.
+    introspected = await Promise.all(
+      tableNames.map(async (name): Promise<IntrospectedTable> => {
+        const [pk, cols, fks] = await Promise.all([
+          introspectPrimaryKey(adapter, name),
+          introspectColumns(adapter, name),
+          introspectForeignKeys(adapter, name),
+        ]);
+        // introspectPrimaryKey normalises no-PK to []; treat [] as null for
+        // generateModels's view-skip logic so the header tally picks it up.
+        const primaryKey = pk.length === 0 ? null : pk.length === 1 ? pk[0]! : pk;
+        return {
+          name,
+          primaryKey,
+          foreignKeys: fks,
+          columns: cols.map((c) => ({
+            name: c.name,
+            type: c.sqlType ?? c.type ?? "",
+          })),
+        };
+      }),
+    );
+  }
+
+  if (introspected.length === 0) {
     process.stderr.write("trails-models-dump: no tables to generate (check --only/--ignore)\n");
     return 1;
   }
 
-  // Assemble IntrospectedTable[] — run the four introspection helpers per
-  // table in parallel. generateModels requires primaryKey / foreignKeys /
-  // columns; we pass columns through for polymorphic + STI detection.
-  const introspected: IntrospectedTable[] = await Promise.all(
-    tableNames.map(async (name): Promise<IntrospectedTable> => {
-      const [pk, cols, fks] = await Promise.all([
-        introspectPrimaryKey(adapter, name),
-        introspectColumns(adapter, name),
-        introspectForeignKeys(adapter, name),
-      ]);
-      // introspectPrimaryKey normalises no-PK to []; treat [] as null for
-      // generateModels's view-skip logic so the header tally picks it up.
-      const primaryKey = pk.length === 0 ? null : pk.length === 1 ? pk[0]! : pk;
-      return {
-        name,
-        primaryKey,
-        foreignKeys: fks,
-        columns: cols.map((c) => ({
-          name: c.name,
-          type: c.sqlType ?? c.type ?? "",
-        })),
-      };
-    }),
-  );
-
   let output = generateModels(introspected, {
-    sourceHint: url,
+    sourceHint,
     stripPrefix: args.stripPrefix,
     stripSuffix: args.stripSuffix,
     noHeader: args.noHeader,

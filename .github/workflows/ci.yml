@@ -481,7 +481,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm vitest run packages/activerecord
+      # Trailing slash is load-bearing: the bare `packages/activerecord` filter
+      # is a substring match that also sweeps in packages/activerecord-cli/**.
+      # Those already run in the dedicated step below, so the slash avoids a
+      # redundant double-run and keeps the CLI's subprocess tests out of this
+      # large suite's worker scheduler (they otherwise starve its reporter RPC
+      # / perturb fork scheduling — see trails-models-dump tests).
+      - run: pnpm vitest run packages/activerecord/
       - run: pnpm vitest run packages/activerecord-cli
 
   postgres-tests:
@@ -516,7 +522,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm vitest run packages/activerecord
+      # Trailing slash is load-bearing: the bare `packages/activerecord` filter
+      # is a substring match that also sweeps in packages/activerecord-cli/**.
+      # Those already run in the dedicated step below, so the slash avoids a
+      # redundant double-run and keeps the CLI's subprocess tests out of this
+      # large suite's worker scheduler (they otherwise starve its reporter RPC
+      # / perturb fork scheduling — see trails-models-dump tests).
+      - run: pnpm vitest run packages/activerecord/
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
           AR_DB_FORKS: 4
@@ -555,7 +567,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm vitest run packages/activerecord
+      # Trailing slash is load-bearing: the bare `packages/activerecord` filter
+      # is a substring match that also sweeps in packages/activerecord-cli/**.
+      # Those already run in the dedicated step below, so the slash avoids a
+      # redundant double-run and keeps the CLI's subprocess tests out of this
+      # large suite's worker scheduler (they otherwise starve its reporter RPC
+      # / perturb fork scheduling — see trails-models-dump tests).
+      - run: pnpm vitest run packages/activerecord/
         env:
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
           AR_DB_FORKS: 4
