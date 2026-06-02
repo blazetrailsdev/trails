@@ -250,6 +250,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     binds: unknown[] = [],
     name: string = "SQL",
   ): Promise<Record<string, unknown>[]> {
+    sql = this.preprocessQuery(sql);
     await this.materializeTransactions();
 
     const payload: Record<string, unknown> = {
@@ -342,6 +343,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Wrapped in a `sql.active_record` notification — see `execute`.
    */
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
+    sql = this.preprocessQuery(sql);
     await this.materializeTransactions();
     if (this._preventWrites) {
       throw new ReadOnlyError("Write query attempted while preventing writes");

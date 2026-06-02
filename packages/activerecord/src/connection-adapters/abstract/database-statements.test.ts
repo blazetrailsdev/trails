@@ -41,6 +41,7 @@ import {
   type DatabaseStatementsHost,
 } from "./database-statements.js";
 import { Result } from "../../result.js";
+import { queryTransformers, type QueryTransformer } from "../../query-transformers.js";
 import type { Quoting } from "./quoting-interface.js";
 
 describe("DatabaseStatements", () => {
@@ -420,6 +421,61 @@ describe("preprocessQuery", () => {
     };
     preprocessQuery.call(host, "DELETE FROM users");
     expect(checked).toBe("DELETE FROM users");
+  });
+
+  describe("queryTransformers loop", () => {
+    function withTransformers(transformers: QueryTransformer[], fn: () => void): void {
+      const saved = queryTransformers.slice();
+      queryTransformers.length = 0;
+      queryTransformers.push(...transformers);
+      try {
+        fn();
+      } finally {
+        queryTransformers.length = 0;
+        queryTransformers.push(...saved);
+      }
+    }
+
+    it("applies registered transformers in order, threading the connection", () => {
+      const host: DatabaseStatementsHost = {};
+      const seen: unknown[] = [];
+      withTransformers(
+        [
+          {
+            call(sql, connection) {
+              seen.push(connection);
+              return `${sql} /*a*/`;
+            },
+          },
+          { call: (sql) => `${sql} /*b*/` },
+        ],
+        () => {
+          expect(preprocessQuery.call(host, "SELECT 1")).toBe("SELECT 1 /*a*/ /*b*/");
+        },
+      );
+      expect(seen).toEqual([host]);
+    });
+
+    it("does not double-apply when a transformer re-enters preprocessQuery", () => {
+      const host: DatabaseStatementsHost = {};
+      let nested = "";
+      withTransformers(
+        [
+          {
+            call(sql) {
+              // A transformer that issues its own query on the same connection
+              // must reuse the already-transformed SQL, not re-comment it.
+              nested = preprocessQuery.call(host, "SELECT inner");
+              return `${sql} /*outer*/`;
+            },
+          },
+        ],
+        () => {
+          expect(preprocessQuery.call(host, "SELECT 1")).toBe("SELECT 1 /*outer*/");
+        },
+      );
+      expect(nested).toBe("SELECT inner");
+    });
   });
 });
 
