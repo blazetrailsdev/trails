@@ -1809,7 +1809,7 @@ export class Relation<T extends Base> {
       const sourceFk = sourceAsName
         ? (sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(sourceAsName)}_id`)
         : (sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(throughClassName)}_id`);
-      const rawThroughPk = throughModel.primaryKey ?? "id";
+      const rawThroughPk = sourceAssocDef?.options?.primaryKey ?? throughModel.primaryKey ?? "id";
       let throughPkCol: string;
       if (Array.isArray(rawThroughPk)) {
         if (rawThroughPk.includes("id")) {

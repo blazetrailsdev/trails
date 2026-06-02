@@ -115,6 +115,28 @@ const TEST_SCHEMA = {
     admittable_type: "string",
   },
   md_member_details: { member_id: "integer" },
+  adt_organizations: { name: "string" },
+  adt_member_details: { member_id: "integer", organization_id: "integer", extra_data: "string" },
+  pk_authors: { name: "string" },
+  pk_essays: {
+    name: "string",
+    writer_id: "string",
+    writer_type: "string",
+    category_id: "string",
+    author_id: "string",
+  },
+  pk_categories: { name: "string" },
+  pk_owners: { name: "string", essay_id: "string" },
+  ds_authors: { name: "string" },
+  ds_posts: { author_id: "integer", title: "string" },
+  ds_comments: { post_id: "integer", body: "string" },
+  css_clubs: { name: "string" },
+  css_memberships: { member_id: "integer", club_id: "integer" },
+  css_members: { name: "string" },
+  cc_customers: {},
+  cc_carriers: {},
+  cc_customer_carriers: { customer_id: "integer", carrier_id: "integer" },
+  cc_shop_accounts: { customer_carrier_id: "integer" },
 } satisfies Schema;
 
 describe("HasOneThroughAssociationsTest", () => {
@@ -896,15 +918,76 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("has one through proxy should not respond to private methods", () => {
-    // BLOCKED: unknown — Ruby private-method visibility (NoMethodError on private) has no TS equivalent
+    // N/A: Ruby private-method visibility (NoMethodError on private) has no TS equivalent
   });
 
   it.skip("has one through proxy should respond to private methods via send", () => {
-    // BLOCKED: unknown — Ruby send / private-method dispatch has no TS equivalent
+    // N/A: Ruby private-method dispatch via send has no TS equivalent
   });
 
-  it.skip("assigning to has one through preserves decorated join record", () => {
-    // BLOCKED: fixture — MemberDetail / Organization fixture models not defined in test suite
+  it("assigning to has one through preserves decorated join record", async () => {
+    class AdtOrganization extends Base {
+      static {
+        this._tableName = "adt_organizations";
+        this.attribute("name", "string");
+      }
+    }
+    class AdtMember extends Base {
+      static {
+        this._tableName = "members";
+        this.attribute("name", "string");
+      }
+    }
+    class AdtMemberDetail extends Base {
+      static {
+        this._tableName = "adt_member_details";
+        this.attribute("member_id", "integer");
+        this.attribute("organization_id", "integer");
+        this.attribute("extra_data", "string");
+      }
+    }
+    registerModel("AdtOrganization", AdtOrganization);
+    registerModel("AdtMember", AdtMember);
+    registerModel("AdtMemberDetail", AdtMemberDetail);
+    Associations.hasOne.call(AdtMember, "adtMemberDetail", {
+      className: "AdtMemberDetail",
+      foreignKey: "member_id",
+    });
+    Associations.hasOne.call(AdtMember, "organization", {
+      className: "AdtOrganization",
+      through: "adtMemberDetail",
+      source: "organization",
+    });
+    Associations.belongsTo.call(AdtMemberDetail, "organization", {
+      className: "AdtOrganization",
+      foreignKey: "organization_id",
+    });
+    Associations.hasMany.call(AdtOrganization, "adtMemberDetails", {
+      className: "AdtMemberDetail",
+      foreignKey: "organization_id",
+    });
+    Associations.hasMany.call(AdtOrganization, "adtMembers", {
+      className: "AdtMember",
+      through: "adtMemberDetails",
+      source: "adtMember",
+    });
+    const organization = await AdtOrganization.create({ name: "NSA" });
+    const member = await AdtMember.create({ name: "Groucho" });
+    const beforeCount = (await AdtMemberDetail.count()) as number;
+    const memberDetail = new AdtMemberDetail({ extra_data: "Extra" });
+    // Access adtMemberDetail association first so it flushes before organization
+    (member.association("adtMemberDetail") as any).writer(memberDetail);
+    (member.association("organization") as any).writer(organization);
+    await member.save();
+    expect(((await AdtMemberDetail.count()) as number) - beforeCount).toBe(1);
+    const loadedOrg = await member.association("organization").loadTarget();
+    expect((loadedOrg as any)?.name).toBe("NSA");
+    const details = await AdtMemberDetail.all()
+      .where({ organization_id: organization.id })
+      .toArray();
+    expect(details.some((d) => d.readAttribute("member_id") === member.id)).toBe(true);
+    const reloadedDetail = await AdtMemberDetail.all().where({ member_id: member.id }).first();
+    expect(reloadedDetail!.readAttribute("extra_data")).toBe("Extra");
   });
 
   it("reassigning has one through", async () => {
@@ -1042,17 +1125,190 @@ describe("HasOneThroughAssociationsTest", () => {
     expect((dashboard as any).name).toBe("my_dashboard");
   });
 
-  it.skip("has one through polymorphic with primary key option", () => {
-    // BLOCKED: fixture — Author / Essay / Owner fixture models with custom primary_key option not defined
+  it("has one through polymorphic with primary key option", async () => {
+    class PkCategory extends Base {
+      static {
+        this._tableName = "pk_categories";
+        this.attribute("name", "string");
+      }
+    }
+    class PkOwner extends Base {
+      static {
+        this._tableName = "pk_owners";
+        this.attribute("name", "string");
+        this.attribute("essay_id", "string");
+      }
+    }
+    class PkEssay extends Base {
+      static {
+        this._tableName = "pk_essays";
+        this.attribute("name", "string");
+        this.attribute("writer_id", "string");
+        this.attribute("writer_type", "string");
+        this.attribute("category_id", "string");
+        this.attribute("author_id", "string");
+      }
+    }
+    class PkAuthor extends Base {
+      static {
+        this._tableName = "pk_authors";
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("PkCategory", PkCategory);
+    registerModel("PkOwner", PkOwner);
+    registerModel("PkEssay", PkEssay);
+    registerModel("PkAuthor", PkAuthor);
+    Associations.belongsTo.call(PkEssay, "writer", { polymorphic: true, primaryKey: "name" });
+    Associations.belongsTo.call(PkEssay, "category", {
+      className: "PkCategory",
+      foreignKey: "category_id",
+      primaryKey: "name",
+    });
+    Associations.hasOne.call(PkEssay, "owner", {
+      className: "PkOwner",
+      foreignKey: "essay_id",
+      primaryKey: "name",
+    });
+    Associations.hasOne.call(PkAuthor, "essay", {
+      className: "PkEssay",
+      primaryKey: "name",
+      as: "writer",
+    });
+    Associations.hasOne.call(PkAuthor, "essayCategory", {
+      className: "PkCategory",
+      through: "essay",
+      source: "category",
+    });
+    Associations.hasOne.call(PkAuthor, "essayOwner", {
+      className: "PkOwner",
+      through: "essay",
+      source: "owner",
+    });
+    const general = await PkCategory.create({ name: "General" });
+    const david = await PkAuthor.create({ name: "David" });
+    await PkEssay.create({
+      name: "A Modest Proposal",
+      writer_id: "David",
+      writer_type: "PkAuthor",
+      category_id: "General",
+    });
+    const blackbeard = await PkOwner.create({ name: "blackbeard", essay_id: "A Modest Proposal" });
+
+    expect(((await david.association("essayCategory").loadTarget()) as any)?.name).toBe("General");
+    const authorsViaCategory = await PkAuthor.all()
+      .joins("essayCategory")
+      .where({ "pk_categories.id": general.id })
+      .toArray();
+    expect(authorsViaCategory[0]?.readAttribute("name")).toBe("David");
+
+    expect(((await david.association("essayOwner").loadTarget()) as any)?.name).toBe("blackbeard");
+    const authorsViaOwner = await PkAuthor.all()
+      .joins("essayOwner")
+      .where({ "pk_owners.name": "blackbeard" })
+      .toArray();
+    expect(authorsViaOwner[0]?.readAttribute("name")).toBe("David");
   });
 
-  it.skip("has one through with primary key option", () => {
-    // BLOCKED: fixture — Author / Essay / Category fixture models with custom primary_key option not defined
+  it("has one through with primary key option", async () => {
+    class PkCategory extends Base {
+      static {
+        this._tableName = "pk_categories";
+        this.attribute("name", "string");
+      }
+    }
+    class PkEssay extends Base {
+      static {
+        this._tableName = "pk_essays";
+        this.attribute("name", "string");
+        this.attribute("writer_id", "string");
+        this.attribute("writer_type", "string");
+        this.attribute("category_id", "string");
+        this.attribute("author_id", "string");
+      }
+    }
+    class PkAuthor extends Base {
+      static {
+        this._tableName = "pk_authors";
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("PkCategory", PkCategory);
+    registerModel("PkEssay", PkEssay);
+    registerModel("PkAuthor", PkAuthor);
+    Associations.belongsTo.call(PkEssay, "category", {
+      className: "PkCategory",
+      foreignKey: "category_id",
+      primaryKey: "name",
+    });
+    Associations.hasOne.call(PkAuthor, "essayTwo", {
+      className: "PkEssay",
+      primaryKey: "name",
+      foreignKey: "author_id",
+    });
+    Associations.hasOne.call(PkAuthor, "essayCategory2", {
+      className: "PkCategory",
+      through: "essayTwo",
+      source: "category",
+    });
+    const general = await PkCategory.create({ name: "General" });
+    const david = await PkAuthor.create({ name: "David" });
+    await PkEssay.create({ name: "Stay Home", author_id: "David", category_id: "General" });
+
+    expect(((await david.association("essayCategory2").loadTarget()) as any)?.name).toBe("General");
+    const authors = await PkAuthor.all()
+      .joins("essayCategory2")
+      .where({ "pk_categories.id": general.id })
+      .toArray();
+    expect(authors[0]?.readAttribute("name")).toBe("David");
   });
 
-  it.skip("has one through with default scope on join model", () => {
-    // BLOCKED: fixture — Author / Post / Comment fixture models not defined
-    // BLOCKED: associations — ThroughAssociation.targetScope chain merge (default_scope on join model) not implemented
+  it("has one through with default scope on join model", async () => {
+    class DsAuthor extends Base {
+      static {
+        this._tableName = "ds_authors";
+        this.attribute("name", "string");
+      }
+    }
+    class DsPost extends Base {
+      static {
+        this._tableName = "ds_posts";
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+      }
+    }
+    class DsComment extends Base {
+      static {
+        this._tableName = "ds_comments";
+        this.attribute("post_id", "integer");
+        this.attribute("body", "string");
+      }
+    }
+    registerModel("DsAuthor", DsAuthor);
+    registerModel("DsPost", DsPost);
+    registerModel("DsComment", DsComment);
+    Associations.hasMany.call(DsPost, "dsComments", {
+      className: "DsComment",
+      foreignKey: "post_id",
+    });
+    Associations.hasOne.call(DsAuthor, "firstPost", {
+      className: "DsPost",
+      foreignKey: "author_id",
+    });
+    Associations.hasOne.call(DsAuthor, "commentOnFirstPost", {
+      className: "DsComment",
+      through: "firstPost",
+      source: "dsComments",
+      scope: (rel: any) => rel.order("ds_posts.id DESC, ds_comments.id ASC"),
+    });
+    const david = await DsAuthor.create({ name: "David" });
+    const welcome = await DsPost.create({ author_id: david.id, title: "Welcome" });
+    const comment = await DsComment.create({ post_id: welcome.id, body: "Hello" });
+
+    const firstViaPost = await DsComment.all().where({ post_id: welcome.id }).order("id").first();
+    const commentOnFirstPost = await david.association("commentOnFirstPost").loadTarget();
+    expect((commentOnFirstPost as any)?.id).toBe(firstViaPost!.id);
+    expect((commentOnFirstPost as any)?.id).toBe(comment.id);
   });
 
   it("has one through many raises exception", () => {
@@ -1163,8 +1419,49 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(memberships[0].readAttribute("club_id")).toBe(club.id);
   });
 
-  it.skip("has one through with custom select on join model default scope", () => {
-    // BLOCKED: associations — default_scope with custom SELECT on join model not wired into through scope chain
+  it("has one through with custom select on join model default scope", async () => {
+    class CssClub extends Base {
+      static {
+        this._tableName = "css_clubs";
+        this.attribute("name", "string");
+      }
+    }
+    class CssMembership extends Base {
+      static {
+        this._tableName = "css_memberships";
+        this.attribute("member_id", "integer");
+        this.attribute("club_id", "integer");
+        this.defaultScope((rel: any) => rel.select("'1' as foo, css_memberships.*"));
+      }
+    }
+    class CssMember extends Base {
+      static {
+        this._tableName = "css_members";
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("CssClub", CssClub);
+    registerModel("CssMembership", CssMembership);
+    registerModel("CssMember", CssMember);
+    Associations.belongsTo.call(CssMembership, "club", {
+      className: "CssClub",
+      foreignKey: "club_id",
+    });
+    Associations.hasOne.call(CssMember, "selectedMembership", {
+      className: "CssMembership",
+      foreignKey: "member_id",
+    });
+    Associations.hasOne.call(CssMember, "selectedClub", {
+      className: "CssClub",
+      through: "selectedMembership",
+      source: "club",
+    });
+    const boringClub = await CssClub.create({ name: "Boring Club" });
+    const groucho = await CssMember.create({ name: "Groucho" });
+    await CssMembership.create({ member_id: groucho.id, club_id: boringClub.id });
+
+    const selectedClub = await groucho.association("selectedClub").loadTarget();
+    expect((selectedClub as any)?.name).toBe("Boring Club");
   });
 
   it("has one through relationship cannot have a counter cache", () => {
@@ -1179,9 +1476,79 @@ describe("HasOneThroughAssociationsTest", () => {
     }).toThrow(/counter_cache/);
   });
 
-  it.skip("has one through do not cache association reader if the though method has default scopes", () => {
-    // BLOCKED: associations — scope-based association-scope cache invalidation not implemented
-    // BLOCKED: associations — default_scope with custom SELECT on join model not wired into through scope chain
+  it("has one through do not cache association reader if the though method has default scopes", async () => {
+    class CcCustomer extends Base {
+      static {
+        this._tableName = "cc_customers";
+      }
+    }
+    class CcCarrier extends Base {
+      static {
+        this._tableName = "cc_carriers";
+      }
+    }
+    class CcCustomerCarrier extends Base {
+      static currentCustomer: any = null;
+      static {
+        this._tableName = "cc_customer_carriers";
+        this.attribute("customer_id", "integer");
+        this.attribute("carrier_id", "integer");
+        this.defaultScope((rel: any) => {
+          const cur = (CcCustomerCarrier as any).currentCustomer;
+          return cur ? rel.where({ customer_id: cur.id }) : rel;
+        });
+      }
+    }
+    class CcShopAccount extends Base {
+      static {
+        this._tableName = "cc_shop_accounts";
+        this.attribute("customer_carrier_id", "integer");
+      }
+    }
+    registerModel("CcCustomer", CcCustomer);
+    registerModel("CcCarrier", CcCarrier);
+    registerModel("CcCustomerCarrier", CcCustomerCarrier);
+    registerModel("CcShopAccount", CcShopAccount);
+    Associations.belongsTo.call(CcCustomerCarrier, "carrier", {
+      className: "CcCarrier",
+      foreignKey: "carrier_id",
+    });
+    Associations.belongsTo.call(CcShopAccount, "customerCarrier", {
+      className: "CcCustomerCarrier",
+      foreignKey: "customer_carrier_id",
+    });
+    Associations.hasOne.call(CcShopAccount, "carrier", {
+      className: "CcCarrier",
+      through: "customerCarrier",
+      source: "carrier",
+    });
+    const customer = await CcCustomer.create({});
+    const carrier = await CcCarrier.create({});
+    const customerCarrier = await CcCustomerCarrier.create({
+      customer_id: customer.id,
+      carrier_id: carrier.id,
+    });
+    const account = await CcShopAccount.create({ customer_carrier_id: customerCarrier.id });
+    try {
+      CcCustomerCarrier.currentCustomer = customer;
+      const accountCarrier = await account.association("carrier").loadTarget();
+      expect((accountCarrier as any)?.id).toBe(carrier.id);
+
+      CcCustomerCarrier.currentCustomer = null;
+      const otherCarrier = await CcCarrier.create({});
+      const otherCustomer = await CcCustomer.create({});
+      const otherCustomerCarrier = await CcCustomerCarrier.create({
+        customer_id: otherCustomer.id,
+        carrier_id: otherCarrier.id,
+      });
+      const otherAccount = await CcShopAccount.create({
+        customer_carrier_id: otherCustomerCarrier.id,
+      });
+      const otherAccountCarrier = await otherAccount.association("carrier").loadTarget();
+      expect((otherAccountCarrier as any)?.id).toBe(otherCarrier.id);
+    } finally {
+      CcCustomerCarrier.currentCustomer = null;
+    }
   });
 
   it("loading cpk association with unpersisted owner", async () => {
