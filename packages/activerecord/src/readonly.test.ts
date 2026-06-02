@@ -8,6 +8,9 @@ import { ReadonlyAttributeError } from "./readonly-attributes.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Item } from "./test-helpers/models/item.js";
 
 const TEST_SCHEMA = {
   posts: { title: "string" },
@@ -244,18 +247,11 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
+  // Canonical `items` fixtures (Rails' Item model + items.yml `dvd` row), shared
+  // across handler-suite files so no sibling can define a conflicting `items`
+  // shape in the worker's DB.
+  useHandlerFixtures(["items"], { schema: canonicalSchema });
   it("marks loaded records as readonly", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-    await Item.create({ name: "Widget" });
     const items = await Item.all().readonly().toArray();
     expect(items[0].isReadonly()).toBe(true);
     await expect(items[0].save()).rejects.toThrow(ReadOnlyRecord);

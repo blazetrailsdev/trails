@@ -7,6 +7,9 @@ import { Base, RecordNotFound, RecordInvalid, ReadOnlyRecord, UnknownPrimaryKey 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Item } from "./test-helpers/models/item.js";
 
 // -- Helpers --
 describe("ErrorsTest", () => {
@@ -28,21 +31,17 @@ describe("ErrorsTest", () => {
 });
 
 describe("error classes", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
+  // Canonical `items` fixtures (shared Item model + items.yml) so this
+  // handler-suite file can't define a conflicting `items` shape in the worker DB.
+  useHandlerFixtures(["items"], { schema: canonicalSchema });
   beforeAll(async () => {
     await defineSchema({
-      items: {},
       widgets: { name: "string" },
       things: { name: "string" },
       empties: {},
     });
   });
   it("find throws RecordNotFound with metadata", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
     try {
       await Item.find(999);
       expect.unreachable("should throw");
