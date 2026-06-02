@@ -257,9 +257,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("via to sql with complicating connection", async () => {
-      // Rails opens another connection that turns off standard_conforming_strings
-      // and escape_string_warning, then re-runs via_to_sql to prove our bytea
-      // quoting (hex \x format) is unaffected by another session's string settings.
+      // Rails sets these flags on a SEPARATE thread-leased connection, never on
+      // the @connection that builds/runs the query — PG's escape_bytea reads the
+      // *query* connection's standard_conforming_strings, so the off-settings are
+      // deliberately isolated from the connection under test. We mirror that: the
+      // flags go on a throwaway connection that is closed before runViaToSql, so
+      // the main `adapter` connection's quoting is what's exercised. Do NOT "fix"
+      // this by SET-ing the main connection — that would test a scenario Rails
+      // specifically avoids. The guard proves our hex `\x` bytea literals are
+      // immune to another session's string settings either way.
       const other = new pg.Client({ connectionString: PG_TEST_URL });
       await other.connect();
       try {
