@@ -19,26 +19,6 @@ import { LegacyThing } from "./test-helpers/models/legacy-thing.js";
 import { Reference } from "./test-helpers/models/reference.js";
 import { Ship } from "./test-helpers/models/ship.js";
 
-// New-record optimistic-lock tests (Rails' `Person.new` / `Person.create!`
-// path) insert a fresh row. They can't use the canonical `people` table on
-// MySQL/MariaDB: that table's `gender` is `VARCHAR(1)`, and inserting a row
-// with a null `gender` trips a pre-existing adapter bug that serializes a null
-// string column as the literal `'NULL'` (4 chars > limit 1). The bug is latent
-// on SQLite/Postgres and on unrestricted string columns (so the fixture-READ
-// tests, which never INSERT a fresh `people` row, are unaffected). Until the
-// adapter is fixed, these tests use a dedicated `lock_people` table holding only
-// the columns they exercise — behaviorally identical to Rails' Person for the
-// lock-version assertions. Follow-up: migrate to the shared `Person` once the
-// MySQL/MariaDB null-string INSERT bug (blazetrailsdev/trails#2783) is fixed.
-class LockNewPerson extends Base {
-  static {
-    this._tableName = "lock_people";
-    this.attribute("first_name", "string");
-    this.attribute("lock_version", "integer", { default: 0 });
-    this.attribute("updated_at", "datetime");
-  }
-}
-
 const TEST_SCHEMA = {
   people: { name: "string", first_name: "string", lock_version: "integer", updated_at: "datetime" },
   pets: { name: "string", person_id: "integer" },
@@ -92,10 +72,6 @@ describe("OptimisticLockingTest", () => {
         ships: canonicalSchema.ships,
         lock_without_defaults: canonicalSchema.lock_without_defaults,
         lock_without_defaults_cust: canonicalSchema.lock_without_defaults_cust,
-        // Stand-in for `people` used only by the new-record tests (see
-        // LockNewPerson) — avoids the canonical `gender VARCHAR(1)` null-INSERT
-        // bug on MySQL/MariaDB.
-        lock_people: { first_name: "string", lock_version: "integer", updated_at: "datetime" },
       },
       { dropExisting: true },
     );
@@ -193,11 +169,11 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock new", async () => {
-    const p1 = new LockNewPerson({ first_name: "anika" });
+    const p1 = new Person({ first_name: "anika" });
     expect(p1.lock_version).toBe(0);
     p1.first_name = "anika2";
     await p1.saveBang();
-    const p2 = await LockNewPerson.find(p1.id);
+    const p2 = await Person.find(p1.id);
     expect(p1.lock_version).toBe(0);
     expect(p2.lock_version).toBe(0);
     p1.first_name = "anika3";
@@ -209,11 +185,11 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock exception record", async () => {
-    const p1 = new LockNewPerson({ first_name: "mira" });
+    const p1 = new Person({ first_name: "mira" });
     expect(p1.lock_version).toBe(0);
     p1.first_name = "mira2";
     await p1.saveBang();
-    const p2 = await LockNewPerson.find(p1.id);
+    const p2 = await Person.find(p1.id);
     expect(p1.lock_version).toBe(0);
     expect(p2.lock_version).toBe(0);
     p1.first_name = "mira3";
@@ -231,13 +207,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock new when explicitly passing nil", async () => {
-    const p1 = new LockNewPerson({ first_name: "anika", lock_version: null });
+    const p1 = new Person({ first_name: "anika", lock_version: null });
     await p1.saveBang();
     expect(p1.lock_version).toBe(0);
   });
 
   it("lock new when explicitly passing value", async () => {
-    const p1 = new LockNewPerson({ first_name: "Douglas Adams", lock_version: 42 });
+    const p1 = new Person({ first_name: "Douglas Adams", lock_version: 42 });
     await p1.saveBang();
     expect(p1.lock_version).toBe(42);
   });
@@ -252,13 +228,9 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("touch stale object", async () => {
-    // Rails bumps the stale version via `update_attribute(:gender, "M")`; the
-    // `lock_people` stand-in has no `gender` column (see LockNewPerson), so we
-    // bump `first_name` instead — same single-attribute, validation-skipping
-    // path, same staleness effect.
-    const person = await LockNewPerson.create({ first_name: "Mehmet Emin" });
-    const stalePerson = await LockNewPerson.find(person.id);
-    await person.updateAttribute("first_name", "Updated");
+    const person = await Person.createBang({ first_name: "Mehmet Emin" });
+    const stalePerson = await Person.find(person.id);
+    await person.updateAttribute("gender", "M");
     await expect(stalePerson.touch()).rejects.toThrow(StaleObjectError);
     expect(Object.keys(stalePerson.savedChanges).length).toBe(0);
   });
@@ -295,13 +267,13 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock column is mass assignable", async () => {
-    const p1 = await LockNewPerson.create({ first_name: "bianca" });
+    const p1 = await Person.create({ first_name: "bianca" });
     expect(p1.lock_version).toBe(0);
-    expect(p1.lock_version).toBe(new LockNewPerson(p1.attributes).lock_version);
+    expect(p1.lock_version).toBe(new Person(p1.attributes).lock_version);
     p1.first_name = "bianca2";
     await p1.saveBang();
     expect(p1.lock_version).toBe(1);
-    expect(p1.lock_version).toBe(new LockNewPerson(p1.attributes).lock_version);
+    expect(p1.lock_version).toBe(new Person(p1.attributes).lock_version);
   });
 
   it("lock without default sets version to zero", async () => {
@@ -515,7 +487,7 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("update without attributes does not only update lock version", async () => {
-    const p1 = await LockNewPerson.create({ first_name: "anika" });
+    const p1 = await Person.createBang({ first_name: "anika" });
     const lockVersion = p1.lock_version;
     await p1.save();
     await p1.reload();

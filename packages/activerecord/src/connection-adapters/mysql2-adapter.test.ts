@@ -72,6 +72,7 @@ describeIfMysql("Mysql2Adapter", () => {
     "books",
     "authors",
     "users",
+    "members",
     "items",
     "accounts",
     "products",
@@ -320,6 +321,47 @@ describeIfMysql("Mysql2Adapter", () => {
       const found = await User.find(user.id);
       expect(found.email).toBeNull();
       expect(found.age).toBeNull();
+    });
+  });
+
+  // Regression for blazetrailsdev/trails#2783: a null value in a string-typed
+  // column must INSERT as the bare SQL keyword `NULL`, not the quoted literal
+  // `'NULL'`. The bug surfaced via the *introspected* default — MariaDB reports
+  // a nullable no-default column's default as the 4-char string "NULL"
+  // (information_schema), which (without the columns() coercion) became a new
+  // record's attribute default and then INSERTed as `'NULL'`. On a length-1
+  // column that 4-char string overflows (`ER_DATA_TOO_LONG`); on an unrestricted
+  // column it silently corrupts the row. The model below declares NO `gender`
+  // attribute, so its default is reflected from the live schema — exercising the
+  // full introspect → default → INSERT path that #2776 hit with `Person`.
+  describe("null string column INSERT (#2783)", () => {
+    class Member extends Base {
+      static {
+        this._tableName = "members";
+        this.attribute("name", "string");
+      }
+    }
+
+    beforeEach(async () => {
+      await adapter.exec(
+        "CREATE TABLE `members` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` VARCHAR(255), `gender` VARCHAR(1), `comments` VARCHAR(255))",
+      );
+      Member.adapter = adapter;
+      Member.resetColumnInformation();
+      await Member.loadSchema();
+    });
+
+    it("inserts a null string column as bare NULL, not the literal 'NULL'", async () => {
+      // `gender` (VARCHAR(1)) and `comments` are left unset, so they take their
+      // reflected null default. A regressed adapter would emit `'NULL'` and trip
+      // ER_DATA_TOO_LONG on `gender`.
+      const member = await Member.create({ name: "anika2" });
+      expect(member.id).toBeGreaterThan(0);
+
+      const row = await adapter.execQuery(
+        `SELECT gender, comments FROM members WHERE id = ${member.id}`,
+      );
+      expect(row.rows[0]).toEqual([null, null]);
     });
   });
 
