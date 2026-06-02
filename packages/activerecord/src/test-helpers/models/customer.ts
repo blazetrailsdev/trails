@@ -103,6 +103,7 @@ export class Customer extends Base {
         ["address_city", "city"],
         ["address_country", "country"],
       ],
+      allowNil: true,
     });
     composedOf(this, "addressHashMapping", {
       className: Address,
@@ -111,18 +112,22 @@ export class Customer extends Base {
         ["address_city", "city"],
         ["address_country", "country"],
       ],
+      allowNil: true,
     });
     composedOf(this, "balance", {
       className: Money,
       mapping: [["balance", "amount"]],
+      allowNil: false,
     });
     composedOf(this, "gpsLocation", {
       className: GpsLocation,
       mapping: [["gps_location", "gpsLocation"]],
+      allowNil: true,
     });
     composedOf(this, "nonBlankGpsLocation", {
       className: GpsLocation,
       mapping: [["gps_location", "gpsLocation"]],
+      allowNil: true,
       converter: (gps: unknown) => {
         Customer.gpsConversionWasRun = true;
         if (gps == null || gps === "") return null;
@@ -135,9 +140,10 @@ export class Customer extends Base {
       constructorFn: (name: unknown) => Fullname.parse(name),
       converter: (v: unknown) => Fullname.parse(v),
     });
+    // mapping uses "toString" so plain-object assignment falls back to Object.prototype.toString
     composedOf(this, "fullnameNoConverter", {
       className: Fullname,
-      mapping: [["name", "toS"]],
+      mapping: [["name", "toString"]],
     });
   }
 }

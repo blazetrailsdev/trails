@@ -35,6 +35,7 @@ interface ComposedOfOptions {
   mapping: [string, string][];
   constructorFn?: (...args: any[]) => any;
   converter?: (value: unknown) => unknown;
+  allowNil?: boolean;
 }
 
 /**
@@ -67,7 +68,14 @@ export function composedOf(
   );
 
   readerMethod(modelClass, name, options.mapping, options.className, options.constructorFn);
-  writerMethod(modelClass, name, options.mapping, options.className, options.converter);
+  writerMethod(
+    modelClass,
+    name,
+    options.mapping,
+    options.className,
+    options.converter,
+    options.allowNil,
+  );
 }
 
 /**
@@ -99,6 +107,30 @@ function readerMethod(
   });
 }
 
+function _decompose(
+  record: Base,
+  cache: Map<string, unknown>,
+  name: string,
+  mapping: [string, string][],
+  value: unknown,
+): void {
+  const result: Record<string, unknown> = {};
+  for (const [modelAttr, valueAttr] of mapping) {
+    const prop = (value as any)[valueAttr];
+    const resolved = typeof prop === "function" ? (prop as () => unknown).call(value) : prop;
+    if (resolved === undefined) {
+      throw new TypeError(
+        `Cannot decompose value: '${valueAttr}' is not a property of the assigned object`,
+      );
+    }
+    result[modelAttr] = resolved;
+  }
+  for (const [modelAttr] of mapping) record.writeAttribute(modelAttr, result[modelAttr]);
+  // Mirrors Rails: part.dup.freeze — copy first, then freeze the copy.
+  const proto = Object.getPrototypeOf(value as object) ?? Object.prototype;
+  cache.set(name, Object.freeze(Object.assign(Object.create(proto), value)));
+}
+
 /**
  * @internal
  * Mirrors: ActiveRecord::Aggregations::ClassMethods#writer_method
@@ -109,6 +141,7 @@ function writerMethod(
   mapping: [string, string][],
   klass: new (...args: any[]) => any,
   converter?: (value: unknown) => unknown,
+  allowNil?: boolean,
 ): void {
   const existing = Object.getOwnPropertyDescriptor(modelClass.prototype, name);
   Object.defineProperty(modelClass.prototype, name, {
@@ -116,9 +149,12 @@ function writerMethod(
     get: existing?.get,
     set(this: Base, value: unknown): void {
       const cache = getAggregationCache(this);
-      if (value === null || value === undefined) {
+      // allow_nil: true → clear all mapped columns when nil and store null in cache.
+      // allow_nil: false (default) → fall through so decomposition raises naturally
+      // (mirrors Rails: nil.send(:method) → NoMethodError).
+      if ((value === null || value === undefined) && allowNil === true) {
         for (const [modelAttr] of mapping) this.writeAttribute(modelAttr, null);
-        cache.delete(name);
+        cache.set(name, null);
         return;
       }
       if (value instanceof klass) {
@@ -130,11 +166,12 @@ function writerMethod(
         );
         return;
       }
-      if (converter) {
+      // Rails guard: converter is never called when part.nil? (aggregations.rb:265).
+      if (converter && value != null) {
         const converted = converter(value);
         if (converted == null) {
           for (const [modelAttr] of mapping) this.writeAttribute(modelAttr, null);
-          cache.delete(name);
+          cache.set(name, null);
         } else if (converted instanceof klass) {
           for (const [modelAttr, valueAttr] of mapping)
             this.writeAttribute(modelAttr, (converted as any)[valueAttr]);
@@ -144,8 +181,18 @@ function writerMethod(
               Object.assign(Object.create(Object.getPrototypeOf(converted)), converted),
             ),
           );
+        } else {
+          // Converter returned a non-null non-klass value: decompose via the mapped
+          // accessor, mirroring Rails which falls through unconditionally after conversion
+          // (aggregations.rb:279-281 — no second is_a?(klass) check).
+          _decompose(this, cache, name, mapping, converted);
         }
+        return;
       }
+      // Non-klass, no converter (or nil with allowNil:false): decompose by reading each
+      // mapped attribute. Mirrors Rails: part.send(value_attr) raises NoMethodError when
+      // the method doesn't exist; we throw if the property is absent.
+      _decompose(this, cache, name, mapping, value);
     },
     configurable: true,
   });
