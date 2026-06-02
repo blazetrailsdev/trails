@@ -70,16 +70,16 @@ line-numbered slots.
 ## Current state
 
 - **api:compare**: 100% — not a goal.
-- **test:compare** (cached, 2026-06-02): 6917/7856 passing-matched (**88%**),
-  ~932 skipped, 4 misplaced.
+- **test:compare** (cached, 2026-06-02 round 2): 6972/7856 passing-matched
+  (**88.7%**), 877 skipped, 4 misplaced (15 wrong-describe).
 
-### Live skip-annotation histogram (ground truth, 2026-06-02)
+### Live skip-annotation histogram (ground truth, 2026-06-02 round 2)
 
 ```
-associations 277 │ relation 178 │ adapter-pg 173 │ schema 112 │ connection-pool 69
-adapter-mysql 42 │ fixture 39 │ migration 27 │ transactions 18 │ type 14
+associations 265 │ adapter-pg 173 │ relation 170 │ schema 112 │ connection-pool 51
+adapter-mysql 35 │ fixture 38 │ migration 26 │ transactions 18 │ type 14
 unknown 8 │ query-cache 4 │ serialize 3 │ serialization 2 │ nested-attributes 2
-adapter-sqlite 2   (+~10 residual 1-off malformed tags: the/needs/STI/SQLite/…)
+adapter-sqlite 2   (+~12 residual 1-off malformed tags: the/needs/STI/SQLite/…)
 ```
 
 ## The dependency spine (why this order)
@@ -423,12 +423,32 @@ branch off updated `main`. (The 5th item — a defensive recursion guard — is 
 the poly-twice follow-up removed the self-recursion from
 `_throughChainHasNestedSource`.)
 
-### Story 7.4 follow-up — `conditions-on-join-table` `[blocked]`
+### Story 7.4 follow-up — `conditions-on-join-table` ✅ shipped (#2841)
 
-1 deferred eager test (`has-and-belongs-to-many-associations.test.ts`) still
-fails in multi-test context (`no such column: developers.lastName`) — a deeper
-`Developer` schema-cache reflection bug (`loadSchemaFromCacheSync` misses
-`developers`; `Project` works). Needs a framework fix, not fixtures.
+`conditions on join table with include and limit` (`eager.test.ts`) is
+un-skipped. The "deeper schema-cache reflection bug" worry was wrong — the
+`Developer.lastName` virtual + `developers` fixtures (#2830/#2831) were enough;
+wiring the test in a fixture-backed `describe("EagerAssociationTest")` with
+`defineSchema(…, { dropExisting: true })` got it green on SQLite + PG. The real
+gap it surfaced (collection eager-load + LIMIT must materialize parent IDs in a
+separate `SELECT DISTINCT pk … LIMIT n` query, not a nested `pk IN (… LIMIT n)`
+subquery — MariaDB rejects the latter) was also fixed, mirroring Rails
+`distinct_relation_for_primary_key`.
+
+**Sibling follow-ups (from #2841 finding, each its own story):**
+
+- **~40–80 LOC — `columns_for_distinct` not mirrored.** `_buildEagerIdSubquery`
+  (`relation.ts`) projects only the pk under `SELECT DISTINCT` and does not
+  append `order_values` to the SELECT list (Rails `columns_for_distinct`,
+  `schema_statements.rb:1429`). A limited collection eager-load that ORDERs on a
+  joined column thus emits an invalid `SELECT DISTINCT id … ORDER BY <unselected
+col>` on PG/MySQL. **Prerequisite** for un-skipping the sibling `order on join
+table with include and limit` (`eager_test.rb:1196`, orders by
+  `developers_projects.joined_on`), still skipped.
+- **~5 LOC — dead code.** `distinctRelationForPrimaryKey`
+  (`connection-adapters/abstract/schema-statements.ts:1340`) is ported but
+  uncalled; the live path is `relation.ts` `_buildEagerJoinManager` /
+  `_buildEagerIdSubquery`. Remove or wire.
 
 ### Association + relation campaigns (audit-gated)
 
@@ -437,25 +457,46 @@ All four infra deps (7.1/7.2/7.4-impl/7.5) are satisfied — every "Needs 7.x" r
 is dep-clear and ready to audit (subject to the §7.2 review-fix follow-up landing
 for `merge()`-bearing eager cases):
 
-| Campaign         | Ours                                                        | Rails                                                       | ~skips | Needs                          |
-| ---------------- | ----------------------------------------------------------- | ----------------------------------------------------------- | -----: | ------------------------------ |
-| eager            | `associations/eager.test.ts`                                | `associations/eager_test.rb`                                |     70 | 7.2 ✅, 7.4 ✅                 |
-| join-model       | `associations/join-model.test.ts`                           | `associations/join_model_test.rb`                           |     41 | 7.2 ✅; DidYouMean (B1972)     |
-| strict-loading   | `strict-loading.test.ts`                                    | `strict_loading_test.rb`                                    |     14 | batch 1 landed; rest dep-clear |
-| has-one          | `associations/has-one-associations.test.ts`                 | `associations/has_one_associations_test.rb`                 |     28 | fixture data folded in         |
-| relation-scoping | `scoping/relation-scoping.test.ts`                          | `scoping/relation_scoping_test.rb`                          |     28 | STI type-constraint (#1983)    |
-| inverse          | `associations/inverse-associations.test.ts`                 | `associations/inverse_associations_test.rb`                 |     23 | 7.5 ✅                         |
-| habtm            | `associations/has-and-belongs-to-many-associations.test.ts` | `associations/has_and_belongs_to_many_associations_test.rb` |     23 | 7.1 ✅                         |
-| where            | `relation/where.test.ts`                                    | `relation/where_test.rb`                                    |     23 | polymorphic fixtures           |
-| cascaded-eager   | `associations/cascaded-eager-loading.test.ts`               | `associations/cascaded_eager_loading_test.rb`               |     18 | 7.2 ✅                         |
-| has-one-through  | `associations/has-one-through-associations.test.ts`         | `associations/has_one_through_associations_test.rb`         |     16 | —                              |
-| where-chain      | `relation/where-chain.test.ts`                              | `relation/where_chain_test.rb`                              |     12 | join aliasing                  |
-| counter-cache    | `counter-cache.test.ts`                                     | `counter_cache_test.rb`                                     |      5 | Batch 134                      |
+| Campaign         | Ours                                                        | Rails                                                       | ~skips | Needs                           |
+| ---------------- | ----------------------------------------------------------- | ----------------------------------------------------------- | -----: | ------------------------------- |
+| eager            | `associations/eager.test.ts`                                | `associations/eager_test.rb`                                |     69 | 7.2 ✅, 7.4 ✅ (#2841)          |
+| join-model       | `associations/join-model.test.ts`                           | `associations/join_model_test.rb`                           |     41 | 7.2 ✅; DidYouMean (B1972)      |
+| strict-loading   | `strict-loading.test.ts`                                    | `strict_loading_test.rb`                                    |     14 | batch 1 landed; rest dep-clear  |
+| has-one          | `associations/has-one-associations.test.ts`                 | `associations/has_one_associations_test.rb`                 |     23 | batch 1 ✅ #2843; batch 2 ↓     |
+| relation-scoping | `scoping/relation-scoping.test.ts`                          | `scoping/relation_scoping_test.rb`                          |     28 | STI type-constraint (#1983)     |
+| inverse          | `associations/inverse-associations.test.ts`                 | `associations/inverse_associations_test.rb`                 |     23 | 7.5 ✅                          |
+| habtm            | `associations/has-and-belongs-to-many-associations.test.ts` | `associations/has_and_belongs_to_many_associations_test.rb` |     23 | 7.1 ✅                          |
+| where            | `relation/where.test.ts`                                    | `relation/where_test.rb`                                    |     23 | polymorphic fixtures            |
+| cascaded-eager   | `associations/cascaded-eager-loading.test.ts`               | `associations/cascaded_eager_loading_test.rb`               |     12 | batch 1 ✅ #2845; batches 2–5 ↓ |
+| has-one-through  | `associations/has-one-through-associations.test.ts`         | `associations/has_one_through_associations_test.rb`         |     16 | —                               |
+| where-chain      | `relation/where-chain.test.ts`                              | `relation/where_chain_test.rb`                              |     12 | join aliasing                   |
+| counter-cache    | `counter-cache.test.ts`                                     | `counter_cache_test.rb`                                     |      5 | Batch 134                       |
 
 Remaining strict-loading batches (eager-load preload-cascade, has-one/has-many
 no-raise, build/writer strict-bypass + loader-reordering, has-one-through
 autosave, fixtures) are dep-clear. The `callbacks` and `nested-through`
 campaigns are done (0 skips) — not listed.
+
+**Sized next batches (newly prioritized from #2843/#2845 audit findings):**
+
+- **has-one batch 2 (~150–250 LOC)** — the replace/creation-failure cluster (4
+  skips: `creation failure replaces existing` ×2, `replacement failure …` ×2).
+  Blocked on two pre-existing `has-one-association.ts` parity gaps: **(A)**
+  `removeTargetBang` default/nullify branch is incomplete vs Rails
+  `remove_target!` `else` (`has_one_association.rb:96-107`) — missing
+  `remove_inverse_instance` + `RecordNotSaved`-on-failed-save, and the no-`dependent`
+  case no-ops instead of nullifying the FK; **(B)** `replace`
+  (`:111-137`) never `load_target`s the existing record (Rails opens with
+  `return target unless load_target || record`), so a writer can't see which old
+  record to remove — auto-load likely needs the writer path made async (design
+  flag). Fix (B) first; it unblocks the batch.
+- **cascaded-eager batches 2–5** — Batch 2: STI three-level ping-pong +
+  multiple-stis-and-order (Firm/DependentFirm STI on companies, SpecialComment/
+  VerySpecialComment STI, ordering on JD aliases). Batch 3: Vertex recursive
+  four-levels (HMT + HABTM self-join). Batch 4 (largest): joins/eager_load +
+  references + count/distinct over eager joins. Batch 5: Person grafts + has_one
+  preload-constraint (after_initialize instrumentation). Reuse the
+  `dropExisting` canonical-fixture `describe` pattern.
 
 **Relation still-blocked (flag, schedule after infra):** `eager_load` toSql +
 STI + non-preload (3, assoc track A5); `missing`-with-enum (5, → Story 3.PG-enum

@@ -1,8 +1,8 @@
 # activerecord — shipping index
 
-Snapshot **2026-06-01**. The sequenced view of what's left to ship for
-`@blazetrails/activerecord`, plus the map of which doc owns what after the
-2026-06-01 consolidation (19 → 8 docs).
+Snapshot **2026-06-02** (cleanup round 2). The sequenced view of what's left to
+ship for `@blazetrails/activerecord`, plus the map of which doc owns what after
+the 2026-06-01 consolidation (19 → 10 docs).
 
 For the audit reports that produced the original sequencing, see
 `~/.btwhooks/data/github/blazetrailsdev/trails/audits/` (slugs `ar-completion`,
@@ -11,24 +11,25 @@ For the audit reports that produced the original sequencing, see
 ## Current state
 
 - **api:compare**: 4969/4969 (100%) — public surface closed.
-- **test:compare**: 6826/7867 (86.8%), 1034 skipped, 4 misplaced (2026-06-01, cached).
+- **test:compare**: 6972/7856 (88.7%), 877 skipped, 4 misplaced (2026-06-02, cached).
 - **Type-audit**: Waves 1–3 shipped; W1b + small follow-ups + W4 remain.
 - **Test infra**: pool epic **complete** (Phases A–F, 2026-05-28); fixtures
   port data-complete (`missing=0` across 146 YAMLs).
 
 ## Doc map (post-consolidation)
 
-| Doc                                                                      | Owns                                                                                                                                   |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `activerecord-index.md` (this)                                           | sequencing + doc map                                                                                                                   |
-| [`workplan.md`](workplan.md)                                             | prioritized, dependency-sensitive PR ordering (waves 0–7) for test:compare 100% + fidelity                                             |
-| [`activerecord-100-plan.md`](activerecord-100-plan.md)                   | test:compare drive — batch list (Part 1) + per-file backlog table (Part 2)                                                             |
-| [`activerecord-gaps.md`](activerecord-gaps.md)                           | residual gaps from the 5 merged gap plans (associations, relation, connection-pool, database-tasks, query-cache) — mostly blocked/done |
-| [`adapter-architecture-cleanup.md`](adapter-architecture-cleanup.md)     | adapter→connection collapse, global-Arel-visitor removal, hash-only constructor, `this.adapter` audit                                  |
-| [`activerecord-type-audit.md`](activerecord-type-audit.md)               | type cleanup (W1b, small follow-ups, W4)                                                                                               |
-| [`parity-verification.md`](parity-verification.md)                       | reference: schema + query parity pipelines                                                                                             |
-| [`fixtures-adoption-inventory.md`](fixtures-adoption-inventory.md)       | reference: script-generated fixture tiering                                                                                            |
-| [`trails-tsc-schema-ts-migration.md`](trails-tsc-schema-ts-migration.md) | plan: make `trails-tsc --schema` read `schema.ts`, then drop `trails-schema-dump` (4 sibling PRs)                                      |
+| Doc                                                                                      | Owns                                                                                                                                   |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `activerecord-index.md` (this)                                                           | sequencing + doc map                                                                                                                   |
+| [`workplan.md`](workplan.md)                                                             | prioritized, dependency-sensitive PR ordering (waves 0–7) for test:compare 100% + fidelity                                             |
+| [`activerecord-100-plan.md`](activerecord-100-plan.md)                                   | test:compare drive — batch list (Part 1) + per-file backlog table (Part 2)                                                             |
+| [`activerecord-gaps.md`](activerecord-gaps.md)                                           | residual gaps from the 5 merged gap plans (associations, relation, connection-pool, database-tasks, query-cache) — mostly blocked/done |
+| [`adapter-architecture-cleanup.md`](adapter-architecture-cleanup.md)                     | adapter→connection collapse, global-Arel-visitor removal, hash-only constructor, `this.adapter` audit                                  |
+| [`activerecord-type-audit.md`](activerecord-type-audit.md)                               | type cleanup (W1b, small follow-ups, W4)                                                                                               |
+| [`parity-verification.md`](parity-verification.md)                                       | reference: schema + query parity pipelines                                                                                             |
+| [`fixtures-adoption-inventory.md`](fixtures-adoption-inventory.md)                       | reference: script-generated fixture tiering                                                                                            |
+| [`trails-tsc-schema-ts-migration.md`](trails-tsc-schema-ts-migration.md)                 | plan: make `trails-tsc --schema` read `schema.ts`, then drop `trails-schema-dump` (4 sibling PRs)                                      |
+| [`trails-models-dump-schema-ts-migration.md`](trails-models-dump-schema-ts-migration.md) | plan: make `trails-models-dump` derive models from committed `db/schema.ts` instead of a live DB                                       |
 
 ## Focused work set (what's actually buildable)
 
