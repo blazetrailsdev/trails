@@ -148,6 +148,31 @@ describe("ConnectionHandlersMultiDbTest", () => {
     );
   });
 
+  it("switching connections with database hash uses passed role and database", () => {
+    const config = {
+      default_env: {
+        animals: { adapter: "sqlite3", database: ":memory:" },
+        primary: { adapter: "sqlite3", database: ":memory:" },
+      },
+    };
+    withBaseConfigs(
+      config,
+      () => {
+        Base.connectsTo({ database: { writing: "primary" } });
+        expect(currentRole.call(Base as any)).toBe("writing");
+        expect(Base.connectedToQ({ role: "writing" })).toBe(true);
+
+        const handler = Base.connectionHandler;
+        expect(Base.connectionHandler).toBe(handler);
+
+        const pool = handler.retrieveConnectionPool("Base");
+        expect(pool).not.toBeNull();
+        expect(pool!.dbConfig.configurationHash).toMatchObject(config.default_env.primary);
+      },
+      { defaultEnv: "default_env" },
+    );
+  });
+
   it("connects to with single configuration", () => {
     withBaseConfigs({ development: { adapter: "sqlite3", database: ":memory:" } }, () => {
       Base.connectsTo({ database: { writing: "development" } });

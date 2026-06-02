@@ -338,6 +338,11 @@ class TestExtractor
     name = ident_name(name_node)
     return unless name
     return unless name.start_with?("test_")
+    # Minitest invokes test methods with no arguments, so a `def test_*` that
+    # declares parameters is a private helper (e.g. `test_lock_free(lock_name)`,
+    # `test_copy_table(from = "customers")`), not a test. Skip it so it doesn't
+    # register as a phantom missing test.
+    return if def_has_params?(node[2])
 
     # Convert test_foo_bar to "foo bar"
     desc = name.sub(/^test_/, "").tr("_", " ")
@@ -355,6 +360,17 @@ class TestExtractor
       style: "def_test",
       assertions: assertions,
     }
+  end
+
+  # Ripper shapes a method's parameter list as the 3rd `:def` child: either a
+  # bare `[:params, ...]` (no parens) or `[:paren, [:params, ...]]`. A method
+  # with no parameters has every `:params` slot nil; any non-nil slot means it
+  # declares args.
+  def def_has_params?(params_node)
+    return false unless params_node.is_a?(Array)
+    inner = params_node[0] == :paren ? params_node[1] : params_node
+    return false unless inner.is_a?(Array) && inner[0] == :params
+    inner.drop(1).any? { |slot| !slot.nil? }
   end
 
   # ---- Assertion extraction ----

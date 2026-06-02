@@ -7679,6 +7679,12 @@ describe("PreloaderTest", () => {
       pm_authors: { name: "string" },
       pm_comments: { body: "string", pm_post_id: "integer" },
       pm_posts: { pm_author_id: "integer", title: "string" },
+      pp_author_favorites: { pp_author_id: "integer", pp_favorite_author_id: "integer" },
+      pp_authors: { name: "string" },
+      pp_comments: { body: "string", pp_post_id: "integer" },
+      pp_posts: { pp_author_id: "integer", title: "string" },
+      pp_taggings: { pp_tag_id: "integer", taggable_id: "integer", taggable_type: "string" },
+      pp_tags: { name: "string" },
       pr_authors: { name: "string" },
       pr_posts: { pr_author_id: "integer", title: "string" },
       ps_authors: { name: "string" },
@@ -8509,6 +8515,160 @@ describe("PreloaderTest", () => {
     // load, and the two slPosts loaders (mary's + bob's) coalesce into one
     // batched call.
     expect(spy).toHaveBeenCalledTimes(3);
+  });
+  it("preload can group multi level ping pong through", async () => {
+    // Rails' Author#similar_posts "ping pongs" back to posts:
+    //   Author → posts → taggings → tags  (has_many :tags, through: :posts)
+    //   Tag    → taggings → taggable(Post) (has_many :tagged_posts, source_type)
+    //   Author → tags → tagged_posts       (has_many :similar_posts)
+    // and favorite_authors loops the same chain a level down. We rebuild that
+    // graph with a `PP` prefix so the preloader has to coalesce the repeated
+    // posts/comments levels across both branches.
+    class PPAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class PPPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("pp_author_id", "integer");
+      }
+    }
+    class PPTagging extends Base {
+      static {
+        this.attribute("pp_tag_id", "integer");
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
+      }
+    }
+    class PPTag extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class PPComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("pp_post_id", "integer");
+      }
+    }
+    class PPAuthorFavorite extends Base {
+      static {
+        this.attribute("pp_author_id", "integer");
+        this.attribute("pp_favorite_author_id", "integer");
+      }
+    }
+    Associations.hasMany.call(PPAuthor, "ppPosts", {
+      className: "PPPost",
+      foreignKey: "pp_author_id",
+    });
+    Associations.hasMany.call(PPPost, "ppTaggings", {
+      className: "PPTagging",
+      as: "taggable",
+    });
+    Associations.belongsTo.call(PPTagging, "ppTag", {
+      className: "PPTag",
+      foreignKey: "pp_tag_id",
+    });
+    Associations.belongsTo.call(PPTagging, "taggable", { polymorphic: true });
+    Associations.hasMany.call(PPPost, "ppTags", {
+      className: "PPTag",
+      through: "ppTaggings",
+      source: "ppTag",
+    });
+    Associations.hasMany.call(PPPost, "ppComments", {
+      className: "PPComment",
+      foreignKey: "pp_post_id",
+    });
+    Associations.hasMany.call(PPAuthor, "ppTags", {
+      className: "PPTag",
+      through: "ppPosts",
+      source: "ppTags",
+    });
+    Associations.hasMany.call(PPTag, "ppTaggings", {
+      className: "PPTagging",
+      foreignKey: "pp_tag_id",
+    });
+    Associations.hasMany.call(PPTag, "ppTaggedPosts", {
+      className: "PPPost",
+      through: "ppTaggings",
+      source: "taggable",
+      sourceType: "PPPost",
+    });
+    Associations.hasMany.call(PPAuthor, "ppSimilarPosts", {
+      className: "PPPost",
+      through: "ppTags",
+      source: "ppTaggedPosts",
+      scope: (rel: any) => rel.distinct(),
+    });
+    Associations.hasMany.call(PPAuthor, "ppAuthorFavorites", {
+      className: "PPAuthorFavorite",
+      foreignKey: "pp_author_id",
+    });
+    Associations.belongsTo.call(PPAuthorFavorite, "ppFavoriteAuthor", {
+      className: "PPAuthor",
+      foreignKey: "pp_favorite_author_id",
+    });
+    Associations.hasMany.call(PPAuthor, "ppFavoriteAuthors", {
+      className: "PPAuthor",
+      through: "ppAuthorFavorites",
+      source: "ppFavoriteAuthor",
+    });
+    registerModel("PPAuthor", PPAuthor);
+    registerModel("PPPost", PPPost);
+    registerModel("PPTagging", PPTagging);
+    registerModel("PPTag", PPTag);
+    registerModel("PPComment", PPComment);
+    registerModel("PPAuthorFavorite", PPAuthorFavorite);
+
+    const mary = await PPAuthor.create({ name: "Mary" });
+    const bob = await PPAuthor.create({ name: "Bob" });
+    await PPAuthorFavorite.create({ pp_author_id: mary.id, pp_favorite_author_id: bob.id });
+    const maryPost = await PPPost.create({ title: "M1", pp_author_id: mary.id });
+    const bobPost = await PPPost.create({ title: "B1", pp_author_id: bob.id });
+    const tag = await PPTag.create({ name: "ruby" });
+    await PPTagging.create({
+      pp_tag_id: tag.id,
+      taggable_id: maryPost.id,
+      taggable_type: "PPPost",
+    });
+    await PPTagging.create({ pp_tag_id: tag.id, taggable_id: bobPost.id, taggable_type: "PPPost" });
+    await PPComment.create({ body: "on mary post", pp_post_id: maryPost.id });
+    await PPComment.create({ body: "on bob post", pp_post_id: bobPost.id });
+
+    const associations = [
+      { ppSimilarPosts: "ppComments" },
+      { ppFavoriteAuthors: { ppSimilarPosts: "ppComments" } },
+    ];
+
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
+    await new Preloader({ records: [mary], associations }).call();
+    // Both branches walk the same posts→taggings→tags→tagged_posts→comments
+    // levels, so the preloader coalesces them into 8 batched loads rather than
+    // re-querying each branch independently. (Rails counts 9 SQL queries for
+    // its richer fixture graph, then 8 once automatic scope inversing lets the
+    // tag/tagging step reuse its inverse — trails' preloader already coalesces
+    // to that floor.)
+    const preloadCalls = spy.mock.calls.length;
+    expect(preloadCalls).toBe(8);
+
+    // assert_no_queries: every level is now preloaded, so re-walking the whole
+    // ping-pong chain reads from the cache without issuing further loads.
+    const marySimilar = (mary as any)._preloadedAssociations.get("ppSimilarPosts");
+    expect(marySimilar.map((p: any) => p.id).sort()).toEqual([maryPost.id, bobPost.id].sort());
+    for (const post of marySimilar) {
+      expect(post._preloadedAssociations.get("ppComments").length).toBe(1);
+    }
+    const maryFavs = (mary as any)._preloadedAssociations.get("ppFavoriteAuthors");
+    expect(maryFavs.map((a: any) => a.id)).toEqual([bob.id]);
+    const bobSimilar = (maryFavs[0] as any)._preloadedAssociations.get("ppSimilarPosts");
+    expect(bobSimilar.map((p: any) => p.id).sort()).toEqual([maryPost.id, bobPost.id].sort());
+    for (const post of bobSimilar) {
+      expect(post._preloadedAssociations.get("ppComments").length).toBe(1);
+    }
+    // Walking the cached graph above triggered no new batched loads.
+    expect(spy.mock.calls.length).toBe(preloadCalls);
   });
   it("preload does not group same class different scope", async () => {
     class DCAuthor extends Base {
