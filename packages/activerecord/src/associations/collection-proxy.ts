@@ -2292,15 +2292,20 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Set the collection to exactly the records identified by ids.
+   * Set the collection to exactly the records identified by ids, e.g.
+   * `order.book_ids = [...]`.
    *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#ids=
+   * Delegates to `CollectionAssociation#idsWriter` — the same method the
+   * generated `<name>_ids=` writer calls — so there is one Rails-faithful
+   * `ids_writer` and tests exercise the real writer path. Mirrors Rails'
+   * `CollectionProxy`, which forwards `ids_writer` to its `@association`.
    */
-  async setIds(ids: (number | string)[]): Promise<void> {
-    const targetModel = this.model as typeof Base;
-    const cleanIds = ids.filter((id) => id !== null && id !== undefined && id !== "");
-    const records = (await Promise.all(cleanIds.map((id) => targetModel.find(Number(id))))) as T[];
-    await this.replace(records);
+  async setIds(ids: (number | string | (number | string)[])[]): Promise<void> {
+    await (
+      this._record.association(this._assocName) as unknown as {
+        idsWriter(ids: unknown[]): Promise<void>;
+      }
+    ).idsWriter(ids);
   }
 
   async pluck(

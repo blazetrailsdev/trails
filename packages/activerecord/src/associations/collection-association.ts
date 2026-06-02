@@ -6,6 +6,7 @@ import { foreignKeyPresentFor } from "./foreign-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
 import type { AssociationReflection } from "../reflection.js";
 import { RecordNotSaved, Rollback } from "../errors.js";
+import { raiseNotFoundAll } from "../relation/finder-methods.js";
 
 /**
  * Base class for has_many and has_and_belongs_to_many associations.
@@ -58,32 +59,61 @@ export class CollectionAssociation extends Association {
   }
 
   /**
-   * Implements the ids writer, e.g. foo.item_ids=.
-   * Loads records by the given IDs and replaces the collection.
+   * Implements the ids writer, e.g. `foo.item_ids=`.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionAssociation#ids_writer
+   * (collection_association.rb). Resolves the child records by their
+   * `association_primary_key` (for a plain has_many this is the target
+   * model's primary key), mapping each id back to its record so the
+   * `values_at(*ids)` order + duplicate semantics are preserved, raises
+   * `RecordNotFound` when not every id resolves, then `replace`s.
    */
   async idsWriter(ids: unknown[]): Promise<void> {
     const Klass = this.klass as any;
     const pk = Klass.primaryKey ?? "id";
     const filteredIds = (Array.isArray(ids) ? ids : [ids]).filter((id) => id != null && id !== "");
 
+    let records: Base[];
     if (filteredIds.length === 0) {
-      this.replace([]);
+      records = [];
     } else if (Array.isArray(pk)) {
+      // Composite-PK child: resolve each tuple id via a per-column lookup
+      // (`klass.where(primary_key => ids)` over an array of tuples). Per-id
+      // resolution keeps the original order and duplicates, matching Rails'
+      // `index_by … values_at(*ids)`.
       const found = await Promise.all(
-        filteredIds.map(async (id) => {
+        filteredIds.map((id) => {
           const conditions: Record<string, unknown> = {};
           const idParts = Array.isArray(id) ? id : [id];
           pk.forEach((col: string, i: number) => {
             conditions[col] = idParts[i];
           });
-          return Klass.findBy(conditions);
+          return Klass.findBy(conditions) as Promise<Base | null>;
         }),
       );
-      this.replace(found.filter((r): r is Base => r != null));
-    } else if (typeof Klass.where === "function") {
-      const records: Base[] = await Klass.where({ [pk]: filteredIds }).toArray();
-      this.replace(records);
+      records = found.filter((r): r is Base => r != null);
+    } else {
+      // Simple PK: one query, then index_by PK and map each id back to its
+      // record (Rails' `where(pk => ids).index_by { … }.values_at(*ids)`).
+      const rows: Base[] = await Klass.where({ [pk]: filteredIds }).toArray();
+      const byKey = new Map<string, Base>(
+        rows.map((r) => [String((r as any)._readAttribute(pk)), r]),
+      );
+      records = filteredIds.map((id) => byKey.get(String(id))).filter((r): r is Base => r != null);
     }
+
+    // Rails: `if records.size != ids.size … raise_record_not_found_exception!`.
+    // Reuse the shared "Couldn't find all" builder (also used by performFind)
+    // so there is a single not-found message source.
+    if (records.length !== filteredIds.length) {
+      raiseNotFoundAll(Klass.name, pk, {
+        ids: filteredIds,
+        wantArray: true,
+        tuples: Array.isArray(pk) ? (filteredIds as unknown[][]) : null,
+      });
+    }
+
+    this.replace(records);
     await this.persistReplace();
   }
 
