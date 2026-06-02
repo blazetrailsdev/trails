@@ -1,17 +1,15 @@
 # activerecord — prioritized work plan (test:compare 100% + Rails fidelity)
 
-> **Snapshot 2026-06-02 (forward-looking only).** This doc now lists **only
-> unfinished work**. Completed waves/stories are collapsed to one-line
-> "✅ complete" markers (with their PRs) so the spawn-loop knows not to re-pick
-> them; the per-story bodies for shipped work have been removed. Each remaining
-> story carries our source anchors (`file:line`), the Rails source reference,
-> the tests it moves, an LOC estimate, dependencies, and an acceptance line.
+> **Snapshot 2026-06-02 (open work only).** This doc lists **only unfinished
+> work** — shipped stories and completed waves have been removed entirely (not
+> tombstoned), so the spawn-loop only ever sees pickable items. Each story
+> carries our source anchors (`file:line`), the Rails source reference, the
+> tests it moves, an LOC estimate, dependencies, and an acceptance line.
 >
-> **Of the four architectural blockers** (canonical list in §"The dependency
-> spine"), **three of four are satisfied on `main`** — #1 ConnectionHandler,
-> #2 AliasTracker / join-table aliasing, #4 global Arel-visitor removal
-> (Phase A). **#3, the `type_for_attribute` cast refactor (Story 3.PG-enum), is
-> still open and still gating.**
+> **One architectural blocker is still open and gating:** #3, the
+> `type_for_attribute` cast refactor (Story 3.PG-enum). The other three
+> (ConnectionHandler, AliasTracker / join-table aliasing, global Arel-visitor
+> removal) are satisfied on `main`.
 >
 > **Anchor verification status:** Waves 0–3 `file:line` anchors were verified
 > against the tree on 2026-06-01. Waves 4–7 anchors are doc-sourced — line
@@ -74,10 +72,6 @@ line-numbered slots.
 - **api:compare**: 100% — not a goal.
 - **test:compare** (cached, 2026-06-02): 6917/7856 passing-matched (**88%**),
   ~932 skipped, 4 misplaced.
-- **Open work:** Wave 1 Phase B/C tail, the Wave-3 schema-dumper subtrack (Epic
-  3.3-U2/U3) + 3.PG-enum (BLOCKER #3, still gating) + the residual PG/MySQL/
-  generic-adapter skips, the Wave-4 pool-campaign remainder, Wave-5 transaction
-  follow-ups, and the Wave-7 association/relation campaigns.
 
 ### Live skip-annotation histogram (ground truth, 2026-06-02)
 
@@ -94,16 +88,9 @@ Rule (from the 100-plan): **isolated → integrated**. `associations`/`relation`
 touch everything, so closing them early means re-opening them every time a
 lower-tier fix lands. The two biggest buckets (≈44% of all skips) come **last**.
 
-Four hard architectural blockers gate the most downstream work. **Three of four
-are satisfied on `main`:**
-
-1. ✅ **ConnectionHandler P9 port** (Story 4.1, no-op — already on `main`).
-2. ✅ **AliasTracker / join-table aliasing** (Story 7.2, #2808). 1
-   cross-arg-collision skip remains; see the §7.2 review-fix follow-up.
-3. **`type_for_attribute` cast refactor** (>300 LOC) → gates enum write-casting
-   - several relation/type tests. _Lead PR: Story 3.PG-enum — still open._
-4. ✅ **Global Arel visitor removal** — Phase A (#2768/#2769/#2774/#2810) +
-   Phase B (Story 1.5, #2834). Phase C (1.6) still open but dep-clear.
+The one architectural blocker still gating downstream work is **#3, the
+`type_for_attribute` cast refactor** (>300 LOC) → gates enum write-casting +
+several relation/type tests. _Lead PR: Story 3.PG-enum._
 
 **Externally blocked — do NOT schedule:**
 
@@ -114,34 +101,31 @@ are satisfied on `main`:**
 - `accepts_nested_attributes_for` (`associations/nested-error.test.ts`, 4) — Phase G.
 
 Permanent skips (`load_async`, GVL, Marshal/YAML, rake/dbconsole) are
-**reclassified, not implemented** — Story 0.1.
+**reclassified, not implemented**.
 
 ---
 
-## Wave 0 — Free denominator + tracking hygiene ✅ complete (#2777, #2778)
+## Wave 0 — tracking hygiene
 
-**Open follow-up (from #2779 finding):** the `resolver.test.ts` "url missing
-scheme" divergence is a documented JS-vs-Ruby behavior gap (trails has no
-symbols; scheme-less string → env lookup → `AdapterNotSpecified`, pinned by
+**Follow-up (from #2779 finding):** the `resolver.test.ts` "url missing scheme"
+divergence is a documented JS-vs-Ruby behavior gap (trails has no symbols;
+scheme-less string → env lookup → `AdapterNotSpecified`, pinned by
 `connection-handling.test.ts`). Move it from a live `it.skip` into
 `unported-files.ts` as a documented divergence (~5 LOC) so it stops counting as
 a live skip.
 
 ---
 
-## Wave 1 — Fidelity foundation: global Arel visitor removal
+## Wave 1 — global Arel visitor removal (tail)
 
-Phase A (Stories 1.1–1.4) ✅ complete (#2768, #2769, #2774, #2810); Phase B
-(Story 1.5) ✅ complete (#2834). Remaining:
-
-### Story 1.6 — Phase C: delete the `syncHandlerVisitor` test dance `[tests-only]` ~per-grep · dep: 1.5 ✅ (deps satisfied)
+### Story 1.6 — Phase C: delete the `syncHandlerVisitor` test dance `[tests-only]` ~per-grep · dep-clear
 
 - Ours: ~635 `syncHandlerVisitor`/`setupHandlerSuite` sites
   (`grep -rn "syncHandlerVisitor\|setupHandlerSuite" packages/activerecord/src`).
   With the global no longer dialect-synced these `beforeEach` calls are dead.
 - Done: grep returns zero; full AR suite green in CI.
 
-**Open follow-up bullets:**
+**Follow-up bullets:**
 
 - (from #2768) latent ~250+ LOC: a genuine `SchemaCreation` port so the adapter
   owns the DDL visitor (Rails `schema_creation.accept(td)`), instead of
@@ -163,14 +147,15 @@ overloads (`relation.ts:~822,941` `as any`).
 
 ---
 
-## Wave 2 — Tier 1 isolated un-skips ✅ complete (#2779, #2784, #2785, #2796)
+## Wave 2 — Tier 1 follow-ups
 
-All four stories landed. Open follow-ups (each its own story):
+The four Wave-2 stories landed; these residual follow-ups remain (each its own
+story):
 
-- **2.1 — async-isolation (separate impl story):** `database-selector.test.ts`
-  "preventing writes works in a threaded environment". `connectedToStack` is a
-  mutable array shallow-copied by `IsolatedExecutionState.scope`, so concurrent
-  async tasks bleed `preventWrites`. Needs per-scope array instances (Ruby uses
+- **2.1 — async-isolation:** `database-selector.test.ts` "preventing writes
+  works in a threaded environment". `connectedToStack` is a mutable array
+  shallow-copied by `IsolatedExecutionState.scope`, so concurrent async tasks
+  bleed `preventWrites`. Needs per-scope array instances (Ruby uses
   thread-local).
 - **2.2 — "view-a" PR (~200 LOC, feasible now):** `createView`/`dropView` not
   yet in `connection-adapters/abstract/schema-statements.ts` (`views()` +
@@ -187,7 +172,7 @@ All four stories landed. Open follow-ups (each its own story):
 - **2.3 — deviation (own story if `valid?` fidelity matters):** trails `valid?`
   does NOT run uniqueness synchronously (registered into `_asyncValidations`,
   run on save) — JS can't block on the async DB query.
-- **2.4 — now unblocked by the shipped `InTimeZone` helper:**
+- **2.4 — TZ-aware un-skips (now unblocked by the shipped `InTimeZone` helper):**
   `date-time-precision.test.ts:139` "formatting datetime … when time zone
   aware"; `adapters/postgresql/infinity.test.ts:117` "assigning 'infinity' on a
   datetime column with TZ aware attributes".
@@ -202,18 +187,16 @@ fields with nan`) — `DecimalType` has no NaN representation; BigDecimal-NaN
 
 ## Wave 3 — Tier 2 adapter + schema (largest isolated yield)
 
-Shipped: 3.1 (#2794), 3.2 (no-op), 3.3-U1 (#2826), 3.4 helper port (#2832), the
-PG type families (serial/array/uuid/money/bytea/timestamp/hstore +
-network/range/interval/oid no-ops), 3.MY prevent-writes/bind-parameter/boolean/
-case-sensitivity (#2823/#2815/#2820/#2819), and 3.misc batch (#2824). Remaining:
+The PG/MySQL type families, 3.1, 3.2, 3.3-U1, the 3.4 helper port, and the
+3.misc first batch have landed. Remaining:
 
 ### Epic 3.3-U — schema-dumper representation unification `[architectural, multi-PR]`
 
 Route live dumps through the Rails-shaped `columnSpec` hook so per-adapter
-`prepareColumnOptions` overrides take effect. U1 shipped (#2826). Remaining:
+`prepareColumnOptions` overrides take effect (U1 landed). Remaining:
 
 - **Story 3.3-U2 — AdapterSchemaSource resolves dsl-type + raw sqlType**
-  `[impl]` ~90 LOC · dep: U1 ✅. `AdapterSchemaSource.columns()` currently maps
+  `[impl]` ~90 LOC · dep-clear. `AdapterSchemaSource.columns()` currently maps
   `col.sqlType || col.type` into `ColumnInfo.type`, collapsing dsl-type and raw
   sql-type. Carry the dsl cast type in `type` and the raw SQL type in a new
   `sqlType` field so `schemaType`/`schemaLimit`/`schemaPrecision` work on live
@@ -235,15 +218,17 @@ Route live dumps through the Rails-shaped `columnSpec` hook so per-adapter
 
 ### Story 3.4 — charset-collation dump (remaining) `[un-skip]` · dep: 3.3-U3
 
-- Helper port shipped (#2832). The staged `it.skip("schema dump includes
-collation")` in `adapters/abstract-mysql-adapter/charset-collation.test.ts`
-  un-skips once U3 lands; re-derive its PROVISIONAL regexes against real U3
-  output. Also un-skip `mysql-enum.test.ts:43` `it.skip("schema dumping")` (same
-  wiring). Verify on a MySQL/MariaDB whose db-default collation ≠ `utf8mb4_bin`.
+- The staged `it.skip("schema dump includes collation")` in
+  `adapters/abstract-mysql-adapter/charset-collation.test.ts` un-skips once U3
+  lands; re-derive its PROVISIONAL regexes against real U3 output. Also un-skip
+  `mysql-enum.test.ts:43` `it.skip("schema dumping")` (same wiring). Verify on a
+  MySQL/MariaDB whose db-default collation ≠ `utf8mb4_bin` (local 13306 is
+  `utf8mb4_bin`, which would suppress the `id` collation; CI's fresh `mariadb:11`
+  differs).
 
 ### Story 3.PG-\* — PostgreSQL type-family residuals · dep: 3.3-U3 for dump-bearing ones
 
-Families shipped; per-family **residual** skips:
+Per-family **residual** skips:
 
 | Family          | Residual skips                                                                                              |
 | --------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -302,7 +287,7 @@ charset" is a pre-existing failure under MariaDB 11.8.
 
 ### Story 3.misc — generic adapter + comment (remaining) `[un-skip]` · dep: 3.3-U3 for comment
 
-~53 skips remain in `adapter.test.ts` (batch #2824 un-skipped 4), clustered:
+~53 skips remain in `adapter.test.ts`, clustered:
 
 - **comment.test.ts (17)** — `CommentTest` gated on `supports_comments?` (false
   on SQLite); needs live PG/MySQL **plus 3.3-U3's columnSpec/dumper hook** for
@@ -317,12 +302,9 @@ charset" is a pre-existing failure under MariaDB 11.8.
 
 ---
 
-## Wave 4 — connection-pool / multi-db
+## Wave 4 — connection-pool / multi-db (pool campaign remainder)
 
-Shipped: 4.1 (no-op, BLOCKER #1), 4.2 second named pool (#2839), 4.3 batch 1 —
-multi-pool-config cluster (#2837). Remaining:
-
-### Story 4.3 — pool/handler file campaign (remaining batches) `[un-skip]` ~250 LOC × N · dep: 4.1 ✅
+### Story 4.3 — pool/handler file campaign (remaining batches) `[un-skip]` ~250 LOC × N · dep-clear
 
 Remaining skipped clusters, by size (from #2837 finding):
 
@@ -341,10 +323,10 @@ Remaining skipped clusters, by size (from #2837 finding):
 
 ---
 
-## Wave 5 — Tier 3 transactions + migration
+## Wave 5 — transactions (5.1 follow-ups)
 
-Shipped: 5.1 transaction callbacks + isolation (#2797), 5.2 migration runner
-(#2799). Open follow-ups from 5.1 (each needs production work, own story):
+Open follow-ups from the transaction-callbacks story (each needs production
+work, own story):
 
 - **HIGH RISK / own story** — `touch` → transactional commit/rollback callbacks
   (3 tests): `timestamp.ts` `touch` builds a direct UPDATE, fires only
@@ -365,27 +347,38 @@ Shipped: 5.1 transaction callbacks + isolation (#2797), 5.2 migration runner
 
 ---
 
-## Wave 6 — query-cache ✅ complete (#2662, #2672, #2684, #2833)
+## Wave 6 — query-cache (remaining un-skips)
 
-Story 6.1 shipped: live mixin + `Base.cache`/`uncached` class methods +
-`QueryCache.run`/`complete` + `installExecutorHooks` (Batch 64). Nothing open.
+### Story 6.1 — query-cache residual un-skips `[un-skip + impl]` · dep-clear
+
+`query-cache.test.ts` still carries ~12 skips after the class-methods/executor-
+hooks batch landed. Triage:
+
+- **Now unblocked by 7.1** — `cache is expired by habtm update` / `…by habtm
+delete` (`:848,853`): needs Post⇔Category HABTM collection-proxy setup
+  (canonical fixtures + the `destroyAssociations` wiring shipped in 7.1).
+- **Actionable impl** — `query cached even when types are reset` (`:540`,
+  `resetColumnInformation` not implemented for this path); `cache is ignored for
+locked relations` (`:492`).
+- **Env-gated** — `cache is available when using a not connected connection`
+  (`:512`, in-memory DB can't test lazy connections); `cache gets cleared after
+migration` (sqlite-skipped).
+- **Likely-permanent (Ruby process/thread semantics)** —
+  `forked processes`/`across threads`/`local to the current thread`/`shared
+connection`/`threads use the same connection` (`:220,223,573,611,614,885`);
+  verify against `scripts/api-compare/unported-files.ts` before attempting.
+- Rails: `test/cases/query_cache_test.rb`; impl
+  `lib/active_record/connection_adapters/abstract/query_cache.rb`.
 
 ---
 
 ## Wave 7 — Tier 4 integrated: associations (277) + relation remainder — LAST
 
-Infra PRs first, then per-file campaigns. Each campaign's exact slots come from
-a `/audit-report` pass (read-only, no PR) per 100-plan methodology.
+The association infra (7.1–7.5) has landed. Per-file campaigns come from a
+`/audit-report` pass (read-only, no PR) per 100-plan methodology. Open infra
+follow-ups first:
 
-### Association infra ✅ complete
-
-7.1 destroyAssociations (#2800), 7.2 join-table aliasing (#2808, BLOCKER #2),
-7.3 composite-FK HMT write (#2806), 7.4 JD HABTM + whereBang (impl pre-shipped
-#2521/#2608; test un-skip #2827), 7.5 collection-dedup / inverse-of (#2583 impl
-
-- #2811 un-skips). Open follow-ups:
-
-#### Story 7.2 review-fix follow-up `[fidelity, ~60 LOC]` · dep-clear
+### Story 7.2 review-fix follow-up `[fidelity, ~60 LOC]` · dep-clear
 
 **⚠ HIGHEST-PRIORITY (#2808 + #2840 findings): review fixes never landed.** 4
 fixes + a regression test were implemented & verified locally but are absent
@@ -404,10 +397,11 @@ that enumerate join stores weren't updated. **Verified still outstanding on
    aliases (spurious eager-load promotion).
 
 Open one small follow-up PR with fixes 1–4 + the regression test from a fresh
-branch off updated `main`. (Item 5 — the defensive recursion guard — is **MOOT**:
-#2840 removed the self-recursion from `_throughChainHasNestedSource`.)
+branch off updated `main`. (The 5th item — a defensive recursion guard — is moot:
+the poly-twice follow-up removed the self-recursion from
+`_throughChainHasNestedSource`.)
 
-#### Story 7.4 follow-up — `conditions-on-join-table` `[blocked]`
+### Story 7.4 follow-up — `conditions-on-join-table` `[blocked]`
 
 1 deferred eager test (`has-and-belongs-to-many-associations.test.ts`) still
 fails in multi-test context (`no such column: developers.lastName`) — a deeper
@@ -417,53 +411,66 @@ fails in multi-test context (`no such column: developers.lastName`) — a deeper
 ### Association + relation campaigns (audit-gated)
 
 Each row: schedule `/audit-report <slug>` → triage into ~250-LOC slots → un-skip.
-**All four infra deps (7.1/7.2/7.4-impl/7.5) are satisfied — every "Needs 7.x"
-row is dep-clear and ready to audit** (subject to the §7.2 review-fix follow-up
-landing for `merge()`-bearing eager cases):
+All four infra deps (7.1/7.2/7.4-impl/7.5) are satisfied — every "Needs 7.x" row
+is dep-clear and ready to audit (subject to the §7.2 review-fix follow-up landing
+for `merge()`-bearing eager cases):
 
-| Campaign         | Ours                                                        | Rails                                                       |             ~skips | Needs                       |
-| ---------------- | ----------------------------------------------------------- | ----------------------------------------------------------- | -----------------: | --------------------------- |
-| eager            | `associations/eager.test.ts`                                | `associations/eager_test.rb`                                |                 70 | 7.2 ✅, 7.4 ✅              |
-| join-model       | `associations/join-model.test.ts`                           | `associations/join_model_test.rb`                           |                 41 | 7.2 ✅; DidYouMean (B1972)  |
-| strict-loading   | `strict-loading.test.ts`                                    | `strict_loading_test.rb`                                    | 30 (batch 1 #2842) | —                           |
-| has-one          | `associations/has-one-associations.test.ts`                 | `associations/has_one_associations_test.rb`                 |                 28 | fixture data folded in      |
-| relation-scoping | `scoping/relation-scoping.test.ts`                          | `scoping/relation_scoping_test.rb`                          |                 28 | STI type-constraint (#1983) |
-| inverse          | `associations/inverse-associations.test.ts`                 | `associations/inverse_associations_test.rb`                 |                 23 | 7.5 ✅                      |
-| habtm            | `associations/has-and-belongs-to-many-associations.test.ts` | `associations/has_and_belongs_to_many_associations_test.rb` |                 23 | 7.1 ✅                      |
-| where            | `relation/where.test.ts`                                    | `relation/where_test.rb`                                    |                 23 | polymorphic fixtures        |
-| cascaded-eager   | `associations/cascaded-eager-loading.test.ts`               | `associations/cascaded_eager_loading_test.rb`               |                 18 | 7.2 ✅                      |
-| has-one-through  | `associations/has-one-through-associations.test.ts`         | `associations/has_one_through_associations_test.rb`         |                 16 | —                           |
-| where-chain      | `relation/where-chain.test.ts`                              | `relation/where_chain_test.rb`                              |                 12 | join aliasing               |
-| counter-cache    | `counter-cache.test.ts`                                     | `counter_cache_test.rb`                                     |                  5 | Batch 134                   |
+| Campaign         | Ours                                                        | Rails                                                       | ~skips | Needs                          |
+| ---------------- | ----------------------------------------------------------- | ----------------------------------------------------------- | -----: | ------------------------------ |
+| eager            | `associations/eager.test.ts`                                | `associations/eager_test.rb`                                |     70 | 7.2 ✅, 7.4 ✅                 |
+| join-model       | `associations/join-model.test.ts`                           | `associations/join_model_test.rb`                           |     41 | 7.2 ✅; DidYouMean (B1972)     |
+| strict-loading   | `strict-loading.test.ts`                                    | `strict_loading_test.rb`                                    |    ~24 | batch 1 landed; rest dep-clear |
+| has-one          | `associations/has-one-associations.test.ts`                 | `associations/has_one_associations_test.rb`                 |     28 | fixture data folded in         |
+| relation-scoping | `scoping/relation-scoping.test.ts`                          | `scoping/relation_scoping_test.rb`                          |     28 | STI type-constraint (#1983)    |
+| inverse          | `associations/inverse-associations.test.ts`                 | `associations/inverse_associations_test.rb`                 |     23 | 7.5 ✅                         |
+| habtm            | `associations/has-and-belongs-to-many-associations.test.ts` | `associations/has_and_belongs_to_many_associations_test.rb` |     23 | 7.1 ✅                         |
+| where            | `relation/where.test.ts`                                    | `relation/where_test.rb`                                    |     23 | polymorphic fixtures           |
+| cascaded-eager   | `associations/cascaded-eager-loading.test.ts`               | `associations/cascaded_eager_loading_test.rb`               |     18 | 7.2 ✅                         |
+| has-one-through  | `associations/has-one-through-associations.test.ts`         | `associations/has_one_through_associations_test.rb`         |     16 | —                              |
+| where-chain      | `relation/where-chain.test.ts`                              | `relation/where_chain_test.rb`                              |     12 | join aliasing                  |
+| counter-cache    | `counter-cache.test.ts`                                     | `counter_cache_test.rb`                                     |      5 | Batch 134                      |
 
-`callbacks` (#2838) and `nested-through` (no-op) campaigns are **complete** — 0
-skips; do not re-pick. `strict-loading` batch 1 shipped (#2842); remaining
-batches (eager-load preload-cascade, has-one/has-many no-raise, build/writer
-strict-bypass + loader-reordering, has-one-through autosave, fixtures) are
-dep-clear — see #2842 finding.
+Remaining strict-loading batches (eager-load preload-cascade, has-one/has-many
+no-raise, build/writer strict-bypass + loader-reordering, has-one-through
+autosave, fixtures) are dep-clear. The `callbacks` and `nested-through`
+campaigns are done (0 skips) — not listed.
 
 **Relation still-blocked (flag, schedule after infra):** `eager_load` toSql +
 STI + non-preload (3, assoc track A5); `missing`-with-enum (5, → Story 3.PG-enum
 
 - join aliasing); parameterized join strings R6c (2, design needed).
 
-### Discovered follow-ups (not yet scoped)
+---
 
-- **~10 LOC audit (from #2840 finding):** other `Querying.*` static delegators
-  that destructure a fixed arg count where the `Relation.*` instance method is
-  variadic may carry the same latent arg-dropping bug #2840 fixed in
-  `Querying#joins` (`const [tableOrSql, on] = args` silently dropped 3rd+ args).
-  Grep `querying.ts` for `const [...] = args` patterns.
+## Cross-cutting follow-ups (orphaned from now-deleted plan docs)
+
+The QueryLogs and encryption-contexts parity plans are complete and their docs
+removed; these still-open follow-ups are preserved here:
+
+- **QueryLogs (optional polish):** make `tagContent` read
+  `ActiveSupport::ExecutionContext.to_h` like Rails (every query merges the live
+  ExecutionContext) instead of the QueryLogs instance `_context` via
+  `updateContext` — touches `query-logs.ts` + activesupport `ExecutionContext`;
+  and align the three `escaping …` unit tests (`query-logs.test.ts:71-83`) to
+  Rails' exact literal inputs (`query_logs_test.rb:43-56`). Not needed for parity.
+- **Encryption `isEncrypted`/`encrypted?` context divergence (~1 line):**
+  `isEncrypted` (`encryption/encrypted-attribute-type.ts:128-130`) wraps in
+  `this.scheme.withContext(...)` but reads `this._encryptor` directly, ignoring
+  the pushed context (Rails `encrypted_attribute_type.rb:48` reads the context
+  encryptor → returns `false` under a swapped `NullEncryptor`). Fix:
+  `this.scheme.withContext(() => this.encryptor.isEncrypted(value))`. Verify
+  `encrypted-fixtures.test.ts` + `unencrypted-attributes.test.ts` stay green
+  (feeds `support_unencrypted_data` detection) before adopting.
 
 ---
 
 ## Net path to 100%
 
 1. **Wave 3** schema-dumper subtrack (Epic 3.3-U2/U3) unblocks the
-   comment/charset/dump-bearing residuals and the last #3 blocker work alongside
-   **3.PG-enum** (`type_for_attribute`).
-2. **Wave 4** pool-campaign remainder and **Wave 5** transaction follow-ups are
-   bounded, parallelizable clusters.
+   comment/charset/dump-bearing residuals alongside **3.PG-enum**
+   (`type_for_attribute`, the last architectural blocker).
+2. **Waves 4/5/6** are bounded, parallelizable clusters (pool campaign,
+   transaction follow-ups, query-cache residuals).
 3. **Wave 7 campaigns** are the long tail (~300 association+relation skips), each
    opened by a read-only audit, executed last — all infra deps satisfied.
 
@@ -476,4 +483,3 @@ STI + non-preload (3, assoc track A5); `missing`-with-enum (5, → Story 3.PG-en
 - Never rename Rails-derived test names; run only touched test files locally.
 - Refresh counts with `pnpm test:compare --cached --package activerecord` after each merge.
   </content>
-  </invoke>
