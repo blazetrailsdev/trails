@@ -7,14 +7,17 @@ export type SchemaColumnsByTable = Record<string, Record<string, DumpColumnSchem
 // Rails default PK is bigint (Rails 5.1+).
 const DEFAULT_PK_TYPE = "bigint";
 
-function strLiteral(node: ts.Node | undefined): string | undefined {
+export function strLiteral(node: ts.Node | undefined): string | undefined {
   if (!node) return undefined;
   if (ts.isStringLiteral(node)) return node.text;
   if (ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
   return undefined;
 }
 
-function objPropValue(obj: ts.ObjectLiteralExpression, key: string): ts.Expression | undefined {
+export function objPropValue(
+  obj: ts.ObjectLiteralExpression,
+  key: string,
+): ts.Expression | undefined {
   for (const prop of obj.properties) {
     if (!ts.isPropertyAssignment(prop)) continue;
     const name = ts.isIdentifier(prop.name) ? prop.name.text : strLiteral(prop.name);
@@ -31,7 +34,7 @@ function isArrayLiteral(node: ts.Expression | undefined): node is ts.ArrayLitera
   return !!node && ts.isArrayLiteralExpression(node);
 }
 
-function parseCreateTable(
+export function parseCreateTable(
   call: ts.CallExpression,
 ):
   | { name: string; opts: ts.ObjectLiteralExpression | undefined; arrowBody: ts.Block | undefined }
@@ -139,7 +142,7 @@ function parseColumnStatement(stmt: ts.Statement): { colName: string; col: DumpC
   return [{ colName, col }];
 }
 
-function walkBody(body: ts.Block, table: Record<string, DumpColumnSchema>): void {
+export function walkBody(body: ts.Block, table: Record<string, DumpColumnSchema>): void {
   for (const stmt of body.statements) {
     for (const { colName, col } of parseColumnStatement(stmt)) {
       table[colName] = col;
