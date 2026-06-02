@@ -735,7 +735,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const book = encryptedBooks("awdr");
 
     await withEncryptionContext({ frozenEncryption: true }, async () => {
-      await book.updateBang({ updated_at: new Date() });
+      await book.updateBang({ updated_at: Temporal.Now.instant() });
     });
 
     await withEncryptionContext({ frozenEncryption: true }, async () => {
