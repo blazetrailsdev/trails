@@ -74,8 +74,7 @@ describe("Ruby extractor gate detection", () => {
       adapters: ["postgresql", "sqlite"],
       source: ["body-skip"],
     });
-    // No gate key on the test case → null over the JSON boundary.
-    expect(g["unconditional"] ?? null).toBeNull();
+    expect(g["unconditional"] ?? null).toBeNull(); // no gate key → null over JSON
   });
 
   it("inverts `unless current_adapter?` to the complementary set", () => {
@@ -109,5 +108,43 @@ describe("Ruby extractor gate detection", () => {
     });
     expect(g["needs savepoints"]).toEqual({ features: ["savepoints"], source: ["body-skip"] });
     expect(g["mariadb only"]).toEqual({ guards: ["mariadb"], source: ["body-skip"] });
+  });
+
+  it("intersects a dir adapter with an in-body feature skip", () => {
+    const g = rubyGates({
+      "cases/adapters/postgresql/combo_test.rb": `
+        class ComboTest < ActiveRecord::TestCase
+          test "pg with json" do
+            skip "no json" unless supports_json?
+            assert true
+          end
+        end
+      `,
+    });
+    expect(g["pg with json"]).toEqual({
+      adapters: ["postgresql"],
+      features: ["json"],
+      source: ["body-skip", "dir"],
+    });
+  });
+
+  it("does not treat a receiver `.skip` (e.g. Arel OFFSET) as a test skip", () => {
+    const g = rubyGates({
+      "cases/offset_test.rb": `
+        class OffsetTest < ActiveRecord::TestCase
+          test "uses offset" do
+            manager.skip(10)
+            relation.skip 5
+            assert true
+          end
+          test "bare skip is a guard" do
+            skip "always"
+            assert true
+          end
+        end
+      `,
+    });
+    expect(g["uses offset"] ?? null).toBeNull();
+    expect(g["bare skip is a guard"]).toEqual({ guards: ["always_skip"], source: ["body-skip"] });
   });
 });

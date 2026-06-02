@@ -419,10 +419,8 @@ class TestExtractor
     walk(els) if els.is_a?(Array)
   end
 
-  # Build the gate hash for a test from its dir gate, the enclosing
+  # Attach a :gate to a test_case from its dir gate, the enclosing
   # `current_adapter?` stack, and any in-body `skip ... if/unless` guards.
-  # Returns the hash (with the gate attached under :gate) so callers can
-  # `@test_cases << add_gate(tc, node)`.
   def add_gate(test_case, body_node)
     parts = []
     parts << { adapters: @file_adapter_gate } if @file_adapter_gate
@@ -445,8 +443,7 @@ class TestExtractor
   end
 
   # Derive a gate from a condition under which the test RUNS. `positive` is
-  # whether the body runs when the condition is true (`if` → true,
-  # `unless` → false).
+  # whether the body runs when the condition is true (`if` → true, `unless` → false).
   def gate_from_run_condition(cond, positive)
     acc = { adapter_syms: [], features: [], guards: [] }
     scan_run_condition(cond, acc)
@@ -517,15 +514,29 @@ class TestExtractor
     node.each { |c| find_skip_guards(c, out) if c.is_a?(Array) }
   end
 
+  # minitest `skip` is always a bare call — never a method on a receiver.
+  # Excluding receiver forms avoids false matches on unrelated `.skip` methods
+  # (Arel's OFFSET builder, a user-defined `klass.skip`). Contrast
+  # `call_ident_name`, kept permissive so `@connection.supports_json?` matches.
   def skip_call?(node)
-    call_ident_name(node) == "skip"
+    return false unless node.is_a?(Array)
+    case node[0]
+    when :command, :fcall, :vcall
+      ident_name(node[1]) == "skip"
+    when :method_add_arg
+      node[1].is_a?(Array) && node[1][0] == :fcall && ident_name(node[1][1]) == "skip"
+    else
+      false
+    end
   end
 
-  # Resolve the method/identifier name of a call-ish sexp.
+  # Resolve the method name of a call-ish sexp. For receiver forms the method
+  # name is the third child, not the receiver in the first.
   def call_ident_name(node)
     return nil unless node.is_a?(Array)
     case node[0]
-    when :command, :command_call then ident_name(node[1])
+    when :command then ident_name(node[1])
+    when :command_call then ident_name(node[3])
     when :fcall, :vcall then ident_name(node[1])
     when :method_add_arg
       node[1].is_a?(Array) && node[1][0] == :fcall ? ident_name(node[1][1]) : nil
@@ -809,12 +820,16 @@ def run
       totalTests: total_tests,
     }
 
-    puts "  #{pkg_name}: #{extractor.test_files.length} files, #{total_tests} tests"
+    gated = extractor.test_files.sum { |f| f[:testCases].count { |t| t[:gate] } }
+    suffix = gated.positive? ? " (#{gated} adapter/feature-gated)" : ""
+    puts "  #{pkg_name}: #{extractor.test_files.length} files, #{total_tests} tests#{suffix}"
   end
 
   # Print summary
   total = manifest[:packages].values.sum { |p| p[:totalTests] }
-  puts "\nTotal: #{total} tests across #{manifest[:packages].values.sum { |p| p[:files].length }} files"
+  files = manifest[:packages].values.sum { |p| p[:files].length }
+  gated = manifest[:packages].values.sum { |p| p[:files].sum { |f| f[:testCases].count { |t| t[:gate] } } }
+  puts "\nTotal: #{total} tests across #{files} files (#{gated} adapter/feature-gated)"
 
   output_path = File.join(OUTPUT_DIR, "rails-tests.json")
   File.write(output_path, JSON.pretty_generate(manifest))
