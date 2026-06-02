@@ -125,10 +125,10 @@ function writerMethod(
     get: existing?.get,
     set(this: Base, value: unknown): void {
       const cache = getAggregationCache(this);
-      // nil with allow_nil: clear all mapped columns.
-      // nil without allow_nil: fall through so decomposition raises naturally
+      // allow_nil: true → clear all mapped columns when nil.
+      // allow_nil: false (default) → fall through so decomposition raises naturally
       // (mirrors Rails: nil.send(:method) → NoMethodError).
-      if ((value === null || value === undefined) && allowNil !== false) {
+      if ((value === null || value === undefined) && allowNil === true) {
         for (const [modelAttr] of mapping) this.writeAttribute(modelAttr, null);
         cache.delete(name);
         return;

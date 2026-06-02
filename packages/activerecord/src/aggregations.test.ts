@@ -127,6 +127,7 @@ describe("AggregationsTest", () => {
         ["address_street", "street"],
         ["address_city", "city"],
       ],
+      allowNil: true,
     });
 
     const c = await Customer.create({
@@ -161,6 +162,7 @@ describe("AggregationsTest", () => {
         ["lat", "lat"],
         ["lng", "lng"],
       ],
+      allowNil: true,
     });
 
     const loc = await Location.create({ name: "HQ", lat: 37.7, lng: -122.4 });
@@ -409,21 +411,6 @@ describe("AggregationsTest", () => {
     (barney as any).fullnameNoConverter = hash;
     expect(barney.readAttribute("name")).toBe(String(hash));
   });
-});
-
-describe("AggregationsTest", () => {
-  // These test names do not match Rails aggregations_test.rb tests; they are
-  // kept as stubs to preserve file structure and avoid test:compare regressions.
-  it.skip("gps latitude", () => {});
-  it.skip("gps longitude", () => {});
-  it.skip("responds to constructor", () => {});
-  it.skip("hash should be the same for objects with the same values", () => {});
-  it.skip("hash should be different for objects with different values", () => {});
-  it.skip("mapping with custom constructor and target object that does not respond to to a", () => {});
-  it.skip("attributes after initialize", () => {});
-  it.skip("name mapping", () => {});
-  it.skip("ensure_custom_mapping", () => {});
-  it.skip("composite value", () => {});
 });
 
 describe("OverridingAggregationsTest", () => {
