@@ -586,13 +586,22 @@ the audit as the campaign's first task.
   3. `relation.ts#isEmptyScope` omits `_namedInnerJoins`.
   4. `relation.ts#referencesEagerLoadedTables` can't see named-inner-join table
      aliases (spurious eager-load promotion).
-  5. (defensive) unbounded recursion guard in `relation.ts#_throughChainHasNestedSource`.
-     Open one small follow-up PR with fixes 1–5 + the regression test from a fresh
-     branch off updated `main`.
-- **Follow-up (~80–150 LOC):** un-skip `"polymorphic has many through joined
-different table twice"` (1 remaining cross-arg-collision skip) — different
-  shape (two separate `joins()` args colliding on `chefs`); needs a set-level
-  collision check.
+  5. ~~(defensive) unbounded recursion guard in
+     `relation.ts#_throughChainHasNestedSource`.~~ **MOOT** — the poly-twice
+     follow-up (#2840) removed the self-recursion from that method entirely
+     (it is now a single-level walk), so there is no recursion to guard.
+     Open one small follow-up PR with fixes 1–4 + the regression test from a
+     fresh branch off updated `main`.
+- **Follow-up ✅ shipped:** un-skipped `"polymorphic has many through joined
+different table twice"`. Root cause was NOT a missing dedup — once both
+  `joins()` args route into one `JoinDependency`, the AliasTracker (7.2) already
+  aliases the second `departments`/`chefs` legs. The real gaps were (1)
+  `_throughChainHasNestedSource` missed the through-is-itself-a-through shape
+  (only caught source-is-through), and (2) `Querying#joins` collapsed variadic
+  string args into the two-arg `(table, onClause)` form, so `joins("a", "b")`
+  was read as `JOIN a ON b`. Fixed the detection + forwarded all args, and
+  disambiguated the `(table, onClause)` shape by the second arg containing SQL
+  (`/[\s=]/`).
 
 #### Story 7.3 — composite-FK HMT write (Batch 20) ✅ shipped (#2806)
 

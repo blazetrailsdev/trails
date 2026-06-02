@@ -1352,8 +1352,22 @@ export class Relation<T extends Base> {
   joins(...args: Array<string | string[] | Nodes.Join>): Relation<T>;
   joins(...args: Array<string | string[] | Nodes.Join | undefined>): Relation<T> {
     const rel = this._clone();
-    // Two-string-argument form: joins(table, onClause) — preserved for back-compat.
-    if (args.length === 2 && typeof args[0] === "string" && typeof args[1] === "string") {
+    // Two-string-argument form: joins(table, onClause) — a trails-only
+    // extension preserved for back-compat. Rails has no such form: it
+    // disambiguates by type — `joins(:a, :b)` (symbols → JoinDependency) vs
+    // `joins("raw sql")` (strings → verbatim fragment). trails collapses both
+    // to strings, so a heuristic is unavoidable here. We assume an ON clause is
+    // a SQL predicate (contains whitespace or `=`) while an association/table
+    // name is a bare identifier; a bare second arg routes to the variadic path
+    // below (Rails' `joins(:a, :b)`). LIMITATION: a space-free operator-only ON
+    // clause (`"a.x<b.y"`) would be misrouted — no current call site does this,
+    // but pass such predicates with surrounding whitespace.
+    if (
+      args.length === 2 &&
+      typeof args[0] === "string" &&
+      typeof args[1] === "string" &&
+      /[\s=]/.test(args[1])
+    ) {
       rel._joinClauses.push({ type: "inner", table: args[0], on: args[1] });
       return rel;
     }
@@ -1527,8 +1541,11 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Walk a `:through` chain and report whether any leg's source reflection is
-   * itself a `:through`/HABTM (the shape `_resolveThroughJoin` mis-joins).
+   * Walk a `:through` chain and report whether it is a nested-through that the
+   * flat `_resolveThroughJoin` path mis-joins — i.e. either the through
+   * reflection is itself a `:through`/HABTM (so an intermediate table is joined
+   * more than once) OR the source reflection is itself a `:through`/HABTM. Both
+   * shapes need JoinDependency's AliasTracker.
    *
    * @internal
    */
@@ -1543,12 +1560,11 @@ export class Relation<T extends Base> {
     const throughModel = modelRegistry.get(throughClassName);
     if (!throughModel) return false;
 
-    // The through reflection itself nests another through whose source nests.
-    if (
-      this._isThroughLike(throughAssoc) &&
-      this._throughChainHasNestedSource(modelClass, throughAssoc)
-    )
-      return true;
+    // The through reflection is itself a :through/HABTM — a nested-through
+    // chain (e.g. Hotel → chefs[through departments] → cake_designers). The
+    // intermediate tables are joined more than once, which the flat resolver
+    // emits unaliased; route it through JoinDependency.
+    if (this._isThroughLike(throughAssoc)) return true;
 
     // The source reflection on the through model is itself a through/HABTM.
     const sourceName = assocDef.options?.source ?? _singularize(assocDef.name);
