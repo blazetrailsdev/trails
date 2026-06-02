@@ -38,10 +38,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       ps(Base.connection).preparedStatements = originalPreparedStatements;
     });
 
-    it("prepared statements disabled", () => {
-      expect(ps(Developer.connection).preparedStatements).toBe(false);
-    });
-
     it("select query works even when prepared statements are disabled", async () => {
       expect(ps(Developer.connection).preparedStatements).toBe(false);
 
