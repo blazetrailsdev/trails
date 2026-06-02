@@ -34,6 +34,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     file: relativePath,
     className: pkgFromPath(relativePath),
     testCases: [],
+    testCount: 0,
   };
 
   const currentAncestors: string[] = [];
@@ -137,6 +138,32 @@ export function extractTestsFromSource(content: string, relativePath: string): T
               );
               return;
             }
+          } else if (base.text === "describeIfSupports") {
+            // describeIfSupports.skipIf(expr)("feature", "title", fn) — title is
+            // arg 1. Handle explicitly so we don't fall through and re-register
+            // the nested tests with no suite title/gate.
+            const title = getArgString(node, 1);
+            if (title) {
+              const wrapperGate = gateFromWrapper(base.text, getArgString(node, 0));
+              enterSuite(
+                node,
+                title,
+                wrapperGate ? mergeGate(wrapperGate, inlineGate) : inlineGate,
+              );
+              return;
+            }
+          } else if (base.text === "itIfSupports") {
+            const title = getArgString(node, 1);
+            if (title) {
+              const wrapperGate = gateFromWrapper(base.text, getArgString(node, 0));
+              addTest(
+                node,
+                title,
+                "it",
+                false,
+                wrapperGate ? mergeGate(wrapperGate, inlineGate) : inlineGate,
+              );
+            }
           } else if (base.text === "it" || base.text === "test") {
             const title = getArgString(node, 0);
             if (title) addTest(node, title, base.text, false, inlineGate);
@@ -164,6 +191,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
   }
 
   visit(sourceFile);
+  fileInfo.testCount = fileInfo.testCases.length;
   return fileInfo;
 }
 

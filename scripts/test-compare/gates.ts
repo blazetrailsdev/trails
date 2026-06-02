@@ -51,10 +51,16 @@ export function mergeGate(base: TestGate | undefined, add: TestGate): TestGate {
   return merged;
 }
 
-/** Normalize a freshly-built gate's array fields (sort + de-dupe). */
+/**
+ * Normalize a freshly-built gate's array fields (sort + de-dupe). A
+ * *present-but-empty* `adapters` array is preserved (not dropped): it means
+ * contradictory gates intersected to "runs on no adapter" (e.g. describeIfPg ▸
+ * describeIfMysql), which is distinct from an absent key (= "runs on all").
+ * Mirrors the Ruby extractor's `finalize_gate` (`merged.key?(:adapters)`).
+ */
 export function finalizeGate(gate: TestGate): TestGate {
   const out: TestGate = { source: sortedUnique(gate.source) };
-  if (gate.adapters?.length) out.adapters = sortedUnique(gate.adapters);
+  if (gate.adapters) out.adapters = sortedUnique(gate.adapters);
   if (gate.features?.length) out.features = sortedUnique(gate.features);
   if (gate.guards?.length) out.guards = sortedUnique(gate.guards);
   return out;
@@ -93,6 +99,9 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
  * `adapterType !== "sqlite"`. Anything else resolves to a `guards: ["unknown"]`
  * gate so the comparison knows the test is conditional without inventing an
  * adapter set.
+ *
+ * Source is `"test"` (per-test inline guard) — the TS analog of the Ruby
+ * extractor's `"body-skip"`, distinct from a named `"wrapper"` suite.
  */
 export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): TestGate {
   const text = exprText.trim();
@@ -107,9 +116,9 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
       const trueMeansEqual = op === "===";
       const runWhenEqual = runsWhenTrue ? trueMeansEqual : !trueMeansEqual;
       const adapters = runWhenEqual ? [adapter] : ALL_ADAPTERS.filter((a) => a !== adapter);
-      return { adapters: sortedUnique(adapters), source: ["wrapper"] };
+      return { adapters: sortedUnique(adapters), source: ["test"] };
     }
   }
 
-  return { guards: ["unknown"], source: ["wrapper"] };
+  return { guards: ["unknown"], source: ["test"] };
 }

@@ -94,6 +94,7 @@ function extractPackageTests(pkgName: string, files: string[]): TestPackageInfo 
   const pkgInfo: TestPackageInfo = {
     name: pkgName,
     files: [],
+    totalTests: 0,
   };
 
   for (const file of files) {
@@ -101,6 +102,7 @@ function extractPackageTests(pkgName: string, files: string[]): TestPackageInfo 
     pkgInfo.files.push(extractTestsFromSource(content, path.relative(ROOT_DIR, file)));
   }
 
+  pkgInfo.totalTests = pkgInfo.files.reduce((sum, f) => sum + f.testCases.length, 0);
   return pkgInfo;
 }
 

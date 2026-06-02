@@ -39,28 +39,29 @@ describe("gates.ts pure helpers", () => {
     });
   });
 
-  it("resolves skipIf / runIf adapter expressions to a run-on set", () => {
-    // skipIf(true-when-mysql) → runs everywhere except mysql
+  it("resolves skipIf / runIf adapter expressions to a run-on set (source: test)", () => {
+    // skipIf(true-when-mysql) → runs everywhere except mysql. Inline guards are
+    // `source: ["test"]` (the TS analog of Ruby's body-skip), not "wrapper".
     expect(gateFromGuardExpr('adapterType === "mysql"', false)).toEqual({
       adapters: ["postgresql", "sqlite"],
-      source: ["wrapper"],
+      source: ["test"],
     });
     // skipIf(adapterType !== "sqlite") → runs only on sqlite
     expect(gateFromGuardExpr('adapterType !== "sqlite"', false)).toEqual({
       adapters: ["sqlite"],
-      source: ["wrapper"],
+      source: ["test"],
     });
     // runIf(adapterType === "postgres") → runs only on postgresql
     expect(gateFromGuardExpr('adapterType === "postgres"', true)).toEqual({
       adapters: ["postgresql"],
-      source: ["wrapper"],
+      source: ["test"],
     });
   });
 
   it("falls back to an unknown guard for unrecognized expressions", () => {
     expect(gateFromGuardExpr("!supportsConflictTarget", false)).toEqual({
       guards: ["unknown"],
-      source: ["wrapper"],
+      source: ["test"],
     });
   });
 
@@ -101,8 +102,8 @@ describe("TS extractor gate detection", () => {
       it.skipIf(adapterType === "mysql")("f", () => {});
       it.runIf(adapterType === "postgres")("g", () => {});
     `);
-    expect(g["f"]).toEqual({ adapters: ["postgresql", "sqlite"], source: ["wrapper"] });
-    expect(g["g"]).toEqual({ adapters: ["postgresql"], source: ["wrapper"] });
+    expect(g["f"]).toEqual({ adapters: ["postgresql", "sqlite"], source: ["test"] });
+    expect(g["g"]).toEqual({ adapters: ["postgresql"], source: ["test"] });
   });
 
   it("composes an adapter wrapper's .skipIf form with the inline guard", () => {
@@ -111,7 +112,33 @@ describe("TS extractor gate detection", () => {
     const g = tsGates(`
       describeIfMysql.skipIf(adapterType === "postgres")("S", () => { it("j", () => {}); });
     `);
-    expect(g["j"]).toEqual({ adapters: ["mysql"], source: ["wrapper"] });
+    // wrapper gate (mysql) ∩ inline guard → source unions both origins.
+    expect(g["j"]).toEqual({ adapters: ["mysql"], source: ["test", "wrapper"] });
+  });
+
+  it("preserves an empty adapter set for contradictory nested wrappers", () => {
+    const g = tsGates(`
+      describeIfPg("outer", () => {
+        describeIfMysql("inner", () => { it("never", () => {}); });
+      });
+    `);
+    // pg ∩ mysql = [] → "runs nowhere", kept distinct from an absent key.
+    expect(g["never"]).toEqual({ adapters: [], source: ["wrapper"] });
+  });
+
+  it("handles describeIfSupports.skipIf without losing the suite title/gate", () => {
+    const info = extractTestsFromSource(
+      `describeIfSupports.skipIf(adapterType === "mysql")("json", "S", () => { it("k", () => {}); });`,
+      "packages/activerecord/src/x.test.ts",
+    );
+    const k = info.testCases.find((t) => t.description === "k")!;
+    // title "S" is preserved in the path; gate = feature(json) ∩ guard(!mysql).
+    expect(k.path).toBe("S > k");
+    expect(k.gate).toEqual({
+      adapters: ["postgresql", "sqlite"],
+      features: ["json"],
+      source: ["test", "wrapper"],
+    });
   });
 
   it("keeps it.skip as pending without a gate (the TODO signal)", () => {
