@@ -704,7 +704,10 @@ jobs:
         # no Ruby and intentionally no-ops this rule.
         run: pnpm exec tsx scripts/build-rails-privates-manifest.ts && pnpm exec eslint packages/arel/src
       - name: Test comparison
-        run: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/test-compare.ts
+        # --gates prints the advisory adapter/feature gate-mismatch breakdown
+        # (should-gate / missing-gate / wrong-gate / over-gated) in the log.
+        # Non-failing: gate mismatches never affect the exit code.
+        run: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/test-compare.ts --gates
       - name: Fixtures comparison
         run: pnpm exec tsx scripts/fixtures-compare/compare.ts --package activerecord --ci
       - name: Models comparison
