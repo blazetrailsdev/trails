@@ -15,6 +15,7 @@ import {
   ReadOnlyRecord,
   StrictLoadingViolationError,
   registerModel,
+  serialize,
 } from "./index.js";
 import { Associations, loadBelongsTo } from "./associations.js";
 import { ReadonlyAttributeError } from "./readonly-attributes.js";
@@ -1678,11 +1679,19 @@ describe("CalculationsTest", () => {
     // requires fixture-based associations
   });
 
-  it.skip("pluck with serialization", async () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-    // requires custom serialized attribute types
+  it("pluck with serialization", async () => {
+    class Account extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    serialize(Account, "name");
+    await Account.create({ name: JSON.stringify({ foo: "bar" }) });
+    // pluck deserializes through the serialized attribute's coder, matching
+    // what reading the attribute off a loaded record returns.
+    const loaded = await Account.all().first();
+    expect(await Account.all().pluck("name")).toEqual([loaded?.name]);
+    expect(await Account.all().pluck("name")).toEqual([{ foo: "bar" }]);
   });
 });
 

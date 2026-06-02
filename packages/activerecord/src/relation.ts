@@ -3072,24 +3072,6 @@ export class Relation<T extends Base> {
         /\s+AS\s+/i.test(c);
       return isComplex ? new Nodes.SqlLiteral(c) : table.get(c);
     });
-    // Extract column names for result mapping
-    const columnNames = columns.map((c) => {
-      if (typeof c === "string") {
-        // Explicit AS alias is reliable on all adapters.
-        const asMatch = c.match(/\s+AS\s+(?:"([^"]+)"|`([^`]+)`|(\w+))\s*$/i);
-        if (asMatch) return asMatch[1] ?? asMatch[2] ?? asMatch[3];
-        // Function expressions: the result column label is adapter-specific and
-        // can't be reliably predicted — use positional fallback (return null).
-        if (c.includes("(")) return null;
-        // Table-qualified or quoted identifiers: extract the last plain identifier segment.
-        // Handles 1, 2, or 3-part names: col, table.col, schema.table.col.
-        const dotMatch = c.match(/(?:["`]?\w+["`]?\.)*["`]?(\w+)["`]?\s*$/);
-        if (dotMatch) return dotMatch[1];
-        return c;
-      }
-      if (c instanceof Nodes.Attribute) return c.name;
-      return null;
-    });
     const manager = table.project(...projections);
     this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
@@ -3105,20 +3087,10 @@ export class Relation<T extends Base> {
       `${this._modelClass.name} Pluck`,
     );
 
-    const rows = result.toArray();
-    if (columns.length === 1) {
-      const name = columnNames[0];
-      if (name) {
-        return rows.map((row) => row[name]);
-      }
-      return rows.map((row) => Object.values(row)[0]);
-    }
-    return rows.map((row) => {
-      return columnNames.map((name, i) => {
-        if (name) return row[name];
-        return Object.values(row)[i];
-      });
-    });
+    // Type-cast results positionally through each result column's type
+    // (model attribute type → join dependency → driver OID → identity),
+    // mirroring Rails' Calculations#type_cast_pluck_values.
+    return this.typeCastPluckValues(result, columns);
   }
 
   /**
@@ -5416,7 +5388,10 @@ export class Relation<T extends Base> {
   }
 
   /** @internal */
-  private typeCastPluckValues(result: unknown[][], columns: string[]): unknown[][] {
+  private typeCastPluckValues(
+    result: import("./result.js").Result,
+    columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral | unknown>,
+  ): unknown[] {
     return _typeCastPluckValues(result, columns, this as any);
   }
 
