@@ -16,6 +16,7 @@ import {
   loadBelongsTo,
   loadHasOne,
   loadHasMany,
+  loadHabtm,
 } from "./associations.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -513,6 +514,14 @@ describe("StrictLoadingTest", () => {
       slhms_logs: { message: "string", slhms_dev_id: "integer" },
       ehos_devs: { name: "string" },
       ehos_profiles: { bio: "string", ehos_dev_id: "integer" },
+      slhab_devs: { name: "string" },
+      slhab_projects: { name: "string" },
+      slhab_devs_projects: { slhab_dev_id: "integer", slhab_project_id: "integer" },
+      slbhab_devs: { name: "string" },
+      slbhab_projects: { name: "string" },
+      slbhab_devs_projects: { slbhab_dev_id: "integer", slbhab_project_id: "integer" },
+      urmd_devs: { name: "string" },
+      urmd_logs: { message: "string", urmd_dev_id: "integer" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -1761,10 +1770,35 @@ describe("StrictLoadingTest", () => {
       loadHasMany(dev, "urmLogs", { className: "UrmLog", foreignKey: "urm_dev_id" }),
     ).rejects.toThrow(StrictLoadingViolationError);
   });
-  it.skip("raises on unloaded relation methods if strict loading by default", () => {
-    // FOLLOW-UP: same path as `raises on unloaded relation methods if strict
-    // loading`, with the owner strict via strictLoadingByDefault instead of an
-    // explicit strictLoadingBang(). Trimmed for PR-size ceiling.
+  it("raises on unloaded relation methods if strict loading by default", async () => {
+    class UrmdDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class UrmdLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("urmd_dev_id", "integer");
+      }
+    }
+    registerModel("UrmdDev", UrmdDev);
+    registerModel("UrmdLog", UrmdLog);
+    Associations.hasMany.call(UrmdDev, "urmdLogs", {
+      className: "UrmdLog",
+      foreignKey: "urmd_dev_id",
+    });
+    UrmdDev.strictLoadingByDefault = true;
+    try {
+      const created = await UrmdDev.create({ name: "Dev" });
+      const dev = await UrmdDev.find(created.id);
+      expect(dev.isStrictLoading()).toBe(true);
+      await expect(
+        loadHasMany(dev, "urmdLogs", { className: "UrmdLog", foreignKey: "urmd_dev_id" }),
+      ).rejects.toThrow(StrictLoadingViolationError);
+    } finally {
+      UrmdDev.strictLoadingByDefault = false;
+    }
   });
   it("strict loading can be turned off on an association in a model with strict loading on", async () => {
     class TooaDev extends Base {
@@ -1871,25 +1905,123 @@ describe("StrictLoadingTest", () => {
     // behaviorally by `preload audit logs are strict loading because parent is
     // strict loading`. Trimmed for PR-size ceiling.
   });
-  it.skip("raises on lazy loading a strict loading habtm relation", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  // The reflection-level `strictLoading: true` option drives the violation
+  // (mirrors Rails' `strict_loading_projects` HABTM declaration), so the
+  // owner itself need not be strict.
+  const slhabHabtmOpts = {
+    className: "SlhabProject",
+    joinTable: "slhab_devs_projects",
+    foreignKey: "slhab_dev_id",
+    associationForeignKey: "slhab_project_id",
+    strictLoading: true,
+  };
+  it("raises on lazy loading a strict loading habtm relation", async () => {
+    class SlhabDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlhabProject extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("SlhabDev", SlhabDev);
+    registerModel("SlhabProject", SlhabProject);
+    const dev = await SlhabDev.create({ name: "Dev" });
+    const project = await SlhabProject.create({ name: "Rails" });
+    await Base.connection.executeMutation(
+      `INSERT INTO "slhab_devs_projects" ("slhab_dev_id", "slhab_project_id") VALUES (${dev.id}, ${project.id})`,
+    );
+    await expect(loadHabtm(dev, "slhabProjects", slhabHabtmOpts)).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
   });
-  it.skip("raises on lazy loading a habtm relation if strict loading by default", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("raises on lazy loading a habtm relation if strict loading by default", async () => {
+    class SlbhabDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlbhabProject extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("SlbhabDev", SlbhabDev);
+    registerModel("SlbhabProject", SlbhabProject);
+    SlbhabDev.strictLoadingByDefault = true;
+    try {
+      const created = await SlbhabDev.create({ name: "Dev" });
+      const project = await SlbhabProject.create({ name: "Rails" });
+      await Base.connection.executeMutation(
+        `INSERT INTO "slbhab_devs_projects" ("slbhab_dev_id", "slbhab_project_id") VALUES (${created.id}, ${project.id})`,
+      );
+      const dev = await SlbhabDev.find(created.id);
+      expect(dev.isStrictLoading()).toBe(true);
+      await expect(
+        loadHabtm(dev, "slbhabProjects", {
+          className: "SlbhabProject",
+          joinTable: "slbhab_devs_projects",
+          foreignKey: "slbhab_dev_id",
+          associationForeignKey: "slbhab_project_id",
+        }),
+      ).rejects.toThrow(StrictLoadingViolationError);
+    } finally {
+      SlbhabDev.strictLoadingByDefault = false;
+    }
   });
-  it.skip("does not raise on eager loading a strict loading habtm relation", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("does not raise on eager loading a strict loading habtm relation", async () => {
+    class SlhabDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlhabProject extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("SlhabDev", SlhabDev);
+    registerModel("SlhabProject", SlhabProject);
+    const dev = await SlhabDev.create({ name: "Dev" });
+    const project = await SlhabProject.create({ name: "Rails" });
+    // A preloaded (eager-loaded) HABTM is reachable even though the
+    // reflection is marked strict_loading.
+    (dev as any)._preloadedAssociations = new Map([["slhabProjects", [project]]]);
+    const projects = await loadHabtm(dev, "slhabProjects", slhabHabtmOpts);
+    expect(projects).toHaveLength(1);
   });
-  it.skip("does not raise on eager loading a habtm relation if strict loading by default", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("does not raise on eager loading a habtm relation if strict loading by default", async () => {
+    class SlbhabDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlbhabProject extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("SlbhabDev", SlbhabDev);
+    registerModel("SlbhabProject", SlbhabProject);
+    SlbhabDev.strictLoadingByDefault = true;
+    try {
+      const created = await SlbhabDev.create({ name: "Dev" });
+      const project = await SlbhabProject.create({ name: "Rails" });
+      const dev = await SlbhabDev.find(created.id);
+      expect(dev.isStrictLoading()).toBe(true);
+      (dev as any)._preloadedAssociations = new Map([["slbhabProjects", [project]]]);
+      const projects = await loadHabtm(dev, "slbhabProjects", {
+        className: "SlbhabProject",
+        joinTable: "slbhab_devs_projects",
+        foreignKey: "slbhab_dev_id",
+        associationForeignKey: "slbhab_project_id",
+      });
+      expect(projects).toHaveLength(1);
+    } finally {
+      SlbhabDev.strictLoadingByDefault = false;
+    }
   });
   it("strict loading violation can log instead of raise", async () => {
     class ClirAuthor extends Base {
