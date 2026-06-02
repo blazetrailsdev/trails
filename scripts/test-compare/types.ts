@@ -33,7 +33,11 @@ export interface TestGate {
    * unrecognized `skipIf`/`runIf` expression. Informational only.
    */
   guards?: string[];
-  /** Where each part of the gate came from (for diagnostics). */
+  /**
+   * Where each part of the gate came from. Ruby emits `"dir"`, `"class"` (any
+   * `if/unless current_adapter?` wrapping, block or modifier), `"body-skip"`.
+   * `"test"`/`"wrapper"` are reserved for the TS extractor.
+   */
   source: ("dir" | "class" | "test" | "body-skip" | "wrapper")[];
 }
 

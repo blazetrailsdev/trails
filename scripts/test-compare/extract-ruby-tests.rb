@@ -146,10 +146,10 @@ class TestExtractor
       process_def(node)
     when :class
       process_class(node)
-    when :if, :unless, :if_mod, :unless_mod
+    when :if, :unless, :if_mod, :unless_mod, :elsif
       process_conditional(node)
     when :program, :bodystmt, :body_stmt, :stmts_add, :stmts_new,
-         :begin, :else, :elsif,
+         :begin, :else,
          :rescue, :ensure, :while, :until, :case, :when, :module
       node.each { |child| walk(child) if child.is_a?(Array) }
     else
@@ -406,7 +406,8 @@ class TestExtractor
     cond = node[1]
     body = node[2]
     els  = node[3] # nil for *_mod forms
-    positive = (kind == :if || kind == :if_mod)
+    # Body runs when COND is true for if/elsif, false for unless.
+    positive = kind != :unless && kind != :unless_mod
     gate = gate_from_run_condition(cond, positive)
 
     if gate
@@ -450,7 +451,10 @@ class TestExtractor
 
     adapters = acc[:adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
     gate = {}
-    unless adapters.empty?
+    # A condition mixing an adapter predicate with a feature/guard is a compound
+    # (`&&`/`||`) — its run-on adapter set isn't sound, so drop it (keep the rest).
+    mixed = !adapters.empty? && !(acc[:features].empty? && acc[:guards].empty?)
+    if !adapters.empty? && !mixed
       gate[:adapters] = positive ? adapters : (ALL_ADAPTERS - adapters)
     end
     unless acc[:features].empty?
@@ -498,11 +502,27 @@ class TestExtractor
   def find_skip_guards(node, out)
     return unless node.is_a?(Array)
 
-    if (node[0] == :if_mod || node[0] == :unless_mod) && skip_call?(node[2])
-      # `skip unless COND` runs when COND true; `skip if COND` runs when false.
-      positive = node[0] == :unless_mod
-      g = gate_from_run_condition(node[1], positive)
-      out << g if g
+    case node[0]
+    when :if_mod, :unless_mod
+      # `skip ... if/unless COND` — modifier form. `unless` runs when COND true.
+      if skip_call?(node[2])
+        g = gate_from_run_condition(node[1], node[0] == :unless_mod)
+        out << g if g
+        return
+      end
+      find_skip_guards(node[2], out) # body only — never scan the condition
+      return
+    when :if, :unless, :elsif
+      # Block form `if/unless COND; skip; end`: a `skip` reached only under COND
+      # is gated by it, NOT always_skip. (`elsif` gated by its own COND only.)
+      cond, body, els = node[1], node[2], node[3]
+      if stmts_have_skip?(body)
+        g = gate_from_run_condition(cond, node[0] == :unless)
+        out << g if g
+      else
+        find_skip_guards(body, out)
+      end
+      find_skip_guards(els, out)
       return
     end
 
@@ -512,6 +532,13 @@ class TestExtractor
     end
 
     node.each { |c| find_skip_guards(c, out) if c.is_a?(Array) }
+  end
+
+  # Does the conditional body's immediate statement list contain a bare `skip`?
+  def stmts_have_skip?(body)
+    return false unless body.is_a?(Array)
+    return true if skip_call?(body)
+    body.any? { |s| s.is_a?(Array) && skip_call?(s) }
   end
 
   # minitest `skip` is always a bare call — never a method on a receiver.
@@ -584,6 +611,8 @@ class TestExtractor
 
   def finalize_gate(merged, sources)
     out = {}
+    # Empty `adapters` (contradictory gates → "runs on no adapter") is kept
+    # distinct from an absent key (= "runs on all").
     out[:adapters] = merged[:adapters].sort if merged.key?(:adapters)
     out[:features] = merged[:features].sort if merged[:features] && !merged[:features].empty?
     out[:guards] = merged[:guards].sort if merged[:guards] && !merged[:guards].empty?
