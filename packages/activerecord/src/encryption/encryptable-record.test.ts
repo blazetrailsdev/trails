@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import {
   freshAdapter,
   configureEncryption,
@@ -29,8 +29,11 @@ import {
 } from "./test-helpers.js";
 import { Configurable } from "./configurable.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { EncryptableRecord } from "./encryptable-record.js";
 import { isEncryptedAttribute } from "../encryption.js";
+import { RecordInvalid } from "../index.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
@@ -401,27 +404,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     });
   });
 
-  it("can only save unencrypted attributes when frozen encryption is true", async () => {
-    // Build a model with one encrypted (name) and one non-encrypted (notes) attribute.
-    const adp = await freshAdapter();
-    const Article = await makeFreshModel(adp, { id: "integer", name: "string", notes: "string" });
-    Article.encrypts("name");
-    new Article();
-    const article = await Article.create({ name: "Dune", notes: "original" });
-    // Updating a non-encrypted attribute via save succeeds even when frozen.
-    await withEncryptionContext({ frozenEncryption: true }, async () => {
-      article.notes = "updated";
-      await article.save();
-    });
-    const reloaded = await Article.find(article.id);
-    expect(reloaded.notes).toBe("updated");
-    // Updating an encrypted attribute fails validation when frozen.
-    withEncryptionContext({ frozenEncryption: true }, () => {
-      article.name = "New title";
-      expect(article.isValid()).toBe(false);
-      expect(article.errors.added("name", "can't be modified because it is encrypted")).toBe(true);
-    });
-  });
   it("validate column sizes", async () => {
     const Author = makeEncryptedAuthor(await freshAdapter());
     new Author();
@@ -729,5 +711,35 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     BookDate.encrypts("name");
     const book = await BookDate.create({ name: "2024-01-01" });
     await assertEncryptedAttribute(book, "name", Temporal.PlainDate.from("2024-01-01"));
+  });
+});
+
+// Fixture-backed tests whose Rails counterpart reads `encrypted_books(:awdr)`.
+// Isolated in their own describe so the handler suite + transactional fixtures
+// don't perturb the freshAdapter-per-test flow above.
+describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
+  let restoreEncryption: (() => void) | undefined;
+  beforeAll(() => {
+    const snapshot = snapshotEncryptionConfig();
+    Configurable.config.previousSchemes = [];
+    configureEncryption();
+    restoreEncryption = () => restoreEncryptionConfig(snapshot);
+  });
+  afterAll(() => {
+    restoreEncryption?.();
+  });
+
+  const { encryptedBooks } = useHandlerFixtures(["encryptedBooks"], { schema: canonicalSchema });
+
+  it("can only save unencrypted attributes when frozen encryption is true", async () => {
+    const book = encryptedBooks("awdr");
+
+    await withEncryptionContext({ frozenEncryption: true }, async () => {
+      await book.updateBang({ updated_at: new Date() });
+    });
+
+    await withEncryptionContext({ frozenEncryption: true }, async () => {
+      await expect(book.updateBang({ name: "Some new title" })).rejects.toThrow(RecordInvalid);
+    });
   });
 });
