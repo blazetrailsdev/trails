@@ -403,7 +403,9 @@ describe("CascadedEagerLoadingTest", () => {
     posts.reduce((sum, p) => sum + targetArr(p, "comments").length, 0);
 
   it("eager association loading with cascaded two levels", async () => {
-    const loaded = await Author.all().includes({ posts: "comments" }).order("authors.id").toArray();
+    // Rails uses `.order(:id)` here (rb:21); the preload path queries only the
+    // authors table, so the bare `id` is unambiguous — mirrors the symbol form.
+    const loaded = await Author.all().includes({ posts: "comments" }).order("id").toArray();
     expect(loaded).toHaveLength(3);
     expect(targetArr(loaded[0], "posts")).toHaveLength(5);
     expect(targetArr(loaded[1], "posts")).toHaveLength(3);
@@ -411,9 +413,11 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading with cascaded two levels and one level", async () => {
+    // Rails uses `.order(:id)` here (rb:29); preload queries only authors, so
+    // the bare `id` is unambiguous — mirrors the symbol form.
     const loaded = await Author.all()
       .includes({ posts: "comments" }, "categorizations")
-      .order("authors.id")
+      .order("id")
       .toArray();
     expect(loaded).toHaveLength(3);
     expect(targetArr(loaded[0], "posts")).toHaveLength(5);
