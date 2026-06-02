@@ -42,8 +42,9 @@ function restore(saved: Map<string, { hadKey: boolean; value: unknown }>): void 
 
 export const ExecutionContext = {
   /**
-   * Register a callback fired whenever the context changes (after `set`,
-   * `setKey`, and `clear`, and again when a block-form `set` restores).
+   * Register a callback fired whenever the context changes — after `set` and
+   * `setKey`, and again when a block-form `set` restores the previous context.
+   * Like Rails, `clear` does not fire.
    * Mirrors: ActiveSupport::ExecutionContext.after_change.
    */
   afterChange(fn: () => void): void {
@@ -103,11 +104,11 @@ export const ExecutionContext = {
     return Object.fromEntries(_store);
   },
 
-  // Rails' `clear` does not fire after_change callbacks, but emptying the
-  // context is a context change that must invalidate any cached state derived
-  // from it (e.g. QueryLogs' cached comment), so we fire here as well.
+  // Rails' `clear` does NOT fire after_change (execution_context.rb:43-45) —
+  // it is the executor's per-request reset, and the cache it would invalidate
+  // (QueryLogs' cached comment) is re-cleared by the next `set`/`setKey`. We
+  // match that exactly rather than firing here.
   clear(): void {
     _store.clear();
-    runAfterChange();
   },
 };

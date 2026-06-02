@@ -80,13 +80,14 @@ describe("ExecutionContextTest", () => {
     expect(calls).toBe(1);
   });
 
-  it("#after_change fires the callback when #clear is called", () => {
+  it("#after_change does not fire when #clear is called", () => {
+    // Matches Rails: ExecutionContext#clear is `store.clear` with no callback.
     let calls = 0;
     ExecutionContext.afterChange(() => {
       calls += 1;
     });
     ExecutionContext.clear();
-    expect(calls).toBe(1);
+    expect(calls).toBe(0);
   });
 
   it("#after_change fires on both the block-form set and its restore", () => {
