@@ -569,6 +569,45 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
     expect(stderr).not.toMatch(/warning:/);
   });
 
+  it("warns and ignores --database-url when auto-discovered db/schema.ts wins", async () => {
+    writeConventionSchema(
+      tmp,
+      `
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("posts", { force: "cascade" }, (t) => {
+          t.string("title");
+        });
+      }
+    `,
+    );
+    const { code, stdout, stderr } = await withCwd(tmp, () =>
+      runDumpInProcess(
+        ["--database-url", "sqlite3:///nonexistent/should-never-connect.db", "--no-header"],
+        {},
+      ),
+    );
+    expect(code, `stderr: ${stderr}\nstdout: ${stdout}`).toBe(0);
+    expect(stdout).toMatch(/export class Post extends Base/);
+    expect(stderr).toMatch(/auto-discovered db\/schema\.ts; ignoring --database-url/);
+  });
+
+  it("uses the convention schema path as the header sourceHint", async () => {
+    writeConventionSchema(
+      tmp,
+      `
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("posts", { force: "cascade" }, (t) => {
+          t.string("title");
+        });
+      }
+    `,
+    );
+    const { code, stdout } = await withCwd(tmp, () => runDumpInProcess([], { DATABASE_URL: "" }));
+    expect(code).toBe(0);
+    const expectedPath = join(tmp, "db", "schema.ts").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    expect(stdout).toMatch(new RegExp(`from ${expectedPath}`));
+  });
+
   it("emits a deprecation warning when falling through to the live-DB path", async () => {
     // tmp has no db/schema.ts → auto-discovery misses → live-DB path with warning.
     applySchema(dbPath, `CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT);`);

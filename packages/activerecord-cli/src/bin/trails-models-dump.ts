@@ -211,6 +211,11 @@ export async function run(argv: readonly string[]): Promise<number> {
     const conventionSchema = path.join(fs.cwd(), "db", "schema.ts");
 
     if (await fs.exists(conventionSchema)) {
+      if (args.databaseUrl) {
+        process.stderr.write(
+          "trails-models-dump: auto-discovered db/schema.ts; ignoring --database-url.\n",
+        );
+      }
       let source: string;
       try {
         source = fs.readFileSync(conventionSchema, "utf8");
