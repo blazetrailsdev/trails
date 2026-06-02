@@ -70,6 +70,16 @@ export interface DefineSchemaOpts {
   dropExisting?: boolean;
 }
 
+/**
+ * Cumulative counters for `dropExisting:true` calls in the current worker.
+ * `skipped` = tables whose schema matched → truncated instead of dropped.
+ * `executed` = tables that were actually dropped + recreated.
+ * Reset between runs if needed; exported for measurement only.
+ *
+ * @internal
+ */
+export const _dropExistingStats = { skipped: 0, executed: 0 };
+
 /** @internal */
 const WRAPPER_KEYS = new Set(["columns", "primaryKey"]);
 
@@ -567,14 +577,42 @@ async function _defineSchemaImpl(
 
   const cache = getCache(adapter);
 
+  // Tables whose column set already matches the requested schema when
+  // dropExisting:true — these get truncated instead of dropped+recreated.
+  const truncateOnly = new Set<string>();
+
   if (opts?.dropExisting) {
     for (const table of [...order].reverse()) {
-      await ss.dropTable(table, { ifExists: true });
-      cache.delete(table);
+      const newSig = tableSignature(schema[table]);
+      const cachedSig = cache.get(table);
+      const sc = adapter.schemaCache;
+      const pool = adapter.pool ?? null;
+      const stillExists =
+        sc && pool !== null
+          ? ((await sc.dataSourceExists(pool, table)) ?? cachedSig !== undefined)
+          : cachedSig !== undefined;
+      if (stillExists && cachedSig === newSig) {
+        truncateOnly.add(table);
+        _dropExistingStats.skipped++;
+      } else {
+        await ss.dropTable(table, { ifExists: true });
+        cache.delete(table);
+        _dropExistingStats.executed++;
+      }
+    }
+    // Truncate schema-matched tables: clear rows without touching the schema.
+    for (const table of order) {
+      if (!truncateOnly.has(table)) continue;
+      await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
+      const pk = primaryKeyOf(schema[table]);
+      if (pk === undefined) {
+        await _resetAutoIncrement(adapter, ss, table);
+      }
     }
   }
 
   for (const table of order) {
+    if (truncateOnly.has(table)) continue;
     const raw = schema[table];
     const newSig = tableSignature(raw);
     const cachedSig = cache.get(table);
