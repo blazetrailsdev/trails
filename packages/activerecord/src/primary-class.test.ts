@@ -84,11 +84,14 @@ describe("PrimaryClassTest", () => {
     expect(ApplicationRecord.abstractClass).toBe(true);
   });
 
-  it.skip("application record shares a connection with active record by default", () => {
-    // Requires multi-DB named config (arunit) — not available in in-memory test env
-  });
+  // Both tests are gated behind Rails' `unless in_memory_db?` (primary_class_test.rb):
+  // they call `connects_to(database: { writing: :arunit, reading: :arunit })` and
+  // assert the new pool shares ActiveRecord::Base's connection. With an in-memory
+  // SQLite database each `connects_to` pool is an independent `:memory:` DB, so the
+  // connections are never equal — which is exactly why Rails skips them in-memory.
+  // Our default suite is in-memory SQLite (see Story 4.2 / MultipleDbTest), so they
+  // stay skipped here too; the second named pool (ARUnit2Model) itself is wired up.
+  it.skip("application record shares a connection with active record by default", () => {});
 
-  it.skip("application record shares a connection with the primary abstract class if set", () => {
-    // Requires multi-DB named config (arunit) — not available in in-memory test env
-  });
+  it.skip("application record shares a connection with the primary abstract class if set", () => {});
 });
