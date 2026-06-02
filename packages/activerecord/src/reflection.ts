@@ -69,6 +69,60 @@ export function strictLoadingViolationMessage(
 }
 
 /**
+ * Extract the explicit counter-cache column from the `counterCache` option,
+ * accepting its raw (`true` | `"<column>"`) or normalized (`{ column }`) form.
+ * Returns null when no explicit column is configured.
+ *
+ * @internal
+ */
+export function counterCacheColumnOption(counterCache: unknown): string | null {
+  if (typeof counterCache === "string") return counterCache;
+  if (counterCache && typeof counterCache === "object") {
+    return (counterCache as { column?: string | null }).column ?? null;
+  }
+  return null;
+}
+
+/**
+ * Single source of truth for the belongs_to counter-cache column. Mirrors
+ * Rails `ActiveRecord::Reflection#counter_cache_column` for `belongs_to?`:
+ * the explicit column, else the pluralized owner model name + `_count`.
+ *
+ * @internal
+ */
+export function belongsToCounterCacheColumn(
+  counterCache: unknown,
+  ownerName: string,
+): string | null {
+  if (!counterCache) return null;
+  // Rails derives `active_record.name.demodulize.underscore.pluralize` + `_count`
+  // (reflection.rb:250) — demodulize so a namespaced owner (`Admin::Post`)
+  // yields `posts_count`, not `admin/posts_count`.
+  return (
+    counterCacheColumnOption(counterCache) ||
+    `${pluralize(underscore(demodulize(ownerName)))}_count`
+  );
+}
+
+/**
+ * Resolve a column name through a model's attribute aliases, bridging the
+ * snake_case ↔ camelCase key convention: alias keys are stored camelCase
+ * (`commentsCount`) while derived names such as counter-cache columns are
+ * snake_case (`comments_count`). Rails gets this for free in `Arel::Table#[]`
+ * (table.rb:84) because its alias keys are already snake_case; trails
+ * normalizes the lookup key instead of the stored alias.
+ *
+ * @internal
+ */
+export function resolveAliasedColumn(
+  modelClass: { _attributeAliases?: Record<string, string> } | null | undefined,
+  name: string,
+): string {
+  const aliases = modelClass?._attributeAliases ?? {};
+  return aliases[name] ?? aliases[camelize(name, "lower")] ?? name;
+}
+
+/**
  * Base class shared by all reflection types.
  *
  * Mirrors: ActiveRecord::Reflection::AbstractReflection
@@ -198,18 +252,10 @@ export class AbstractReflection {
 
   counterCacheColumn(): string | null {
     const counterCache = (this as any).options?.counterCache;
-    if (!counterCache) {
-      if (this.belongsTo()) return null;
-      return `${(this as any).name}_count`;
-    }
-
-    const column: string | null =
-      counterCache && typeof counterCache === "object" ? (counterCache.column ?? null) : null;
-
     if (this.belongsTo()) {
-      return column || `${pluralize(underscore((this as any).activeRecord?.name ?? ""))}_count`;
+      return belongsToCounterCacheColumn(counterCache, (this as any).activeRecord?.name ?? "");
     }
-    return column || `${(this as any).name}_count`;
+    return counterCacheColumnOption(counterCache) || `${(this as any).name}_count`;
   }
 
   checkValidityOfInverseBang(): void {
