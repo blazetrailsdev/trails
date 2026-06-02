@@ -8,6 +8,19 @@ import { singularize, pluralize } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 /**
+ * @internal Shared identifier guard for MySQL bare-identifier emission
+ * (charset/collation). MySQL requires `CHARACTER SET`/`COLLATE` as bare
+ * identifiers — `quoteIdentifier` (backtick-wrapping) produces invalid DDL
+ * like `COLLATE \`utf8mb4_bin\``. This regex substitutes for quoting: only
+ * safe charset/collation names pass.
+ */
+export function assertSafeMysqlIdentifier(value: string, kind: string): void {
+  if (!/^[A-Za-z0-9_]+$/.test(value)) {
+    throw new ArgumentError(`Invalid MySQL ${kind}: ${JSON.stringify(value)}`);
+  }
+}
+
+/**
  * Column type mapping.
  */
 export type ColumnType =
@@ -1154,22 +1167,14 @@ export class TableDefinition {
       if (this._adapterName === "sqlite" && col.options.collation) {
         parts.push(`COLLATE ${this._adapter.quoteIdentifier(col.options.collation)}`);
       } else if (this._adapterName === "mysql") {
-        // MySQL requires CHARACTER SET and COLLATE as bare identifiers — quoteIdentifier
-        // (backtick-wrapping) produces invalid DDL like COLLATE `utf8mb4_bin`.
-        // The safeIdentRe guard substitutes for quoting: only safe charset/collation names pass.
-        const safeIdentRe = /^[A-Za-z0-9_]+$/;
+        // MySQL emits CHARACTER SET and COLLATE as bare identifiers; the shared
+        // guard substitutes for quoting (see assertSafeMysqlIdentifier).
         if (col.options.charset) {
-          if (!safeIdentRe.test(col.options.charset))
-            throw new ArgumentError(
-              `Invalid MySQL charset: ${JSON.stringify(col.options.charset)}`,
-            );
+          assertSafeMysqlIdentifier(col.options.charset, "charset");
           parts.push(`CHARACTER SET ${col.options.charset}`);
         }
         if (col.options.collation) {
-          if (!safeIdentRe.test(col.options.collation))
-            throw new ArgumentError(
-              `Invalid MySQL collation: ${JSON.stringify(col.options.collation)}`,
-            );
+          assertSafeMysqlIdentifier(col.options.collation, "collation");
           parts.push(`COLLATE ${col.options.collation}`);
         }
       }
@@ -1258,15 +1263,12 @@ export class TableDefinition {
     }
 
     if (this._adapterName === "mysql") {
-      const safeIdentRe = /^[A-Za-z0-9_]+$/;
       if (this.charset) {
-        if (!safeIdentRe.test(this.charset))
-          throw new ArgumentError(`Invalid MySQL charset: ${JSON.stringify(this.charset)}`);
+        assertSafeMysqlIdentifier(this.charset, "charset");
         sql += ` DEFAULT CHARSET=${this.charset}`;
       }
       if (this.collation) {
-        if (!safeIdentRe.test(this.collation))
-          throw new ArgumentError(`Invalid MySQL collation: ${JSON.stringify(this.collation)}`);
+        assertSafeMysqlIdentifier(this.collation, "collation");
         sql += ` COLLATE=${this.collation}`;
       }
     }
