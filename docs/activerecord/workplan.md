@@ -323,13 +323,17 @@ sibling PRs (CLAUDE.md heuristic: prep the surface, then privates follow):
   `[impl]` ~90 LOC · dep: U1. `AdapterSchemaSource.columns()` currently maps
   `col.sqlType` into `ColumnInfo.type`. Carry the dsl cast type in `type` and
   the raw SQL type in a new `sqlType` field so `schemaType`/`schemaLimit`/
-  `schemaPrecision` work on live columns. Convert the dialect virtual
-  `type: :sym` / `size: :sym` outputs to TS text + update their unit tests.
+  `schemaPrecision` work on live columns. Convert **all remaining dialect
+  Ruby-isms** to TS text + update their unit tests: virtual `type: :sym` /
+  `size: :sym` outputs **and** `mysql/schema-dumper.ts` `schemaPrecision`
+  datetime-precision-0 `"nil"`→`"null"` (U1 only fixed the abstract base).
 - **Story 3.3-U3 — route `emitTable` through `columnSpec`** `[impl]` ~120 LOC ·
   dep: U2. Replace the inline `colspec` block with `columnSpec` /
   `columnSpecForPrimaryKey` + `formatColspecRaw`; reconcile defaults
-  (`cleanDefault`→`schemaDefault`); update round-trip snapshots; verify live
-  PG/MySQL in CI (needs `TEST_ADAPTER=postgresql`/`mysql2`).
+  (`cleanDefault`→`schemaDefault`), incl. the abstract `columnSpecForPrimaryKey`
+  `spec["default"] ??= "nil"` Ruby-ism (explicit-PK-default path) → `"null"`;
+  update round-trip snapshots; verify live PG/MySQL in CI (needs
+  `TEST_ADAPTER=postgresql`/`mysql2`).
 
 ### Story 3.4 — SchemaDumpingHelper port + charset-collation dump `[impl + port]` ~165 LOC · dep: 3.3
 

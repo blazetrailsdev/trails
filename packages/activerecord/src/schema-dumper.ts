@@ -1176,18 +1176,22 @@ export class SchemaDumper {
    * {@link formatColspec} re-serializes native JS values. This is the formatter
    * the `columnSpec`-routed emit path uses (Epic 3.3-U); `formatColspec` stays
    * on the legacy inline path until `emitTable` is wired (Story 3.3-U3).
+   *
+   * Keys are interpolated raw (every colspec key is an identifier), matching
+   * Rails and the sibling `formatColspec`. The spec must be **compacted** —
+   * `prepareColumnOptions` only sets defined keys, mirroring Rails'
+   * `spec.compact!` before `format_colspec`; a stray `undefined`/`null` value
+   * would render literally.
    * @internal
    */
   formatColspecRaw(colspec: Record<string, unknown>): string {
-    const isIdent = /^[a-zA-Z_$][\w$]*$/;
     return Object.entries(colspec)
       .map(([k, v]) => {
-        const key = isIdent.test(k) ? k : JSON.stringify(k);
         const value =
           v && typeof v === "object" && !Array.isArray(v)
             ? `{ ${this.formatColspecRaw(v as Record<string, unknown>)} }`
             : String(v);
-        return `${key}: ${value}`;
+        return `${k}: ${value}`;
       })
       .join(", ");
   }
