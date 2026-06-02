@@ -1,16 +1,26 @@
 import type { Base } from "./base.js";
+import type { Type } from "@blazetrails/activemodel";
 import { Json } from "./type/json.js";
-import { SerializationTypeMismatch } from "./errors.js";
-import { resolveAliasName } from "@blazetrails/activemodel";
+import { Serialized, type Coder } from "./type/serialized.js";
+import {
+  ColumnNotSerializableError,
+  isTypeIncompatibleWithSerialize,
+  buildColumnSerializer,
+} from "./attribute-methods/serialization.js";
 
-interface Coder {
-  dump(value: unknown): string;
+interface InnerCoder {
+  dump(value: unknown): string | null;
   load(raw: unknown): unknown;
 }
 
 const _jsonType = new Json();
 
-const JSON_CODER: Coder = {
+/**
+ * The default coder. Mirrors Rails' `ActiveRecord::Coders::JSON`, but loads
+ * through the `Json` type so invalid JSON deserializes to `null` (rescue)
+ * rather than raising — matching `Type::Json#deserialize`.
+ */
+const JSON_INNER: InnerCoder = {
   dump(value: unknown): string {
     return _jsonType.serialize(value) ?? "null";
   },
@@ -19,137 +29,111 @@ const JSON_CODER: Coder = {
   },
 };
 
-const ARRAY_CODER: Coder = {
-  dump(value: unknown): string {
-    return JSON.stringify(Array.isArray(value) ? value : []);
-  },
-  load(raw: unknown): unknown[] {
-    if (raw === null || raw === undefined) return [];
-    if (typeof raw === "string") {
-      try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    }
-    return Array.isArray(raw) ? raw : [];
-  },
-};
+/**
+ * Stand-in for Ruby's `Hash` class, used as the `object_class` for the
+ * `hash`/`type: Hash` coders. JS has no distinct hash class (object literals
+ * are plain `Object`, and arrays are also `Object`), so a `Symbol.hasInstance`
+ * shim lets `Coders::ColumnSerializer` validate "is a plain object, not an
+ * array" via `instanceof` and default to `{}` via `new`.
+ *
+ * @internal
+ */
+export class HashObject {
+  constructor() {
+    return {};
+  }
+  static [Symbol.hasInstance](value: unknown): boolean {
+    return value != null && typeof value === "object" && !Array.isArray(value);
+  }
+}
 
-const HASH_CODER: Coder = {
-  dump(value: unknown): string {
-    return JSON.stringify(typeof value === "object" && value !== null ? value : {});
-  },
-  load(raw: unknown): Record<string, unknown> {
-    if (raw === null || raw === undefined) return {};
-    if (typeof raw === "string") {
-      try {
-        const parsed = JSON.parse(raw);
-        return typeof parsed === "object" && parsed !== null ? parsed : {};
-      } catch {
-        return {};
-      }
-    }
-    return typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
-  },
-};
+type CoderOption = "json" | "array" | "hash" | InnerCoder | (new (...args: any[]) => any);
+
+export interface SerializeOptions {
+  coder?: CoderOption;
+  type?: "Array" | "Hash" | typeof Array | typeof Object | (new (...args: any[]) => any);
+}
+
+/**
+ * Maps the `coder`/`type` options to Rails' `serialize(attr, coder:, type:)`
+ * shape, then delegates to the canonical `build_column_serializer`. The
+ * string-keyed `coder: "json" | "array" | "hash"` forms are a trails
+ * convenience for `coder: JSON, type: Array | Hash`. Returns the built coder
+ * plus the `(coder, type)` pair used by `type_incompatible_with_serialize?`.
+ */
+function resolveSerializer(
+  attribute: string,
+  options: SerializeOptions,
+): { coder: Coder; coderIdentity: unknown; objectType: unknown } {
+  const { coder: coderOpt } = options;
+
+  let rawCoder: unknown = JSON_INNER;
+  // Identity passed to type_incompatible_with_serialize?; the JSON arm fires
+  // for `coder == ::JSON`, so default/"json" report as the global JSON.
+  let coderIdentity: unknown = globalThis.JSON;
+  let objectType: unknown = Object;
+
+  if (!coderOpt || coderOpt === "json") {
+    // default JSON coder
+  } else if (coderOpt === "array") {
+    objectType = globalThis.Array;
+  } else if (coderOpt === "hash") {
+    objectType = HashObject;
+  } else {
+    rawCoder = coderOpt;
+    coderIdentity = coderOpt;
+  }
+
+  // An explicit `type:` constrains the object class (Rails `serialize :x, type: Array`).
+  const t = options.type;
+  if (t === globalThis.Array || t === "Array") {
+    objectType = globalThis.Array;
+  } else if (t === "Hash") {
+    objectType = HashObject;
+  } else if (typeof t === "function" && t !== Object) {
+    objectType = t;
+  }
+
+  const coder = buildColumnSerializer(attribute, rawCoder, objectType) as Coder;
+  return { coder, coderIdentity, objectType };
+}
 
 /**
  * Declare that an attribute should be serialized before saving and
  * deserialized when loading.
  *
- * Mirrors: ActiveRecord::Base.serialize
+ * Wraps the attribute's cast type with `Type::Serialized`, so the coder runs
+ * on both the read path (deserialize/cast) and the write path (serialize for
+ * the database) — matching Rails' `decorate_attributes` step rather than a
+ * read-only accessor override.
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::Serialization::ClassMethods#serialize
  *
  * Usage:
  *   serialize(User, 'preferences', { coder: 'json' })
  *   serialize(User, 'tags', { coder: 'array' })
  *   serialize(User, 'settings', { coder: 'hash' })
  *   serialize(User, 'data', { coder: customCoder })
+ *   serialize(Post, 'tags', { type: Array })
  */
 export function serialize(
   modelClass: typeof Base,
   attribute: string,
-  options: { coder?: "json" | "array" | "hash" | Coder; type?: "Array" | "Hash" } = {},
+  options: SerializeOptions = {},
 ): void {
-  let coder: Coder;
-  if (!options.coder || options.coder === "json") {
-    coder = JSON_CODER;
-  } else if (options.coder === "array") {
-    coder = ARRAY_CODER;
-  } else if (options.coder === "hash") {
-    coder = HASH_CODER;
-  } else {
-    coder = options.coder;
-  }
+  const { coder, coderIdentity, objectType } = resolveSerializer(attribute, options);
 
-  const expectedType =
-    options.type ??
-    (options.coder === "array" ? "Array" : options.coder === "hash" ? "Hash" : undefined);
-
-  // Store the coder config on the class
-  if (!(modelClass as any)._serializedAttributes) {
-    (modelClass as any)._serializedAttributes = new Map();
-  }
-  if (!(modelClass as any)._serializedExpectedTypes) {
-    (modelClass as any)._serializedExpectedTypes = new Map();
-  }
-  (modelClass as any)._serializedAttributes.set(attribute, coder);
-  if (expectedType) {
-    (modelClass as any)._serializedExpectedTypes.set(attribute, expectedType);
-  } else {
-    (modelClass as any)._serializedExpectedTypes.delete(attribute);
-  }
-  if (!(modelClass as any)._serializeWrapped) {
-    (modelClass as any)._serializeWrapped = true;
-    const originalRead = modelClass.prototype.readAttribute;
-
-    modelClass.prototype.readAttribute = function (name: string): unknown {
-      const raw = originalRead.call(this, name);
-      // Serialized coders are registered under the canonical attribute
-      // name, so resolve aliases before the map lookup — matches Rails
-      // `serialize` wrapping `_read_attribute(column_name)` through the
-      // attribute_aliases-aware read path.
-      const canonical = resolveAliasName(this.constructor as any, name);
-      const serializedAttrs: Map<string, Coder> | undefined = (this.constructor as any)
-        ._serializedAttributes;
-      if (serializedAttrs?.has(canonical)) {
-        const expected: string | undefined = (
-          this.constructor as any
-        )._serializedExpectedTypes?.get(canonical);
-        if (expected && raw !== null && raw !== undefined) {
-          // Validate the raw parsed value BEFORE the coder coerces it.
-          // The coders silently coerce (e.g. ARRAY_CODER returns [] for non-arrays),
-          // so checking after load() would be dead code.
-          let parsed: unknown = raw;
-          if (typeof raw === "string") {
-            try {
-              parsed = JSON.parse(raw);
-            } catch {
-              // unparseable string — let the coder handle it
-            }
-          }
-          if (parsed !== null && parsed !== undefined) {
-            const actualType = Array.isArray(parsed)
-              ? "Array"
-              : typeof parsed === "object"
-                ? "Hash"
-                : typeof parsed;
-            if (expected === "Array" && !Array.isArray(parsed)) {
-              throw new SerializationTypeMismatch(
-                `Attribute was supposed to be a Array, but was a ${actualType}.`,
-              );
-            }
-            if (expected === "Hash" && (typeof parsed !== "object" || Array.isArray(parsed))) {
-              throw new SerializationTypeMismatch(
-                `Attribute was supposed to be a Hash, but was a ${actualType}.`,
-              );
-            }
-          }
-        }
-        return serializedAttrs.get(canonical)!.load(raw);
-      }
-      return raw;
-    };
-  }
+  modelClass.decorateAttributes([attribute], (name: string, castType: Type): Type => {
+    // `castType instanceof Json` (computed here, where Json is already imported)
+    // catches both Type::Json and its OID::Jsonb subclass — Rails' `is_a?(Json)`.
+    if (
+      isTypeIncompatibleWithSerialize(castType, coderIdentity, objectType, castType instanceof Json)
+    ) {
+      throw new ColumnNotSerializableError(name, castType);
+    }
+    // Re-declaring serialize on the same attribute (e.g. switching coders)
+    // must wrap the underlying cast type, not stack a second Serialized.
+    const subtype = castType instanceof Serialized ? castType.subtype : castType;
+    return new Serialized(subtype, coder);
+  });
 }

@@ -169,10 +169,14 @@ describe("SerializationTest", () => {
 
     try {
       const author = await Author.create({ name: "David" });
-      await SerializedPost.create({ author_id: author.id, title: "Hello" });
+      // `title` is `serialize`-wrapped (JSON coder), so the stored value is the
+      // coder's encoded form. Assign/query the pre-serialized string — matching
+      // the convention used throughout the serialize tests — so the persisted
+      // value and the join predicate compare equal.
+      await SerializedPost.create({ author_id: author.id, title: JSON.stringify("Hello") });
 
       const results = await Author.joins("serializedPosts")
-        .where({ name: "David", serialized_posts: { title: "Hello" } })
+        .where({ name: "David", serialized_posts: { title: JSON.stringify("Hello") } })
         .toArray();
       expect(results.length).toBe(1);
     } finally {

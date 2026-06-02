@@ -21,8 +21,16 @@ export interface Serialization {
  * Mirrors: ActiveRecord::AttributeMethods::Serialization::ColumnNotSerializableError
  */
 export class ColumnNotSerializableError extends Error {
-  constructor(attributeName: string) {
-    super(`Column \`${attributeName}\` of type binary is not serializable.`);
+  constructor(name: string, type?: unknown) {
+    const typeName =
+      type == null
+        ? "unknown"
+        : ((type as { constructor?: { name?: string } }).constructor?.name ?? String(type));
+    super(
+      `Column \`${name}\` of type ${typeName} does not support \`serialize\` feature.\n` +
+        `Usually it means that you are trying to use \`serialize\`\n` +
+        `on a column that already implements serialization natively.`,
+    );
     this.name = "ColumnNotSerializableError";
   }
 }
@@ -53,16 +61,25 @@ export class ColumnSerializer {
   }
 }
 
-/** @internal */
-function isTypeIncompatibleWithSerialize(
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::Serialization::ClassMethods#type_incompatible_with_serialize?
+ *
+ * @internal
+ */
+export function isTypeIncompatibleWithSerialize(
   castType: unknown,
   coder: unknown,
   type: unknown,
+  isJsonType?: boolean,
 ): boolean {
   const resolvedCoder = coder === globalThis.JSON ? CodersJSON : coder;
-  // Duck-type for ActiveRecord::Type::Json — avoids importing type/json.ts which would
-  // create a cycle via store.ts → serialization.ts → type/json.ts → store.ts.
-  if ((castType as any)?.name === "json" && resolvedCoder === CodersJSON) return true;
+  // Mirrors `cast_type.is_a?(ActiveRecord::Type::Json)`. The caller passes the
+  // `instanceof Json` result (so OID::Jsonb, which extends Json, is also caught)
+  // — importing type/json.ts here would cycle via store.ts → serialization.ts →
+  // type/json.ts → store.ts. Falls back to a name duck-type for callers that
+  // don't supply it.
+  const jsonish = isJsonType ?? (castType as any)?.name === "json";
+  if (jsonish && resolvedCoder === CodersJSON) return true;
   if (castType != null && typeof (castType as any).typeCastArray === "function" && type === Array)
     return true;
   return false;
