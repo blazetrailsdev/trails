@@ -6,7 +6,10 @@
 
 import type { Result } from "./result.js";
 import type { SchemaCache } from "./connection-adapters/schema-cache.js";
-import type { AlterTable } from "./connection-adapters/abstract/schema-definitions.js";
+import type {
+  AlterTable,
+  TableDefinition,
+} from "./connection-adapters/abstract/schema-definitions.js";
 import type { Visitors } from "@blazetrails/arel";
 
 export type { AdapterName } from "./connection-adapters/abstract-adapter.js";
@@ -432,6 +435,18 @@ export interface DatabaseAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#create_alter_table
    */
   createAlterTable?(name: string): AlterTable;
+
+  /**
+   * Instantiate the adapter's dialect-specific `TableDefinition` (e.g.
+   * PostgreSQL's with range/hstore/jsonb column methods, MySQL's with
+   * charset/collation options). `SchemaStatements#createTable` dispatches
+   * through this so dialect column helpers are available in the table
+   * definer block. Adapters that don't mix in `SchemaStatements` (direct
+   * mocks in tests) may omit it.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#create_table_definition
+   */
+  createTableDefinition?(name: string, options?: Record<string, unknown>): TableDefinition;
 
   /**
    * Whether the adapter supports a conflict target in INSERT...ON CONFLICT.
