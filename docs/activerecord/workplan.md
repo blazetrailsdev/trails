@@ -586,9 +586,12 @@ the audit as the campaign's first task.
   3. `relation.ts#isEmptyScope` omits `_namedInnerJoins`.
   4. `relation.ts#referencesEagerLoadedTables` can't see named-inner-join table
      aliases (spurious eager-load promotion).
-  5. (defensive) unbounded recursion guard in `relation.ts#_throughChainHasNestedSource`.
-     Open one small follow-up PR with fixes 1–5 + the regression test from a fresh
-     branch off updated `main`.
+  5. ~~(defensive) unbounded recursion guard in
+     `relation.ts#_throughChainHasNestedSource`.~~ **MOOT** — the poly-twice
+     follow-up (#2840) removed the self-recursion from that method entirely
+     (it is now a single-level walk), so there is no recursion to guard.
+     Open one small follow-up PR with fixes 1–4 + the regression test from a
+     fresh branch off updated `main`.
 - **Follow-up ✅ shipped:** un-skipped `"polymorphic has many through joined
 different table twice"`. Root cause was NOT a missing dedup — once both
   `joins()` args route into one `JoinDependency`, the AliasTracker (7.2) already

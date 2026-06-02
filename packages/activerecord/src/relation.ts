@@ -1352,11 +1352,16 @@ export class Relation<T extends Base> {
   joins(...args: Array<string | string[] | Nodes.Join>): Relation<T>;
   joins(...args: Array<string | string[] | Nodes.Join | undefined>): Relation<T> {
     const rel = this._clone();
-    // Two-string-argument form: joins(table, onClause) — preserved for
-    // back-compat. Disambiguated from a two-association list (Rails'
-    // `joins(:a, :b)`) by the shape of the second arg: an ON clause is a SQL
-    // predicate (contains whitespace or `=`), whereas an association/table name
-    // is a bare identifier. A bare second arg routes to the variadic path below.
+    // Two-string-argument form: joins(table, onClause) — a trails-only
+    // extension preserved for back-compat. Rails has no such form: it
+    // disambiguates by type — `joins(:a, :b)` (symbols → JoinDependency) vs
+    // `joins("raw sql")` (strings → verbatim fragment). trails collapses both
+    // to strings, so a heuristic is unavoidable here. We assume an ON clause is
+    // a SQL predicate (contains whitespace or `=`) while an association/table
+    // name is a bare identifier; a bare second arg routes to the variadic path
+    // below (Rails' `joins(:a, :b)`). LIMITATION: a space-free operator-only ON
+    // clause (`"a.x<b.y"`) would be misrouted — no current call site does this,
+    // but pass such predicates with surrounding whitespace.
     if (
       args.length === 2 &&
       typeof args[0] === "string" &&
@@ -1536,8 +1541,11 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Walk a `:through` chain and report whether any leg's source reflection is
-   * itself a `:through`/HABTM (the shape `_resolveThroughJoin` mis-joins).
+   * Walk a `:through` chain and report whether it is a nested-through that the
+   * flat `_resolveThroughJoin` path mis-joins — i.e. either the through
+   * reflection is itself a `:through`/HABTM (so an intermediate table is joined
+   * more than once) OR the source reflection is itself a `:through`/HABTM. Both
+   * shapes need JoinDependency's AliasTracker.
    *
    * @internal
    */
