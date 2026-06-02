@@ -325,7 +325,7 @@ async function buildRelation(
     if (!hasCsKey || value == null) {
       comparison = adapter?.defaultUniquenessComparison?.(attr, bind) ?? null;
     } else if (options.caseSensitive) {
-      comparison = adapter?.caseSensitiveComparison?.(attr, bind) ?? null;
+      comparison = (await adapter?.caseSensitiveComparison?.(attr, bind)) ?? null;
     } else {
       // UUID columns are already canonical lowercase — skip LOWER() to match Rails,
       // which returns false from can_perform_case_insensitive_comparison_for? for uuid

@@ -1600,7 +1600,10 @@ export class AbstractAdapter implements Quoting {
     return attribute.eq(value);
   }
 
-  caseSensitiveComparison(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
+  caseSensitiveComparison(
+    attribute: Nodes.Attribute,
+    value: unknown,
+  ): Nodes.Node | Promise<Nodes.Node> {
     return attribute.eq(value);
   }
 
