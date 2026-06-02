@@ -215,6 +215,26 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return `ADD ${this.visitUniqueConstraintDefinition(o)}`;
   }
 
+  /**
+   * Route ChangeColumn{,Default}Definition to their visitors. Rails dispatches
+   * dynamically via `visit_#{o.class}`; our abstract `accept` is a manual chain
+   * that doesn't know these PG-only node types, so override it here (mirrors
+   * the MySQL SchemaCreation). Without this, bulk `changeColumnForAlter` throws
+   * "Unknown definition type: ChangeColumnDefinition".
+   * @internal
+   */
+  override accept(
+    o:
+      | Parameters<AbstractSchemaCreation["accept"]>[0]
+      | ChangeColumnDefinition
+      | ChangeColumnDefaultDefinition,
+  ): string {
+    if (o instanceof ChangeColumnDefinition) return this.visitChangeColumnDefinition(o);
+    if (o instanceof ChangeColumnDefaultDefinition)
+      return this.visitChangeColumnDefaultDefinition(o);
+    return super.accept(o as Parameters<AbstractSchemaCreation["accept"]>[0]);
+  }
+
   /** @internal */
   protected visitChangeColumnDefinition(o: ChangeColumnDefinition): string {
     const column = o.column;

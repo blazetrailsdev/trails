@@ -2809,13 +2809,7 @@ describeIfPg("BulkAlterTableMigrationsTest", () => {
     await adapter.close();
   });
 
-  // BLOCKED: PostgreSQL bulk changeTable can't visit a ChangeColumnDefinition
-  // ("Unknown definition type: ChangeColumnDefinition" from SchemaCreation.accept
-  // via PostgreSQLAdapter.changeColumnForAlter). Pre-existing impl gap — these
-  // never passed against live PG (the PG adapter dir is excluded from CI, so the
-  // failure was latent). Skipped here pending the bulk ALTER COLUMN fix; the
-  // relocation keeps them under the Rails BulkAlterTableMigrationsTest layout.
-  it.skip("changing columns", async () => {
+  it("changing columns", async () => {
     await adapter.exec(
       `CREATE TABLE delete_me (id serial primary key, name varchar, birthdate date)`,
     );
@@ -2831,8 +2825,7 @@ describeIfPg("BulkAlterTableMigrationsTest", () => {
     expect(birthdate.type).toBe("datetime");
   });
 
-  // BLOCKED: same ChangeColumnDefinition gap as "changing columns" above.
-  it.skip("changing column null with default", async () => {
+  it("changing column null with default", async () => {
     await adapter.exec(
       `CREATE TABLE delete_me (id serial primary key, name varchar, age integer, birthdate date)`,
     );
