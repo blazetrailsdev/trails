@@ -159,8 +159,9 @@ Per file (or cluster), iterate the `--gates` report until it's clean:
    or spuriously-passing fake test — **don't**. Only convert when the body is a
    real, passing test that was skipped for adapter applicability (rare). For the
    stubs, should-gate is **implementation-time guidance**: when you build the
-   feature, gate it the way Rails does. See
-   [`project_gate_cleanup_should_gate_are_stubs`].
+   feature, gate it the way Rails does. (Empirically ~120/124 of the AR
+   should-gate items in the current run are stubs of this kind — the body is a
+   `BLOCKED: … not implemented` / `requires fixtures` comment.)
 3. **wrong-gate** → make our gate equal Rails', **mirroring Rails' mechanism**:
    if Rails gates by `supports_X?`, use `itIfSupports("X")` (not an adapter
    check); add the key to `SUPPORTS` if missing (verify vs vendored Rails).
@@ -186,9 +187,11 @@ Per file (or cluster), iterate the `--gates` report until it's clean:
 across activerecord — every Rails-gated test we match is gated equivalently (or
 deliberately, documented, left un-gated for a portability reason).
 
-> Tip: `should-gate` is the cheapest win — it's pure test-file edits (no
-> implementation), and each conversion also lowers the headline `skipped` count
-> the [100 attack plan](test-compare-100-attack-plan.md) is chasing.
+> Tip: the **lane-preserving wrong-gate** conversions are the cheapest real win
+> — pure test-file edits, zero behavior change (see step 3). `should-gate` items
+> _look_ cheap but are almost always unimplemented stubs (step 2); genuine
+> adapter-applicability skips are rare, so verify the body passes on the target
+> adapter before converting one.
 
 ---
 
