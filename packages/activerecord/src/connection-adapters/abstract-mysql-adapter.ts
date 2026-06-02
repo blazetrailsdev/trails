@@ -34,7 +34,7 @@ import {
   ValueTooLong,
   sqlTypeToMigrationKeyword,
 } from "../errors.js";
-import { sql as arelSql, type Nodes, Visitors } from "@blazetrails/arel";
+import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
 import {
   SchemaCreation as MysqlSchemaCreation,
@@ -981,16 +981,43 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return [];
   }
 
-  caseSensitiveComparison(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
-    // TODO: Rails checks column.collation && !column.case_sensitive? and wraps
-    // in Arel::Nodes::Bin for case-insensitive collations. Add when schema
-    // column introspection supports collation detection.
+  /**
+   * Mirrors: AbstractMysqlAdapter#case_sensitive_comparison.
+   * A non-binary column with a case-insensitive collation needs an explicit
+   * `BINARY` cast (Arel::Nodes::Bin) to force a case-sensitive comparison.
+   * @internal
+   */
+  override async caseSensitiveComparison(
+    attribute: Nodes.Attribute,
+    value: unknown,
+  ): Promise<Nodes.Node> {
+    const column = (await this.columnForAttribute(attribute)) as MysqlColumn | undefined;
+    if (column?.collation && !column.isCaseSensitive()) {
+      return attribute.eq(new Nodes.Bin(attribute.quotedNode(value)));
+    }
     return super.caseSensitiveComparison(attribute, value);
   }
 
-  /** @internal */
-  canPerformCaseInsensitiveComparisonFor(column: { collation?: string | null }): boolean {
-    return column.collation != null && column.collation.endsWith("_ci");
+  /**
+   * Mirrors: AbstractAdapter#case_insensitive_comparison, with MySQL's
+   * `can_perform_case_insensitive_comparison_for?` override. A column whose
+   * collation is already case-insensitive needs no `LOWER()` wrapper.
+   * @internal
+   */
+  override async caseInsensitiveComparison(
+    attribute: Nodes.Attribute,
+    value: unknown,
+  ): Promise<Nodes.Node> {
+    const column = (await this.columnForAttribute(attribute)) as MysqlColumn | undefined;
+    if (column && this.canPerformCaseInsensitiveComparisonFor(column)) {
+      return attribute.lower().eq((attribute.relation as any).lower(value));
+    }
+    return attribute.eq(value);
+  }
+
+  /** @internal Mirrors: AbstractMysqlAdapter#can_perform_case_insensitive_comparison_for? */
+  canPerformCaseInsensitiveComparisonFor(column: MysqlColumn): boolean {
+    return column.isCaseSensitive();
   }
 
   columnsForDistinct(columns: string, orders: string[]): string {
