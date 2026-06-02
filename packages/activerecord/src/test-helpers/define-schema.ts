@@ -30,6 +30,10 @@ export type ColumnSpec =
   | {
       type: AnyPrimitiveColumnSpec;
       limit?: number;
+      /** Decimal/numeric total digits (mirrors Rails' `precision:`). */
+      precision?: number;
+      /** Decimal/numeric fractional digits (mirrors Rails' `scale:`). */
+      scale?: number;
       references?: string;
       null?: boolean;
       default?: unknown;
@@ -621,6 +625,8 @@ async function _defineSchemaImpl(
         const options: Record<string, unknown> = {};
         if (typeof spec === "object") {
           if (spec.limit !== undefined) options["limit"] = spec.limit;
+          if (spec.precision !== undefined) options["precision"] = spec.precision;
+          if (spec.scale !== undefined) options["scale"] = spec.scale;
           if (spec.null !== undefined) options["null"] = spec.null;
           if (spec.default !== undefined) options["default"] = spec.default;
           if (spec.array !== undefined) options["array"] = spec.array;

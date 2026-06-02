@@ -13,6 +13,7 @@ import {
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { DateTime as OidDateTime } from "../../connection-adapters/postgresql/oid/date-time.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { withTimezoneConfig } from "../../test-helper.js";
 import { Base } from "../../index.js";
 
 setupHandlerSuite();
@@ -138,21 +139,66 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(output).toMatch(/t\.datetime/);
     });
 
-    // Needs Rails time zone support
-    it.skip("timestamp with zone values with rails time zone support and no time zone set", () => {
-      // BLOCKED: adapter-pg — timezone-aware type routing not implemented
-      // ROOT-CAUSE: Rails' with_timezone_config helper (default: :utc, aware_attributes: true)
-      // switches the OID type for timestamptz columns between OID::DateTime and
-      // OID::TimestampWithTimeZone; our adapter has no equivalent runtime config switch.
-      // connection-adapters/postgresql/oid/timestamp-with-time-zone.ts would need to be
-      // wired to a per-connection `aware_attributes` flag. Also requires reconnect() semantics.
-      // SCOPE: ~100 LOC across postgresql-adapter.ts + oid/timestamp-with-time-zone.ts; blocks 5 tests.
+    it("timestamp with zone values with rails time zone support and no time zone set", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+      await adapter.exec(
+        `CREATE TABLE postgresql_timestamp_with_zones (id SERIAL PRIMARY KEY, "time" TIMESTAMP WITH TIME ZONE)`,
+      );
+      await adapter.execute(
+        `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
+      );
+      try {
+        await withTimezoneConfig({ default: "utc", awareAttributes: true }, async () => {
+          adapter.reconnect();
+          class PostgresqlTimestampWithZone extends Base {
+            static _tableName = "postgresql_timestamp_with_zones";
+          }
+          await PostgresqlTimestampWithZone.loadSchema();
+          const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
+            time: Temporal.Instant;
+          };
+          // time zone aware types defaults to [datetime, time] — timestamptz is
+          // NOT included, so the value stays a plain instant (Rails: instance_of Time).
+          expect(record.time).toBeInstanceOf(Temporal.Instant);
+          expect(record.time.epochNanoseconds).toBe(
+            Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
+          );
+        });
+      } finally {
+        adapter.reconnect();
+        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+      }
     });
-    it.skip("timestamp with zone values without rails time zone support", () => {
-      // BLOCKED: adapter-pg — timezone-aware type routing not implemented
-      // ROOT-CAUSE: Same as above; additionally requires setting session-level PG timezone
-      // ("SET time zone 'America/Jamaica'") and routing through the aware_attributes=false path.
-      // SCOPE: Same as above.
+
+    it("timestamp with zone values without rails time zone support", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+      await adapter.exec(
+        `CREATE TABLE postgresql_timestamp_with_zones (id SERIAL PRIMARY KEY, "time" TIMESTAMP WITH TIME ZONE)`,
+      );
+      await adapter.execute(
+        `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
+      );
+      try {
+        await withTimezoneConfig({ default: "local", awareAttributes: false }, async () => {
+          adapter.reconnect();
+          // make sure to use a non-UTC time zone
+          await adapter.execute(`SET time zone 'America/Jamaica'`);
+          class PostgresqlTimestampWithZone extends Base {
+            static _tableName = "postgresql_timestamp_with_zones";
+          }
+          await PostgresqlTimestampWithZone.loadSchema();
+          const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
+            time: Temporal.Instant;
+          };
+          expect(record.time).toBeInstanceOf(Temporal.Instant);
+          expect(record.time.epochNanoseconds).toBe(
+            Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
+          );
+        });
+      } finally {
+        adapter.reconnect();
+        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+      }
     });
   });
 

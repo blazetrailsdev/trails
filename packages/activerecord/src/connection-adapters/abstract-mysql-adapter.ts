@@ -81,6 +81,7 @@ import {
   DecimalType,
 } from "@blazetrails/activemodel";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
+import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
 import { Date as DateType } from "../type/date.js";
 import { DateTime as MysqlDateTimeType } from "./mysql/date-time.js";
 import { Time as TimeType } from "../type/time.js";
@@ -1532,8 +1533,19 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       undefined,
       (sqlType) => new MysqlDateTimeType({ precision: extractMysqlTimePrecision(sqlType) }),
     );
-    m.registerType(/decimal/i, undefined, () => new DecimalType());
-    m.registerType(/numeric/i, undefined, () => new DecimalType());
+    // Mirrors AbstractAdapter#initialize_type_map's decimal registration
+    // (abstract_adapter.rb:906) — MySQL inherits it in Rails, so extract
+    // precision/scale from the sql_type rather than dropping them. Without
+    // this, `decimal(10,2)` columns build a scale-less DecimalType and values
+    // aren't truncated to the column's scale on cast.
+    const registerDecimal = (sqlType: string) => {
+      const scale = this.extractScale(sqlType);
+      const precision = this.extractPrecision(sqlType);
+      if (scale === 0) return new DecimalWithoutScale({ precision });
+      return new DecimalType({ precision, scale });
+    };
+    m.registerType(/decimal/i, undefined, registerDecimal);
+    m.registerType(/numeric/i, undefined, registerDecimal);
     m.registerType("json", new JsonType());
 
     // MySQL-specific overrides (mirrors MySQL's initialize_type_map additions)

@@ -5,10 +5,12 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
+import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Base, ReadonlyAttributeError } from "./index.js";
 import { formatForInspect } from "./attribute-inspection.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { inTimeZone } from "./test-helpers/in-time-zone.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
@@ -910,12 +912,53 @@ describe("AttributeMethodsTest", () => {
     expect(attrs["name"]).toBe("NoPK");
   });
 
-  it.skip("time attributes are retrieved in the current time zone", async () => {
-    // BLOCKED: type — attribute_methods_test.rb: time_zone_aware_attributes read in current TZ
+  it("time attributes are retrieved in the current time zone", async () => {
+    await inTimeZone("Pacific Time (US & Canada)", () => {
+      class Topic extends Base {
+        static {
+          this.attribute("written_on", "datetime");
+        }
+      }
+      const utcTime = Temporal.Instant.from("2008-01-01T00:00:00Z");
+      const record = Topic.new({}) as unknown as {
+        writeAttribute(name: string, value: unknown): void;
+        written_on: TimeWithZone;
+      };
+      record.writeAttribute("written_on", utcTime);
+      const wo = record.written_on;
+      // record.written_on is equal to (i.e. simultaneous with) utc_time …
+      expect(wo.utc().epochNanoseconds).toBe(utcTime.epochNanoseconds);
+      // … but is a TimeWithZone …
+      expect(wo).toBeInstanceOf(TimeWithZone);
+      // … and is in the current Time.zone …
+      expect(wo.timeZone.name).toBe("Pacific Time (US & Canada)");
+      // … and represents time values adjusted accordingly (Time.utc(2007,12,31,16)).
+      const t = wo.time;
+      expect([t.year, t.month, t.day, t.hour, t.minute, t.second]).toEqual([
+        2007, 12, 31, 16, 0, 0,
+      ]);
+    });
   });
 
-  it.skip("setting time zone-aware attribute in other time zone", async () => {
-    // BLOCKED: type — attribute_methods_test.rb: time_zone_aware_attributes write across TZ
+  it("setting time zone-aware attribute in other time zone", async () => {
+    const utcTime = Temporal.Instant.from("2008-01-01T00:00:00Z");
+    const cstTime = new TimeWithZone(utcTime, TimeZone.find("Central Time (US & Canada)"));
+    await inTimeZone("Pacific Time (US & Canada)", () => {
+      class Topic extends Base {
+        static {
+          this.attribute("written_on", "datetime");
+        }
+      }
+      const record = Topic.new({}) as unknown as { written_on: TimeWithZone };
+      record.written_on = cstTime;
+      const wo = record.written_on;
+      expect(wo.utc().epochNanoseconds).toBe(utcTime.epochNanoseconds);
+      expect(wo.timeZone.name).toBe("Pacific Time (US & Canada)");
+      const t = wo.time;
+      expect([t.year, t.month, t.day, t.hour, t.minute, t.second]).toEqual([
+        2007, 12, 31, 16, 0, 0,
+      ]);
+    });
   });
 });
 

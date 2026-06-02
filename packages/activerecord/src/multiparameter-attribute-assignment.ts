@@ -177,6 +177,21 @@ function buildDate(year: number, month: number, day: number): Temporal.PlainDate
   try {
     return Temporal.PlainDate.from({ year, month, day }, { overflow: "reject" });
   } catch {
+    // Rails' `read_date` rescues an invalid `Date.new(*set_values)` and falls
+    // back to `instantiate_time_object(set_values).to_date` — i.e. it lets the
+    // overflowing components roll over the way `Time.local` does (Nov 31 → Dec 1,
+    // Feb 29 in a common year → Mar 1). But `Time.utc/local` only accepts month
+    // in 1..12 and mday in 1..31, rolling *within-range* calendar overflow and
+    // raising `ArgumentError` otherwise (verified on Ruby 3.3: mday 0, mday 32,
+    // month 13 all raise "out of range"), which Rails surfaces as a
+    // MultiparameterAssignmentErrors. Roll over only inside that accepted
+    // domain; otherwise re-raise to match Time's strictness.
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return Temporal.PlainDate.from({ year, month: 1, day: 1 }).add({
+        months: month - 1,
+        days: day - 1,
+      });
+    }
     throw new Error(`Invalid date: ${year}-${month}-${day}`);
   }
 }
