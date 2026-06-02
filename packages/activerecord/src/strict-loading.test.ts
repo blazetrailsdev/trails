@@ -522,6 +522,12 @@ describe("StrictLoadingTest", () => {
       slbhab_devs_projects: { slbhab_dev_id: "integer", slbhab_project_id: "integer" },
       urmd_devs: { name: "string" },
       urmd_logs: { message: "string", urmd_dev_id: "integer" },
+      elslid_devs: { name: "string" },
+      elslid_logs: { message: "string", elslid_dev_id: "integer" },
+      ehosd_devs: { name: "string" },
+      ehosd_profiles: { bio: "string", ehosd_dev_id: "integer" },
+      ehmd_devs: { name: "string" },
+      ehmd_logs: { message: "string", ehmd_dev_id: "integer" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -1740,10 +1746,41 @@ describe("StrictLoadingTest", () => {
     expect(logs).toHaveLength(2);
     expect(logs.every((l: any) => l._strictLoading)).toBe(true);
   });
-  it.skip("eager load audit logs are strict loading because it is strict loading by default", () => {
-    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
-    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
-    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  it("eager load audit logs are strict loading because it is strict loading by default", async () => {
+    class ElslidDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class ElslidLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("elslid_dev_id", "integer");
+      }
+    }
+    Associations.hasMany.call(ElslidDev, "elslidLogs", {
+      className: "ElslidLog",
+      foreignKey: "elslid_dev_id",
+    });
+    registerModel("ElslidDev", ElslidDev);
+    registerModel("ElslidLog", ElslidLog);
+    // The *target* model is strict_loading_by_default, so its instances are
+    // strict_loading regardless of the (non-strict) owner.
+    ElslidLog.strictLoadingByDefault = true;
+    try {
+      const dev = await ElslidDev.create({ name: "D" });
+      for (let i = 0; i < 3; i++) {
+        await ElslidLog.create({ message: "I am message", elslid_dev_id: dev.id });
+      }
+      const loaded = await ElslidDev.all().eagerLoad("elslidLogs").toArray();
+      expect(loaded[0].isStrictLoading()).toBe(false);
+      expect((await ElslidLog.last())?.isStrictLoading()).toBe(true);
+      const logs = (loaded[0] as any)._preloadedAssociations?.get("elslidLogs") ?? [];
+      expect(logs).toHaveLength(3);
+      expect(logs.every((l: Base) => l.isStrictLoading())).toBe(true);
+    } finally {
+      ElslidLog.strictLoadingByDefault = false;
+    }
   });
   it("raises on unloaded relation methods if strict loading", async () => {
     class UrmDev extends Base {
@@ -1895,15 +1932,79 @@ describe("StrictLoadingTest", () => {
     });
     expect(loaded?.id).toBe(profile.id);
   });
-  it.skip("does not raise on eager loading a has one relation if strict loading by default", () => {
-    // FOLLOW-UP: owner-strict + preloaded has_one (no-raise) — already covered
-    // behaviorally by `preload audit logs are strict loading because parent is
-    // strict loading`. Trimmed for PR-size ceiling.
+  it("does not raise on eager loading a has one relation if strict loading by default", async () => {
+    class EhosdDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class EhosdProfile extends Base {
+      static {
+        this.attribute("bio", "string");
+        this.attribute("ehosd_dev_id", "integer");
+      }
+    }
+    Associations.hasOne.call(EhosdDev, "ehosdProfile", {
+      className: "EhosdProfile",
+      foreignKey: "ehosd_dev_id",
+    });
+    registerModel("EhosdDev", EhosdDev);
+    registerModel("EhosdProfile", EhosdProfile);
+    EhosdDev.strictLoadingByDefault = true;
+    try {
+      const created = await EhosdDev.create({ name: "D" });
+      const profile = await EhosdProfile.create({ bio: "I am bio", ehosd_dev_id: created.id });
+      // Mirror `Developer.includes(:ship).first`: the real includes path
+      // populates the preloaded cache, so accessing it on a strict owner does
+      // not raise.
+      const dev = (await EhosdDev.all().includes("ehosdProfile").toArray())[0];
+      expect(dev.isStrictLoading()).toBe(true);
+      const loaded = await loadHasOne(dev, "ehosdProfile", {
+        className: "EhosdProfile",
+        foreignKey: "ehosd_dev_id",
+      });
+      expect(loaded?.id).toBe(profile.id);
+    } finally {
+      EhosdDev.strictLoadingByDefault = false;
+    }
   });
-  it.skip("does not raise on eager loading a has many relation if strict loading by default", () => {
-    // FOLLOW-UP: owner-strict + preloaded has_many (no-raise) — already covered
-    // behaviorally by `preload audit logs are strict loading because parent is
-    // strict loading`. Trimmed for PR-size ceiling.
+  it("does not raise on eager loading a has many relation if strict loading by default", async () => {
+    class EhmdDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class EhmdLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("ehmd_dev_id", "integer");
+      }
+    }
+    Associations.hasMany.call(EhmdDev, "ehmdLogs", {
+      className: "EhmdLog",
+      foreignKey: "ehmd_dev_id",
+    });
+    registerModel("EhmdDev", EhmdDev);
+    registerModel("EhmdLog", EhmdLog);
+    EhmdDev.strictLoadingByDefault = true;
+    try {
+      const created = await EhmdDev.create({ name: "D" });
+      for (let i = 0; i < 3; i++) {
+        await EhmdLog.create({ message: "I am message", ehmd_dev_id: created.id });
+      }
+      // Mirror `Developer.includes(:audit_logs).first`: the real includes path
+      // populates the preloaded cache, so accessing it on a strict owner does
+      // not raise.
+      const dev = (await EhmdDev.all().includes("ehmdLogs").toArray())[0];
+      expect(dev.isStrictLoading()).toBe(true);
+      const loaded = await loadHasMany(dev, "ehmdLogs", {
+        className: "EhmdLog",
+        foreignKey: "ehmd_dev_id",
+      });
+      expect(loaded).toHaveLength(3);
+    } finally {
+      EhmdDev.strictLoadingByDefault = false;
+    }
   });
   // The reflection-level `strictLoading: true` option drives the violation
   // (mirrors Rails' `strict_loading_projects` HABTM declaration), so the
