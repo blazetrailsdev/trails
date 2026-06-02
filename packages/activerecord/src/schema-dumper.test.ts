@@ -4,6 +4,7 @@ import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { cleanDefault, cleanRawPgExpression } from "./schema-dumper.js";
 import { createSidecarTestAdapter, createTestAdapter, adapterType } from "./test-adapter.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 function freshCtx(): { adapter: TestDatabaseAdapter; ctx: MigrationContext } {
@@ -243,7 +244,7 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("products_price_check");
     expect(output).toContain("t.checkConstraint");
   });
-  it.skipIf(adapterType !== "postgres")("schema dumps exclusion constraints", async () => {
+  itIfSupports("exclusion_constraints", "schema dumps exclusion constraints", async () => {
     const { SchemaDumper: PgSchemaDumper } =
       await import("./connection-adapters/postgresql/schema-dumper.js");
     const { adapter: testAdapter, ctx: testCtx } = freshSidecarCtx();
@@ -261,7 +262,7 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("test_schema_exclusion_date_overlap");
     expect(output).toContain("daterange(start_date, end_date) WITH &&");
   });
-  it.skipIf(adapterType !== "postgres")("schema dumps unique constraints", async () => {
+  itIfSupports("unique_constraints", "schema dumps unique constraints", async () => {
     const { SchemaDumper: PgSchemaDumper } =
       await import("./connection-adapters/postgresql/schema-dumper.js");
     const { adapter: testAdapter, ctx: testCtx } = freshSidecarCtx();
@@ -282,7 +283,8 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("test_schema_unique_position_2_nnd");
     expect(output).toContain("nullsNotDistinct: true");
   });
-  it.skipIf(adapterType !== "postgres")(
+  itIfSupports(
+    "unique_constraints",
     "schema does not dump unique constraints as indexes",
     async () => {
       const { SchemaDumper: PgSchemaDumper } =
@@ -359,7 +361,7 @@ describe("SchemaDumperTest", () => {
     // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs type aliasing support */
   });
-  it.skipIf(adapterType === "mysql")("schema dump expression indices", async () => {
+  itIfSupports("expression_index", "schema dump expression indices", async () => {
     await ctx.createTable("users", {}, (t) => {
       t.string("email");
     });
@@ -368,7 +370,7 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain('"lower(email)"');
     expect(output).toContain("idx_users_lower_email");
   });
-  it.skipIf(adapterType === "mysql")("schema dump expression indices escaping", async () => {
+  itIfSupports("expression_index", "schema dump expression indices escaping", async () => {
     await ctx.createTable("users", {}, (t) => {
       t.string("first_name");
       t.string("last_name");
