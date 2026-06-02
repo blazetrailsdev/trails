@@ -8,6 +8,17 @@
  */
 const _store = new Map<string, unknown>();
 
+// Callbacks fired whenever the context mutates. Mirrors Rails'
+// `@after_change_callbacks` (execution_context.rb). ActiveRecord::QueryLogs
+// registers one here to invalidate its cached SQL comment on every change.
+const _afterChangeCallbacks: Array<() => void> = [];
+
+function runAfterChange(): void {
+  for (const cb of _afterChangeCallbacks) {
+    cb();
+  }
+}
+
 function saveAndApply(
   attrs: Record<string, unknown>,
 ): Map<string, { hadKey: boolean; value: unknown }> {
@@ -30,20 +41,32 @@ function restore(saved: Map<string, { hadKey: boolean; value: unknown }>): void 
 }
 
 export const ExecutionContext = {
+  /**
+   * Register a callback fired whenever the context changes (after `set`,
+   * `setKey`, and `clear`, and again when a block-form `set` restores).
+   * Mirrors: ActiveSupport::ExecutionContext.after_change.
+   */
+  afterChange(fn: () => void): void {
+    _afterChangeCallbacks.push(fn);
+  },
+
   set<T = void>(attrs: Record<string, unknown>, fn?: () => T): T | void {
     if (!fn) {
       for (const key of Object.keys(attrs)) {
         _store.set(key, attrs[key]);
       }
+      runAfterChange();
       return;
     }
 
     const saved = saveAndApply(attrs);
+    runAfterChange();
     let result: T;
     try {
       result = fn();
     } catch (e) {
       restore(saved);
+      runAfterChange();
       throw e;
     }
 
@@ -51,16 +74,19 @@ export const ExecutionContext = {
       return (result as unknown as Promise<unknown>).then(
         (val) => {
           restore(saved);
+          runAfterChange();
           return val;
         },
         (e) => {
           restore(saved);
+          runAfterChange();
           throw e;
         },
       ) as unknown as T;
     }
 
     restore(saved);
+    runAfterChange();
     return result;
   },
 
@@ -70,13 +96,18 @@ export const ExecutionContext = {
 
   setKey(key: string, value: unknown): void {
     _store.set(key, value);
+    runAfterChange();
   },
 
   toH(): Record<string, unknown> {
     return Object.fromEntries(_store);
   },
 
+  // Rails' `clear` does not fire after_change callbacks, but emptying the
+  // context is a context change that must invalidate any cached state derived
+  // from it (e.g. QueryLogs' cached comment), so we fire here as well.
   clear(): void {
     _store.clear();
+    runAfterChange();
   },
 };
