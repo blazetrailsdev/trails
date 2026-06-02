@@ -2417,6 +2417,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     const ar = new _AssociationRelationCtor(rel.model, this);
     ar._copyStateFrom(rel);
+    // Re-apply the association's `extend:` modules — mirrors Rails
+    // `CollectionAssociation#scope`, which extends the freshly built scope
+    // with `reflection.extensions`. Without this, an extension method
+    // (`posts(:welcome).comments.find_most_recent`) is lost the moment the
+    // proxy delegates a named scope through `scope()` (`comments.not_again`),
+    // since the scope is built off `buildHasManyRelation`, not cloned off the
+    // proxy that carries `_extending`.
+    const ext = this._assocDef.options.extend;
+    if (ext) {
+      const extensions = Array.isArray(ext) ? ext : [ext];
+      ar.extendingBang(...extensions);
+    }
     return wrapWithScopeProxy(ar);
   }
 
