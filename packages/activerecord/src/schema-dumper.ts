@@ -996,7 +996,11 @@ export class SchemaDumper {
           colspec.default = cleanedDefault;
         }
       }
-      if (extraOpts) {
+      // Serial/bigserial emit a bare shorthand — Rails' schema_limit /
+      // schema_precision / schema_scale all suppress type options for a serial
+      // column, so skip the whole extraOpts spread (today int4/int8 carry none,
+      // but this keeps the invariant local rather than relying on that).
+      if (!col.isSerial && extraOpts) {
         for (const [key, value] of Object.entries(extraOpts)) {
           // `enum_type` carries the PG enum type name — consumed by
           // the column-type fallback below, not a column option.
