@@ -2813,6 +2813,11 @@ export class Base extends Model {
 
     let didDelete = false;
     const destroyResult = await cbRunAll(ctor.prototype, "destroy", this, async () => {
+      // Mirrors Rails Persistence#destroy: `destroy_associations` runs inside the
+      // destroy callback chain — after before_destroy, before the row delete.
+      // The base hook is a no-op; HABTM overrides it to clean up join rows.
+      await (this as any).destroyAssociations();
+
       const table = ctor.arelTable;
       const pk = this.id;
       if (!(Array.isArray(pk) ? pk.every((v) => v == null) : pk == null)) {

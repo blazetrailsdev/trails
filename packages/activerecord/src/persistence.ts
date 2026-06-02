@@ -1323,7 +1323,15 @@ function _queryConstraintsHash(this: PersistencePrivateHost): Record<string, unk
   );
 }
 
-/** @internal */
+/**
+ * A hook to be overridden by association modules. The base implementation is a
+ * no-op; `Builder::HasAndBelongsToMany` overrides it on the model prototype to
+ * delete join rows. Invoked by `Base#_destroyRow` inside the destroy callback
+ * chain (after before_destroy, before the row delete).
+ *
+ * Mirrors: ActiveRecord::Persistence#destroy_associations
+ * @internal
+ */
 export function destroyAssociations(this: PersistencePrivateHost): void {}
 
 /** @internal */
