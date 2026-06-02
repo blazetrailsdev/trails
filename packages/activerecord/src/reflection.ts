@@ -1245,8 +1245,15 @@ export class ThroughReflection extends AbstractReflection {
     // i.e. an explicit class_name wins, else resolve via the source reflection
     // rather than the through association's own name (`noJoinsComments` would
     // otherwise singularize to a nonexistent `NoJoinsComment`, while its source
-    // is `Comment`). The trailing fallback only fires when the source can't be
-    // resolved, preserving the old error message instead of an empty class name.
+    // is `Comment`).
+    //
+    // The trailing `delegateReflection.className` fallback is deliberately
+    // NON-Rails: when the source can't be resolved Rails raises (nil.class_name
+    // inside derive_class_name); we instead return the delegate's own
+    // singularized name so `_klass` produces the informative "Model
+    // 'NoJoinsComment' not found" error rather than "Model '' not found". This
+    // is a best-effort error-message path, not a resolution path — it only
+    // triggers when the source genuinely can't be resolved.
     return (
       (this.options.className as string | undefined) ||
       this.deriveClassName() ||
