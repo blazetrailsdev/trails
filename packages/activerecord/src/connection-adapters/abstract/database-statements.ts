@@ -1674,10 +1674,12 @@ function affectedRows(rawResult: any): never {
  * (commented) SQL — the Rails-faithful ordering where `preprocess_query` runs
  * in `internal_execute`, before `raw_execute`'s `log` block.
  *
- * The re-entrancy guard ensures the transformer loop runs at most once per
- * logical query: a transformer that itself issues a query on this connection
- * (or any other nested execution) reuses the already-transformed SQL rather
- * than re-commenting it.
+ * The `_inQueryTransformers` guard ensures the transformer loop runs at most
+ * once per logical query: a transformer that itself issues a query on this
+ * connection (or any other nested execution) reuses the already-transformed SQL
+ * rather than re-commenting it. `executeBatch` also sets this flag so batch
+ * statements stay uncommented — mirroring Rails' `execute_batch`, which calls
+ * `raw_execute` directly and bypasses `preprocess_query`.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#preprocess_query
  * @internal
@@ -1738,8 +1740,19 @@ export async function executeBatch(
   statements: string[],
   name?: string | null,
 ): Promise<void> {
-  for (const statement of statements) {
-    await (this as any).executeMutation(statement);
+  // Rails' execute_batch calls raw_execute directly, bypassing preprocess_query,
+  // so batch statements never carry a QueryLogs comment. trails routes batches
+  // through executeMutation (its write primitive), so suppress the transformer
+  // pass for the duration to match Rails — see preprocessQuery's guard.
+  const host = this as DatabaseStatementsHost & { _inQueryTransformers?: boolean };
+  const prev = host._inQueryTransformers;
+  host._inQueryTransformers = true;
+  try {
+    for (const statement of statements) {
+      await (this as any).executeMutation(statement);
+    }
+  } finally {
+    host._inQueryTransformers = prev;
   }
 }
 

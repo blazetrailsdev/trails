@@ -226,8 +226,18 @@ export async function executeBatch(
   statements: string[],
   name: string | null = null,
 ): Promise<void> {
-  for (const statement of statements) {
-    await this.execute(statement, [], name ?? undefined);
+  // Mirror Rails' execute_batch → raw_execute, which bypasses preprocess_query:
+  // batch statements carry no QueryLogs comment. Suppress the transformer pass
+  // (see abstract preprocessQuery's guard) for the duration of the batch.
+  const host = this as ExecuteBatchHost & { _inQueryTransformers?: boolean };
+  const prev = host._inQueryTransformers;
+  host._inQueryTransformers = true;
+  try {
+    for (const statement of statements) {
+      await this.execute(statement, [], name ?? undefined);
+    }
+  } finally {
+    host._inQueryTransformers = prev;
   }
 }
 

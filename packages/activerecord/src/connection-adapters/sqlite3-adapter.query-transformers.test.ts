@@ -60,6 +60,18 @@ describe("SQLite3Adapter queryTransformers wiring", () => {
     expect(sqls.every((s) => !s.includes("/*"))).toBe(true);
   });
 
+  it("leaves executeBatch statements uncommented (matches Rails execute_batch)", async () => {
+    queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
+    const { sqls } = await captureSql(() =>
+      adapter.executeBatch([
+        "CREATE TABLE a (id INTEGER PRIMARY KEY)",
+        "CREATE TABLE b (id INTEGER PRIMARY KEY)",
+      ]),
+    );
+    expect(sqls.length).toBeGreaterThan(0);
+    expect(sqls.every((s) => !s.includes("/*app:test*/"))).toBe(true);
+  });
+
   it("applies each transformer exactly once per query", async () => {
     let calls = 0;
     queryTransformers.push({
