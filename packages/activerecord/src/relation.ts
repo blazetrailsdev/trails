@@ -311,6 +311,12 @@ export class Relation<T extends Base> {
   }> = [];
   private _joinValues: (string | Nodes.Join)[] = [];
   private _leftOuterJoinsValues: AssociationSpec[] = [];
+  // INNER `joins()` association names that must be resolved through
+  // JoinDependency (rather than the flat `_resolveAssociationJoin` path)
+  // because the chain references a table more than once and needs Rails'
+  // AliasTracker self-join aliasing — e.g. a nested `:through` whose source
+  // reflection is itself a `:through` (`Author.joins(:similar_posts)`).
+  private _namedInnerJoins: AssociationSpec[] = [];
   private _includesAssociations: AssociationSpec[] = [];
   private _preloadAssociations: AssociationSpec[] = [];
   private _eagerLoadAssociations: AssociationSpec[] = [];
@@ -1362,6 +1368,15 @@ export class Relation<T extends Base> {
         if (!rel._joinValues.includes(arg)) rel._joinValues.push(arg);
         continue;
       }
+      // Nested-through chains that reference a table more than once (e.g. a
+      // `:through` whose source is itself a `:through`) can't be expressed by
+      // the flat `_resolveAssociationJoin` path — it emits unaliased duplicate
+      // JOINs. Route them through JoinDependency (InnerJoin), which applies
+      // Rails' AliasTracker self-join aliasing (`taggings_authors_join`, …).
+      if (typeof arg === "string" && rel._joinNeedsJoinDependency(arg)) {
+        if (!rel._namedInnerJoins.includes(arg)) rel._namedInnerJoins.push(arg);
+        continue;
+      }
       const resolved = rel._resolveAssociationJoin(arg);
       if (resolved) {
         const entries = Array.isArray(resolved) ? resolved : [resolved];
@@ -1482,6 +1497,66 @@ export class Relation<T extends Base> {
     if (reflection.type === "belongsTo") return `${_toUnderscore(name)}_id`;
     if (reflection.options.as) return `${_toUnderscore(reflection.options.as)}_id`;
     return `${_toUnderscore(ownerName)}_id`;
+  }
+
+  /**
+   * True when an INNER `joins(name)` must be routed through JoinDependency
+   * rather than the flat `_resolveAssociationJoin` path. This is the case for
+   * a `:through` association whose chain references a table more than once —
+   * specifically when the through reflection OR the source reflection (at any
+   * nesting level) is itself a `:through`/HABTM. The flat resolver emits an
+   * unaliased duplicate JOIN there; JoinDependency applies AliasTracker.
+   *
+   * @internal
+   */
+  private _joinNeedsJoinDependency(name: string): boolean {
+    const modelClass = this._modelClass as any;
+    const assocDef = (modelClass._associations ?? []).find((a: any) => a.name === name);
+    if (!assocDef) return false;
+    return this._throughChainHasNestedSource(modelClass, assocDef);
+  }
+
+  /** @internal */
+  private _isThroughLike(assocDef: any): boolean {
+    return (
+      assocDef.options?.through != null ||
+      assocDef.type === "hasAndBelongsToMany" ||
+      (assocDef.type as string) === "hasManyThrough" ||
+      (assocDef.type as string) === "hasOneThrough"
+    );
+  }
+
+  /**
+   * Walk a `:through` chain and report whether any leg's source reflection is
+   * itself a `:through`/HABTM (the shape `_resolveThroughJoin` mis-joins).
+   *
+   * @internal
+   */
+  private _throughChainHasNestedSource(modelClass: any, assocDef: any): boolean {
+    const throughName = assocDef.options?.through;
+    if (!throughName) return false;
+    const throughAssoc = (modelClass._associations ?? []).find((a: any) => a.name === throughName);
+    if (!throughAssoc) return false;
+    const throughClassName =
+      throughAssoc.options?.className ??
+      _camelize(throughAssoc.type === "hasMany" ? _singularize(throughName) : throughName);
+    const throughModel = modelRegistry.get(throughClassName);
+    if (!throughModel) return false;
+
+    // The through reflection itself nests another through whose source nests.
+    if (
+      this._isThroughLike(throughAssoc) &&
+      this._throughChainHasNestedSource(modelClass, throughAssoc)
+    )
+      return true;
+
+    // The source reflection on the through model is itself a through/HABTM.
+    const sourceName = assocDef.options?.source ?? _singularize(assocDef.name);
+    const throughAssocs: any[] = (throughModel as any)._associations ?? [];
+    const sourceAssoc =
+      throughAssocs.find((a: any) => a.name === sourceName) ??
+      throughAssocs.find((a: any) => a.name === _pluralize(sourceName));
+    return !!sourceAssoc && this._isThroughLike(sourceAssoc);
   }
 
   /**
@@ -2699,7 +2774,8 @@ export class Relation<T extends Base> {
     const hasStashed =
       manager.joinSourceCount > 0 ||
       this._eagerLoadAssociations.length > 0 ||
-      this._leftOuterJoinsValues.length > 0;
+      this._leftOuterJoinsValues.length > 0 ||
+      this._namedInnerJoins.length > 0;
     const leadingJoins: Nodes.Join[] = [];
     const joinNodes: Nodes.Join[] = [];
     for (const v of this._joinValues) {
@@ -2735,6 +2811,18 @@ export class Relation<T extends Base> {
         this as any,
         pendingLeftOuter,
         Nodes.OuterJoin,
+      );
+      for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
+    }
+    // Named INNER joins routed through JoinDependency (nested-through chains
+    // needing AliasTracker self-join aliasing). Emitted as InnerJoin so they
+    // produce the canonical `*_<owner>_join` aliases (mirrors Rails joins_values
+    // → named_join with InnerJoin type).
+    if (this._namedInnerJoins.length > 0) {
+      const jd = QueryMethodBangs.constructJoinDependency.call(
+        this as any,
+        this._namedInnerJoins,
+        Nodes.InnerJoin,
       );
       for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
     }
@@ -4855,6 +4943,7 @@ export class Relation<T extends Base> {
     this._joinClauses = [...source._joinClauses];
     this._joinValues = [...source._joinValues];
     this._leftOuterJoinsValues = [...source._leftOuterJoinsValues];
+    this._namedInnerJoins = [...source._namedInnerJoins];
     this._includesAssociations = [...source._includesAssociations];
     this._preloadAssociations = [...source._preloadAssociations];
     this._eagerLoadAssociations = [...source._eagerLoadAssociations];

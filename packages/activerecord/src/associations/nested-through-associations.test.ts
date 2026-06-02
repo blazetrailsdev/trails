@@ -1402,33 +1402,81 @@ describe("NestedThroughAssociationsTest", () => {
   // the chain (Author -> posts -> taggings -> tags -> taggings -> posts).
   // Rails' AliasTracker emits the canonical alias `taggings_authors_join`
   // for the second occurrence, which the test depends on.
-  it.skip("nested has many through with a table referenced multiple times", () => {
-    // BLOCKED on the INNER `joins()` nested-through resolver, NOT on alias
-    // emission. AF6 shipped the JoinDependency self-join aliasing: the
-    // LEFT-OUTER (eager-load) path already emits the canonical
-    // `taggings_authors_join` / `posts_authors_join` aliases for this exact
-    // similar_posts chain — see
-    // join-dependency-through-aliasing.test.ts ("emits canonical self-join
-    // aliases when a nested-through chain references a table multiple times").
-    //
-    // The remaining blocker is `Relation#_resolveThroughJoin` (relation.ts):
-    // the INNER `joins(...)` path only resolves a single source -> through ->
-    // target hop and cannot walk a through whose source is itself a through
-    // (here `tags.tagged_posts`), so it mis-joins `tags.author_id`. Routing
-    // INNER nested-through joins through JoinDependency is a relation.ts change
-    // outside AF6's file scope (follow-up). The `author.similar_posts` read
-    // additionally needs nested-through-with-through-source preload support.
-    //
-    // Rails body (ported/translated to TS):
-    //   const authors = await Author.joins("similarPosts")
-    //     .where({ "posts.id": miscByBobId }).distinct().toArray();
-    //   expect(authors.map((a) => a.name).sort()).toEqual(["bob", "mary"]);
-    //   const a1 = await Author.joins("similarPosts")
-    //     .where({ "taggings.taggable_type": "FakeModel" }).toArray();
-    //   expect(a1).toEqual([]);
-    //   const a2 = await Author.joins("similarPosts")
-    //     .where({ "taggings_authors_join.taggable_type": "FakeModel" }).toArray();
-    //   expect(a2).toEqual([]);
+  it("nested has many through with a table referenced multiple times", async () => {
+    // The INNER `joins(:similar_posts)` chain references `taggings` (and
+    // `posts`) twice: Author -> posts -> taggings -> tags -> taggings -> posts.
+    // The first occurrence is aliased `taggings_authors_join` by AliasTracker;
+    // the test references that alias in a `where` to prove the polymorphism is
+    // observed on both join legs.
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Author, "similarPosts", {
+      className: "Post",
+      through: "tags",
+      source: "taggedPosts",
+    });
+    Associations.hasMany.call(Post, "taggings", { className: "Tagging", as: "taggable" });
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
+    Associations.belongsTo.call(Tagging, "taggable", {
+      polymorphic: true,
+      foreignKey: "taggable_id",
+    });
+    Associations.hasMany.call(Tag, "taggings", { className: "Tagging", foreignKey: "tag_id" });
+    Associations.hasMany.call(Tag, "taggedPosts", {
+      className: "Post",
+      through: "taggings",
+      source: "taggable",
+      sourceType: "Post",
+    });
+
+    const bob = await Author.create({ name: "bob" });
+    const mary = await Author.create({ name: "mary" });
+    const carl = await Author.create({ name: "carl" }); // no shared tag → excluded
+    const misc = await Tag.create({ name: "Misc" });
+    const blue = await Tag.create({ name: "Blue" });
+    const general = await Tag.create({ name: "General" });
+
+    const tagPost = async (author: any, title: string, tagIds: any[]) => {
+      const post = await Post.create({ author_id: author.id, title, body: "b" });
+      for (const tagId of tagIds) {
+        await Tagging.create({ tag_id: tagId, taggable_id: post.id, taggable_type: "Post" });
+      }
+      return post;
+    };
+    const miscByBob = await tagPost(bob, "misc by bob", [misc.id, blue.id]);
+    await tagPost(bob, "other by bob", [blue.id]);
+    await tagPost(mary, "misc by mary", [misc.id]);
+    await tagPost(mary, "other by mary", [blue.id]);
+    await tagPost(carl, "carl post", [general.id]);
+
+    const authors = await (Author as any)
+      .joins("similarPosts")
+      .where({ "posts.id": miscByBob.id })
+      .distinct()
+      .toArray();
+    expect(authors.map((a: any) => a.name).sort()).toEqual(["bob", "mary"]);
+
+    // Polymorphism is observed on both join legs (the unaliased second taggings
+    // and the `taggings_authors_join`-aliased first taggings).
+    const a1 = await (Author as any)
+      .joins("similarPosts")
+      .where({ "taggings.taggable_type": "FakeModel" })
+      .toArray();
+    expect(a1).toEqual([]);
+    const a2 = await (Author as any)
+      .joins("similarPosts")
+      .where({ "taggings_authors_join.taggable_type": "FakeModel" })
+      .toArray();
+    expect(a2).toEqual([]);
   });
 
   // Mirrors Rails test_nested_has_many_through_with_scope_on_polymorphic_reflection
@@ -1447,19 +1495,84 @@ describe("NestedThroughAssociationsTest", () => {
   //
   // The polymorphic source on `ordered_taggings` (a scoped through) must
   // emit `taggable_type='Post'` on the canonical-aliased `taggings` join.
-  it.skip("nested has many through with scope on polymorphic reflection", () => {
-    // BLOCKED on the same INNER `joins()` nested-through resolver gap as the
-    // sibling test above — NOT on alias emission, which AF6 shipped (the
-    // LEFT-OUTER path emits the canonical `taggings_authors_join` alias). The
-    // INNER `Relation#_resolveThroughJoin` can't walk a through whose source is
-    // itself a through (`ordered_tags.tagged_posts`). This case additionally
-    // exercises a scoped through (`-> { order("taggings.id DESC") }`).
-    // SCOPE: subsumed by the sibling test's ~200 LOC rewire; no extra LOC.
-    //
-    // Rails body (ported/translated to TS):
-    //   const authors = await Author.joins("ordered_posts")
-    //     .where({ "posts.id": miscByBobId }).distinct().toArray();
-    //   expect(authors.map((a) => a.name).sort()).toEqual(["bob", "mary"]);
+  it("nested has many through with scope on polymorphic reflection", async () => {
+    // `ordered_posts` runs through `ordered_tags` (itself through posts) whose
+    // source `tagged_posts` runs through a SCOPED reflection
+    // (`ordered_taggings -> { order(...) }`) carrying a polymorphic
+    // `source_type: "Post"`. The type constraint must still be emitted on the
+    // canonical-aliased taggings join despite the order scope.
+    class OrderedTag extends Base {
+      static {
+        this.tableName = "tags";
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("OrderedTag", OrderedTag);
+    (OrderedTag as any)._associations = [];
+
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+    Associations.hasMany.call(Author, "orderedTags", {
+      className: "OrderedTag",
+      through: "posts",
+      source: "orderedTags",
+    });
+    Associations.hasMany.call(Author, "orderedPosts", {
+      className: "Post",
+      through: "orderedTags",
+      source: "taggedPosts",
+    });
+    Associations.hasMany.call(Post, "taggings", { className: "Tagging", as: "taggable" });
+    Associations.hasMany.call(Post, "orderedTags", {
+      className: "OrderedTag",
+      through: "taggings",
+      source: "orderedTag",
+    });
+    Associations.belongsTo.call(Tagging, "orderedTag", {
+      className: "OrderedTag",
+      foreignKey: "tag_id",
+    });
+    Associations.belongsTo.call(Tagging, "taggable", {
+      polymorphic: true,
+      foreignKey: "taggable_id",
+    });
+    Associations.hasMany.call(OrderedTag, "orderedTaggings", {
+      className: "Tagging",
+      foreignKey: "tag_id",
+      scope: (rel: any) => rel.order({ id: "desc" }),
+    });
+    Associations.hasMany.call(OrderedTag, "taggedPosts", {
+      className: "Post",
+      through: "orderedTaggings",
+      source: "taggable",
+      sourceType: "Post",
+    });
+
+    const bob = await Author.create({ name: "bob" });
+    const mary = await Author.create({ name: "mary" });
+    const carl = await Author.create({ name: "carl" });
+    const misc = await Tag.create({ name: "Misc" });
+    const blue = await Tag.create({ name: "Blue" });
+    const general = await Tag.create({ name: "General" });
+
+    const tagPost = async (author: any, title: string, tagIds: any[]) => {
+      const post = await Post.create({ author_id: author.id, title, body: "b" });
+      for (const tagId of tagIds) {
+        await Tagging.create({ tag_id: tagId, taggable_id: post.id, taggable_type: "Post" });
+      }
+      return post;
+    };
+    const miscByBob = await tagPost(bob, "misc by bob", [misc.id, blue.id]);
+    await tagPost(bob, "other by bob", [blue.id]);
+    await tagPost(mary, "misc by mary", [misc.id]);
+    await tagPost(mary, "other by mary", [blue.id]);
+    await tagPost(carl, "carl post", [general.id]);
+
+    const authors = await (Author as any)
+      .joins("orderedPosts")
+      .where({ "posts.id": miscByBob.id })
+      .distinct()
+      .toArray();
+    expect(authors.map((a: any) => a.name).sort()).toEqual(["bob", "mary"]);
   });
 
   it("joins through polymorphic source with source_type emits type constraint", () => {

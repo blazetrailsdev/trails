@@ -90,6 +90,9 @@ export function mergeBang(this: any, other: any): any {
     for (const v of other._leftOuterJoinsValues ?? []) {
       if (!this._leftOuterJoinsValues.includes(v)) this._leftOuterJoinsValues.push(v);
     }
+    for (const v of other._namedInnerJoins ?? []) {
+      if (!this._namedInnerJoins.includes(v)) this._namedInnerJoins.push(v);
+    }
     // sticky none
     if (other._isNone) this._isNone = true;
   } else if (typeof other === "object" && other !== null) {

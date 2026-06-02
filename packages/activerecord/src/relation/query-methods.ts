@@ -123,6 +123,7 @@ interface QueryMethodsHost {
   _joinClauses: Array<{ type: "inner" | "left"; table: string; on: string; quoted?: boolean }>;
   _joinValues: (string | Nodes.Join)[];
   _leftOuterJoinsValues: AssociationSpec[];
+  _namedInnerJoins: AssociationSpec[];
   _includesAssociations: AssociationSpec[];
   _preloadAssociations: AssociationSpec[];
   _eagerLoadAssociations: AssociationSpec[];
@@ -654,6 +655,7 @@ function unscopeBang(
         case "joins":
           this._joinClauses = [];
           this._joinValues = [];
+          this._namedInnerJoins = [];
           break;
         case "leftOuterJoins":
           this._joinClauses = this._joinClauses.filter((j) => j.type !== "left");
@@ -1332,12 +1334,17 @@ function addTreeToJoinDependency(
 function constructJoinDependency(
   this: QueryMethodsHost,
   associations: string | AssociationSpec[],
-  _joinType?: unknown,
+  joinType?: unknown,
 ): JoinDependency {
   // Mirror Rails construct_join_dependency → JoinDependency.make_tree (join_dependency.rb:47).
   // Flatten the AssociationSpec mix into a tree, then add each association to the JD
   // using parent context so nested specs attach correctly without duplicate intermediate nodes.
-  const jd = new JoinDependency(this._modelClass);
+  // The join type (InnerJoin for joins(), OuterJoin for eager_load/left_outer_joins)
+  // is threaded into the JoinDependency so joinConstraints emits the requested join.
+  const jd = new JoinDependency(
+    this._modelClass,
+    joinType as typeof Nodes.InnerJoin | typeof Nodes.OuterJoin | undefined,
+  );
   const modelName = (this._modelClass as any).name ?? "model";
   const specs = Array.isArray(associations) ? associations : [associations];
   const tree = makeAssocTree();
@@ -2371,7 +2378,9 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
 /** @internal */
 export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTracker): void {
   const hasEagerAssocs =
-    this._eagerLoadAssociations.length > 0 || this._leftOuterJoinsValues.length > 0;
+    this._eagerLoadAssociations.length > 0 ||
+    this._leftOuterJoinsValues.length > 0 ||
+    this._namedInnerJoins.length > 0;
   if (this._joinClauses.length === 0 && this._joinValues.length === 0 && !hasEagerAssocs) return;
 
   const buckets = buildJoinBuckets.call(this);
@@ -2407,6 +2416,15 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
     const [primary, ...rest] = stashedJoins;
     const constraintNodes = primary.joinConstraints(rest, aliases);
     for (const node of constraintNodes) arel.source.right.push(node);
+  }
+
+  // Named INNER joins routed through JoinDependency (nested-through chains that
+  // need AliasTracker self-join aliasing). Emitted as a standalone JoinDependency
+  // with InnerJoin type so it produces the canonical `*_<owner>_join` aliases
+  // (mirrors Rails joins_values → named_join with InnerJoin).
+  if (this._namedInnerJoins.length > 0) {
+    const jd = constructJoinDependency.call(this, this._namedInnerJoins, Nodes.InnerJoin);
+    for (const node of jd.joinConstraints([], aliases)) arel.source.right.push(node);
   }
 
   for (const node of joinNodes) arel.source.right.push(node);
