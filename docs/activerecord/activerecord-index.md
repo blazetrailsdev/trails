@@ -11,30 +11,34 @@ For the audit reports that produced the original sequencing, see
 ## Current state
 
 - **api:compare**: 4969/4969 (100%) — public surface closed.
-- **test:compare**: 6972/7856 (88.7%), 877 skipped, 4 misplaced (2026-06-02, cached).
+- **test:compare**: 6959/7856 (88.6%), 890 skipped, 3 missing, 15 wrong-describe,
+  4 misplaced (2026-06-02, cached). Full inventory + phase ordering:
+  [`test-compare-100-attack-plan.md`](test-compare-100-attack-plan.md).
 - **Type-audit**: Waves 1–3 shipped; W1b + small follow-ups + W4 remain.
 - **Test infra**: pool epic **complete** (Phases A–F, 2026-05-28); fixtures
   port data-complete (`missing=0` across 146 YAMLs).
 
 ## Doc map (post-consolidation)
 
-| Doc                                                                                      | Owns                                                                                                                                   |
-| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `activerecord-index.md` (this)                                                           | sequencing + doc map                                                                                                                   |
-| [`workplan.md`](workplan.md)                                                             | prioritized, dependency-sensitive PR ordering (waves 0–7) for test:compare 100% + fidelity                                             |
-| [`activerecord-100-plan.md`](activerecord-100-plan.md)                                   | test:compare drive — batch list (Part 1) + per-file backlog table (Part 2)                                                             |
-| [`activerecord-gaps.md`](activerecord-gaps.md)                                           | residual gaps from the 5 merged gap plans (associations, relation, connection-pool, database-tasks, query-cache) — mostly blocked/done |
-| [`adapter-architecture-cleanup.md`](adapter-architecture-cleanup.md)                     | adapter→connection collapse, global-Arel-visitor removal, hash-only constructor, `this.adapter` audit                                  |
-| [`activerecord-type-audit.md`](activerecord-type-audit.md)                               | type cleanup (W1b, small follow-ups, W4)                                                                                               |
-| [`parity-verification.md`](parity-verification.md)                                       | reference: schema + query parity pipelines                                                                                             |
-| [`fixtures-adoption-inventory.md`](fixtures-adoption-inventory.md)                       | reference: script-generated fixture tiering                                                                                            |
-| [`trails-tsc-schema-ts-migration.md`](trails-tsc-schema-ts-migration.md)                 | plan: make `trails-tsc --schema` read `schema.ts`, then drop `trails-schema-dump` (4 sibling PRs)                                      |
-| [`trails-models-dump-schema-ts-migration.md`](trails-models-dump-schema-ts-migration.md) | plan: make `trails-models-dump` derive models from committed `db/schema.ts` instead of a live DB                                       |
+| Doc                                                                                      | Owns                                                                                                                                                        |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `activerecord-index.md` (this)                                                           | doc map + high-level state                                                                                                                                  |
+| [`test-compare-100-attack-plan.md`](test-compare-100-attack-plan.md)                     | **authoritative test:compare 100% ordering** — complete grouped skip inventory, CI-lane analysis, phase sequence (0–4), per-file table, source-verification |
+| [`workplan.md`](workplan.md)                                                             | **per-story specs** (anchors, Rails refs, LOC, deps, acceptance) for the open waves; ordering deferred to the attack plan via a wave→phase crosswalk        |
+| [`activerecord-100-plan.md`](activerecord-100-plan.md)                                   | test:compare drive — batch list (Part 1) + per-file backlog table (Part 2); historical batch detail                                                         |
+| [`activerecord-gaps.md`](activerecord-gaps.md)                                           | residual gaps from the 5 merged gap plans (associations, relation, connection-pool, database-tasks, query-cache) — mostly blocked/done                      |
+| [`adapter-architecture-cleanup.md`](adapter-architecture-cleanup.md)                     | adapter→connection collapse, global-Arel-visitor removal, hash-only constructor, `this.adapter` audit                                                       |
+| [`activerecord-type-audit.md`](activerecord-type-audit.md)                               | type cleanup (W1b, small follow-ups, W4)                                                                                                                    |
+| [`parity-verification.md`](parity-verification.md)                                       | reference: schema + query parity pipelines                                                                                                                  |
+| [`fixtures-adoption-inventory.md`](fixtures-adoption-inventory.md)                       | reference: script-generated fixture tiering                                                                                                                 |
+| [`trails-tsc-schema-ts-migration.md`](trails-tsc-schema-ts-migration.md)                 | plan: make `trails-tsc --schema` read `schema.ts`, then drop `trails-schema-dump` (4 sibling PRs)                                                           |
+| [`trails-models-dump-schema-ts-migration.md`](trails-models-dump-schema-ts-migration.md) | plan: make `trails-models-dump` derive models from committed `db/schema.ts` instead of a live DB                                                            |
 
 ## Focused work set (what's actually buildable)
 
-1. **test:compare drive** — `activerecord-100-plan.md` Phase 4/5 batches +
-   per-file table. The main live backlog.
+1. **test:compare drive** — [`test-compare-100-attack-plan.md`](test-compare-100-attack-plan.md)
+   is the authoritative phase plan (pick a phase/story there, get its spec from
+   `workplan.md`). The main live backlog.
 2. **adapter-architecture** — `adapter-architecture-cleanup.md`: global-Arel-visitor
    removal (Phases A–C, **unblocked**), adapter→connection PR A/B/C, hash-only
    constructor (gated on #2700).
@@ -79,7 +83,7 @@ Owned outside `docs/activerecord/`:
 ## Sequencing summary
 
 ```
-test:compare drive (100-plan)        ── continuous ──
+test:compare drive (attack-plan)     ── continuous; Phase 0→4 (specs in workplan.md) ──
 adapter-architecture cleanup         ── parallel (visitor removal unblocked) ──
 type cleanup (type-audit)            ── parallel ──
 gap residuals (gaps)                 ── mostly blocked; pick unblocked items only ──
