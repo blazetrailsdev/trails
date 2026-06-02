@@ -83,10 +83,14 @@ function buildColumns(
 }
 
 /**
- * The dumper writes `deferrable: ${JSON.stringify(fk.deferrable)}` where
- * `fk.deferrable` has already been normalised to `"immediate"` / `"deferred"`
- * (postgresql-adapter.ts:3591) — never a bare boolean, and the `false` case is
- * never emitted. So only the two string forms can appear in a dumped schema.ts.
+ * The dumper writes `deferrable: ${JSON.stringify(fk.deferrable)}` only when
+ * the value is neither `false` nor `undefined` (schema-dumper.ts:1172), and by
+ * then it has been normalised to `"immediate"` / `"deferred"` — never a bare
+ * boolean — across every adapter that emits FKs: PG's `assertValidDeferrable`
+ * rejects bare `true` (postgresql-adapter.ts:3591) and SQLite's
+ * `_parseFkDeferrable` is typed `Map<string, "immediate" | "deferred">`
+ * (sqlite3-adapter.ts:1151). So only the two string forms can appear in a
+ * dumped schema.ts.
  * @internal
  */
 function parseDeferrable(opts: ts.ObjectLiteralExpression): "immediate" | "deferred" | undefined {
@@ -113,8 +117,18 @@ function parseAddForeignKey(call: ts.CallExpression): ForeignKeyDefinition | und
       ? (args[2] as ts.ObjectLiteralExpression)
       : undefined;
 
+  // Rails' foreign_key_column_for strips the configured table_name_prefix/suffix
+  // before singularizing (schema_statements.rb:1241,1246); the offline parser has
+  // no access to that config, so the inference can diverge under a non-empty
+  // prefix/suffix. Near-dead in practice: the dumper always emits an explicit
+  // `column:` for introspected FKs (schema-dumper.ts:1161), so this default only
+  // fires on a hand-written schema.ts.
   const column = (opts && strLiteral(objPropValue(opts, "column"))) ?? `${singularize(toTable)}_id`;
   const primaryKey = (opts && strLiteral(objPropValue(opts, "primaryKey"))) ?? "id";
+  // For a composite FK `column` is the comma-joined string (e.g. "a_id,b_id"),
+  // so the synthesized name can contain a comma. Harmless: it surfaces only in
+  // generateModels' composite-FK `// TODO composite FK ...` comment
+  // (model-codegen.ts:241) and never round-trips through the dumper.
   const name =
     (opts && strLiteral(objPropValue(opts, "name"))) ?? `fk_rails_${fromTable}_${column}`;
   const onDelete = opts
