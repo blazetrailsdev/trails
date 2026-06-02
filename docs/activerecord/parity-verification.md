@@ -16,8 +16,7 @@ canonical formats — not a "what to build" plan.
   canonical JSON file. A diff job compares the two.
 - **Neutral canonical format.** Neither side's native dump is "truth."
   Both lower into a versioned schema so reshapes in
-  `dumpSchemaColumns` (`packages/activerecord/src/schema-columns-dump.ts`)
-  or `ActiveRecord::SchemaDumper` don't break parity.
+  `SchemaDumper` or `ActiveRecord::SchemaDumper` don't break parity.
 - **Separate ruby and node jobs in CI, run in parallel**, joined by a
   diff job that downloads both artifacts.
 - **Run all fixtures, never fail-fast.** Diff prints per-fixture

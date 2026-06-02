@@ -6,11 +6,13 @@ export default async function defineSchema(ctx: MigrationContext) {
     t.integer("followee_id");
     t.timestamps();
   });
+  await ctx.addIndex("follows", ["follower_id", "followee_id"], { unique: true });
   await ctx.createTable("likes", { force: "cascade" }, (t) => {
     t.integer("user_id");
     t.integer("tweet_id");
     t.timestamps();
   });
+  await ctx.addIndex("likes", ["user_id", "tweet_id"], { unique: true });
   await ctx.createTable("tweets", { force: "cascade" }, (t) => {
     t.integer("user_id");
     t.text("body");
@@ -22,4 +24,5 @@ export default async function defineSchema(ctx: MigrationContext) {
     t.string("bio");
     t.timestamps();
   });
+  await ctx.addIndex("users", "handle", { unique: true });
 }

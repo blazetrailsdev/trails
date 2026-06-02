@@ -157,11 +157,10 @@ no AR import) and the new sibling file imports both the helpers and
 (`@blazetrails/activerecord` does expose a `./*` wildcard subpath export
 (`package.json:37`), so `ForeignKeyDefinition` _could_ instead be
 value-imported from the narrow `connection-adapters/abstract/schema-definitions.js`
-subpath — the way `schema-ts-parser.ts` already imports a _type_ from the
-narrow `schema-columns-dump` subpath. But a narrow value import still drags AR
-runtime into a file on the `trails-tsc` barrel; it shrinks the surface without
-removing the coupling. The sibling-file split keeps the boundary clean, so it
-remains the better answer.)
+subpath. But a narrow value import still drags AR runtime into a file on the
+`trails-tsc` barrel; it shrinks the surface without removing the coupling.
+The sibling-file split keeps the boundary clean, so it remains the better
+answer.)
 
 **`parseSchemaForModels` internals:**
 
