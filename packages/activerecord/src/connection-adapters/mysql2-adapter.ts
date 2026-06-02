@@ -1105,16 +1105,22 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       const charLen = r.char_len ?? r.CHAR_LEN ?? r.CHARACTER_MAXIMUM_LENGTH;
       const numPrec = r.num_precision ?? r.NUM_PRECISION ?? r.NUMERIC_PRECISION;
       const numScale = r.num_scale ?? r.NUM_SCALE ?? r.NUMERIC_SCALE;
-      // character_maximum_length covers string types; for numeric types (float, int, etc.)
-      // it is NULL, so fall back to the type-map limit keyed on DATA_TYPE (not COLUMN_TYPE).
-      // On MariaDB, FLOAT COLUMN_TYPE is normalized to "double" which gives limit=53; using
-      // DATA_TYPE ("float") correctly yields limit=24 matching Rails' native_database_types.
       const charLimitVal = charLen != null ? Number(charLen) : null;
       // lookupCastType always returns a Type (falls back to ValueType with name "value").
-      // We preserve baseType for unregistered types so callers see the raw DATA_TYPE
-      // rather than the opaque "value" sentinel.
-      const castType = this.lookupCastType(baseType);
-      const typeMapLimit = charLimitVal == null ? (castType.limit ?? null) : null;
+      // Key the cast lookup on the full COLUMN_TYPE (e.g. "tinyint(1)") so the
+      // emulate_booleans override (/^tinyint\(1\)/i → Boolean) can fire — Rails'
+      // new_column_from_field keys on the full sql_type (mysql/schema_statements.rb:191).
+      const castType = this.lookupCastType(sqlType);
+      // Rails' fetch_type_metadata derives type AND limit from that one
+      // lookup_cast_type(sql_type) (abstract/schema_statements.rb:1717), so an
+      // emulated tinyint(1) gets type :boolean with limit nil — not the integer
+      // limit 1. The lone divergence is MariaDB, which normalizes a declared
+      // FLOAT's COLUMN_TYPE to "double" in information_schema (limit 53), whereas
+      // Rails reads SHOW FULL FIELDS where it stays "float" (limit 24). For that
+      // one type, re-key the limit on DATA_TYPE to keep Rails' 24; every other
+      // registration yields the same fixed limit regardless of which key is used.
+      const limitType = baseType === "float" ? this.lookupCastType(baseType) : castType;
+      const typeMapLimit = charLimitVal == null ? (limitType.limit ?? null) : null;
       // Map DATA_TYPE ("varchar") to the Rails semantic type ("string") via the type map.
       // MysqlDateTimeType.name is "datetime" for both "datetime" and "timestamp" DATA_TYPEs.
       const castName = castType.name;

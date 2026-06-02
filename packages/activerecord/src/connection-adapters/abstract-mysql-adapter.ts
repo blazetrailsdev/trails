@@ -1087,7 +1087,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   set emulateBooleans(value: boolean) {
     this._emulateBooleans = value;
-    this._typeMap = null; // invalidate cache
+    // Rails' `emulate_booleans=` is a plain class_attribute; its type map is
+    // memoized per emulate_booleans value (EXTENDED_TYPE_MAPS). trails caches a
+    // single map, so drop it here to rebuild against the new setting. Reflected
+    // columns are invalidated separately by `resetColumnInformation` (the
+    // table-scoped `clear_data_source_cache!` Rails calls there) — the toggle's
+    // caller pairs the two, mirroring `mysql_boolean_test.rb`'s
+    // `emulate_booleans` helper.
+    this._typeMap = null;
   }
 
   get nativeTypeMap(): TypeMap {
@@ -1516,10 +1523,17 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
     // Base types (mirrors AbstractAdapter#initialize_type_map via super)
     m.registerType(/^boolean/i, undefined, () => new BooleanType());
-    m.registerType(/^char/i, undefined, () => new StringType());
-    m.registerType(/^varchar/i, undefined, () => new StringType());
-    m.registerType(/^enum/i, undefined, () => new StringType());
-    m.registerType(/^set/i, undefined, () => new StringType());
+    // MySQL registers char/varchar/enum/set with a String type whose
+    // boolean coercions are "1"/"0" rather than the ActiveModel default
+    // "t"/"f", so a boolean assigned to a string column round-trips as
+    // 1/0. Mirrors mysql2_adapter.rb's `Type.register(:string, ...)` block
+    // (`Type::String.new(true: "1", false: "0")`) and its char/enum/set
+    // registrations.
+    const mysqlString = () => new StringType({ trueString: "1", falseString: "0" });
+    m.registerType(/^char/i, undefined, mysqlString);
+    m.registerType(/^varchar/i, undefined, mysqlString);
+    m.registerType(/^enum/i, undefined, mysqlString);
+    m.registerType(/^set/i, undefined, mysqlString);
     m.registerType(/^binary/i, undefined, () => new BinaryType());
     m.registerType(/^varbinary/i, undefined, () => new BinaryType());
     m.registerType(/^date$/i, new DateType());
