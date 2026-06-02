@@ -63,16 +63,20 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((ratingsColumn as any).isArray()).toBe(true);
     });
     it.skip("not compatible with serialize array", async () => {
-      // BLOCKED: adapter-pg — serialize decorator gap
-      // ROOT-CAUSE: Base.serialize() in base.ts does not raise ColumnNotSerializableError for
-      //   array-typed columns; the error class itself is also not yet defined.
-      // SCOPE: ~30 LOC — add ColumnNotSerializableError to errors.ts + guard in serialize() decorator
+      // BLOCKED: serialize machinery — no cast-type decoration step.
+      // ColumnNotSerializableError already exists (attribute-methods/serialization.ts),
+      // but serialize() (serialize.ts) only wraps readAttribute with a coder; it never
+      // resolves the attribute's cast type, so it can't run Rails'
+      // `type_incompatible_with_serialize?` (cast_type responds to type_cast_array &&
+      // type == Array) to raise on an OID::Array column. Needs a decorate-attributes
+      // step in the serialize machinery — a serialize-feature story, not array OID.
     });
     it.skip("array with serialized attributes", async () => {
-      // BLOCKED: adapter-pg — serialize decorator coder path missing
-      // ROOT-CAUSE: Base.serialize({ coder: ... }) in base.ts not wired; coder encode/decode
-      //   lifecycle around the OID::Array serialize/deserialize chain is not implemented.
-      // SCOPE: ~50 LOC in base.ts serialize decorator + integration with attribute-set lifecycle
+      // BLOCKED: serialize machinery — custom-coder load/dump lifecycle.
+      // serialize() supports "json"/"array"/"hash"/coder-object on read, but not Rails'
+      // class-coder protocol (`MyTags.load`/`MyTags.dump`) layered over an OID::Array
+      // column with full write+reload round-trip. Needs Type::Serialized-style wrapping
+      // of the underlying array type — a serialize-feature story, not array OID.
     });
     it("default", async () => {
       await adapter.addColumn("pg_arrays", "score", "integer", { array: true, default: [4, 4, 2] });
@@ -142,18 +146,22 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((column as any).isArray()).toBe(true);
     });
     it.skip("change column cant make non array column to array", async () => {
-      // BLOCKED: adapter-pg — StatementInvalid wrapping missing for DDL errors
-      // ROOT-CAUSE: adapter's executeStatement (postgresql-adapter.ts) does not catch PG
-      //   constraint/type errors and re-raise as ActiveRecord::StatementInvalid; the error class
-      //   is also not yet exported from errors.ts.
-      // SCOPE: ~20 LOC — StatementInvalid error class + catch-rethrow in executeStatement
+      // BLOCKED: cross-cutting — DDL exec path does not translate driver errors.
+      // ROOT-CAUSE: schema statements run DDL via `exec()` (postgresql-adapter.ts:1986),
+      //   which is the bare driver call with no exception translation; only `execute()`
+      //   routes through `_translateException` → StatementInvalid. PG raises a raw 42804
+      //   ("cannot be cast automatically") here, so `assert_raises StatementInvalid` fails.
+      // SCOPE: adapter-wide — route schema-statement DDL through the translating path
+      //   (or wrap `exec`). Belongs in a DDL exception-translation story, not array OID.
     });
-    it.skip("change column default with array", async () => {
-      // BLOCKED: adapter-pg — changeColumnDefault array serialization missing
-      // ROOT-CAUSE: schema-statements changeColumnDefault passes the value through quoteDefault
-      //   but does not serialize JS arrays via OID::Array before quoting; PG receives a JS
-      //   stringified value instead of a valid array literal.
-      // SCOPE: ~10 LOC in connection-adapters/postgresql/schema-statements.ts
+    it("change column default with array", async () => {
+      await adapter.changeColumnDefault("pg_arrays", "tags", []);
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+      }
+      await PgArrays.loadSchema();
+      // Rails: assert_equal [], PgArray.column_defaults["tags"]
+      expect((PgArrays as any).columnDefaults["tags"]).toEqual([]);
     });
 
     it("type cast array", async () => {
@@ -289,11 +297,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].tags).toEqual(tags);
     });
 
-    it.skip("insert fixture", async () => {
-      // BLOCKED: adapter-pg — insert_fixture API missing
-      // ROOT-CAUSE: PostgreSQLAdapter has no insertFixture() method; Rails' connection.insert_fixture
-      //   serializes fixture hash values through the column types and executes a single INSERT.
-      // SCOPE: ~20 LOC in postgresql-adapter.ts + abstract-adapter insertFixture
+    it("insert fixture", async () => {
+      const tagValues = ["val1", "val2", "val3_with_'_multiple_quote_'_chars"];
+      await (adapter as any).insertFixture({ tags: tagValues }, "pg_arrays");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+      }
+      await PgArrays.loadSchema();
+      const last = await (PgArrays as any).last();
+      // Rails: assert_equal(PgArray.last.tags, tag_values)
+      expect((last as any).tags).toEqual(tagValues);
     });
     it("attribute for inspect for array field", async () => {
       class PgArrays extends Base {
@@ -373,18 +386,18 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("mutate value in array", async () => {
-      // BLOCKED: adapter-pg — hstore array subtype missing
-      // ROOT-CAUSE: OID::HStore type (connection-adapters/postgresql/oid/hstore.ts) is not wired
-      //   as the element subtype for `hstores hstore[]` columns; the hstores column is not
-      //   registered in the type-map initializer as an array-of-hstore OID.
-      // SCOPE: ~15 LOC — wire hstore OID as array element subtype in type-map-initializer.ts
+      // BLOCKED: hstore[] subtype + missing schema column.
+      // The pg_arrays table created above omits the `hstores hstore[]` column (needs the
+      // hstore extension), and OID::HStore is not wired as an array element subtype, so
+      // an `hstore[]` column would not deserialize to per-element hash objects. Both the
+      // hstore-extension table setup and the array-of-hstore OID wiring are prerequisites.
     });
     it.skip("datetime with timezone awareness", async () => {
-      // BLOCKED: adapter-pg — timezone-aware datetime deserialization missing
-      // ROOT-CAUSE: OID::DateTime (or the timestamp array subtype) does not respect
-      //   ActiveSupport::TimeZone when casting array elements; `in_time_zone` / `Time.zone`
-      //   infrastructure not ported to TS.
-      // SCOPE: large — requires TimeZone registry port; defer to a dedicated timezone PR
+      // BLOCKED: TimeZone infra + missing schema column.
+      // The pg_arrays table above omits the `datetimes datetime[]` column, and the
+      // timestamp/datetime array subtype does not respect ActiveSupport::TimeZone when
+      // casting elements (`in_time_zone` / `Time.zone` not ported). Requires the TimeZone
+      // registry port — defer to a dedicated timezone PR.
     });
     it("assigning non array value", async () => {
       class PgArrays extends Base {

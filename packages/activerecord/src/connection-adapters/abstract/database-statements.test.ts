@@ -295,7 +295,7 @@ describe("DatabaseStatements", () => {
     } {
       const executed: Array<{ sql: string; name?: string | null; receiver: unknown }> = [];
       const host: QuoterHost = {
-        async execute(sql: string, name?: string | null) {
+        async execute(sql: string, _binds?: unknown[], name?: string | null) {
           // captures `this` to verify receiver is preserved
           executed.push({ sql, name, receiver: this });
         },
