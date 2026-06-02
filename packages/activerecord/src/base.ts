@@ -2441,18 +2441,18 @@ export class Base extends Model {
         // relative to nil). Dispatch through the prototype setter so the write
         // lands in the store hash rather than a standalone attribute slot.
         for (const [k, v] of Object.entries(_storeAttrs)) {
-          let _proto = Object.getPrototypeOf(this);
-          let _dispatched = false;
-          while (_proto !== null && _proto !== Object.prototype) {
-            const _desc = Object.getOwnPropertyDescriptor(_proto, k);
-            if (_desc?.set) {
-              (_desc.set as (val: unknown) => void).call(this, v);
-              _dispatched = true;
+          let proto = Object.getPrototypeOf(this);
+          let dispatched = false;
+          while (proto !== null && proto !== Object.prototype) {
+            const desc = Object.getOwnPropertyDescriptor(proto, k);
+            if (desc?.set) {
+              (desc.set as (val: unknown) => void).call(this, v);
+              dispatched = true;
               break;
             }
-            _proto = Object.getPrototypeOf(_proto);
+            proto = Object.getPrototypeOf(proto);
           }
-          if (!_dispatched) (this as any)._writeAttribute(k, v);
+          if (!dispatched) (this as any)._writeAttribute(k, v);
         }
         if (assocPending) {
           _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);

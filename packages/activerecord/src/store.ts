@@ -315,11 +315,11 @@ export class StringKeyedHashAccessor extends HashAccessor {
   }
 
   /**
-   * Mirrors: ActiveRecord::Store::StringKeyedHashAccessor.prepare.
-   * Structured column types (hstore, jsonb) store native objects rather
-   * than JSON strings, so initialize a null/undefined value to an empty
-   * plain object `{}` instead of the JSON literal `"{}"` that HashAccessor
-   * uses for text-backed columns.
+   * TS-specific override: the base HashAccessor.prepare writes `"{}"` (a JSON
+   * string) for null values, which the hstore parser rejects as invalid hstore
+   * format. Write `{}` (plain object) instead. Rails' StringKeyedHashAccessor
+   * does not override prepare — it inherits HashAccessor.prepare which writes
+   * an empty Ruby Hash; TS needs this override because the base writes a string.
    */
   static override prepare(object: Base, attribute: string): void {
     const val = object.readAttribute(attribute);
