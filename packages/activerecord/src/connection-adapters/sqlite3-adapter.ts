@@ -2044,7 +2044,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const code = (e as any)?.code;
       if (code !== undefined) (exc as any).code = code;
     }
-    return translateException(exc, msg, sql, binds);
+    return translateException(exc, msg, sql, binds, this.pool);
   }
 
   /** @internal */
@@ -2287,6 +2287,7 @@ function translateException(
   message: string,
   sql: string,
   binds: unknown[],
+  connectionPool?: unknown,
 ): Error {
   const msg = exception.message;
   const code = (exception as any)?.code as string | undefined;
@@ -2294,27 +2295,27 @@ function translateException(
     code?.includes("CONSTRAINT_UNIQUE") ||
     /(column(s)? .* (is|are) not unique|UNIQUE constraint failed: .*)/i.test(msg)
   ) {
-    return new RecordNotUnique(message, { sql, binds, cause: exception });
+    return new RecordNotUnique(message, { sql, binds, connectionPool, cause: exception });
   }
   if (
     code?.includes("CONSTRAINT_NOTNULL") ||
     /(.* may not be NULL|NOT NULL constraint failed: .*)/i.test(msg)
   ) {
-    return new NotNullViolation(message, { sql, binds, cause: exception });
+    return new NotNullViolation(message, { sql, binds, connectionPool, cause: exception });
   }
   if (code?.includes("CONSTRAINT_FOREIGNKEY") || /FOREIGN KEY constraint failed/i.test(msg)) {
-    return new InvalidForeignKey(message, { sql, binds, cause: exception });
+    return new InvalidForeignKey(message, { sql, binds, connectionPool, cause: exception });
   }
   if (msg.includes("String or BLOB exceeded size limit")) {
-    return new ValueTooLong(message, { sql, binds, cause: exception });
+    return new ValueTooLong(message, { sql, binds, connectionPool, cause: exception });
   }
   if (_isSqliteMissingDbError(exception)) {
-    return new NoDatabaseError(message, { sql, binds, cause: exception });
+    return new NoDatabaseError(message, { sql, binds, connectionPool, cause: exception });
   }
   if (/called on a closed database/i.test(msg)) {
-    return new ConnectionNotEstablished(message, { cause: exception });
+    return new ConnectionNotEstablished(message, { connectionPool, cause: exception });
   }
-  return new StatementInvalid(message, { sql, binds, cause: exception });
+  return new StatementInvalid(message, { sql, binds, connectionPool, cause: exception });
 }
 
 // `executeMutation` is this adapter's write/DDL primitive (reads go through
