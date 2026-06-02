@@ -126,7 +126,9 @@ function _decompose(
     result[modelAttr] = resolved;
   }
   for (const [modelAttr] of mapping) record.writeAttribute(modelAttr, result[modelAttr]);
-  cache.set(name, Object.freeze(value));
+  // Mirrors Rails: part.dup.freeze — copy first, then freeze the copy.
+  const proto = Object.getPrototypeOf(value as object) ?? Object.prototype;
+  cache.set(name, Object.freeze(Object.assign(Object.create(proto), value)));
 }
 
 /**
