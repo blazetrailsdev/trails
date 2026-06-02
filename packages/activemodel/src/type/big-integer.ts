@@ -3,6 +3,13 @@ import { IntegerType } from "./integer.js";
 export class BigIntegerType extends IntegerType {
   readonly name: string = "big_integer";
 
+  // Mirrors Rails: `BigInteger < Integer` inherits `Integer#type`, hardcoded
+  // `:integer`. Our `name` ("big_integer") is the type-registry key, not the
+  // reflected column type — `column.type` for a bigint is `:integer`.
+  override type(): string {
+    return "integer";
+  }
+
   serializeCastValue(value: number | null): number | null {
     return value;
   }

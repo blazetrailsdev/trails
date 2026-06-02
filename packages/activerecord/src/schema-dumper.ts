@@ -46,6 +46,8 @@ export interface ColumnInfo {
   array?: boolean;
   /** True when the column's OID-resolved type is a PostgreSQL enum (not a domain or other custom type). */
   isEnum?: boolean;
+  /** True for PostgreSQL serial/bigserial columns — emitted as the `t.serial`/`t.bigserial` shorthand. */
+  isSerial?: boolean;
 }
 
 export interface IndexInfo {
@@ -174,6 +176,9 @@ const DSL_HELPER_METHODS = new Set([
   "text",
   "integer",
   "bigint",
+  // PG serial shorthands — TableDefinition.serial / .bigserial helpers.
+  "serial",
+  "bigserial",
   "float",
   "decimal",
   "boolean",
@@ -414,6 +419,7 @@ class AdapterSchemaSource implements SchemaSource {
       collation: col.collation ?? undefined,
       array: (col as any).array === true ? true : undefined,
       isEnum: col.type === "enum" ? true : undefined,
+      isSerial: (col as any).isSerial === true ? true : undefined,
     }));
   }
 
@@ -966,11 +972,22 @@ export class SchemaDumper {
     for (const col of columns) {
       if (col.name === "id" && hasId) continue;
 
-      const { dslType, extraOpts } = sqlTypeToDsl(col.type);
+      const { dslType: mappedDslType, extraOpts } = sqlTypeToDsl(col.type);
+      // PG serial/bigserial: Rails emits the shorthand and omits both the
+      // sequence default and the integer limit (schema_default / schema_limit
+      // return nil for a serial column). The SQL type still introspects as
+      // integer/bigint, so we override here off the carried isSerial flag.
+      const dslType = col.isSerial
+        ? col.type === "bigint"
+          ? "bigserial"
+          : "serial"
+        : mappedDslType;
       const colspec: Record<string, unknown> = {};
 
       if (col.null === false) colspec.null = false;
-      if (col.defaultFunction) {
+      if (col.isSerial) {
+        // serial columns carry no user-visible default
+      } else if (col.defaultFunction) {
         const fn = col.defaultFunction;
         colspec.default = () => fn;
       } else {
@@ -979,7 +996,11 @@ export class SchemaDumper {
           colspec.default = cleanedDefault;
         }
       }
-      if (extraOpts) {
+      // Serial/bigserial emit a bare shorthand — Rails' schema_limit /
+      // schema_precision / schema_scale all suppress type options for a serial
+      // column, so skip the whole extraOpts spread (today int4/int8 carry none,
+      // but this keeps the invariant local rather than relying on that).
+      if (!col.isSerial && extraOpts) {
         for (const [key, value] of Object.entries(extraOpts)) {
           // `enum_type` carries the PG enum type name — consumed by
           // the column-type fallback below, not a column option.
@@ -988,7 +1009,12 @@ export class SchemaDumper {
         }
       }
       if (col.array && !colspec.array) colspec.array = true;
-      if (col.limit !== undefined && col.limit !== null && extraOpts?.limit === undefined)
+      if (
+        !col.isSerial &&
+        col.limit !== undefined &&
+        col.limit !== null &&
+        extraOpts?.limit === undefined
+      )
         colspec.limit = col.limit;
       if (extraOpts?.precision === undefined) {
         if (dslType === "datetime" || dslType === "timestamp") {
