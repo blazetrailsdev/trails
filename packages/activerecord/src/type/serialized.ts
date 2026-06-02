@@ -1,4 +1,5 @@
 import { Type, ValueType, BinaryData } from "@blazetrails/activemodel";
+import { IndifferentHashAccessor } from "../store.js";
 
 /**
  * Structural JSON key used to compare a value against the coder's default.
@@ -53,8 +54,9 @@ export class Serialized extends ValueType {
     }
   }
 
+  // Rails: Type::Serialized#accessor returns Store::IndifferentHashAccessor.
   accessor(): unknown {
-    return null;
+    return IndifferentHashAccessor;
   }
 
   deserialize(value: unknown): unknown {
@@ -87,12 +89,22 @@ export class Serialized extends ValueType {
   }
 
   override isChangedInPlace(rawOldValue: unknown, value: unknown): boolean {
-    const oldSerialized = this.serialize(this.deserialize(rawOldValue));
-    const newSerialized = this.serialize(value);
-    return oldSerialized !== newSerialized;
+    if (value === null || value === undefined) return false;
+    const rawNewValue = encoded(this, value);
+    const oldNil = rawOldValue === null || rawOldValue === undefined;
+    const newNil = rawNewValue === null || rawNewValue === undefined;
+    return (
+      oldNil !== newNil || (this.subtype.isChangedInPlace?.(rawOldValue, rawNewValue) ?? false)
+    );
   }
 
   assertValidValue(value: unknown): void {
+    // trails accepts pre-serialized string payloads on assignment (see `cast`),
+    // so a raw string is not yet the decoded object the coder validates — the
+    // coder's `load` re-validates the decoded result on read. Rails only sees
+    // already-decoded objects here because its Mutable#cast never accepts a
+    // raw payload, so it has no equivalent guard.
+    if (typeof value === "string") return;
     if (this.coder.assertValidValue) {
       this.coder.assertValidValue(value);
     }
@@ -103,6 +115,11 @@ export class Serialized extends ValueType {
   }
 
   override isSerialized(): boolean {
+    return true;
+  }
+
+  // Rails: Type::Serialized includes ActiveModel::Type::Helpers::Mutable.
+  override isMutable(): boolean {
     return true;
   }
 
