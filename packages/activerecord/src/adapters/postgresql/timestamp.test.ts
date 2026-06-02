@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { TimeWithZone } from "@blazetrails/activesupport";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import {
   describeIfPg,
@@ -203,28 +204,123 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTimestampWithAwareTypesTest", () => {
-    it.skip("timestamp with zone values with rails time zone support and time zone set", () => {
-      // BLOCKED: adapter-pg — timezone-aware type routing not implemented
-      // ROOT-CAUSE: Requires aware_types: [:timestamptz, :datetime, :time] routing +
-      // zone: "Pacific Time (US & Canada)" config; the OID type for timestamptz would
-      // need to wrap values in a zone-aware type (Rails' ActiveSupport::TimeWithZone analog).
-      // No equivalent TimeWithZone class exists in the TS layer yet.
-      // SCOPE: ~150 LOC new; blocks this test only.
+    it("timestamp with zone values with rails time zone support and time zone set", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+      await adapter.exec(
+        `CREATE TABLE postgresql_timestamp_with_zones (id SERIAL PRIMARY KEY, "time" TIMESTAMP WITH TIME ZONE)`,
+      );
+      await adapter.execute(
+        `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
+      );
+      try {
+        await withTimezoneConfig(
+          {
+            default: "utc",
+            awareAttributes: true,
+            zone: "Pacific Time (US & Canada)",
+            awareTypes: ["timestamptz", "datetime", "time"],
+          },
+          async () => {
+            adapter.reconnect();
+            class PostgresqlTimestampWithZone extends Base {
+              static _tableName = "postgresql_timestamp_with_zones";
+            }
+            await PostgresqlTimestampWithZone.loadSchema();
+            const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
+              time: TimeWithZone;
+            };
+            // aware_types includes :timestamptz + a zone is set, so the timestamptz
+            // column is wrapped in TimeWithZone (Rails: instance_of ActiveSupport::TimeWithZone).
+            expect(record.time).toBeInstanceOf(TimeWithZone);
+            expect(record.time.utc().epochNanoseconds).toBe(
+              Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
+            );
+          },
+        );
+      } finally {
+        adapter.reconnect();
+        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+      }
     });
   });
 
   describe("PostgreSQLTimestampWithTimeZoneTest", () => {
-    it.skip("timestamp with zone values with rails time zone support and timestamptz and no time zone set", () => {
-      // BLOCKED: adapter-pg — aware_attributes / aware_types routing not implemented.
-      // withPostgresqlDatetimeType is now wired (see test-helper.ts); the remaining
-      // blocker is with_timezone_config(aware_attributes: true, aware_types: [...]),
-      // which routes timestamptz columns through TimeWithZone instead of Temporal.Instant.
-      // SCOPE: ~150 LOC — TimeWithZone class + OID::TimestampWithTimeZone routing.
+    it("timestamp with zone values with rails time zone support and timestamptz and no time zone set", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+      await adapter.exec(
+        `CREATE TABLE postgresql_timestamp_with_zones (id SERIAL PRIMARY KEY, "time" TIMESTAMP WITH TIME ZONE)`,
+      );
+      await adapter.execute(
+        `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
+      );
+      try {
+        await withPostgresqlDatetimeType("timestamptz", async () => {
+          await withTimezoneConfig(
+            {
+              default: "utc",
+              awareAttributes: true,
+              awareTypes: ["timestamptz", "datetime", "time"],
+            },
+            async () => {
+              adapter.reconnect();
+              class PostgresqlTimestampWithZone extends Base {
+                static _tableName = "postgresql_timestamp_with_zones";
+              }
+              await PostgresqlTimestampWithZone.loadSchema();
+              const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
+                time: Temporal.Instant;
+              };
+              // aware_types includes :timestamptz but NO zone is set, so the
+              // converter passes the value through unwrapped (Rails: instance_of Time).
+              expect(record.time).toBeInstanceOf(Temporal.Instant);
+              expect(record.time.epochNanoseconds).toBe(
+                Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
+              );
+            },
+          );
+        });
+      } finally {
+        adapter.reconnect();
+        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+      }
     });
-    it.skip("timestamp with zone values with rails time zone support and timestamptz and time zone set", () => {
-      // BLOCKED: adapter-pg — same as above; additionally requires per-connection timezone
-      // config (zone: "Pacific Time (US & Canada)") and TimeWithZone wrapping.
-      // SCOPE: Same as above.
+    it("timestamp with zone values with rails time zone support and timestamptz and time zone set", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+      await adapter.exec(
+        `CREATE TABLE postgresql_timestamp_with_zones (id SERIAL PRIMARY KEY, "time" TIMESTAMP WITH TIME ZONE)`,
+      );
+      await adapter.execute(
+        `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
+      );
+      try {
+        await withPostgresqlDatetimeType("timestamptz", async () => {
+          await withTimezoneConfig(
+            {
+              default: "utc",
+              awareAttributes: true,
+              zone: "Pacific Time (US & Canada)",
+              awareTypes: ["timestamptz", "datetime", "time"],
+            },
+            async () => {
+              adapter.reconnect();
+              class PostgresqlTimestampWithZone extends Base {
+                static _tableName = "postgresql_timestamp_with_zones";
+              }
+              await PostgresqlTimestampWithZone.loadSchema();
+              const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
+                time: TimeWithZone;
+              };
+              expect(record.time).toBeInstanceOf(TimeWithZone);
+              expect(record.time.utc().epochNanoseconds).toBe(
+                Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
+              );
+            },
+          );
+        });
+      } finally {
+        adapter.reconnect();
+        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
+      }
     });
   });
 
@@ -260,20 +356,32 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.exec(`DROP TABLE IF EXISTS ts_infinity_dev`);
       }
     });
-    it.skip("save infinity and beyond", async () => {
-      // BLOCKED: adapter-pg — type map OID lookup fails at schema reflection time
-      // ROOT-CAUSE: loadSchema() → columns() loads OID 1114 (timestamp) as data value,
-      // but loadAdditionalTypes is only triggered for result FIELD OIDs (e.g., OID 26 = oid).
-      // So lookupCastTypeFromColumn(updated_at, oid=1114) falls back to ValueType.
-      // ValueType.serialize(DateInfinity) = DateInfinity (Symbol). Arel's quote() calls
-      // String(Symbol) = "Symbol(@blazetrails/activemodel:DateInfinity)" → PG error.
-      // Fix needed: call adapter.loadAdditionalTypes() before schema reflection so OID→type
-      // mappings are populated, OR make lookupCastTypeFromColumn fall back to sqlType-name
-      // lookup when oid miss (i.e., try typeMap.lookup(normalizeFormatType(sqlType)) as
-      // secondary key after OID miss). The fallback path already exists when oid==null;
-      // extending it to oid-miss would fix timestamp, bytea, and all custom OID types.
-      // SCOPE: ~5 LOC in postgresql-adapter.ts:lookupCastTypeFromColumn; unblocks save
-      // infinity, BC timestamp tests, and bytea round-trip tests.
+    it("save infinity and beyond", async () => {
+      // Rails: Developer.create!(name:, updated_at: 1.0 / 0.0) → reads back +Infinity;
+      // -1.0 / 0.0 → -Infinity. TS uses the DateInfinity / DateNegativeInfinity
+      // sentinels (the timestamp OID round-trips them as "infinity" / "-infinity").
+      class Dev extends Base {
+        static tableName = "ts_infinity_dev";
+      }
+      await adapter.exec(`DROP TABLE IF EXISTS ts_infinity_dev`);
+      await adapter.exec(
+        `CREATE TABLE ts_infinity_dev (id serial primary key, name varchar, updated_at timestamp)`,
+      );
+      try {
+        await Dev.loadSchema();
+        const pos = (await (Dev as any).create({
+          name: "aaron",
+          updated_at: DateInfinity,
+        })) as { updated_at: unknown };
+        expect(pos.updated_at).toBe(DateInfinity);
+        const neg = (await (Dev as any).create({
+          name: "aaron",
+          updated_at: DateNegativeInfinity,
+        })) as { updated_at: unknown };
+        expect(neg.updated_at).toBe(DateNegativeInfinity);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS ts_infinity_dev`);
+      }
     });
     it("bc timestamp", async () => {
       // Rails: Time.new(0) - 1.week = Dec 25, ISO year -1 (2 BC)
