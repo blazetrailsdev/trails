@@ -3,6 +3,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { dumpTableSchema } from "../../test-helpers/schema-dumping-helper.js";
+import type { SchemaSource } from "../../schema-dumper.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -102,6 +104,41 @@ describeIfMysql("Mysql2Adapter", () => {
       const col = columns.find((c) => c.name === "description");
       expect(col?.type).toBe("text");
       expect(col?.collation).toBe("utf8mb4_unicode_ci");
+    });
+
+    it.skip("schema dump includes collation", async () => {
+      // BLOCKED on Epic 3.3-U2/U3: the live `emitTable` builds its colspec inline
+      // and never routes through `columnSpecForPrimaryKey` / `prepareColumnOptions`,
+      // so it emits neither the `id: { type, collation }` primary-key wrapping nor
+      // the native-default `limit` suppression these assertions require. The MySQL
+      // dialect helpers (mysql/schema-dumper.ts) that produce this output are still
+      // dead vs live dumps. Un-skip once U3 wires emitTable → columnSpec.
+      // Caveat: also needs a real-MySQL CI lane — `schema_collation` suppresses a
+      // column collation equal to the table default, and a MariaDB whose database
+      // default collation is `utf8mb4_bin` (e.g. the local 13306 box) would suppress
+      // the `id` collation. The helper port itself (dumpTableSchema) is exercised by
+      // test-helpers/schema-dumping-helper.test.ts.
+      //
+      // The regexes below are PROVISIONAL placeholders mirroring Rails'
+      // charset_collation_test.rb:79-84 intent (id-collation wrapping; collation
+      // immediately after the column name with no native-default limit between).
+      // Rails end-anchors each column line (`…collation: "ascii_bin"$`); our TS DSL
+      // terminates the call with `});` instead, and the exact emitted spacing/order
+      // is set by the U3 `emitTable → columnSpec` rewrite. Re-derive these against
+      // the ACTUAL U3 output when un-skipping rather than trusting them verbatim.
+      const output = await dumpTableSchema(
+        adapter as unknown as SchemaSource,
+        "charset_collations",
+      );
+      expect(output).toMatch(
+        /createTable\("charset_collations",\s+\{\s+id:\s+\{\s+type:\s+"string",\s+collation:\s+"utf8mb4_bin"\s+\}/,
+      );
+      expect(output).toMatch(
+        /t\.string\("string_ascii_bin",\s+\{\s+collation:\s+"ascii_bin"\s+\}\)/,
+      );
+      expect(output).toMatch(
+        /t\.text\("text_ucs2_unicode_ci",\s+\{\s+collation:\s+"ucs2_unicode_ci"\s+\}\)/,
+      );
     });
   });
 });
