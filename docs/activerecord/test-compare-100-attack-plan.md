@@ -101,29 +101,9 @@ Phase 4  integrated tail: associations (265) + relation (170) ── LAST, audit
 
 ---
 
-## Phase 0 — Hygiene & reclassification `[quick wins, ~1–2 PRs]`
+## Phase 0 — Hygiene & reclassification
 
-Cheap, high-leverage: fixes the non-skip arithmetic and stops permanent skips
-from counting. Do these first so the percentage reflects real work.
-
-### Story H-1 — relocate the 4 misplaced + 15 wrong-describe tests `[move]` ~tests-only · dep: none
-
-- **Misplaced (4):** all in `migration_test.rb` — `changing columns`,
-  `changing column null with default`, + 2 more currently living in
-  `adapters/postgresql/change-schema.test.ts`; convention says they belong in
-  `migration.test.ts`. Move them (don't rewrite).
-- **Wrong-describe (15):** `postgresql_adapter_test.rb` (8),
-  `has_many_associations_test.rb` (4), `sqlite3/explain_test.rb` (2),
-  `encrypted_fixtures_test.rb` (1). Tests exist but sit under the wrong
-  `describe` block — move to the Rails-matching describe.
-- **Done:** `totalMisplaced 0`, `totalWrongDescribe 0`.
-
-### Story H-2 — port the 3 genuinely-missing tests `[port]` ~small · dep: none
-
-- `associations_test.rb` (1 missing), `abstract_mysql_adapter/connection_test.rb`
-  (1, MySQL — verify locally), `connection_handlers_multi_db_test.rb` (1).
-- Generate stubs via `pnpm test:stubs`, write bodies under the **exact** Rails
-  name. **Done:** `totalMissing 0`.
+**H-1 shipped #2859** (`totalMisplaced 0`, `totalWrongDescribe 0`). **H-2 shipped #2860** (`totalMissing 0`, `lock free` was a Ruby phantom — fixed the extractor). Remaining:
 
 ### Story H-3 — reclassify the residual permanent skips `[hygiene]` ~20 skips · dep: none
 
@@ -160,19 +140,20 @@ files — those don't count toward 890 and are out of scope).
 
 ## Phase 1 — Architectural unblockers `[gate downstream — do early]`
 
-### Story I-1 — Epic 3.3-U2/U3: schema-dumper `columnSpec` unification `[impl, multi-PR]` ~90 + ~120 LOC · dep: none (U3 dep: U2)
+### Story I-1 — Epic 3.3-U3: schema-dumper `columnSpec` wiring `[impl]` ~120 LOC · dep: U2 ✅ #2864
 
-The single highest-leverage unblock. Routes live dumps through the Rails-shaped
-`columnSpec` hook. **Full spec in [`workplan.md`](workplan.md) Epic 3.3-U.**
+**U2 shipped #2864** (`AdapterSchemaSource` now carries dsl-type in `type` + raw `sqlType`; dialect Ruby-isms → TS text). **U3 only remaining.**
 
 - **Gates:** `schema_dumper_test.rb` (22), `comment_test.rb` (17), `view_test.rb`
   dump-bearing cases (~6 of 21), `defaults_test.rb` dump cases, `mysql_enum`
   dump, `charset_collation` collation dump, `column_definition_test.rb` (3).
-- **U2** (~90 LOC): `AdapterSchemaSource` carries dsl-type in `type` + raw SQL
-  in new `sqlType`; convert remaining dialect Ruby-isms to TS text.
-- **U3** (~120 LOC, dep U2): route `emitTable` through `columnSpec` /
+- **U3** (~120 LOC): route `emitTable` through `columnSpec` /
   `columnSpecForPrimaryKey` + `formatColspecRaw`; reconcile defaults; PG serial
   dump folds into PG subclass; verify live PG/MySQL.
+- **Prerequisite (land before U3):** switch SQLite `/char/i`, `/binary/i`,
+  `/text/i` type-map registrations to `register_class_with_limit` — else U3's
+  `schemaLimit(column)` silently drops `limit: N` for live `varchar(N)` columns.
+  Regression guard already in `schema-dumper.test.ts`.
 - **Done:** schema_dumper + comment dump-bearing skips green.
 
 ### Story I-2 — `type_for_attribute` cast refactor (enum write-casting) `[impl, BLOCKER]` >300 LOC, split · dep: none
@@ -190,29 +171,9 @@ cast path remains).
 - Split via `<base>`/`<base>b`. **Done:** the 5 relation enum skips green +
   string-label enum predicates cast.
 
-### Story I-3 — general `serialize` write-path `[impl]` ~150–300 LOC · dep: none
+**I-3 shipped #2872** (`Base.serialize` now decorates cast type with `Type::Serialized`; array×2 + hstore×2 PG serialize skips un-skipped locally). Follow-up: `bytea_test.rb` "serialize" — binary `Buffer`↔`string` bridge in `Type::Serialized#deserialize` (~15 LOC + test) — see Discovered Follow-ups.
 
-**Spec in [`workplan.md`](workplan.md) Wave 3 cross-cutting.** Wire
-`Base.serialize` to decorate the cast type with `Type::Serialized` (exists at
-`type/serialized.ts`, unused) instead of the read-only `readAttribute`
-monkey-patch.
-
-- **Gates:** PG `array_test.rb` serialize machinery (part of 6), `bytea_test.rb`
-  serialize, `hstore_test.rb` 2 serialize-coder skips, json/yaml dump-on-write.
-- **Done:** dump-on-write parity for json/yaml/array/hash/binary.
-
-### Story I-4 — wire `pluck`/`calculate` result type-casting `[impl]` ~40–100 LOC · dep: none
-
-**Source-verified 2026-06-02 — smaller than the workplan implies.** The cast
-helpers already exist from #917: `typeCastPluckValues` / `typeCastCalculatedValue`
-in `relation/calculations.ts:718,731`, surfaced as private methods
-`relation.ts:5406,5411`. **But nothing calls them** — `pluck()` / `calculate()`
-return raw driver values. The job is **wiring the existing methods into the live
-paths** (cast via `Result.columnTypes`, OID-based, per Rails
-`type_cast_pluck_values`/`type_cast_calculated_value`), not writing them.
-
-- **Touches:** `calculations.test.ts` (6), `relation/select.test.ts` (some of
-  10), PG `numbers_test.rb`. **Done:** pluck/calc return typed values.
+**I-4 shipped #2868** (`pluck()` now type-casts positionally through `Result#columnTypes`; `pluck with serialization` un-skipped; `ensureSchemaLoaded()` guard added). Follow-up: serialize write-side coder dump — see Discovered Follow-ups.
 
 ### Story I-5 — add a `TEST_ADAPTER=postgresql`/`mysql2` CI job `[infra]` ~40 LOC ci.yml · dep: none
 
@@ -247,34 +208,33 @@ as its own sibling PR. **Audit-first recommended** given the size.
 
 - **Done:** `insert_all` skips → 0 on SQLite.
 
-### Story F-2 — connection-pool / multi-db campaign (51) `[un-skip]` ~250 LOC × N · dep: none
+### Story F-2 — connection-pool / multi-db campaign `[un-skip]` ~250 LOC × N · dep: none
 
-**Spec in [`workplan.md`](workplan.md) Story 4.3.** Cluster by file to stay
-under 500 LOC:
+**Batch 1 shipped #2883** (12 un-skips: schema-cache DDL-invalidation ×7, `permanentConnectionCheckout` config ×5). 39 skips remaining:
 
-- `transactions_test.rb` connection-pool-tagged subset, `connection_pool_test.rb`
-  (8), `connection_handling_test.rb` (6), `connection_handler_test.rb` (4),
-  `registration_test.rb` (4), `connection_management_test.rb` (2),
-  `connection_handlers_multi_db_test.rb` (2), `unconnected_test.rb` (3),
-  `disconnected_test.rb` / `invalid_connection_test.rb` / `reaper_test.rb` /
-  `database_selector_test.rb` (1 each).
-- **Verify each candidate against `unported-files.ts`** — fork/pid/thread cases
-  are likely permanent (→ Story H-3). 🚫 `standalone_connection_test.rb` (4) is
-  externally blocked.
+- **Next-batch candidates:** `connection-handler.test.ts` role-aliasing + `connectsTo` shared-pool (4 non-fork); `registration.test.ts` adapter-registration (4).
+- **Permanent (→ H-3):** `connection-pool.test.ts` thread/fiber (14); fork subsets of `connection-handler.test.ts` (5).
+- Remaining actionable: `unconnected.test.ts` (3), `connection-management.test.ts` (2), `disconnected.test.ts` (1), `connection-handlers-multi-db.test.ts` loading-relations (1), 1-skip tail.
+- 🚫 `standalone-connection.test.ts` (4): externally blocked (H-3).
 
-### Story F-3 — migration runner campaign (26) `[un-skip + impl]` ~200 LOC · dep: none
+**Verify each candidate against `unported-files.ts`** — fork/pid/thread cases are permanent.
 
-**Spec in [`workplan.md`](workplan.md) Story 5.2.** Natural sibling split:
-migration-copy (`migration_test.rb` 7) vs CommandRecorder-inversion
-(`invertible_migration_test.rb` 4) + Batch 132 delegate. PG migration cases
-(`uuid`, `invertible_migration`, `infinity`) ride Phase 3.
+### Story F-3 — migration runner campaign `[un-skip + impl]` · dep: none
 
-### Story F-4 — transactions + callbacks + touch (18 + 10 + 4) `[un-skip + impl]` · dep: none
+**Batch 1 shipped #2869** (3 un-skips: change column default / down with prefix / add check constraint; impl fix: `changeColumnDefault` now delegates to adapter override). 23 remaining:
 
-**Spec in [`workplan.md`](workplan.md) Story 5.1 follow-ups.** `transactions_test.rb`
-non-pool subset, `transaction_callbacks_test.rb` (10),
-`transaction_instrumentation_test.rb` (2), `touch_later_test.rb` (4). Several are
-HIGH-RISK (touch → transactional commit callbacks) — own story each.
+- **Next-batch candidate — CopyMigrationsTest (5, `migration_test.rb`):** self-contained, `Migration.copy` already implemented. Follow `MigrationProperTableNameAndCopy` tmp-dir pattern. Magic-comments case needs magic-comment-aware prepend.
+- **Expression-index revert (1):** needs String column-list parsing + expression-aware index-name in `buildCreateIndexDefinition`.
+- Latent: `_reverseOperation` addCheckConstraint uses raw table vs `_pt`-prefixed at :834 — surfaces on prefixed check-constraint cases.
+- PG cases (`uuid`, `invertible_migration`, `infinity`) ride Phase 3.
+
+### Story F-4 — transactions + callbacks + touch `[un-skip + impl]` · dep: none
+
+**Batch 1 shipped #2870** (3 un-skips in `transactions.test.ts`: rollback-state-restoration cluster). Remaining:
+
+- `transactions.test.ts` (33): mostly permanent Ruby-only (throw/catch, Thread.kill, timeout) or missing infra. Reachable next: `update should rollback on failure!` (needs Author→posts + `post_ids=` + validation rollback).
+- `transaction-callbacks.test.ts` (10): savepoint-scoped callbacks, `before_committed_on_all_records`, belongs-to touch callbacks.
+- `touch_later_test.rb` (4): HIGH-RISK — canonical Invoice/LineItem/Node/Tree/Owner/Pet models + `belongs_to touch:` + `ActiveRecord.before_committed_on_all_records`. Own story each.
 
 ### Story F-5 — query-cache residuals (5) `[un-skip + impl]` · dep: I-? (habtm setup for 2)
 
@@ -301,15 +261,16 @@ authors/Event/Book fixtures wired in (**spec in `workplan.md` Story 3.misc**).
 
 ### Story F-8 — small core leftovers `[un-skip]` · dep: none
 
-The 1–4-skip core files not in a campaign above: `locking_test.rb` (12 —
-Optimistic\*), `aggregations_test.rb` (8), `readonly_test.rb` (7),
-`base_prevent_writes_test.rb` (8), `sanitize_test.rb` (4), `reserved_word_test.rb`
-(4), `instrumentation_test.rb` (4), `hot_compatibility_test.rb` (4),
-`statement_cache_test.rb` (3), `suppressor_test.rb` (3), `batches_test.rb` (3),
-`reflection_test.rb` (3), `column_definition_test.rb` (3 → I-1), and the long
-1–2-skip tail (`clone`, `attributes`, `types`, `secure_token`, `delegated_type`,
-`primary_class`, `log_subscriber`, …). Batch by theme into ≤500-LOC PRs;
-several are Phase-1-gated (type, schema) — tackle after their unblocker.
+**Batch A shipped #2871** (5 un-skips: readonly `cant touch readonly column` + `touch()` readonly-guard impl, sanitize ×3, reserved-word ×1). Remaining (audited):
+
+- `readonly.test.ts` (6): assoc-readonly propagation — Phase 4 territory.
+- `statement_cache.test.ts` (3): Liquid/Molecule/Electron + `birds` table + `findBy` cache-bust on `table_name=` reassignment.
+- `reflection.test.ts` (14): 4 permanently UNPORTED (Ruby Symbol/`const_missing`); 10 need canonical Author/Post/Hotel fixtures or HABTM join-table reflection.
+- `sanitize.test.ts` (3): 1 needs Relation→subquery in `replaceBindVariable`; 2 permanent D-Y boolean-quoting (`TRUE` vs `1`).
+- `reserved-word.test.ts` (3): SQLite ALTER-via-table-rebuild, limited-delete subselect, singular-assoc reader.
+- Long tail: `locking` (12), `aggregations` (8), `base_prevent_writes` (8), `instrumentation` (4), `hot_compatibility` (4), `suppressor` (3), `batches` (3), `column_definition` (3 → I-1), 1–2-skip tail. Batch by theme; Phase-1-gated items tackle after I-1 ships.
+
+**Process gotcha (re-runs of this batch):** stand-in tables under heavily-shared names (`people`, `posts`, `items`) collide on the shared live DB by fork-scheduling. Use uniquely-prefixed stand-ins (`ro_people`, `lock_people`) or canonical shape + `dropExisting:true`.
 
 ---
 
@@ -368,7 +329,7 @@ that sizes the un-skip slots into ≤250-LOC batches, then un-skips.
 | relation/where    | `relation/where_test.rb`                                                                                                                                                                                                                      |    12 | polymorphic fixtures                                  |
 | has-one-through   | `associations/has_one_through_associations_test.rb`                                                                                                                                                                                           |    11 | + disable-joins variant (5)                           |
 | autosave          | `autosave_association_test.rb`                                                                                                                                                                                                                |    11 |                                                       |
-| relation/select   | `relation/select_test.rb`                                                                                                                                                                                                                     |    10 | some → I-4                                            |
+| relation/select   | `relation/select_test.rb`                                                                                                                                                                                                                     |    10 | relation                                              |
 | eager-full-sti    | `associations/eager_load_includes_full_sti_class_test.rb`                                                                                                                                                                                     |     8 |                                                       |
 | strict-loading    | `strict_loading_test.rb`                                                                                                                                                                                                                      |     7 | batch 1 landed; rest dep-clear                        |
 | inverse           | `associations/inverse_associations_test.rb`                                                                                                                                                                                                   |     7 | 7.5 ✅                                                |
@@ -384,6 +345,20 @@ that sizes the un-skip slots into ≤250-LOC batches, then un-skips.
 
 ---
 
+## Discovered follow-ups (not yet scoped)
+
+Items surfaced from post-merge findings of shipped PRs. Not existing stories — add to a story or open a new one when picking up.
+
+| Item                                                                                            | Source           | Effort         | Notes                                                                                                                                                                                    |
+| ----------------------------------------------------------------------------------------------- | ---------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bytea_test.rb` "serialize" — binary `Buffer`↔`string` bridge in `Type::Serialized#deserialize` | #2872 post-merge | ~15 LOC + test | `Bytea#deserialize` yields `Uint8Array`; JSON coder's `load` needs a string. Interacts with encryption binary path.                                                                      |
+| Serialize write-side coder dump                                                                 | #2868 post-merge | ~30–60 LOC     | `Model.create({content:{...}})` should dump on save. Lets `pluck with serialization` use a Hash not pre-stringified string.                                                              |
+| `touch()` `updated_on` gap                                                                      | #2871 post-merge | ~5 LOC + test  | Build `touchColSet` from `timestampAttributesForUpdateInModel` not hardcoded `"updated_at"`, so `updated_on` is touched when present (Rails parity).                                     |
+| Composite `id=` dirty-tracking under rollback                                                   | #2870 post-merge | ~30–60 LOC     | `transactions.ts rememberTransactionRecordState` captures post-edit value on `id=` before save→remember; mass-assign path restores correctly. Fix in `attribute-methods/primary-key.ts`. |
+| autosave/`inverse_of` + frozen AttributeSet on destroy cascade                                  | #2870 post-merge | investigation  | Adding either option to a `has_many dependent:destroy` assoc raises `FrozenError` on the destroyed record during cascade. Blocks faithful assoc shapes in frozen+destroy+rollback tests. |
+
+---
+
 ## Appendix A — full per-file gap table (155 files, 2026-06-02)
 
 `skip` = matched-but-skipped, `m` = missing. `CI` column: ✅ = **core/sqlite3**
@@ -392,187 +367,185 @@ file, run by all three CI jobs (incl. against live PG/MariaDB via
 **excluded from all current CI jobs** (no `TEST_ADAPTER` lane — see §1 / Story
 I-5), local-verify only. Dominant blocker tag shown; refresh per file.
 
-| skip |   m | CI  | file                                                                 | dominant blocker                     |
-| ---: | --: | :-: | -------------------------------------------------------------------- | ------------------------------------ |
-|   60 |   0 | ✅  | associations/eager_test.rb                                           | associations — eager-loading         |
-|   51 |   0 | ✅  | adapter_test.rb                                                      | fixture                              |
-|   41 |   0 | ✅  | insert_all_test.rb                                                   | relation                             |
-|   36 |   0 | ✅  | transactions_test.rb                                                 | connection-pool                      |
-|   36 |   0 | ✅  | associations/join_model_test.rb                                      | associations — join-model            |
-|   27 |   0 | ✅  | associations/has_one_associations_test.rb                            | associations — has-one               |
-|   22 |   0 | ✅  | schema_dumper_test.rb                                                | schema (→ I-1)                       |
-|   21 |   0 | ✅  | view_test.rb                                                         | schema — view DDL / dump (→ I-1)     |
-|   20 |   0 | ✅  | scoping/relation_scoping_test.rb                                     | relation — scoping                   |
-|   18 |   0 | ✅  | nested_attributes_test.rb                                            | nested-attributes                    |
-|   18 |   0 | ✅  | associations/cascaded_eager_loading_test.rb                          | associations                         |
-|   17 |   0 | ✅  | comment_test.rb                                                      | schema — comment dump (→ I-1)        |
-|   17 |   0 | ✅  | bind_parameter_test.rb                                               | relation — Relation API              |
-|   14 |   0 | ✅  | associations/has_and_belongs_to_many_associations_test.rb            | associations — habtm                 |
-|   13 |   0 | ✅  | quoting_test.rb                                                      | schema — quoting / type-cast         |
-|   13 |   0 | ✅  | defaults_test.rb                                                     | schema (→ I-1)                       |
-|   12 |   0 | ✅  | relation/where_test.rb                                               | relation — WHERE                     |
-|   12 |   0 | ✅  | locking_test.rb                                                      | Optimistic\* locking                 |
-|   11 |   0 | ✅  | autosave_association_test.rb                                         | associations — autosave              |
-|   11 |   0 | ✅  | associations/has_one_through_associations_test.rb                    | fixture                              |
-|   10 |   1 | ✅  | associations_test.rb                                                 | associations                         |
-|   10 |   0 | ✅  | transaction_callbacks_test.rb                                        | transactions                         |
-|   10 |   0 | ✅  | relation/select_test.rb                                              | relation (→ I-4)                     |
-|   10 |   0 | ✅  | nested_attributes_with_callbacks_test.rb                             | nested-attributes                    |
-|    8 |   0 | ✅  | connection_pool_test.rb                                              | connection-pool                      |
-|    8 |   0 | ✅  | base_prevent_writes_test.rb                                          | relation — prevent-writes            |
-|    8 |   0 | ✅  | associations/eager_load_includes_full_sti_class_test.rb              | associations                         |
-|    8 |   0 | ✅  | aggregations_test.rb                                                 | relation — calculation               |
-|    7 |   0 | ✅  | strict_loading_test.rb                                               | relation — StrictLoading             |
-|    7 |   0 | ✅  | readonly_test.rb                                                     | relation — Relation API              |
-|    7 |   0 | ✅  | migration_test.rb                                                    | migration (+ 4 misplaced)            |
-|    7 |   0 | ✅  | associations/inverse_associations_test.rb                            | InverseOfAssociationRecursion        |
-|    6 |   0 | ✅  | relations_test.rb                                                    | relation                             |
-|    6 |   0 | ✅  | relation/where_chain_test.rb                                         | relation                             |
-|    6 |   0 | ✅  | connection_handling_test.rb                                          | connection-pool                      |
-|    6 |   0 | ✅  | calculations_test.rb                                                 | relation — calculation (→ I-4)       |
-|    6 |   0 | ✅  | associations/eager_singularization_test.rb                           | associations                         |
-|    6 |   0 | ❌  | adapters/postgresql/transaction_test.rb                              | adapter-pg                           |
-|    6 |   0 | ❌  | adapters/postgresql/array_test.rb                                    | serialize machinery (→ I-3)          |
-|    5 |   0 | ✅  | query_cache_test.rb                                                  | habtm setup needed                   |
-|    5 |   0 | ✅  | counter_cache_test.rb                                                | associations                         |
-|    5 |   0 | ✅  | base_test.rb                                                         | schema                               |
-|    5 |   0 | ✅  | associations/has_one_through_disable_joins_associations_test.rb      | associations                         |
-|    5 |   0 | ❌  | adapters/postgresql/referential_integrity_test.rb                    | adapter-pg                           |
-|    5 |   0 | ❌  | adapters/postgresql/postgresql_adapter_test.rb                       | adapter-pg (+8 wrong-describe)       |
-|    5 |   0 | ❌  | adapters/postgresql/optimizer_hints_test.rb                          | adapter-pg                           |
-|    5 |   0 | ❌  | adapters/postgresql/numbers_test.rb                                  | adapter-pg (→ I-4)                   |
-|    5 |   0 | ❌  | adapters/postgresql/enum_test.rb                                     | adapter-pg (→ I-2)                   |
-|    5 |   0 | ❌  | adapters/postgresql/deferred_constraints_test.rb                     | adapter-pg                           |
-|    5 |   0 | ❌  | adapters/postgresql/create_unlogged_tables_test.rb                   | adapter-pg                           |
-|    5 |   0 | ❌  | adapters/postgresql/collation_test.rb                                | adapter-pg                           |
-|    5 |   0 | ❌  | adapters/abstract_mysql_adapter/unsigned_type_test.rb                | adapter-mysql                        |
-|    5 |   0 | ❌  | adapters/abstract_mysql_adapter/transaction_test.rb                  | adapter-mysql                        |
-|    5 |   0 | ❌  | adapters/abstract_mysql_adapter/optimizer_hints_test.rb              | adapter-mysql                        |
-|    4 |   0 | ✅  | touch_later_test.rb                                                  | associations — touch                 |
-|    4 |   0 | ✅  | sanitize_test.rb                                                     | relation — SQL sanitization          |
-|    4 |   0 | ✅  | reserved_word_test.rb                                                | SQLite adapter gap                   |
-|    4 |   0 | ✅  | invertible_migration_test.rb                                         | migration — CommandRecorder          |
-|    4 |   0 | ✅  | instrumentation_test.rb                                              | relation — Notifications             |
-|    4 |   0 | ✅  | hot_compatibility_test.rb                                            | (untagged)                           |
-|    4 |   0 | ✅  | connection_adapters/standalone_connection_test.rb                    | 🚫 externally blocked                |
-|    4 |   0 | ✅  | connection_adapters/registration_test.rb                             | connection-pool                      |
-|    4 |   0 | ✅  | connection_adapters/connection_handler_test.rb                       | connection-pool                      |
-|    4 |   0 | ✅  | associations/nested_error_test.rb                                    | nested-attributes (Phase G)          |
-|    4 |   0 | ✅  | associations/has_many_associations_test.rb                           | associations (+4 wrong-describe)     |
-|    4 |   0 | ❌  | adapters/postgresql/transaction_nested_test.rb                       | adapter-pg                           |
-|    4 |   0 | ❌  | adapters/postgresql/rename_table_test.rb                             | adapter-pg                           |
-|    4 |   0 | ❌  | adapters/postgresql/quoting_test.rb                                  | adapter-pg                           |
-|    4 |   0 | ❌  | adapters/abstract_mysql_adapter/mysql_explain_test.rb                | adapter-mysql                        |
-|    4 |   0 | ❌  | adapters/abstract_mysql_adapter/auto_increment_test.rb               | adapter-mysql                        |
-|    3 |   0 | ✅  | unconnected_test.rb                                                  | connection-pool                      |
-|    3 |   0 | ✅  | tasks/database_tasks_test.rb                                         | (untagged)                           |
-|    3 |   0 | ✅  | suppressor_test.rb                                                   | (untagged)                           |
-|    3 |   0 | ✅  | statement_cache_test.rb                                              | relation                             |
-|    3 |   0 | ✅  | reflection_test.rb                                                   | associations — reflection            |
-|    3 |   0 | ✅  | forbidden_attributes_protection_test.rb                              | nested-attributes                    |
-|    3 |   0 | ✅  | column_definition_test.rb                                            | schema (→ I-1)                       |
-|    3 |   0 | ✅  | batches_test.rb                                                      | (untagged)                           |
-|    3 |   0 | ✅  | associations/left_outer_join_association_test.rb                     | associations                         |
-|    3 |   0 | ❌  | adapters/postgresql/xml_test.rb                                      | adapter-pg                           |
-|    3 |   0 | ❌  | adapters/postgresql/type_lookup_test.rb                              | adapter-pg                           |
-|    3 |   0 | ❌  | adapters/postgresql/hstore_test.rb                                   | serialization (→ I-3)                |
-|    3 |   0 | ❌  | adapters/postgresql/date_test.rb                                     | adapter-pg                           |
-|    3 |   0 | ❌  | adapters/postgresql/composite_test.rb                                | adapter-pg                           |
-|    3 |   0 | ❌  | adapters/abstract_mysql_adapter/sp_test.rb                           | adapter-mysql                        |
-|    3 |   0 | ❌  | adapters/abstract_mysql_adapter/set_test.rb                          | adapter-mysql                        |
-|    3 |   0 | ❌  | adapters/abstract_mysql_adapter/nested_deadlock_test.rb              | adapter-mysql                        |
-|    2 |   0 | ✅  | unsafe_raw_sql_test.rb                                               | relation                             |
-|    2 |   0 | ✅  | transaction_instrumentation_test.rb                                  | transactions                         |
-|    2 |   0 | ✅  | statement_invalid_test.rb                                            | relation                             |
-|    2 |   0 | ✅  | relation/with_test.rb                                                | (untagged)                           |
-|    2 |   0 | ✅  | primary_class_test.rb                                                | (untagged)                           |
-|    2 |   0 | ✅  | log_subscriber_test.rb                                               | (untagged)                           |
-|    2 |   0 | ✅  | inheritance_test.rb                                                  | fixture                              |
-|    2 |   0 | ✅  | database_statements_test.rb                                          | relation                             |
-|    2 |   0 | ✅  | connection_management_test.rb                                        | connection-pool                      |
-|    2 |   0 | ✅  | connection_adapters/schema_cache_test.rb                             | schema                               |
-|    2 |   0 | ✅  | clone_test.rb                                                        | (untagged)                           |
-|    2 |   0 | ✅  | attributes_test.rb                                                   | type                                 |
-|    2 |   0 | ✅  | attribute_methods/read_test.rb                                       | type                                 |
-|    2 |   0 | ✅  | associations/inner_join_association_test.rb                          | associations                         |
-|    2 |   0 | ✅  | associations/extension_test.rb                                       | associations                         |
-|    2 |   0 | ✅  | associations/eager_load_nested_include_test.rb                       | associations                         |
-|    2 |   0 | ❌  | adapters/postgresql/uuid_test.rb                                     | migration framework                  |
-|    2 |   0 | ❌  | adapters/postgresql/explain_test.rb                                  | adapter-pg                           |
-|    2 |   0 | ❌  | adapters/postgresql/domain_test.rb                                   | adapter-pg                           |
-|    2 |   0 | ❌  | adapters/abstract_mysql_adapter/virtual_column_test.rb               | adapter-mysql                        |
-|    2 |   0 | ❌  | adapters/abstract_mysql_adapter/mysql_enum_test.rb                   | schema-dumper columnSpec (→ I-1/I-2) |
-|    1 |   1 | ✅  | connection_adapters/connection_handlers_multi_db_test.rb             | connection-pool                      |
-|    1 |   0 | ✅  | types_test.rb                                                        | type                                 |
-|    1 |   0 | ✅  | type_caster/connection_test.rb                                       | type                                 |
-|    1 |   0 | ✅  | timestamp_test.rb                                                    | type                                 |
-|    1 |   0 | ✅  | table_metadata_test.rb                                               | schema                               |
-|    1 |   0 | ✅  | secure_token_test.rb                                                 | relation                             |
-|    1 |   0 | ✅  | relation/update_all_test.rb                                          | relation                             |
-|    1 |   0 | ✅  | relation/predicate_builder_test.rb                                   | relation                             |
-|    1 |   0 | ✅  | relation/delegation_test.rb                                          | (untagged)                           |
-|    1 |   0 | ✅  | reaper_test.rb                                                       | (untagged)                           |
-|    1 |   0 | ✅  | prepared_statement_status_test.rb                                    | relation                             |
-|    1 |   0 | ✅  | persistence/reload_association_cache_test.rb                         | associations                         |
-|    1 |   0 | ✅  | numeric_data_test.rb                                                 | type                                 |
-|    1 |   0 | ✅  | invalid_connection_test.rb                                           | connection-pool                      |
-|    1 |   0 | ✅  | finder_test.rb                                                       | associations                         |
-|    1 |   0 | ✅  | finder_respond_to_test.rb                                            | relation                             |
-|    1 |   0 | ✅  | encryption/encryptable_record_test.rb                                | encryption                           |
-|    1 |   0 | ✅  | encryption/concurrency_test.rb                                       | (untagged)                           |
-|    1 |   0 | ✅  | disconnected_test.rb                                                 | connection-pool                      |
-|    1 |   0 | ✅  | delegated_type_test.rb                                               | fixture + delegated-type touch       |
-|    1 |   0 | ✅  | database_selector_test.rb                                            | connection-pool                      |
-|    1 |   0 | ✅  | database_configurations/resolver_test.rb                             | (→ H-3 divergence)                   |
-|    1 |   0 | ✅  | connection_adapters/merge_and_resolve_default_url_config_test.rb     | (untagged)                           |
-|    1 |   0 | ✅  | column_alias_test.rb                                                 | schema                               |
-|    1 |   0 | ✅  | associations/required_test.rb                                        | (untagged)                           |
-|    1 |   0 | ✅  | associations/has_many_through_associations_test.rb                   | (untagged)                           |
-|    1 |   0 | ✅  | associations/bidirectional_destroy_dependencies_test.rb              | associations                         |
-|    1 |   0 | ✅  | associations/belongs_to_associations_test.rb                         | associations                         |
-|    1 |   0 | ❌  | adapters/sqlite3/statement_pool_test.rb                              | adapter-sqlite                       |
-|    1 |   0 | ✅  | adapters/sqlite3/explain_test.rb                                     | adapter-sqlite (+2 wrong-describe)   |
-|    1 |   0 | ❌  | adapters/postgresql/virtual_column_test.rb                           | schema                               |
-|    1 |   0 | ❌  | adapters/postgresql/timestamp_test.rb                                | adapter-pg                           |
-|    1 |   0 | ❌  | adapters/postgresql/statement_pool_test.rb                           | (untagged)                           |
-|    1 |   0 | ❌  | adapters/postgresql/schema_test.rb                                   | adapter-pg                           |
-|    1 |   0 | ❌  | adapters/postgresql/invertible_migration_test.rb                     | migration                            |
-|    1 |   0 | ❌  | adapters/postgresql/infinity_test.rb                                 | type                                 |
-|    1 |   0 | ❌  | adapters/postgresql/foreign_table_test.rb                            | adapter-pg                           |
-|    1 |   0 | ❌  | adapters/postgresql/case_insensitive_test.rb                         | adapter-pg                           |
-|    1 |   0 | ❌  | adapters/postgresql/bytea_test.rb                                    | adapter-pg (→ I-3)                   |
-|    1 |   0 | ❌  | adapters/mysql2/mysql2_adapter_test.rb                               | (untagged)                           |
-|    1 |   0 | ❌  | adapters/mysql2/check_constraint_quoting_test.rb                     | adapter-mysql                        |
-|    1 |   0 | ❌  | adapters/abstract_mysql_adapter/sql_types_test.rb                    | adapter-mysql                        |
-|    1 |   0 | ❌  | adapters/abstract_mysql_adapter/count_deleted_rows_with_lock_test.rb | adapter-mysql                        |
-|    1 |   0 | ❌  | adapters/abstract_mysql_adapter/charset_collation_test.rb            | (→ I-1)                              |
-|    1 |   0 | ✅  | adapter_prevent_writes_test.rb                                       | relation — prevent-writes            |
-|    1 |   0 | ✅  | active_record_test.rb                                                | connection-pool                      |
-|    0 |   1 | ✅  | adapters/abstract_mysql_adapter/connection_test.rb                   | (missing → H-2)                      |
+| skip |   m | CI  | file                                                                 | dominant blocker                         |
+| ---: | --: | :-: | -------------------------------------------------------------------- | ---------------------------------------- |
+|   60 |   0 | ✅  | associations/eager_test.rb                                           | associations — eager-loading             |
+|   51 |   0 | ✅  | adapter_test.rb                                                      | fixture                                  |
+|   41 |   0 | ✅  | insert_all_test.rb                                                   | relation                                 |
+|   36 |   0 | ✅  | transactions_test.rb                                                 | connection-pool                          |
+|   36 |   0 | ✅  | associations/join_model_test.rb                                      | associations — join-model                |
+|   27 |   0 | ✅  | associations/has_one_associations_test.rb                            | associations — has-one                   |
+|   22 |   0 | ✅  | schema_dumper_test.rb                                                | schema (→ I-1)                           |
+|   21 |   0 | ✅  | view_test.rb                                                         | schema — view DDL / dump (→ I-1)         |
+|   20 |   0 | ✅  | scoping/relation_scoping_test.rb                                     | relation — scoping                       |
+|   18 |   0 | ✅  | nested_attributes_test.rb                                            | nested-attributes                        |
+|   18 |   0 | ✅  | associations/cascaded_eager_loading_test.rb                          | associations                             |
+|   17 |   0 | ✅  | comment_test.rb                                                      | schema — comment dump (→ I-1)            |
+|   17 |   0 | ✅  | bind_parameter_test.rb                                               | relation — Relation API                  |
+|   14 |   0 | ✅  | associations/has_and_belongs_to_many_associations_test.rb            | associations — habtm                     |
+|   13 |   0 | ✅  | quoting_test.rb                                                      | schema — quoting / type-cast             |
+|   13 |   0 | ✅  | defaults_test.rb                                                     | schema (→ I-1)                           |
+|   12 |   0 | ✅  | relation/where_test.rb                                               | relation — WHERE                         |
+|   12 |   0 | ✅  | locking_test.rb                                                      | Optimistic\* locking                     |
+|   11 |   0 | ✅  | autosave_association_test.rb                                         | associations — autosave                  |
+|   11 |   0 | ✅  | associations/has_one_through_associations_test.rb                    | fixture                                  |
+|   10 |   1 | ✅  | associations_test.rb                                                 | associations                             |
+|   10 |   0 | ✅  | transaction_callbacks_test.rb                                        | transactions                             |
+|   10 |   0 | ✅  | relation/select_test.rb                                              | relation (→ I-4)                         |
+|   10 |   0 | ✅  | nested_attributes_with_callbacks_test.rb                             | nested-attributes                        |
+|    8 |   0 | ✅  | connection_pool_test.rb                                              | connection-pool                          |
+|    8 |   0 | ✅  | base_prevent_writes_test.rb                                          | relation — prevent-writes                |
+|    8 |   0 | ✅  | associations/eager_load_includes_full_sti_class_test.rb              | associations                             |
+|    8 |   0 | ✅  | aggregations_test.rb                                                 | relation — calculation                   |
+|    7 |   0 | ✅  | strict_loading_test.rb                                               | relation — StrictLoading                 |
+|    7 |   0 | ✅  | readonly_test.rb                                                     | relation — Relation API                  |
+|    7 |   0 | ✅  | migration_test.rb                                                    | migration (+ 4 misplaced)                |
+|    7 |   0 | ✅  | associations/inverse_associations_test.rb                            | InverseOfAssociationRecursion            |
+|    6 |   0 | ✅  | relations_test.rb                                                    | relation                                 |
+|    6 |   0 | ✅  | relation/where_chain_test.rb                                         | relation                                 |
+|    6 |   0 | ✅  | connection_handling_test.rb                                          | connection-pool                          |
+|    6 |   0 | ✅  | calculations_test.rb                                                 | relation — calculation                   |
+|    6 |   0 | ✅  | associations/eager_singularization_test.rb                           | associations                             |
+|    6 |   0 | ❌  | adapters/postgresql/transaction_test.rb                              | adapter-pg                               |
+|    4 |   0 | ❌  | adapters/postgresql/array_test.rb                                    | serialize machinery (2 un-skipped #2872) |
+|    5 |   0 | ✅  | query_cache_test.rb                                                  | habtm setup needed                       |
+|    5 |   0 | ✅  | counter_cache_test.rb                                                | associations                             |
+|    5 |   0 | ✅  | base_test.rb                                                         | schema                                   |
+|    5 |   0 | ✅  | associations/has_one_through_disable_joins_associations_test.rb      | associations                             |
+|    5 |   0 | ❌  | adapters/postgresql/referential_integrity_test.rb                    | adapter-pg                               |
+|    5 |   0 | ❌  | adapters/postgresql/postgresql_adapter_test.rb                       | adapter-pg (+8 wrong-describe)           |
+|    5 |   0 | ❌  | adapters/postgresql/optimizer_hints_test.rb                          | adapter-pg                               |
+|    5 |   0 | ❌  | adapters/postgresql/numbers_test.rb                                  | adapter-pg (→ I-4)                       |
+|    5 |   0 | ❌  | adapters/postgresql/enum_test.rb                                     | adapter-pg (→ I-2)                       |
+|    5 |   0 | ❌  | adapters/postgresql/deferred_constraints_test.rb                     | adapter-pg                               |
+|    5 |   0 | ❌  | adapters/postgresql/create_unlogged_tables_test.rb                   | adapter-pg                               |
+|    5 |   0 | ❌  | adapters/postgresql/collation_test.rb                                | adapter-pg                               |
+|    5 |   0 | ❌  | adapters/abstract_mysql_adapter/unsigned_type_test.rb                | adapter-mysql                            |
+|    5 |   0 | ❌  | adapters/abstract_mysql_adapter/transaction_test.rb                  | adapter-mysql                            |
+|    5 |   0 | ❌  | adapters/abstract_mysql_adapter/optimizer_hints_test.rb              | adapter-mysql                            |
+|    4 |   0 | ✅  | touch_later_test.rb                                                  | associations — touch                     |
+|    4 |   0 | ✅  | sanitize_test.rb                                                     | relation — SQL sanitization              |
+|    4 |   0 | ✅  | reserved_word_test.rb                                                | SQLite adapter gap                       |
+|    4 |   0 | ✅  | invertible_migration_test.rb                                         | migration — CommandRecorder              |
+|    4 |   0 | ✅  | instrumentation_test.rb                                              | relation — Notifications                 |
+|    4 |   0 | ✅  | hot_compatibility_test.rb                                            | (untagged)                               |
+|    4 |   0 | ✅  | connection_adapters/standalone_connection_test.rb                    | 🚫 externally blocked                    |
+|    4 |   0 | ✅  | connection_adapters/registration_test.rb                             | connection-pool                          |
+|    4 |   0 | ✅  | connection_adapters/connection_handler_test.rb                       | connection-pool                          |
+|    4 |   0 | ✅  | associations/nested_error_test.rb                                    | nested-attributes (Phase G)              |
+|    4 |   0 | ✅  | associations/has_many_associations_test.rb                           | associations (+4 wrong-describe)         |
+|    4 |   0 | ❌  | adapters/postgresql/transaction_nested_test.rb                       | adapter-pg                               |
+|    4 |   0 | ❌  | adapters/postgresql/rename_table_test.rb                             | adapter-pg                               |
+|    4 |   0 | ❌  | adapters/postgresql/quoting_test.rb                                  | adapter-pg                               |
+|    4 |   0 | ❌  | adapters/abstract_mysql_adapter/mysql_explain_test.rb                | adapter-mysql                            |
+|    4 |   0 | ❌  | adapters/abstract_mysql_adapter/auto_increment_test.rb               | adapter-mysql                            |
+|    3 |   0 | ✅  | unconnected_test.rb                                                  | connection-pool                          |
+|    3 |   0 | ✅  | tasks/database_tasks_test.rb                                         | (untagged)                               |
+|    3 |   0 | ✅  | suppressor_test.rb                                                   | (untagged)                               |
+|    3 |   0 | ✅  | statement_cache_test.rb                                              | relation                                 |
+|    3 |   0 | ✅  | reflection_test.rb                                                   | associations — reflection                |
+|    3 |   0 | ✅  | forbidden_attributes_protection_test.rb                              | nested-attributes                        |
+|    3 |   0 | ✅  | column_definition_test.rb                                            | schema (→ I-1)                           |
+|    3 |   0 | ✅  | batches_test.rb                                                      | (untagged)                               |
+|    3 |   0 | ✅  | associations/left_outer_join_association_test.rb                     | associations                             |
+|    3 |   0 | ❌  | adapters/postgresql/xml_test.rb                                      | adapter-pg                               |
+|    3 |   0 | ❌  | adapters/postgresql/type_lookup_test.rb                              | adapter-pg                               |
+|    3 |   0 | ❌  | adapters/postgresql/hstore_test.rb                                   | serialization (→ I-3)                    |
+|    3 |   0 | ❌  | adapters/postgresql/date_test.rb                                     | adapter-pg                               |
+|    3 |   0 | ❌  | adapters/postgresql/composite_test.rb                                | adapter-pg                               |
+|    3 |   0 | ❌  | adapters/abstract_mysql_adapter/sp_test.rb                           | adapter-mysql                            |
+|    3 |   0 | ❌  | adapters/abstract_mysql_adapter/set_test.rb                          | adapter-mysql                            |
+|    3 |   0 | ❌  | adapters/abstract_mysql_adapter/nested_deadlock_test.rb              | adapter-mysql                            |
+|    2 |   0 | ✅  | unsafe_raw_sql_test.rb                                               | relation                                 |
+|    2 |   0 | ✅  | transaction_instrumentation_test.rb                                  | transactions                             |
+|    2 |   0 | ✅  | statement_invalid_test.rb                                            | relation                                 |
+|    2 |   0 | ✅  | relation/with_test.rb                                                | (untagged)                               |
+|    2 |   0 | ✅  | primary_class_test.rb                                                | (untagged)                               |
+|    2 |   0 | ✅  | log_subscriber_test.rb                                               | (untagged)                               |
+|    2 |   0 | ✅  | inheritance_test.rb                                                  | fixture                                  |
+|    2 |   0 | ✅  | database_statements_test.rb                                          | relation                                 |
+|    2 |   0 | ✅  | connection_management_test.rb                                        | connection-pool                          |
+|    2 |   0 | ✅  | connection_adapters/schema_cache_test.rb                             | schema                                   |
+|    2 |   0 | ✅  | clone_test.rb                                                        | (untagged)                               |
+|    2 |   0 | ✅  | attributes_test.rb                                                   | type                                     |
+|    2 |   0 | ✅  | attribute_methods/read_test.rb                                       | type                                     |
+|    2 |   0 | ✅  | associations/inner_join_association_test.rb                          | associations                             |
+|    2 |   0 | ✅  | associations/extension_test.rb                                       | associations                             |
+|    2 |   0 | ✅  | associations/eager_load_nested_include_test.rb                       | associations                             |
+|    2 |   0 | ❌  | adapters/postgresql/uuid_test.rb                                     | migration framework                      |
+|    2 |   0 | ❌  | adapters/postgresql/explain_test.rb                                  | adapter-pg                               |
+|    2 |   0 | ❌  | adapters/postgresql/domain_test.rb                                   | adapter-pg                               |
+|    2 |   0 | ❌  | adapters/abstract_mysql_adapter/virtual_column_test.rb               | adapter-mysql                            |
+|    2 |   0 | ❌  | adapters/abstract_mysql_adapter/mysql_enum_test.rb                   | schema-dumper columnSpec (→ I-1/I-2)     |
+|    1 |   1 | ✅  | connection_adapters/connection_handlers_multi_db_test.rb             | connection-pool                          |
+|    1 |   0 | ✅  | types_test.rb                                                        | type                                     |
+|    1 |   0 | ✅  | type_caster/connection_test.rb                                       | type                                     |
+|    1 |   0 | ✅  | timestamp_test.rb                                                    | type                                     |
+|    1 |   0 | ✅  | table_metadata_test.rb                                               | schema                                   |
+|    1 |   0 | ✅  | secure_token_test.rb                                                 | relation                                 |
+|    1 |   0 | ✅  | relation/update_all_test.rb                                          | relation                                 |
+|    1 |   0 | ✅  | relation/predicate_builder_test.rb                                   | relation                                 |
+|    1 |   0 | ✅  | relation/delegation_test.rb                                          | (untagged)                               |
+|    1 |   0 | ✅  | reaper_test.rb                                                       | (untagged)                               |
+|    1 |   0 | ✅  | prepared_statement_status_test.rb                                    | relation                                 |
+|    1 |   0 | ✅  | persistence/reload_association_cache_test.rb                         | associations                             |
+|    1 |   0 | ✅  | numeric_data_test.rb                                                 | type                                     |
+|    1 |   0 | ✅  | invalid_connection_test.rb                                           | connection-pool                          |
+|    1 |   0 | ✅  | finder_test.rb                                                       | associations                             |
+|    1 |   0 | ✅  | finder_respond_to_test.rb                                            | relation                                 |
+|    1 |   0 | ✅  | encryption/encryptable_record_test.rb                                | encryption                               |
+|    1 |   0 | ✅  | encryption/concurrency_test.rb                                       | (untagged)                               |
+|    1 |   0 | ✅  | disconnected_test.rb                                                 | connection-pool                          |
+|    1 |   0 | ✅  | delegated_type_test.rb                                               | fixture + delegated-type touch           |
+|    1 |   0 | ✅  | database_selector_test.rb                                            | connection-pool                          |
+|    1 |   0 | ✅  | database_configurations/resolver_test.rb                             | (→ H-3 divergence)                       |
+|    1 |   0 | ✅  | connection_adapters/merge_and_resolve_default_url_config_test.rb     | (untagged)                               |
+|    1 |   0 | ✅  | column_alias_test.rb                                                 | schema                                   |
+|    1 |   0 | ✅  | associations/required_test.rb                                        | (untagged)                               |
+|    1 |   0 | ✅  | associations/has_many_through_associations_test.rb                   | (untagged)                               |
+|    1 |   0 | ✅  | associations/bidirectional_destroy_dependencies_test.rb              | associations                             |
+|    1 |   0 | ✅  | associations/belongs_to_associations_test.rb                         | associations                             |
+|    1 |   0 | ❌  | adapters/sqlite3/statement_pool_test.rb                              | adapter-sqlite                           |
+|    1 |   0 | ✅  | adapters/sqlite3/explain_test.rb                                     | adapter-sqlite (+2 wrong-describe)       |
+|    1 |   0 | ❌  | adapters/postgresql/virtual_column_test.rb                           | schema                                   |
+|    1 |   0 | ❌  | adapters/postgresql/timestamp_test.rb                                | adapter-pg                               |
+|    1 |   0 | ❌  | adapters/postgresql/statement_pool_test.rb                           | (untagged)                               |
+|    1 |   0 | ❌  | adapters/postgresql/schema_test.rb                                   | adapter-pg                               |
+|    1 |   0 | ❌  | adapters/postgresql/invertible_migration_test.rb                     | migration                                |
+|    1 |   0 | ❌  | adapters/postgresql/infinity_test.rb                                 | type                                     |
+|    1 |   0 | ❌  | adapters/postgresql/foreign_table_test.rb                            | adapter-pg                               |
+|    1 |   0 | ❌  | adapters/postgresql/case_insensitive_test.rb                         | adapter-pg                               |
+|    1 |   0 | ❌  | adapters/postgresql/bytea_test.rb                                    | adapter-pg (→ I-3)                       |
+|    1 |   0 | ❌  | adapters/mysql2/mysql2_adapter_test.rb                               | (untagged)                               |
+|    1 |   0 | ❌  | adapters/mysql2/check_constraint_quoting_test.rb                     | adapter-mysql                            |
+|    1 |   0 | ❌  | adapters/abstract_mysql_adapter/sql_types_test.rb                    | adapter-mysql                            |
+|    1 |   0 | ❌  | adapters/abstract_mysql_adapter/count_deleted_rows_with_lock_test.rb | adapter-mysql                            |
+|    1 |   0 | ❌  | adapters/abstract_mysql_adapter/charset_collation_test.rb            | (→ I-1)                                  |
+|    1 |   0 | ✅  | adapter_prevent_writes_test.rb                                       | relation — prevent-writes                |
+|    1 |   0 | ✅  | active_record_test.rb                                                | connection-pool                          |
+|    0 |   0 | ✅  | adapters/abstract_mysql_adapter/connection_test.rb                   | (phantom resolved in H-2 #2860)          |
 
 ## Appendix B — story index (dispatch order)
 
-| Story   | Title                                                  | Phase |    ~Skips moved | Dep                                     |
-| ------- | ------------------------------------------------------ | ----- | --------------: | --------------------------------------- |
-| H-1     | relocate misplaced + wrong-describe                    | 0     |  0 (19 reclass) | —                                       |
-| H-2     | port 3 missing tests                                   | 0     |      +3 matched | —                                       |
-| H-3     | reclassify permanent skips                             | 0     |   shrinks denom | —                                       |
-| I-1     | schema-dumper columnSpec U2/U3                         | 1     |             ~60 | —                                       |
-| I-2     | type_for_attribute enum cast                           | 1     |             ~15 | —                                       |
-| I-3     | general serialize write-path                           | 1     |             ~10 | —                                       |
-| I-4     | pluck/calculate result cast (wire existing helpers)    | 1     |             ~15 | —                                       |
-| I-5     | `TEST_ADAPTER` CI job (CI-gates 135 adapter-dir skips) | 1     | 0 (unlocks 135) | —                                       |
-| F-1     | insert_all cluster                                     | 2     |              41 | —                                       |
-| F-2     | connection-pool / multi-db                             | 2     |             ~45 | —                                       |
-| F-3     | migration runner                                       | 2     |             ~15 | —                                       |
-| F-4     | transactions + callbacks + touch                       | 2     |             ~30 | —                                       |
-| F-5     | query-cache residuals                                  | 2     |              ~5 | F-7(habtm)                              |
-| F-6     | nested-attributes                                      | 2     |             ~25 | partial G                               |
-| F-7     | fixtures-backed (adapter_test, h1t)                    | 2     |             ~40 | I-1(comment)                            |
-| F-8     | small core leftovers                                   | 2     |             ~50 | I-1/I-3/type                            |
-| P3-\*   | adapter type-families (PG+MySQL)                       | 3     |            ~135 | I-5 (CI-gate); I-1/I-3 (dump/serialize) |
-| 7.2-fix | \_namedInnerJoins review-fix                           | 4     |            gate | —                                       |
-| W7-\*   | associations + relation campaigns                      | 4     |            ~300 | audit-gated                             |
+✅ = fully shipped and removed from plan. Partial-batch stories show remaining count.
+
+| Story   | Title                                                           | Phase |     ~Skips left | Dep                       |
+| ------- | --------------------------------------------------------------- | ----- | --------------: | ------------------------- |
+| H-3     | reclassify permanent skips                                      | 0     |   shrinks denom | —                         |
+| I-1     | schema-dumper columnSpec U3 (U2 ✅ #2864)                       | 1     |             ~60 | —                         |
+| I-2     | type_for_attribute enum cast                                    | 1     |             ~15 | —                         |
+| I-5     | `TEST_ADAPTER` CI job (CI-gates adapter-dir skips)              | 1     | 0 (unlocks 135) | —                         |
+| F-1     | insert_all cluster                                              | 2     |              41 | —                         |
+| F-2     | connection-pool / multi-db (batch 1 ✅ #2883 — 12 shipped)      | 2     |             ~39 | —                         |
+| F-3     | migration runner (batch 1 ✅ #2869 — 3 shipped)                 | 2     |             ~23 | —                         |
+| F-4     | transactions + callbacks + touch (batch 1 ✅ #2870 — 3 shipped) | 2     |             ~47 | —                         |
+| F-5     | query-cache residuals                                           | 2     |              ~5 | F-7(habtm)                |
+| F-6     | nested-attributes                                               | 2     |             ~25 | partial G                 |
+| F-7     | fixtures-backed (adapter_test, h1t)                             | 2     |             ~40 | I-1(comment)              |
+| F-8     | small core leftovers (batch A ✅ #2871 — 5 shipped)             | 2     |             ~29 | I-1/type                  |
+| P3-\*   | adapter type-families (PG+MySQL)                                | 3     |            ~135 | I-5 (CI-gate); I-1 (dump) |
+| 7.2-fix | \_namedInnerJoins review-fix                                    | 4     |            gate | —                         |
+| W7-\*   | associations + relation campaigns                               | 4     |            ~300 | audit-gated               |
 
 > **Externally blocked / permanent (not on the path, → H-3 or deferred):**
 > `standalone_connection_test.rb` (4), `accepts_nested_attributes_for` deep
