@@ -140,10 +140,17 @@ describe("DirtyTest", () => {
   });
 
   it("saved_change_to_attribute? returns whether a change occurred in the last save", async () => {
-    // NOTE: Rails creates `Person` once and checks the nil→"Sean" change. trails'
-    // dirty tracking doesn't populate saved-changes for attributes set during the
-    // initial INSERT, so the change is exercised via a follow-up update instead.
-    // The method-level fidelity (predicate + from/to) matches Rails.
+    // DEVIATION (trails dirty-tracking gap): Rails uses a single `create!("Sean")`
+    // and checks the nil→"Sean" change plus `saved_change_to_gender?` and the
+    // `from: nil` / `to:`-only predicate variants (dirty_test.rb:842-851). In trails,
+    // INSERT-time *user-assigned* attributes are NOT recorded in the changeset —
+    // after `Person.create({first_name})` `savedChanges` holds only the save-managed
+    // columns (`created_at`/`updated_at`), so `savedChangeToAttribute("first_name")`
+    // is false. We therefore exercise the change via a follow-up update. Method-level
+    // fidelity (predicate + from/to) matches Rails. TODO: once create-time dirty
+    // tracking captures assigned attributes, restore Rails' create-only form and the
+    // dropped `gender` / `from: nil` assertions (the `from: nil` case also depends on
+    // null-vs-undefined handling in savedChangeToAttribute, model.ts).
     const p = await Person.create({ first_name: "Sean" });
     p.first_name = "Bob";
     await p.save();
@@ -188,8 +195,7 @@ describe("DirtyTest", () => {
         this.afterSave(function (record: any) {
           if (record.changed) throw new Error("changed? should be false");
           if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
-          if (Object.keys(record.savedChanges).length === 0)
-            throw new Error("saved_changes? should be true");
+          if (!record.isSavedChanges()) throw new Error("saved_changes? should be true");
           if (record.idInDatabase() == null) throw new Error("id_in_database should not be nil");
         });
       }
