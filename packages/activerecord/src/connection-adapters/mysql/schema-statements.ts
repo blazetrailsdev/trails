@@ -180,7 +180,7 @@ export function newColumnFromField(
   return new Column(fieldName, def, meta, field["Null"] === "YES", {
     defaultFunction: defFn ?? undefined,
     collation: field["Collation"] ?? null,
-    unsigned: /unsigned/i.test(field["Type"] ?? ""),
+    unsigned: /\bunsigned(?: zerofill)?$/i.test(field["Type"] ?? ""),
     autoIncrement: /auto_increment/i.test(field["Extra"] ?? ""),
     virtual: /(virtual|stored|persistent)\s+generated/i.test(field["Extra"] ?? ""),
     onUpdate: onUpdateForColumn,
