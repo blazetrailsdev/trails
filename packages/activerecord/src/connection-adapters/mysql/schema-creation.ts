@@ -13,6 +13,7 @@ import type {
   AddColumnDefinition,
 } from "../abstract/schema-definitions.js";
 import {
+  assertSafeMysqlIdentifier,
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
   CreateIndexDefinition,
@@ -57,13 +58,6 @@ export interface VisitorHostAdapter {
   isMariadb?(): boolean;
   /** Mirrors `SchemaStatements#isForeignKeysEnabled` (`adapter.config?.foreignKeys !== false`). */
   config?: { foreignKeys?: boolean };
-}
-
-/** @internal Shared identifier guard for MySQL bare-identifier emission (charset/collation). */
-export function assertSafeMysqlIdentifier(value: string, kind: string): void {
-  if (!/^[A-Za-z0-9_]+$/.test(value)) {
-    throw new ArgumentError(`Invalid MySQL ${kind}: ${JSON.stringify(value)}`);
-  }
 }
 
 export class SchemaCreation extends AbstractSchemaCreation {

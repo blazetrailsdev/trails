@@ -149,12 +149,9 @@ export class SchemaStatements {
 
     // Rails: `td = create_table_definition(...)` — dispatches to the adapter's
     // dialect-specific TableDefinition (e.g. PostgreSQL::TableDefinition with
-    // range/hstore/jsonb column methods).
-    const td = (
-      this.adapter as unknown as {
-        createTableDefinition(n: string, o: Record<string, unknown>): TableDefinition;
-      }
-    ).createTableDefinition(name, {
+    // range/hstore/jsonb column methods). Every real adapter mixes in
+    // SchemaStatements, so the optional method is always present here.
+    const td = this.adapter.createTableDefinition!(name, {
       ...options,
       adapterName: this.adapterName,
       adapter: this.adapter,
