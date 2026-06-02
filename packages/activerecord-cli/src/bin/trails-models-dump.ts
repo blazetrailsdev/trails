@@ -11,8 +11,9 @@
  *
  * Source of the schema, in order:
  *   1. --schema <path>     parse a committed db/schema.ts (no DB connection)
- *   2. --database-url <url>
- *   3. $DATABASE_URL
+ *   2. db/schema.ts        auto-discovered relative to CWD (no DB connection)
+ *   3. --database-url <url>
+ *   4. $DATABASE_URL
  *
  * The `--schema` path is a pure file read + codegen — it never calls
  * `Base.establishConnection()` and needs no reachable database.
@@ -204,45 +205,73 @@ export async function run(argv: readonly string[]): Promise<number> {
     }
     introspected = parsedTables.filter((t) => keep(t.name));
   } else {
-    const url = args.databaseUrl ?? process.env.DATABASE_URL;
-    if (!url) {
+    // Convention default: auto-discover db/schema.ts relative to CWD before
+    // reaching for a live DB connection.
+    const fs = await getFsAsync();
+    const path = await getPathAsync();
+    const conventionSchema = path.join(fs.cwd(), "db", "schema.ts");
+
+    if (await fs.exists(conventionSchema)) {
+      let source: string;
+      try {
+        source = fs.readFileSync(conventionSchema, "utf8");
+      } catch {
+        process.stderr.write(`trails-models-dump: cannot read schema file: ${conventionSchema}\n`);
+        return 1;
+      }
+      sourceHint = conventionSchema;
+      const parsedTables = parseSchemaForModels(source, conventionSchema);
+      if (parsedTables.length === 0) {
+        process.stderr.write(
+          `trails-models-dump: no createTable found in ${conventionSchema} — is it a db/schema.ts?\n`,
+        );
+        return 1;
+      }
+      introspected = parsedTables.filter((t) => keep(t.name));
+    } else {
+      const url = args.databaseUrl ?? process.env.DATABASE_URL;
+      if (!url) {
+        process.stderr.write(
+          "trails-models-dump: no database URL — pass --database-url or set DATABASE_URL.\n",
+        );
+        return 1;
+      }
       process.stderr.write(
-        "trails-models-dump: no database URL — pass --database-url or set DATABASE_URL.\n",
+        "trails-models-dump: warning: generating from a live DB connection; consider committing db/schema.ts and using --schema instead.\n",
       );
-      return 1;
+
+      await Base.establishConnection(url);
+      const adapter = Base.connection;
+
+      const allTables = await introspectTables(adapter);
+      const tableNames = allTables.filter(keep);
+      sourceHint = url;
+
+      // Assemble IntrospectedTable[] — run the four introspection helpers per
+      // table in parallel. generateModels requires primaryKey / foreignKeys /
+      // columns; we pass columns through for polymorphic + STI detection.
+      introspected = await Promise.all(
+        tableNames.map(async (name): Promise<IntrospectedTable> => {
+          const [pk, cols, fks] = await Promise.all([
+            introspectPrimaryKey(adapter, name),
+            introspectColumns(adapter, name),
+            introspectForeignKeys(adapter, name),
+          ]);
+          // introspectPrimaryKey normalises no-PK to []; treat [] as null for
+          // generateModels's view-skip logic so the header tally picks it up.
+          const primaryKey = pk.length === 0 ? null : pk.length === 1 ? pk[0]! : pk;
+          return {
+            name,
+            primaryKey,
+            foreignKeys: fks,
+            columns: cols.map((c) => ({
+              name: c.name,
+              type: c.sqlType ?? c.type ?? "",
+            })),
+          };
+        }),
+      );
     }
-
-    await Base.establishConnection(url);
-    const adapter = Base.connection;
-
-    const allTables = await introspectTables(adapter);
-    const tableNames = allTables.filter(keep);
-    sourceHint = url;
-
-    // Assemble IntrospectedTable[] — run the four introspection helpers per
-    // table in parallel. generateModels requires primaryKey / foreignKeys /
-    // columns; we pass columns through for polymorphic + STI detection.
-    introspected = await Promise.all(
-      tableNames.map(async (name): Promise<IntrospectedTable> => {
-        const [pk, cols, fks] = await Promise.all([
-          introspectPrimaryKey(adapter, name),
-          introspectColumns(adapter, name),
-          introspectForeignKeys(adapter, name),
-        ]);
-        // introspectPrimaryKey normalises no-PK to []; treat [] as null for
-        // generateModels's view-skip logic so the header tally picks it up.
-        const primaryKey = pk.length === 0 ? null : pk.length === 1 ? pk[0]! : pk;
-        return {
-          name,
-          primaryKey,
-          foreignKeys: fks,
-          columns: cols.map((c) => ({
-            name: c.name,
-            type: c.sqlType ?? c.type ?? "",
-          })),
-        };
-      }),
-    );
   }
 
   if (introspected.length === 0) {
