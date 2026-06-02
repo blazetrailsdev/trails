@@ -120,7 +120,11 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   isEncrypted(value: unknown): boolean {
     if (typeof value !== "string") return false;
-    return this.scheme.withContext(() => this._encryptor.isEncrypted(value));
+    // Mirrors Rails encrypted?(value) → with_context { encryptor.encrypted? value }
+    // (encrypted_attribute_type.rb:48): the encryptor is resolved from the current
+    // context, so under a swapped NullEncryptor/EncryptingOnlyEncryptor this reports
+    // false — same as the decrypt/encrypt text paths.
+    return this.scheme.withContext(() => this.encryptor.isEncrypted(value));
   }
 
   // Delegate store accessor dispatch to the castType so store_accessor works
