@@ -105,6 +105,15 @@ describe("TS extractor gate detection", () => {
     expect(g["g"]).toEqual({ adapters: ["postgresql"], source: ["wrapper"] });
   });
 
+  it("composes an adapter wrapper's .skipIf form with the inline guard", () => {
+    // describeIfMysql restricts to mysql; skipIf(postgres) → runs on !postgres;
+    // intersection = mysql.
+    const g = tsGates(`
+      describeIfMysql.skipIf(adapterType === "postgres")("S", () => { it("j", () => {}); });
+    `);
+    expect(g["j"]).toEqual({ adapters: ["mysql"], source: ["wrapper"] });
+  });
+
   it("keeps it.skip as pending without a gate (the TODO signal)", () => {
     const info = extractTestsFromSource(
       `it.skip("h", () => {}); it("i", () => {});`,

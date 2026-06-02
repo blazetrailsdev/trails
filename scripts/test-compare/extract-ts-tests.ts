@@ -221,10 +221,18 @@ export function extractTestsFromSource(content: string, relativePath: string): T
         if (ts.isIdentifier(base) && GATING_MODIFIERS.has(modifier)) {
           const guardExpr = expression.arguments[0]?.getText(sourceFile) ?? "";
           const inlineGate = gateFromGuardExpr(guardExpr, modifier === "runIf");
-          if (base.text === "describe") {
+          if (ADAPTER_SUITE_WRAPPERS.has(base.text)) {
+            // describe.skipIf(…) and the adapter wrappers' .skipIf form, e.g.
+            // describeIfPg.skipIf(…) — compose the wrapper's adapter gate with
+            // the inline guard.
             const title = getArgString(node, 0);
             if (title) {
-              enterSuite(node, title, inlineGate);
+              const wrapperGate = gateFromWrapper(base.text);
+              enterSuite(
+                node,
+                title,
+                wrapperGate ? mergeGate(wrapperGate, inlineGate) : inlineGate,
+              );
               return;
             }
           } else if (base.text === "it" || base.text === "test") {
