@@ -61,4 +61,75 @@ describe("ExecutionContextTest", () => {
     ).rejects.toThrow("async error");
     expect(ExecutionContext.toH().fail_key).toBeUndefined();
   });
+
+  it("#after_change fires the callback when #[]= assigns a key", () => {
+    let calls = 0;
+    ExecutionContext.afterChange(() => {
+      calls += 1;
+    });
+    ExecutionContext.setKey("foo", "bar");
+    expect(calls).toBe(1);
+  });
+
+  it("#after_change fires the callback when #set assigns keys without a block", () => {
+    let calls = 0;
+    ExecutionContext.afterChange(() => {
+      calls += 1;
+    });
+    ExecutionContext.set({ foo: "bar" });
+    expect(calls).toBe(1);
+  });
+
+  it("#after_change does not fire when #clear is called", () => {
+    // Matches Rails: ExecutionContext#clear is `store.clear` with no callback.
+    let calls = 0;
+    ExecutionContext.afterChange(() => {
+      calls += 1;
+    });
+    ExecutionContext.clear();
+    expect(calls).toBe(0);
+  });
+
+  it("#after_change fires on both the block-form set and its restore", () => {
+    let calls = 0;
+    ExecutionContext.afterChange(() => {
+      calls += 1;
+    });
+    ExecutionContext.set({ foo: "bar" }, () => {
+      expect(calls).toBe(1);
+    });
+    expect(calls).toBe(2);
+  });
+
+  it("#after_change fires on the block-form set and its restore even when the block throws", () => {
+    let calls = 0;
+    ExecutionContext.afterChange(() => {
+      calls += 1;
+    });
+    expect(() =>
+      ExecutionContext.set({ foo: "bar" }, () => {
+        throw new Error("boom");
+      }),
+    ).toThrow("boom");
+    expect(calls).toBe(2);
+  });
+
+  it("#after_change fires on the block-form set and its restore for async blocks", async () => {
+    let calls = 0;
+    ExecutionContext.afterChange(() => {
+      calls += 1;
+    });
+    await ExecutionContext.set({ foo: "bar" }, async () => {
+      expect(calls).toBe(1);
+    });
+    expect(calls).toBe(2);
+  });
+
+  it("#after_change invokes every registered callback", () => {
+    const order: string[] = [];
+    ExecutionContext.afterChange(() => order.push("a"));
+    ExecutionContext.afterChange(() => order.push("b"));
+    ExecutionContext.setKey("foo", "bar");
+    expect(order).toEqual(["a", "b"]);
+  });
 });
