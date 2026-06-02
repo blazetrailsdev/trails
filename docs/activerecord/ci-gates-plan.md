@@ -153,9 +153,9 @@ Per file (or cluster), iterate the `--gates` report until it's clean:
 1. **Run** `pnpm test:compare --package activerecord --gates` (refresh
    manifests first if stale — drop `--cached`).
 2. **should-gate** → **check the `it.skip` body first.** Empirically ~all
-   should-gate `it.skip`s are **unimplemented-feature / infra stubs** (`BLOCKED:
-… not implemented / requires fixtures / DDL API`), _not_ tests skipped purely
-   for the wrong adapter. Converting a stub to a gate just creates a vacuously-
+   should-gate `it.skip`s are **unimplemented-feature / infra stubs**
+   (`BLOCKED: … not implemented / requires fixtures / DDL API`), _not_ tests
+   skipped purely for the wrong adapter. Converting a stub to a gate just creates a vacuously-
    or spuriously-passing fake test — **don't**. Only convert when the body is a
    real, passing test that was skipped for adapter applicability (rare). For the
    stubs, should-gate is **implementation-time guidance**: when you build the
