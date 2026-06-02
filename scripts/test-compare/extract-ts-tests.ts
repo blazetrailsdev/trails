@@ -1,10 +1,10 @@
-import * as ts from "typescript";
 import * as path from "path";
 import * as fs from "fs";
 import { globSync } from "tinyglobby";
-import type { TestManifest, TestPackageInfo, TestFileInfo, TestCaseInfo } from "./types.js";
+import type { TestManifest, TestPackageInfo } from "./types.js";
+import { extractTestsFromSource } from "./extract-ts-core.js";
 
-const GATING_MODIFIERS = new Set(["skipIf", "runIf"]);
+export { extractTestsFromSource } from "./extract-ts-core.js";
 
 const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
@@ -77,7 +77,9 @@ function main() {
   console.log("TS Test Extraction Summary:");
   for (const [pkg, pkgInfo] of Object.entries(manifest.packages)) {
     const totalTests = pkgInfo.files.reduce((sum, f) => sum + f.testCases.length, 0);
-    console.log(`  ${pkg}: ${pkgInfo.files.length} files, ${totalTests} tests`);
+    const gated = pkgInfo.files.reduce((s, f) => s + f.testCases.filter((t) => t.gate).length, 0);
+    const suffix = gated > 0 ? ` (${gated} adapter/feature-gated)` : "";
+    console.log(`  ${pkg}: ${pkgInfo.files.length} files, ${totalTests} tests${suffix}`);
   }
 
   if (!fs.existsSync(OUTPUT_DIR)) {
@@ -92,168 +94,16 @@ function extractPackageTests(pkgName: string, files: string[]): TestPackageInfo 
   const pkgInfo: TestPackageInfo = {
     name: pkgName,
     files: [],
+    totalTests: 0,
   };
 
   for (const file of files) {
-    const fileInfo = extractFileTests(file);
-    pkgInfo.files.push(fileInfo);
+    const content = fs.readFileSync(file, "utf-8");
+    pkgInfo.files.push(extractTestsFromSource(content, path.relative(ROOT_DIR, file)));
   }
 
+  pkgInfo.totalTests = pkgInfo.files.reduce((sum, f) => sum + f.testCases.length, 0);
   return pkgInfo;
 }
 
-function extractFileTests(filePath: string): TestFileInfo {
-  const content = fs.readFileSync(filePath, "utf-8");
-  const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.ESNext, false);
-
-  const relativePath = path.relative(ROOT_DIR, filePath);
-  const fileInfo: TestFileInfo = {
-    file: relativePath,
-    className: pkgFromPath(relativePath),
-    testCases: [],
-  };
-
-  const currentAncestors: string[] = [];
-
-  function visit(node: ts.Node) {
-    if (ts.isCallExpression(node)) {
-      const expression = node.expression;
-      if (ts.isIdentifier(expression)) {
-        const funcName = expression.text;
-
-        if (
-          funcName === "describe" ||
-          funcName === "describeIfPg" ||
-          funcName === "describeIfMysql" ||
-          funcName === "describeIfSqlite"
-        ) {
-          const title = getFirstArgString(node);
-          if (title) {
-            currentAncestors.push(title);
-            ts.forEachChild(node, visit);
-            currentAncestors.pop();
-            return;
-          }
-        } else if (funcName === "it" || funcName === "test") {
-          const title = getFirstArgString(node);
-          if (title) {
-            const testCase: TestCaseInfo = {
-              path: [...currentAncestors, title].join(" > "),
-              description: title,
-              ancestors: [...currentAncestors],
-              file: relativePath,
-              line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
-              style: funcName as "it" | "test",
-              assertions: [],
-              pending: false,
-            };
-            fileInfo.testCases.push(testCase);
-          }
-        }
-      } else if (
-        ts.isCallExpression(expression) &&
-        ts.isPropertyAccessExpression(expression.expression)
-      ) {
-        // Handle the callable-modifier form: it.skipIf(expr)("name", fn) /
-        // test.runIf(expr)("name", fn) / describe.skipIf(expr)("suite", fn).
-        // The outer CallExpression's expression is itself a CallExpression whose
-        // expression is a PropertyAccessExpression like `it.skipIf`.
-        //
-        // Restricted to gating modifiers (skipIf / runIf) — `each` and friends
-        // generate multiple runtime tests from a template title, so static
-        // extraction of the template name would add noise to test:compare.
-        const inner: ts.PropertyAccessExpression = expression.expression;
-        const base = inner.expression;
-        const modifier = inner.name.text;
-        if (ts.isIdentifier(base) && GATING_MODIFIERS.has(modifier)) {
-          if (
-            base.text === "describe" ||
-            base.text === "describeIfPg" ||
-            base.text === "describeIfMysql" ||
-            base.text === "describeIfSqlite"
-          ) {
-            const title = getFirstArgString(node);
-            if (title) {
-              currentAncestors.push(title);
-              ts.forEachChild(node, visit);
-              currentAncestors.pop();
-              return;
-            }
-          } else if (base.text === "it" || base.text === "test") {
-            const title = getFirstArgString(node);
-            if (title) {
-              const testCase: TestCaseInfo = {
-                path: [...currentAncestors, title].join(" > "),
-                description: title,
-                ancestors: [...currentAncestors],
-                file: relativePath,
-                line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
-                style: base.text as "it" | "test",
-                assertions: [],
-                pending: false,
-              };
-              fileInfo.testCases.push(testCase);
-            }
-          }
-        }
-      } else if (ts.isPropertyAccessExpression(expression)) {
-        // Handle describe.skip, it.skip, it.todo, it.only, etc.
-        const base = expression.expression;
-        if (ts.isIdentifier(base) && base.text === "describe") {
-          const title = getFirstArgString(node);
-          if (title) {
-            currentAncestors.push(title);
-            ts.forEachChild(node, visit);
-            currentAncestors.pop();
-            return;
-          }
-        } else if (ts.isIdentifier(base) && (base.text === "it" || base.text === "test")) {
-          const modifier = expression.name.text;
-          const title = getFirstArgString(node);
-          if (title) {
-            const testCase: TestCaseInfo = {
-              path: [...currentAncestors, title].join(" > "),
-              description: title,
-              ancestors: [...currentAncestors],
-              file: relativePath,
-              line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
-              style: base.text as "it" | "test",
-              assertions: [],
-              pending: modifier === "skip" || modifier === "todo",
-            };
-            fileInfo.testCases.push(testCase);
-          }
-        }
-      }
-    }
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
-  return fileInfo;
-}
-
-function getFirstArgString(node: ts.CallExpression): string | null {
-  if (node.arguments.length > 0) {
-    const firstArg = node.arguments[0];
-    if (ts.isStringLiteral(firstArg) || ts.isNoSubstitutionTemplateLiteral(firstArg)) {
-      return firstArg.text;
-    }
-  }
-  return null;
-}
-
-function pkgFromPath(relPath: string): string {
-  const parts = relPath.split(path.sep);
-  // packages/arel/src/... -> arel
-  if (parts[0] === "packages" && parts[1]) {
-    if (parts[1] === "actionpack" && parts[3]) {
-      return parts[3]; // actiondispatch, actioncontroller, actionview
-    }
-    if (parts[1] === "trailties") return "trailties";
-    return parts[1];
-  }
-  return "unknown";
-}
-
-main();
+if (require.main === module) main();
