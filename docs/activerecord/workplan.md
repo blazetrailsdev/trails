@@ -323,7 +323,29 @@ Remaining skipped clusters, by size (from #2837 finding):
 
 ---
 
-## Wave 5 — transactions (5.1 follow-ups)
+## Wave 5 — transactions + migration
+
+### Story 5.2 — migration runner (remaining batches) `[un-skip + impl]` ~200 LOC · dep: none
+
+The raise-on-duplicate + method-missing un-skips landed (#2799); the rest of the
+migration-runner campaign is still open and **actionable, not externally
+blocked** (11 live `it.skip` tagged `BLOCKED: migration — migration runner gap`,
+the histogram's `migration 27` bucket spanning these plus adapter-gated cases):
+
+- Ours: `migration.test.ts` (7 — migration-copy feature: timestamps/magic-
+  comments/same-plugin/non-existing+empty dirs at `:2659,2666,2682,2689,2696`;
+  `migration instance has connection` `:1343`; `name collision across dbs`
+  `:1462`, tagged connection-pool); `invertible-migration.test.ts` (4 — Batch 48
+  CommandRecorder inversion: revert `change_column_default` `:170`, table-name
+  prefix `:321`, add-index-on-expression `:367`, add-check-constraint invalid
+  option `:417`). Plus Batch 132 (`migration.ts:~1908` delegate to
+  `adapter.createTableDefinition`).
+- Rails: `test/cases/migration_test.rb`, `invertible_migration_test.rb`; impl
+  `lib/active_record/migration.rb`, `migration/command_recorder.rb`.
+- Done: the 11 migration-runner skips green; sub-cluster to stay under 500 LOC
+  (migration-copy vs CommandRecorder-inversion are natural sibling splits).
+
+### Story 5.1 follow-ups
 
 Open follow-ups from the transaction-callbacks story (each needs production
 work, own story):
@@ -419,7 +441,7 @@ for `merge()`-bearing eager cases):
 | ---------------- | ----------------------------------------------------------- | ----------------------------------------------------------- | -----: | ------------------------------ |
 | eager            | `associations/eager.test.ts`                                | `associations/eager_test.rb`                                |     70 | 7.2 ✅, 7.4 ✅                 |
 | join-model       | `associations/join-model.test.ts`                           | `associations/join_model_test.rb`                           |     41 | 7.2 ✅; DidYouMean (B1972)     |
-| strict-loading   | `strict-loading.test.ts`                                    | `strict_loading_test.rb`                                    |    ~24 | batch 1 landed; rest dep-clear |
+| strict-loading   | `strict-loading.test.ts`                                    | `strict_loading_test.rb`                                    |     14 | batch 1 landed; rest dep-clear |
 | has-one          | `associations/has-one-associations.test.ts`                 | `associations/has_one_associations_test.rb`                 |     28 | fixture data folded in         |
 | relation-scoping | `scoping/relation-scoping.test.ts`                          | `scoping/relation_scoping_test.rb`                          |     28 | STI type-constraint (#1983)    |
 | inverse          | `associations/inverse-associations.test.ts`                 | `associations/inverse_associations_test.rb`                 |     23 | 7.5 ✅                         |
@@ -470,7 +492,7 @@ removed; these still-open follow-ups are preserved here:
    comment/charset/dump-bearing residuals alongside **3.PG-enum**
    (`type_for_attribute`, the last architectural blocker).
 2. **Waves 4/5/6** are bounded, parallelizable clusters (pool campaign,
-   transaction follow-ups, query-cache residuals).
+   migration runner + transaction follow-ups, query-cache residuals).
 3. **Wave 7 campaigns** are the long tail (~300 association+relation skips), each
    opened by a read-only audit, executed last — all infra deps satisfied.
 
