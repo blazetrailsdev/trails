@@ -958,6 +958,10 @@ describe("HasOneThroughAssociationsTest", () => {
       through: "adtMemberDetail",
       source: "organization",
     });
+    Associations.belongsTo.call(AdtMemberDetail, "adtMember", {
+      className: "AdtMember",
+      foreignKey: "member_id",
+    });
     Associations.belongsTo.call(AdtMemberDetail, "organization", {
       className: "AdtOrganization",
       foreignKey: "organization_id",
@@ -982,10 +986,8 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(((await AdtMemberDetail.count()) as number) - beforeCount).toBe(1);
     const loadedOrg = await member.association("organization").loadTarget();
     expect((loadedOrg as any)?.name).toBe("NSA");
-    const details = await AdtMemberDetail.all()
-      .where({ organization_id: organization.id })
-      .toArray();
-    expect(details.some((d) => d.readAttribute("member_id") === member.id)).toBe(true);
+    const orgMembers = (await organization.association("adtMembers").loadTarget()) as any[];
+    expect(orgMembers.some((m) => m.id === member.id)).toBe(true);
     const reloadedDetail = await AdtMemberDetail.all().where({ member_id: member.id }).first();
     expect(reloadedDetail!.readAttribute("extra_data")).toBe("Extra");
   });
@@ -1303,12 +1305,17 @@ describe("HasOneThroughAssociationsTest", () => {
     });
     const david = await DsAuthor.create({ name: "David" });
     const welcome = await DsPost.create({ author_id: david.id, title: "Welcome" });
-    const comment = await DsComment.create({ post_id: welcome.id, body: "Hello" });
+    // Two comments so the `ds_comments.id ASC` ordering is load-bearing (mirrors Rails
+    // fixture where welcome has multiple comments).
+    const firstComment = await DsComment.create({ post_id: welcome.id, body: "Hello" });
+    await DsComment.create({ post_id: welcome.id, body: "Later" });
 
+    // posts(:welcome).comments.order("id").first — lowest-id comment on welcome
     const firstViaPost = await DsComment.all().where({ post_id: welcome.id }).order("id").first();
     const commentOnFirstPost = await david.association("commentOnFirstPost").loadTarget();
     expect((commentOnFirstPost as any)?.id).toBe(firstViaPost!.id);
-    expect((commentOnFirstPost as any)?.id).toBe(comment.id);
+    // Scope orders ds_comments.id ASC → must pick firstComment, not the later one
+    expect((commentOnFirstPost as any)?.id).toBe(firstComment.id);
   });
 
   it("has one through many raises exception", () => {
