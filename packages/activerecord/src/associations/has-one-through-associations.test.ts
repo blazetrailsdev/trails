@@ -1431,7 +1431,7 @@ describe("HasOneThroughAssociationsTest", () => {
         this._tableName = "css_memberships";
         this.attribute("member_id", "integer");
         this.attribute("club_id", "integer");
-        this.defaultScope((rel: any) => rel.select("'1' as foo, css_memberships.*"));
+        this.defaultScope((rel: any) => rel.select("'1' as foo"));
       }
     }
     class CssMember extends Base {
