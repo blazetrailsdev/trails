@@ -292,6 +292,44 @@ siblings; the schema-dumper subtrack is ordered.
   adapter's `prepareColumnOptions` override is unreachable (#1723).
 - Done: `emitTable` calls `columnSpec`; PG/SQLite/MySQL snapshots updated;
   unblocks per-adapter dumper fidelity.
+- **Re-scoped (not a ~50 LOC wiring).** The abstract/dialect `columnSpec`
+  helpers emit Ruby `schema.rb` strings (`precision: nil`, `-> { … }`,
+  virtual `type: :integer`, `size: :tiny`) while the live `emitTable` emits
+  TypeScript-DSL literals (`precision: null`, `default: () => "…"`). They also
+  diverge on the default data-path (`cleanDefault` + `sqlTypeToDsl` extraOpts
+  vs `column.*` + `schemaDefault`/`typeCastForSchema`), and `AdapterSchemaSource`
+  sets `column.type = col.sqlType` (`"varchar(255)"`), so `schemaType` can't
+  resolve the dsl helper. A faithful wire is the **representation-unification
+  epic** below, not a single PR.
+
+### Epic 3.3-U — schema-dumper representation unification `[architectural, multi-PR]` · dep: 3.1
+
+Route live dumps through the Rails-shaped `columnSpec` hook so per-adapter
+`prepareColumnOptions` overrides take effect. Split into non-overlapping
+sibling PRs (CLAUDE.md heuristic: prep the surface, then privates follow):
+
+- **Story 3.3-U1 — TS-emittable columnSpec helpers + raw colspec formatter**
+  `[impl]` ~80 LOC · dep: none. Make the _abstract base_ dumper helpers emit
+  directly-emittable TypeScript-DSL text (`schemaPrecision` datetime-nil
+  `"nil"`→`"null"`; `schemaExpression` `-> { … }`→`() => …`), and add a
+  Rails-faithful **raw** colspec formatter (`formatColspecRaw`, mirrors Rails
+  `format_colspec` — values emitted verbatim, not re-quoted by `formatColspec`).
+  `columnSpec` stays unwired (no live-output change); fully unit-verifiable on
+  SQLite, no live DB. **Files: `connection-adapters/abstract/schema-dumper.ts`,
+  `schema-dumper.ts` + their `*.test.ts` only** (no dialect files → no conflict
+  with sibling PG/MySQL agents). Done: `columnSpec` output, fed through
+  `formatColspecRaw`, round-trips as valid TS-DSL.
+- **Story 3.3-U2 — AdapterSchemaSource resolves dsl-type + raw sqlType**
+  `[impl]` ~90 LOC · dep: U1. `AdapterSchemaSource.columns()` currently maps
+  `col.sqlType` into `ColumnInfo.type`. Carry the dsl cast type in `type` and
+  the raw SQL type in a new `sqlType` field so `schemaType`/`schemaLimit`/
+  `schemaPrecision` work on live columns. Convert the dialect virtual
+  `type: :sym` / `size: :sym` outputs to TS text + update their unit tests.
+- **Story 3.3-U3 — route `emitTable` through `columnSpec`** `[impl]` ~120 LOC ·
+  dep: U2. Replace the inline `colspec` block with `columnSpec` /
+  `columnSpecForPrimaryKey` + `formatColspecRaw`; reconcile defaults
+  (`cleanDefault`→`schemaDefault`); update round-trip snapshots; verify live
+  PG/MySQL in CI (needs `TEST_ADAPTER=postgresql`/`mysql2`).
 
 ### Story 3.4 — SchemaDumpingHelper port + charset-collation dump `[impl + port]` ~165 LOC · dep: 3.3
 

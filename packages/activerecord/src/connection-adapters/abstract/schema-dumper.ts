@@ -100,7 +100,9 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** @internal */
   protected schemaPrecision(column: Column): string | undefined {
     if (column.type === "datetime") {
-      if (column.precision == null) return "nil";
+      // TS-DSL literal `null` (Rails dumps the Ruby `nil`); the value is emitted
+      // verbatim by formatColspecRaw, so it must already read as valid TS.
+      if (column.precision == null) return "null";
       if (column.precision === BaseSchemaDumper.DEFAULT_DATETIME_PRECISION) return undefined;
       return String(column.precision);
     }
@@ -139,7 +141,9 @@ export class SchemaDumper extends BaseSchemaDumper {
 
   /** @internal */
   protected schemaExpression(column: Column): string | undefined {
-    if (column.defaultFunction) return `-> { ${JSON.stringify(column.defaultFunction)} }`;
+    // TS-DSL arrow form (Rails dumps the Ruby lambda `-> { … }`); emitted verbatim
+    // by formatColspecRaw and consumed by the DSL as `default: () => "fn()"`.
+    if (column.defaultFunction) return `() => ${JSON.stringify(column.defaultFunction)}`;
     return undefined;
   }
 
