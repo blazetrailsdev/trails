@@ -1,14 +1,26 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/money_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
+import { sql as arelSql } from "@blazetrails/arel";
 import { Money } from "../../connection-adapters/postgresql/oid/money.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    // Mirrors Rails setup: lc_monetary = 'C' fixes the money output format so
+    // values come back as "$123.45" regardless of the server's host locale.
+    await adapter.exec(`set lc_monetary = 'C'`);
     await adapter.exec(`DROP TABLE IF EXISTS "postgresql_moneys"`);
     await adapter.exec(`
       CREATE TABLE "postgresql_moneys" (
@@ -22,6 +34,23 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.exec(`DROP TABLE IF EXISTS "postgresql_moneys"`);
     await adapter.close();
   });
+
+  // Rails maps the `postgresql_moneys` table to a `PostgresqlMoney` model;
+  // its `wealth` / `depth` columns resolve to the OID::Money type so that
+  // calculations and writes carry numeric values. Mirrors infinity_test.rb's
+  // model wiring — the model shares the test's `adapter` connection.
+  async function modelClass() {
+    const { Base } = await import("../../index.js");
+    const a = adapter;
+    class PostgresqlMoney extends Base {
+      static tableName = "postgresql_moneys";
+      static {
+        this.adapter = a;
+      }
+    }
+    await PostgresqlMoney.loadSchema();
+    return PostgresqlMoney;
+  }
 
   describe("PostgresqlMoneyTest", () => {
     it("column", async () => {
@@ -165,18 +194,26 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(Number(negative[0].wealth)).toBeCloseTo(-567.89, 2);
     });
 
-    // Needs ORM layer (Relation#sum with type cast)
-    it.skip("sum with type cast", async () => {
-      // BLOCKED: relation
-      // ROOT-CAUSE: Relation#sum — no type-cast applied to SQL expressions (e.g. PostgresqlMoney.sum("id * wealth"))
-      // SCOPE: ~100 LOC in relation/calculations.ts; affects ~2 tests in money.test.ts
+    // Rails: assert_equal BigDecimal("123.45"), PostgresqlMoney.sum("id * wealth")
+    // The aggregate is over a raw SQL expression (id * wealth), whose result
+    // column is the PG money type — MoneyDecoder casts it to a number.
+    it("sum with type cast", async () => {
+      await adapter.executeMutation(
+        `INSERT INTO "postgresql_moneys" ("id", "wealth") VALUES (1, '123.45'::money)`,
+      );
+      const M = await modelClass();
+      expect(Number(await (M as any).sum("id * wealth"))).toBeCloseTo(123.45, 2);
     });
 
-    // Needs ORM layer (Relation#pluck with type cast)
-    it.skip("pluck with type cast", async () => {
-      // BLOCKED: relation
-      // ROOT-CAUSE: Relation#pluck — no type-cast applied to Arel.sql expressions (e.g. PostgresqlMoney.pluck(Arel.sql("id * wealth")))
-      // SCOPE: ~100 LOC in relation/calculations.ts; affects ~2 tests in money.test.ts
+    // Rails: assert_equal [BigDecimal("123.45")], PostgresqlMoney.pluck(Arel.sql("id * wealth"))
+    it("pluck with type cast", async () => {
+      await adapter.executeMutation(
+        `INSERT INTO "postgresql_moneys" ("id", "wealth") VALUES (1, '123.45'::money)`,
+      );
+      const M = await modelClass();
+      const plucked = await (M as any).pluck(arelSql("id * wealth"));
+      expect(plucked).toHaveLength(1);
+      expect(Number(plucked[0])).toBeCloseTo(123.45, 2);
     });
 
     it("create and update money", async () => {
@@ -211,11 +248,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(Number(rows[0].wealth)).toBeCloseTo(987.65, 2);
     });
 
-    // Needs ORM layer (Relation#update_all with BigDecimal cast)
-    it.skip("update all with money big decimal", async () => {
-      // BLOCKED: relation
-      // ROOT-CAUSE: Relation#update_all — BigDecimal values not serialized via Money#serialize before SQL binding
-      // SCOPE: ~50 LOC in relation.ts or relation/query-methods.ts; affects ~1 test in money.test.ts
+    // Rails: PostgresqlMoney.update_all(wealth: "123.45".to_d). Trails has no
+    // BigDecimal; DecimalType represents it as the decimal string "123.45",
+    // which update_all binds and PG coerces to money.
+    it("update all with money big decimal", async () => {
+      const M = await modelClass();
+      const money = await (M as any).create({});
+      await (M as any).updateAll({ wealth: "123.45" });
+      await money.reload();
+      expect(Number(money.wealth)).toBeCloseTo(123.45, 2);
     });
 
     it("update all with money numeric", async () => {

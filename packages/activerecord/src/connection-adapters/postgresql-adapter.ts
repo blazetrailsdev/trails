@@ -75,6 +75,7 @@ const getTemporalTypeParser = makeGetTypeParser(pg.types);
 const TEMPORAL_OIDS = new Set([1082, 1083, 1114, 1184, 1266]);
 const OID_INTERVAL = 1186;
 const OID_INTERVAL_ARRAY = 1187;
+const OID_MONEY = 790;
 import {
   READ_QUERY,
   executeBatch as pgExecuteBatch,
@@ -374,6 +375,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             if (oid === OID_INTERVAL_ARRAY && format !== "binary") return (v: unknown) => v;
             if ((oid === OID_JSON || oid === OID_JSONB) && format !== "binary")
               return (v: unknown) => v;
+            // PG money (OID 790): the wire format is locale-formatted text
+            // ("$123.45"). Decode to a number via MoneyDecoder so result
+            // values from raw expressions (SUM(id * wealth), pluck(Arel.sql))
+            // carry a numeric value — mirrors Rails' money type-map coder.
+            if (oid === OID_MONEY && format !== "binary")
+              return (v: unknown) => (typeof v === "string" ? MoneyDecoder.decode(v) : v);
             return oid === 1082 && !PostgreSQLAdapter.decodeDates
               ? format === "binary"
                 ? pg.types.getTypeParser(oid, "binary")
@@ -467,6 +474,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           }
           if ((oid === OID_JSON || oid === OID_JSONB) && format !== "binary") {
             const fallback = (v: unknown) => v;
+            return userGetTypeParser?.(oid, format) ?? fallback;
+          }
+          // PG money (OID 790): decode locale-formatted text ("$123.45") to a
+          // number so SUM(id * wealth) / pluck(Arel.sql(...)) carry numeric
+          // values — mirrors Rails' money type-map coder.
+          if (oid === OID_MONEY && format !== "binary") {
+            const fallback = (v: unknown) => (typeof v === "string" ? MoneyDecoder.decode(v) : v);
             return userGetTypeParser?.(oid, format) ?? fallback;
           }
           if (oid === 1082 && !PostgreSQLAdapter.decodeDates) {

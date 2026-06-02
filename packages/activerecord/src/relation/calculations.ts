@@ -151,6 +151,13 @@ function buildAggNode(table: any, fn: AggFn, column: string, distinct: boolean):
   if (column === "*") {
     return new Nodes.NamedFunction(sqlName, [new Nodes.SqlLiteral("*")], undefined, distinct);
   }
+  // Mirrors Rails' arel_column: only a bare or table-qualified identifier maps
+  // to a column attribute. Any other expression (e.g. "id * wealth") passes
+  // through as raw SQL so SUM(id * wealth) is emitted, not a quoted
+  // pseudo-column. Matches the yield-Arel.sql branch in Calculations.
+  if (!/^[A-Za-z_]\w*(\.[A-Za-z_]\w*)?$/.test(column.trim())) {
+    return new Nodes.NamedFunction(sqlName, [new Nodes.SqlLiteral(column)], undefined, distinct);
+  }
   const attr = table.get(column);
   if (distinct) {
     return new Nodes.NamedFunction(sqlName, [attr], undefined, true);
