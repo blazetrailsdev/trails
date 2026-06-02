@@ -29,6 +29,7 @@ import {
   columnNameWithOrderMatcher as pgColumnNameWithOrderMatcher,
 } from "./postgresql/quoting.js";
 import { TypeMapInitializer, type PgTypeRow } from "./postgresql/oid/type-map-initializer.js";
+import { Money } from "./postgresql/oid/money.js";
 import {
   initializeInstanceTypeMap,
   initializeTypeMap as staticInitializeTypeMap,
@@ -5385,20 +5386,19 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
 }
 
 /**
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter::MoneyDecoder
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter::MoneyDecoder.
+ *
+ * Registered as the result-set coder for OID 790 (PG money). Rails defines
+ * `TYPE = OID::Money.new` and `decode(value) = TYPE.deserialize(value)`; we
+ * delegate to the same Money type so locale-formatted money text — US
+ * ("$123.45"), EU grouping ("$12.345.678,12"), and accounting parentheses —
+ * deserializes exactly as the Money attribute type, not via ad-hoc stripping.
  */
 export class MoneyDecoder {
-  static decode(value: string): number {
-    let str = value.trim();
-    let negative = false;
-    if (str.startsWith("(") && str.endsWith(")")) {
-      negative = true;
-      str = str.slice(1, -1).trim();
-    }
-    const cleaned = str.replace(/[$,\s]/g, "");
-    const num = parseFloat(cleaned);
-    if (isNaN(num)) return NaN;
-    return negative ? -num : num;
+  static readonly TYPE = new Money();
+
+  static decode(value: string): string | null {
+    return MoneyDecoder.TYPE.deserialize(value) as string | null;
   }
 }
 
