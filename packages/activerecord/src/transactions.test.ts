@@ -1059,6 +1059,14 @@ describe("TransactionTest", () => {
         this._tableName = "topics";
         this.attribute("title", "string");
         this.attribute("parent_id", "integer");
+        // Rails Topic declares: has_many :replies, dependent: :destroy,
+        // autosave: true, inverse_of: :topic (topic.rb:49). Both autosave and
+        // inverse_of are omitted here: each independently exposes an unrelated
+        // framework gap when a record is destroyed+frozen inside the rolled-back
+        // transaction (autosave / inverse-back-reference writes hit the frozen
+        // AttributeSet during the save/cascade flow). Neither bears on
+        // frozen-state restoration — the behavior this test verifies — and
+        // dependent: :destroy alone reproduces Rails' double-destroy cascade.
         this.hasMany("replies", {
           className: "FrozenReply",
           foreignKey: "parent_id",
@@ -1069,6 +1077,9 @@ describe("TransactionTest", () => {
     }
     class FrozenReply extends FrozenTopic {
       static {
+        // Rails Reply: belongs_to :topic, foreign_key: "parent_id",
+        // inverse_of: :replies (reply.rb:6). inverse_of omitted — see the
+        // has_many note above.
         this.belongsTo("topic", { className: "FrozenTopic", foreignKey: "parent_id" });
       }
     }
@@ -1111,7 +1122,11 @@ describe("TransactionTest", () => {
     expect(book.id).toEqual([1, 2]);
 
     await CpkBook.transaction(async () => {
-      await book.update({ author_id: 42, id: 42 });
+      await book.updateBang({ author_id: 42, id: 42 });
+      // Guard against a silent no-op: the in-TX write must take effect, so the
+      // post-rollback assertion genuinely proves restoration (not that nothing
+      // ever changed).
+      expect(book.id).toEqual([42, 42]);
       throw new Rollback();
     });
 
