@@ -538,15 +538,31 @@ export function symbolColumnToString(this: SchemaHost, name: string): string | u
  * with no pool/table simply has nothing to clear.
  */
 function clearAdapterDataSourceCache(host: SchemaHost): void {
+  // The raw, sync SchemaCache — `clearDataSourceCacheBang(connection, name)`.
+  // NOT the pool's BoundSchemaReflection (async, single-arg `(name)`); reaching
+  // for that form here would clear a table named `null` and leave a floating
+  // Promise. Both branches below resolve the raw cache, matching what the
+  // adapter's own `schemaCache` getter returns (abstract-adapter.ts).
   type Cache = { clearDataSourceCacheBang?: (connection: unknown, name: string) => void };
-  let cache: Cache | undefined;
+  let cache: Cache | null | undefined;
   let table: string | undefined;
   try {
     table = (host as unknown as { tableName?: string }).tableName;
     const direct = (host as unknown as { _adapter?: { schemaCache?: Cache } })._adapter;
-    cache =
-      direct?.schemaCache ??
-      (host as unknown as { schemaCache?: () => Cache | undefined }).schemaCache?.();
+    if (direct?.schemaCache) {
+      cache = direct.schemaCache;
+    } else {
+      // Pooled path: read the pool config's raw SchemaCache directly (the slot
+      // the adapter getter shares), NOT `schemaCache()` whose fallback is the
+      // bound reflection. Getting the pool never leases a connection — Rails
+      // reaches schema_cache through the pool in `reset_column_information`.
+      const pool = (
+        host as unknown as {
+          connectionPool?: () => { poolConfig?: { schemaCache?: Cache | null } };
+        }
+      ).connectionPool?.();
+      cache = pool?.poolConfig?.schemaCache;
+    }
   } catch {
     return;
   }
