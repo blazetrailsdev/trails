@@ -9,6 +9,8 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Person } from "./test-helpers/models/person.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -23,9 +25,15 @@ describe("DirtyTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
+    // Re-establish the canonical `people` shape (Rails' dirty_test.rb reads the
+    // shared `Person`). Using the canonical columns instead of a reduced bespoke
+    // `{first_name}` means this file no longer overwrites the worker DB's
+    // `people` table with a reduced shape — removing a cross-file collision that
+    // `locking.test.ts` guards against with `dropExisting`. `topics` stays a
+    // bespoke scratch table (separate convergence).
     await defineSchema({
       topics: { title: "string" },
-      people: { first_name: "string" },
+      people: canonicalSchema.people,
     });
   });
   it("attribute changes", () => {
@@ -132,11 +140,6 @@ describe("DirtyTest", () => {
   });
 
   it("saved_change_to_attribute? returns whether a change occurred in the last save", async () => {
-    class Person extends Base {
-      static {
-        this.attribute("first_name", "string");
-      }
-    }
     const p = await Person.create({ first_name: "Sean" });
     p.first_name = "Bob";
     await p.save();
@@ -146,11 +149,6 @@ describe("DirtyTest", () => {
   });
 
   it("saved_change_to_attribute returns the change that occurred in the last save", async () => {
-    class Person extends Base {
-      static {
-        this.attribute("first_name", "string");
-      }
-    }
     const p = await Person.create({ first_name: "Sean" });
     p.first_name = "Bob";
     await p.save();
@@ -159,11 +157,6 @@ describe("DirtyTest", () => {
   });
 
   it("attribute_before_last_save returns the original value before saving", async () => {
-    class Person extends Base {
-      static {
-        this.attribute("first_name", "string");
-      }
-    }
     const p = await Person.create({ first_name: "Sean" });
     p.first_name = "Bob";
     await p.save();
@@ -171,16 +164,28 @@ describe("DirtyTest", () => {
   });
 
   it("changed? in after callbacks returns false", async () => {
-    class Person extends Base {
+    // Mirrors Rails' anonymous `Class.new(ActiveRecord::Base) { self.table_name =
+    // "people"; after_save {...} }` — a one-off callback that must not pollute the
+    // shared canonical `Person`. Explicit `_tableName` targets the canonical
+    // `people` table (the class name would otherwise clash with the imported
+    // `Person` in the model registry).
+    const klass = class extends Base {
       static {
+        this._tableName = "people";
         this.attribute("first_name", "string");
+        // AR_NO_AUTO_SCHEMA is on, so this throwaway class only knows the columns
+        // it declares. Declare the canonical `people` timestamp columns
+        // (NOT NULL) so the timestamp module auto-fills them on insert — Rails'
+        // anonymous class gets this for free via schema reflection.
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
         this.afterSave(function (record: any) {
           if (record.changed) throw new Error("changed? should be false");
           if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
         });
       }
-    }
-    const person = await Person.create({ first_name: "Sean" });
+    };
+    const person = await klass.create({ first_name: "Sean" });
     expect(person.changed).toBe(false);
   });
 });
