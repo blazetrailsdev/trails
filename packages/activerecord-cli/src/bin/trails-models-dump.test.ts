@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -531,5 +531,93 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
     const { code, stdout } = await runDumpInProcess(["--schema", schemaPath]);
     expect(code).toBe(0);
     expect(stdout).toMatch(new RegExp(`from ${schemaPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  });
+
+  // Convention default: auto-discover db/schema.ts relative to CWD.
+  async function withCwd<T>(dir: string, fn: () => Promise<T>): Promise<T> {
+    const orig = process.cwd();
+    process.chdir(dir);
+    try {
+      return await fn();
+    } finally {
+      process.chdir(orig);
+    }
+  }
+
+  function writeConventionSchema(dir: string, source: string): void {
+    const dbDir = join(dir, "db");
+    mkdirSync(dbDir, { recursive: true });
+    writeFileSync(join(dbDir, "schema.ts"), source);
+  }
+
+  it("auto-discovers db/schema.ts relative to CWD when no --schema or DB URL given", async () => {
+    writeConventionSchema(
+      tmp,
+      `
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("posts", { force: "cascade" }, (t) => {
+          t.string("title");
+        });
+      }
+    `,
+    );
+    const { code, stdout, stderr } = await withCwd(tmp, () =>
+      runDumpInProcess(["--no-header"], { DATABASE_URL: "" }),
+    );
+    expect(code, `stderr: ${stderr}\nstdout: ${stdout}`).toBe(0);
+    expect(stdout).toMatch(/export class Post extends Base/);
+    expect(stderr).not.toMatch(/warning:/);
+  });
+
+  it("warns and ignores --database-url when auto-discovered db/schema.ts wins", async () => {
+    writeConventionSchema(
+      tmp,
+      `
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("posts", { force: "cascade" }, (t) => {
+          t.string("title");
+        });
+      }
+    `,
+    );
+    const { code, stdout, stderr } = await withCwd(tmp, () =>
+      runDumpInProcess(
+        ["--database-url", "sqlite3:///nonexistent/should-never-connect.db", "--no-header"],
+        {},
+      ),
+    );
+    expect(code, `stderr: ${stderr}\nstdout: ${stdout}`).toBe(0);
+    expect(stdout).toMatch(/export class Post extends Base/);
+    expect(stderr).toMatch(/auto-discovered db\/schema\.ts; ignoring --database-url/);
+  });
+
+  it("uses the convention schema path as the header sourceHint", async () => {
+    writeConventionSchema(
+      tmp,
+      `
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("posts", { force: "cascade" }, (t) => {
+          t.string("title");
+        });
+      }
+    `,
+    );
+    const { code, stdout } = await withCwd(tmp, () => runDumpInProcess([], { DATABASE_URL: "" }));
+    expect(code).toBe(0);
+    const expectedPath = join(tmp, "db", "schema.ts").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    expect(stdout).toMatch(new RegExp(`from ${expectedPath}`));
+  });
+
+  it("emits a deprecation warning when falling through to the live-DB path", async () => {
+    // tmp has no db/schema.ts → auto-discovery misses → live-DB path with warning.
+    applySchema(dbPath, `CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT);`);
+    const { code, stdout, stderr } = await withCwd(tmp, () =>
+      runDumpInProcess(["--no-header"], { DATABASE_URL: `sqlite3://${dbPath}` }),
+    );
+    expect(code, `stderr: ${stderr}`).toBe(0);
+    expect(stdout).toMatch(/export class Item extends Base/);
+    expect(stderr).toMatch(
+      /warning: generating from a live DB connection; consider committing db\/schema\.ts/,
+    );
   });
 });
