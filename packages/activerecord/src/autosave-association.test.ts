@@ -832,7 +832,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     await order.reload();
 
     expect(await order.orderAgreementIds).toEqual(orderAgreements);
-    expect(await association(order, "orderAgreements").toArray()).toHaveLength(2);
+    const loadedAgreements = await association(order, "orderAgreements").toArray();
+    expect(loadedAgreements).toHaveLength(2);
+    expect(loadedAgreements.map((a) => a.id)).toContain(a2.id);
   });
   it("assign ids with cpk for two models", async () => {
     // Rails: order has a CPK [shop_id, id]; books is a composite-FK has_many
@@ -883,7 +885,11 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     await order.reload();
 
     expect(await order.bookIds).toEqual(bookIds);
-    expect(await association(order, "books").toArray()).toHaveLength(2);
+    const loadedBooks = await association(order, "books").toArray();
+    expect(loadedBooks).toHaveLength(2);
+    const loadedTitles = loadedBooks.map((b) => b.title);
+    expect(loadedTitles).toContain("First");
+    expect(loadedTitles).toContain("Second");
   });
   it("has one cpk has one autosave with id", async () => {
     // Rails: test "has_one cpk has_one autosave with id" — when the parent has a CPK
