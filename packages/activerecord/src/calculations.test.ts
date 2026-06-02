@@ -15,6 +15,7 @@ import {
   ReadOnlyRecord,
   StrictLoadingViolationError,
   registerModel,
+  serialize,
 } from "./index.js";
 import { Associations, loadBelongsTo } from "./associations.js";
 import { ReadonlyAttributeError } from "./readonly-attributes.js";
@@ -41,6 +42,7 @@ describe("CalculationsTest", () => {
         credits: "integer",
         firm_id: "integer",
         name: "string",
+        verified: "boolean",
       },
       posts: {
         category: "string",
@@ -1678,11 +1680,41 @@ describe("CalculationsTest", () => {
     // requires fixture-based associations
   });
 
-  it.skip("pluck with serialization", async () => {
-    // BLOCKED: relation — calculation / aggregation gap
-    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
-    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
-    // requires custom serialized attribute types
+  it("pluck with serialization", async () => {
+    class Account extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    serialize(Account, "name");
+    // Rails' test passes the Hash and the coder dumps it on write; trails'
+    // `serialize` (serialize.ts) only wraps the read side, so we store the
+    // already-dumped string. This isolates the behavior under test — that
+    // pluck deserializes through the same coder a record read does — from
+    // the separate, pre-existing write-side-dump gap.
+    await Account.create({ name: JSON.stringify({ foo: "bar" }) });
+    const loaded = await Account.all().first();
+    expect(await Account.all().pluck("name")).toEqual([loaded?.name]);
+    expect(await Account.all().pluck("name")).toEqual([{ foo: "bar" }]);
+  });
+
+  it("pluck type casts on a schema-reflected model", async () => {
+    // Write through a model with declared attributes...
+    class AccountWriter extends Base {
+      static _tableName = "accounts";
+      static {
+        this.attribute("name", "string");
+        this.attribute("verified", "boolean");
+      }
+    }
+    await AccountWriter.create({ name: "reflected", verified: true });
+    // ...then pluck through a fresh model whose columns come only from DB
+    // reflection. pluck is its first operation, so without an explicit
+    // schema load the boolean would fall through uncast (raw 0/1 on SQLite).
+    class AccountReader extends Base {
+      static _tableName = "accounts";
+    }
+    expect(await AccountReader.all().pluck("verified")).toEqual([true]);
   });
 });
 
