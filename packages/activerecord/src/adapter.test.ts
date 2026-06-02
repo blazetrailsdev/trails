@@ -78,15 +78,23 @@ describe("AdapterTest", () => {
     // ROOT-CAUSE: adapter.test.ts has no createTestAdapter/defineSchema setup; Book (test-fixtures.ts) is defined but not wired here
     // SCOPE: ~20 LOC port (Book wiring + setup); affects ~1 test
   });
-  it.skip("valid column", () => {
-    // BLOCKED: schema
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#isValidType: stub returns true for any non-empty string; must consult nativeDatabaseTypes()
-    // SCOPE: ~10 LOC + nativeDatabaseTypes fix; affects ~2 tests
+  it("valid column", async () => {
+    const conn = new SQLite3Adapter(":memory:");
+    try {
+      for (const type of Object.keys(conn.nativeDatabaseTypes())) {
+        expect(conn.isValidType(type)).toBe(true);
+      }
+    } finally {
+      await conn.close();
+    }
   });
-  it.skip("invalid column", () => {
-    // BLOCKED: schema
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#isValidType: stub returns true for any non-empty string; must return false for types not in nativeDatabaseTypes()
-    // SCOPE: ~10 LOC; affects ~2 tests
+  it("invalid column", async () => {
+    const conn = new SQLite3Adapter(":memory:");
+    try {
+      expect(conn.isValidType("foobar")).toBe(false);
+    } finally {
+      await conn.close();
+    }
   });
   it.skip("table exists?", () => {
     // BLOCKED: fixture
@@ -103,10 +111,13 @@ describe("AdapterTest", () => {
     // ROOT-CAUSE: test-helpers/fixtures: needs accounts table for addIndex/indexes/removeIndex round-trip
     // SCOPE: ~25 LOC port; affects ~3 tests
   });
-  it.skip("returns empty indexes for non existing table", () => {
-    // BLOCKED: schema
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#indexes: must return [] for unknown tables rather than throw
-    // SCOPE: ~5 LOC; affects ~1 test
+  it("returns empty indexes for non existing table", async () => {
+    const conn = new SQLite3Adapter(":memory:");
+    try {
+      expect(await conn.indexes("nonexistingtable")).toEqual([]);
+    } finally {
+      await conn.close();
+    }
   });
   it.skip("remove index when name and wrong column name specified", () => {
     // BLOCKED: schema
@@ -164,10 +175,19 @@ describe("AdapterTest", () => {
       setDisablePreparedStatements(original);
     }
   });
-  it.skip("table alias", () => {
-    // BLOCKED: schema
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#tableAliasFor: Ruby per-instance method override (def @connection.test_table_alias_length) has no TS equivalent; needs subclass-based port
-    // SCOPE: ~15 LOC port via TestAdapter subclass; affects ~1 test
+  it("table alias", () => {
+    // Rails redefines `table_alias_length` on the connection's singleton class
+    // to return 10; TS has no per-instance method override, so a subclass that
+    // overrides the (mixed-in) `tableAliasLength` reproduces the same effect.
+    class TableAliasAdapter extends AbstractAdapter {
+      tableAliasLength(): number {
+        return 10;
+      }
+    }
+    const conn = new TableAliasAdapter();
+    expect(conn.tableAliasFor("posts")).toBe("posts");
+    expect(conn.tableAliasFor("posts_comments")).toBe("posts_comm");
+    expect(conn.tableAliasFor("dbo.posts")).toBe("dbo_posts");
   });
   it.skip("uniqueness violations are translated to specific exception", () => {
     // BLOCKED: fixture
