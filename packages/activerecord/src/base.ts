@@ -2438,9 +2438,21 @@ export class Base extends Model {
         (this as any)._dirty.snapshot((this as any)._attributes);
         // Assign store accessor keys after the clean baseline so they appear
         // as dirty on new records (mirrors Rails: new-record attrs are changed
-        // relative to nil). writeAttribute routes them through their setters.
+        // relative to nil). Dispatch through the prototype setter so the write
+        // lands in the store hash rather than a standalone attribute slot.
         for (const [k, v] of Object.entries(_storeAttrs)) {
-          (this as any).writeAttribute(k, v);
+          let _proto = Object.getPrototypeOf(this);
+          let _dispatched = false;
+          while (_proto !== null && _proto !== Object.prototype) {
+            const _desc = Object.getOwnPropertyDescriptor(_proto, k);
+            if (_desc?.set) {
+              (_desc.set as (val: unknown) => void).call(this, v);
+              _dispatched = true;
+              break;
+            }
+            _proto = Object.getPrototypeOf(_proto);
+          }
+          if (!_dispatched) (this as any)._writeAttribute(k, v);
         }
         if (assocPending) {
           _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
