@@ -338,6 +338,14 @@ class TestExtractor
     name = ident_name(name_node)
     return unless name
     return unless name.start_with?("test_")
+    # Minitest invokes test methods with no arguments, so a `def test_*` that
+    # declares a *required* parameter (e.g. the private helper
+    # `test_lock_free(lock_name)`) can never be run as a test — skip it so it
+    # doesn't register as a phantom missing test. Methods callable with zero
+    # args (only-default positionals, *rest, keyword-with-default, &block) are
+    # still real tests — e.g. `test_copy_table(from = "customers")` — and are
+    # kept.
+    return if def_has_required_params?(node[2])
 
     # Convert test_foo_bar to "foo bar"
     desc = name.sub(/^test_/, "").tr("_", " ")
@@ -355,6 +363,25 @@ class TestExtractor
       style: "def_test",
       assertions: assertions,
     }
+  end
+
+  # Ripper shapes a method's parameter list as the 3rd `:def` child: either a
+  # bare `[:params, ...]` (no parens) or `[:paren, [:params, ...]]`. The
+  # `:params` slots are [reqd, optional, rest, post, keywords, kwrest, block].
+  # Only required parameters stop minitest from invoking the method with zero
+  # args: required positionals (`reqd`), required post-splat positionals
+  # (`post`), and keyword args declared without a default (Ripper records their
+  # value as `false`). Optional/default/rest/block params leave the method
+  # zero-arg-callable, so they don't disqualify it as a test.
+  def def_has_required_params?(params_node)
+    return false unless params_node.is_a?(Array)
+    inner = params_node[0] == :paren ? params_node[1] : params_node
+    return false unless inner.is_a?(Array) && inner[0] == :params
+    reqd, _optional, _rest, post, keywords, = inner.drop(1)
+    return true if reqd.is_a?(Array) && !reqd.empty?
+    return true if post.is_a?(Array) && !post.empty?
+    return true if keywords.is_a?(Array) && keywords.any? { |_label, default| default == false }
+    false
   end
 
   # ---- Assertion extraction ----
