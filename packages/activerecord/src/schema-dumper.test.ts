@@ -370,7 +370,11 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain('"lower(email)"');
     expect(output).toContain("idx_users_lower_email");
   });
-  itIfSupports("expression_index", "schema dump expression indices escaping", async () => {
+  // NOT converted to itIfSupports: Rails gates this by current_adapter?(:Mysql2,
+  // :Trilogy) (schema_dumper_test.rb:313, real-MySQL-only, asserts concat_ws
+  // backtick output), not by supports_expression_index?. Our body is a PG/SQLite
+  // port (`lower(a || b)`), so it's a pre-existing divergence — left as-is.
+  it.skipIf(adapterType === "mysql")("schema dump expression indices escaping", async () => {
     await ctx.createTable("users", {}, (t) => {
       t.string("first_name");
       t.string("last_name");

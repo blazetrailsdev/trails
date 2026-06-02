@@ -52,8 +52,12 @@ if (adapterSupports("savepoints")) { … }                                // imp
 - Support is resolved off `adapterType` for the CI matrix (postgres:17,
   mariadb:11, in-memory sqlite) — the same idiom as
   `adapterType !== "mysql"` in `insert-all.test.ts`. The table mirrors **Rails'**
-  `supports_<feature>?` (incl. its `mariadb?` / `database_version` branching),
-  not our own adapter methods, so the gate-mismatch comparison is apples-to-apples.
+  `supports_<feature>?` (incl. its `mariadb?` / `database_version` branching).
+  Where our own adapter's `supports*()` diverged from Rails it's being
+  reconciled to match (e.g. `supportsJson`/`supportsExpressionIndex` now return
+  `false` on MariaDB, mirroring Rails) — the end state is to **power
+  `adapterSupports` from the connected adapter** and drop this static table once
+  every adapter capability is Rails-faithful.
 - **An unknown feature key throws** — add it to the `SUPPORTS` table when a
   suite first gates on it.
 
@@ -66,6 +70,9 @@ Currently seeded (`SUPPORTS` in `supports.ts`):
 | `comments`                                        | postgres, mysql  | SQL COMMENT ON — not SQLite                                  |
 | `concurrent_connections`                          | postgres, mysql  | in-memory SQLite can't run concurrently                      |
 | `insert_conflict_target`                          | postgres, sqlite | MySQL has no `ON CONFLICT (target)`                          |
+| `advisory_locks`                                  | postgres, mysql  | abstract default false → not SQLite                          |
+| `exclusion_constraints`, `unique_constraints`     | postgres         | PostgreSQL only                                              |
+| `expression_index`                                | postgres, sqlite | Rails `!mariadb? && >= 8.0.13`; mysql lane is MariaDB → out  |
 
 > Adding a key: verify the cell against the vendored Rails
 > `supports_<key>?` for pg17 / mariadb11 / recent sqlite before adding it.
@@ -113,12 +120,12 @@ source use different vocab Ruby↔TS, so they don't drive mismatches).
 
 The four kinds:
 
-| Kind             | Meaning                                   | Action                                                                                                                                                   |
-| ---------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **should-gate**  | Rails gates it; we `it.skip` it as a TODO | Replace the `it.skip` with the matching gate — it likely already passes under the right adapter. **Highest value.**                                      |
-| **missing-gate** | Rails gates it; we run it unconditionally | Decide: if our impl passes on every backend, leave it (benign — we're more portable); if it would misbehave on the adapter Rails excludes, add the gate. |
-| **wrong-gate**   | both gate it, to **different** sets       | Reconcile. Often we gated by adapter where Rails gates by feature — switch to `itIfSupports("<feature>")`, or fix the adapter set.                       |
-| **over-gated**   | Rails runs it everywhere; we gate it      | Remove our gate, or confirm we genuinely need to restrict it.                                                                                            |
+| Kind             | Meaning                                   | Action                                                                                                                                                                                      |
+| ---------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **should-gate**  | Rails gates it; we `it.skip` it as a TODO | Usually an **unimplemented-feature stub**, not a flip-to-gate win — implementation guidance, not a mechanical convert (see §3.2). Only gate it if the body is real + passes on the adapter. |
+| **missing-gate** | Rails gates it; we run it unconditionally | Decide: if our impl passes on every backend, leave it (benign — we're more portable); if it would misbehave on the adapter Rails excludes, add the gate.                                    |
+| **wrong-gate**   | both gate it, to **different** sets       | Reconcile. Often we gated by adapter where Rails gates by feature — switch to `itIfSupports("<feature>")`, or fix the adapter set.                                                          |
+| **over-gated**   | Rails runs it everywhere; we gate it      | Remove our gate, or confirm we genuinely need to restrict it.                                                                                                                               |
 
 The summary line carries the count (also visible in CI):
 
@@ -145,16 +152,28 @@ Per file (or cluster), iterate the `--gates` report until it's clean:
 
 1. **Run** `pnpm test:compare --package activerecord --gates` (refresh
    manifests first if stale — drop `--cached`).
-2. **should-gate** → convert the `it.skip("…")` to the matching gate:
-   - Rails `adapters=[postgresql]` → wrap in `describeIfPg(…)` or
-     `it.skipIf(adapterType !== "postgres")(…)`.
-   - Rails `features=[json]` → `itIfSupports("json", …)`.
-   - Un-TODO it: the body usually already passes under that adapter, so this
-     converts a **skipped** test into a **passing gated** test (drops both the
-     `skipped` and `gate-mismatch` counts).
-3. **wrong-gate** → make our gate equal Rails'. If Rails gates by feature and we
-   gated by adapter, prefer the feature gate (`itIfSupports`) so the sets line
-   up by construction; add the feature to `SUPPORTS` if missing.
+2. **should-gate** → **check the `it.skip` body first.** Empirically ~all
+   should-gate `it.skip`s are **unimplemented-feature / infra stubs** (`BLOCKED:
+… not implemented / requires fixtures / DDL API`), _not_ tests skipped purely
+   for the wrong adapter. Converting a stub to a gate just creates a vacuously-
+   or spuriously-passing fake test — **don't**. Only convert when the body is a
+   real, passing test that was skipped for adapter applicability (rare). For the
+   stubs, should-gate is **implementation-time guidance**: when you build the
+   feature, gate it the way Rails does. See
+   [`project_gate_cleanup_should_gate_are_stubs`].
+3. **wrong-gate** → make our gate equal Rails', **mirroring Rails' mechanism**:
+   if Rails gates by `supports_X?`, use `itIfSupports("X")` (not an adapter
+   check); add the key to `SUPPORTS` if missing (verify vs vendored Rails).
+   - **Lane-preserving subset is the safe, first cleanup**: when our adapter set
+     already equals the capability's lanes, the swap is zero-runtime-change —
+     only the expression aligns. Verify on the real backend(s) the capability
+     runs on (PG/MariaDB via docker — see §8 of the adapter-test-ci plan).
+   - **Not all are lane-preserving.** If our gate is _narrower_ than Rails'
+     (e.g. `bulk_alter`/`transaction_isolation`), converting enables new lanes →
+     verify the body passes there; it may surface a real impl gap (defer).
+   - **If Rails gates by `current_adapter?`, mirror that, not a capability**
+     (e.g. the MySQL-only `expression indices escaping` test stays an adapter
+     gate). Don't force a capability gate where Rails doesn't use one.
 4. **missing-gate** → judgment call. Run the test under the adapter Rails
    excludes; if green, leave it un-gated (note it — we're legitimately more
    portable). If red or semantically different, add the gate.
