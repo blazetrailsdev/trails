@@ -18,7 +18,12 @@ const TEST_SCHEMA = {
   users: { name: "string" },
   items: { name: "string" },
   products: { sku: "string", name: "string" },
-  people: { name: "string", born_at: "datetime" },
+  // Uniquely-prefixed stand-in for `people`: that canonical table name is
+  // physically redefined with conflicting reduced shapes by sibling suites
+  // (dirty `{first_name}`, autosave `{name,first_name}`, …) in the shared
+  // handler DB, so a bespoke `people` here would collide depending on fork
+  // scheduling. Mirrors the `lock_people` / `aco_people` convention.
+  ro_people: { name: "string", born_at: "datetime" },
 } as const;
 
 // -- Helpers --
@@ -132,6 +137,7 @@ describe("ReadonlyTest", () => {
   it("cant touch readonly column", async () => {
     class Person extends Base {
       static {
+        this._tableName = "ro_people";
         this.attribute("name", "string");
         this.attribute("born_at", "datetime");
       }
