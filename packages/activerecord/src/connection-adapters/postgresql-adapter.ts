@@ -4474,6 +4474,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async tableOptions(tableName: string): Promise<Record<string, unknown>> {
+    // supportsNativePartitioning() reads databaseVersion; ensure it's populated.
+    await this.getDatabaseVersion();
     const options: Record<string, unknown> = {};
     const comment = await this.tableComment(tableName);
     if (comment !== null) options.comment = comment;
