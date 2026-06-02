@@ -4474,6 +4474,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async tableOptions(tableName: string): Promise<Record<string, unknown>> {
+    // supportsNativePartitioning() reads databaseVersion; ensure it's
+    // populated. Mirrors Rails, where database_version is memoized lazily
+    // via pool.server_version(self) → get_database_version, so it's never
+    // unset on a live adapter.
+    await this.getDatabaseVersion();
     const options: Record<string, unknown> = {};
     const comment = await this.tableComment(tableName);
     if (comment !== null) options.comment = comment;
