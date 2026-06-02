@@ -118,18 +118,26 @@ describeIfMysql("Mysql2Adapter", () => {
       // default collation is `utf8mb4_bin` (e.g. the local 13306 box) would suppress
       // the `id` collation. The helper port itself (dumpTableSchema) is exercised by
       // test-helpers/schema-dumping-helper.test.ts.
+      //
+      // The regexes below are PROVISIONAL placeholders mirroring Rails'
+      // charset_collation_test.rb:79-84 intent (id-collation wrapping; collation
+      // immediately after the column name with no native-default limit between).
+      // Rails end-anchors each column line (`…collation: "ascii_bin"$`); our TS DSL
+      // terminates the call with `});` instead, and the exact emitted spacing/order
+      // is set by the U3 `emitTable → columnSpec` rewrite. Re-derive these against
+      // the ACTUAL U3 output when un-skipping rather than trusting them verbatim.
       const output = await dumpTableSchema(
         adapter as unknown as SchemaSource,
         "charset_collations",
       );
       expect(output).toMatch(
-        /createTable\("charset_collations",\s*\{\s*id:\s*\{\s*type:\s*"string",\s*collation:\s*"utf8mb4_bin"\s*\}/,
+        /createTable\("charset_collations",\s+\{\s+id:\s+\{\s+type:\s+"string",\s+collation:\s+"utf8mb4_bin"\s+\}/,
       );
       expect(output).toMatch(
-        /t\.string\("string_ascii_bin",\s*\{\s*collation:\s*"ascii_bin"\s*\}\)/,
+        /t\.string\("string_ascii_bin",\s+\{\s+collation:\s+"ascii_bin"\s+\}\)/,
       );
       expect(output).toMatch(
-        /t\.text\("text_ucs2_unicode_ci",\s*\{\s*collation:\s*"ucs2_unicode_ci"\s*\}\)/,
+        /t\.text\("text_ucs2_unicode_ci",\s+\{\s+collation:\s+"ucs2_unicode_ci"\s+\}\)/,
       );
     });
   });

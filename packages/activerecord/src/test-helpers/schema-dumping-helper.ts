@@ -24,7 +24,7 @@ export async function dumpTableSchema(source: SchemaSource, ...tables: string[])
   // Rails: `connection.data_sources - tables` (tables + views). Prefer the
   // adapter's `dataSources()` so views are also ignored; fall back to `tables()`
   // for a bare `SchemaSource` that only enumerates base tables.
-  const enumerated = source as SchemaSource & { dataSources?: () => Promise<string[]> };
+  const enumerated = source as { dataSources?: () => Promise<string[]> };
   const dataSources = enumerated.dataSources
     ? await enumerated.dataSources()
     : await source.tables();
