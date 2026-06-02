@@ -1,6 +1,6 @@
 # Migrate `trails-models-dump` to consume `schema.ts`
 
-**Status:** in progress — PR 1 ✅ #2851, PR 2 ✅ #2861; PRs 3–4 open
+**Status:** in progress — PR 1 ✅ #2851, PR 2 ✅ #2861, PR 3 open #2889; PR 4 open
 **Owner:** activerecord-cli
 **Related:** PR #2759 (wired up `ar db:schema:dump`), PR #2761 (parseSchemaTs — PR A), companion plan `trails-tsc-schema-ts-migration.md`
 
@@ -211,7 +211,7 @@ When neither `--schema` nor a DB URL is available, prefer auto-discovering
 
 Per repo convention these are **non-overlapping sibling PRs**, not a stack.
 
-### PR 3 — Migrate consumers and docs (~50 LOC) `[open]`
+### PR 3 — Migrate consumers and docs (~50 LOC) `[open #2889]`
 
 - `packages/activerecord-cli/README.md`: update the `ar models:dump` row in
   the Tooling table to show `--schema db/schema.ts` as the primary form;
