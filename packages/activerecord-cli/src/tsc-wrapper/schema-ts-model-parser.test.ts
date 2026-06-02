@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { generateModels } from "@blazetrails/activerecord";
 import { parseSchemaForModels } from "./schema-ts-model-parser.js";
 
 const FILE = "db/schema.ts";
@@ -143,5 +144,26 @@ describe("parseSchemaForModels", () => {
     expect(tables.find((t) => t.name === "books")!.foreignKeys).toHaveLength(1);
     expect(tables.find((t) => t.name === "books")!.foreignKeys[0]!.toTable).toBe("authors");
     expect(tables.find((t) => t.name === "reviews")!.foreignKeys[0]!.column).toBe("book_id");
+  });
+
+  it("produces a shape generateModels consumes into correct classes and associations", () => {
+    // Locks the real contract: the parsed IntrospectedTable[] must flow
+    // straight into generateModels (PR 2 wires this into the CLI).
+    const source = `
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("authors", { force: "cascade" }, (t) => {
+          t.string("name");
+        });
+        await ctx.createTable("books", { force: "cascade" }, (t) => {
+          t.string("title");
+        });
+        await ctx.addForeignKey("books", "authors", { column: "author_id" });
+      }
+    `;
+    const out = generateModels(parseSchemaForModels(source, FILE), { noHeader: true });
+    expect(out).toContain("export class Author extends Base {");
+    expect(out).toContain("export class Book extends Base {");
+    expect(out).toContain('this.belongsTo("author");');
+    expect(out).toContain('this.hasMany("books");');
   });
 });

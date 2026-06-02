@@ -82,17 +82,16 @@ function buildColumns(
   return columns;
 }
 
-/** @internal */
-function parseDeferrable(
-  opts: ts.ObjectLiteralExpression,
-): "immediate" | "deferred" | false | undefined {
-  const node = objPropValue(opts, "deferrable");
-  if (!node) return undefined;
-  const str = strLiteral(node);
-  if (str === "immediate" || str === "deferred") return str;
-  if (node.kind === ts.SyntaxKind.TrueKeyword) return "deferred";
-  if (isFalse(node)) return false;
-  return undefined;
+/**
+ * The dumper writes `deferrable: ${JSON.stringify(fk.deferrable)}` where
+ * `fk.deferrable` has already been normalised to `"immediate"` / `"deferred"`
+ * (postgresql-adapter.ts:3591) — never a bare boolean, and the `false` case is
+ * never emitted. So only the two string forms can appear in a dumped schema.ts.
+ * @internal
+ */
+function parseDeferrable(opts: ts.ObjectLiteralExpression): "immediate" | "deferred" | undefined {
+  const str = strLiteral(objPropValue(opts, "deferrable"));
+  return str === "immediate" || str === "deferred" ? str : undefined;
 }
 
 /**
