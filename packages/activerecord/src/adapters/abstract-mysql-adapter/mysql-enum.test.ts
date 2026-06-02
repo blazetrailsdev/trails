@@ -4,6 +4,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { Base } from "../../base.js";
+import { SchemaDumper } from "../../schema-dumper.js";
+import type { SchemaSource } from "../../schema-dumper.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -30,6 +32,22 @@ describeIfMysql("Mysql2Adapter", () => {
       const columns = await adapter.columns("enum_tests");
       const column = columns.find((c) => c.name === "enum_column");
       expect((column as any).isBigint()).toBe(false);
+    });
+
+    // BLOCKED: schema-dumper columnSpec divergence (Wave 3 Story 3.3). For a raw
+    // string-typed column trails' emitTable appends `{ limit, collation }` option
+    // literals, whereas Rails emits a bare `t.column "enum_column", "enum(...)"`.
+    // The `unsigned`/`bigint` introspection this file proves is unaffected; un-skip
+    // when the schema dumper stops emitting native-type options for opaque string
+    // types. (See enum_tests dump: the column line carries `{ limit: 8, collation }`.)
+    it.skip("schema dumping", async () => {
+      const schema = await SchemaDumper.dumpTableSchema(
+        adapter as unknown as SchemaSource,
+        "enum_tests",
+      );
+      expect(schema).toMatch(
+        /t\.column\("enum_column", "enum\('text','blob','tiny','medium','long','unsigned','bigint'\)"\)/,
+      );
     });
 
     // BLOCKED: not a MySQL-adapter gap — needs general enum label mass-assignment.
