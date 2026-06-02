@@ -77,10 +77,11 @@ port 13306 via `docker-compose`; CI uses 3306). CI now runs `mysql:8` (changed f
 3. **Bounded framework clusters in parallel** (Phase 2) — pool, migration,
    transactions, query-cache, nested-attributes, insert_all, fixtures. Each is
    self-contained and CI-runnable.
-4. **Adapter type-families** (Phase 3): the `adapters/<db>/**` dirs are excluded
-   from all current CI jobs (no `TEST_ADAPTER=postgresql`/`mysql2` lane), so they
-   are local-verify-only until **Story I-5** adds a dedicated job. The un-skip
-   work can proceed in parallel (verified locally); I-5 makes it CI-gated.
+4. **Adapter type-families** (Phase 3): the `adapters/<db>/**` dirs were excluded
+   from all core CI jobs (no `TEST_ADAPTER=postgresql`/`mysql2` lane), so they
+   were local-verify-only until **Story I-5** (✅ shipped) added the dedicated
+   `postgres-adapter-tests` / `mariadb-adapter-tests` jobs. The un-skip work is
+   now CI-gated.
 5. **≤500 LOC per PR**, split via non-overlapping **sibling** branches off
    `main` (`<base>`/`<base>b`/`<base>c`), never stacked. (CLAUDE.md)
 6. **Never rename a Rails-derived test name.** Fix the implementation.
@@ -175,7 +176,11 @@ cast path remains).
 
 **I-4 shipped #2868** (`pluck()` now type-casts positionally through `Result#columnTypes`; `pluck with serialization` un-skipped; `ensureSchemaLoaded()` guard added). Follow-up: serialize write-side coder dump — see Discovered Follow-ups.
 
-### Story I-5 — add a `TEST_ADAPTER=postgresql`/`mysql2` CI job `[infra]` ~40 LOC ci.yml · dep: none
+### Story I-5 — add a `TEST_ADAPTER=postgresql`/`mysql2` CI job `[infra]` ~40 LOC ci.yml · dep: none — ✅ **SHIPPED**
+
+**Shipped:** `postgres-adapter-tests` + `mariadb-adapter-tests` jobs in
+`ci.yml` set `TEST_ADAPTER` + the live-backend URL and run only the adapter
+dirs (path-filtered). Wired into the `ci` aggregate `needs` + skip allow-list.
 
 **Source-verified gap.** The `postgres-tests`/`mysql-tests` jobs run the _core_
 suite against a live backend. The `ADAPTER_SPECIFIC_EXCLUDE` block was dropped in

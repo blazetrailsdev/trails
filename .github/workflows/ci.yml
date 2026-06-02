@@ -639,6 +639,106 @@ jobs:
       # covers the SQLite E2E until a mysql suite lands and can be wired up.
       - run: pnpm vitest run packages/activerecord-cli
 
+  # Adapter-specific suites. The core AR jobs above run the *shared* suite
+  # against a live backend but `vitest.config.ts` drops every
+  # `adapters/<db>/**` file unless `TEST_ADAPTER` names that backend (the
+  # comment at vitest.config.ts:17 explains why: adapter-specific files build
+  # their own adapter and collide with the shared suite's table drops). These
+  # two jobs set `TEST_ADAPTER` so those dirs load, then restrict the run to
+  # the adapter dirs alone — the shared suite is already covered by
+  # postgres-tests / mariadb-tests. Without these jobs the ~135 adapter-dir
+  # tests are local-verify-only.
+  postgres-adapter-tests:
+    name: PostgreSQL Adapter Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: rails_js_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # Path filters select only the adapter dirs. The bare `connection-adapters/postgresql`
+      # filter matches both the `postgresql/` subdir and the root-level
+      # `postgresql-adapter.*.test.ts` files (substring match).
+      - run: >
+          pnpm vitest run
+          packages/activerecord/src/adapters/postgresql
+          packages/activerecord/src/connection-adapters/postgresql
+          packages/activerecord/src/tasks/postgresql-database-tasks.test.ts
+        env:
+          TEST_ADAPTER: postgresql
+          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
+          AR_DB_FORKS: 4
+
+  mariadb-adapter-tests:
+    name: MariaDB Adapter Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true'
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_DATABASE: rails_js_test
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # The bare `connection-adapters/mysql` filter matches the `mysql/`
+      # subdir plus the root-level `mysql2-adapter.test.ts` /
+      # `mysql-type-lookup.test.ts` files (substring match).
+      - run: >
+          pnpm vitest run
+          packages/activerecord/src/adapters/abstract-mysql-adapter
+          packages/activerecord/src/adapters/mysql2
+          packages/activerecord/src/connection-adapters/mysql
+          packages/activerecord/src/connection-adapters/abstract-mysql-adapter.test.ts
+          packages/activerecord/src/tasks/mysql-database-tasks.test.ts
+        env:
+          TEST_ADAPTER: mysql2
+          MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
+          AR_DB_FORKS: 4
+
   website:
     name: Website
     needs: changes
@@ -1034,6 +1134,8 @@ jobs:
       - sqlite-tests
       - postgres-tests
       - mysql-tests
+      - postgres-adapter-tests
+      - mysql-adapter-tests
       - website
       - pr-attribution
       - rails-comparison
@@ -1097,7 +1199,8 @@ jobs:
                   # legitimate (non-PR events, or any other author).
                   continue
                   ;;
-                sqlite-tests|postgres-tests|mysql-tests)
+                sqlite-tests|postgres-tests|mysql-tests|\
+                postgres-adapter-tests|mysql-adapter-tests)
                   # AR test skip is legitimate when no AR-affecting paths changed.
                   [ "$AR_AFFECTED" = "false" ] && continue
                   ;;
