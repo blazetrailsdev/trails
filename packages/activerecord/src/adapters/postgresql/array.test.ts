@@ -7,7 +7,7 @@ import { SchemaDumper } from "../../schema-dumper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
-import { Base } from "../../index.js";
+import { Base, serialize, ColumnNotSerializableError } from "../../index.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -62,21 +62,50 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(ratingsColumn.type).toBe("integer");
       expect((ratingsColumn as any).isArray()).toBe(true);
     });
-    it.skip("not compatible with serialize array", async () => {
-      // BLOCKED: serialize machinery — no cast-type decoration step.
-      // ColumnNotSerializableError already exists (attribute-methods/serialization.ts),
-      // but serialize() (serialize.ts) only wraps readAttribute with a coder; it never
-      // resolves the attribute's cast type, so it can't run Rails'
-      // `type_incompatible_with_serialize?` (cast_type responds to type_cast_array &&
-      // type == Array) to raise on an OID::Array column. Needs a decorate-attributes
-      // step in the serialize machinery — a serialize-feature story, not array OID.
+    it("not compatible with serialize array", async () => {
+      // Rails: serialize :tags, type: Array on an OID::Array column raises
+      // ColumnNotSerializableError (type_incompatible_with_serialize?).
+      class PgArrayNotSerializable extends Base {
+        static tableName = "pg_arrays";
+      }
+      await PgArrayNotSerializable.loadSchema();
+      expect(() => {
+        serialize(PgArrayNotSerializable, "tags", { type: Array });
+        new PgArrayNotSerializable();
+      }).toThrow(ColumnNotSerializableError);
     });
-    it.skip("array with serialized attributes", async () => {
-      // BLOCKED: serialize machinery — custom-coder load/dump lifecycle.
-      // serialize() supports "json"/"array"/"hash"/coder-object on read, but not Rails'
-      // class-coder protocol (`MyTags.load`/`MyTags.dump`) layered over an OID::Array
-      // column with full write+reload round-trip. Needs Type::Serialized-style wrapping
-      // of the underlying array type — a serialize-feature story, not array OID.
+    it("array with serialized attributes", async () => {
+      // Rails: a class-coder (MyTags.load/MyTags.dump) layered over an OID::Array
+      // column round-trips through Type::Serialized on write + reload.
+      class MyTags {
+        constructor(public tags: string[]) {}
+        toArray(): string[] {
+          return this.tags;
+        }
+        static load(tags: unknown): MyTags {
+          return new MyTags(
+            Array.isArray(tags) ? (tags as string[]) : tags == null ? [] : [String(tags)],
+          );
+        }
+        static dump(object: unknown): unknown {
+          return object instanceof MyTags ? object.toArray() : object;
+        }
+      }
+      class PgArraySerialized extends Base {
+        static tableName = "pg_arrays";
+      }
+      await PgArraySerialized.loadSchema();
+      serialize(PgArraySerialized, "tags", { coder: MyTags });
+
+      await PgArraySerialized.create({ tags: new MyTags(["one", "two"]) } as any);
+      const record = (await PgArraySerialized.first())!;
+      expect(record.tags).toBeInstanceOf(MyTags);
+      expect((record.tags as MyTags).toArray()).toEqual(["one", "two"]);
+
+      (record as any).tags = new MyTags(["three", "four"]);
+      await record.save();
+      await (record as any).reload();
+      expect((record.tags as MyTags).toArray()).toEqual(["three", "four"]);
     });
     it("default", async () => {
       await adapter.addColumn("pg_arrays", "score", "integer", { array: true, default: [4, 4, 2] });

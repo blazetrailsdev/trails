@@ -1,4 +1,43 @@
 import { Type, ValueType, BinaryData } from "@blazetrails/activemodel";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { IndifferentHashAccessor } from "../store.js";
+
+/**
+ * Whether a value is compared against the coder default by structural value
+ * rather than identity. Rails' `default_value?` is `value == coder.load(nil)`:
+ * built-in collection defaults (`Array`/`Hash`, and our store's
+ * `HashWithIndifferentAccess`) have value-based `==`, but an arbitrary coder
+ * object (e.g. a custom class coder's `object_class` instance) has no `==` and
+ * so falls back to identity. We mirror that — only plain arrays/objects and
+ * HWIA are value-compared; everything else uses reference equality.
+ *
+ * @internal
+ */
+function isValueComparable(value: unknown): boolean {
+  if (Array.isArray(value)) return true;
+  if (value instanceof HashWithIndifferentAccess) return true;
+  if (value !== null && typeof value === "object") {
+    const proto = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
+  }
+  return false;
+}
+
+/**
+ * Structural JSON key used to compare a value against the coder's default.
+ * Unwraps objects that expose `toHash()` (the HashWithIndifferentAccess
+ * interface) so their contents — not their Map-backed internal shape — drive
+ * the comparison.
+ *
+ * @internal
+ */
+function canonicalKey(value: unknown): string {
+  return JSON.stringify(value, (_k, v) =>
+    v && typeof v === "object" && typeof (v as { toHash?: unknown }).toHash === "function"
+      ? (v as { toHash(): unknown }).toHash()
+      : v,
+  );
+}
 
 export interface Coder {
   dump(value: unknown): string | null;
@@ -27,17 +66,18 @@ export class Serialized extends ValueType {
     this.subtype = subtype;
     this.coder = coder;
     this._defaultValue = coder.load(null);
-    if (typeof this._defaultValue === "object" && this._defaultValue !== null) {
+    if (isValueComparable(this._defaultValue)) {
       try {
-        this._defaultValueJson = JSON.stringify(this._defaultValue);
+        this._defaultValueJson = canonicalKey(this._defaultValue);
       } catch {
         this._defaultValueJson = undefined;
       }
     }
   }
 
+  // Rails: Type::Serialized#accessor returns Store::IndifferentHashAccessor.
   accessor(): unknown {
-    return null;
+    return IndifferentHashAccessor;
   }
 
   deserialize(value: unknown): unknown {
@@ -47,7 +87,16 @@ export class Serialized extends ValueType {
   }
 
   cast(value: unknown): unknown {
-    return this.deserialize(value);
+    // A string (or null) is treated as an already-encoded payload and
+    // deserialized directly. A structured value (Hash/Array/coder object) is
+    // round-tripped through the coder — `deserialize(serialize(value))` — so
+    // assigning e.g. a class-coder instance loads back through the coder.
+    // Mirrors ActiveModel::Type::Helpers::Mutable#cast for the structured case
+    // while still accepting pre-serialized string assignments.
+    if (value === null || value === undefined || typeof value === "string") {
+      return this.deserialize(value);
+    }
+    return this.deserialize(this.serialize(value));
   }
 
   serialize(value: unknown): unknown {
@@ -61,12 +110,22 @@ export class Serialized extends ValueType {
   }
 
   override isChangedInPlace(rawOldValue: unknown, value: unknown): boolean {
-    const oldSerialized = this.serialize(this.deserialize(rawOldValue));
-    const newSerialized = this.serialize(value);
-    return oldSerialized !== newSerialized;
+    if (value === null || value === undefined) return false;
+    const rawNewValue = encoded(this, value);
+    const oldNil = rawOldValue === null || rawOldValue === undefined;
+    const newNil = rawNewValue === null || rawNewValue === undefined;
+    return (
+      oldNil !== newNil || (this.subtype.isChangedInPlace?.(rawOldValue, rawNewValue) ?? false)
+    );
   }
 
   assertValidValue(value: unknown): void {
+    // trails accepts pre-serialized string payloads on assignment (see `cast`),
+    // so a raw string is not yet the decoded object the coder validates — the
+    // coder's `load` re-validates the decoded result on read. Rails only sees
+    // already-decoded objects here because its Mutable#cast never accepts a
+    // raw payload, so it has no equivalent guard.
+    if (typeof value === "string") return;
     if (this.coder.assertValidValue) {
       this.coder.assertValidValue(value);
     }
@@ -77,6 +136,11 @@ export class Serialized extends ValueType {
   }
 
   override isSerialized(): boolean {
+    return true;
+  }
+
+  // Rails: Type::Serialized includes ActiveModel::Type::Helpers::Mutable.
+  override isMutable(): boolean {
     return true;
   }
 
@@ -91,7 +155,7 @@ export class Serialized extends ValueType {
       return this._defaultValue === null || this._defaultValue === undefined;
     if (typeof value === "object" && this._defaultValueJson !== undefined) {
       try {
-        return JSON.stringify(value) === this._defaultValueJson;
+        return canonicalKey(value) === this._defaultValueJson;
       } catch {
         return false;
       }
@@ -116,7 +180,7 @@ export function encoded(serialized: Serialized, value: unknown): unknown {
   if (value === defaultVal) return undefined;
   if (typeof value === "object" && value !== null && s._defaultValueJson !== undefined) {
     try {
-      if (JSON.stringify(value) === s._defaultValueJson) return undefined;
+      if (canonicalKey(value) === s._defaultValueJson) return undefined;
     } catch {
       // non-serializable; treat as non-default
     }

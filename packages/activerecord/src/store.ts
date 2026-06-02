@@ -223,8 +223,12 @@ export class HashAccessor {
       const obj = this._writeHash(raw);
       obj[key] = value;
       // Structured types (json/jsonb/hstore) store plain objects; text/string columns
-      // store JSON-encoded strings. Use the column's type name to decide.
-      const typeName = (object.constructor as any).typeForAttribute?.(attribute)?.name;
+      // store JSON-encoded strings. Use the column's type name to decide. A
+      // `serialize`-wrapped column (Type::Serialized) is text-backed — its coder
+      // round-trips a JSON string — so look through to the wrapped subtype.
+      let castType = (object.constructor as any).typeForAttribute?.(attribute);
+      if (castType?.isSerialized?.() && castType.subtype) castType = castType.subtype;
+      const typeName = castType?.name;
       const isStringBacked =
         !typeName ||
         typeName === "string" ||

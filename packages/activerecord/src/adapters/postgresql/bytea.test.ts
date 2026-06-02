@@ -290,17 +290,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("serialize", () => {
-      // BLOCKED: serialize write-path — NOT bytea-specific.
-      // ROOT-CAUSE: Base.serialize (serialize.ts) only decorates readAttribute to
-      // run coder.load; it never dumps on write. So a saved serialized value is
-      // never encoded — it persists as NULL for ANY column type (verified on a
-      // plain string column with the json coder, not just bytea). Rails instead
-      // decorates the attribute's cast type with Type::Serialized (which wraps the
-      // subtype's serialize/deserialize), so dump-on-write and the binary string↔
-      // Buffer bridge both fall out for free. Trails already has Type::Serialized
-      // (type/serialized.ts) but Base.serialize doesn't wire it in.
-      // SCOPE: general serialize-subsystem refactor (json/yaml/array/hash + binary),
-      // a separate story — out of scope for the bytea OID family.
+      // BLOCKED: binary-subtype coder bridge (follow-up to the general serialize
+      // write-path). Base.serialize now decorates the cast type with
+      // Type::Serialized (dump-on-write works for json/array/hash — verified on
+      // SQLite + PG array/hstore). What remains is bytea-specific: on read,
+      // Bytea#deserialize yields a Uint8Array, but the JSON coder's load() needs
+      // a string, so Type::Serialized#deserialize must bridge binary Buffer→string
+      // for binary subtypes (Rails' Binary#deserialize returns a String). That
+      // bridge interacts with encryption's deliberate binary handling
+      // (encrypted-attribute-type.ts), so it's split out to avoid coupling.
+      // SCOPE: ~15 LOC binary bridge in type/serialized.ts + this test body.
     });
 
     it("schema dumping", async () => {
