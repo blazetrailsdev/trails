@@ -1,30 +1,59 @@
-# activerecord — prioritized work plan (test:compare 100% + Rails fidelity)
+# activerecord — per-story specs (test:compare 100% + Rails fidelity)
 
-> **Snapshot 2026-06-02 (open work only).** This doc lists **only unfinished
-> work** — shipped stories and completed waves have been removed entirely (not
-> tombstoned), so the spawn-loop only ever sees pickable items. Each story
-> carries our source anchors (`file:line`), the Rails source reference, the
-> tests it moves, an LOC estimate, dependencies, and an acceptance line.
+> **⚠ Ordering moved (2026-06-02 reconcile).** Sequencing, the complete skip
+> inventory, the CI-lane analysis, and the per-file table now live in
+> **[`test-compare-100-attack-plan.md`](test-compare-100-attack-plan.md)** —
+> that doc is authoritative for **what order to do things in**. **This doc is now
+> the per-story SPEC source**: source anchors (`file:line`), Rails references,
+> tests moved, LOC estimates, dependencies, acceptance lines. Pick the phase/
+> story in the attack plan, then come here for the spec. The wave→phase crosswalk
+> below maps the two.
 >
-> **One architectural blocker is still open and gating:** #3, the
-> `type_for_attribute` cast refactor (Story 3.PG-enum). The other three
-> (ConnectionHandler, AliasTracker / join-table aliasing, global Arel-visitor
-> removal) are satisfied on `main`.
+> **Snapshot 2026-06-02 (open work only).** Lists **only unfinished work** —
+> shipped stories/waves are removed entirely (not tombstoned), so the spawn-loop
+> only sees pickable items.
+>
+> **One architectural blocker is still open and gating:** the
+> `type_for_attribute` cast refactor (Story 3.PG-enum → attack-plan **I-2**).
+> Note `typeForAttribute` itself exists (`enum.ts:78`); the gap is the
+> where/predicate-builder cast path. ConnectionHandler, AliasTracker / join-table
+> aliasing, and global Arel-visitor removal are satisfied on `main`.
 >
 > **Anchor verification status:** Waves 0–3 `file:line` anchors were verified
 > against the tree on 2026-06-01. Waves 4–7 anchors are doc-sourced — line
 > numbers drift, so re-`grep` before editing. Never trust a cited line blindly.
 >
-> Sources: [`activerecord-index.md`](activerecord-index.md),
+> Sources: [`test-compare-100-attack-plan.md`](test-compare-100-attack-plan.md)
+> (ordering + inventory), [`activerecord-index.md`](activerecord-index.md),
 > [`activerecord-100-plan.md`](activerecord-100-plan.md),
 > [`activerecord-gaps.md`](activerecord-gaps.md),
 > [`adapter-architecture-cleanup.md`](adapter-architecture-cleanup.md),
-> [`activerecord-type-audit.md`](activerecord-type-audit.md), plus the live
-> in-tree skip histogram. The 100-plan owns batch detail; this doc owns the
-> **order** and the **per-story spec**.
+> [`activerecord-type-audit.md`](activerecord-type-audit.md).
 >
 > **Goals:** (1) `test:compare` 100%; (2) Rails fidelity.
 > `api:compare` is already closed (4969/4969).
+
+## Wave → phase crosswalk
+
+The attack plan's phases supersede these waves for ordering. Each wave's stories
+keep their specs below; find them by this map:
+
+| This doc (wave/story)                                                      | Attack-plan phase / story                                                                     |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Wave 0 (resolver divergence)                                               | Phase 0 — H-3 (reclassify)                                                                    |
+| Wave 1 (Arel-visitor tail, DatabaseTasks P3-5, type W1b)                   | Phase 2 — F-8 + fidelity follow-ups                                                           |
+| Wave 2 (Tier-1 follow-ups: view-a, forbidden-attrs, TZ-aware, NaN decimal) | Phase 2 — F-6/F-8                                                                             |
+| Wave 3 Epic 3.3-U2/U3 (schema-dumper)                                      | Phase 1 — **I-1**                                                                             |
+| Wave 3 Story 3.PG-enum (type_for_attribute)                                | Phase 1 — **I-2**                                                                             |
+| Wave 3 serialize / pluck-cast cross-cutting                                | Phase 1 — **I-3 / I-4**                                                                       |
+| Wave 3 Story 3.4 / 3.PG-\* / 3.MY-\*                                       | Phase 3 — adapter type-families (needs **I-5** for CI)                                        |
+| Wave 3 Story 3.misc (adapter_test fixtures)                                | Phase 2 — **F-7**                                                                             |
+| Wave 4 Story 4.3 (pool campaign)                                           | Phase 2 — **F-2**                                                                             |
+| Wave 5 Story 5.2 (migration runner)                                        | Phase 2 — **F-3**                                                                             |
+| Wave 5 Story 5.1 follow-ups (transactions)                                 | Phase 2 — **F-4**                                                                             |
+| Wave 6 Story 6.1 (query-cache)                                             | Phase 2 — **F-5**                                                                             |
+| Wave 7 (associations + relation)                                           | Phase 4 — integrated tail (LAST)                                                              |
+| —                                                                          | Phase 0 — H-1/H-2 (misplaced/missing); Phase 1 — I-5 (CI job); Phase 2 — F-1 (insert_all, 41) |
 
 ## How to read this plan
 
@@ -70,27 +99,16 @@ line-numbered slots.
 ## Current state
 
 - **api:compare**: 100% — not a goal.
-- **test:compare** (cached, 2026-06-02 round 2): 6972/7856 passing-matched
-  (**88.7%**), 877 skipped, 4 misplaced (15 wrong-describe).
+- **test:compare** (cached, 2026-06-02): **6959/7856 (88.6%)**, **890 skipped**,
+  3 missing, 15 wrong-describe, 4 misplaced. (Authoritative per-file counts +
+  histogram now live in the attack plan §1 / Appendix A — refresh there.)
 
-### Live skip-annotation histogram (ground truth, 2026-06-02 round 2)
+## Ordering & the dependency spine → see the attack plan
 
-```
-associations 265 │ adapter-pg 173 │ relation 170 │ schema 112 │ connection-pool 51
-adapter-mysql 35 │ fixture 38 │ migration 26 │ transactions 18 │ type 14
-unknown 8 │ query-cache 4 │ serialize 3 │ serialization 2 │ nested-attributes 2
-adapter-sqlite 2   (+~12 residual 1-off malformed tags: the/needs/STI/SQLite/…)
-```
-
-## The dependency spine (why this order)
-
-Rule (from the 100-plan): **isolated → integrated**. `associations`/`relation`
-touch everything, so closing them early means re-opening them every time a
-lower-tier fix lands. The two biggest buckets (≈44% of all skips) come **last**.
-
-The one architectural blocker still gating downstream work is **#3, the
-`type_for_attribute` cast refactor** (>300 LOC) → gates enum write-casting +
-several relation/type tests. _Lead PR: Story 3.PG-enum._
+The "why this order" reasoning (isolated→integrated; biggest buckets last; the
+CI-lane analysis) now lives in
+[`test-compare-100-attack-plan.md`](test-compare-100-attack-plan.md) §2. This doc
+no longer duplicates it. Two items kept here because they're spec-level facts:
 
 **Externally blocked — do NOT schedule:**
 
@@ -100,8 +118,10 @@ several relation/type tests. _Lead PR: Story 3.PG-enum._
 - `adapter.ts` deletion / `DatabaseAdapter` removal — Phase G fixtures (deferred).
 - `accepts_nested_attributes_for` (`associations/nested-error.test.ts`, 4) — Phase G.
 
-Permanent skips (`load_async`, GVL, Marshal/YAML, rake/dbconsole) are
-**reclassified, not implemented**.
+**Permanent skips** (`load_async`, GVL, Marshal/YAML, rake/dbconsole): the intent
+is reclassify-not-implement, but **~19 are still live `it.skip`** in counted files
+(source-verified 2026-06-02) — see attack-plan Story **H-3** for the list and the
+reclassification work.
 
 ---
 
@@ -529,13 +549,12 @@ removed; these still-open follow-ups are preserved here:
 
 ## Net path to 100%
 
-1. **Wave 3** schema-dumper subtrack (Epic 3.3-U2/U3) unblocks the
-   comment/charset/dump-bearing residuals alongside **3.PG-enum**
-   (`type_for_attribute`, the last architectural blocker).
-2. **Waves 4/5/6** are bounded, parallelizable clusters (pool campaign,
-   migration runner + transaction follow-ups, query-cache residuals).
-3. **Wave 7 campaigns** are the long tail (~300 association+relation skips), each
-   opened by a read-only audit, executed last — all infra deps satisfied.
+The authoritative net path + phase sequence is in
+[`test-compare-100-attack-plan.md`](test-compare-100-attack-plan.md) (§2 + "Net
+path"). In brief: Phase 0 hygiene → Phase 1 architectural unblockers (I-1 dumper,
+I-2 enum cast, I-3 serialize, I-4 pluck-cast, I-5 CI adapter job) → Phase 2
+bounded clusters (F-1…F-8) → Phase 3 adapter type-families → Phase 4 the
+associations+relation tail, last.
 
 ## Conventions (CLAUDE.md — apply to every story)
 
