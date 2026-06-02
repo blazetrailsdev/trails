@@ -151,7 +151,8 @@ function parseIpAddr(value: string): IPAddr | null {
  * always emits the canonical form (lowercase hex, no leading zeros per group,
  * longest run of zero groups compressed to `::`, leftmost run on ties, only
  * when the run is ≥ 2 groups). IPv4-tailed forms (`::ffff:192.168.0.1`) are
- * converted to all-hex form to match Ruby (`::ffff:c0a8:1`).
+ * preserved in mixed notation — PG and Ruby's IPAddr#to_s both use this form
+ * for IPv4-mapped addresses.
  *
  * Without this, two textually different inputs that parse to the same address
  * (e.g. `2001:DB8::1` vs `2001:db8:0:0:0:0:0:1`) would compare unequal in
@@ -160,14 +161,18 @@ function parseIpAddr(value: string): IPAddr | null {
  * manually-assigned values before save.
  */
 function canonicalizeIpv6(value: string): string {
-  let head = value;
   const lastColon = value.lastIndexOf(":");
+  let ipv4Tail: string | null = null;
+  let head = value;
+
   if (lastColon !== -1 && value.slice(lastColon + 1).includes(".")) {
-    const tail = value.slice(lastColon + 1);
-    const [a, b, c, d] = tail.split(".").map(Number);
-    const h1 = ((a << 8) | b).toString(16);
-    const h2 = ((c << 8) | d).toString(16);
-    head = `${value.slice(0, lastColon + 1)}${h1}:${h2}`;
+    // IPv4-tailed form (e.g. ::ffff:192.168.0.1): preserve the IPv4 tail
+    // as-is and canonicalize only the 6-group hex prefix. Both PG and Ruby
+    // IPAddr#to_s use mixed notation for IPv4-mapped addresses.
+    ipv4Tail = value.slice(lastColon + 1);
+    // Substitute "0:0" for the IPv4 tail so the :: expansion logic always sees
+    // 8 groups; the last two placeholder groups are discarded via slice(0, 6) below.
+    head = value.slice(0, lastColon + 1) + "0:0";
   }
 
   let groups: string[];
@@ -183,12 +188,25 @@ function canonicalizeIpv6(value: string): string {
 
   groups = groups.map((g) => parseInt(g, 16).toString(16));
 
+  // For pure-hex IPv4-mapped addresses (::ffff:xxxx:xxxx with no IPv4 tail in
+  // the input string), Ruby's IPAddr#to_s outputs mixed notation (::ffff:a.b.c.d).
+  // Detect this case and synthesize the IPv4 tail so both textual forms
+  // canonicalize to the same string and don't produce spurious dirty marks.
+  if (!ipv4Tail && groups[5] === "ffff" && groups.slice(0, 5).every((g) => g === "0")) {
+    const g6 = parseInt(groups[6], 16);
+    const g7 = parseInt(groups[7], 16);
+    ipv4Tail = `${g6 >> 8}.${g6 & 0xff}.${g7 >> 8}.${g7 & 0xff}`;
+  }
+
+  // Apply RFC 5952 to the hex prefix only (6 groups when IPv4 tail, 8 otherwise).
+  const activeGroups = ipv4Tail ? groups.slice(0, 6) : groups;
+
   let bestStart = -1;
   let bestLen = 0;
   let curStart = -1;
   let curLen = 0;
-  for (let i = 0; i <= groups.length; i++) {
-    if (i < groups.length && groups[i] === "0") {
+  for (let i = 0; i <= activeGroups.length; i++) {
+    if (i < activeGroups.length && activeGroups[i] === "0") {
       if (curStart === -1) curStart = i;
       curLen++;
     } else {
@@ -201,10 +219,21 @@ function canonicalizeIpv6(value: string): string {
     }
   }
 
-  if (bestLen < 2) return groups.join(":");
-  const before = groups.slice(0, bestStart).join(":");
-  const after = groups.slice(bestStart + bestLen).join(":");
-  return `${before}::${after}`;
+  let hexResult: string;
+  if (bestLen < 2) {
+    hexResult = activeGroups.join(":");
+  } else {
+    const before = activeGroups.slice(0, bestStart).join(":");
+    const after = activeGroups.slice(bestStart + bestLen).join(":");
+    hexResult = `${before}::${after}`;
+  }
+
+  if (ipv4Tail) {
+    // "::ffff" + ":" + "192.168.0.1" → "::ffff:192.168.0.1"
+    // "::" (all-zero prefix) + "192.168.0.1" → "::192.168.0.1"
+    return hexResult.endsWith("::") ? hexResult + ipv4Tail : hexResult + ":" + ipv4Tail;
+  }
+  return hexResult;
 }
 
 /**
