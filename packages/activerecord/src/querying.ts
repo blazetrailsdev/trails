@@ -216,8 +216,10 @@ export function joins<T extends typeof Base>(
     return relation.joins(args[0] as string[]);
   }
   if (args.length === 0 || typeof args[0] === "string" || args[0] === undefined) {
-    const [tableOrSql, on] = args as [string?, string?];
-    return relation.joins(tableOrSql, on);
+    // Forward all string args so the variadic association-list form
+    // (`joins("a", "b")`, mirroring Rails `joins(:a, :b)`) is preserved.
+    // Relation#joins disambiguates the two-arg `(table, onClause)` shape.
+    return relation.joins(...(args as Array<string | undefined>));
   }
   return relation.joins(...(args as import("@blazetrails/arel").Nodes.Join[]));
 }
