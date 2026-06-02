@@ -1674,12 +1674,17 @@ function affectedRows(rawResult: any): never {
  * (commented) SQL — the Rails-faithful ordering where `preprocess_query` runs
  * in `internal_execute`, before `raw_execute`'s `log` block.
  *
- * The `_inQueryTransformers` guard ensures the transformer loop runs at most
- * once per logical query: a transformer that itself issues a query on this
- * connection (or any other nested execution) reuses the already-transformed SQL
- * rather than re-commenting it. `executeBatch` also sets this flag so batch
- * statements stay uncommented — mirroring Rails' `execute_batch`, which calls
- * `raw_execute` directly and bypasses `preprocess_query`.
+ * `_inQueryTransformers` is a one-shot "skip the transformer pass" flag.
+ * `executeBatch` sets it before each statement so batch SQL stays uncommented —
+ * matching Rails, whose `execute_batch` calls `raw_execute` directly and so
+ * skips the `query_transformers` loop. (Unlike Rails' `raw_execute`, the
+ * write-checks above still run for batch statements; only the transformer pass
+ * is suppressed.) The flag is **consumed synchronously here, before any await**,
+ * so it can never span an await boundary and bleed into a concurrent query on
+ * the same adapter. It also short-circuits a synchronous re-entrant call (a
+ * transformer that itself runs SQL); real, async, DB-issuing transformers don't
+ * hit this — by the time their query runs, the flag is already cleared, so they
+ * transform normally, exactly as in Rails (which has no guard at all).
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#preprocess_query
  * @internal
@@ -1688,7 +1693,10 @@ export function preprocessQuery(this: DatabaseStatementsHost, sql: string): stri
   this.checkIfWriteQuery?.(sql);
   markTransactionWrittenIfWrite.call(this, sql);
   const host = this as DatabaseStatementsHost & { _inQueryTransformers?: boolean };
-  if (host._inQueryTransformers) return sql;
+  if (host._inQueryTransformers) {
+    host._inQueryTransformers = false;
+    return sql;
+  }
   host._inQueryTransformers = true;
   try {
     for (const t of queryTransformers) {
@@ -1740,19 +1748,20 @@ export async function executeBatch(
   statements: string[],
   name?: string | null,
 ): Promise<void> {
-  // Rails' execute_batch calls raw_execute directly, bypassing preprocess_query,
-  // so batch statements never carry a QueryLogs comment. trails routes batches
-  // through executeMutation (its write primitive), so suppress the transformer
-  // pass for the duration to match Rails — see preprocessQuery's guard.
+  // Rails' execute_batch calls raw_execute directly, so batch statements skip the
+  // query_transformers pass and carry no QueryLogs comment. trails routes batches
+  // through executeMutation (which preprocesses), so flag each statement to
+  // suppress the transformer pass (write-checks still run). The flag is consumed
+  // synchronously inside preprocessQuery before any await — so it never spans the
+  // await — and the finally clears it if executeMutation throws before consuming.
   const host = this as DatabaseStatementsHost & { _inQueryTransformers?: boolean };
-  const prev = host._inQueryTransformers;
-  host._inQueryTransformers = true;
-  try {
-    for (const statement of statements) {
+  for (const statement of statements) {
+    host._inQueryTransformers = true;
+    try {
       await (this as any).executeMutation(statement);
+    } finally {
+      host._inQueryTransformers = false;
     }
-  } finally {
-    host._inQueryTransformers = prev;
   }
 }
 

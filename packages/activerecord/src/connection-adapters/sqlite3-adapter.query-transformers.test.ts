@@ -72,6 +72,23 @@ describe("SQLite3Adapter queryTransformers wiring", () => {
     expect(sqls.every((s) => !s.includes("/*app:test*/"))).toBe(true);
   });
 
+  it("does not let a concurrent batch suppress a normal query's comment", async () => {
+    // The batch-suppression flag is consumed synchronously inside preprocessQuery
+    // (before any await), so a query interleaved with an in-flight batch still
+    // gets transformed. If the flag spanned the await, this comment would be lost.
+    await adapter.executeMutation("CREATE TABLE t (id INTEGER PRIMARY KEY)");
+    queryTransformers.push({ call: (sql) => `${sql} /*app:test*/` });
+    const { sqls } = await captureSql(() =>
+      Promise.all([
+        adapter.executeBatch(["INSERT INTO t (id) VALUES (1)", "INSERT INTO t (id) VALUES (2)"]),
+        adapter.execute("SELECT id FROM t"),
+      ]),
+    );
+    // The batch statements stay uncommented; the concurrent SELECT keeps its comment.
+    expect(sqls.some((s) => s === "SELECT id FROM t /*app:test*/")).toBe(true);
+    expect(sqls.some((s) => s.startsWith("INSERT") && s.includes("/*app:test*/"))).toBe(false);
+  });
+
   it("applies each transformer exactly once per query", async () => {
     let calls = 0;
     queryTransformers.push({
