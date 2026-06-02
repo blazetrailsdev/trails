@@ -773,6 +773,50 @@ describe("QueryCacheExpiryTest", () => {
     expect(store.enabled).toBe(false);
   });
 
+  it("update", async () => {
+    const { cached, Task } = await setup();
+    const task = await Task.create({ title: "a" });
+    await cached.cache(async () => {
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      (task as any).title = "b";
+      await (task as any).save();
+      expect(cached.queryCache.empty).toBe(true);
+    });
+  });
+  it("destroy", async () => {
+    const { cached, Task } = await setup();
+    const task = await Task.create({ title: "a" });
+    await cached.cache(async () => {
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await (task as any).destroy();
+      expect(cached.queryCache.empty).toBe(true);
+    });
+  });
+  it("insert", async () => {
+    const { cached, Task } = await setup();
+    await cached.cache(async () => {
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await Task.create({ title: "a" });
+      expect(cached.queryCache.empty).toBe(true);
+    });
+  });
+  it("insert all", async () => {
+    const { cached, Task } = await setup();
+    await cached.cache(async () => {
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await Task.insert({ title: "a" });
+      expect(cached.queryCache.empty).toBe(true);
+
+      await Task.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await Task.insertAll([{ title: "b" }]);
+      expect(cached.queryCache.empty).toBe(true);
+    });
+  });
   it("insert all bang", async () => {
     const { cached, Task } = await setup();
     await cached.cache(async () => {
