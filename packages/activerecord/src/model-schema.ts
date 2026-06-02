@@ -527,6 +527,51 @@ export function symbolColumnToString(this: SchemaHost, name: string): string | u
 }
 
 /**
+ * Drop the cached reflected columns for a model's table, matching the
+ * `schema_cache.clear_data_source_cache!(table_name)` step in Rails'
+ * `reset_column_information` (model_schema.rb).
+ *
+ * Resolved WITHOUT leasing a connection — Rails keeps `reset_column_information`
+ * inert (`active_connection&.`, schema_cache reached via the pool). We prefer a
+ * directly-assigned adapter (`Base.adapter=` bypasses the pool), else the
+ * pool-level schema cache; both skip `leaseConnection()`. Best-effort: a model
+ * with no pool/table simply has nothing to clear.
+ */
+function clearAdapterDataSourceCache(host: SchemaHost): void {
+  // The raw, sync SchemaCache — `clearDataSourceCacheBang(connection, name)`.
+  // NOT the pool's BoundSchemaReflection (async, single-arg `(name)`); reaching
+  // for that form here would clear a table named `null` and leave a floating
+  // Promise. Both branches below resolve the raw cache, matching what the
+  // adapter's own `schemaCache` getter returns (abstract-adapter.ts).
+  type Cache = { clearDataSourceCacheBang?: (connection: unknown, name: string) => void };
+  let cache: Cache | null | undefined;
+  let table: string | undefined;
+  try {
+    table = (host as unknown as { tableName?: string }).tableName;
+    const direct = (host as unknown as { _adapter?: { schemaCache?: Cache } })._adapter;
+    if (direct?.schemaCache) {
+      cache = direct.schemaCache;
+    } else {
+      // Pooled path: read the pool config's raw SchemaCache directly (the slot
+      // the adapter getter shares), NOT `schemaCache()` whose fallback is the
+      // bound reflection. Getting the pool never leases a connection — Rails
+      // reaches schema_cache through the pool in `reset_column_information`.
+      const pool = (
+        host as unknown as {
+          connectionPool?: () => { poolConfig?: { schemaCache?: Cache | null } };
+        }
+      ).connectionPool?.();
+      cache = pool?.poolConfig?.schemaCache;
+    }
+  } catch {
+    return;
+  }
+  if (table && typeof cache?.clearDataSourceCacheBang === "function") {
+    cache.clearDataSourceCacheBang(null, table);
+  }
+}
+
+/**
  * Rails: clears column cache, schema cache, reloads schema.
  * Drops schema-sourced attribute defs so the next load re-reflects
  * them; user-declared defs (source === "user") are preserved, matching
@@ -573,6 +618,13 @@ export function resetColumnInformation(this: SchemaHost): void {
   this._schemaLoaded = false;
   (this as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
+  // Mirrors Rails reset_column_information's
+  // `schema_cache.clear_data_source_cache!(table_name)` (model_schema.rb): drop
+  // the connection's per-table reflected columns so the next load re-reads from
+  // the database. trails bakes the resolved cast type into each cached Column,
+  // so this is also what lets a toggled `emulate_booleans` re-resolve
+  // tinyint(1) columns; without it the stale boolean/integer type would survive.
+  clearAdapterDataSourceCache(this);
   if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) return;
   for (const [name, def] of Array.from(this._attributeDefinitions)) {
     if ((def.userProvided ?? true) === false || def.source === "schema") {
