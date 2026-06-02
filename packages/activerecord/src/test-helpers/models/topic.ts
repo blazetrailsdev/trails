@@ -44,20 +44,26 @@ export class Topic extends Base {
     this.beforeDestroy(async function (this: Topic) {
       await this.destroyChildren();
     });
-    this.beforeValidation(async function (this: Topic) {
-      await this.beforeValidationForTransaction();
+    // Rails registers these as plain synchronous method hooks
+    // (`before_validation :before_validation_for_transaction`, etc. —
+    // all `def ...; end`). They MUST stay sync: `before_validation` runs on
+    // the strict-sync validation chain (ActiveModel `valid?`), which rejects
+    // a Promise-returning callback. The record arrives as the callback arg
+    // (not `this`), matching the `afterInitialize`/`setEmailAddress` hook below.
+    this.beforeValidation((record: Topic) => {
+      (record as any).beforeValidationForTransaction();
     });
-    this.beforeSave(async function (this: Topic) {
-      await this.beforeSaveForTransaction();
+    this.beforeSave((record: Topic) => {
+      (record as any).beforeSaveForTransaction();
     });
-    this.beforeDestroy(async function (this: Topic) {
-      await this.beforeDestroyForTransaction();
+    this.beforeDestroy((record: Topic) => {
+      (record as any).beforeDestroyForTransaction();
     });
-    this.afterSave(async function (this: Topic) {
-      await this.afterSaveForTransaction();
+    this.afterSave((record: Topic) => {
+      (record as any).afterSaveForTransaction();
     });
-    this.afterCreate(async function (this: Topic) {
-      await this.afterCreateForTransaction();
+    this.afterCreate((record: Topic) => {
+      (record as any).afterCreateForTransaction();
     });
     this.afterInitialize((record: Topic) => {
       (record as any).setEmailAddress();
@@ -97,15 +103,15 @@ export class Topic extends Base {
   }
 
   /** @internal */
-  private async beforeValidationForTransaction() {}
+  private beforeValidationForTransaction() {}
   /** @internal */
-  private async beforeSaveForTransaction() {}
+  private beforeSaveForTransaction() {}
   /** @internal */
-  private async beforeDestroyForTransaction() {}
+  private beforeDestroyForTransaction() {}
   /** @internal */
-  private async afterSaveForTransaction() {}
+  private afterSaveForTransaction() {}
   /** @internal */
-  private async afterCreateForTransaction() {}
+  private afterCreateForTransaction() {}
 }
 
 export class DefaultRejectedTopic extends Topic {

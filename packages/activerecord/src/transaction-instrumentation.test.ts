@@ -1,10 +1,14 @@
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterEach, afterAll, beforeEach, vi } from "vitest";
 import { Base } from "./index.js";
+import { Topic } from "./test-helpers/models/topic.js";
 import { Rollback } from "./errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { useFixtures } from "./test-helpers/use-fixtures.js";
+import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 
 // Use an isolated in-memory SQLite3 adapter per test. The transaction
@@ -18,43 +22,65 @@ import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 // adapter-agnostic; the instrumentation paths under test live in
 // `connection-adapters/abstract/transaction.ts`, not in the driver.
 //
-// D-1 non-candidate: this file's TM-isolation need is structural.
-// With a shared handler-resolved adapter (pool: 1), TM state from one
-// test's transaction accumulates and causes afterCommit/afterRollback
-// callbacks to miss in later tests. The per-test fresh SQLite3Adapter
-// pattern is required for deterministic assertions.
+// Fixtures load NON-transactionally into the per-test adapter via
+// `useFixtures` (no pinned outer transaction), mirroring the Rails
+// counterpart's `self.use_transactional_tests = false` — an outer
+// transactional-fixtures wrapper would itself materialize and skew the
+// materialization/restart event counts these tests assert on. The
+// canonical `Topic` model + `topics(...)` lookups + `.touch`/`.update(title:)`
+// writes match the Rails counterpart verbatim (fixture names `first`, `fifth`);
+// callback-leak tests keep a throwaway subclass, exactly as Rails uses
+// `Class.new`.
 async function freshIsolatedAdapter(): Promise<SQLite3Adapter> {
   const adapter = new SQLite3Adapter(":memory:");
-  await defineSchema(adapter, { topics: { title: "string", updated_at: "datetime" } });
+  await defineSchema(adapter, { topics: canonicalSchema.topics });
   return adapter;
 }
 
 const freshAdapter = freshIsolatedAdapter;
 
+// Throwaway subclass for the callback-leak tests (Rails' `Class.new`). An
+// explicit table name is required: with the canonical `Topic` imported, a
+// class literally named `Topic` collides in the model-name registry and gets
+// uniquified to `Topic2` (→ table `topic2s`), so we pin the table to `topics`.
 function makeTopic(adp: DatabaseAdapter) {
-  class Topic extends Base {
+  class TransactionTopic extends Base {
+    static _tableName = "topics";
     static {
       this.attribute("title", "string");
       this.attribute("updated_at", "datetime");
       this.adapter = adp;
     }
   }
-  return { Topic, adapter: adp };
+  return { Topic: TransactionTopic, adapter: adp };
 }
 
 describe("TransactionInstrumentationTest", () => {
   let sharedAdapter: SQLite3Adapter;
   beforeEach(async () => {
+    // Close the prior test's adapter here (not in afterEach) so the
+    // useFixtures afterEach DELETE always runs against an open connection.
+    sharedAdapter?.close();
     sharedAdapter = await freshAdapter();
+    Topic.adapter = sharedAdapter;
+    await Topic.loadSchema();
   });
+  // Object-map form (not the `["topics"]` registry form) on purpose: the
+  // registry form requires a `{ schema }` option (use-fixtures-schema rule),
+  // which registers a `beforeAll` that defines the schema before `sharedAdapter`
+  // exists — it's created per-test in `beforeEach` for TM isolation. The
+  // object-map form is exempt from that rule and wires its own schema, which
+  // `freshIsolatedAdapter` already creates per test.
+  const { topics } = useFixtures({ topics: [Topic, topicFixtureData] }, () => sharedAdapter);
   afterEach(() => {
     Notifications.unsubscribeAll();
     vi.restoreAllMocks();
+  });
+  afterAll(() => {
     sharedAdapter?.close();
   });
 
   it("start transaction is triggered when the transaction is materialized", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const startEvents: any[] = [];
     Notifications.subscribe("start_transaction.active_record", (event: any) => {
       startEvents.push(event);
@@ -62,44 +88,42 @@ describe("TransactionInstrumentationTest", () => {
 
     await Topic.transaction(async () => {
       expect(startEvents).toHaveLength(0);
-      await Topic.create({ title: "test" });
+      await topics("first").touch();
       expect(startEvents).toHaveLength(1);
       expect(startEvents[0].payload.connection).toBeTruthy();
     });
   });
 
   it("start transaction is not triggered for ordinary nested calls", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const startEvents: any[] = [];
     Notifications.subscribe("start_transaction.active_record", (event: any) => {
       startEvents.push(event);
     });
 
     await Topic.transaction(async () => {
-      await Topic.create({ title: "first" });
+      await topics("first").touch();
       expect(startEvents).toHaveLength(1);
 
       await Topic.transaction(async () => {
-        await Topic.create({ title: "second" });
+        await topics("first").touch();
         expect(startEvents).toHaveLength(1);
       });
     });
   });
 
   it("start transaction is triggered for requires new", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const startEvents: any[] = [];
     Notifications.subscribe("start_transaction.active_record", (event: any) => {
       startEvents.push(event);
     });
 
     await Topic.transaction(async () => {
-      await Topic.create({ title: "outer" });
+      await topics("first").touch();
       expect(startEvents).toHaveLength(1);
 
       await Topic.transaction(
         async () => {
-          await Topic.create({ title: "inner" });
+          await topics("first").touch();
           expect(startEvents).toHaveLength(2);
         },
         { requiresNew: true },
@@ -108,14 +132,13 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation on commit", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
     await Topic.transaction(async () => {
-      await Topic.create({ title: "test" });
+      await topics("fifth").update({ title: "Ruby on Rails" });
     });
 
     expect(events).toHaveLength(1);
@@ -125,14 +148,13 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation on rollback", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
     await Topic.transaction(async () => {
-      await Topic.create({ title: "test" });
+      await topics("fifth").update({ title: "Ruby on Rails" });
       throw new Rollback();
     });
 
@@ -143,17 +165,16 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with savepoints", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
     await Topic.transaction(async () => {
-      await Topic.create({ title: "outer" });
+      await topics("fifth").update({ title: "Sinatra" });
       await Topic.transaction(
         async () => {
-          await Topic.create({ title: "inner" });
+          await topics("fifth").update({ title: "Ruby on Rails" });
         },
         { requiresNew: true },
       );
@@ -167,7 +188,6 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with restart parent transaction on commit", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -176,7 +196,7 @@ describe("TransactionInstrumentationTest", () => {
     await Topic.transaction(async () => {
       await Topic.transaction(
         async () => {
-          await Topic.create({ title: "inner" });
+          await topics("fifth").update({ title: "Ruby on Rails" });
         },
         { requiresNew: true },
       );
@@ -186,7 +206,6 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with restart parent transaction on rollback", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -195,7 +214,7 @@ describe("TransactionInstrumentationTest", () => {
     await Topic.transaction(async () => {
       await Topic.transaction(
         async () => {
-          await Topic.create({ title: "inner" });
+          await topics("fifth").update({ title: "Ruby on Rails" });
           throw new Rollback();
         },
         { requiresNew: true },
@@ -210,7 +229,6 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with unmaterialized restart parent transactions", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -229,14 +247,13 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with materialized restart parent transactions", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
     await Topic.transaction(async () => {
-      await Topic.create({ title: "outer" });
+      await topics("fifth").update({ title: "Sinatra" });
       await Topic.transaction(
         async () => {
           throw new Rollback();
@@ -250,19 +267,18 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with restart savepoint parent transactions", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
     await Topic.transaction(async () => {
-      await Topic.create({ title: "outer" });
+      await topics("fifth").update({ title: "Sinatry" });
       await Topic.transaction(
         async () => {
           await Topic.transaction(
             async () => {
-              await Topic.create({ title: "innermost" });
+              await topics("fifth").update({ title: "Ruby on Rails" });
               throw new Rollback();
             },
             { requiresNew: true },
@@ -280,14 +296,13 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with restart savepoint parent transactions on commit", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
     await Topic.transaction(async () => {
-      await Topic.create({ title: "outer" });
+      await topics("fifth").update({ title: "Sinatra" });
       await Topic.transaction(async () => {}, { requiresNew: true });
     });
 
@@ -296,7 +311,6 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation only fires if materialized", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -308,7 +322,6 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation only fires on rollback if materialized", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -329,6 +342,9 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation fires before after commit callbacks", async () => {
+    // Rails uses an anonymous `Class.new(ActiveRecord::Base)` here so the
+    // after_commit callback doesn't leak onto the shared Topic class across
+    // tests; the throwaway subclass is the TS equivalent.
     const { Topic } = makeTopic(sharedAdapter);
     const order: string[] = [];
 
@@ -349,8 +365,12 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation fires before after rollback callbacks", async () => {
-    const { Topic, adapter } = makeTopic(sharedAdapter);
+    const { Topic } = makeTopic(sharedAdapter);
     const order: string[] = [];
+
+    Topic.afterRollback(function () {
+      order.push("after_rollback");
+    });
 
     Notifications.subscribe("transaction.active_record", () => {
       order.push("notification");
@@ -358,12 +378,6 @@ describe("TransactionInstrumentationTest", () => {
 
     await Topic.transaction(async () => {
       await Topic.create({ title: "test" });
-      // Register directly on the transaction to avoid the save-path
-      // ordering issue between state-restore and rolledbackBang callbacks.
-      const txn = (adapter as any).transactionManager.currentTransaction as any;
-      txn?.afterRollback?.(() => {
-        order.push("after_rollback");
-      });
       throw new Rollback();
     });
 
@@ -371,20 +385,19 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation on failed commit", async () => {
-    const { Topic, adapter } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
     const MyError = class extends Error {};
-    vi.spyOn(adapter as any, "commitDbTransaction").mockImplementationOnce(async () => {
+    vi.spyOn(sharedAdapter as any, "commitDbTransaction").mockImplementationOnce(async () => {
       throw new MyError("commit failed");
     });
 
     await expect(
       Topic.transaction(async () => {
-        await Topic.create({ title: "test" });
+        await topics("fifth").update({ title: "Ruby on Rails" });
       }),
     ).rejects.toThrow(MyError);
 
@@ -400,14 +413,13 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation on failed rollback when unmaterialized", async () => {
-    const { Topic, adapter } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
     const MyError = class extends Error {};
-    const tm = (adapter as any).transactionManager;
+    const tm = (sharedAdapter as any).transactionManager;
     vi.spyOn(tm, "rollbackTransaction").mockImplementationOnce(async () => {
       throw new MyError("rollback failed");
     });
@@ -422,7 +434,6 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation on broken subscription", async () => {
-    const { Topic } = makeTopic(sharedAdapter);
     const MyError = class extends Error {};
     const sub: NotificationSubscriber = Notifications.subscribe("transaction.active_record", () => {
       throw new MyError("broken subscriber");
@@ -430,7 +441,7 @@ describe("TransactionInstrumentationTest", () => {
 
     await expect(
       Topic.transaction(async () => {
-        await Topic.create({ title: "test" });
+        await topics("fifth").update({ title: "Ruby on Rails" });
       }),
     ).rejects.toThrow(MyError);
 

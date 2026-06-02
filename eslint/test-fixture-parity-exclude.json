@@ -4,6 +4,5 @@
   "packages/activerecord/src/associations/extension.test.ts",
   "packages/activerecord/src/associations/has-and-belongs-to-many-associations.test.ts",
   "packages/activerecord/src/associations/has-many-through-disable-joins-associations.test.ts",
-  "packages/activerecord/src/encryption/encryptable-record.test.ts",
-  "packages/activerecord/src/transaction-instrumentation.test.ts"
+  "packages/activerecord/src/encryption/encryptable-record.test.ts"
 ]
