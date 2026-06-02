@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractTestsFromSource } from "./extract-ts-tests.js";
+import { extractTestsFromSource } from "./extract-ts-core.js";
 import { gateFromGuardExpr, gateFromWrapper, mergeGate } from "./gates.js";
 import type { TestGate } from "./types.js";
 
