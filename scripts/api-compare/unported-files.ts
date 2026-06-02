@@ -777,11 +777,15 @@ export const UNPORTED_FILES: UnportedFile[] = [
     tests: [
       "deadlock correctly raises Deadlocked inside nested SavepointTransaction",
       "deadlock inside nested SavepointTransaction is recoverable",
+      "rollback exception is swallowed after a rollback",
     ],
     reason:
       "Provokes a real database deadlock by running competing transactions on " +
-      "two Ruby Threads (nested_deadlock_test.rb:36-160). A deadlock requires " +
-      "genuine concurrency; single-threaded JS cannot reproduce it.",
+      "two Ruby Threads synchronized with a Concurrent::CyclicBarrier " +
+      "(nested_deadlock_test.rb:36-160); 'rollback exception is swallowed after " +
+      "a rollback' (:81) asserts `deadlocks == 1, \"deadlock is required for " +
+      'the test setup"`. A deadlock requires genuine concurrency; ' +
+      "single-threaded JS cannot reproduce it.",
   },
   {
     testFile: "adapters/postgresql/transaction_nested_test.rb",
