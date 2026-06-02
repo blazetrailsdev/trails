@@ -40,7 +40,7 @@ Commands:
   destroy:model <Name>           Delete app/models/<snake>.ts + its create migration
   typecheck                      Type-check your models via trails-tsc
   schema:dump                    Dump the current schema via trails-schema-dump
-  models:dump                    Dump model metadata via trails-models-dump
+  models:dump                    Dump model metadata via trails-models-dump (--schema <path> for offline)
   db:create                      Create the database for the current TRAILS_ENV
   db:drop                        Drop the database for the current TRAILS_ENV
   db:migrate                     Run pending migrations

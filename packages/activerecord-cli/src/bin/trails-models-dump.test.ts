@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -253,5 +253,220 @@ describe("trails-models-dump CLI", { timeout: 30_000 }, () => {
     expect(stdout).toMatch(
       new RegExp(`from sqlite3://${dbPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
     );
+  });
+
+  // --schema path: parse a committed db/schema.ts offline, no DB connection.
+  function writeSchema(source: string): string {
+    const schemaPath = join(tmp, "schema.ts");
+    writeFileSync(schemaPath, source);
+    return schemaPath;
+  }
+
+  it("generates a model module from a db/schema.ts with no database connection", () => {
+    // DATABASE_URL points at a path that does not exist and no DB is running:
+    // if the --schema path reached Base.establishConnection() it would fail.
+    const schemaPath = writeSchema(`
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("authors", { force: "cascade" }, (t) => {
+          t.string("name");
+        });
+        await ctx.createTable("books", { force: "cascade" }, (t) => {
+          t.string("title");
+          t.bigint("author_id", { null: false });
+        });
+        await ctx.addForeignKey("books", "authors", { column: "author_id" });
+      }
+    `);
+    const { code, stdout, stderr } = runDump(["--schema", schemaPath], {
+      DATABASE_URL: "sqlite3:///nonexistent/should-never-connect.db",
+    });
+    expect(code, `stderr: ${stderr}\nstdout: ${stdout}`).toBe(0);
+    expect(stdout).toMatch(/export class Author extends Base \{/);
+    expect(stdout).toMatch(/export class Book extends Base \{/);
+    expect(stdout).toMatch(/this\.belongsTo\("author"\)/);
+    expect(stdout).toMatch(/this\.hasMany\("books"\)/);
+  });
+
+  it("emits the same class/association structure on the --schema path as the live-DB path", () => {
+    // Same logical schema expressed two ways: a SQLite DB (live introspection)
+    // and a db/schema.ts (offline parse). The generated bodies must match.
+    applySchema(
+      dbPath,
+      `
+      CREATE TABLE authors (id INTEGER PRIMARY KEY, name TEXT);
+      CREATE TABLE books (
+        id INTEGER PRIMARY KEY,
+        author_id INTEGER NOT NULL REFERENCES authors(id),
+        title TEXT
+      );
+      `,
+    );
+    const schemaPath = writeSchema(`
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("authors", { force: "cascade" }, (t) => {
+          t.string("name");
+        });
+        await ctx.createTable("books", { force: "cascade" }, (t) => {
+          t.bigint("author_id", { null: false });
+          t.string("title");
+        });
+        await ctx.addForeignKey("books", "authors", { column: "author_id" });
+      }
+    `);
+
+    const live = runDump(["--database-url", `sqlite3://${dbPath}`, "--no-header"]);
+    const offline = runDump(["--schema", schemaPath, "--no-header"]);
+    expect(live.code, `stderr: ${live.stderr}`).toBe(0);
+    expect(offline.code, `stderr: ${offline.stderr}`).toBe(0);
+    expect(offline.stdout).toBe(live.stdout);
+  });
+
+  it("models a composite-primary-key table from --schema", () => {
+    const schemaPath = writeSchema(`
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("memberships", { primaryKey: ["user_id", "group_id"], id: false }, (t) => {
+          t.bigint("user_id", { null: false });
+          t.bigint("group_id", { null: false });
+        });
+      }
+    `);
+    const { code, stdout, stderr } = runDump(["--schema", schemaPath, "--no-header"]);
+    expect(code, `stderr: ${stderr}`).toBe(0);
+    expect(stdout).toMatch(/export class Membership extends Base \{/);
+    expect(stdout).toMatch(/this\._primaryKey = \["user_id","group_id"\]/);
+  });
+
+  it("models a UUID-primary-key table from --schema", () => {
+    const schemaPath = writeSchema(`
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("widgets", { id: "uuid" }, (t) => {
+          t.string("label");
+        });
+      }
+    `);
+    const { code, stdout, stderr } = runDump(["--schema", schemaPath, "--no-header"]);
+    expect(code, `stderr: ${stderr}`).toBe(0);
+    expect(stdout).toMatch(/export class Widget extends Base \{/);
+  });
+
+  it("skips an id:false table with no primary key on the --schema path", () => {
+    const schemaPath = writeSchema(`
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("logs", { id: false }, (t) => {
+          t.string("message");
+        });
+        await ctx.createTable("users", { force: "cascade" }, (t) => {
+          t.string("email");
+        });
+      }
+    `);
+    const { code, stdout, stderr } = runDump(["--schema", schemaPath, "--no-header"]);
+    expect(code, `stderr: ${stderr}`).toBe(0);
+    expect(stdout).toMatch(/export class User extends Base/);
+    expect(stdout).not.toMatch(/class Log /);
+  });
+
+  it("applies --only/--ignore filtering on the --schema path", () => {
+    const schemaPath = writeSchema(`
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("authors", { force: "cascade" }, (t) => {
+          t.string("name");
+        });
+        await ctx.createTable("books", { force: "cascade" }, (t) => {
+          t.string("title");
+        });
+      }
+    `);
+    const { code, stdout } = runDump(["--schema", schemaPath, "--only", "books", "--no-header"]);
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/export class Book extends Base/);
+    expect(stdout).not.toMatch(/export class Author extends Base/);
+  });
+
+  it("exits 1 with a pointed error when the --schema file cannot be read", () => {
+    const { code, stderr } = runDump(["--schema", join(tmp, "does-not-exist.ts")]);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/cannot read schema file/);
+  });
+
+  it("exits 1 with a file-pointed error when --schema has no createTable calls", () => {
+    // A readable file that isn't a real schema.ts: the error must point at the
+    // file, not misdirect the user to --only/--ignore.
+    const schemaPath = writeSchema(`export default async function defineSchema() {}`);
+    const { code, stderr } = runDump(["--schema", schemaPath]);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/no createTable found/);
+    expect(stderr).not.toMatch(/--only\/--ignore/);
+  });
+
+  it("exits 1 when --schema= is passed an empty value", () => {
+    // Empty would be falsy and silently misroute to the live-DB branch.
+    const { code, stderr } = runDump(["--schema="]);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/--schema expects a value/);
+  });
+
+  it("warns and ignores --database-url when --schema is also given", () => {
+    // --schema wins per documented precedence; the explicit conflicting flag
+    // is surfaced. DATABASE_URL points at an unconnectable path to prove the
+    // DB branch is never taken.
+    const schemaPath = writeSchema(`
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("items", { force: "cascade" }, (t) => {
+          t.string("name");
+        });
+      }
+    `);
+    const { code, stdout, stderr } = runDump([
+      "--schema",
+      schemaPath,
+      "--database-url",
+      "sqlite3:///nonexistent/should-never-connect.db",
+      "--no-header",
+    ]);
+    expect(code, `stderr: ${stderr}`).toBe(0);
+    expect(stderr).toMatch(/--schema given; ignoring --database-url/);
+    expect(stdout).toMatch(/export class Item extends Base/);
+  });
+
+  it("does not warn about an ambient DATABASE_URL on the --schema path", () => {
+    const schemaPath = writeSchema(`
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("items", { force: "cascade" }, (t) => {
+          t.string("name");
+        });
+      }
+    `);
+    const { code, stderr } = runDump(["--schema", schemaPath, "--no-header"], {
+      DATABASE_URL: "sqlite3:///nonexistent/should-never-connect.db",
+    });
+    expect(code, `stderr: ${stderr}`).toBe(0);
+    expect(stderr).not.toMatch(/ignoring --database-url/);
+  });
+
+  it("writes to --out on the --schema path", () => {
+    const schemaPath = writeSchema(`
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("items", { force: "cascade" }, (t) => {
+          t.string("name");
+        });
+      }
+    `);
+    const { code, stderr } = runDump(["--schema", schemaPath, "--out", outPath]);
+    expect(code, `stderr: ${stderr}`).toBe(0);
+    expect(readFileSync(outPath, "utf8")).toMatch(/export class Item extends Base/);
+  });
+
+  it("uses the resolved schema path as the header sourceHint", () => {
+    const schemaPath = writeSchema(`
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("items", { force: "cascade" }, (t) => {
+          t.string("name");
+        });
+      }
+    `);
+    const { code, stdout } = runDump(["--schema", schemaPath]);
+    expect(code).toBe(0);
+    expect(stdout).toMatch(new RegExp(`from ${schemaPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
   });
 });
