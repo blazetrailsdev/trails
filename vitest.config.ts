@@ -234,6 +234,7 @@ export default defineConfig({
             "scripts/d1-migrate-pg-mysql.test.ts",
             "scripts/test-deps/*.test.ts",
             "scripts/tasks/*.test.ts",
+            "scripts/test-compare/*.test.ts",
             "eslint/*.test.mjs",
             "vendor/*.test.ts",
           ],
