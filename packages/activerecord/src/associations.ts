@@ -1802,6 +1802,15 @@ export async function loadHabtm(
 
   // Lazily loading a HABTM on a strict-loading owner (or a reflection marked
   // `strictLoading: true`) is a violation, just like the other macros.
+  //
+  // Ordering matches the sibling collection loaders (loadHasMany guards before
+  // its null-FK return): the guard runs ahead of the unsaved-owner / null-PK
+  // short-circuit below. Rails instead reaches `violates_strict_loading?` only
+  // from inside `find_target`, which `find_target?` gates on
+  // `!owner.new_record? || foreign_key_present?` — so a *new* strict owner with
+  // a plain HABTM returns `[]` without raising. Replicating that requires a
+  // `find_target?`-style new-record check ahead of this guard across all
+  // collection loaders; deferred (see the new-record bucket in the PR).
   if (_violatesStrictLoading(record, options)) {
     strictLoadingViolationBang(record, assocName, {
       className: options.className ?? camelize(singularize(assocName)),
