@@ -382,6 +382,17 @@ export class SchemaStatements {
     columnName: string,
     options: { from?: unknown; to: unknown } | unknown,
   ): Promise<void> {
+    // Adapters that cannot run `ALTER COLUMN ... SET DEFAULT` (SQLite) override
+    // changeColumnDefault with a table-rebuild path. Delegate when the adapter
+    // supplies its own implementation; the gate prevents self-recursion now
+    // that SchemaStatements is mixed into AbstractAdapter (see addForeignKey).
+    const adapter = this.adapter as any;
+    if (
+      typeof adapter.changeColumnDefault === "function" &&
+      adapter.changeColumnDefault !== SchemaStatements.prototype.changeColumnDefault
+    ) {
+      return adapter.changeColumnDefault(tableName, columnName, options);
+    }
     const defaultVal =
       typeof options === "object" && options !== null && "to" in (options as any)
         ? (options as any).to
@@ -516,7 +527,14 @@ export class SchemaStatements {
   async addCheckConstraint(
     tableName: string,
     expression: string,
-    options: { name?: string; validate?: boolean } = {},
+    // Rails forwards unrecognized options (`**options`) rather than rejecting
+    // them; only :name / :validate are consumed here.
+    options: {
+      name?: string;
+      validate?: boolean;
+      ifNotExists?: boolean;
+      [key: string]: unknown;
+    } = {},
   ): Promise<void> {
     const adapter = this.adapter as any;
     if (

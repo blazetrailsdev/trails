@@ -6,8 +6,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Migration } from "./index.js";
 import { IrreversibleMigration } from "./migration.js";
 import { CommandRecorder } from "./migration/command-recorder.js";
+import { Base } from "./base.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, adapterType } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -167,20 +168,16 @@ describe("InvertibleMigrationTest", () => {
     expect(await tableExists("items")).toBe(false);
   });
 
-  it.skip("migrate revert change column default", async () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    // ALTER COLUMN SET DEFAULT not supported in SQLite
-    class CreateHorses extends Migration {
+  it("migrate revert change column default", async () => {
+    class ChangeColumnDefault1 extends Migration {
       async change() {
-        await this.createTable("horses", {}, (t) => {
+        await this.createTable("horses", (t) => {
           t.string("name", { default: "Sekitoba" });
         });
       }
     }
 
-    class ChangeDefault extends Migration {
+    class ChangeColumnDefault2 extends Migration {
       async change() {
         await this.changeColumnDefault("horses", "name", {
           from: "Sekitoba",
@@ -189,15 +186,24 @@ describe("InvertibleMigrationTest", () => {
       }
     }
 
-    const m1 = makeMigration(new (CreateHorses as any)());
-    await m1.migrate("up");
-    expect(await tableExists("horses")).toBe(true);
+    const nameDefault = async (): Promise<unknown> => {
+      const cols = await (adapter as any).columns("horses");
+      const value = cols.find((c: any) => c.name === "name")?.default;
+      // MySQL's column introspection reports string defaults with their SQL
+      // quotes ('Sekitoba'); SQLite/PG report the bare value. Normalize so the
+      // round-trip assertion is adapter-agnostic.
+      return typeof value === "string" ? value.replace(/^'(.*)'$/s, "$1") : value;
+    };
 
-    const m2 = makeMigration(new (ChangeDefault as any)());
-    await m2.migrate("up");
-    await m2.migrate("down");
-    // If reversal works, changeColumnDefault(from: "Diomed", to: "Sekitoba") ran
-    expect(await tableExists("horses")).toBe(true);
+    await makeMigration(new ChangeColumnDefault1()).migrate("up");
+    expect(await nameDefault()).toBe("Sekitoba");
+
+    const migration2 = makeMigration(new ChangeColumnDefault2());
+    await migration2.migrate("up");
+    expect(await nameDefault()).toBe("Diomed");
+
+    await migration2.migrate("down");
+    expect(await nameDefault()).toBe("Sekitoba");
   });
   it("migrate revert change column comment", () => {
     const recorder = new CommandRecorder();
@@ -318,11 +324,27 @@ describe("InvertibleMigrationTest", () => {
     expect(await tableExists("down_test")).toBe(false);
   });
 
-  it.skip("migrate down with table name prefix", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    /* table name prefixes not supported */
+  it("migrate down with table name prefix", async () => {
+    Base.tableNamePrefix = "p_";
+    Base.tableNameSuffix = "_s";
+    try {
+      class InvertibleMigration extends Migration {
+        async change() {
+          await this.createTable("horses", (t) => {
+            t.text("content");
+            t.datetime("remind_at");
+          });
+        }
+      }
+      const migration = makeMigration(new InvertibleMigration());
+      await migration.migrate("up");
+      expect(await tableExists("p_horses_s")).toBe(true);
+      await expect(migration.migrate("down")).resolves.not.toThrow();
+      expect(await tableExists("p_horses_s")).toBe(false);
+    } finally {
+      Base.tableNamePrefix = "";
+      Base.tableNameSuffix = "";
+    }
   });
 
   it("migrations can handle foreign keys to specific tables", async () => {
@@ -365,10 +387,13 @@ describe("InvertibleMigrationTest", () => {
   });
 
   it.skip("migrate revert add index without name on expression", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    /* expression indexes not supported */
+    // Rails: `add_index :horses, "remind_at, place_id"` (a String column
+    // list) then asserts `index_exists?(:horses, [:remind_at, :place_id])`
+    // round-trips through migrate(:up)/(:down). BLOCKED: addIndex treats a
+    // String `columns` arg as a single identifier and quotes it, so the
+    // comma-list is rejected; faithful support needs String-column parsing +
+    // expression-aware index-name derivation + index introspection. Deferred
+    // to the next F-3 batch.
   });
 
   it("up only", async () => {
@@ -414,12 +439,35 @@ describe("InvertibleMigrationTest", () => {
     expect(inv.cmd).toBe("removeForeignKey");
     expect(inv.args[0]).toBe("horses");
   });
-  it.skip("migrate revert add check constraint with invalid option", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    /* check constraints not implemented */
-  });
+  // SQLite + PG round-trip the check constraint through introspection; the
+  // MySQL adapter's checkConstraints() does not yet surface it (pre-existing
+  // gap, out of scope for this SQLite-lane batch — rides Phase 3).
+  it.skipIf(adapterType === "mysql")(
+    "migrate revert add check constraint with invalid option",
+    async () => {
+      class InvertibleMigration extends Migration {
+        async change() {
+          await this.createTable("horses", (t) => {
+            t.integer("place_id");
+          });
+        }
+      }
+      class RevertCheckConstraintWithInvalidOption extends Migration {
+        async change() {
+          // Unknown options pass straight through to the constraint DDL.
+          await this.addCheckConstraint("horses", "place_id > 0", { invalid: "option" });
+        }
+      }
+
+      await makeMigration(new InvertibleMigration()).migrate("up");
+      const m = makeMigration(new RevertCheckConstraintWithInvalidOption());
+      await m.migrate("up");
+      expect((await (adapter as any).checkConstraints("horses")).length).toBe(1);
+
+      await m.migrate("down");
+      expect((await (adapter as any).checkConstraints("horses")).length).toBe(0);
+    },
+  );
 
   it("migrate revert change table", async () => {
     class CreateHorses extends Migration {

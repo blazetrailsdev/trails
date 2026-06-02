@@ -818,7 +818,14 @@ export abstract class Migration {
   async addCheckConstraint(
     tableName: string,
     expression: string,
-    options: { name?: string; validate?: boolean } = {},
+    // Mirrors Rails' `add_check_constraint(table, expression, **options)`:
+    // unrecognized options are forwarded verbatim, not rejected.
+    options: {
+      name?: string;
+      validate?: boolean;
+      ifNotExists?: boolean;
+      [key: string]: unknown;
+    } = {},
   ): Promise<void> {
     if (this._recording) {
       this._recorder.record("addCheckConstraint", [tableName, expression, options]);
