@@ -46,6 +46,19 @@ describe.skipIf(!SQLITE_ONLY)("MultipleDbTest", () => {
     }
   });
 
+  it("find", async () => {
+    const c1 = await Course.find(1);
+    expect(c1.name).toBe("Ruby Development");
+    const c2 = await Course.find(2);
+    expect(c2.name).toBe("Java Development");
+    const e1 = await Entrant.find(1);
+    expect(e1.name).toBe("Ruby Developer");
+    const e2 = await Entrant.find(2);
+    expect(e2.name).toBe("Ruby Guru");
+    const e3 = await Entrant.find(3);
+    expect(e3.name).toBe("Java Lover");
+  });
+
   const entrantsOf = (course: InstanceType<typeof Course>) =>
     (course as unknown as { entrants: { count(): Promise<number> } }).entrants;
 
