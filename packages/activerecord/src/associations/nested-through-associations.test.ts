@@ -80,6 +80,15 @@ const TEST_SCHEMA: Schema = {
   },
   phmt_cake_designer2s: { name: "string" },
   phmt_drink_designer2s: { name: "string" },
+  phmt3_hotels: { name: "string" },
+  phmt3_departments: { phmt3_hotel_id: "integer" },
+  phmt3_chefs: {
+    phmt3_department_id: "integer",
+    employable_id: "integer",
+    employable_type: "string",
+  },
+  phmt3_cake_designers: { name: "string" },
+  phmt3_drink_designers: { name: "string" },
   hmps_categories: { name: "string" },
   hmps_posts: { title: "string", body: "string" },
   hmps_essays: { writer_id: "integer", writer_type: "string", hmps_category_id: "integer" },
@@ -2540,13 +2549,93 @@ describe("NestedThroughAssociationsTest", () => {
     expect(drinks.map((r: any) => r.id)).toEqual([drinkDesigner.id]);
   });
 
-  it.skip("polymorphic has many through joined different table twice", () => {
-    // BLOCKED on the INNER `joins()` nested-through resolver, NOT on alias
-    // emission (AF6 shipped JoinDependency self-join aliasing; the LEFT-OUTER
-    // path emits the `{table}_{owner}_join` aliases). `Hotel.joins(:cake_designers,
-    // :drink_designers)` joins the same polymorphic `chefs` table twice in one
-    // INNER query; routing this through JoinDependency is a relation.ts
-    // follow-up outside AF6's file scope.
+  it("polymorphic has many through joined different table twice", async () => {
+    // Mirrors Rails test_polymorphic_has_many_through_joined_different_table_twice:
+    //   Hotel.joins(:cake_designers, :drink_designers).take == hotel
+    // Both :cake_designers and :drink_designers are has_many-through the same
+    // polymorphic `chefs` (departments → chefs → employable), so the two
+    // separate joins() args share the departments/chefs prefix and must dedup
+    // against each other at the set level (only the final employable leg differs
+    // by source_type). Without the cross-arg dedup, `chefs` joins twice.
+    class Phmt3Hotel extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Phmt3Department extends Base {
+      static {
+        this.attribute("phmt3_hotel_id", "integer");
+      }
+    }
+    class Phmt3Chef extends Base {
+      static {
+        this.attribute("phmt3_department_id", "integer");
+        this.attribute("employable_id", "integer");
+        this.attribute("employable_type", "string");
+      }
+    }
+    class Phmt3CakeDesigner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Phmt3DrinkDesigner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    Associations.hasMany.call(Phmt3Hotel, "phmt3Department3s", {
+      className: "Phmt3Department",
+      foreignKey: "phmt3_hotel_id",
+    });
+    Associations.hasMany.call(Phmt3Hotel, "phmt3Chefs", {
+      className: "Phmt3Chef",
+      through: "phmt3Department3s",
+      source: "phmt3Chefs",
+    });
+    Associations.hasMany.call(Phmt3Hotel, "cakeDesigners", {
+      className: "Phmt3CakeDesigner",
+      through: "phmt3Chefs",
+      source: "employable",
+      sourceType: "Phmt3CakeDesigner",
+    });
+    Associations.hasMany.call(Phmt3Hotel, "drinkDesigners", {
+      className: "Phmt3DrinkDesigner",
+      through: "phmt3Chefs",
+      source: "employable",
+      sourceType: "Phmt3DrinkDesigner",
+    });
+    Associations.hasMany.call(Phmt3Department, "phmt3Chefs", {
+      className: "Phmt3Chef",
+      foreignKey: "phmt3_department_id",
+    });
+    Associations.belongsTo.call(Phmt3Chef, "employable", {
+      polymorphic: true,
+      foreignKey: "employable_id",
+    });
+    registerModel("Phmt3Hotel", Phmt3Hotel);
+    registerModel("Phmt3Department", Phmt3Department);
+    registerModel("Phmt3Chef", Phmt3Chef);
+    registerModel("Phmt3CakeDesigner", Phmt3CakeDesigner);
+    registerModel("Phmt3DrinkDesigner", Phmt3DrinkDesigner);
+
+    const cakeDesigner = await Phmt3CakeDesigner.create({ name: "Cake Boss" });
+    const drinkDesigner = await Phmt3DrinkDesigner.create({ name: "Drink Boss" });
+    const hotel = await Phmt3Hotel.create({ name: "Grand" });
+    const dept = await Phmt3Department.create({ phmt3_hotel_id: hotel.id });
+    await Phmt3Chef.create({
+      phmt3_department_id: dept.id,
+      employable_id: cakeDesigner.id,
+      employable_type: "Phmt3CakeDesigner",
+    });
+    await Phmt3Chef.create({
+      phmt3_department_id: dept.id,
+      employable_id: drinkDesigner.id,
+      employable_type: "Phmt3DrinkDesigner",
+    });
+
+    const result = await (Phmt3Hotel as any).joins("cakeDesigners", "drinkDesigners").take();
+    expect(result?.id).toBe(hotel.id);
   });
 
   it("has many through polymorphic with scope", async () => {
