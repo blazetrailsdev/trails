@@ -260,9 +260,9 @@ describe("SerializationTest", () => {
   describe("asJson type coercion (Rails ActiveSupport::JSON parity)", () => {
     // Rails' JSON encoder routes every value through `as_json` — BigDecimal
     // → string, Time/Date → ISO8601, Symbol → string. Our helper ports
-    // the subset that actually occurs in JS: BigInt → string, Date →
-    // ISO8601 (so the hash form already contains strings, not Date
-    // objects), and recursive coercion within arrays/objects.
+    // the subset that actually occurs in JS: Date → ISO8601 and recursive
+    // coercion within arrays/objects. BigIntegerType now returns number
+    // (not JS BigInt), so no BigInt → string coercion is needed.
     it("asJson coerces bigint attributes to string (JSON.stringify-safe)", () => {
       class Row extends Model {
         static {
@@ -272,10 +272,11 @@ describe("SerializationTest", () => {
       }
       const r = new Row({ id: "99999999999999999999", name: "row-1" });
       const json = r.asJson();
-      // bigint attributes are coerced to decimal strings by coerceForJson.
-      expect(json["id"]).toBe("99999999999999999999");
+      // BigIntegerType now returns number (not BigInt). Values beyond 2^53
+      // lose precision — an inherent JS float64 limit. JSON.stringify is
+      // safe for numbers (no TypeError), so the round-trip constraint holds.
+      expect(json["id"]).toBe(Number("99999999999999999999"));
       expect(json["name"]).toBe("row-1");
-      // JSON.stringify now round-trips without throwing.
       expect(() => JSON.stringify(json)).not.toThrow();
     });
 
@@ -323,8 +324,8 @@ describe("SerializationTest", () => {
       );
       const json = b.asJson({ include: "posts" });
       expect(Array.isArray(json.posts)).toBe(true);
-      // Each post's BigInt id is coerced to a string.
-      expect((json.posts as Array<{ id: string }>)[0].id).toBe("1000000000000");
+      // BigIntegerType returns number; within MAX_SAFE_INTEGER so no precision loss.
+      expect((json.posts as Array<{ id: number }>)[0].id).toBe(1000000000000);
       expect(() => JSON.stringify(json)).not.toThrow();
     });
 
@@ -350,8 +351,7 @@ describe("SerializationTest", () => {
     it("JSON.stringify(model) delegates to asJson via toJSON()", () => {
       // Direct `JSON.stringify(model)` should match `model.toJson()` —
       // without the hook, the default walker would enumerate
-      // `_attributes`/`_dirty`/`errors`/etc. and potentially throw on
-      // BigInt state.
+      // `_attributes`/`_dirty`/`errors`/etc. rather than the clean attribute set.
       class Row extends Model {
         static {
           this.attribute("id", "big_integer");
@@ -361,7 +361,8 @@ describe("SerializationTest", () => {
       const r = new Row({ id: "42", name: "row-1" });
       expect(JSON.stringify(r)).toBe(r.toJson());
       const parsed = JSON.parse(JSON.stringify(r));
-      expect(parsed).toEqual({ id: "42", name: "row-1" });
+      // BigIntegerType now returns number, so id is serialized as a number.
+      expect(parsed).toEqual({ id: 42, name: "row-1" });
     });
 
     it("JSON.stringify(model) with large bigint id above Number.MAX_SAFE_INTEGER", () => {
@@ -371,15 +372,15 @@ describe("SerializationTest", () => {
           this.attribute("name", "string");
         }
       }
-      // 2^62 — cannot be represented as a JS number without precision loss.
+      // 2^62 is exactly representable as float64 (power of 2), so no precision
+      // loss here even though it exceeds MAX_SAFE_INTEGER. BigIntegerType casts
+      // to number; JSON.stringify serializes it as a number, not a string.
       const big = 2n ** 62n;
       const r = new Row({ id: big, name: "row-2" });
       expect(() => JSON.stringify(r)).not.toThrow();
       const parsed = JSON.parse(JSON.stringify(r));
-      // bigint is coerced to decimal string (not number — JS number loses
-      // precision above 2^53-1). Consumers must parse with BigInt(str).
-      expect(typeof parsed.id).toBe("string");
-      expect(parsed.id).toBe("4611686018427387904");
+      expect(typeof parsed.id).toBe("number");
+      expect(parsed.id).toBe(Number(big));
       expect(parsed.name).toBe("row-2");
     });
 
