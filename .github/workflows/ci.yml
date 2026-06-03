@@ -639,15 +639,15 @@ jobs:
       # covers the SQLite E2E until a mysql suite lands and can be wired up.
       - run: pnpm vitest run packages/activerecord-cli
 
-  # Adapter-specific suites. The core AR jobs above run the *shared* suite
-  # against a live backend but `vitest.config.ts` drops every
-  # `adapters/<db>/**` file unless `TEST_ADAPTER` names that backend (the
-  # comment at vitest.config.ts:17 explains why: adapter-specific files build
-  # their own adapter and collide with the shared suite's table drops). These
-  # two jobs set `TEST_ADAPTER` so those dirs load, then restrict the run to
-  # the adapter dirs alone — the shared suite is already covered by
-  # postgres-tests / mariadb-tests. Without these jobs the ~135 adapter-dir
-  # tests are local-verify-only.
+  # Adapter-specific suites (EXPLORATORY — branch tc100-i5, do-not-merge).
+  # The core AR jobs run the *shared* suite against a live backend but
+  # `vitest.config.ts` unconditionally excludes every live-DB `adapters/<db>/**`
+  # file (post-#2897). These two jobs set `RUN_ADAPTER_DIRS=1` — the exploratory
+  # escape hatch that drops that exclude in this own vitest process — then
+  # restrict the run to the adapter dirs alone (own process, never interleaved
+  # with the shared suite). They are the measuring probe for the §4/§5 backlog
+  # in docs/activerecord/adapter-test-ci-coverage-plan.md; expected RED until
+  # those fixes land, so they are NOT folded into the real jobs yet.
   postgres-adapter-tests:
     name: PostgreSQL Adapter Tests
     needs: changes
@@ -682,34 +682,36 @@ jobs:
       - run: pnpm build
       # Path filters select only the adapter dirs. The bare `connection-adapters/postgresql`
       # filter matches both the `postgresql/` subdir and the root-level
-      # `postgresql-adapter.*.test.ts` files (substring match).
+      # `postgresql-adapter.*.test.ts` files (substring match). RUN_ADAPTER_DIRS=1
+      # drops the unconditional ADAPTER_SPECIFIC_EXCLUDE so adapters/postgresql/**
+      # actually loads (without it the filter would match only the unit subdir).
       - run: >
           pnpm vitest run
           packages/activerecord/src/adapters/postgresql
           packages/activerecord/src/connection-adapters/postgresql
           packages/activerecord/src/tasks/postgresql-database-tasks.test.ts
         env:
-          TEST_ADAPTER: postgresql
+          RUN_ADAPTER_DIRS: "1"
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
           AR_DB_FORKS: 4
 
-  mariadb-adapter-tests:
-    name: MariaDB Adapter Tests
+  mysql-adapter-tests:
+    name: MySQL Adapter Tests
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ubuntu-latest
     services:
-      mariadb:
-        image: mariadb:11
+      mysql:
+        image: mysql:8
         env:
-          MARIADB_DATABASE: rails_js_test
-          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+          MYSQL_DATABASE: rails_js_test
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
         ports:
           - 3306:3306
         options: >-
-          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-cmd "mysqladmin ping -h localhost --silent"
           --health-interval 2s
           --health-timeout 5s
           --health-retries 10
@@ -726,7 +728,10 @@ jobs:
       - run: pnpm build
       # The bare `connection-adapters/mysql` filter matches the `mysql/`
       # subdir plus the root-level `mysql2-adapter.test.ts` /
-      # `mysql-type-lookup.test.ts` files (substring match).
+      # `mysql-type-lookup.test.ts` files (substring match). mysql:8 (not the
+      # old mariadb:11) since #2897 — re-measures the M-1..M-4 dialect cluster
+      # against the real backend the tests were authored for. RUN_ADAPTER_DIRS=1
+      # drops the unconditional exclude so the adapter dirs load.
       - run: >
           pnpm vitest run
           packages/activerecord/src/adapters/abstract-mysql-adapter
@@ -735,7 +740,7 @@ jobs:
           packages/activerecord/src/connection-adapters/abstract-mysql-adapter.test.ts
           packages/activerecord/src/tasks/mysql-database-tasks.test.ts
         env:
-          TEST_ADAPTER: mysql2
+          RUN_ADAPTER_DIRS: "1"
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
           AR_DB_FORKS: 4
 
