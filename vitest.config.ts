@@ -14,42 +14,12 @@ const SHARED_EXCLUDE = [
   "packages/*/dx-tests/**",
 ];
 
-// Adapter-specific test files must not load on a mismatched TEST_ADAPTER run.
-// Shared tests that route through `createTestAdapter` + `SchemaAdapter` will
-// drop tables that adapter-specific files (which construct their own adapter
-// directly) assume stick around for the duration of a describe. See
-// docs/activerecord-index.md (TEST_ADAPTER excludes shipped #1630).
-const TEST_ADAPTER = process.env.TEST_ADAPTER ?? "sqlite3";
-const ADAPTER_SPECIFIC_EXCLUDE = [
-  ...(TEST_ADAPTER !== "postgresql"
-    ? [
-        "packages/activerecord/src/adapters/postgresql/**",
-        "packages/activerecord/src/connection-adapters/postgresql/**",
-        "packages/activerecord/src/connection-adapters/postgresql-*.test.ts",
-        "packages/activerecord/src/tasks/postgresql-*.test.ts",
-      ]
-    : []),
-  ...(TEST_ADAPTER !== "mysql2"
-    ? [
-        "packages/activerecord/src/adapters/abstract-mysql-adapter/**",
-        "packages/activerecord/src/adapters/mysql2/**",
-        "packages/activerecord/src/connection-adapters/mysql/**",
-        "packages/activerecord/src/connection-adapters/mysql2-*.test.ts",
-        "packages/activerecord/src/connection-adapters/abstract-mysql-adapter.test.ts",
-        "packages/activerecord/src/connection-adapters/mysql-*.test.ts",
-        "packages/activerecord/src/tasks/mysql-*.test.ts",
-      ]
-    : []),
-  ...(TEST_ADAPTER !== "sqlite3"
-    ? [
-        "packages/activerecord/src/adapters/sqlite3/**",
-        "packages/activerecord/src/adapters/sqlite3-*.test.ts",
-        "packages/activerecord/src/connection-adapters/sqlite3/**",
-        "packages/activerecord/src/connection-adapters/sqlite3-*.test.ts",
-        "packages/activerecord/src/tasks/sqlite-*.test.ts",
-      ]
-    : []),
-];
+// Adapter-specific test files now load on every run. Files that construct
+// their own adapter directly (OID types, quoting helpers, schema-creation
+// logic) are pure unit tests that pass on any backend. Tests that need a live
+// DB are wrapped with `describeIfPg` / `describeIfMysql` / `describeIfSqlite`
+// from their adapter's test-helper, which probes availability at collection
+// time and falls back to `describe.skip` when the backend is absent.
 
 const _parsedForks = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "", 10);
 const TEST_FORKS = Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : 6;
@@ -175,7 +145,7 @@ export default defineConfig({
         test: {
           name: "activerecord",
           include: ["packages/activerecord/src/**/*.test.ts"],
-          exclude: [...SHARED_EXCLUDE, ...ADAPTER_SPECIFIC_EXCLUDE],
+          exclude: SHARED_EXCLUDE,
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
           // instead of re-issuing the DDL per file. No-op on PG/MySQL runs.
@@ -205,9 +175,9 @@ export default defineConfig({
           // time than the rare hidden flake costs. Revisit if a real
           // regression slips through.
           retry: process.env.PG_TEST_URL || process.env.MYSQL_TEST_URL ? 2 : 0,
-          // Large-schema beforeAll(defineSchema(...)) calls on MariaDB issue
+          // Large-schema beforeAll(defineSchema(...)) calls on MySQL issue
           // hundreds of CREATE TABLE statements (e.g. has-many-associations.test.ts
-          // creates ~354 tables in one beforeAll). At ~30ms per CREATE on MariaDB
+          // creates ~354 tables in one beforeAll). At ~30ms per CREATE on MySQL
           // that's ~10.7s, just over the 10s vitest default and a frequent CI
           // flake source. Bump to 30s to absorb DDL load + CI contention. See
           // docs/activerecord/phase-f-ddl-tracking-removal.md for context on why
