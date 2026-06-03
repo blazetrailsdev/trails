@@ -724,7 +724,9 @@ export class TableDefinition {
       if (this.columns[i].options.primaryKey) this.columns.splice(i, 1);
     }
 
-    if (id === false) return;
+    // Mirrors Rails set_primary_key's `if id && !as` guard: CTAS tables have
+    // their columns defined by the SELECT, so never add a PK column.
+    if (id === false || this.as) return;
 
     const pkName = primaryKey ?? "id";
     const pkType = (typeof id === "string" ? id : "primary_key") as ColumnType;
