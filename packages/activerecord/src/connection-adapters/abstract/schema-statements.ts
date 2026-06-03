@@ -71,7 +71,11 @@ export class SchemaStatements {
 
   get schemaCreation(): SchemaCreation {
     if (!this._schemaCreation) {
-      this._schemaCreation = new SchemaCreation(this.adapterName, this.adapter);
+      const adapterSC = (this.adapter as unknown as { schemaCreation?: unknown }).schemaCreation;
+      this._schemaCreation =
+        adapterSC instanceof SchemaCreation
+          ? adapterSC
+          : new SchemaCreation(this.adapterName, this.adapter);
     }
     return this._schemaCreation;
   }
@@ -162,7 +166,7 @@ export class SchemaStatements {
     });
     if (definer) definer(td);
 
-    await this.adapter.executeMutation(td.toSql());
+    await this.adapter.executeMutation(this.schemaCreation.accept(td));
 
     // Rails: if supports_comments? && !supports_comments_in_create?
     //   change_table_comment(table_name, comment) if options[:comment].present?
