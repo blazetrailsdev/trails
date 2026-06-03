@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { snakeToCamel, rubyMethodToTs, rubyFileToTs } from "./conventions.js";
+import {
+  snakeToCamel,
+  rubyMethodToTs,
+  rubyFileToTs,
+  SKIP,
+  SKIP_GROUPS,
+  explainConventions,
+} from "./conventions.js";
 
 describe("snakeToCamel", () => {
   it("converts standard snake_case to camelCase", () => {
@@ -156,5 +163,40 @@ describe("rubyFileToTs", () => {
     // The alias is global, not per-package — any framework's railties/
     // subdir maps to trailties/ uniformly.
     expect(rubyFileToTs("railties/some_file.rb", "actiondispatch")).toBe("trailties/some-file.ts");
+  });
+});
+
+describe("SKIP_GROUPS", () => {
+  it("derives the SKIP set exactly (every grouped name, nothing else)", () => {
+    expect(SKIP).toEqual(new Set(SKIP_GROUPS.flatMap((g) => g.names)));
+  });
+
+  it("has no duplicate names across groups", () => {
+    const all = SKIP_GROUPS.flatMap((g) => g.names);
+    expect(all.length).toBe(new Set(all).size);
+  });
+
+  it("requires a non-empty reason for every group", () => {
+    for (const g of SKIP_GROUPS) {
+      expect(g.reason.trim().length).toBeGreaterThan(0);
+      expect(g.names.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("makes rubyMethodToTs skip every grouped name", () => {
+    for (const name of SKIP) {
+      expect(rubyMethodToTs(name)).toBeNull();
+    }
+  });
+});
+
+describe("explainConventions", () => {
+  it("renders worked examples from the live rules and lists every skip reason", () => {
+    const md = explainConventions();
+    expect(md).toContain("`valid?` → `isValid()` or `valid()`");
+    expect(md).toContain("`save!` → `saveBang()`");
+    for (const g of SKIP_GROUPS) {
+      expect(md).toContain(g.reason);
+    }
   });
 });

@@ -705,6 +705,11 @@ jobs:
         run: pnpm exec tsx scripts/api-compare/extract-ts-api.ts && pnpm exec tsx scripts/api-compare/compare.ts
       - name: API comparison (privates)
         run: pnpm exec tsx scripts/api-compare/compare.ts --privates
+      - name: Conventions doc up to date
+        # docs/ruby-ts-conventions.md is generated from explainConventions()
+        # in conventions.ts; fail if it drifts so the agent-facing doc can't
+        # go stale. Regenerate with `pnpm api:conventions`.
+        run: pnpm exec tsx scripts/api-compare/conventions-doc.ts --check
       - name: Dependency lint
         run: pnpm exec tsx scripts/api-compare/lint-deps.ts
       - name: Rails-private JSDoc lint

@@ -170,7 +170,9 @@ post.comments[0];
 
 Full reference: [**Trails Idioms**](packages/website/docs/guides/idioms.md) —
 async conventions, keyword args → options objects, and the rest of the
-Ruby-to-TypeScript translation table.
+Ruby-to-TypeScript translation table. The exact name-matching rules used by
+`api:compare` are generated from the comparison source into
+[docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md).
 
 ## Packages
 

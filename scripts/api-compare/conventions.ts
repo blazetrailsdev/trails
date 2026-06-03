@@ -104,70 +104,103 @@ export const OPERATORS = new Set([
   "~@",
 ]);
 
-export const SKIP = new Set([
-  "dup",
-  "clone",
-  "freeze",
-  "hash",
-  "inspect",
-  "pretty_print",
-  "object_id",
-  "class",
-  "send",
-  "public_send",
-  "tap",
-  "then",
-  "yield_self",
-  "respond_to?",
-  "respond_to_missing?",
-  "method_missing",
-  "is_a?",
-  "kind_of?",
-  "instance_of?",
-  "nil?",
-  "equal?",
-  "eql?",
-  "instance_variable_get",
-  "instance_variable_set",
-  "instance_variables",
-  "initialize_copy",
-  "initialize_dup",
-  "initialize_clone",
-  "encode_with",
-  "init_with",
-  "to_ary",
-  "to_a",
-  "to_i",
-  "to_f",
-  "to_h",
-  "to_hash",
-  "to_r",
-  "to_c",
-  // Ruby module lifecycle hooks — no TypeScript equivalent
-  "extended",
-  "included",
-  "inherited",
-  // Ruby object hooks — no TypeScript equivalent
-  "singleton_method_added",
-  // NoTouching: TS uses a Map-based depth counter (_noTouchingDepth) instead of
-  // a thread-local array; klasses() is the Rails internal accessor for that array.
-  "klasses",
-  // PostgreSQL::Quoting#lookup_cast_type issues an async DB query (SELECT oid)
-  // to resolve a sql_type string; our standalone-function quoting module has no
-  // adapter instance, so this can't be ported without a larger refactor.
-  "lookup_cast_type",
-  // CheckPending helpers — depend on Rails.root, system("bin/rails ..."), and
-  // the ActiveRecord::Tasks infrastructure that has no JS equivalent.
-  "any_schema_needs_update?",
-  "db_configs_in_current_env",
-  "load_schema!",
-  // Migrator internal index helpers — Rails stores @target_version / @direction
-  // as instance variables; our TS Migrator passes them as method parameters
-  // instead, so these zero-arg helpers can't be faithfully ported.
-  "target",
-  "start",
-  "finish",
-]);
+/**
+ * Ruby methods api:compare never expects a TS counterpart for, grouped by the
+ * reason they're skipped. The grouping is the single source of truth for both
+ * the `SKIP` lookup set (below) and the generated conventions doc — keeping the
+ * rationale machine-readable means a future skip can't land without a reason,
+ * and the doc can't drift from the list.
+ */
+export interface SkipGroup {
+  /** Why every name in this group is skipped. */
+  reason: string;
+  names: string[];
+}
+
+export const SKIP_GROUPS: SkipGroup[] = [
+  {
+    reason:
+      "Ruby core object / value-protocol methods with no meaningful public " +
+      "TypeScript surface (identity, reflection, coercion).",
+    names: [
+      "dup",
+      "clone",
+      "freeze",
+      "hash",
+      "inspect",
+      "pretty_print",
+      "object_id",
+      "class",
+      "send",
+      "public_send",
+      "tap",
+      "then",
+      "yield_self",
+      "respond_to?",
+      "respond_to_missing?",
+      "method_missing",
+      "is_a?",
+      "kind_of?",
+      "instance_of?",
+      "nil?",
+      "equal?",
+      "eql?",
+      "instance_variable_get",
+      "instance_variable_set",
+      "instance_variables",
+      "initialize_copy",
+      "initialize_dup",
+      "initialize_clone",
+      "encode_with",
+      "init_with",
+      "to_ary",
+      "to_a",
+      "to_i",
+      "to_f",
+      "to_h",
+      "to_hash",
+      "to_r",
+      "to_c",
+    ],
+  },
+  {
+    reason: "Ruby module lifecycle hooks — no TypeScript equivalent.",
+    names: ["extended", "included", "inherited"],
+  },
+  {
+    reason: "Ruby object hooks — no TypeScript equivalent.",
+    names: ["singleton_method_added"],
+  },
+  {
+    reason:
+      "NoTouching: TS uses a Map-based depth counter (_noTouchingDepth) instead " +
+      "of a thread-local array; klasses() is the Rails internal accessor for " +
+      "that array.",
+    names: ["klasses"],
+  },
+  {
+    reason:
+      "PostgreSQL::Quoting#lookup_cast_type issues an async DB query (SELECT oid) " +
+      "to resolve a sql_type string; our standalone-function quoting module has " +
+      "no adapter instance, so this can't be ported without a larger refactor.",
+    names: ["lookup_cast_type"],
+  },
+  {
+    reason:
+      'CheckPending helpers — depend on Rails.root, system("bin/rails ..."), and ' +
+      "the ActiveRecord::Tasks infrastructure that has no JS equivalent.",
+    names: ["any_schema_needs_update?", "db_configs_in_current_env", "load_schema!"],
+  },
+  {
+    reason:
+      "Migrator internal index helpers — Rails stores @target_version / " +
+      "@direction as instance variables; our TS Migrator passes them as method " +
+      "parameters instead, so these zero-arg helpers can't be faithfully ported.",
+    names: ["target", "start", "finish"],
+  },
+];
+
+export const SKIP = new Set<string>(SKIP_GROUPS.flatMap((g) => g.names));
 
 /**
  * Convert Ruby method name → candidate TS names to try matching.
@@ -238,4 +271,104 @@ export function rubyMethodToTs(name: string): string[] | null {
   }
 
   return [snakeToCamel(name)];
+}
+
+/**
+ * Render the Ruby→TypeScript naming conventions as Markdown.
+ *
+ * This is the single source of truth for the agent-facing conventions doc:
+ * `scripts/api-compare/conventions-doc.ts` writes the return value to a file
+ * and CI re-runs it with `--check` to fail on drift. Everything that can be
+ * derived from the live tables (operators, token renames, path aliases, the
+ * skip list, worked examples) is computed here rather than hand-written, so
+ * the doc is structurally incapable of going stale; only the prose policy
+ * lines below are authored, and they live next to the code they describe.
+ */
+export function explainConventions(): string {
+  const example = (ruby: string): string => {
+    const ts = rubyMethodToTs(ruby);
+    if (ts === null) return "_(skipped)_";
+    return ts.map((c) => `\`${c}()\``).join(" or ");
+  };
+
+  const renameRows = Object.entries(TOKEN_RENAMES)
+    .map(([from, to]) => `| \`${from}\` | \`${to}\` |`)
+    .join("\n");
+
+  const pathAliasRows = Object.entries(PATH_SEGMENT_ALIASES)
+    .map(([from, to]) => `| \`${from}\` | \`${to}\` |`)
+    .join("\n");
+
+  const operatorList = [...OPERATORS].map((o) => `\`${o}\``).join(", ");
+
+  const skipSections = SKIP_GROUPS.map((g) => {
+    const names = g.names.map((n) => `\`${n}\``).join(", ");
+    return `- ${g.reason}\n  - ${names}`;
+  }).join("\n");
+
+  return `# Ruby → TypeScript naming conventions
+
+<!-- GENERATED FILE — do not edit by hand.
+     Regenerate with \`pnpm api:conventions\`. The source of truth is
+     \`explainConventions()\` in scripts/api-compare/conventions.ts; CI runs
+     \`pnpm api:conventions --check\` and fails if this file drifts from it. -->
+
+These are the exact rules \`api:compare\` uses to match a Ruby method or file to
+its trails TypeScript counterpart. Follow them when porting Rails code so the
+comparison credits your implementation.
+
+## Method names
+
+| Ruby | TypeScript | Example |
+| ---- | ---------- | ------- |
+| \`predicate?\` (bare) | \`is*\` prefix, camel fallback | \`valid?\` → ${example("valid?")} |
+| \`is_*?\` | camel form only (no doubled \`isIs*\`) | \`is_number?\` → ${example("is_number?")} |
+| \`has_*?\` / \`supports_*?\` / \`can_*?\` … | camel form + \`is*\` fallback | \`has_attribute?\` → ${example("has_attribute?")} |
+| \`name!\` (bang) | \`*Bang\` suffix | \`save!\` → ${example("save!")} |
+| \`name=\` (setter) | bare camel name | \`table_name=\` → ${example("table_name=")} |
+| \`initialize\` / \`new\` | \`constructor\` | \`initialize\` → ${example("initialize")} |
+| \`to_s\` / \`to_str\` | \`toString\` | \`to_s\` → ${example("to_s")} |
+| \`to_json\` | \`toJSON\` | \`to_json\` → ${example("to_json")} |
+| \`to_sql\` | \`toSql\` | \`to_sql\` → ${example("to_sql")} |
+| everything else | \`snake_case\` → \`camelCase\` | \`has_many\` → ${example("has_many")} |
+
+Predicate-form details: \`is_*?\` collapses to a single candidate so trails can't
+land the redundant doubled \`isIsNumber\`. Already-predicate prefixes keep the
+\`is*\` fallback because the disambiguating alias is sometimes needed when the bare
+name collides with a macro (e.g. \`isHasOne()\` alongside the \`Model.hasOne\`
+declaration). Leading underscores and runs of underscores collapse like a single
+underscore (\`visit__regexp\` → \`visitRegexp\`), and underscore-before-capital
+collapses too (\`visit_Arel_Nodes_X\` → \`visitArelNodesX\`).
+
+## Operators
+
+These Ruby operator methods have no api:compare counterpart (map them to named
+methods like \`get()\`/\`set()\` as the surrounding code does):
+
+${operatorList}
+
+## Token renames
+
+Applied to every identifier before camelization (and the equivalent applies to
+file paths):
+
+| Ruby token | trails token |
+| ---------- | ------------ |
+${renameRows}
+
+## File paths
+
+Ruby \`foo_bar.rb\` → \`foo-bar.ts\` (kebab-case), with these path-segment aliases
+applied first (trails railties are not \`Rails::Railtie\` subclasses):
+
+| Ruby segment | trails segment |
+| ------------ | -------------- |
+${pathAliasRows}
+
+## Skipped methods
+
+api:compare never expects a TS counterpart for these Ruby methods:
+
+${skipSections}
+`;
 }
