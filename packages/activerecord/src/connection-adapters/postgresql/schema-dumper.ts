@@ -43,7 +43,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isDefaultPrimaryKey(column: Column): boolean {
-    return this.schemaType(column) === "bigserial";
+    const st = this.schemaType(column);
+    return st === "bigserial" || st === "serial";
   }
 
   /**

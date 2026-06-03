@@ -11,7 +11,7 @@ export class DecimalType extends NumericValueType {
   }
 
   typeCastForSchema(value: unknown): string {
-    return JSON.stringify(value) ?? String(value);
+    return String(value);
   }
 
   // JS has no BigDecimal, so we represent decimals as strings to avoid

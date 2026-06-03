@@ -11,9 +11,9 @@ adapter-only job path. The ~40-LOC wiring is the last step, after the remaining
 bucket fixes below land.
 
 **Progress:** the exploratory probe surfaced ~38 pre-existing failures; bucket
-fixes have brought that down to **9** (run `26880196064`): **PG 6** (P-9) +
-**MySQL 3** (M-1a/M-1b). Everything else is resolved — this doc tracks only what
-remains.
+fixes have brought that down to **3** (run `26880196064` baseline): **MySQL 3**
+(M-1a/M-1b). PG 6 (P-9) resolved. Everything else is resolved — this doc tracks
+only what remains.
 
 ---
 
@@ -94,11 +94,11 @@ buckets are green, then flip to a hard gate — see §4.
 Counts are de-duplicated vitest "Failed Tests" totals. Re-confirm each bucket
 against current `main` before scoping it (the set drifts as fixes land).
 
-### PostgreSQL — 6 failed
+### PostgreSQL — 0 failed (P-9 resolved)
 
-| #   | Bucket                            | Files / tests                                                                                                                                                                 | Root cause                                                                                                                                                                              | Likely fix                                                                                                          |
-| --- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| P-9 | **schema-dumper: type shorthand** | `serial.test.ts` shorthand / not-bigserial / collided-sequence / long-table-name (4), `array.test.ts` `schema dump with shorthand` (1), `bit-string.test.ts` `bit string` (1) | dumper doesn't emit the shorthand DSL (`t.serial`/`t.bigserial`, `t.bitVarying`, array shorthand) — emits the raw `// These are extensions…` fallback instead. All fail **standalone**. | Epic 3.3-U `emitTable`/column-spec family — emit the shorthand for serial/bigserial/bit-varying/array column types. |
+| #       | Bucket                            | Files / tests                                                           | Root cause                                                                 | Fix                                                                                                                                                |
+| ------- | --------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~P-9~~ | ~~schema-dumper: type shorthand~~ | ~~`serial.test.ts` (4), `array.test.ts` (1), `bit-string.test.ts` (1)~~ | ~~dumper didn't emit shorthand DSL for serial/bigserial/bitVarying/array~~ | Resolved: `isDefaultPrimaryKey` widened to include `"serial"`; `DecimalType.typeCastForSchema` → `String(value)`; `RUN_ADAPTER_DIRS` gate on main. |
 
 ### MySQL — 3 failed (mysql:8)
 
@@ -111,27 +111,17 @@ against current `main` before scoping it (the set drifts as fixes land).
 
 ## 4. Remaining steps
 
-1. **P-9** — PG schema-dump type shorthand (Epic 3.3-U family).
+1. ~~**P-9**~~ — resolved.
 2. **M-1a** — changeColumn drops collation on type change (~30–50 LOC).
 3. **M-1b** — `isCaseSensitive()` + uniqueness LOWER/BINARY wiring (~30–50 LOC).
 4. **Wire the lane in** (~40 LOC) — add the adapter-dir step to `postgres-tests`
-   / `mysql-tests` (relocate from PR #2863's prototype jobs). Open decision:
-   land it **non-blocking** (`continue-on-error`) first for early signal, or
-   hold until P-9 + M-1a + M-1b are green and turn it on as a hard gate in one
-   PR. Recommend non-blocking once PG is green (P-9), so PG regressions are
-   caught while M-1 lands.
+   / `mysql-tests` (relocate from PR #2863's prototype jobs). The `RUN_ADAPTER_DIRS`
+   gate is now on `main`. Recommend non-blocking (`continue-on-error`) for PG now
+   (P-9 green), hard gate once M-1a + M-1b land.
 
 ---
 
 ## 5. Local verification recipe
-
-> **Prerequisite:** the `RUN_ADAPTER_DIRS` env gate currently lives **only** on
-> the exploratory branch `tc100-i5-test-compare-100-phase-1-story` — it is not on
-> `main` yet, where the var is silently ignored and `ADAPTER_SPECIFIC_EXCLUDE`
-> keeps the adapter dirs out of the run (the opposite of what the recipe below
-> intends). Check that branch out first, or temporarily delete the relevant
-> entries from `ADAPTER_SPECIFIC_EXCLUDE` in `vitest.config.ts`. Productionizing
-> the gate is step 4 in §4.
 
 No per-worktree DB is auto-created. Spin one up, set `RUN_ADAPTER_DIRS=1`, and
 target the dirs:
