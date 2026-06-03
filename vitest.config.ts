@@ -27,12 +27,11 @@ const SHARED_EXCLUDE = [
 //   - cross-file isolation: concentrating the PG adapter files under AR_DB_FORKS
 //     parallel forks exhausts the per-worker advisory-lock pool and leaks
 //     search_path / schema_cache across files (the plan's §4 prerequisite).
-//   - pre-existing bucket failures: P-9 PG schema-dump shorthands; M-1/M-2/M-3
-//     MySQL dialect (collation, warnings, temp-table DDL).
+//   - pre-existing bucket failures: M-1a/M-1b MySQL dialect (collation, case-sensitivity).
 // Enabling them is Story I-5: a dedicated TEST_ADAPTER step (own process) plus
 // the §4/§5 fixes — see docs/activerecord/adapter-test-ci-coverage-plan.md.
-// Remaining MySQL blockers: M-1a (addColumn charset propagation) + M-1b
-// (isCaseSensitive / LOWER / BINARY uniqueness path). M-2/M-3/M-4 resolved.
+// Remaining MySQL blockers: M-1a (changeColumn collation) + M-1b
+// (isCaseSensitive / LOWER / BINARY uniqueness path). M-2/M-3/M-4/P-9 resolved.
 const RUN_ADAPTER_DIRS = process.env.RUN_ADAPTER_DIRS === "1";
 const ADAPTER_SPECIFIC_EXCLUDE = RUN_ADAPTER_DIRS
   ? []

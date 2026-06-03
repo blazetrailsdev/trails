@@ -119,13 +119,7 @@ against current `main` before scoping it (the set drifts as fixes land).
 
 ## 5. Local verification recipe
 
-> **Prerequisite:** the `RUN_ADAPTER_DIRS` env gate currently lives **only** on
-> the exploratory branch `tc100-i5-test-compare-100-phase-1-story` — it is not on
-> `main` yet, where the var is silently ignored and `ADAPTER_SPECIFIC_EXCLUDE`
-> keeps the adapter dirs out of the run (the opposite of what the recipe below
-> intends). Check that branch out first, or temporarily delete the relevant
-> entries from `ADAPTER_SPECIFIC_EXCLUDE` in `vitest.config.ts`. Productionizing
-> the gate is step 4 in §4.
+`RUN_ADAPTER_DIRS=1` is live on `main` (added in PR D). No branch-switching needed.
 
 No per-worktree DB is auto-created. Spin one up, set `RUN_ADAPTER_DIRS=1`, and
 target the dirs:
