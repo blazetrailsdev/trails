@@ -174,15 +174,25 @@ jobs:
           else
             echo "Changed files:"
             echo "$files"
-            # Prettier only formats files that still exist, so exclude
-            # deletions (--diff-filter=ACMR keeps added/copied/modified/
-            # renamed). Emit as a multiline output for the Prettier job.
-            pfiles=$(git diff --name-only --diff-filter=ACMR "$base"..."$head" 2>/dev/null || true)
-            {
-              echo "prettier_files<<__PRETTIER_EOF__"
-              echo "$pfiles"
-              echo "__PRETTIER_EOF__"
-            } >> "$GITHUB_OUTPUT"
+            # Prettier file list for the Prettier job. A change to Prettier's
+            # config or its version pin reformats the whole tree, so fall back
+            # to `__ALL__` (check everything) in that case — there is no other
+            # full-tree check to catch the resulting drift. Otherwise emit the
+            # changed files, excluding deletions (--diff-filter=ACMR keeps
+            # added/copied/modified/renamed) since Prettier can't format a path
+            # that no longer exists. If that diff somehow fails, fall back to
+            # `__ALL__` rather than silently skipping the check.
+            if echo "$files" | grep -qE '^(\.prettierrc\.json|\.prettierignore|package\.json)$'; then
+              echo "prettier_files=__ALL__" >> "$GITHUB_OUTPUT"
+            elif pfiles=$(git diff --name-only --diff-filter=ACMR "$base"..."$head" 2>/dev/null); then
+              {
+                echo "prettier_files<<__PRETTIER_EOF__"
+                echo "$pfiles"
+                echo "__PRETTIER_EOF__"
+              } >> "$GITHUB_OUTPUT"
+            else
+              echo "prettier_files=__ALL__" >> "$GITHUB_OUTPUT"
+            fi
             # docs_only: any line NOT under `docs/`, `examples/`, and not the
             # top-level `README.md` flips the switch. README is markdown-only
             # and only ever runs through prettier; `examples/` are standalone
