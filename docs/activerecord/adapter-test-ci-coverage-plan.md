@@ -112,7 +112,7 @@ against current `main` before scoping it (the set drifts as fixes land).
 ## 4. Remaining steps
 
 1. **P-9** — PG schema-dump type shorthand (Epic 3.3-U family).
-2. **M-1a** — addColumn/changeColumn charset propagation (~30–50 LOC).
+2. **M-1a** — changeColumn drops collation on type change (~30–50 LOC).
 3. **M-1b** — `isCaseSensitive()` + uniqueness LOWER/BINARY wiring (~30–50 LOC).
 4. **Wire the lane in** (~40 LOC) — add the adapter-dir step to `postgres-tests`
    / `mysql-tests` (relocate from PR #2863's prototype jobs). Open decision:
@@ -142,7 +142,6 @@ docker run -d --name <slug>-pg -e POSTGRES_DB=rails_js_test \
   -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -p <port>:5432 postgres:17
 RUN_ADAPTER_DIRS=1 PG_TEST_URL="postgres://postgres:postgres@localhost:<port>/rails_js_test" \
   pnpm vitest run packages/activerecord/src/adapters/postgresql \
-  packages/activerecord/src/connection-adapters/postgresql \
   packages/activerecord/src/tasks/postgresql-database-tasks.test.ts
 
 # MySQL 8 (matches CI; docker-compose uses the same image)
