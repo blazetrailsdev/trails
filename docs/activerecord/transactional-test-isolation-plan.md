@@ -13,7 +13,7 @@ Wiring the adapter dirs into the shared `pnpm vitest run packages/activerecord/`
 invocation (PR #2918) failed on 3 PG tests in `adapters/postgresql/schema.test.ts`:
 
 - `data source exists when not on schema search path` / `without schema search
-  path` — set `search_path` to `public`, expect unqualified `things` invisible;
+path` — set `search_path` to `public`, expect unqualified `things` invisible;
   got **visible**.
 - `dump indexes … multiple schemas in search path` — expected 5 indexes, got `[]`.
 
