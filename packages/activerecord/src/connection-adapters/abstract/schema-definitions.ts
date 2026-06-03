@@ -1188,6 +1188,32 @@ export class TableDefinition {
         parts[lastIdx] = parts[lastIdx] + "[]";
       }
 
+      // Emit GENERATED ALWAYS AS (...) STORED for PG generated columns.
+      // Must come after the type (incl. array []) but before NOT NULL / DEFAULT.
+      // Mirrors PostgreSQL::SchemaCreation#add_column_options! (as: / stored: branch).
+      // PgTableDefinition.newColumnDefinition resolves "virtual" → real type before toSql()
+      // runs, so options.as may be set on any column type — not just type:"virtual".
+      const asExpr = (col.options as Record<string, unknown>)["as"] as string | undefined;
+      if (asExpr != null) {
+        if (this._adapterName !== "postgres") {
+          // MySQL and SQLite3 support generated columns via addColumn/changeTable
+          // (their SchemaCreation#add_column_options! branches are already wired).
+          // createTable → toSql() is not yet wired for those adapters.
+          throw new Error(
+            `Generated columns (as: ...) in createTable are not yet implemented for the ` +
+              `${this._adapterName} adapter; use changeTable or addColumn instead.`,
+          );
+        }
+        const isStored = (col.options as Record<string, unknown>)["stored"] as boolean | undefined;
+        if (!isStored) {
+          throw new ArgumentError(
+            `PostgreSQL currently does not support VIRTUAL (not persisted) generated columns.\n` +
+              `Specify 'stored: true' option for '${col.name}'`,
+          );
+        }
+        parts.push(`GENERATED ALWAYS AS (${asExpr}) STORED`);
+      }
+
       if (col.options.null === false && col.type !== "primary_key") {
         parts.push("NOT NULL");
       }
