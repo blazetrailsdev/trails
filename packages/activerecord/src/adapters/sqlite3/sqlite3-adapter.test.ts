@@ -1,7 +1,8 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/sqlite3_adapter_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type {
@@ -23,7 +24,7 @@ afterEach(async () => {
   Notifications.unsubscribeAll();
 });
 
-describe("SQLite3AdapterTest", () => {
+describeIfSqlite("SQLite3AdapterTest", () => {
   beforeEach(() => {
     adapter.exec(
       `CREATE TABLE "items" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT, "price" INTEGER, "active" INTEGER DEFAULT 1)`,

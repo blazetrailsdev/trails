@@ -1,7 +1,8 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/quoting_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
 let adapter: SQLite3Adapter;
@@ -15,7 +16,7 @@ afterEach(() => {
 });
 
 // -- Rails test class: quoting_test.rb --
-describe("SQLite3QuotingTest", () => {
+describeIfSqlite("SQLite3QuotingTest", () => {
   it("quote string", async () => {
     adapter.exec(`CREATE TABLE "quote_test" ("id" INTEGER PRIMARY KEY, "val" TEXT)`);
     await adapter.executeMutation(`INSERT INTO "quote_test" ("val") VALUES ('it''s')`);

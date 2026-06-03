@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 import { BigIntegerType, IntegerType, BooleanType } from "@blazetrails/activemodel";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
@@ -23,7 +24,7 @@ afterEach(() => {
   adapter.close();
 });
 
-describe("SQLite3 bigint round-trip", () => {
+describeIfSqlite("SQLite3 bigint round-trip", () => {
   const BIG = 2n ** 62n; // 4611686018427387904 — well above Number.MAX_SAFE_INTEGER
 
   it("returns bigint for BIGINT column", async () => {

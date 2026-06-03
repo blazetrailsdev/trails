@@ -1,7 +1,8 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/json_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { Base } from "../../index.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
@@ -16,7 +17,7 @@ afterEach(() => {
   adapter.close();
 });
 
-describe("SQLite3JSONTest", () => {
+describeIfSqlite("SQLite3JSONTest", () => {
   it("json string cast round-trip", async () => {
     await defineSchema(adapter, {
       json_string_cast: { data: "json" },

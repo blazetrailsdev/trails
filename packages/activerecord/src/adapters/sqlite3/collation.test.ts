@@ -1,7 +1,8 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/collation_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
@@ -22,7 +23,7 @@ afterEach(() => {
   adapter.close();
 });
 
-describe("SQLite3CollationTest", () => {
+describeIfSqlite("SQLite3CollationTest", () => {
   it("string column with collation", async () => {
     const columns = await adapter.columns("collation_table_sqlite3");
 

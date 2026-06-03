@@ -1,7 +1,8 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { it, expect, afterEach } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
-describe("SQLite3StatementPoolTest", () => {
+describeIfSqlite("SQLite3StatementPoolTest", () => {
   // Track every adapter created so a failing assertion can't leak an
   // open SQLite handle into later tests.
   const openAdapters: SQLite3Adapter[] = [];

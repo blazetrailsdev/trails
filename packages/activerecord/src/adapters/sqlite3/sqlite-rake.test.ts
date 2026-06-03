@@ -1,6 +1,7 @@
-import { describe, it } from "vitest";
+import { it } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 
-describe("SqliteDBCreateTest", () => {
+describeIfSqlite("SqliteDBCreateTest", () => {
   it.skip("db checks database exists", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — rake
   });
@@ -21,7 +22,7 @@ describe("SqliteDBCreateTest", () => {
   });
 });
 
-describe("SqliteDBDropTest", () => {
+describeIfSqlite("SqliteDBDropTest", () => {
   it.skip("checks db dir is absolute", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — rake
   });
@@ -39,19 +40,19 @@ describe("SqliteDBDropTest", () => {
   });
 });
 
-describe("SqliteDBCharsetTest", () => {
+describeIfSqlite("SqliteDBCharsetTest", () => {
   it.skip("db retrieves charset", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — rake
   });
 });
 
-describe("SqliteDBCollationTest", () => {
+describeIfSqlite("SqliteDBCollationTest", () => {
   it.skip("db retrieves collation", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — rake
   });
 });
 
-describe("SqliteStructureDumpTest", () => {
+describeIfSqlite("SqliteStructureDumpTest", () => {
   it.skip("structure dump", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — rake
   });
@@ -63,7 +64,7 @@ describe("SqliteStructureDumpTest", () => {
   });
 });
 
-describe("SqliteStructureLoadTest", () => {
+describeIfSqlite("SqliteStructureLoadTest", () => {
   it.skip("structure load", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — rake
   });
