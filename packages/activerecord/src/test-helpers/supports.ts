@@ -52,10 +52,11 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   exclusion_constraints: ["postgres"],
   unique_constraints: ["postgres"],
   // `supports_expression_index?`: `!mariadb? && database_version >= "8.0.13"`.
-  // MySQL 8 is not MariaDB and is ≥ 8.0.13 → true. PostgreSQL always true.
-  // SQLite true (≥ 3.9). (postgresql_adapter.rb:208, sqlite3_adapter.rb:155,
-  // abstract_mysql_adapter.rb:104)
-  expression_index: ALL,
+  // MySQL 8 qualifies at the server level, but our schema-dump DDL generator
+  // does not yet emit the correct MySQL 8 expression-index syntax (P-9 family).
+  // Unlock "mysql" here once the dump path is fixed. (postgresql_adapter.rb:208,
+  // sqlite3_adapter.rb:155, abstract_mysql_adapter.rb:104)
+  expression_index: ["postgres", "sqlite"],
 };
 
 /** Does the active backend support Rails' `supports_<feature>?` capability? */

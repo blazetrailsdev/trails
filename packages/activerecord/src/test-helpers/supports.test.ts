@@ -10,13 +10,14 @@ describe("adapterSupports", () => {
     expect(adapterSupports("foreign_keys")).toBe(true);
     // json: `!mariadb? && >= 5.7.8` — MySQL 8 is not MariaDB → true on all CI lanes.
     expect(adapterSupports("json")).toBe(true);
-    // expression_index: `!mariadb? && >= 8.0.13` — MySQL 8 qualifies → true on all CI lanes.
-    expect(adapterSupports("expression_index")).toBe(true);
   });
 
   it("reflects the active adapter for backend-specific capabilities", () => {
     expect(adapterSupports("comments")).toBe(adapterType !== "sqlite");
     expect(adapterSupports("insert_conflict_target")).toBe(adapterType !== "mysql");
+    // expression_index: PG + SQLite; MySQL 8 qualifies at the server level but our
+    // schema-dump DDL generator doesn't yet emit correct MySQL 8 syntax (P-9 family).
+    expect(adapterSupports("expression_index")).toBe(adapterType !== "mysql");
     // advisory_locks: PG + MySQL, not SQLite (mirrors the old skipIf(=== sqlite)).
     expect(adapterSupports("advisory_locks")).toBe(adapterType !== "sqlite");
     // exclusion/unique constraints: PG only (mirrors skipIf(!== postgres)).

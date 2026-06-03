@@ -1014,7 +1014,9 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
     ).toThrow("Dangerous query method");
   });
 
-  it("allows safe column name string for returning", () => {
+  // MySQL 8 doesn't support INSERT...RETURNING; the constructor throws immediately.
+  // MariaDB 11 supported it, so the gate is MySQL-specific.
+  it.skipIf(adapterType === "mysql")("allows safe column name string for returning", () => {
     class Book extends Base {
       static {
         this._tableName = "books";
