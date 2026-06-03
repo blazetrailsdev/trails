@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { snakeToCamel, rubyMethodToTs, rubyFileToTs } from "./conventions.js";
+import {
+  snakeToCamel,
+  rubyMethodToTs,
+  rubyFileToTs,
+  SKIP,
+  SKIP_GROUPS,
+  ALREADY_PREDICATE_PREFIXES,
+  explainConventions,
+} from "./conventions.js";
 
 describe("snakeToCamel", () => {
   it("converts standard snake_case to camelCase", () => {
@@ -156,5 +164,57 @@ describe("rubyFileToTs", () => {
     // The alias is global, not per-package — any framework's railties/
     // subdir maps to trailties/ uniformly.
     expect(rubyFileToTs("railties/some_file.rb", "actiondispatch")).toBe("trailties/some-file.ts");
+  });
+});
+
+describe("SKIP_GROUPS", () => {
+  it("has no duplicate names across groups", () => {
+    const all = SKIP_GROUPS.flatMap((g) => g.names);
+    expect(all.length).toBe(new Set(all).size);
+  });
+
+  it("requires a non-empty reason for every group", () => {
+    for (const g of SKIP_GROUPS) {
+      expect(g.reason.trim().length).toBeGreaterThan(0);
+      expect(g.names.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("makes rubyMethodToTs skip every grouped name", () => {
+    for (const name of SKIP) {
+      expect(rubyMethodToTs(name)).toBeNull();
+    }
+  });
+});
+
+describe("ALREADY_PREDICATE_PREFIXES", () => {
+  it("drives the matcher: every prefix keeps the camel form + is* fallback", () => {
+    for (const prefix of ALREADY_PREDICATE_PREFIXES) {
+      // `<prefix>_thing?` → [camel, isPrefixed], camel first.
+      const camel = snakeToCamel(`${prefix}_thing`);
+      const isPrefixed = "is" + camel.replace(/^./, (c) => c.toUpperCase());
+      expect(rubyMethodToTs(`${prefix}_thing?`)).toEqual([camel, isPrefixed]);
+    }
+  });
+
+  it("is enumerated in full by the generated doc (not a hand-picked subset)", () => {
+    const md = explainConventions();
+    for (const prefix of ALREADY_PREDICATE_PREFIXES) {
+      expect(md).toContain(`\`${prefix}_*?\``);
+    }
+  });
+});
+
+describe("explainConventions", () => {
+  it("renders worked examples from the live rules and lists every skip reason", () => {
+    const md = explainConventions();
+    expect(md).toContain("`valid?` → `isValid` or `valid`");
+    expect(md).toContain("`save!` → `saveBang`");
+    // setter renders as a bare symbol name, never `tableName()`
+    expect(md).toContain("`table_name=` → `tableName`");
+    expect(md).not.toContain("`tableName()`");
+    for (const g of SKIP_GROUPS) {
+      expect(md).toContain(g.reason);
+    }
   });
 });

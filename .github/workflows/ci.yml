@@ -174,9 +174,17 @@ jobs:
             # apps not built, type-checked, or tested by any CI job (the root
             # `tsc --build` doesn't reference them and they have no `test`
             # script) — so neither needs the full matrix.
+            #
+            # Exception: docs/ruby-ts-conventions.md is GENERATED from
+            # conventions.ts and guarded by `api:conventions --check` in the
+            # rails-comparison job. Treat a change to it as non-docs-only so a
+            # hand-edit (ignoring the file's do-not-edit banner) still runs the
+            # drift check instead of short-circuiting to a green docs-only run.
             if [ -z "$files" ]; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
             elif echo "$files" | grep -qvE '^docs/|^examples/|^README\.md$|^CLAUDE\.md$'; then
+              echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            elif echo "$files" | grep -qxF 'docs/ruby-ts-conventions.md'; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
             else
               echo "docs_only=true" >> "$GITHUB_OUTPUT"
@@ -705,6 +713,11 @@ jobs:
         run: pnpm exec tsx scripts/api-compare/extract-ts-api.ts && pnpm exec tsx scripts/api-compare/compare.ts
       - name: API comparison (privates)
         run: pnpm exec tsx scripts/api-compare/compare.ts --privates
+      - name: Conventions doc up to date
+        # docs/ruby-ts-conventions.md is generated from explainConventions()
+        # in conventions.ts; fail if it drifts so the agent-facing doc can't
+        # go stale. Regenerate with `pnpm api:conventions`.
+        run: pnpm exec tsx scripts/api-compare/conventions-doc.ts --check
       - name: Dependency lint
         run: pnpm exec tsx scripts/api-compare/lint-deps.ts
       - name: Rails-private JSDoc lint
