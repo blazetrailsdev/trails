@@ -23,24 +23,26 @@ const SHARED_EXCLUDE = [
 //
 // The live-DB `adapters/<db>/**` suites stay excluded from the shared
 // `pnpm vitest run packages/activerecord/` invocation. They cannot run green in
-// that invocation yet — verified locally against postgres:17 / mysql:8:
-//   - cross-file isolation: concentrating the PG adapter files under AR_DB_FORKS
-//     parallel forks exhausts the per-worker advisory-lock pool and leaks
-//     search_path / schema_cache across files (the plan's §4 prerequisite).
-//   - pre-existing bucket failures: P-9 PG schema-dump shorthands; M-1/M-2/M-3
-//     MySQL dialect (collation, warnings, temp-table DDL).
-// Enabling them is Story I-5: a dedicated TEST_ADAPTER step (own process) plus
-// the §4/§5 fixes — see docs/activerecord/adapter-test-ci-coverage-plan.md.
+// that invocation yet — cross-file isolation: concentrating the PG adapter files
+// under AR_DB_FORKS parallel forks exhausts the per-worker advisory-lock pool
+// and leaks search_path / schema_cache across files (the plan's §4 prerequisite).
 // Remaining MySQL blockers: M-1a (addColumn charset propagation) + M-1b
 // (isCaseSensitive / LOWER / BINARY uniqueness path). M-2/M-3/M-4 resolved.
-const ADAPTER_SPECIFIC_EXCLUDE = [
-  "packages/activerecord/src/adapters/postgresql/**",
-  "packages/activerecord/src/tasks/postgresql-*.test.ts",
-  "packages/activerecord/src/adapters/abstract-mysql-adapter/**",
-  "packages/activerecord/src/adapters/mysql2/**",
-  "packages/activerecord/src/connection-adapters/mysql2-*.test.ts",
-  "packages/activerecord/src/tasks/mysql-*.test.ts",
-];
+// P-9 PG schema-dump shorthands resolved (serial/bigserial/bitVarying/array).
+//
+// Set RUN_ADAPTER_DIRS=1 to drop this exclude for a dedicated adapter-dirs run
+// (see docs/activerecord/adapter-test-ci-coverage-plan.md §5).
+const ADAPTER_SPECIFIC_EXCLUDE =
+  process.env.RUN_ADAPTER_DIRS === "1"
+    ? []
+    : [
+        "packages/activerecord/src/adapters/postgresql/**",
+        "packages/activerecord/src/tasks/postgresql-*.test.ts",
+        "packages/activerecord/src/adapters/abstract-mysql-adapter/**",
+        "packages/activerecord/src/adapters/mysql2/**",
+        "packages/activerecord/src/connection-adapters/mysql2-*.test.ts",
+        "packages/activerecord/src/tasks/mysql-*.test.ts",
+      ];
 
 const _parsedForks = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "", 10);
 const TEST_FORKS = Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : 6;
