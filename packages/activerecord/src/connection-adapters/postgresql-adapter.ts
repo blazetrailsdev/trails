@@ -382,9 +382,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             // Money type so result values from raw expressions
             // (SUM(id * wealth), pluck(Arel.sql)) come back as the bare number
             // string — mirrors Rails' money type-map coder.
-            // OID 20 = int8 (bigint/bigserial). The pg driver returns int8 as
-            // strings by default to avoid precision loss. Parse to number to
-            // match Rails' Integer cast — mirrors pg_type.rb OID::Integer.
+            // OID 20 = int8. The pg driver returns int8 as strings by default;
+            // parse to number so all paths (raw queries, RETURNING clauses,
+            // pluck) are consistent. Mirrors Rails add_pg_decoders (int8 →
+            // PG::TextDecoder::Integer). Values > 2^53 lose precision, same
+            // tradeoff as Rails on any 64-bit finite-precision runtime.
             if (oid === OID_INT8 && format !== "binary") return (v: string) => parseInt(v, 10);
             if (oid === OID_MONEY && format !== "binary")
               return (v: unknown) => (typeof v === "string" ? MoneyDecoder.decode(v) : v);
@@ -487,8 +489,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           // deserialized decimal string via the Money type so SUM(id * wealth)
           // / pluck(Arel.sql(...)) come back as the bare number string —
           // mirrors Rails' money type-map coder.
-          // OID 20 = int8 (bigint/bigserial). Parse to number — see the
-          // matching branch in the connectionString constructor above.
           if (oid === OID_INT8 && format !== "binary") {
             const fallback = (v: string) => parseInt(v, 10);
             return userGetTypeParser?.(oid, format) ?? fallback;

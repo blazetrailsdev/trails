@@ -35,9 +35,10 @@ describe("IntegerTest", () => {
   });
 
   it("casting nan and infinity", () => {
+    // Rails: Float::INFINITY.to_i raises FloatDomainError → rescued as nil.
     expect(type.cast(NaN)).toBeNull();
-    expect(type.cast(Infinity)).toBe(Infinity);
-    expect(type.cast(-Infinity)).toBe(-Infinity);
+    expect(type.cast(Infinity)).toBeNull();
+    expect(type.cast(-Infinity)).toBeNull();
   });
 
   it("casting booleans for database", () => {

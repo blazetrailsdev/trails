@@ -94,7 +94,7 @@ export class IntegerType extends NumericValueType {
   /** @internal Rails-private helper. */
   protected castValue(value: unknown): number | null {
     if (typeof value === "number") {
-      if (isNaN(value)) return null;
+      if (!isFinite(value)) return null;
       return Math.trunc(value);
     }
     if (typeof value === "bigint") return Number(value);
