@@ -14,41 +14,30 @@ const SHARED_EXCLUDE = [
   "packages/*/dx-tests/**",
 ];
 
-// Adapter-specific test files must not load on a mismatched TEST_ADAPTER run.
-// Shared tests that route through `createTestAdapter` + `SchemaAdapter` will
-// drop tables that adapter-specific files (which construct their own adapter
-// directly) assume stick around for the duration of a describe. See
-// docs/activerecord-index.md (TEST_ADAPTER excludes shipped #1630).
-const TEST_ADAPTER = process.env.TEST_ADAPTER ?? "sqlite3";
+// Gate-based design (replaces the old TEST_ADAPTER-keyed exclude). The pure-unit
+// `connection-adapters/<db>/**` subdirs (OID types, quoting helpers,
+// schema-creation stubs) are NOT excluded here, so they now load on every CI job
+// — previously the TEST_ADAPTER default of sqlite3 dropped the PG/MySQL ones in
+// all jobs, so they never ran. They pass on any backend; live-DB cases inside
+// them are wrapped in `describeIfPg` / `describeIfMysql` / `describeIfSqlite`.
+//
+// The live-DB `adapters/<db>/**` suites stay excluded from the shared
+// `pnpm vitest run packages/activerecord/` invocation. They cannot run green in
+// that invocation yet — verified locally against postgres:17 / mysql:8:
+//   - cross-file isolation: concentrating the PG adapter files under AR_DB_FORKS
+//     parallel forks exhausts the per-worker advisory-lock pool and leaks
+//     search_path / schema_cache across files (the plan's §4 prerequisite).
+//   - pre-existing bucket failures: P-9 PG schema-dump shorthands; M-1/M-2/M-3
+//     MySQL dialect (collation, warnings, temp-table DDL).
+// Enabling them is Story I-5: a dedicated TEST_ADAPTER step (own process) plus
+// the §4/§5 fixes — see docs/activerecord/adapter-test-ci-coverage-plan.md.
 const ADAPTER_SPECIFIC_EXCLUDE = [
-  ...(TEST_ADAPTER !== "postgresql"
-    ? [
-        "packages/activerecord/src/adapters/postgresql/**",
-        "packages/activerecord/src/connection-adapters/postgresql/**",
-        "packages/activerecord/src/connection-adapters/postgresql-*.test.ts",
-        "packages/activerecord/src/tasks/postgresql-*.test.ts",
-      ]
-    : []),
-  ...(TEST_ADAPTER !== "mysql2"
-    ? [
-        "packages/activerecord/src/adapters/abstract-mysql-adapter/**",
-        "packages/activerecord/src/adapters/mysql2/**",
-        "packages/activerecord/src/connection-adapters/mysql/**",
-        "packages/activerecord/src/connection-adapters/mysql2-*.test.ts",
-        "packages/activerecord/src/connection-adapters/abstract-mysql-adapter.test.ts",
-        "packages/activerecord/src/connection-adapters/mysql-*.test.ts",
-        "packages/activerecord/src/tasks/mysql-*.test.ts",
-      ]
-    : []),
-  ...(TEST_ADAPTER !== "sqlite3"
-    ? [
-        "packages/activerecord/src/adapters/sqlite3/**",
-        "packages/activerecord/src/adapters/sqlite3-*.test.ts",
-        "packages/activerecord/src/connection-adapters/sqlite3/**",
-        "packages/activerecord/src/connection-adapters/sqlite3-*.test.ts",
-        "packages/activerecord/src/tasks/sqlite-*.test.ts",
-      ]
-    : []),
+  "packages/activerecord/src/adapters/postgresql/**",
+  "packages/activerecord/src/tasks/postgresql-*.test.ts",
+  "packages/activerecord/src/adapters/abstract-mysql-adapter/**",
+  "packages/activerecord/src/adapters/mysql2/**",
+  "packages/activerecord/src/connection-adapters/mysql2-*.test.ts",
+  "packages/activerecord/src/tasks/mysql-*.test.ts",
 ];
 
 const _parsedForks = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "", 10);
@@ -205,9 +194,9 @@ export default defineConfig({
           // time than the rare hidden flake costs. Revisit if a real
           // regression slips through.
           retry: process.env.PG_TEST_URL || process.env.MYSQL_TEST_URL ? 2 : 0,
-          // Large-schema beforeAll(defineSchema(...)) calls on MariaDB issue
+          // Large-schema beforeAll(defineSchema(...)) calls on MySQL issue
           // hundreds of CREATE TABLE statements (e.g. has-many-associations.test.ts
-          // creates ~354 tables in one beforeAll). At ~30ms per CREATE on MariaDB
+          // creates ~354 tables in one beforeAll). At ~30ms per CREATE on MySQL
           // that's ~10.7s, just over the 10s vitest default and a frequent CI
           // flake source. Bump to 30s to absorb DDL load + CI contention. See
           // docs/activerecord/phase-f-ddl-tracking-removal.md for context on why

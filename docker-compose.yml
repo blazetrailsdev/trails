@@ -13,15 +13,15 @@ services:
       timeout: 5s
       retries: 10
 
-  mariadb:
-    image: mariadb:11
+  mysql:
+    image: mysql:8
     ports:
       - "${MYSQL_PORT:-13306}:3306"
     environment:
-      MARIADB_DATABASE: rails_js_test
-      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: rails_js_test
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--silent"]
       interval: 2s
       timeout: 5s
       retries: 10

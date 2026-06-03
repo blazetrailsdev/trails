@@ -44,11 +44,11 @@ keyed on `TEST_ADAPTER`) **excludes the `adapters/postgresql/**`and MySQL dirs i
 every job.** What the PG/MySQL jobs actually do is re-point the **core** suite at
 a live backend via`PG_TEST_URL`/`MYSQL_TEST_URL`:
 
-| CI job           | Image / env                                     | Runs (file set)                                                          | Backend  |
-| ---------------- | ----------------------------------------------- | ------------------------------------------------------------------------ | -------- |
-| `sqlite-tests`   | default                                         | core + `adapters/sqlite3/**`                                             | SQLite   |
-| `postgres-tests` | `postgres:17`, `PG_TEST_URL`, `AR_DB_FORKS=4`   | **same core set** (PG dirs excluded); runs `describeIfPg` branches       | Postgres |
-| `mariadb-tests`  | `mariadb:11`, `MYSQL_TEST_URL`, `AR_DB_FORKS=4` | **same core set** (MySQL dirs excluded); runs `describeIfMysql` branches | MariaDB  |
+| CI job           | Image / env                                   | Runs (file set)                                                          | Backend  |
+| ---------------- | --------------------------------------------- | ------------------------------------------------------------------------ | -------- |
+| `sqlite-tests`   | default                                       | core + `adapters/sqlite3/**`                                             | SQLite   |
+| `postgres-tests` | `postgres:17`, `PG_TEST_URL`, `AR_DB_FORKS=4` | **same core set** (PG dirs excluded); runs `describeIfPg` branches       | Postgres |
+| `mysql-tests`    | `mysql:8`, `MYSQL_TEST_URL`, `AR_DB_FORKS=4`  | **same core set** (MySQL dirs excluded); runs `describeIfMysql` branches | MySQL 8  |
 
 **Consequence — two distinct buckets:**
 
@@ -62,9 +62,9 @@ So the PG/MySQL **splits exist and are valuable** (they catch backend-specific
 behavior in core tests), but the **135 adapter-_dir_ skips are still not run by
 CI** until a dedicated `TEST_ADAPTER=postgresql`/`mysql2` job is added — see Story
 I-5. Locally, run them with
-`TEST_ADAPTER=postgresql PG_TEST_URL=… pnpm vitest run <file>` (MariaDB locally is
-port 13306; CI uses 3306). Watch env-specific divergences (e.g. db-default
-collation `utf8mb4_bin` locally vs CI's fresh `mariadb:11`).
+`TEST_ADAPTER=postgresql PG_TEST_URL=… pnpm vitest run <file>` (MySQL locally is
+port 13306 via `docker-compose`; CI uses 3306). CI now runs `mysql:8` (changed from
+`mariadb:11` in #2897); docker-compose also updated to `mysql:8`.
 
 ## 2. Strategy & ordering principles
 
@@ -177,11 +177,12 @@ cast path remains).
 
 ### Story I-5 — add a `TEST_ADAPTER=postgresql`/`mysql2` CI job `[infra]` ~40 LOC ci.yml · dep: none
 
-**Source-verified gap.** The `postgres-tests`/`mariadb-tests` jobs run the _core_
-suite against a live backend but **exclude** `adapters/<db>/**` because
-`vitest.config.ts` keys `ADAPTER_SPECIFIC_EXCLUDE` on `TEST_ADAPTER`, which no CI
-job sets. So the 135 adapter-dir skips (and their un-skips) are never exercised
-in CI.
+**Source-verified gap.** The `postgres-tests`/`mysql-tests` jobs run the _core_
+suite against a live backend. The `ADAPTER_SPECIFIC_EXCLUDE` block was dropped in
+#2897 (adapter-CI PR A), so adapter-dir files now load on every run — pure unit
+tests pass everywhere, DB-dependent ones are gated by `describeIfPg`/`describeIfMysql`.
+The dedicated `TEST_ADAPTER` step (wiring the adapter dirs as a second vitest
+invocation) is the remaining work; see `adapter-test-ci-coverage-plan.md`.
 
 - The adapter dirs are excluded from the _shared_ run on purpose (the comment at
   `vitest.config.ts:17` warns adapter-specific files construct their own adapter
@@ -362,7 +363,7 @@ Items surfaced from post-merge findings of shipped PRs. Not existing stories —
 ## Appendix A — full per-file gap table (155 files, 2026-06-02)
 
 `skip` = matched-but-skipped, `m` = missing. `CI` column: ✅ = **core/sqlite3**
-file, run by all three CI jobs (incl. against live PG/MariaDB via
+file, run by all three CI jobs (incl. against live PG/MySQL 8 via
 `describeIf*`); ❌ = **adapter-dir** file (`adapters/postgresql/**` or MySQL),
 **excluded from all current CI jobs** (no `TEST_ADAPTER` lane — see §1 / Story
 I-5), local-verify only. Dominant blocker tag shown; refresh per file.
@@ -556,16 +557,16 @@ I-5), local-verify only. Dominant blocker tag shown; refresh per file.
 Each phase's load-bearing claims were checked against the tree. Corrections
 already folded into the stories above:
 
-| Claim checked                                                       | Source                                                                    | Result                                                                                                                                                                                                                                                                                                                                                                                                |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **How CI exercises PG/MySQL**                                       | `ci.yml:466,487,527` + `vitest.config.ts:17-48`                           | ⚠️ **Two corrections.** (1) The 3 jobs DO exist and the PG/MariaDB ones run the **core** suite against a live backend (`PG_TEST_URL`/`MYSQL_TEST_URL`, exercising `describeIf*`). (2) But `TEST_ADAPTER` is never set in CI, so `ADAPTER_SPECIFIC_EXCLUDE` **drops `adapters/<db>/**`in every job** — the 135 adapter-dir skips are NOT CI-run today. → reframed Story I-5 (add a`TEST_ADAPTER` job). |
-| I-1 `columnSpec`/`formatColspecRaw` exist (U1 landed)               | `connection-adapters/abstract/schema-dumper.ts`, `mysql/schema-dumper.ts` | ✅ Confirmed; `AdapterSchemaSource` sqlType/type collapse confirmed (comment at `mysql/schema-dumper.ts:17`).                                                                                                                                                                                                                                                                                         |
-| I-2 `typeForAttribute` missing                                      | `enum.ts:78`, `table-metadata.ts:35`                                      | ⚠️ **Refined.** It exists & is used; gap is the where/predicate-builder cast path only.                                                                                                                                                                                                                                                                                                               |
-| I-3 `type/serialized.ts` unused; `serialize.ts` monkey-patches read | `type/serialized.ts`, `serialize.ts:105-109`                              | ✅ Confirmed read-path `readAttribute` override.                                                                                                                                                                                                                                                                                                                                                      |
-| I-4 pluck/calc don't cast                                           | `relation/calculations.ts:718,731`; `relation.ts:5406-5412`               | ⚠️ **Refined.** Cast helpers + private wrappers already exist (#917) but are **never called** from `pluck()`/`calculate()` — it's a wiring job (~40–100 LOC), not new code.                                                                                                                                                                                                                           |
-| H-3 permanent skips "already reclassified"                          | tight scan of counted-skip files                                          | ⚠️ **Corrected.** ~19 live permanent `it.skip` remain in counted files (YAML/Marshal/thread/fork); must be reclassified. (A loose grep hits ~190 across _unmapped_ files — noise, out of scope.)                                                                                                                                                                                                      |
-| Phase 4 `_namedInnerJoins` fixes outstanding                        | `relation/merger.ts` (0 refs), `query-methods.ts:126,895,2425`            | ✅ Confirmed still outstanding.                                                                                                                                                                                                                                                                                                                                                                       |
-| Phase 0 misplaced live in PG change-schema                          | `adapters/postgresql/change-schema.test.ts:158,174`                       | ✅ Confirmed.                                                                                                                                                                                                                                                                                                                                                                                         |
+| Claim checked                                                       | Source                                                                    | Result                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **How CI exercises PG/MySQL**                                       | `ci.yml` + `vitest.config.ts`                                             | Updated (#2897): `mariadb-tests` → `mysql-tests` (mysql:8); `ADAPTER_SPECIFIC_EXCLUDE` dropped. Adapter-dir files now load on every run; pure unit tests pass everywhere, DB-dependent ones use `describeIf*`. Dedicated `TEST_ADAPTER` step (adapter-dir second vitest invocation) is next — see Story I-5 / adapter-test-ci-coverage-plan.md. |
+| I-1 `columnSpec`/`formatColspecRaw` exist (U1 landed)               | `connection-adapters/abstract/schema-dumper.ts`, `mysql/schema-dumper.ts` | ✅ Confirmed; `AdapterSchemaSource` sqlType/type collapse confirmed (comment at `mysql/schema-dumper.ts:17`).                                                                                                                                                                                                                                   |
+| I-2 `typeForAttribute` missing                                      | `enum.ts:78`, `table-metadata.ts:35`                                      | ⚠️ **Refined.** It exists & is used; gap is the where/predicate-builder cast path only.                                                                                                                                                                                                                                                         |
+| I-3 `type/serialized.ts` unused; `serialize.ts` monkey-patches read | `type/serialized.ts`, `serialize.ts:105-109`                              | ✅ Confirmed read-path `readAttribute` override.                                                                                                                                                                                                                                                                                                |
+| I-4 pluck/calc don't cast                                           | `relation/calculations.ts:718,731`; `relation.ts:5406-5412`               | ⚠️ **Refined.** Cast helpers + private wrappers already exist (#917) but are **never called** from `pluck()`/`calculate()` — it's a wiring job (~40–100 LOC), not new code.                                                                                                                                                                     |
+| H-3 permanent skips "already reclassified"                          | tight scan of counted-skip files                                          | ⚠️ **Corrected.** ~19 live permanent `it.skip` remain in counted files (YAML/Marshal/thread/fork); must be reclassified. (A loose grep hits ~190 across _unmapped_ files — noise, out of scope.)                                                                                                                                                |
+| Phase 4 `_namedInnerJoins` fixes outstanding                        | `relation/merger.ts` (0 refs), `query-methods.ts:126,895,2425`            | ✅ Confirmed still outstanding.                                                                                                                                                                                                                                                                                                                 |
+| Phase 0 misplaced live in PG change-schema                          | `adapters/postgresql/change-schema.test.ts:158,174`                       | ✅ Confirmed.                                                                                                                                                                                                                                                                                                                                   |
 
 **Not yet source-verified (trust `workplan.md` / refresh before starting):** the
 per-cluster internals of Phase 2 (insert_all sub-clusters, migration-runner

@@ -94,11 +94,10 @@ trailing aggregation) only until the failures below are fixed; once green it is
 a hard gate like the rest of the job. **Do not turn the step on as a hard gate
 until §4 isolation + §5 bucket fixes land**, or it red-walls every merge.
 
-Decision still open for the owner (see §6): the `mariadb-tests` service is
-**MariaDB**, but the MySQL adapter tests encode **MySQL** defaults
-(collation, warning text, DDL). Either (a) make the tests dialect-aware, or
-(b) add a real `mysql:8` service for the adapter step. This choice gates the
-entire MySQL bucket.
+§6.1 **RESOLVED (PR #2897):** the `mariadb-tests` job has been replaced by
+`mysql-tests` using `mysql:8`. The core suite still runs against the live
+MySQL 8 backend (no `TEST_ADAPTER` step yet). The §6.1 adapter-step decision
+(dialect-aware vs. real `mysql:8`) was resolved in favour of `mysql:8`.
 
 ---
 
@@ -242,15 +241,15 @@ fixes that landed after the prototype). "iso" = was a §4 isolation artifact.
 2. ~~**P-1** databaseVersion~~ — **DONE** (resolved on `main`).
 3. ~~**M-5** Relation-not-loaded bootstrap~~ — **DONE** (#2879).
 4. ~~**P-7** change_table~~ — **DONE** (visitor already on `main`).
-5. **§6.1 decision**, then **M-1 / M-2 / M-3 / M-4** MySQL dialect cluster (all 6
-   remaining MariaDB failures).
+5. ~~**§6.1 decision**~~ — **DONE** (#2897: `mysql-tests` with `mysql:8`). Re-confirm
+   M-1..M-4 under real mysql:8 — many may dissolve.
 6. **P-9** schema-dump type shorthand (serial/array/bit-string — Epic 3.3-U family).
 7. ~~**P-8** network IPv4-mapped IPv6~~ — **DONE** (#2881).
 8. **P-3** virtual-column `createTable` generated-clause, **P-6** hstore store
    accessors, **P-9** schema-dump type shorthand.
-9. **Turn the step into a hard gate** inside `postgres-tests` / `mariadb-tests`
+9. **Turn the step into a hard gate** inside `postgres-tests` / `mysql-tests`
    (the ~40-LOC wiring; relocate from PR #2863's prototype jobs). Remaining
-   before this: PG **14** (P-3, P-6, P-9), MariaDB **6** (M-1..M-4).
+   before this: PG **14** (P-3, P-6, P-9), MySQL **≤6** (M-1..M-4, to re-confirm).
 
 ---
 
@@ -267,9 +266,9 @@ TEST_ADAPTER=postgresql PG_TEST_URL="postgres://postgres:postgres@localhost:<por
   packages/activerecord/src/connection-adapters/postgresql \
   packages/activerecord/src/tasks/postgresql-database-tasks.test.ts
 
-# MariaDB (note §6.1: real behavior may need mysql:8)
-docker run -d --name <slug>-my -e MARIADB_DATABASE=rails_js_test \
-  -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes -p <port>:3306 mariadb:11
+# MySQL 8 (matches CI; docker-compose uses the same image)
+docker run -d --name <slug>-my -e MYSQL_DATABASE=rails_js_test \
+  -e MYSQL_ALLOW_EMPTY_PASSWORD=yes -p <port>:3306 mysql:8
 TEST_ADAPTER=mysql2 MYSQL_TEST_URL="mysql://root@localhost:<port>/rails_js_test" \
   pnpm vitest run packages/activerecord/src/adapters/abstract-mysql-adapter \
   packages/activerecord/src/adapters/mysql2 \

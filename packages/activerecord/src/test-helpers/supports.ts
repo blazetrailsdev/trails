@@ -12,7 +12,7 @@ import { adapterType } from "../test-adapter.js";
  * same idiom suites already use (e.g. `adapterType !== "mysql"` in
  * insert-all.test.ts, which deliberately reads `adapterType` rather than the
  * live `supports_*?` method) — for the backends our matrix runs: CI's
- * postgres:17, mariadb:11, and the in-memory sqlite default.
+ * postgres:17, mysql:8, and the in-memory sqlite default.
  *
  * Feature keys match Rails' `supports_<key>?` (and the keys the test:compare
  * gate extractor derives), so a flagged `it.skip` of a Rails feature-gated
@@ -21,22 +21,22 @@ import { adapterType } from "../test-adapter.js";
  * everywhere — catching typos and undocumented capability assumptions.
  *
  * The table mirrors Rails' `supports_<feature>?` *for the matrix versions* —
- * it bakes in Rails' `mariadb?` / `database_version` branching (the `mysql`
- * lane is MariaDB 11), so it tracks the fixed CI backends, not the live
- * predicate. Match Rails here (not our own adapter, which may differ) so the
- * gate-mismatch diagnostics compare like with like.
+ * it bakes in Rails' `mariadb?` / `database_version` branching for the fixed
+ * CI backends (pg17 / mysql:8 / in-memory sqlite). Match Rails here (not our
+ * own adapter, which may differ) so the gate-mismatch diagnostics compare like
+ * with like.
  */
 const ALL = ["postgres", "mysql", "sqlite"] as const;
 type Backend = (typeof ALL)[number];
 
 const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
-  // Available on every backend we test (pg17 / mariadb11 / recent sqlite).
+  // Available on every backend we test (pg17 / mysql:8 / recent sqlite).
   savepoints: ALL,
   foreign_keys: ALL,
   check_constraints: ALL,
-  // Rails `supports_json?` is `!mariadb? && …`; the `mysql` lane is MariaDB
-  // (JSON there is a LONGTEXT alias), so Rails reports false → exclude it.
-  json: ["postgres", "sqlite"],
+  // Rails `supports_json?` is `!mariadb? && database_version >= "5.7.8"`.
+  // MySQL 8 is not MariaDB and is ≥ 5.7.8 → true. (mysql2_adapter.rb:70)
+  json: ALL,
   // SQL-standard COMMENT ON / inline column comments — not SQLite.
   comments: ["postgres", "mysql"],
   // SQLite's in-memory shared-cache connection can't run truly concurrently.
@@ -51,9 +51,11 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // PostgreSQL only (postgresql_adapter.rb:224/228; abstract default false).
   exclusion_constraints: ["postgres"],
   unique_constraints: ["postgres"],
-  // `supports_expression_index?`: PostgreSQL + SQLite≥3.9; MySQL is
-  // `!mariadb? && >= 8.0.13` — our `mysql` lane is MariaDB, so false there.
-  // (postgresql_adapter.rb:208, sqlite3_adapter.rb:155, abstract_mysql_adapter.rb:104)
+  // `supports_expression_index?`: `!mariadb? && database_version >= "8.0.13"`.
+  // MySQL 8 qualifies at the server level, but our schema-dump DDL generator
+  // does not yet emit the correct MySQL 8 expression-index syntax (P-9 family).
+  // Unlock "mysql" here once the dump path is fixed. (postgresql_adapter.rb:208,
+  // sqlite3_adapter.rb:155, abstract_mysql_adapter.rb:104)
   expression_index: ["postgres", "sqlite"],
 };
 

@@ -838,7 +838,8 @@ describe("SchemaDumperDefaultsTest", () => {
     expect(output).toMatch(/decimal.*"decimal_with_default".*precision: 3.*scale: 2/);
   });
 
-  it("schema dump with text column", async () => {
+  // MySQL 8 strict mode forbids TEXT column defaults; MariaDB allowed them.
+  it.skipIf(adapterType === "mysql")("schema dump with text column", async () => {
     await ctx.createTable("dump_defaults", {}, (t) => {
       t.text("text_with_default", { default: "John" });
     });
