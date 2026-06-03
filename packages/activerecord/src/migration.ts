@@ -2115,7 +2115,7 @@ export class MigrationContext {
       case "binary":
         return an === "postgres" ? "BYTEA" : "BLOB";
       case "primary_key":
-        if (an === "postgres") return "SERIAL PRIMARY KEY";
+        if (an === "postgres") return "BIGSERIAL PRIMARY KEY";
         if (an === "mysql") return "BIGINT AUTO_INCREMENT PRIMARY KEY";
         return "INTEGER PRIMARY KEY AUTOINCREMENT";
       default:

@@ -330,7 +330,7 @@ export async function createTable(this: typeof Base): Promise<void> {
   if (pks.length === 1) {
     const pk = pks[0];
     const pkDef = isPg
-      ? `${a.quoteIdentifier(pk)} SERIAL PRIMARY KEY`
+      ? `${a.quoteIdentifier(pk)} BIGSERIAL PRIMARY KEY`
       : isMysql
         ? `${a.quoteIdentifier(pk)} BIGINT AUTO_INCREMENT PRIMARY KEY`
         : `${a.quoteIdentifier(pk)} INTEGER PRIMARY KEY AUTOINCREMENT`;
