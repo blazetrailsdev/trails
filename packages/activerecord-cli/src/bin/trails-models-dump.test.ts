@@ -292,6 +292,41 @@ describe("ar models:dump", { timeout: 30_000 }, () => {
     expect(stdout).not.toMatch(/export class Author extends Base/);
   });
 
+  it("applies --ignore filtering", async () => {
+    const schemaPath = writeSchema(SIMPLE_SCHEMA);
+    const { code, stdout } = await runDumpInProcess([
+      "--schema",
+      schemaPath,
+      "--ignore",
+      "books",
+      "--no-header",
+    ]);
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/export class Author extends Base/);
+    expect(stdout).not.toMatch(/export class Book extends Base/);
+  });
+
+  it("BUILTIN_IGNORE wins even when --only names a bookkeeping table", async () => {
+    const schemaPath = writeSchema(`
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("schema_migrations", { id: false }, (t) => {
+          t.string("version");
+        });
+        await ctx.createTable("users", { force: "cascade" }, (t) => {
+          t.string("email");
+        });
+      }
+    `);
+    const { code, stderr } = await runDumpInProcess([
+      "--schema",
+      schemaPath,
+      "--only",
+      "schema_migrations",
+    ]);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/no tables to generate/);
+  });
+
   it("exits 1 when --only matches no tables", async () => {
     const schemaPath = writeSchema(SIMPLE_SCHEMA);
     const { code, stderr } = await runDumpInProcess([

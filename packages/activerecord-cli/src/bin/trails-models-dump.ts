@@ -143,8 +143,9 @@ export async function run(argv: readonly string[]): Promise<number> {
   const ignoreSet = new Set([...BUILTIN_IGNORE, ...args.ignore]);
   const onlySet = args.only.length > 0 ? new Set(args.only) : null;
   const keep = (name: string): boolean => {
+    if (ignoreSet.has(name)) return false;
     if (onlySet) return onlySet.has(name);
-    return !ignoreSet.has(name);
+    return true;
   };
 
   // Resolve the schema source: --schema > auto-discovered db/schema.ts > error.
