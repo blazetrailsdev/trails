@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { ColumnInfo, SqliteConnection } from "../sqlite-adapter.js";
-import { getFs } from "../fs-adapter.js";
-import { getOs } from "../os-adapter.js";
+import { getFs } from "@blazetrails/activesupport/fs-adapter";
+import { getOs } from "@blazetrails/activesupport/os-adapter";
 import { betterSqlite3Driver } from "./better-sqlite3.js";
 
 describe("SqliteDriver — better-sqlite3 round-trip", () => {

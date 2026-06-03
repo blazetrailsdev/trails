@@ -182,7 +182,7 @@ describe("AppGenerator", () => {
   it("sqlite database config includes driver import", async () => {
     await makeGen("sqlite").run();
     const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
-    expect(dbConfig).toContain("@blazetrails/activesupport/sqlite/better-sqlite3");
+    expect(dbConfig).toContain("@blazetrails/activerecord/sqlite/better-sqlite3");
   });
 
   it("--package-manager npm uses npm install in bin/setup", async () => {
@@ -224,7 +224,7 @@ describe("AppGenerator", () => {
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.dependencies["better-sqlite3"]).toBeUndefined();
     const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
-    expect(dbConfig).toContain("@blazetrails/activesupport/sqlite/node-sqlite");
+    expect(dbConfig).toContain("@blazetrails/activerecord/sqlite/node-sqlite");
   });
 
   it("--sqlite-driver expo-sqlite omits driver dep", async () => {
@@ -238,7 +238,7 @@ describe("AppGenerator", () => {
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.dependencies["better-sqlite3"]).toBeUndefined();
     const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
-    expect(dbConfig).toContain("@blazetrails/activesupport/sqlite/expo-sqlite");
+    expect(dbConfig).toContain("@blazetrails/activerecord/sqlite/expo-sqlite");
   });
 
   it("skips docker files when --skip-docker", async () => {

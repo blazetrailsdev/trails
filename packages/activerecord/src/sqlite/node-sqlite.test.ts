@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { SqliteConnection } from "../sqlite-adapter.js";
-import { getFs } from "../fs-adapter.js";
-import { getOs } from "../os-adapter.js";
+import { getFs } from "@blazetrails/activesupport/fs-adapter";
+import { getOs } from "@blazetrails/activesupport/os-adapter";
 import { isNodeSqliteAvailable, nodeSqliteDriver } from "./node-sqlite.js";
 
 describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip", () => {

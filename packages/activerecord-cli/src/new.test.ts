@@ -70,7 +70,7 @@ describe("ArNewTest", () => {
   it("node-sqlite: db.ts includes side-effect import, package.json has no driver dep", async () => {
     const { appDir } = await arNew(parentDir, "myapp", "node-sqlite");
     const dbTs = await readFile(join(appDir, "db.ts"), "utf8");
-    expect(dbTs).toContain("@blazetrails/activesupport/sqlite/node-sqlite");
+    expect(dbTs).toContain("@blazetrails/activerecord/sqlite/node-sqlite");
     const pkg = JSON.parse(await readFile(join(appDir, "package.json"), "utf8"));
     expect(Object.keys(pkg.dependencies)).not.toContain("node-sqlite");
     expect(Object.keys(pkg.dependencies)).not.toContain("better-sqlite3");

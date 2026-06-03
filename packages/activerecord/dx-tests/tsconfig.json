@@ -16,11 +16,9 @@
       "@blazetrails/activesupport/temporal": ["../../activesupport/src/temporal.ts"],
       "@blazetrails/activesupport/gzip": ["../../activesupport/src/gzip.ts"],
       "@blazetrails/activesupport/yaml": ["../../activesupport/src/yaml.ts"],
-      "@blazetrails/activesupport/sqlite-adapter": ["../../activesupport/src/sqlite-adapter.ts"],
-      "@blazetrails/activesupport/sqlite/better-sqlite3": [
-        "../../activesupport/src/sqlite-drivers/better-sqlite3.ts"
-      ],
       "@blazetrails/activesupport/process-adapter": ["../../activesupport/src/process-adapter.ts"],
+      "@blazetrails/activesupport/fs-adapter": ["../../activesupport/src/fs-adapter.ts"],
+      "@blazetrails/activesupport/os-adapter": ["../../activesupport/src/os-adapter.ts"],
       "@blazetrails/activesupport/testing/temporal-helpers": [
         "../../activesupport/src/testing/temporal-helpers.ts"
       ],

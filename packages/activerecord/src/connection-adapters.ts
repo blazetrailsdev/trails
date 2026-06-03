@@ -110,7 +110,7 @@ const sqlite3Loader: AdapterLoader = async () => {
   // establishConnection) gets a registered driver without each consumer
   // re-importing the subpath. Apps that pre-register a custom driver are
   // unaffected — registerSqliteDriver overwrites with a one-time warn.
-  await import("@blazetrails/activesupport/sqlite/better-sqlite3").catch(() => {});
+  await import("./sqlite/better-sqlite3.js").catch(() => {});
   return (await import("./connection-adapters/sqlite3-adapter.js")).SQLite3Adapter as any;
 };
 const mysql2Loader: AdapterLoader = async () =>

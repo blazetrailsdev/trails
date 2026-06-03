@@ -3,8 +3,8 @@ import type {
   SqliteConnection,
   SqliteDriver,
   SqliteStatement,
-} from "@blazetrails/activesupport/sqlite-adapter";
-import { getSqlite } from "@blazetrails/activesupport/sqlite-adapter";
+} from "../sqlite-adapter.js";
+import { getSqlite } from "../sqlite-adapter.js";
 import { Visitors } from "@blazetrails/arel";
 import type { DatabaseAdapter } from "../adapter.js";
 import type { InsertBuilder } from "../insert-all.js";

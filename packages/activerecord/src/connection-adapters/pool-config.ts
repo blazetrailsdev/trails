@@ -271,7 +271,7 @@ export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
    * AR_SQLITE_DRIVER, then exactly-one-registered fallback.
    * Mirrors database.yml `driver:`.
    */
-  driver?: string | import("@blazetrails/activesupport/sqlite-adapter").SqliteDriver;
+  driver?: string | import("../sqlite-adapter.js").SqliteDriver;
   // Mirrors: database.yml `pragmas:` — applied via PRAGMA on each connection.
   // Keys must be simple SQLite pragma identifiers (word characters only, e.g. "cache_size").
   // String values must be identifier-like enum words (e.g. "WAL", "NORMAL") — arbitrary

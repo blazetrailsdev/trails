@@ -172,6 +172,9 @@ importers:
       better-sqlite3:
         specifier: ^12.6.2
         version: 12.6.2
+      expo-sqlite:
+        specifier: ^15.0.0
+        version: 15.2.14(expo@55.0.23)(react-native@0.85.3(@babel/core@7.29.0)(react@19.2.6))(react@19.2.6)
       mysql2:
         specifier: ^3.18.2
         version: 3.19.0(@types/node@25.3.5)
@@ -202,12 +205,6 @@ importers:
       '@js-temporal/polyfill':
         specifier: ^0.5.1
         version: 0.5.1
-      better-sqlite3:
-        specifier: ^12.0.0
-        version: 12.6.2
-      expo-sqlite:
-        specifier: ^15.0.0
-        version: 15.2.14(expo@55.0.23)(react-native@0.85.3(@babel/core@7.29.0)(react@19.2.6))(react@19.2.6)
       tinyglobby:
         specifier: ^0.2.16
         version: 0.2.16

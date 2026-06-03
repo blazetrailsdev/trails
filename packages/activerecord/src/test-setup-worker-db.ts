@@ -26,7 +26,7 @@ import mysql from "mysql2/promise";
 // file. The import body runs once per module realm; should a module reset
 // re-evaluate it, registerSqliteDriver() simply overwrites the same driver
 // (it logs an "already registered" warning, harmless here).
-import "@blazetrails/activesupport/sqlite/better-sqlite3";
+import "./sqlite/better-sqlite3.js";
 import { WORKER_DB_ENV, ensureWorkerClone } from "./test-helpers/sqlite-template.js";
 
 // Shared by all evaluations of this module within the same worker process.

@@ -10,7 +10,7 @@
 // it via getSqlite() without each test bootstrapping the registry. Lives here
 // (not in activerecord/index.ts) to keep better-sqlite3 a true optional peer
 // for non-test consumers.
-import "@blazetrails/activesupport/sqlite/better-sqlite3";
+import "./sqlite/better-sqlite3.js";
 import { beforeEach } from "vitest";
 import { resetTestAdapterState } from "./test-adapter.js";
 import { shouldSkipGlobalReset } from "./test-helpers/skip-global-reset.js";
