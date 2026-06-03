@@ -54,6 +54,8 @@ export abstract class Type<T = unknown> {
   }
 
   typeCastForSchema(value: unknown): string {
+    // JSON.stringify throws on BigInt; use String() directly for it.
+    if (typeof value === "bigint") return value.toString();
     return JSON.stringify(value) ?? String(value);
   }
 
