@@ -12,6 +12,7 @@ import type { AdapterName } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { SQLite3AdapterOptions } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
+import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -121,6 +122,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return "sqlite";
   }
 
+  get schemaCreation(): SQLite3SchemaCreation {
+    return (this._sqlite3SchemaCreation ??= new SQLite3SchemaCreation("sqlite", this));
+  }
+
   /** Returns true for raw SQLite driver errors that indicate a missing or unopenable database file (SQLITE_CANTOPEN). */
   isNoDatabaseError(error: unknown): boolean {
     return _isSqliteMissingDbError(error);
@@ -167,6 +172,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.driver?.isOpen() ?? false;
   }
   private _inTransaction = false;
+  private _sqlite3SchemaCreation?: SQLite3SchemaCreation;
   private _readonly: boolean;
   private _strict: boolean;
   private _preventWrites = false;

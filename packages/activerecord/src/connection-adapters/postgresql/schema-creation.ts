@@ -291,7 +291,11 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (opts["collation"]) {
       sql += ` COLLATE ${this.adapter.quoteIdentifier(String(opts["collation"]))}`;
     }
-    const colName = opts["column"] ? ((opts["column"] as any).name as string) : "unknown";
+    const col = opts["column"] as { type?: string; name?: string } | undefined;
+    if (col?.type === "uuid" && opts["primaryKey"] && !("default" in opts)) {
+      sql += " DEFAULT gen_random_uuid()";
+    }
+    const colName = col?.name ?? "unknown";
     sql += _pgGeneratedClause(
       colName,
       opts["as"] as string | undefined,
