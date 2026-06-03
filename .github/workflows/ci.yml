@@ -359,7 +359,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.1
+          version: 11.5.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -379,7 +379,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.1
+          version: 11.5.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -474,7 +474,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.1
+          version: 11.5.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -515,7 +515,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.1
+          version: 11.5.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -569,7 +569,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.1
+          version: 11.5.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -605,7 +605,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.1
+          version: 11.5.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -668,7 +668,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.1
+          version: 11.5.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -733,7 +733,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.1
+          version: 11.5.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -777,7 +777,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.1
+          version: 11.5.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -809,7 +809,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.1
+          version: 11.5.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -860,7 +860,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.1
+          version: 11.5.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -901,7 +901,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.1
+          version: 11.5.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -943,7 +943,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.34.1
+          version: 11.5.1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
