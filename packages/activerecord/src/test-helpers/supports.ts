@@ -35,7 +35,7 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   foreign_keys: ALL,
   check_constraints: ALL,
   // Rails `supports_json?` is `!mariadb? && database_version >= "5.7.8"`.
-  // MySQL 8 is not MariaDB and is ≥ 5.7.8 → true. (abstract_mysql_adapter.rb:108)
+  // MySQL 8 is not MariaDB and is ≥ 5.7.8 → true. (mysql2_adapter.rb:70)
   json: ALL,
   // SQL-standard COMMENT ON / inline column comments — not SQLite.
   comments: ["postgres", "mysql"],
