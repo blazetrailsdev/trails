@@ -52,8 +52,8 @@ compat obligations.
 The SQLite driver track (shipped) established the registry pattern:
 `DriverFactory` interface, `registerDriver()` call in the adapter
 subpath export, capability flags so the adapter layer can branch on
-async vs sync. Live in `@blazetrails/activerecord/sqlite-adapter`; see
-`activesupport.md` for the interface reference. The database-adapter
+async vs sync. Live in `@blazetrails/activerecord/sqlite-adapter`; see that
+source file's JSDoc for the interface reference. The database-adapter
 registry in BC-3 copies this shape verbatim.
 
 ## 3. Migration plan

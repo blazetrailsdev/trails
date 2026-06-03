@@ -31,9 +31,10 @@ describe("sqlite-adapter registry", () => {
     vi.unstubAllEnvs();
     clearSqliteDrivers();
   });
-  // Restore the real better-sqlite3 registration after the suite so peer
-  // "other" tests sharing the same worker (and globalThis-keyed registry)
-  // don't see an empty registry from our last clearSqliteDrivers().
+  // Restore the real better-sqlite3 registration after the suite so sibling
+  // tests in the `sqlite-drivers` vitest project — sharing the same worker
+  // (and globalThis-keyed registry) — don't see an empty registry from our
+  // last clearSqliteDrivers().
   afterAll(() => registerSqliteDriver(betterSqlite3Driver));
 
   it("returns the only registered driver when no name is passed", () => {
