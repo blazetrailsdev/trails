@@ -78,7 +78,9 @@ describe("PostgreSQL::SchemaDumper", () => {
     it("returns false for serial (non-bigserial)", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
-      expect(dumper.isDefaultPrimaryKey(col)).toBe(false);
+      // TS createTable emits SERIAL PRIMARY KEY (int4) as its default PK, so
+      // serial columns are also treated as default — no id: option emitted.
+      expect(dumper.isDefaultPrimaryKey(col)).toBe(true);
     });
   });
 
