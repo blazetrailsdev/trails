@@ -11,7 +11,6 @@
  */
 import { describe, it } from "vitest";
 import {
-  ActiveRecordError,
   SubclassNotFound,
   AssociationTypeMismatch,
   SerializationTypeMismatch,
@@ -94,8 +93,6 @@ import {
 
 describe("ErrorsTest", () => {
   it("can be instantiated with no args", () => {
-    const base = ActiveRecordError;
-    void base;
     const errorKlasses = [
       SubclassNotFound,
       AssociationTypeMismatch,
