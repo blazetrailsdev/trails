@@ -256,6 +256,19 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return "mysql";
   }
 
+  private _mysqlSchemaCreation?: MysqlSchemaCreation;
+  /**
+   * MySQL-specific SchemaCreation so that DDL methods mixed in from
+   * SchemaStatements (e.g. `addColumn`) emit `CHARACTER SET` / `COLLATE`
+   * clauses. Overrides the abstract SchemaStatements getter which would
+   * otherwise create a bare `abstract/schema-creation` instance lacking
+   * MySQL-specific column-option handling.
+   * @internal
+   */
+  get schemaCreation(): MysqlSchemaCreation {
+    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this));
+  }
+
   /**
    * Quote a value using MySQL-family escape rules (`\0 \n \r \Z \\ ''`
    * via MYSQL_ESCAPE_MAP, booleans as `1/0`, Dates as
