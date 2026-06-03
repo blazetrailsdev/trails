@@ -74,6 +74,7 @@ import { makeGetTypeParser } from "./postgresql/temporal-type-parsers.js";
 
 const getTemporalTypeParser = makeGetTypeParser(pg.types);
 const TEMPORAL_OIDS = new Set([1082, 1083, 1114, 1184, 1266]);
+const OID_INT8 = 20;
 const OID_INTERVAL = 1186;
 const OID_INTERVAL_ARRAY = 1187;
 const OID_MONEY = 790;
@@ -381,6 +382,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             // Money type so result values from raw expressions
             // (SUM(id * wealth), pluck(Arel.sql)) come back as the bare number
             // string — mirrors Rails' money type-map coder.
+            // OID 20 = int8 (bigint/bigserial). The pg driver returns int8 as
+            // strings by default to avoid precision loss. Parse to number to
+            // match Rails' Integer cast — mirrors pg_type.rb OID::Integer.
+            if (oid === OID_INT8 && format !== "binary") return (v: string) => parseInt(v, 10);
             if (oid === OID_MONEY && format !== "binary")
               return (v: unknown) => (typeof v === "string" ? MoneyDecoder.decode(v) : v);
             return oid === 1082 && !PostgreSQLAdapter.decodeDates
@@ -482,6 +487,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           // deserialized decimal string via the Money type so SUM(id * wealth)
           // / pluck(Arel.sql(...)) come back as the bare number string —
           // mirrors Rails' money type-map coder.
+          // OID 20 = int8 (bigint/bigserial). Parse to number — see the
+          // matching branch in the connectionString constructor above.
+          if (oid === OID_INT8 && format !== "binary") {
+            const fallback = (v: string) => parseInt(v, 10);
+            return userGetTypeParser?.(oid, format) ?? fallback;
+          }
           if (oid === OID_MONEY && format !== "binary") {
             const fallback = (v: unknown) => (typeof v === "string" ? MoneyDecoder.decode(v) : v);
             return userGetTypeParser?.(oid, format) ?? fallback;

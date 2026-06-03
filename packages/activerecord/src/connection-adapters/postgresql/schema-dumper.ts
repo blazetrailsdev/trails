@@ -43,12 +43,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isDefaultPrimaryKey(column: Column): boolean {
-    // Accept both bigserial (Rails default, int8) and serial (TS createTable
-    // default, int4 — TableDefinition.toSql() emits SERIAL PRIMARY KEY). Both
-    // map to "no id: option needed" in the dump — omitting it round-trips
-    // faithfully through the TS schema DSL in either case.
-    const st = this.schemaType(column);
-    return st === "bigserial" || st === "serial";
+    return this.schemaType(column) === "bigserial";
   }
 
   /**
