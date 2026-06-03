@@ -101,6 +101,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       ).rejects.toThrow(/does not support VIRTUAL.*Specify 'stored: true'/s);
     });
 
+    it("non persisted column via createTable", async () => {
+      await expect(
+        adapter.createTable("bad_virtual", { force: true }, (t) => {
+          t.virtual("invalid", { type: "string", as: "LOWER(name)" });
+        }),
+      ).rejects.toThrow(/does not support VIRTUAL.*Specify 'stored: true'/s);
+      await adapter.exec("DROP TABLE IF EXISTS bad_virtual").catch(() => {});
+    });
+
     it.skip("schema dumping", () => {
       // BLOCKED: schema — TS schema dumper emits TS DSL (t.string/t.integer) and does
       // not honor virtual-column options. The PG-specific prepareColumnOptions

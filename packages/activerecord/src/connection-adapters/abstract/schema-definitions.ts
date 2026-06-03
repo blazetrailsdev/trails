@@ -1147,59 +1147,6 @@ export class TableDefinition {
           case "char":
             parts.push(`CHAR(${col.options.limit ?? 1})`);
             break;
-          case "virtual": {
-            // Resolve to the real SQL type from options.type, mirroring SchemaCreation's virtual branch.
-            // Note: PgTableDefinition.newColumnDefinition resolves "virtual" to the real type before
-            // toSql() runs, so this case handles only the abstract-TableDefinition path.
-            const realType =
-              ((col.options as Record<string, unknown>)["type"] as string | undefined) ?? "string";
-            switch (realType) {
-              case "string":
-                parts.push(`VARCHAR(${col.options.limit ?? 255})`);
-                break;
-              case "text":
-                parts.push("TEXT");
-                break;
-              case "integer":
-                parts.push("INTEGER");
-                break;
-              case "bigint":
-                parts.push("BIGINT");
-                break;
-              case "float":
-                parts.push(this._adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL");
-                break;
-              case "decimal":
-                parts.push(`DECIMAL(${col.options.precision ?? 10}, ${col.options.scale ?? 0})`);
-                break;
-              case "boolean":
-                parts.push("BOOLEAN");
-                break;
-              case "date":
-                parts.push("DATE");
-                break;
-              case "time":
-                parts.push("TIME");
-                break;
-              case "datetime":
-              case "timestamp":
-                parts.push(this._adapterName === "postgres" ? "TIMESTAMP" : "DATETIME");
-                break;
-              case "binary":
-                parts.push(this._adapterName === "postgres" ? "BYTEA" : "BLOB");
-                break;
-              case "json":
-                parts.push("JSON");
-                break;
-              case "jsonb":
-                parts.push(this._adapterName === "postgres" ? "JSONB" : "JSON");
-                break;
-              default:
-                parts.push(String(realType).toUpperCase());
-                break;
-            }
-            break;
-          }
           default:
             if (!col.type || !col.type.trim()) {
               throw new Error(
@@ -1249,11 +1196,17 @@ export class TableDefinition {
       const asExpr = (col.options as Record<string, unknown>)["as"] as string | undefined;
       if (asExpr != null) {
         if (this._adapterName !== "postgres") {
-          throw new Error("Generated columns (as: ...) are only supported on PostgreSQL");
+          // MySQL and SQLite3 support generated columns via addColumn/changeTable
+          // (their SchemaCreation#add_column_options! branches are already wired).
+          // createTable → toSql() is not yet wired for those adapters.
+          throw new Error(
+            `Generated columns (as: ...) in createTable are not yet implemented for the ` +
+              `${this._adapterName} adapter; use changeTable or addColumn instead.`,
+          );
         }
         const isStored = (col.options as Record<string, unknown>)["stored"] as boolean | undefined;
         if (!isStored) {
-          throw new Error(
+          throw new ArgumentError(
             `PostgreSQL currently does not support VIRTUAL (not persisted) generated columns.\n` +
               `Specify 'stored: true' option for '${col.name}'`,
           );
