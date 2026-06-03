@@ -551,7 +551,16 @@ jobs:
           MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
         ports:
           - 3306:3306
+        # mysql:8 fsyncs every DDL/commit to disk (transactional data
+        # dictionary + doublewrite + redo), which dominates this DDL-heavy
+        # suite — the activerecord vitest step ran ~2.15x slower than it did
+        # on mariadb:11 (~400s -> ~860s). Mounting the data dir as tmpfs sends
+        # all that durability traffic to RAM; the DB is throwaway per-run so
+        # losing it on container stop is fine. --mount is a `docker create`
+        # flag, so it goes here in options (service containers can't override
+        # the image command to pass server args directly).
         options: >-
+          --mount type=tmpfs,destination=/var/lib/mysql
           --health-cmd "mysqladmin ping -h localhost --silent"
           --health-interval 2s
           --health-timeout 5s
