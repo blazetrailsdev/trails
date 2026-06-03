@@ -16,7 +16,6 @@
  * stubbed or adapted.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { ReadOnlyRecord } from "./index.js";
 
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 
@@ -46,9 +45,14 @@ describe("ReadOnlyTest", () => {
     dev.readonlyBang();
     expect(dev.isReadonly()).toBe(true);
 
-    await expect(dev.save()).rejects.toThrow(ReadOnlyRecord);
-    await expect(dev.saveBang()).rejects.toThrow(ReadOnlyRecord);
-    await expect(dev.destroy()).rejects.toThrow(ReadOnlyRecord);
+    // In-memory writes remain allowed; only persistence is blocked.
+    expect(() => {
+      (dev as Record<string, unknown>).name = "Luscious forbidden fruit.";
+    }).not.toThrow();
+
+    await expect(dev.save()).rejects.toThrow("Developer is marked as readonly");
+    await expect(dev.saveBang()).rejects.toThrow("Developer is marked as readonly");
+    await expect(dev.destroy()).rejects.toThrow("Developer is marked as readonly");
   });
 
   it("cant touch readonly record", async () => {
@@ -58,7 +62,7 @@ describe("ReadOnlyTest", () => {
     dev.readonlyBang();
     expect(dev.isReadonly()).toBe(true);
 
-    await expect(dev.touch()).rejects.toThrow(ReadOnlyRecord);
+    await expect(dev.touch()).rejects.toThrow("Developer is marked as readonly");
   });
 
   it("cant touch readonly column", async () => {
@@ -73,7 +77,9 @@ describe("ReadOnlyTest", () => {
     dev.readonlyBang();
     expect(dev.isReadonly()).toBe(true);
 
-    await expect(dev.updateColumn("name", "New name")).rejects.toThrow(ReadOnlyRecord);
+    await expect(dev.updateColumn("name", "New name")).rejects.toThrow(
+      "Developer is marked as readonly",
+    );
   });
 
   it("cant update columns readonly record", async () => {
@@ -83,7 +89,9 @@ describe("ReadOnlyTest", () => {
     dev.readonlyBang();
     expect(dev.isReadonly()).toBe(true);
 
-    await expect(dev.updateColumns({ name: "New name" })).rejects.toThrow(ReadOnlyRecord);
+    await expect(dev.updateColumns({ name: "New name" })).rejects.toThrow(
+      "Developer is marked as readonly",
+    );
   });
 
   it("find with readonly option", async () => {
@@ -182,12 +190,15 @@ describe("ReadOnlyTest", () => {
   });
 
   it.skip("association collection method missing scoping not readonly", () => {
-    // BLOCKED: associations — requires developer.projects.allAsMethod().first()
-    // and project.comments.allAsMethod().first() via association collection
-    // proxy method delegation. `allAsMethod` / `allAsScope` are Rails-style
-    // class-method scopes on Project / Post that the collection proxy must
-    // surface through method_missing delegation; that delegation path is not
-    // yet fully wired in trails.
-    // SCOPE: association collection proxy method_missing delegation (~30 LOC).
+    // BLOCKED (two gaps):
+    // (1) Collection proxy method_missing — developer.projects.allAsMethod().first()
+    //     and (Post.find(1) as "project").comments.allAsMethod().first() require the
+    //     proxy to surface Project.allAsMethod / Comment.allAsMethod through delegation.
+    //     `Project.allAsMethod` exists (project.ts:65); `Comment.allAsMethod` is absent
+    //     (comment.ts has `allAsScope` scope but the static `allAsMethod` from
+    //     comment.rb:58 is not ported). Delegation path not yet wired in trails.
+    // (2) Comment.allAsMethod missing — comment.rb:58 `def self.all_as_method; all; end`
+    //     has no TS equivalent; comment.ts only has the `allAsScope` named scope.
+    // SCOPE: port Comment.allAsMethod (~3 LOC) + collection proxy delegation (~30 LOC).
   });
 });
