@@ -105,7 +105,7 @@ describeIfMysql("Mysql2Adapter", () => {
         } catch (e) {
           expect(e).toBeInstanceOf(SQLWarning);
           expect((e as SQLWarning).message).toBe(
-            `Query had warning_count=1 but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`,
+            `Query had warning_count=1 but 'SHOW WARNINGS' did not return the warnings. Check MySQL logs or database configuration.`,
           );
         }
       });

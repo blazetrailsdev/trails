@@ -475,6 +475,22 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       waitTimeout,
       variables,
     };
+    // Validate charset/collation at construction time so a misconfigured value
+    // raises immediately rather than on the first query. Rails defers this to
+    // connection-open time (no constructor validation in AbstractMysqlAdapter);
+    // we validate early as a fail-fast safety measure. _buildInitSql() re-applies
+    // the same regex before each new connection as the authoritative guard.
+    const _charset =
+      (mysqlConfig.charset as string | undefined) ??
+      (mysqlConfig as { encoding?: string }).encoding;
+    const _collation = (mysqlConfig as { collation?: string }).collation;
+    const SAFE_CHARSET_RE = /^[A-Za-z0-9_]+$/;
+    if (_charset && !SAFE_CHARSET_RE.test(_charset)) {
+      throw new Error(`Invalid MySQL charset: ${JSON.stringify(_charset)}`);
+    }
+    if (_collation && !SAFE_CHARSET_RE.test(_collation)) {
+      throw new Error(`Invalid MySQL collation: ${JSON.stringify(_collation)}`);
+    }
     // _fakeConnection: true skips connection creation — used in unit tests that need
     // a Mysql2Adapter instance without a live DB (mirrors Rails' fake_connection
     // constructor path: `new Mysql2Adapter(fake_conn, logger, nil, config)`).
