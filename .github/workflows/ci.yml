@@ -54,6 +54,10 @@ jobs:
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite }}
       parity_postgres: ${{ steps.filter.outputs.parity_postgres }}
       parity_mysql: ${{ steps.filter.outputs.parity_mysql }}
+      # Newline-separated list of changed files (existing ones only —
+      # deletions excluded) for the Prettier job to check. The literal
+      # `__ALL__` means "couldn't compute a reliable diff, check everything".
+      prettier_files: ${{ steps.filter.outputs.prettier_files }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -155,6 +159,7 @@ jobs:
 
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "prettier_files=__ALL__" >> "$GITHUB_OUTPUT"
             force_all_affected
           # Triple-dot: diff against the merge-base of $base and $head, not
           # against the current tip of the base branch. Using `$base $head`
@@ -164,10 +169,30 @@ jobs:
           elif ! files=$(git diff --name-only "$base"..."$head" 2>/dev/null); then
             echo "git diff failed (base may be unreachable after force-push) — running full matrix"
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "prettier_files=__ALL__" >> "$GITHUB_OUTPUT"
             force_all_affected
           else
             echo "Changed files:"
             echo "$files"
+            # Prettier file list for the Prettier job. A change to Prettier's
+            # config or its version pin reformats the whole tree, so fall back
+            # to `__ALL__` (check everything) in that case — there is no other
+            # full-tree check to catch the resulting drift. Otherwise emit the
+            # changed files, excluding deletions (--diff-filter=ACMR keeps
+            # added/copied/modified/renamed) since Prettier can't format a path
+            # that no longer exists. If that diff somehow fails, fall back to
+            # `__ALL__` rather than silently skipping the check.
+            if echo "$files" | grep -qE '^(\.prettierrc\.json|\.prettierignore|package\.json)$'; then
+              echo "prettier_files=__ALL__" >> "$GITHUB_OUTPUT"
+            elif pfiles=$(git diff --name-only --diff-filter=ACMR "$base"..."$head" 2>/dev/null); then
+              {
+                echo "prettier_files<<__PRETTIER_EOF__"
+                echo "$pfiles"
+                echo "__PRETTIER_EOF__"
+              } >> "$GITHUB_OUTPUT"
+            else
+              echo "prettier_files=__ALL__" >> "$GITHUB_OUTPUT"
+            fi
             # docs_only: any line NOT under `docs/`, `examples/`, and not the
             # top-level `README.md` flips the switch. README is markdown-only
             # and only ever runs through prettier; `examples/` are standalone
@@ -320,7 +345,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: npx --yes prettier@3.8.1 --check .
+      # Check only the files changed on this PR/push, not the whole tree.
+      # `__ALL__` is the fallback sentinel from the `changes` job (diff
+      # couldn't be computed); empty means nothing checkable changed.
+      # `--ignore-unknown` skips paths Prettier has no parser for, and
+      # `.prettierignore` is still honored.
+      - env:
+          PRETTIER_FILES: ${{ needs.changes.outputs.prettier_files }}
+        run: |
+          set -euo pipefail
+          if [ "$PRETTIER_FILES" = "__ALL__" ]; then
+            npx --yes prettier@3.8.1 --check .
+          elif [ -z "$PRETTIER_FILES" ]; then
+            echo "No changed files to check with Prettier."
+          else
+            printf '%s\n' "$PRETTIER_FILES" \
+              | xargs -r -d '\n' npx --yes prettier@3.8.1 --check --ignore-unknown
+          fi
 
   guides-typecheck:
     name: Guides Code Type Check
