@@ -273,12 +273,11 @@ function safeSet(target: Record<string, unknown>, key: string, value: unknown): 
  * - Symbol → string (Ruby symbols are interned strings)
  *
  * We cover the JS analog:
- * - `bigint` → decimal string. Rails serializes large integers as JSON
- *   numbers because Ruby's Integer is arbitrary-precision and the JSON
- *   encoder handles them natively. JS `JSON.stringify` throws on bigint,
- *   and JS numbers lose precision above 2^53-1, so we emit a decimal
- *   string instead. Consumers that need the numeric value must parse
- *   with `BigInt(str)`.
+ * - `bigint` → decimal string. A defensive handler for raw JS BigInt
+ *   values passed directly (e.g. advisory lock IDs). `BigIntegerType`
+ *   model attributes are `number`, not `bigint`, so they never reach
+ *   this branch during normal model serialization — they pass through
+ *   as numbers (with float64 precision loss above 2^53).
  * - Temporal types → ISO 8601 string via `toJSON()`. Precision is
  *   native (no trailing-zero truncation for JSON consumers).
  * - Plain arrays / objects → recurse

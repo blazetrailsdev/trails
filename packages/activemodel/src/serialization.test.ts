@@ -263,7 +263,7 @@ describe("SerializationTest", () => {
     // the subset that actually occurs in JS: Date → ISO8601 and recursive
     // coercion within arrays/objects. BigIntegerType now returns number
     // (not JS BigInt), so no BigInt → string coercion is needed.
-    it("asJson coerces bigint attributes to string (JSON.stringify-safe)", () => {
+    it("asJson coerces big_integer attributes to number (JSON.stringify-safe)", () => {
       class Row extends Model {
         static {
           this.attribute("id", "big_integer");
