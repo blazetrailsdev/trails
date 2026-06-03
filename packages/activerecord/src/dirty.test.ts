@@ -32,6 +32,7 @@ import { Person } from "./test-helpers/models/person.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { NumericData } from "./test-helpers/models/numeric-data.js";
+import { adapterType } from "./test-adapter.js";
 
 // trails generates column accessors (`pirate.catchphrase`) at runtime, so they
 // aren't visible to TS on the model classes. This alias keeps the inherited
@@ -46,15 +47,15 @@ type Rec = Base & Record<string, unknown>;
  */
 const call = <T>(recv: object, name: string): T => (recv as Record<string, () => T>)[name]();
 
-// A few tests pass on SQLite + MySQL but expose adapter-specific dirty-tracking
-// gaps on PostgreSQL: (a) a datetime attribute on an anonymous reflected class
-// (`Class.new { table_name = "topics" }`) reads back `undefined` after create on
-// PG, and (b) the save-managed columns (id/timestamps) aren't recorded in
-// `saved_changes` after an INSERT on PG, so `saved_changes?` / `changed?` come
-// back empty. Skipped on PG only — keeps the SQLite/MySQL coverage while the
-// gaps are tracked in dirty-test-framework-gaps.md. (The active adapter is
-// postgres exactly when PG_TEST_URL is set; see bootstrap-test-handler.ts.)
-const SKIP_ON_PG = !!process.env.PG_TEST_URL;
+// A few tests below pass on SQLite + MySQL but expose adapter-specific
+// dirty-tracking gaps on PostgreSQL: (a) a datetime attribute on an anonymous
+// reflected class (`Class.new { table_name = "topics" }`) reads back `undefined`
+// after create on PG, and (b) the save-managed columns (id/timestamps) aren't
+// recorded in `saved_changes` after an INSERT on PG, so `saved_changes?` /
+// `changed?` come back empty. They're gated with
+// `it.skipIf(adapterType === "postgres")` — the inline form `test:compare`'s
+// gate extractor recognizes — keeping SQLite/MySQL coverage. Tracked in
+// dirty-test-framework-gaps.md.
 
 /** Mirrors Rails' private `with_partial_writes(klass, on = true)`. */
 async function withPartialWrites(
@@ -306,7 +307,7 @@ describe("DirtyTest", () => {
     }
   });
 
-  it.skipIf(SKIP_ON_PG)(
+  it.skipIf(adapterType === "postgres")(
     "nullable datetime not marked as changed if new value is blank",
     async () => {
       await withTimezoneConfig({ zone: "Europe/London", awareAttributes: true }, async () => {
@@ -567,24 +568,27 @@ describe("DirtyTest", () => {
     // to MySQL DDL cost. Column-name reflection is covered elsewhere.
   });
 
-  it.skipIf(SKIP_ON_PG)("datetime attribute can be updated with fractional seconds", async () => {
-    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
-      const Target = class extends Base {
-        static tableName = "topics";
-      };
-      const zone = getZone()!;
+  it.skipIf(adapterType === "postgres")(
+    "datetime attribute can be updated with fractional seconds",
+    async () => {
+      await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+        const Target = class extends Base {
+          static tableName = "topics";
+        };
+        const zone = getZone()!;
 
-      const writtenOn = new TimeWithZone(Temporal.Instant.from("2012-12-01T12:00:00Z"), zone);
+        const writtenOn = new TimeWithZone(Temporal.Instant.from("2012-12-01T12:00:00Z"), zone);
 
-      const topic = (await Target.create({ written_on: writtenOn })) as Rec;
-      topic.written_on = new TimeWithZone(
-        (topic.written_on as TimeWithZone).utc().add({ milliseconds: 300 }),
-        zone,
-      );
+        const topic = (await Target.create({ written_on: writtenOn })) as Rec;
+        topic.written_on = new TimeWithZone(
+          (topic.written_on as TimeWithZone).utc().add({ milliseconds: 300 }),
+          zone,
+        );
 
-      expect(topic.attributeChanged("written_on")).toBe(true);
-    });
-  });
+        expect(topic.attributeChanged("written_on")).toBe(true);
+      });
+    },
+  );
 
   it.skip("datetime attribute doesnt change if zone is modified in string", () => {
     // BLOCKED: time-zone parity — Rails re-renders the value in another zone
@@ -664,16 +668,19 @@ describe("DirtyTest", () => {
     // No per-instance method override in JS.
   });
 
-  it.skipIf(SKIP_ON_PG)("attributes assigned but not selected are dirty", async () => {
-    const person = (await Person.select("id").first()) as Rec;
-    expect(person.changed).toBe(false);
+  it.skipIf(adapterType === "postgres")(
+    "attributes assigned but not selected are dirty",
+    async () => {
+      const person = (await Person.select("id").first()) as Rec;
+      expect(person.changed).toBe(false);
 
-    person.first_name = "Sean";
-    expect(person.changed).toBe(true);
+      person.first_name = "Sean";
+      expect(person.changed).toBe(true);
 
-    person.first_name = null;
-    expect(person.changed).toBe(true);
-  });
+      person.first_name = null;
+      expect(person.changed).toBe(true);
+    },
+  );
 
   it.skip("attributes not selected are still missing after save", () => {
     // BLOCKED: attribute-methods — accessing an unselected attribute
@@ -702,7 +709,7 @@ describe("DirtyTest", () => {
     // the current value ("Sean") instead of nil. See the predicate test above.
   });
 
-  it.skipIf(SKIP_ON_PG)(
+  it.skipIf(adapterType === "postgres")(
     "saved_changes? returns whether the last call to save changed anything",
     async () => {
       const person = (await Person.create({ first_name: "Sean" })) as Rec;
@@ -721,7 +728,7 @@ describe("DirtyTest", () => {
     // See "saved_change_to_attribute? ...".
   });
 
-  it.skipIf(SKIP_ON_PG)("changed? in after callbacks returns false", async () => {
+  it.skipIf(adapterType === "postgres")("changed? in after callbacks returns false", async () => {
     const klass = class extends Base {
       static {
         this.tableName = "people";
@@ -740,25 +747,28 @@ describe("DirtyTest", () => {
     expect(person.changed).toBe(false);
   });
 
-  it.skipIf(SKIP_ON_PG)("changed? in around callbacks after yield returns false", async () => {
-    const klass = class extends Base {
-      static {
-        this.tableName = "people";
-        this.aroundCreate(async function (record: Rec, proceed: () => Promise<void>) {
-          await proceed();
-          if (record.changed) throw new Error("changed? should be false");
-          if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
-          if (!call<boolean>(record, "isSavedChanges"))
-            throw new Error("saved_changes? should be true");
-          if (call<unknown>(record, "idInDatabase") == null)
-            throw new Error("id_in_database should not be nil");
-        });
-      }
-    };
+  it.skipIf(adapterType === "postgres")(
+    "changed? in around callbacks after yield returns false",
+    async () => {
+      const klass = class extends Base {
+        static {
+          this.tableName = "people";
+          this.aroundCreate(async function (record: Rec, proceed: () => Promise<void>) {
+            await proceed();
+            if (record.changed) throw new Error("changed? should be false");
+            if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
+            if (!call<boolean>(record, "isSavedChanges"))
+              throw new Error("saved_changes? should be true");
+            if (call<unknown>(record, "idInDatabase") == null)
+              throw new Error("id_in_database should not be nil");
+          });
+        }
+      };
 
-    const person = (await klass.create({ first_name: "Sean" })) as Rec;
-    expect(person.changed).toBe(false);
-  });
+      const person = (await klass.create({ first_name: "Sean" })) as Rec;
+      expect(person.changed).toBe(false);
+    },
+  );
 
   it.skip("partial insert off with unchanged default function attribute", () => {
     // BLOCKED: schema — Rails' `aircraft.manufactured_at` defaults to
