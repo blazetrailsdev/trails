@@ -1447,13 +1447,26 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
     return rows.map((r) => {
       const sqlType = r.type || "";
-      const precMatch = /^(datetime|timestamp|time)\((\d+)\)$/i.exec(sqlType);
-      const precision = precMatch ? parseInt(precMatch[2], 10) : null;
-      const baseSqlType = precMatch ? sqlType.slice(0, sqlType.indexOf("(")) : sqlType;
+      // Extract (N) parameter — precision for temporal types, limit for everything else.
+      const paramMatch = /\((\d+)\)/.exec(sqlType);
+      const isDtPrec = /^(datetime|timestamp|time)\b/i.test(sqlType);
+      const precision = isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
+      const limit = !isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
+      // Strip (N) so the base SQL name can be looked up in the TypeMap.
+      // NOTE: baseSqlType is stored in sqlType (e.g. "varchar" not "varchar(10)").
+      // This diverges from Rails' SqlTypeMetadata#sql_type which carries the full
+      // string. It is safe here because `limit` is populated explicitly above, so
+      // schemaLimit does not need to parse parens from column.sqlType.
+      const baseSqlType = paramMatch ? sqlType.slice(0, sqlType.indexOf("(")).trimEnd() : sqlType;
+      // Resolve the DSL cast-type name (e.g. "varchar" → "string") via the
+      // TypeMap so schemaType returns the right DSL identifier after U3 wires
+      // emitTable through columnSpec.
+      const castType = this.lookupCastType(baseSqlType);
+      const dslTypeName = castType.type() !== "value" ? castType.type() : baseSqlType.toLowerCase();
       const meta = new SqlTypeMetadata({
         sqlType: baseSqlType,
-        type: baseSqlType.toLowerCase(),
-        limit: null,
+        type: dslTypeName,
+        limit,
         precision,
         scale: null,
       });
