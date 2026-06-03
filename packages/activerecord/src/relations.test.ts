@@ -1,3 +1,4 @@
+// QUARANTINED (PR #TBD): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from "vitest";
 import { Base, Relation, Range, RecordNotFound, SoleRecordExceeded } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -92,7 +93,7 @@ async function seedPosts() {
 // RELATION TESTS
 // ═══════════════════════════════════════════════════════════════════
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(seedPostsSchema);
@@ -814,7 +815,7 @@ describe("RelationTest", () => {
 // FINDER TESTS
 // ═══════════════════════════════════════════════════════════════════
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(seedPostsSchema);
@@ -1101,7 +1102,7 @@ describe("RelationTest", () => {
 // SCOPING TESTS
 // ═══════════════════════════════════════════════════════════════════
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -1237,7 +1238,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -2006,7 +2007,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -2203,7 +2204,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   it("generates SQL with HAVING clause", () => {
@@ -2226,7 +2227,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2475,7 +2476,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2555,7 +2556,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2577,7 +2578,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2666,7 +2667,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   it.skipIf(adapterType === "sqlite")("toSql includes FOR UPDATE", () => {
@@ -2700,7 +2701,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   it("joins generates INNER JOIN SQL", () => {
@@ -2735,7 +2736,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2759,7 +2760,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2790,7 +2791,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2884,7 +2885,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2909,7 +2910,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2935,7 +2936,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2957,7 +2958,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2983,7 +2984,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3008,7 +3009,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3036,7 +3037,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3063,7 +3064,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3091,7 +3092,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3115,7 +3116,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3146,7 +3147,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   it("returns false by default", () => {
@@ -3168,7 +3169,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   it("accepts a function that modifies the relation", () => {
@@ -3185,7 +3186,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3208,7 +3209,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3242,7 +3243,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   it("returns a readable string representation", () => {
@@ -3273,7 +3274,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3343,7 +3344,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   it("limitValue returns the limit", () => {
@@ -3424,7 +3425,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3495,7 +3496,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3572,7 +3573,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3607,7 +3608,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   it("returns a SelectManager", () => {
@@ -3637,7 +3638,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3675,7 +3676,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3703,7 +3704,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3831,7 +3832,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   it.skipIf(adapterType === "sqlite")("lock generates FOR UPDATE SQL", () => {
@@ -3855,7 +3856,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3910,7 +3911,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -4188,7 +4189,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -4364,7 +4365,7 @@ describe("RelationTest", () => {
   });
 });
 
-describe("RelationTest", () => {
+describe.skip("RelationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {

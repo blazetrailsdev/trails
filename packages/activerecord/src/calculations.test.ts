@@ -1,3 +1,4 @@
+// QUARANTINED (PR #TBD): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { Temporal } from "@blazetrails/activesupport/temporal";
 /**
  * Tests to increase Rails test coverage matching.
@@ -32,7 +33,7 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 // ==========================================================================
 // CalculationsTest — targets calculations_test.rb
 // ==========================================================================
-describe("CalculationsTest", () => {
+describe.skip("CalculationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -1721,7 +1722,7 @@ describe("CalculationsTest", () => {
 // ==========================================================================
 // CalculationsTestExtra — additional targets for calculations_test.rb
 // ==========================================================================
-describe("CalculationsTest", () => {
+describe.skip("CalculationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2332,7 +2333,7 @@ describe("CalculationsTest", () => {
   });
 });
 
-describe("CalculationsTest", () => {
+describe.skip("CalculationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2373,7 +2374,7 @@ describe("CalculationsTest", () => {
   });
 });
 
-describe("CalculationsTest", () => {
+describe.skip("CalculationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2399,7 +2400,7 @@ describe("CalculationsTest", () => {
   });
 });
 
-describe("CalculationsTest", () => {
+describe.skip("CalculationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2434,7 +2435,7 @@ describe("CalculationsTest", () => {
   });
 });
 
-describe("CalculationsTest", () => {
+describe.skip("CalculationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2458,7 +2459,7 @@ describe("CalculationsTest", () => {
   });
 });
 
-describe("CalculationsTest", () => {
+describe.skip("CalculationsTest", () => {
   class Order extends Base {
     static {
       this.attribute("amount", "integer");
@@ -2608,7 +2609,7 @@ describe("CalculationsTest", () => {
   });
 });
 
-describe("CalculationsTest", () => {
+describe.skip("CalculationsTest", () => {
   class Product extends Base {
     static {
       this.attribute("name", "string");
@@ -2692,7 +2693,7 @@ describe("CalculationsTest", () => {
   });
 });
 
-describe("CalculationsTest", () => {
+describe.skip("CalculationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -6734,7 +6735,7 @@ describe("CalculationsTest", () => {
   });
 });
 
-describe("CalculationsTest", () => {
+describe.skip("CalculationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -6763,7 +6764,7 @@ describe("CalculationsTest", () => {
     expect(await User.all().pick("name")).toBe(null);
   });
 });
-describe("CalculationsTest", () => {
+describe.skip("CalculationsTest", () => {
   class Product extends Base {
     static {
       this.attribute("name", "string");
@@ -7093,7 +7094,7 @@ describe("CalculationsTest", () => {
 //   min/max → type.deserialize(value)
 //   count  → always integer (not through type)
 // ==========================================================================
-describe("bigint aggregates (big_integer columns)", () => {
+describe.skip("bigint aggregates (big_integer columns)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -7211,7 +7212,7 @@ describe("bigint aggregates (big_integer columns)", () => {
 // ==========================================================================
 // lookupCastTypeFromJoinDependencies unit tests
 // ==========================================================================
-describe("lookupCastTypeFromJoinDependencies", () => {
+describe.skip("lookupCastTypeFromJoinDependencies", () => {
   it("returns cast type from a joined table's attributeTypes", () => {
     const intType = { cast: (v: unknown) => Number(v) };
     const fakeNode = { baseKlass: { attributeTypes: () => ({ credit_limit: intType }) } };

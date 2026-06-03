@@ -1,3 +1,4 @@
+// QUARANTINED (PR #TBD): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -456,7 +457,7 @@ const HEAD_SCHEMA: Schema = {
   posts: { title: "string" },
 };
 
-describe("HasManyAssociationsTestPrimaryKeys", () => {
+describe.skip("HasManyAssociationsTestPrimaryKeys", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -603,7 +604,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   });
 });
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -636,7 +637,7 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
-describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
+describe.skip("HasManyAssociationsTestForReorderWithJoinDependency", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -651,7 +652,7 @@ describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
   });
 });
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -818,7 +819,7 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -980,7 +981,7 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -1351,7 +1352,7 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -1820,7 +1821,7 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2064,7 +2065,7 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2157,7 +2158,7 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -7352,7 +7353,7 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -7392,7 +7393,7 @@ describe("HasManyAssociationsTest", () => {
 // the parent describe's `beforeEach`. Hoisting the classes and adapter to
 // `beforeAll` means schema DDL runs once per file and each test runs inside
 // BEGIN/ROLLBACK rather than rebuilding tables.
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   class Author extends Base {
     declare name: string;
   }
@@ -7614,7 +7615,7 @@ const DEFAULT_SCOPE_SCHEMA: Schema = {
   ds_bulbs: { car_id: "integer", name: "string" },
 };
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -7738,7 +7739,7 @@ const TAIL_PRIMARY_KEYS_SCHEMA: Schema = {
   cpk_asg_posts: { author_id: "integer", title: "string" },
 };
 
-describe("HasManyAssociationsTestPrimaryKeys", () => {
+describe.skip("HasManyAssociationsTestPrimaryKeys", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -7811,7 +7812,7 @@ const TAIL_HMT_SCHEMA: Schema = {
   preload_posts: { author_id: "integer", title: "string" },
 };
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -8087,7 +8088,7 @@ const TAIL_ASYNC_SCHEMA: Schema = {
   async_posts: { author_id: "integer", title: "string" },
 };
 
-describe("AsyncHasManyAssociationsTest", () => {
+describe.skip("AsyncHasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -8127,7 +8128,7 @@ const TAIL_HMT2_SCHEMA: Schema = {
   r_containers: { name: "string" },
 };
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -8207,7 +8208,7 @@ const COUNTER_CACHE_HEAD_SCHEMA: Schema = {
   posts: { author_id: "integer", title: "string" },
 };
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 

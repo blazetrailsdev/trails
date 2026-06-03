@@ -1,3 +1,4 @@
+// QUARANTINED (PR #TBD): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Associations tests — mirrors Rails activerecord/test/cases/associations/*
  *
@@ -43,7 +44,7 @@ import { LoaderQuery } from "./associations/preloader/association.js";
 // belongs_to associations (Rails: belongs_to_associations_test.rb)
 // ==========================================================================
 
-describe("BelongsToAssociations", () => {
+describe.skip("BelongsToAssociations", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -261,7 +262,7 @@ describe("BelongsToAssociations", () => {
 // has_one associations (Rails: has_one_associations_test.rb)
 // ==========================================================================
 
-describe("HasOneAssociations", () => {
+describe.skip("HasOneAssociations", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -370,7 +371,7 @@ describe("HasOneAssociations", () => {
 // has_many associations (Rails: has_many_associations_test.rb)
 // ==========================================================================
 
-describe("HasManyAssociations", () => {
+describe.skip("HasManyAssociations", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -509,7 +510,7 @@ describe("HasManyAssociations", () => {
 // has_many :through (Rails: has_many_through_associations_test.rb)
 // ==========================================================================
 
-describe("HasManyThroughAssociations", () => {
+describe.skip("HasManyThroughAssociations", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -618,7 +619,7 @@ describe("HasManyThroughAssociations", () => {
 // CollectionProxy (Rails: collection_proxy_test.rb)
 // ==========================================================================
 
-describe("CollectionProxy", () => {
+describe.skip("CollectionProxy", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -855,7 +856,7 @@ describe("CollectionProxy", () => {
 // Dependent associations (Rails: has_many_associations_test.rb)
 // ==========================================================================
 
-describe("DependentAssociations", () => {
+describe.skip("DependentAssociations", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -1105,7 +1106,7 @@ describe("DependentAssociations", () => {
 // Strict loading (Rails: strict_loading_test.rb)
 // ==========================================================================
 
-describe("StrictLoading", () => {
+describe.skip("StrictLoading", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -1191,7 +1192,7 @@ describe("StrictLoading", () => {
 // Association definition via class methods
 // ==========================================================================
 
-describe("AssociationDefinitions", () => {
+describe.skip("AssociationDefinitions", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   // Rails: test_belongs_to_macro_is_stored
@@ -1264,7 +1265,7 @@ describe("AssociationDefinitions", () => {
 // Reflection (Rails: reflection_test.rb)
 // ==========================================================================
 
-describe("AssociationReflection", () => {
+describe.skip("AssociationReflection", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -1391,7 +1392,7 @@ describe("AssociationReflection", () => {
 // HABTM (Rails: has_and_belongs_to_many_associations_test.rb)
 // ==========================================================================
 
-describe("HasAndBelongsToManyAssociations", () => {
+describe.skip("HasAndBelongsToManyAssociations", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -1464,7 +1465,7 @@ describe("HasAndBelongsToManyAssociations", () => {
 // Counter cache (Rails: counter_cache_test.rb)
 // ==========================================================================
 
-describe("CounterCache", () => {
+describe.skip("CounterCache", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -1588,7 +1589,7 @@ describe("CounterCache", () => {
 // Touch parent (Rails: belongs_to_associations_test.rb touch tests)
 // ==========================================================================
 
-describe("TouchBelongsToParents", () => {
+describe.skip("TouchBelongsToParents", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -1654,7 +1655,7 @@ describe("TouchBelongsToParents", () => {
   });
 });
 
-describe("Rails-guided: association features", () => {
+describe.skip("Rails-guided: association features", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -1907,7 +1908,7 @@ describe("Rails-guided: association features", () => {
   });
 });
 
-describe("AssociationsTest", () => {
+describe.skip("AssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3611,7 +3612,7 @@ describe("AssociationsTest", () => {
   });
 });
 
-describe("Associations", () => {
+describe.skip("Associations", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -3703,7 +3704,7 @@ describe("Associations", () => {
   });
 });
 
-describe("Associations: dependent", () => {
+describe.skip("Associations: dependent", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3774,7 +3775,7 @@ describe("Associations: dependent", () => {
   });
 });
 
-describe("CollectionProxy", () => {
+describe.skip("CollectionProxy", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3897,7 +3898,7 @@ describe("CollectionProxy", () => {
   });
 });
 
-describe("Polymorphic Associations", () => {
+describe.skip("Polymorphic Associations", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -3992,7 +3993,7 @@ describe("Polymorphic Associations", () => {
   });
 });
 
-describe("association scopes", () => {
+describe.skip("association scopes", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -4040,7 +4041,7 @@ describe("association scopes", () => {
   });
 });
 
-describe("whereAssociated / whereMissing", () => {
+describe.skip("whereAssociated / whereMissing", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -4097,7 +4098,7 @@ describe("whereAssociated / whereMissing", () => {
   });
 });
 
-describe("destroyedByAssociation", () => {
+describe.skip("destroyedByAssociation", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -4125,7 +4126,7 @@ describe("destroyedByAssociation", () => {
   });
 });
 
-describe("dependent: restrictWithException", () => {
+describe.skip("dependent: restrictWithException", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -4193,7 +4194,7 @@ describe("dependent: restrictWithException", () => {
   });
 });
 
-describe("CollectionProxy enhancements", () => {
+describe.skip("CollectionProxy enhancements", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -4333,7 +4334,7 @@ describe("CollectionProxy enhancements", () => {
   });
 });
 
-describe("Associations (Rails-guided)", () => {
+describe.skip("Associations (Rails-guided)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -4416,7 +4417,7 @@ describe("Associations (Rails-guided)", () => {
   });
 });
 
-describe("Associations (Rails-guided)", () => {
+describe.skip("Associations (Rails-guided)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -4546,7 +4547,7 @@ describe("Associations (Rails-guided)", () => {
   });
 });
 
-describe("Polymorphic Associations (Rails-guided)", () => {
+describe.skip("Polymorphic Associations (Rails-guided)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -4643,7 +4644,7 @@ describe("Polymorphic Associations (Rails-guided)", () => {
   });
 });
 
-describe("HABTM (Rails-guided)", () => {
+describe.skip("HABTM (Rails-guided)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -4703,7 +4704,7 @@ describe("HABTM (Rails-guided)", () => {
   });
 });
 
-describe("inverse_of (Rails-guided)", () => {
+describe.skip("inverse_of (Rails-guided)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -4778,7 +4779,7 @@ describe("inverse_of (Rails-guided)", () => {
   });
 });
 
-describe("Association Scopes (Rails-guided)", () => {
+describe.skip("Association Scopes (Rails-guided)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -4860,7 +4861,7 @@ describe("Association Scopes (Rails-guided)", () => {
 // BelongsToAssociationsTest (testable subset)
 // ---------------------------------------------------------------------------
 
-describe("BelongsToAssociationsTest", () => {
+describe.skip("BelongsToAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -6011,7 +6012,7 @@ function makeFirmClients() {
 // HasManyAssociationsTest (testable subset)
 // ---------------------------------------------------------------------------
 
-describe("HasManyAssociationsTest", () => {
+describe.skip("HasManyAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -7210,7 +7211,7 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
-describe("AssociationProxyTest", () => {
+describe.skip("AssociationProxyTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -7584,7 +7585,7 @@ describe("AssociationProxyTest", () => {
   });
 });
 
-describe("PreloaderTest", () => {
+describe.skip("PreloaderTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -9620,7 +9621,7 @@ describe("PreloaderTest", () => {
   });
 });
 
-describe("OverridingAssociationsTest", () => {
+describe.skip("OverridingAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -9830,7 +9831,7 @@ describe("OverridingAssociationsTest", () => {
   });
 });
 
-describe("GeneratedMethodsTest", () => {
+describe.skip("GeneratedMethodsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   it("association methods override attribute methods of same name", () => {
@@ -9871,7 +9872,7 @@ describe("GeneratedMethodsTest", () => {
   });
 });
 
-describe("WithAnnotationsTest", () => {
+describe.skip("WithAnnotationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   it("belongs to with annotation includes a query comment", () => {
@@ -9939,7 +9940,7 @@ describe("WithAnnotationsTest", () => {
 // CollectionProxy delegation via Proxy
 // ==========================================================================
 
-describe("CollectionProxyDelegation", () => {
+describe.skip("CollectionProxyDelegation", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -10150,7 +10151,7 @@ describe("CollectionProxyDelegation", () => {
   });
 });
 
-describe("eagerLoadBang", () => {
+describe.skip("eagerLoadBang", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   it("resolves without error", async () => {

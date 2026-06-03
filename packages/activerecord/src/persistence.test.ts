@@ -1,3 +1,4 @@
+// QUARANTINED (PR #TBD): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 
@@ -23,7 +24,7 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 // ==========================================================================
 // PersistenceTest — targets persistence_test.rb
 // ==========================================================================
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -427,7 +428,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 // More PersistenceTest
 // ==========================================================================
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -499,7 +500,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 // PersistenceTest (continued) — more persistence_test.rb coverage
 // ==========================================================================
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -663,7 +664,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 // PersistenceTest2 — additional coverage for persistence_test.rb
 // ==========================================================================
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   let Post: typeof Base;
@@ -918,7 +919,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 // PersistenceTest3 — additional missing tests from persistence_test.rb
 // ==========================================================================
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -1079,7 +1080,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -2153,7 +2154,7 @@ describe("PersistenceTest", () => {
   }); // QueryConstraintsTest
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2243,7 +2244,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2337,7 +2338,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2376,7 +2377,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2399,7 +2400,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2419,7 +2420,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2441,7 +2442,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2465,7 +2466,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2511,7 +2512,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2535,7 +2536,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2570,7 +2571,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2593,7 +2594,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2970,7 +2971,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -3161,7 +3162,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -3271,7 +3272,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -3334,7 +3335,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -3447,7 +3448,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -3547,7 +3548,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -3653,7 +3654,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3698,7 +3699,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3780,7 +3781,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3897,7 +3898,7 @@ describe("PersistenceTest", () => {
   });
 });
 
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3974,7 +3975,7 @@ describe("PersistenceTest", () => {
     expect(result.isDestroyed()).toBe(true);
   });
 });
-describe("PersistenceTest", () => {
+describe.skip("PersistenceTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 

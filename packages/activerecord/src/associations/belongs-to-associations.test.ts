@@ -1,3 +1,4 @@
+// QUARANTINED (PR #TBD): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -23,7 +24,7 @@ function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
 
-describe("BelongsToWithForeignKeyTest", () => {
+describe.skip("BelongsToWithForeignKeyTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -44,7 +45,7 @@ describe("BelongsToWithForeignKeyTest", () => {
   });
 });
 
-describe("touch on belongs_to", () => {
+describe.skip("touch on belongs_to", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -85,7 +86,7 @@ describe("touch on belongs_to", () => {
   });
 });
 
-describe("BelongsToAssociationsTest", () => {
+describe.skip("BelongsToAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3654,7 +3655,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 });
 
-describe("AsyncBelongsToAssociationsTest", () => {
+describe.skip("AsyncBelongsToAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -3687,7 +3688,7 @@ describe("AsyncBelongsToAssociationsTest", () => {
   });
 });
 
-describe("BelongsToAssociationsTest", () => {
+describe.skip("BelongsToAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {

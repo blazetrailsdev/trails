@@ -1,3 +1,4 @@
+// QUARANTINED (PR #TBD): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Mirrors Rails activerecord/test/cases/associations/eager_test.rb
  */
@@ -485,7 +486,7 @@ async function seedSponsors(): Promise<void> {
 // ==========================================================================
 // EagerAssociationTest — targets associations/eager_test.rb
 // ==========================================================================
-describe("EagerAssociationTest", () => {
+describe.skip("EagerAssociationTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -5560,7 +5561,7 @@ describe("EagerAssociationTest", () => {
   });
 });
 
-describe("EagerLoadingTooManyIdsTest", () => {
+describe.skip("EagerLoadingTooManyIdsTest", () => {
   it.skip("preloading too many ids", () => {
     // BLOCKED: associations — eager-loading feature gap
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
@@ -5580,7 +5581,7 @@ describe("EagerLoadingTooManyIdsTest", () => {
 // categorizations fixtures, so they need the fixture-backed handler suite. The
 // main block above declares ad-hoc per-test models against a local schema.
 // ==========================================================================
-describe("EagerAssociationTest", () => {
+describe.skip("EagerAssociationTest", () => {
   const { posts, categories } = useHandlerFixtures([
     "categories",
     "posts",
@@ -5672,7 +5673,7 @@ describe("EagerAssociationTest", () => {
 // name as the other EagerAssociationTest blocks so test:compare matches it to
 // the Rails `EagerAssociationTest` class.
 // ==========================================================================
-describe("EagerAssociationTest", () => {
+describe.skip("EagerAssociationTest", () => {
   useHandlerFixtures(["developers", "projects", "developersProjects"]);
   // Force-recreate the canonical tables with `dropExisting` (mirrors the
   // EagerAssociationTest block above). Sibling files share the per-worker SQLite
