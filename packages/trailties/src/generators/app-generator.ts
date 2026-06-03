@@ -206,7 +206,7 @@ db/schema.ts linguist-generated
 `,
     );
 
-    this.createFile(".node-version", "22.0.0\n");
+    this.createFile(".node-version", "24.16.0\n");
 
     this.createFile(
       "README.md",
@@ -927,7 +927,7 @@ export async function setupTestDatabase(): Promise<void> {
       "Dockerfile",
       `# syntax=docker/dockerfile:1
 
-ARG NODE_VERSION=22.0.0
+ARG NODE_VERSION=24.16.0
 FROM node:${"${NODE_VERSION}"}-slim AS base
 
 LABEL fly_launch_runtime="Trails"
