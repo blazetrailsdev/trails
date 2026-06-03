@@ -14,34 +14,42 @@ const SHARED_EXCLUDE = [
   "packages/*/dx-tests/**",
 ];
 
-// Gate-based design (replaces the old TEST_ADAPTER-keyed exclude). The pure-unit
-// `connection-adapters/<db>/**` subdirs (OID types, quoting helpers,
-// schema-creation stubs) are NOT excluded here, so they now load on every CI job
-// — previously the TEST_ADAPTER default of sqlite3 dropped the PG/MySQL ones in
-// all jobs, so they never ran. They pass on any backend; live-DB cases inside
-// them are wrapped in `describeIfPg` / `describeIfMysql` / `describeIfSqlite`.
+// Rails model: TEST_ADAPTER selects one backend; that backend's adapter dirs
+// run as part of the shared `pnpm vitest run packages/activerecord/` invocation;
+// the other backends' adapter dirs are excluded (mirrors `rake test:postgresql`
+// / `rake test:mysql2` / `rake test:sqlite3`).
 //
-// The live-DB `adapters/<db>/**` suites stay excluded from the shared
-// `pnpm vitest run packages/activerecord/` invocation. They cannot run green in
-// that invocation yet — cross-file isolation: concentrating the PG adapter files
-// under AR_DB_FORKS parallel forks exhausts the per-worker advisory-lock pool
-// and leaks search_path / schema_cache across files (the plan's §4 prerequisite).
-// P-9 PG schema-dump shorthands resolved. M-1a/M-1b MySQL resolved. All bucket
-// failures resolved — see docs/activerecord/adapter-test-ci-coverage-plan.md.
+// The pure-unit `connection-adapters/<db>/**` subdirs (OID types, quoting
+// helpers, schema-creation stubs) are NOT in this exclude — they run on every
+// CI job regardless of TEST_ADAPTER. Live-DB cases inside them are wrapped in
+// `describeIfPg` / `describeIfMysql` / `describeIfSqlite`.
 //
-// Set RUN_ADAPTER_DIRS=1 to drop this exclude for a dedicated adapter-dirs run
-// (see docs/activerecord/adapter-test-ci-coverage-plan.md §5).
+// CI sets TEST_ADAPTER=postgresql on postgres-tests and TEST_ADAPTER=mysql2 on
+// mysql-tests. sqlite-tests leaves TEST_ADAPTER unset (defaults to sqlite3).
+// See docs/activerecord/adapter-test-ci-coverage-plan.md §5 for the local recipe.
+const TEST_ADAPTER = process.env.TEST_ADAPTER ?? "sqlite3";
+
+const PG_ADAPTER_DIRS = [
+  "packages/activerecord/src/adapters/postgresql/**",
+  "packages/activerecord/src/tasks/postgresql-*.test.ts",
+];
+const MYSQL_ADAPTER_DIRS = [
+  "packages/activerecord/src/adapters/abstract-mysql-adapter/**",
+  "packages/activerecord/src/adapters/mysql2/**",
+  "packages/activerecord/src/connection-adapters/mysql2-*.test.ts",
+  "packages/activerecord/src/tasks/mysql-*.test.ts",
+];
+const SQLITE_ADAPTER_DIRS = [
+  "packages/activerecord/src/adapters/sqlite3/**",
+  "packages/activerecord/src/tasks/sqlite-*.test.ts",
+];
+
 const ADAPTER_SPECIFIC_EXCLUDE =
-  process.env.RUN_ADAPTER_DIRS === "1"
-    ? []
-    : [
-        "packages/activerecord/src/adapters/postgresql/**",
-        "packages/activerecord/src/tasks/postgresql-*.test.ts",
-        "packages/activerecord/src/adapters/abstract-mysql-adapter/**",
-        "packages/activerecord/src/adapters/mysql2/**",
-        "packages/activerecord/src/connection-adapters/mysql2-*.test.ts",
-        "packages/activerecord/src/tasks/mysql-*.test.ts",
-      ];
+  TEST_ADAPTER === "postgresql"
+    ? [...MYSQL_ADAPTER_DIRS, ...SQLITE_ADAPTER_DIRS]
+    : TEST_ADAPTER === "mysql2"
+      ? [...PG_ADAPTER_DIRS, ...SQLITE_ADAPTER_DIRS]
+      : [...PG_ADAPTER_DIRS, ...MYSQL_ADAPTER_DIRS]; // default: sqlite3
 
 // Low-level SQLite driver wrappers + the driver registry. These are pure unit
 // tests (they register/swap drivers directly) and must NOT load test-setup-ar,
