@@ -236,7 +236,11 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (o.ifNotExists) sql += " IF NOT EXISTS";
     sql += ` ${this.adapter.quoteTableName(o.tableName)}`;
 
-    const statements: string[] = o.columns.map((c) => this.visitColumnDefinition(c));
+    // Mirrors Rails' visit_TableDefinition: skip column definitions when `as:` is
+    // set (CREATE TABLE ... AS SELECT ...) — the SELECT defines the columns. Indexes
+    // declared in the block are still emitted inline (MySQL-specific; tested by
+    // active-schema.test.ts "indexes in create").
+    const statements: string[] = o.as ? [] : o.columns.map((c) => this.visitColumnDefinition(c));
     if (o.compositePrimaryKey && o.compositePrimaryKey.length > 0) {
       const cols = o.compositePrimaryKey.map((k) => this.adapter.quoteIdentifier(k)).join(", ");
       statements.push(`PRIMARY KEY (${cols})`);
