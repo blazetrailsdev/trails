@@ -14,15 +14,23 @@ const SHARED_EXCLUDE = [
   "packages/*/dx-tests/**",
 ];
 
-// connection-adapters/<db>/ subdirectory files (OID types, quoting helpers,
-// schema-creation stubs) are pure unit tests that load on every run and pass on
-// any backend without a gate. Tests that need a live DB are wrapped with
-// `describeIfPg` / `describeIfMysql` / `describeIfSqlite`.
+// Gate-based design (replaces the old TEST_ADAPTER-keyed exclude). The pure-unit
+// `connection-adapters/<db>/**` subdirs (OID types, quoting helpers,
+// schema-creation stubs) are NOT excluded here, so they now load on every CI job
+// — previously the TEST_ADAPTER default of sqlite3 dropped the PG/MySQL ones in
+// all jobs, so they never ran. They pass on any backend; live-DB cases inside
+// them are wrapped in `describeIfPg` / `describeIfMysql` / `describeIfSqlite`.
 //
-// adapters/<db>/** and the few connection-adapter files that hit a live DB are
-// still excluded from the shared run — they contain pre-existing failures
-// (P-3 virtual-column, P-9 schema-dump shorthands, M-1/M-3 MySQL dialect,
-// M-4 _buildInitSql) addressed in follow-up PRs.
+// The live-DB `adapters/<db>/**` suites stay excluded from the shared
+// `pnpm vitest run packages/activerecord/` invocation. They cannot run green in
+// that invocation yet — verified locally against postgres:17 / mysql:8:
+//   - cross-file isolation: concentrating the PG adapter files under AR_DB_FORKS
+//     parallel forks exhausts the per-worker advisory-lock pool and leaks
+//     search_path / schema_cache across files (the plan's §4 prerequisite).
+//   - pre-existing bucket failures: P-9 PG schema-dump shorthands; M-1/M-2/M-3
+//     MySQL dialect (collation, warnings, temp-table DDL).
+// Enabling them is Story I-5: a dedicated TEST_ADAPTER step (own process) plus
+// the §4/§5 fixes — see docs/activerecord/adapter-test-ci-coverage-plan.md.
 const ADAPTER_SPECIFIC_EXCLUDE = [
   "packages/activerecord/src/adapters/postgresql/**",
   "packages/activerecord/src/tasks/postgresql-*.test.ts",
