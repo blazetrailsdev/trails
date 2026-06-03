@@ -11,8 +11,8 @@ adapter-only job path. The ~40-LOC wiring is the last step, after the remaining
 bucket fixes below land.
 
 **Progress:** the exploratory probe surfaced ~38 pre-existing failures; bucket
-fixes have brought that down to **0**. PG (P-9) and MySQL (M-1a/M-1b) all
-resolved. Everything else is resolved — this doc tracks only what remains.
+fixes have brought that down to **0**. PG (P-9, P-money) and MySQL (M-1a/M-1b)
+all resolved. Everything else is resolved — this doc tracks only what remains.
 
 ---
 
@@ -93,11 +93,12 @@ buckets are green, then flip to a hard gate — see §4.
 Counts are de-duplicated vitest "Failed Tests" totals. Re-confirm each bucket
 against current `main` before scoping it (the set drifts as fixes land).
 
-### PostgreSQL — 0 failed (P-9 resolved)
+### PostgreSQL — 0 failed ✓
 
-| #       | Bucket                            | Files / tests                                                           | Root cause                                                                 | Fix                                                                                             |
-| ------- | --------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| ~~P-9~~ | ~~schema-dumper: type shorthand~~ | ~~`serial.test.ts` (4), `array.test.ts` (1), `bit-string.test.ts` (1)~~ | ~~dumper didn't emit shorthand DSL for serial/bigserial/bitVarying/array~~ | Resolved: `isDefaultPrimaryKey` widened to include `"serial"`; `RUN_ADAPTER_DIRS` gate on main. |
+| #           | Bucket                            | Files / tests                                                           | Root cause                                                                                                                                | Fix                                                                                                                                            |
+| ----------- | --------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~P-9~~     | ~~schema-dumper: type shorthand~~ | ~~`serial.test.ts` (4), `array.test.ts` (1), `bit-string.test.ts` (1)~~ | ~~dumper didn't emit shorthand DSL for serial/bigserial/bitVarying/array~~                                                                | Resolved: `isDefaultPrimaryKey` widened to include `"serial"`; `RUN_ADAPTER_DIRS` gate on main.                                                |
+| ~~P-money~~ | ~~schema-dumper: money default~~  | ~~`money.test.ts` (1), `schema.test.ts` (1)~~                           | ~~`splitPgDefault` regex `[\w"\s.]+` can't span `::` in multi-cast chains; `(150.55)::numeric::money` was treated as a function default~~ | Resolved: regex changed to `(?:::[\w"\s.]+)+` in `splitPgDefault`; test assertion updated to Rails order (`scale` before `default: "150.55"`). |
 
 ### MySQL — 0 failed ✓
 
@@ -108,12 +109,12 @@ M-1a and M-1b resolved. See §4 for next steps.
 ## 4. Remaining steps
 
 1. ~~**P-9**~~ — resolved.
-2. ~~**M-1a**~~ — resolved.
-3. ~~**M-1b**~~ — resolved.
-4. **Wire the lane in** (~40 LOC) — add the adapter-dir step to `postgres-tests`
+2. ~~**P-money**~~ — resolved.
+3. ~~**M-1a**~~ — resolved.
+4. ~~**M-1b**~~ — resolved.
+5. **Wire the lane in** (~40 LOC) — add the adapter-dir step to `postgres-tests`
    / `mysql-tests` (relocate from PR #2863's prototype jobs). The `RUN_ADAPTER_DIRS`
-   gate is now on `main`. Recommend non-blocking (`continue-on-error`) for PG now
-   (P-9 green), hard gate once M-1a + M-1b land.
+   gate is now on `main`. Recommend hard gate for PG (P-9 + P-money both green).
 
 ---
 

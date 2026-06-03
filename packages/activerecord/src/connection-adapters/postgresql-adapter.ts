@@ -5460,12 +5460,12 @@ function splitPgDefault(raw: string | null): { literal: unknown; fn: string | nu
   // 'value'::type — quoted literal with an optional cast.
   const quoted = /^'((?:[^']|'')*)'::[\w"\s.]+$/.exec(raw);
   if (quoted) return { literal: quoted[1].replace(/''/g, "'"), fn: null };
-  // (N)::type — numeric wrapped in parens with a cast (PG emits this for
-  // things like `DEFAULT 150.55::numeric::money`).
-  const parenNum = /^\((-?\d+(?:\.\d+)?)\)::[\w"\s.]+$/.exec(raw);
+  // (N)::type[::type2...] — numeric wrapped in parens with one or more casts
+  // (PG emits this for `DEFAULT 150.55::numeric::money` → `(150.55)::numeric::money`).
+  const parenNum = /^\((-?\d+(?:\.\d+)?)\)(?:::[\w"\s.]+)+$/.exec(raw);
   if (parenNum) return { literal: parenNum[1], fn: null };
-  // N::type — bare numeric with a cast.
-  const castNum = /^(-?\d+(?:\.\d+)?)::[\w"\s.]+$/.exec(raw);
+  // N::type[::type2...] — bare numeric with one or more casts.
+  const castNum = /^(-?\d+(?:\.\d+)?)(?:::[\w"\s.]+)+$/.exec(raw);
   if (castNum) return { literal: castNum[1], fn: null };
   // Bare numeric / boolean / NULL literal.
   if (/^-?\d+(?:\.\d+)?$/.test(raw)) return { literal: raw, fn: null };
