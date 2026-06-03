@@ -162,7 +162,7 @@ export class SchemaStatements {
     });
     if (definer) definer(td);
 
-    await this.adapter.executeMutation(td.toSql());
+    await this.adapter.executeMutation(this.adapter.toSql(td));
 
     // Rails: if supports_comments? && !supports_comments_in_create?
     //   change_table_comment(table_name, comment) if options[:comment].present?
