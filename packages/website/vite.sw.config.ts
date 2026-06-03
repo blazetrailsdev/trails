@@ -28,13 +28,10 @@ export default defineConfig({
   plugins: [prependImportScripts()],
   resolve: {
     alias: [
-      // Subpath imports must come before the base alias.
-      // The sqlite driver subpath maps "sqlite/<name>" → "sqlite-drivers/<name>"
-      // because the package layout uses a plural directory.
-      {
-        find: /^@blazetrails\/activesupport\/sqlite\/(.+)$/,
-        replacement: path.resolve(__dirname, "../activesupport/src/sqlite-drivers/$1.ts"),
-      },
+      // Subpath imports must come before the base alias. The activerecord
+      // sqlite drivers (@blazetrails/activerecord/sqlite/<name>) are handled by
+      // the generic activerecord subpath alias below — the src/sqlite/ dir
+      // matches the specifier, so no special case is needed.
       {
         find: /^@blazetrails\/activesupport\/(.+)$/,
         replacement: path.resolve(__dirname, "../activesupport/src/$1.ts"),

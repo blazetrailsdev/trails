@@ -9,7 +9,7 @@ import type {
   SqliteOpenConfig,
   SyncSqliteConnection,
   SyncSqliteStatement,
-} from "@blazetrails/activesupport/sqlite-adapter";
+} from "../../sqlite-adapter.js";
 import { assertLogged } from "./test-helper.js";
 
 let adapter: SQLite3Adapter;

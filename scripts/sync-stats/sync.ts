@@ -2,7 +2,7 @@ import { execSync } from "child_process";
 import { mkdirSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
-import "@blazetrails/activesupport/sqlite/better-sqlite3";
+import "@blazetrails/activerecord/sqlite/better-sqlite3";
 import { Base, MigrationContext } from "@blazetrails/activerecord";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 

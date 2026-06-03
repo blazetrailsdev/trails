@@ -175,7 +175,7 @@ describe("SQLite3Adapter transaction control", () => {
       // drivers (node:sqlite, wa-sqlite, expo-sqlite). Grep ensures this stays true.
       const dirs = [
         path.resolve(import.meta.dirname, "."),
-        path.resolve(import.meta.dirname, "../../../../activesupport/src/sqlite-drivers"),
+        path.resolve(import.meta.dirname, "../../sqlite"),
       ];
       const pattern = /\bdriver\.transaction\s*\(/;
       for (const dir of dirs) {

@@ -52,8 +52,8 @@ compat obligations.
 The SQLite driver track (shipped) established the registry pattern:
 `DriverFactory` interface, `registerDriver()` call in the adapter
 subpath export, capability flags so the adapter layer can branch on
-async vs sync. Live in `@blazetrails/activesupport/sqlite-adapter`; see
-`activesupport.md` for the interface reference. The database-adapter
+async vs sync. Live in `@blazetrails/activerecord/sqlite-adapter`; see that
+source file's JSDoc for the interface reference. The database-adapter
 registry in BC-3 copies this shape verbatim.
 
 ## 3. Migration plan
@@ -165,16 +165,16 @@ One PR per gap discovered. The matrix below tracks state.
 
 ## 4. Per-package portability matrix
 
-| Package         | Status                       | Notes                                                                                                                                       |
-| --------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `arel`          | ✅ portable today            | No native deps                                                                                                                              |
-| `activemodel`   | ✅ portable today            | No native deps                                                                                                                              |
-| `activesupport` | ✅ portable                  | Adapter layer is the template; sqlite-adapter / sqlite-drivers / process-adapter / fs-adapter / path-adapter / crypto-adapter all live here |
-| `activerecord`  | 🟡 partial — see BC-3 / BC-4 | Core is portable; subpath exports for adapters shipped; eager pg/mysql2 imports still leak from non-subpath-entry files                     |
-| `trailties`     | ❌ server-only intentionally | CLI tool; Node-only is correct                                                                                                              |
-| `actionpack`    | ⏳ audit needed              | Likely portable; no known native deps                                                                                                       |
-| `actionview`    | ⏳ audit needed              | Likely portable                                                                                                                             |
-| `rack`          | ⏳ audit needed              | Likely portable                                                                                                                             |
+| Package         | Status                       | Notes                                                                                                                                                            |
+| --------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `arel`          | ✅ portable today            | No native deps                                                                                                                                                   |
+| `activemodel`   | ✅ portable today            | No native deps                                                                                                                                                   |
+| `activesupport` | ✅ portable                  | Adapter layer is the template; process-adapter / fs-adapter / path-adapter / crypto-adapter all live here                                                        |
+| `activerecord`  | 🟡 partial — see BC-3 / BC-4 | Core is portable; subpath exports for adapters shipped (incl. sqlite-adapter + sqlite/ drivers); eager pg/mysql2 imports still leak from non-subpath-entry files |
+| `trailties`     | ❌ server-only intentionally | CLI tool; Node-only is correct                                                                                                                                   |
+| `actionpack`    | ⏳ audit needed              | Likely portable; no known native deps                                                                                                                            |
+| `actionview`    | ⏳ audit needed              | Likely portable                                                                                                                                                  |
+| `rack`          | ⏳ audit needed              | Likely portable                                                                                                                                                  |
 
 ## 5. CI gates (planned in BC-4)
 

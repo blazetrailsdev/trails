@@ -51,12 +51,16 @@
   },
   "peerDependencies": {
     "better-sqlite3": "^12.6.2",
+    "expo-sqlite": "^15.0.0",
     "mysql2": "^3.18.2",
     "pg": "^8.19.0",
     "typescript": ">=5.0.0"
   },
   "peerDependenciesMeta": {
     "better-sqlite3": {
+      "optional": true
+    },
+    "expo-sqlite": {
       "optional": true
     },
     "mysql2": {
