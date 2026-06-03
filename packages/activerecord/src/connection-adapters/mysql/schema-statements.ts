@@ -82,7 +82,7 @@ export interface SchemaStatements {
   createSchemaDumper(options?: Record<string, unknown>): unknown;
   typeToSql(type: string, options?: Record<string, unknown>): string;
   tableAliasLength(): number;
-  schemaCreation(): unknown;
+  readonly schemaCreation: unknown;
 }
 
 /** @internal */

@@ -677,7 +677,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       columnName,
       defaultOrChanges,
     );
-    return new MysqlSchemaCreation().accept(cd);
+    return this.schemaCreation.accept(cd);
   }
 
   /**
@@ -1658,7 +1658,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     options: Record<string, unknown> = {},
   ): Promise<string> {
     const cd = await this.buildChangeColumnDefinition(tableName, columnName, type, options);
-    return new MysqlSchemaCreation().accept(cd);
+    return this.schemaCreation.accept(cd);
   }
 
   /** @internal */
@@ -1716,7 +1716,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
     const colDef = new ColumnDefinition(newColumnName, column.sqlType, colOpts);
     const cd = new ChangeColumnDefinition(colDef, columnName);
-    return new MysqlSchemaCreation().accept(cd);
+    return this.schemaCreation.accept(cd);
   }
 
   /** @internal */
