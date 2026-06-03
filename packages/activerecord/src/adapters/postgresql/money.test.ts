@@ -122,7 +122,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const { SchemaDumper } = await import("../../connection-adapters/abstract/schema-dumper.js");
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_moneys");
       expect(output).toMatch(/t\.money\("wealth",\s*\{[^}]*scale:\s*2/);
-      expect(output).toMatch(/t\.money\("depth",\s*\{[^}]*default:\s*150\.55[^}]*scale:\s*2/);
+      expect(output).toMatch(/t\.money\("depth",\s*\{[^}]*scale:\s*2[^}]*default:\s*150\.55/);
     });
 
     it("money where", async () => {

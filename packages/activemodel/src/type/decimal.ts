@@ -11,7 +11,10 @@ export class DecimalType extends NumericValueType {
   }
 
   typeCastForSchema(value: unknown): string {
-    return JSON.stringify(value) ?? String(value);
+    // Rails: BigDecimal.to_s returns the plain numeric string without quoting.
+    // Emit the raw string so schema dumps produce `default: 1.5` not `default: "1.5"`.
+    if (value === null || value === undefined) return "null";
+    return String(value);
   }
 
   // JS has no BigDecimal, so we represent decimals as strings to avoid
