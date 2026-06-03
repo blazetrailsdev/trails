@@ -94,8 +94,10 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** @internal */
   protected schemaLimit(column: Column): string | undefined {
     if (column.bigint || column.type === "bigint") return undefined;
-    // Serial/bigserial shorthand columns never emit a limit — the limit is
-    // an implementation detail of the underlying int4/int8 type.
+    // Rails suppresses the serial/bigserial limit because it matches the native
+    // database type's default (int4 limit = 4, int8 limit = 8). We don't have
+    // the native_database_types comparison available here, so we guard explicitly
+    // on isSerial — functionally equivalent to the Rails approach.
     if (column.isSerial) return undefined;
     const limit = column.limit;
     if (limit == null) return undefined;
@@ -131,11 +133,11 @@ export class SchemaDumper extends BaseSchemaDumper {
       if (type != null && typeof type.deserialize === "function") {
         const deserialized = type.deserialize(column.default);
         if (deserialized == null) {
-          // column.default may already be a deserialized JS value (e.g. [] for
-          // a PG array column). If the scalar subtype rejects it, apply
-          // typeCastForSchema directly on the original value.
-          if (column.default != null) return type.typeCastForSchema(column.default);
-          return this.schemaExpression(column);
+          // column.default is already non-null (the `== null` guard above
+          // returned early). It may be a pre-deserialized JS value (e.g. []
+          // for a PG OID::Array column) that the scalar element type cannot
+          // deserialize. Apply typeCastForSchema directly on the original.
+          return type.typeCastForSchema(column.default);
         }
         return type.typeCastForSchema(deserialized);
       }

@@ -1453,6 +1453,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const precision = isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
       const limit = !isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
       // Strip (N) so the base SQL name can be looked up in the TypeMap.
+      // NOTE: baseSqlType is stored in sqlType (e.g. "varchar" not "varchar(10)").
+      // This diverges from Rails' SqlTypeMetadata#sql_type which carries the full
+      // string. It is safe here because `limit` is populated explicitly above, so
+      // schemaLimit does not need to parse parens from column.sqlType.
       const baseSqlType = paramMatch ? sqlType.slice(0, sqlType.indexOf("(")).trimEnd() : sqlType;
       // Resolve the DSL cast-type name (e.g. "varchar" → "string") via the
       // TypeMap so schemaType returns the right DSL identifier after U3 wires

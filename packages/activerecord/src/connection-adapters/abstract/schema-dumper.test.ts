@@ -78,6 +78,23 @@ describe("SchemaDumper schemaDefault with adapter type deserialize", () => {
     );
     expect(result).toContain("uuid()");
   });
+
+  it("pre-deserialized array default uses typeCastForSchema when deserialize returns null", () => {
+    // Mirrors the PG OID::Array case: column.default is already [] (deserialized by
+    // the adapter) but lookupCastTypeFromColumn returns the scalar element type (e.g.
+    // DecimalType) which cannot deserialize an array — deserialize([]) → null.
+    // schemaDefault must call typeCastForSchema on the original value directly.
+    const rejectingType = {
+      deserialize: () => null,
+      typeCastForSchema: (v: unknown) => JSON.stringify(v),
+    };
+    const adapter = { lookupCastTypeFromColumn: () => rejectingType };
+    const dumper = SchemaDumper.create(adapter as any);
+    const result = (dumper as any).schemaDefault({ hasDefault: true, default: [] }) as
+      | string
+      | undefined;
+    expect(result).toBe("[]");
+  });
 });
 
 // Story 3.3-U1: columnSpec must emit directly-emittable TypeScript-DSL text

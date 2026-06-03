@@ -23,14 +23,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
     const spec = super.prepareColumnOptions(column as any);
     if (column.array) spec["array"] = true;
 
-    // Support both real PG Column (isVirtual() method) and plain ColumnInfo (virtual property).
-    const isVirtual =
-      typeof (column as any).isVirtual === "function"
-        ? (column as any).isVirtual()
-        : !!(column as any).virtual;
-
     const adapter = this.pgAdapter();
-    if (adapter?.supportsVirtualColumns?.() && isVirtual) {
+    if (adapter?.supportsVirtualColumns?.() && this._isVirtual(column)) {
       spec["as"] = this.extractExpressionForVirtualColumn(column);
       spec["stored"] = true;
       // enum_type must be set before the early return — Rails adds it after the virtual
@@ -49,11 +43,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isDefaultPrimaryKey(column: Column): boolean {
-    // Our TableDefinition#toSql() creates `SERIAL PRIMARY KEY` (int4) as the
-    // default, so a serial PK is the "no-id-spec-needed" default. A bigserial PK
-    // is non-default and requires an explicit `id: "bigserial"` in the dump.
-    const st = this.schemaType(column);
-    return st === "serial";
+    return this.schemaType(column) === "bigserial";
   }
 
   /**
@@ -126,13 +116,18 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override schemaTypeWithVirtual(column: Column): string {
-    // PG Column exposes isVirtual(); plain ColumnInfo uses the `virtual` property.
-    const isVirtual =
-      typeof (column as any).isVirtual === "function"
-        ? (column as any).isVirtual()
-        : !!(column as any).virtual;
-    if (isVirtual) return "virtual";
+    if (this._isVirtual(column)) return "virtual";
     return this.schemaType(column);
+  }
+
+  /**
+   * Handles both real PG Column objects (which expose `isVirtual()`) and plain
+   * `ColumnInfo` objects from `AdapterSchemaSource` (which expose `virtual`).
+   */
+  private _isVirtual(column: Column): boolean {
+    return typeof (column as any).isVirtual === "function"
+      ? (column as any).isVirtual()
+      : !!(column as any).virtual;
   }
 
   /** @internal */

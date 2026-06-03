@@ -69,16 +69,15 @@ describe("PostgreSQL::SchemaDumper", () => {
   });
 
   describe("isDefaultPrimaryKey", () => {
-    it("returns true when schemaType is serial (matches TableDefinition#toSql default)", () => {
+    it("returns true when schemaType is bigserial", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
-      // createTable produces SERIAL PRIMARY KEY (int4); serial is the actual default.
-      const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
+      const col = makeColumn({ sqlType: "bigint", type: "integer", serial: true });
       expect(dumper.isDefaultPrimaryKey(col)).toBe(true);
     });
 
-    it("returns false for bigserial (non-default, emits id: bigserial)", () => {
+    it("returns false for serial (non-bigserial)", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
-      const col = makeColumn({ sqlType: "bigint", type: "integer", serial: true });
+      const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
       expect(dumper.isDefaultPrimaryKey(col)).toBe(false);
     });
   });
