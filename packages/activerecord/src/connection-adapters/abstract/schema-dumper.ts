@@ -6,7 +6,7 @@
  * `schema_type`, `schema_limit`, `schema_default`, etc.
  */
 
-import type { SchemaSource, ColumnInfo } from "../../schema-dumper.js";
+import type { SchemaSource, ColumnInfo, IndexInfo } from "../../schema-dumper.js";
 import { SchemaDumper as BaseSchemaDumper } from "../../schema-dumper.js";
 
 /** Column-shaped interface this dumper depends on. */
@@ -38,13 +38,15 @@ export class SchemaDumper extends BaseSchemaDumper {
   protected columnSpecForPrimaryKey(column: Column): Record<string, unknown> {
     const spec: Record<string, unknown> = {};
     if (!this.isDefaultPrimaryKey(column)) {
-      spec["id"] = String(this.schemaType(column));
+      // Pre-format the id value as a TS-DSL string literal for formatColspecRaw.
+      spec["id"] = JSON.stringify(this.schemaType(column));
     }
     const colOpts = this.prepareColumnOptions(column);
     delete colOpts["null"];
     Object.assign(spec, colOpts);
     if (this.isExplicitPrimaryKeyDefault(column)) {
-      spec["default"] ??= "nil";
+      // "null" (not Ruby "nil") — emitted verbatim by formatColspecRaw as `default: null`.
+      spec["default"] ??= "null";
     }
     return spec;
   }
@@ -92,6 +94,9 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** @internal */
   protected schemaLimit(column: Column): string | undefined {
     if (column.bigint || column.type === "bigint") return undefined;
+    // Serial/bigserial shorthand columns never emit a limit — the limit is
+    // an implementation detail of the underlying int4/int8 type.
+    if (column.isSerial) return undefined;
     const limit = column.limit;
     if (limit == null) return undefined;
     return String(limit);
@@ -125,7 +130,13 @@ export class SchemaDumper extends BaseSchemaDumper {
       const type = adapter.lookupCastTypeFromColumn(column);
       if (type != null && typeof type.deserialize === "function") {
         const deserialized = type.deserialize(column.default);
-        if (deserialized == null) return this.schemaExpression(column);
+        if (deserialized == null) {
+          // column.default may already be a deserialized JS value (e.g. [] for
+          // a PG array column). If the scalar subtype rejects it, apply
+          // typeCastForSchema directly on the original value.
+          if (column.default != null) return type.typeCastForSchema(column.default);
+          return this.schemaExpression(column);
+        }
         return type.typeCastForSchema(deserialized);
       }
     }
@@ -151,5 +162,83 @@ export class SchemaDumper extends BaseSchemaDumper {
   protected schemaCollation(column: Column): string | undefined {
     if (column.collation) return JSON.stringify(column.collation);
     return undefined;
+  }
+
+  /**
+   * Epic 3.3-U3: adapter-backed emitTable routed through columnSpec so
+   * per-dialect `prepareColumnOptions` overrides (schemaType, schemaLimit,
+   * schemaPrecision, schemaDefault, etc.) take effect on live dumps.
+   *
+   * The base-class `emitTable` (inline colspec) continues to serve the
+   * in-memory MigrationContext path unchanged. This override is called only
+   * when the instance is an adapter-specific SchemaDumper subclass.
+   * @internal
+   */
+  protected override emitTable(
+    lines: string[],
+    tableName: string,
+    columns: ColumnInfo[],
+    indexes: IndexInfo[],
+    adapterTableOpts: Record<string, unknown> = {},
+    inlineConstraints: string[] = [],
+  ): void {
+    const pkColumns = this.orderPrimaryKeyColumns(
+      tableName,
+      columns.filter((c) => c.primaryKey),
+    );
+    const hasCompositePk = pkColumns.length > 1;
+    const pkColumn = pkColumns[0];
+    const hasId = !hasCompositePk && pkColumn?.name === "id";
+    const stripped = this.removePrefixAndSuffix(tableName);
+
+    // All values in tableOpts are pre-formatted TS-DSL text for formatColspecRaw.
+    const tableOpts: Record<string, unknown> = {};
+    if (hasCompositePk) {
+      tableOpts["primaryKey"] = JSON.stringify(pkColumns.map((c) => c.name));
+      tableOpts["id"] = "false";
+    } else if (!hasId) {
+      tableOpts["id"] = "false";
+    } else if (pkColumn) {
+      if (!this.isDefaultPrimaryKey(pkColumn)) {
+        Object.assign(tableOpts, this.columnSpecForPrimaryKey(pkColumn));
+      }
+    }
+    if (typeof adapterTableOpts.charset === "string")
+      tableOpts["charset"] = JSON.stringify(adapterTableOpts.charset);
+    if (typeof adapterTableOpts.collation === "string")
+      tableOpts["collation"] = JSON.stringify(adapterTableOpts.collation);
+    if (typeof adapterTableOpts.options === "string")
+      tableOpts["options"] = JSON.stringify(adapterTableOpts.options);
+    if (typeof adapterTableOpts.comment === "string" && adapterTableOpts.comment.length > 0)
+      tableOpts["comment"] = JSON.stringify(adapterTableOpts.comment);
+    tableOpts["force"] = '"cascade"';
+
+    lines.push(
+      `  await ctx.createTable(${JSON.stringify(stripped)}, { ${this.formatColspecRaw(tableOpts)} }, (t) => {`,
+    );
+
+    for (const col of columns) {
+      if (col.name === "id" && hasId) continue;
+
+      const [dslType, spec] = this.columnSpec(col);
+      const optStr = Object.keys(spec).length > 0 ? `, { ${this.formatColspecRaw(spec)} }` : "";
+      const typeName = String(dslType);
+
+      if (this._isDslHelper(typeName)) {
+        lines.push(`    t.${typeName}(${JSON.stringify(col.name)}${optStr});`);
+      } else if ((col as any).isEnum && typeName === "enum") {
+        lines.push(`    t.enum(${JSON.stringify(col.name)}${optStr});`);
+      } else {
+        // Generic fallback: pass arbitrary SQL type verbatim via t.column.
+        const colType = typeName === "enum" ? ((col as any).sqlType ?? typeName) : typeName;
+        lines.push(
+          `    t.column(${JSON.stringify(col.name)}, ${JSON.stringify(colType)}${optStr});`,
+        );
+      }
+    }
+
+    for (const line of inlineConstraints) lines.push(line);
+    lines.push("  });");
+    this.indexesInCreate(tableName, lines, indexes);
   }
 }

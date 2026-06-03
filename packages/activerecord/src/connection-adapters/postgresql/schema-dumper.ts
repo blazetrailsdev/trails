@@ -23,8 +23,14 @@ export class SchemaDumper extends AbstractSchemaDumper {
     const spec = super.prepareColumnOptions(column as any);
     if (column.array) spec["array"] = true;
 
+    // Support both real PG Column (isVirtual() method) and plain ColumnInfo (virtual property).
+    const isVirtual =
+      typeof (column as any).isVirtual === "function"
+        ? (column as any).isVirtual()
+        : !!(column as any).virtual;
+
     const adapter = this.pgAdapter();
-    if (adapter?.supportsVirtualColumns?.() && column.isVirtual()) {
+    if (adapter?.supportsVirtualColumns?.() && isVirtual) {
       spec["as"] = this.extractExpressionForVirtualColumn(column);
       spec["stored"] = true;
       // enum_type must be set before the early return — Rails adds it after the virtual
@@ -43,7 +49,59 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isDefaultPrimaryKey(column: Column): boolean {
-    return this.schemaType(column) === "bigserial";
+    // Our TableDefinition#toSql() creates `SERIAL PRIMARY KEY` (int4) as the
+    // default, so a serial PK is the "no-id-spec-needed" default. A bigserial PK
+    // is non-default and requires an explicit `id: "bigserial"` in the dump.
+    const st = this.schemaType(column);
+    return st === "serial";
+  }
+
+  /**
+   * For PG array columns the OID::Array wrapper has no `limit` of its own;
+   * the limit belongs to the element type and is encoded in the SQL type
+   * string (e.g. `"character varying(255)"`, `"bit(8)"`). Parse it when
+   * `column.limit` is absent.
+   * @internal
+   */
+  protected override schemaLimit(column: Column): string | undefined {
+    const base = super.schemaLimit(column);
+    if (base !== undefined) return base;
+    const sqlType = (column.sqlType ?? "").toLowerCase();
+    if (/^(?:character varying|varchar|char(?:acter)?|bpchar)\b/.test(sqlType)) {
+      const m = /\((\d+)\)/.exec(sqlType);
+      return m ? m[1] : undefined;
+    }
+    if (/^(?:bit|varbit|bit varying)\b/.test(sqlType)) {
+      const m = /\((\d+)\)/.exec(sqlType);
+      return m ? m[1] : undefined;
+    }
+    return undefined;
+  }
+
+  /**
+   * For PG array columns where `column.precision` is absent, parse precision
+   * from the element type's SQL type string (e.g. `"numeric(10,2)"`).
+   * @internal
+   */
+  protected override schemaPrecision(column: Column): string | undefined {
+    const base = super.schemaPrecision(column);
+    if (base !== undefined) return base;
+    const sqlType = (column.sqlType ?? "").toLowerCase();
+    const m = /^numeric\((\d+)/.exec(sqlType);
+    return m ? m[1] : undefined;
+  }
+
+  /**
+   * For PG array columns where `column.scale` is absent, parse scale from
+   * the element type's SQL type string (e.g. `"numeric(10,2)"`).
+   * @internal
+   */
+  protected override schemaScale(column: Column): string | undefined {
+    const base = super.schemaScale(column);
+    if (base !== undefined) return base;
+    const sqlType = (column.sqlType ?? "").toLowerCase();
+    const m = /^numeric\(\d+,\s*(\d+)\)/.exec(sqlType);
+    return m ? m[1] : undefined;
   }
 
   /** @internal */
@@ -53,18 +111,27 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override schemaType(column: Column): string {
-    if (column.isSerial) return column.isBigint() ? "bigserial" : "serial";
-    if (column.isBigint()) return "bigint";
+    // Use sqlType to detect bigint (works with both real Column objects and
+    // plain ColumnInfo from AdapterSchemaSource, which has no isBigint() method).
+    const isBigSql = /^bigint\b/i.test(column.sqlType ?? "");
+    if (column.isSerial) return isBigSql ? "bigserial" : "serial";
+    if (isBigSql || column.type === "bigint") return "bigint";
     const semantic = column.type ?? undefined;
-    // BigIntegerType.name is "big_integer" — normalize to "bigint" for schema output
+    // BigIntegerType.name is "big_integer" — normalize to "bigint" for schema output.
     if (semantic === "big_integer") return "bigint";
+    // OID::BitVarying.type() returns Rails-style "bit_varying"; map to DSL "bitVarying".
+    if (semantic === "bit_varying") return "bitVarying";
     return semantic ?? super.schemaType(column as any);
   }
 
   /** @internal */
   protected override schemaTypeWithVirtual(column: Column): string {
-    // Abstract base checks column.virtual (property); PG Column exposes isVirtual() instead
-    if (column.isVirtual()) return "virtual";
+    // PG Column exposes isVirtual(); plain ColumnInfo uses the `virtual` property.
+    const isVirtual =
+      typeof (column as any).isVirtual === "function"
+        ? (column as any).isVirtual()
+        : !!(column as any).virtual;
+    if (isVirtual) return "virtual";
     return this.schemaType(column);
   }
 
