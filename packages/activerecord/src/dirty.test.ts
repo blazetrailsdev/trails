@@ -404,11 +404,12 @@ describe("DirtyTest", () => {
   });
 
   it.skip("association assignment changes foreign key", () => {
-    // BLOCKED: model — needs `Parrot.create`, but the canonical `Parrot`
-    // declares a virtual `cancelSaveFromCallback` attribute that trails
-    // currently persists as a column, so the INSERT fails (`parrots has no
-    // column named cancelSaveFromCallback`). SCOPE: mark that attribute
-    // `{ virtual: true }` on the canonical Parrot, separate PR.
+    // BLOCKED (two gaps): (1) canonical Parrot declares `cancelSaveFromCallback`
+    // as a real column instead of `{ virtual: true }`, so `Parrot.create` tries
+    // to INSERT a column `parrots` lacks; (2) without fixtures loaded the
+    // canonical models aren't in the registry, so Pirate's `belongsTo("parrot")`
+    // can't resolve the Parrot class. SCOPE: virtualize the attr + register the
+    // models (or load parrot fixtures), separate PR.
   });
 
   it.skip("attribute should be compared with type cast", () => {
@@ -749,9 +750,12 @@ describe("DirtyTest", () => {
   });
 
   it.skip("attribute_changed? properly type casts enum values", () => {
-    // BLOCKED: model — needs `LiveParrot.create` (extends Parrot), but the
-    // canonical Parrot persists its virtual `cancelSaveFromCallback` attribute,
-    // so the INSERT fails. See "association assignment changes foreign key".
+    // BLOCKED (two gaps): (1) the canonical Parrot virtual-attr issue above
+    // (needs `LiveParrot.create`); (2) enum dirty `from:`/`to:` don't type-cast —
+    // Rails matches `breed_changed?(from: "african")`, `from: :african`, and
+    // `from: 0` against the same change, but trails compares the stored integer
+    // only, so the label forms fail. SCOPE: enum-aware dirty option casting,
+    // separate PR.
   });
 });
 
