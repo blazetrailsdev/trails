@@ -18,15 +18,15 @@ The quarantine header in each file reads:
 These are the largest files by test count; quarantining them drops the most DDL
 per PR. The PR ceiling is waived (mechanical sweep).
 
-| File                                           | Tests skipped | Rails counterpart                              |
-| ---------------------------------------------- | :-----------: | ---------------------------------------------- |
-| `associations.test.ts`                         |      402      | `associations/*_test.rb` (omnibus)             |
-| `associations/has-many-associations.test.ts`   |      310      | `associations/has_many_associations_test.rb`   |
-| `calculations.test.ts`                         |      544      | `calculations_test.rb`                         |
-| `relations.test.ts`                            |      675      | `relations_test.rb`                            |
-| `associations/eager.test.ts`                   |      203      | `associations/eager_test.rb`                   |
-| `persistence.test.ts`                          |      389      | `persistence_test.rb`                          |
-| `associations/belongs-to-associations.test.ts` |      153      | `associations/belongs_to_associations_test.rb` |
+| File                                           | Tests skipped | Rails counterpart                                                                                                                                |
+| ---------------------------------------------- | :-----------: | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `associations.test.ts`                         |      402      | `associations/*_test.rb` (omnibus)                                                                                                               |
+| `associations/has-many-associations.test.ts`   |      310      | `associations/has_many_associations_test.rb`                                                                                                     |
+| `calculations.test.ts`                         |      544      | `calculations_test.rb`                                                                                                                           |
+| `relations.test.ts`                            |      675      | `relations_test.rb`                                                                                                                              |
+| `associations/eager.test.ts`                   |      203      | `associations/eager_test.rb`                                                                                                                     |
+| `persistence.test.ts`                          |      389      | `persistence_test.rb` — ⚠️ contains 38 pre-existing `expect(true).toBe(true)` stubs (composite-key + `queryConstraints` gaps); remove in rewrite |
+| `associations/belongs-to-associations.test.ts` |      153      | `associations/belongs_to_associations_test.rb`                                                                                                   |
 
 **Phase 1 total: 2,676 tests quarantined.**
 
