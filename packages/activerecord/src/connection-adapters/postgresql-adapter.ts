@@ -5457,15 +5457,23 @@ function splitPgDefault(raw: string | null): { literal: unknown; fn: string | nu
     const content = arrayLiteral[1].replace(/''/g, "'");
     return { literal: content, fn: null };
   }
-  // 'value'::type — quoted literal with an optional cast.
+  // 'value'::type — quoted literal with a single cast (intentionally single-cast;
+  // multi-cast quoted forms like 'x'::text::domain fall to DEFAULT_FUNCTION_RE
+  // and are treated as function defaults, consistent with the domain-cast policy).
   const quoted = /^'((?:[^']|'')*)'::[\w"\s.]+$/.exec(raw);
   if (quoted) return { literal: quoted[1].replace(/''/g, "'"), fn: null };
-  // (N)::type — numeric wrapped in parens with a cast (PG emits this for
-  // things like `DEFAULT 150.55::numeric::money`).
-  const parenNum = /^\((-?\d+(?:\.\d+)?)\)::[\w"\s.]+$/.exec(raw);
+  // (N)::type[::type2...] — numeric wrapped in parens with one or more casts.
+  // PG emits `(150.55)::numeric::money` for `DEFAULT 150.55::numeric::money`.
+  // Rails' extract_value_from_default (postgresql_adapter.rb:769) only allows
+  // an optional ::bigint suffix and would misclassify this as a function default;
+  // we go beyond Rails' implementation to match what money_test.rb:98 asserts.
+  // NOTE: both splitPgDefault and cleanRawPgExpression (schema-dumper.ts) must
+  // handle multi-cast chains; cleanRawPgExpression already used (+) for this.
+  const parenNum = /^\((-?\d+(?:\.\d+)?)\)(?:::[\w"\s.]+)+$/.exec(raw);
   if (parenNum) return { literal: parenNum[1], fn: null };
-  // N::type — bare numeric with a cast.
-  const castNum = /^(-?\d+(?:\.\d+)?)::[\w"\s.]+$/.exec(raw);
+  // N::type[::type2...] — bare numeric with one or more casts. PG normalizes
+  // multi-cast numerics to the parens form above; this branch is defensive.
+  const castNum = /^(-?\d+(?:\.\d+)?)(?:::[\w"\s.]+)+$/.exec(raw);
   if (castNum) return { literal: castNum[1], fn: null };
   // Bare numeric / boolean / NULL literal.
   if (/^-?\d+(?:\.\d+)?$/.test(raw)) return { literal: raw, fn: null };
