@@ -3,7 +3,8 @@
 <!-- GENERATED FILE — do not edit by hand.
      Regenerate with `pnpm api:conventions`. The source of truth is
      `explainConventions()` in scripts/api-compare/conventions.ts; CI runs
-     `pnpm api:conventions --check` and fails if this file drifts from it. -->
+     `tsx scripts/api-compare/conventions-doc.ts --check` and fails if this
+     file drifts from it. -->
 
 These are the exact rules `api:compare` uses to match a Ruby method or file to
 its trails TypeScript counterpart. Follow them when porting Rails code so the
@@ -14,18 +15,18 @@ comparison credits your implementation.
 The Example column shows the TS **symbol name(s)** api:compare looks for (it
 matches the first candidate present in the target file), not a call expression.
 
-| Ruby                                  | TypeScript                           | Example                                               |
-| ------------------------------------- | ------------------------------------ | ----------------------------------------------------- |
-| `predicate?` (bare)                   | `is*` prefix, camel fallback         | `valid?` → `isValid` or `valid`                       |
-| `is_*?`                               | camel form only (no doubled `isIs*`) | `is_number?` → `isNumber`                             |
-| `has_*?` / `supports_*?` / `can_*?` … | camel form + `is*` fallback          | `has_attribute?` → `hasAttribute` or `isHasAttribute` |
-| `name!` (bang)                        | `*Bang` suffix                       | `save!` → `saveBang`                                  |
-| `name=` (setter)                      | bare camel name                      | `table_name=` → `tableName`                           |
-| `initialize` / `new`                  | `constructor`                        | `initialize` → `constructor`                          |
-| `to_s` / `to_str`                     | `toString`                           | `to_s` → `toString`                                   |
-| `to_json`                             | `toJSON`                             | `to_json` → `toJSON`                                  |
-| `to_sql`                              | `toSql`                              | `to_sql` → `toSql`                                    |
-| everything else                       | `snake_case` → `camelCase`           | `has_many` → `hasMany`                                |
+| Ruby                                                                                                                     | TypeScript                           | Example                                               |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | ----------------------------------------------------- |
+| `predicate?` (bare)                                                                                                      | `is*` prefix, camel fallback         | `valid?` → `isValid` or `valid`                       |
+| `is_*?`                                                                                                                  | camel form only (no doubled `isIs*`) | `is_number?` → `isNumber`                             |
+| `has_*?` / `supports_*?` / `can_*?` / `should_*?` / `needs_*?` / `includes_*?` / `responds_*?` / `allows_*?` / `uses_*?` | camel form + `is*` fallback          | `has_attribute?` → `hasAttribute` or `isHasAttribute` |
+| `name!` (bang)                                                                                                           | `*Bang` suffix                       | `save!` → `saveBang`                                  |
+| `name=` (setter)                                                                                                         | bare camel name                      | `table_name=` → `tableName`                           |
+| `initialize` / `new`                                                                                                     | `constructor`                        | `initialize` → `constructor`                          |
+| `to_s` / `to_str`                                                                                                        | `toString`                           | `to_s` → `toString`                                   |
+| `to_json`                                                                                                                | `toJSON`                             | `to_json` → `toJSON`                                  |
+| `to_sql`                                                                                                                 | `toSql`                              | `to_sql` → `toSql`                                    |
+| everything else                                                                                                          | `snake_case` → `camelCase`           | `has_many` → `hasMany`                                |
 
 Predicate-form details: `is_*?` collapses to a single candidate so trails can't
 land the redundant doubled `isIsNumber`. Already-predicate prefixes keep the

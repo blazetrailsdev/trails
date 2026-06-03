@@ -203,6 +203,27 @@ export const SKIP_GROUPS: SkipGroup[] = [
 export const SKIP = new Set<string>(SKIP_GROUPS.flatMap((g) => g.names));
 
 /**
+ * Camel-prefixes that are *already* predicates, so the bare camel form is the
+ * canonical candidate and the `is*` form is only a disambiguating fallback
+ * (e.g. `hasOne` + `isHasOne`). `rubyMethodToTs` matches on these and the
+ * generated conventions doc enumerates them — keeping the single list here
+ * means the doc can't name a different set than the matcher actually uses.
+ */
+export const ALREADY_PREDICATE_PREFIXES = [
+  "has",
+  "supports",
+  "can",
+  "should",
+  "needs",
+  "includes",
+  "responds",
+  "allows",
+  "uses",
+];
+
+const ALREADY_PREDICATE_RE = new RegExp(`^(${ALREADY_PREDICATE_PREFIXES.join("|")})`);
+
+/**
  * Convert Ruby method name → candidate TS names to try matching.
  *
  * Returns null if the method should be skipped entirely. Otherwise
@@ -254,7 +275,7 @@ export function rubyMethodToTs(name: string): string[] | null {
     // alias when the bare name collides with a macro (e.g. Reflection
     // exposes `isHasOne()` as a predicate alongside the `Model.hasOne`
     // association declaration).
-    if (/^(has|supports|can|should|needs|includes|responds|allows|uses)/.test(camel)) {
+    if (ALREADY_PREDICATE_RE.test(camel)) {
       return [camel, isPrefixed];
     }
     return [isPrefixed, camel];
@@ -304,6 +325,10 @@ export function explainConventions(): string {
 
   const operatorList = [...OPERATORS].map((o) => `\`${o}\``).join(", ");
 
+  // Enumerate the real already-predicate prefix list (not a hand-picked
+  // subset) so the row can't name a different set than the matcher uses.
+  const predicatePrefixes = ALREADY_PREDICATE_PREFIXES.map((p) => `\`${p}_*?\``).join(" / ");
+
   const skipSections = SKIP_GROUPS.map((g) => {
     const names = g.names.map((n) => `\`${n}\``).join(", ");
     return `- ${g.reason}\n  - ${names}`;
@@ -314,7 +339,8 @@ export function explainConventions(): string {
 <!-- GENERATED FILE — do not edit by hand.
      Regenerate with \`pnpm api:conventions\`. The source of truth is
      \`explainConventions()\` in scripts/api-compare/conventions.ts; CI runs
-     \`pnpm api:conventions --check\` and fails if this file drifts from it. -->
+     \`tsx scripts/api-compare/conventions-doc.ts --check\` and fails if this
+     file drifts from it. -->
 
 These are the exact rules \`api:compare\` uses to match a Ruby method or file to
 its trails TypeScript counterpart. Follow them when porting Rails code so the
@@ -329,7 +355,7 @@ matches the first candidate present in the target file), not a call expression.
 | ---- | ---------- | ------- |
 | \`predicate?\` (bare) | \`is*\` prefix, camel fallback | \`valid?\` → ${example("valid?")} |
 | \`is_*?\` | camel form only (no doubled \`isIs*\`) | \`is_number?\` → ${example("is_number?")} |
-| \`has_*?\` / \`supports_*?\` / \`can_*?\` … | camel form + \`is*\` fallback | \`has_attribute?\` → ${example("has_attribute?")} |
+| ${predicatePrefixes} | camel form + \`is*\` fallback | \`has_attribute?\` → ${example("has_attribute?")} |
 | \`name!\` (bang) | \`*Bang\` suffix | \`save!\` → ${example("save!")} |
 | \`name=\` (setter) | bare camel name | \`table_name=\` → ${example("table_name=")} |
 | \`initialize\` / \`new\` | \`constructor\` | \`initialize\` → ${example("initialize")} |

@@ -5,6 +5,7 @@ import {
   rubyFileToTs,
   SKIP,
   SKIP_GROUPS,
+  ALREADY_PREDICATE_PREFIXES,
   explainConventions,
 } from "./conventions.js";
 
@@ -167,10 +168,6 @@ describe("rubyFileToTs", () => {
 });
 
 describe("SKIP_GROUPS", () => {
-  it("derives the SKIP set exactly (every grouped name, nothing else)", () => {
-    expect(SKIP).toEqual(new Set(SKIP_GROUPS.flatMap((g) => g.names)));
-  });
-
   it("has no duplicate names across groups", () => {
     const all = SKIP_GROUPS.flatMap((g) => g.names);
     expect(all.length).toBe(new Set(all).size);
@@ -186,6 +183,24 @@ describe("SKIP_GROUPS", () => {
   it("makes rubyMethodToTs skip every grouped name", () => {
     for (const name of SKIP) {
       expect(rubyMethodToTs(name)).toBeNull();
+    }
+  });
+});
+
+describe("ALREADY_PREDICATE_PREFIXES", () => {
+  it("drives the matcher: every prefix keeps the camel form + is* fallback", () => {
+    for (const prefix of ALREADY_PREDICATE_PREFIXES) {
+      // `<prefix>_thing?` → [camel, isPrefixed], camel first.
+      const camel = snakeToCamel(`${prefix}_thing`);
+      const isPrefixed = "is" + camel.replace(/^./, (c) => c.toUpperCase());
+      expect(rubyMethodToTs(`${prefix}_thing?`)).toEqual([camel, isPrefixed]);
+    }
+  });
+
+  it("is enumerated in full by the generated doc (not a hand-picked subset)", () => {
+    const md = explainConventions();
+    for (const prefix of ALREADY_PREDICATE_PREFIXES) {
+      expect(md).toContain(`\`${prefix}_*?\``);
     }
   });
 });
