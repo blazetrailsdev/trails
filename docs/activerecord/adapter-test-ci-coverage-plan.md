@@ -96,9 +96,9 @@ against current `main` before scoping it (the set drifts as fixes land).
 
 ### PostgreSQL — 0 failed (P-9 resolved)
 
-| #       | Bucket                            | Files / tests                                                           | Root cause                                                                 | Fix                                                                                                                                                |
-| ------- | --------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ~~P-9~~ | ~~schema-dumper: type shorthand~~ | ~~`serial.test.ts` (4), `array.test.ts` (1), `bit-string.test.ts` (1)~~ | ~~dumper didn't emit shorthand DSL for serial/bigserial/bitVarying/array~~ | Resolved: `isDefaultPrimaryKey` widened to include `"serial"`; `DecimalType.typeCastForSchema` → `String(value)`; `RUN_ADAPTER_DIRS` gate on main. |
+| #       | Bucket                            | Files / tests                                                           | Root cause                                                                 | Fix                                                                                             |
+| ------- | --------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| ~~P-9~~ | ~~schema-dumper: type shorthand~~ | ~~`serial.test.ts` (4), `array.test.ts` (1), `bit-string.test.ts` (1)~~ | ~~dumper didn't emit shorthand DSL for serial/bigserial/bitVarying/array~~ | Resolved: `isDefaultPrimaryKey` widened to include `"serial"`; `RUN_ADAPTER_DIRS` gate on main. |
 
 ### MySQL — 3 failed (mysql:8)
 
