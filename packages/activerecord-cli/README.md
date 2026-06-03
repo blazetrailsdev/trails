@@ -92,11 +92,11 @@ environment in many setups. `ar` resolves `TRAILS_ENV → NODE_ENV → "developm
 
 ### Tooling
 
-| Command                                | Description                                                                                      |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `ar typecheck`                         | Type-check models via `trails-tsc`                                                               |
-| `ar models:dump --schema db/schema.ts` | Dump model metadata from `db/schema.ts` (no DB needed); `--database-url` is the live-DB fallback |
-| `ar generate:manifest`                 | Regenerate `app/models/index.ts` (also listed under Scaffolding)                                 |
+| Command                | Description                                                                                         |
+| ---------------------- | --------------------------------------------------------------------------------------------------- |
+| `ar typecheck`         | Type-check models via `trails-tsc`                                                                  |
+| `ar models:dump`       | Dump model classes from `db/schema.ts` (auto-discovered); or `--schema <path>` for an explicit path |
+| `ar generate:manifest` | Regenerate `app/models/index.ts` (also listed under Scaffolding)                                    |
 
 Pass `--help` to any command for its full option set.
 

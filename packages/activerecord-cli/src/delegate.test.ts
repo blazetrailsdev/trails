@@ -32,7 +32,7 @@ describe("delegate subcommands", () => {
     ]);
   });
 
-  it("models:dump calls trails-models-dump run() in-process", async () => {
+  it("models:dump calls run() in-process", async () => {
     const code = await run(["models:dump", "--no-header"], ".");
     expect(code).toBe(0);
     expect(mockModelsDump).toHaveBeenCalledWith(["--no-header"]);
