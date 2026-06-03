@@ -285,10 +285,13 @@ export function rubyMethodToTs(name: string): string[] | null {
  * lines below are authored, and they live next to the code they describe.
  */
 export function explainConventions(): string {
+  // Render the candidate TS *symbol names* (not call expressions) — a Ruby
+  // setter like `name=` maps to a symbol named `name`, which may be a method
+  // or an accessor, so trailing `()` would be misleading.
   const example = (ruby: string): string => {
     const ts = rubyMethodToTs(ruby);
     if (ts === null) return "_(skipped)_";
-    return ts.map((c) => `\`${c}()\``).join(" or ");
+    return ts.map((c) => `\`${c}\``).join(" or ");
   };
 
   const renameRows = Object.entries(TOKEN_RENAMES)
@@ -318,6 +321,9 @@ its trails TypeScript counterpart. Follow them when porting Rails code so the
 comparison credits your implementation.
 
 ## Method names
+
+The Example column shows the TS **symbol name(s)** api:compare looks for (it
+matches the first candidate present in the target file), not a call expression.
 
 | Ruby | TypeScript | Example |
 | ---- | ---------- | ------- |

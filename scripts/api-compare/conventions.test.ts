@@ -193,8 +193,11 @@ describe("SKIP_GROUPS", () => {
 describe("explainConventions", () => {
   it("renders worked examples from the live rules and lists every skip reason", () => {
     const md = explainConventions();
-    expect(md).toContain("`valid?` → `isValid()` or `valid()`");
-    expect(md).toContain("`save!` → `saveBang()`");
+    expect(md).toContain("`valid?` → `isValid` or `valid`");
+    expect(md).toContain("`save!` → `saveBang`");
+    // setter renders as a bare symbol name, never `tableName()`
+    expect(md).toContain("`table_name=` → `tableName`");
+    expect(md).not.toContain("`tableName()`");
     for (const g of SKIP_GROUPS) {
       expect(md).toContain(g.reason);
     }

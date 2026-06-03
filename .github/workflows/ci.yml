@@ -174,9 +174,17 @@ jobs:
             # apps not built, type-checked, or tested by any CI job (the root
             # `tsc --build` doesn't reference them and they have no `test`
             # script) — so neither needs the full matrix.
+            #
+            # Exception: docs/ruby-ts-conventions.md is GENERATED from
+            # conventions.ts and guarded by `api:conventions --check` in the
+            # rails-comparison job. Treat a change to it as non-docs-only so a
+            # hand-edit (ignoring the file's do-not-edit banner) still runs the
+            # drift check instead of short-circuiting to a green docs-only run.
             if [ -z "$files" ]; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
             elif echo "$files" | grep -qvE '^docs/|^examples/|^README\.md$|^CLAUDE\.md$'; then
+              echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            elif echo "$files" | grep -qxF 'docs/ruby-ts-conventions.md'; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
             else
               echo "docs_only=true" >> "$GITHUB_OUTPUT"

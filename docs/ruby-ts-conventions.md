@@ -11,18 +11,21 @@ comparison credits your implementation.
 
 ## Method names
 
-| Ruby                                  | TypeScript                           | Example                                                   |
-| ------------------------------------- | ------------------------------------ | --------------------------------------------------------- |
-| `predicate?` (bare)                   | `is*` prefix, camel fallback         | `valid?` → `isValid()` or `valid()`                       |
-| `is_*?`                               | camel form only (no doubled `isIs*`) | `is_number?` → `isNumber()`                               |
-| `has_*?` / `supports_*?` / `can_*?` … | camel form + `is*` fallback          | `has_attribute?` → `hasAttribute()` or `isHasAttribute()` |
-| `name!` (bang)                        | `*Bang` suffix                       | `save!` → `saveBang()`                                    |
-| `name=` (setter)                      | bare camel name                      | `table_name=` → `tableName()`                             |
-| `initialize` / `new`                  | `constructor`                        | `initialize` → `constructor()`                            |
-| `to_s` / `to_str`                     | `toString`                           | `to_s` → `toString()`                                     |
-| `to_json`                             | `toJSON`                             | `to_json` → `toJSON()`                                    |
-| `to_sql`                              | `toSql`                              | `to_sql` → `toSql()`                                      |
-| everything else                       | `snake_case` → `camelCase`           | `has_many` → `hasMany()`                                  |
+The Example column shows the TS **symbol name(s)** api:compare looks for (it
+matches the first candidate present in the target file), not a call expression.
+
+| Ruby                                  | TypeScript                           | Example                                               |
+| ------------------------------------- | ------------------------------------ | ----------------------------------------------------- |
+| `predicate?` (bare)                   | `is*` prefix, camel fallback         | `valid?` → `isValid` or `valid`                       |
+| `is_*?`                               | camel form only (no doubled `isIs*`) | `is_number?` → `isNumber`                             |
+| `has_*?` / `supports_*?` / `can_*?` … | camel form + `is*` fallback          | `has_attribute?` → `hasAttribute` or `isHasAttribute` |
+| `name!` (bang)                        | `*Bang` suffix                       | `save!` → `saveBang`                                  |
+| `name=` (setter)                      | bare camel name                      | `table_name=` → `tableName`                           |
+| `initialize` / `new`                  | `constructor`                        | `initialize` → `constructor`                          |
+| `to_s` / `to_str`                     | `toString`                           | `to_s` → `toString`                                   |
+| `to_json`                             | `toJSON`                             | `to_json` → `toJSON`                                  |
+| `to_sql`                              | `toSql`                              | `to_sql` → `toSql`                                    |
+| everything else                       | `snake_case` → `camelCase`           | `has_many` → `hasMany`                                |
 
 Predicate-form details: `is_*?` collapses to a single candidate so trails can't
 land the redundant doubled `isIsNumber`. Already-predicate prefixes keep the
