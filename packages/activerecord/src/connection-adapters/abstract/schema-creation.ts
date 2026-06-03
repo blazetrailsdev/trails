@@ -93,19 +93,44 @@ export class SchemaCreation {
       statements.push(this.visitPrimaryKeyDefinition({ name: o.compositePrimaryKey }));
     }
 
-    for (const fk of o.foreignKeys) {
-      statements.push(this.visitForeignKeyDefinition(fk));
+    if (this.useForeignKeys()) {
+      for (const fk of o.foreignKeys) {
+        statements.push(this.visitForeignKeyDefinition(fk));
+      }
     }
 
-    for (const chk of o.checkConstraints) {
-      statements.push(this.visitCheckConstraintDefinition(chk));
+    if (this.supportsCheckConstraints()) {
+      for (const chk of o.checkConstraints) {
+        statements.push(this.visitCheckConstraintDefinition(chk));
+      }
     }
+
+    statements.push(...this.tableConstraintStatements(o));
 
     if (statements.length > 0) sql += ` (${statements.join(", ")})`;
     sql = this.addTableOptionsBang(sql, o);
     if (o.as) sql += ` AS ${this.toSql(o.as)}`;
 
     return sql;
+  }
+
+  /** @internal */
+  protected useForeignKeys(): boolean {
+    return true;
+  }
+
+  /** @internal */
+  protected supportsCheckConstraints(): boolean {
+    return true;
+  }
+
+  /**
+   * Adapter-specific constraints to append to the CREATE TABLE statement
+   * (e.g. PostgreSQL exclusion/unique constraints). Returns empty by default.
+   * @internal
+   */
+  protected tableConstraintStatements(_o: TableDefinition): string[] {
+    return [];
   }
 
   protected visitColumnDefinition(o: ColumnDefinition): string {
