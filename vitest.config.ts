@@ -33,14 +33,17 @@ const SHARED_EXCLUDE = [
 // the §4/§5 fixes — see docs/activerecord/adapter-test-ci-coverage-plan.md.
 // Remaining MySQL blockers: M-1a (addColumn charset propagation) + M-1b
 // (isCaseSensitive / LOWER / BINARY uniqueness path). M-2/M-3/M-4 resolved.
-const ADAPTER_SPECIFIC_EXCLUDE = [
-  "packages/activerecord/src/adapters/postgresql/**",
-  "packages/activerecord/src/tasks/postgresql-*.test.ts",
-  "packages/activerecord/src/adapters/abstract-mysql-adapter/**",
-  "packages/activerecord/src/adapters/mysql2/**",
-  "packages/activerecord/src/connection-adapters/mysql2-*.test.ts",
-  "packages/activerecord/src/tasks/mysql-*.test.ts",
-];
+const RUN_ADAPTER_DIRS = process.env.RUN_ADAPTER_DIRS === "1";
+const ADAPTER_SPECIFIC_EXCLUDE = RUN_ADAPTER_DIRS
+  ? []
+  : [
+      "packages/activerecord/src/adapters/postgresql/**",
+      "packages/activerecord/src/tasks/postgresql-*.test.ts",
+      "packages/activerecord/src/adapters/abstract-mysql-adapter/**",
+      "packages/activerecord/src/adapters/mysql2/**",
+      "packages/activerecord/src/connection-adapters/mysql2-*.test.ts",
+      "packages/activerecord/src/tasks/mysql-*.test.ts",
+    ];
 
 const _parsedForks = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "", 10);
 const TEST_FORKS = Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : 6;
