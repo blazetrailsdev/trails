@@ -1067,7 +1067,7 @@ export class TableDefinition {
         switch (col.type) {
           case "primary_key":
             if (this._adapterName === "postgres") {
-              parts.push("BIGSERIAL PRIMARY KEY");
+              parts.push("SERIAL PRIMARY KEY");
             } else if (this._adapterName === "mysql") {
               parts.push("BIGINT AUTO_INCREMENT PRIMARY KEY");
             } else {
