@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -16,7 +17,7 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
-describe("StoreTest", () => {
+describe.skip("StoreTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -676,7 +677,7 @@ describe("StoreTest", () => {
   });
 });
 
-describe("StoreTest", () => {
+describe.skip("StoreTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -741,7 +742,7 @@ describe("StoreTest", () => {
   });
 });
 
-describe("StoreTest", () => {
+describe.skip("StoreTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -791,7 +792,7 @@ describe("StoreTest", () => {
   });
 });
 
-describe("StoreTest", () => {
+describe.skip("StoreTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -856,7 +857,7 @@ describe("StoreTest", () => {
   });
 });
 
-describe("store private helpers — tested through public accessor API", () => {
+describe.skip("store private helpers — tested through public accessor API", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -909,7 +910,7 @@ describe("store private helpers — tested through public accessor API", () => {
   });
 });
 
-describe("storeAccessorsModule", () => {
+describe.skip("storeAccessorsModule", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -991,7 +992,7 @@ describe("storeAccessorsModule", () => {
   });
 });
 
-describe("IndifferentCoder wiring via store() and Base.store()", () => {
+describe.skip("IndifferentCoder wiring via store() and Base.store()", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {

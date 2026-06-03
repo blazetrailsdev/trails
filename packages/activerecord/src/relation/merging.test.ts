@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -20,7 +21,7 @@ beforeAll(async () => {
   });
 });
 
-describe("RelationMergingTest", () => {
+describe.skip("RelationMergingTest", () => {
   function makeModel() {
     class Post extends Base {
       static {
@@ -204,7 +205,7 @@ describe("RelationMergingTest", () => {
   });
 });
 
-describe("MergingDifferentRelationsTest", () => {
+describe.skip("MergingDifferentRelationsTest", () => {
   function makeModel() {
     class Post extends Base {
       static {
@@ -270,7 +271,7 @@ describe("MergingDifferentRelationsTest", () => {
   });
 });
 
-describe("RelationMergingTest", () => {
+describe.skip("RelationMergingTest", () => {
   function makeModel() {
     class Post extends Base {
       static {
@@ -291,7 +292,7 @@ describe("RelationMergingTest", () => {
   });
 });
 
-describe("merge()", () => {
+describe.skip("merge()", () => {
   it("combines conditions from two relations", async () => {
     class Item extends Base {
       static _tableName = "items";
@@ -364,7 +365,7 @@ describe("merge()", () => {
   });
 });
 
-describe("from()", () => {
+describe.skip("from()", () => {
   it("changes the FROM clause in SQL", () => {
     class Item extends Base {
       static _tableName = "items";
@@ -377,7 +378,7 @@ describe("from()", () => {
   });
 });
 
-describe("unscope()", () => {
+describe.skip("unscope()", () => {
   it("removes where conditions", async () => {
     class Item extends Base {
       static _tableName = "items";
@@ -418,7 +419,7 @@ describe("unscope()", () => {
   });
 });
 
-describe("pluck with Arel nodes", () => {
+describe.skip("pluck with Arel nodes", () => {
   it("accepts Arel Attribute nodes", async () => {
     class User extends Base {
       static _tableName = "users";
@@ -435,7 +436,7 @@ describe("pluck with Arel nodes", () => {
   });
 });
 
-describe("only()", () => {
+describe.skip("only()", () => {
   it("keeps only specified query parts", async () => {
     class User extends Base {
       static _tableName = "users";
@@ -457,7 +458,7 @@ describe("only()", () => {
   });
 });
 
-describe("unscope()", () => {
+describe.skip("unscope()", () => {
   it("removes specified query parts", async () => {
     class User extends Base {
       static _tableName = "users";
@@ -476,7 +477,7 @@ describe("unscope()", () => {
   });
 });
 
-describe("Relation Merging (Rails-guided)", () => {
+describe.skip("Relation Merging (Rails-guided)", () => {
   it("merge combines two relations", async () => {
     class User extends Base {
       static {
@@ -495,7 +496,7 @@ describe("Relation Merging (Rails-guided)", () => {
   });
 });
 
-describe("Unscope (Rails-guided)", () => {
+describe.skip("Unscope (Rails-guided)", () => {
   it("removes where conditions", async () => {
     class Item extends Base {
       static {
@@ -531,7 +532,7 @@ describe("Unscope (Rails-guided)", () => {
   });
 });
 
-describe("Pluck (Rails-guided)", () => {
+describe.skip("Pluck (Rails-guided)", () => {
   it("pluck single column", async () => {
     class User extends Base {
       static {

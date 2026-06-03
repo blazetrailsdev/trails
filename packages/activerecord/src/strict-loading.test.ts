@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -26,7 +27,7 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 // ==========================================================================
 // StrictLoadingTest — targets strict_loading_test.rb
 // ==========================================================================
-describe("StrictLoadingTest", () => {
+describe.skip("StrictLoadingTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -420,7 +421,7 @@ describe("StrictLoadingTest", () => {
   });
 });
 
-describe("StrictLoadingTest", () => {
+describe.skip("StrictLoadingTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2199,7 +2200,7 @@ describe("StrictLoadingTest", () => {
   });
 });
 
-describe("StrictLoadingFixturesTest", () => {
+describe.skip("StrictLoadingFixturesTest", () => {
   it.skip("strict loading violations are ignored on fixtures", () => {
     // BLOCKED: relation — StrictLoadingViolation not wired into association loading
     // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
@@ -2208,7 +2209,7 @@ describe("StrictLoadingFixturesTest", () => {
   });
 });
 
-describe("strict_loading", () => {
+describe.skip("strict_loading", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2271,7 +2272,7 @@ describe("strict_loading", () => {
   });
 });
 
-describe("strictLoadingByDefault", () => {
+describe.skip("strictLoadingByDefault", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {

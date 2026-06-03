@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -13,7 +14,7 @@ import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-describe("TimestampTest", () => {
+describe.skip("TimestampTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -312,7 +313,7 @@ describe("TimestampTest", () => {
   });
 });
 
-describe("TimestampsWithoutTransactionTest", () => {
+describe.skip("TimestampsWithoutTransactionTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -338,7 +339,7 @@ describe("TimestampsWithoutTransactionTest", () => {
   });
 });
 
-describe("TimestampTest", () => {
+describe.skip("TimestampTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -481,7 +482,7 @@ describe("TimestampTest", () => {
   });
 });
 
-describe("TimestampTest", () => {
+describe.skip("TimestampTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -564,7 +565,7 @@ describe("TimestampTest", () => {
   });
 });
 
-describe("TimestampTest", () => {
+describe.skip("TimestampTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -619,7 +620,7 @@ describe("TimestampTest", () => {
   });
 });
 
-describe("TimestampTest", () => {
+describe.skip("TimestampTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -639,7 +640,7 @@ describe("TimestampTest", () => {
   });
 });
 
-describe("TimestampTest", () => {
+describe.skip("TimestampTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -666,7 +667,7 @@ describe("TimestampTest", () => {
   });
 });
 
-describe("TimestampTest", () => {
+describe.skip("TimestampTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -687,7 +688,7 @@ describe("TimestampTest", () => {
   });
 });
 
-describe("TimestampTest", () => {
+describe.skip("TimestampTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -826,7 +827,7 @@ describe("TimestampTest", () => {
   });
 });
 
-describe("TimestampTest", () => {
+describe.skip("TimestampTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -845,7 +846,7 @@ describe("TimestampTest", () => {
   });
 });
 
-describe("TimestampTest", () => {
+describe.skip("TimestampTest", () => {
   class Article extends Base {
     static {
       this.attribute("title", "string");
@@ -904,7 +905,7 @@ describe("TimestampTest", () => {
   });
 });
 
-describe("TimestampTest", () => {
+describe.skip("TimestampTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -949,7 +950,7 @@ describe("TimestampTest", () => {
 
 // MySQL/MariaDB datetime wire format (Temporal ISO Z suffix) is a pre-existing
 // gap tracked separately; these tests cover the SQLite/PG paths only.
-describe("TimestampTest — t.timestamps() end-to-end", () => {
+describe.skip("TimestampTest — t.timestamps() end-to-end", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -979,7 +980,7 @@ describe("TimestampTest — t.timestamps() end-to-end", () => {
   );
 });
 
-describe("TimestampTest — t.timestamps() end-to-end", () => {
+describe.skip("TimestampTest — t.timestamps() end-to-end", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {

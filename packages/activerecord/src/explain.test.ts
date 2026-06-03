@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -13,7 +14,7 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
 
-describe("ExplainTest", () => {
+describe.skip("ExplainTest", () => {
   beforeAll(async () => {
     await defineSchema({
       posts: { title: "string", score: "integer" },

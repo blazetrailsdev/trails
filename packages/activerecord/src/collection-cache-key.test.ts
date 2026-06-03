@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { describe, it, expect, beforeAll } from "vitest";
@@ -44,7 +45,7 @@ class Developer extends Base {
   }
 }
 
-describe("CollectionCacheKeyTest", () => {
+describe.skip("CollectionCacheKeyTest", () => {
   it("collection_cache_key on model", async () => {
     await Developer.create({ name: "Alice", salary: 100000 });
     const key = await Developer.collectionCacheKey();

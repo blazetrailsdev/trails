@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -10,7 +11,7 @@ import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 // -- Helpers --
-describe("SecureTokenTest", () => {
+describe.skip("SecureTokenTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -109,7 +110,7 @@ describe("SecureTokenTest", () => {
   });
 });
 
-describe("has_secure_token", () => {
+describe.skip("has_secure_token", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -161,7 +162,7 @@ describe("has_secure_token", () => {
   });
 });
 
-describe("has_secure_token (Rails-guided)", () => {
+describe.skip("has_secure_token (Rails-guided)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {

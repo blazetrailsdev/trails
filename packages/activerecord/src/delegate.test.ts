@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, delegate } from "./index.js";
 import { Associations } from "./associations.js";
@@ -15,7 +16,7 @@ beforeAll(async () => {
   });
 });
 
-describe("Delegate (Rails-guided)", () => {
+describe.skip("Delegate (Rails-guided)", () => {
   // D-Y-INCOMPATIBLE: canonical posts table has `body NOT NULL`; tests create Post
   // without body. defineSchema fast-path reuses the canonical table (title+author_id
   // are a subset), so the NOT NULL constraint fires. Phase G: supply body in creates

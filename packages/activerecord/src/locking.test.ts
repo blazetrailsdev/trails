@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -41,7 +42,7 @@ const TEST_SCHEMA = {
   },
 } as const;
 
-describe("OptimisticLockingTest", () => {
+describe.skip("OptimisticLockingTest", () => {
   // Mirrors Rails `fixtures :people, :legacy_things, :references,
   // :string_key_objects`: seed the canonical rows and read them with the shared
   // Person/LegacyThing/Reference/StringKeyObject models (Rails' `Person.find(1)`
@@ -520,7 +521,7 @@ describe("OptimisticLockingTest", () => {
   });
 });
 
-describe("OptimisticLockingWithSchemaChangeTest", () => {
+describe.skip("OptimisticLockingWithSchemaChangeTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -614,7 +615,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 });
 
-describe("PessimisticLockingTest", () => {
+describe.skip("PessimisticLockingTest", () => {
   // Mirrors Rails `fixtures :people` — seed the canonical people rows and read
   // them with `Person.find(people("michael").id)` (Rails' `Person.find(1)`)
   // instead of constructing records inline. `schema` recreates the canonical

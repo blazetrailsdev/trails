@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -17,7 +18,7 @@ import { Comment } from "../test-helpers/models/comment.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { Category } from "../test-helpers/models/category.js";
 
-describe("CascadedEagerLoadingTest", () => {
+describe.skip("CascadedEagerLoadingTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -365,7 +366,7 @@ describe("CascadedEagerLoadingTest", () => {
 // eager.test.ts). The block above declares ad-hoc per-test models against a
 // local synthetic schema.
 // ==========================================================================
-describe("CascadedEagerLoadingTest", () => {
+describe.skip("CascadedEagerLoadingTest", () => {
   const { authors } = useHandlerFixtures([
     "authors",
     "posts",

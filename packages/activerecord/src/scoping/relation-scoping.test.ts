@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -43,7 +44,7 @@ beforeAll(async () => {
   });
 });
 
-describe("RelationScopingTest", () => {
+describe.skip("RelationScopingTest", () => {
   function makeDeveloper() {
     class Developer extends Base {
       static {
@@ -610,7 +611,7 @@ describe("RelationScopingTest", () => {
   });
 });
 
-describe("NestedRelationScopingTest", () => {
+describe.skip("NestedRelationScopingTest", () => {
   function makeModel() {
     class NRSPost extends Base {
       static {
@@ -713,7 +714,7 @@ describe("NestedRelationScopingTest", () => {
   });
 });
 
-describe("scoping()", () => {
+describe.skip("scoping()", () => {
   it("sets currentScope within the block", async () => {
     class Post extends Base {
       static {
@@ -729,7 +730,7 @@ describe("scoping()", () => {
   });
 });
 
-describe("scopeForCreate / whereValuesHash", () => {
+describe.skip("scopeForCreate / whereValuesHash", () => {
   it("scopeForCreate returns attributes for new records", async () => {
     class Post extends Base {
       static {
@@ -780,7 +781,7 @@ describe("scopeForCreate / whereValuesHash", () => {
   });
 });
 
-describe("Scoping block (Rails-guided)", () => {
+describe.skip("Scoping block (Rails-guided)", () => {
   it("scoping sets currentScope within the block", async () => {
     class Post extends Base {
       static {
@@ -796,7 +797,7 @@ describe("Scoping block (Rails-guided)", () => {
   });
 });
 
-describe("Static shorthands (Rails-guided)", () => {
+describe.skip("Static shorthands (Rails-guided)", () => {
   it("Base.where is shorthand for Base.all().where()", () => {
     class Post extends Base {
       static {

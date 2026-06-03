@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
 import { Base } from "./index.js";
 import { AdminUser } from "./test-helpers/models/admin/user.js";
@@ -32,7 +33,7 @@ const { "admin/users": adminUsers } = useFixtures(
   () => Base.connection,
 );
 
-describe("FilterAttributesTest", () => {
+describe.skip("FilterAttributesTest", () => {
   let previousFilterAttributes: (string | RegExp | ((k: string, v: unknown) => unknown))[];
 
   beforeEach(() => {

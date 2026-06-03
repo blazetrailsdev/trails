@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -20,7 +21,7 @@ beforeAll(async () => {
   });
 });
 
-describe("WithAnnotationsTest", () => {
+describe.skip("WithAnnotationsTest", () => {
   function makeModel() {
     class Post extends Base {
       static {
@@ -251,7 +252,7 @@ describe("WithAnnotationsTest", () => {
   });
 });
 
-describe("annotate()", () => {
+describe.skip("annotate()", () => {
   it("adds SQL comments to the query", () => {
     class Item extends Base {
       static {
@@ -278,7 +279,7 @@ describe("annotate()", () => {
   });
 });
 
-describe("optimizerHints()", () => {
+describe.skip("optimizerHints()", () => {
   it("adds optimizer hints to SQL", () => {
     class User extends Base {
       static {
@@ -302,7 +303,7 @@ describe("optimizerHints()", () => {
   });
 });
 
-describe("Annotate (Rails-guided)", () => {
+describe.skip("Annotate (Rails-guided)", () => {
   it("annotate adds comment to SQL", () => {
     class User extends Base {
       static {

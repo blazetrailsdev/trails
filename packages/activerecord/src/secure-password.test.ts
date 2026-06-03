@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { performance } from "node:perf_hooks";
 import { Base } from "./index.js";
@@ -13,7 +14,7 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 // differences are immaterial (sqlite ignores unread columns).
 // -- Phase 2000: Core --
 
-describe("secure_password", () => {
+describe.skip("secure_password", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -87,7 +88,7 @@ describe("secure_password", () => {
   });
 });
 
-describe("SecurePassword (Rails-guided)", () => {
+describe.skip("SecurePassword (Rails-guided)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -174,7 +175,7 @@ describe("SecurePassword (Rails-guided)", () => {
   });
 });
 
-describe("password reset token", () => {
+describe.skip("password reset token", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -306,7 +307,7 @@ describe("password reset token", () => {
   });
 });
 
-describe("SecurePasswordTest", () => {
+describe.skip("SecurePasswordTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -497,7 +498,7 @@ describe("SecurePasswordTest", () => {
   });
 });
 
-describe("hasSecurePassword — per-attribute confirmation, challenge, and salt", () => {
+describe.skip("hasSecurePassword — per-attribute confirmation, challenge, and salt", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {

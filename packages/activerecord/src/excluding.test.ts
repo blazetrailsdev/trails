@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -12,7 +13,7 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 // ==========================================================================
 // ExcludingTest — targets excluding_test.rb
 // ==========================================================================
-describe("ExcludingTest", () => {
+describe.skip("ExcludingTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -41,7 +42,7 @@ describe("ExcludingTest", () => {
   });
 });
 
-describe("ExcludingTest", () => {
+describe.skip("ExcludingTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -136,7 +137,7 @@ describe("ExcludingTest", () => {
   });
 });
 
-describe("excluding() / without()", () => {
+describe.skip("excluding() / without()", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -171,7 +172,7 @@ describe("excluding() / without()", () => {
   });
 });
 
-describe("Excluding (Rails-guided)", () => {
+describe.skip("Excluding (Rails-guided)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {

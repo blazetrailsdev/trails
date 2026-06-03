@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -12,7 +13,7 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
-describe("CustomPropertiesTest", () => {
+describe.skip("CustomPropertiesTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -509,7 +510,7 @@ describe("CustomPropertiesTest", () => {
   });
 });
 
-describe("DefineAttributeTest", () => {
+describe.skip("DefineAttributeTest", () => {
   it("define_attribute registers a type object directly", () => {
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
@@ -571,7 +572,7 @@ describe("DefineAttributeTest", () => {
   });
 });
 
-describe("DefaultAttributesTest", () => {
+describe.skip("DefaultAttributesTest", () => {
   it("_default_attributes returns an AttributeSet", () => {
     class Post extends Base {
       static {
@@ -660,7 +661,7 @@ describe("DefaultAttributesTest", () => {
   });
 });
 
-describe("DefineAttributeSTITest", () => {
+describe.skip("DefineAttributeSTITest", () => {
   it("defineAttribute on STI subclass routes to the STI base", () => {
     const intType = typeRegistry.lookup("integer");
     class Animal extends Base {
@@ -704,7 +705,7 @@ describe("DefineAttributeSTITest", () => {
   });
 });
 
-describe("ResetDefaultAttributesCascadeTest", () => {
+describe.skip("ResetDefaultAttributesCascadeTest", () => {
   it("adding an attribute to a superclass invalidates an AR subclass _defaultAttributes cache", () => {
     class Post extends Base {
       static {

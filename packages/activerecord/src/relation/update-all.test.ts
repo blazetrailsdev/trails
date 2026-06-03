@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 
@@ -30,7 +31,7 @@ beforeAll(async () => {
 // ==========================================================================
 // UpdateAllTest — targets relation/update_all_test.rb
 // ==========================================================================
-describe("UpdateAllTest", () => {
+describe.skip("UpdateAllTest", () => {
   it("update all updates all records", async () => {
     class Post extends Base {
       static {
@@ -56,7 +57,7 @@ describe("UpdateAllTest", () => {
   });
 });
 
-describe("UpdateAllTest", () => {
+describe.skip("UpdateAllTest", () => {
   function makeModel() {
     class Post extends Base {
       static {

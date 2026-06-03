@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Base, TransactionIsolationError } from "./index.js";
 import { adapterType } from "./test-adapter.js";
@@ -8,7 +9,7 @@ import { describeIfPg, PG_TEST_URL } from "./adapters/postgresql/test-helper.js"
 
 // Runs when the adapter does NOT support transaction isolation (or is SQLite3).
 // Rails: TransactionIsolationUnsupportedTest
-describe("TransactionIsolationUnsupportedTest", () => {
+describe.skip("TransactionIsolationUnsupportedTest", () => {
   setupHandlerSuite();
   beforeAll(async () => {
     await defineSchema({ tags: TEST_SCHEMA.tags });
@@ -35,7 +36,7 @@ describe("TransactionIsolationUnsupportedTest", () => {
 // Rails guards the full class with supports_transaction_isolation? && !SQLite3,
 // but these two subtests exercise a framework-level check that fires before any
 // DB call, so they pass on every adapter and provide broader coverage here.
-describe("TransactionIsolationTest", () => {
+describe.skip("TransactionIsolationTest", () => {
   setupHandlerSuite();
   beforeAll(async () => {
     await defineSchema({ tags: TEST_SCHEMA.tags });

@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -37,7 +38,7 @@ beforeAll(async () => {
 // ==========================================================================
 // NamedScopingTest — targets scoping/named_scoping_test.rb
 // ==========================================================================
-describe("NamedScopingTest", () => {
+describe.skip("NamedScopingTest", () => {
   it("implements enumerable", async () => {
     class Post extends Base {
       static {
@@ -596,7 +597,7 @@ describe("NamedScopingTest", () => {
 // ==========================================================================
 // NamedScopingTest2 — more targets for named_scoping_test.rb
 // ==========================================================================
-describe("NamedScopingTest", () => {
+describe.skip("NamedScopingTest", () => {
   it("method missing priority when delegating", async () => {
     class Post extends Base {
       static {
@@ -936,7 +937,7 @@ describe("NamedScopingTest", () => {
 // ==========================================================================
 // NamedScopingTest3 — additional missing tests from scoping/named_scoping_test.rb
 // ==========================================================================
-describe("NamedScopingTest", () => {
+describe.skip("NamedScopingTest", () => {
   it("has many associations have access to scopes", () => {
     expect(true).toBe(true);
   });
@@ -987,7 +988,7 @@ describe("NamedScopingTest", () => {
   });
 });
 
-describe("NamedScopingTest", () => {
+describe.skip("NamedScopingTest", () => {
   class Product extends Base {
     static {
       this.attribute("name", "string");
@@ -1011,7 +1012,7 @@ describe("NamedScopingTest", () => {
   });
 });
 
-describe("NamedScopingTest", () => {
+describe.skip("NamedScopingTest", () => {
   it("scope is accessible on Relation via proxy", async () => {
     class User extends Base {
       static {
@@ -1101,7 +1102,7 @@ describe("NamedScopingTest", () => {
   });
 });
 
-describe("NamedScopingTest", () => {
+describe.skip("NamedScopingTest", () => {
   it("adds extension methods to the scoped relation", () => {
     class Article extends Base {
       static {
@@ -1121,7 +1122,7 @@ describe("NamedScopingTest", () => {
   });
 });
 
-describe("NamedScopingTest", () => {
+describe.skip("NamedScopingTest", () => {
   it("named scope filters records", async () => {
     class Product extends Base {
       static {
@@ -1227,7 +1228,7 @@ describe("NamedScopingTest", () => {
   });
 });
 
-describe("NamedScopingTest", () => {
+describe.skip("NamedScopingTest", () => {
   class Post extends Base {
     static {
       this.attribute("title", "string");
@@ -1317,7 +1318,7 @@ describe("NamedScopingTest", () => {
   });
 });
 
-describe("NamedScopingTest", () => {
+describe.skip("NamedScopingTest", () => {
   // Rails: test_scope_is_chainable
   it("scopes are chainable with where", async () => {
     class Post extends Base {

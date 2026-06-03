@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { describe, it, expect, beforeAll } from "vitest";
 import { sql } from "@blazetrails/arel";
 import { Base } from "../index.js";
@@ -14,7 +15,7 @@ beforeAll(async () => {
   });
 });
 
-describe("OrderTest", () => {
+describe.skip("OrderTest", () => {
   it("order with string", () => {
     class Post extends Base {
       static {

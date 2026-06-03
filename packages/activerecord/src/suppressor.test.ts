@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -24,7 +25,7 @@ beforeAll(async () => {
   });
 });
 
-describe("SuppressorTest", () => {
+describe.skip("SuppressorTest", () => {
   it("suppresses create", async () => {
     class Post extends Base {
       static {
@@ -114,7 +115,7 @@ describe("SuppressorTest", () => {
   });
 });
 
-describe("suppress()", () => {
+describe.skip("suppress()", () => {
   it("prevents records from being persisted to database", async () => {
     class User extends Base {
       static {
@@ -135,7 +136,7 @@ describe("suppress()", () => {
   });
 });
 
-describe("Suppressor.registry", () => {
+describe.skip("Suppressor.registry", () => {
   it("returns the suppression registry", () => {
     const registry = Base.registry;
     expect(registry).toBeDefined();

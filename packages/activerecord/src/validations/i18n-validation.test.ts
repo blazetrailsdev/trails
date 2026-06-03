@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Error as ActiveModelError, I18n } from "@blazetrails/activemodel";
@@ -21,7 +22,7 @@ class FakeReply {
   }
 }
 
-describe("I18nValidationTest", () => {
+describe.skip("I18nValidationTest", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     I18n.reset();

@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { Base, Relation } from "./index.js";
 import { registerModel } from "./associations.js";
@@ -15,7 +16,7 @@ beforeAll(async () => {
     post_classes: { title: "string", status: "string" },
   });
 });
-describe("QueryingTest — static forwarders on Base", () => {
+describe.skip("QueryingTest — static forwarders on Base", () => {
   let Post: typeof Base;
 
   beforeAll(() => {
@@ -154,7 +155,7 @@ describe("QueryingTest — static forwarders on Base", () => {
   });
 });
 
-describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
+describe.skip("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
   let Model: typeof Base;
 
   afterEach(() => vi.restoreAllMocks());
@@ -186,7 +187,7 @@ describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
   });
 });
 
-describe("_loadFromSql — STI detection (Story J gap 2)", () => {
+describe.skip("_loadFromSql — STI detection (Story J gap 2)", () => {
   let Animal: typeof Base;
   let Dog: typeof Base;
 

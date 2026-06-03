@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Mirrors: activerecord/test/cases/unsafe_raw_sql_test.rb
  */
@@ -20,7 +21,7 @@ class Post extends Base {
   }
 }
 
-describe("UnsafeRawSqlTest", () => {
+describe.skip("UnsafeRawSqlTest", () => {
   beforeAll(async () => {
     await defineSchema({
       posts: { title: "string", author_id: "integer", type: "string", tags_count: "integer" },

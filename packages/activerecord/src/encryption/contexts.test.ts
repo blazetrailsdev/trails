@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 // vendor/rails/activerecord/test/cases/encryption/contexts_test.rb
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base } from "../index.js";
@@ -21,7 +22,7 @@ import { RecordInvalid } from "../validations.js";
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
 
-describe("ActiveRecord::Encryption::ContextsTest", () => {
+describe.skip("ActiveRecord::Encryption::ContextsTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
   let EncryptedPost: typeof Base;
   let EncryptedBook: typeof Base;

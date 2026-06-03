@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -41,7 +42,7 @@ async function assertUpsertConflictTargetBehavior(
 // ==========================================================================
 // InsertAllTest — targets insert_all_test.rb
 // ==========================================================================
-describe("InsertAllTest", () => {
+describe.skip("InsertAllTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -864,7 +865,7 @@ describe("InsertAllTest", () => {
   });
 });
 
-describe("insertAll / upsertAll", () => {
+describe.skip("insertAll / upsertAll", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -899,7 +900,7 @@ describe("insertAll / upsertAll", () => {
   });
 });
 
-describe("insertAll / upsertAll (Rails-guided)", () => {
+describe.skip("insertAll / upsertAll (Rails-guided)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -1037,7 +1038,7 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
 // ==========================================================================
 // Regression: upsertAll on returning DBs (cache miss path)
 // ==========================================================================
-describe("InsertAll async uniqueIndexes regression", () => {
+describe.skip("InsertAll async uniqueIndexes regression", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {

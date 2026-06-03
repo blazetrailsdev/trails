@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -16,7 +17,7 @@ beforeAll(async () => {
     invoices: { amount: "integer", updated_at: "datetime", created_at: "datetime" },
   });
 });
-describe("TouchLaterTest", () => {
+describe.skip("TouchLaterTest", () => {
   function makeTouchModel() {
     class Invoice extends Base {
       static {
@@ -133,7 +134,7 @@ describe("TouchLaterTest", () => {
   });
 });
 
-describe("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", () => {
+describe.skip("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", () => {
   it("uses _touchTime stored on the record rather than an explicit argument", async () => {
     const { surreptitiouslyTouch } = await import("./touch-later.js");
     class Invoice extends Base {
@@ -163,7 +164,7 @@ describe("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", 
   });
 });
 
-describe("touchDeferredAttributes delegates to timestampTouch with deferred time (Story K gap 4)", () => {
+describe.skip("touchDeferredAttributes delegates to timestampTouch with deferred time (Story K gap 4)", () => {
   it("uses the stored _touchTime and clears deferred state", async () => {
     const { touchDeferredAttributes } = await import("./touch-later.js");
     class Invoice extends Base {

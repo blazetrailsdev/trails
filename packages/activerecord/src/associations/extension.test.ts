@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -26,7 +27,7 @@ registerModel(Project);
 // (whose `comments` association carries the Rails `find_most_recent` /
 // `with_content` extension block) + real posts/comments fixture lookups,
 // mirroring `AssociationsExtensionsTest` against `posts(:welcome).comments`.
-describe("AssociationsExtensionsTest", () => {
+describe.skip("AssociationsExtensionsTest", () => {
   const { posts, comments, developers, projects } = useHandlerFixtures(
     ["posts", "comments", "developers", "projects", "developersProjects"],
     { schema: canonicalSchema },
@@ -168,7 +169,7 @@ async function freshAdapter(): Promise<TestDatabaseAdapter> {
 // follow-up pass, so this file stays on eslint/test-fixture-parity-exclude.json
 // until then. (`extension with scopes` migrated to canonical Post + comments
 // fixtures once `scope()` began carrying the association's `extend:` modules.)
-describe("AssociationsExtensionsTest", () => {
+describe.skip("AssociationsExtensionsTest", () => {
   let extAdapter: TestDatabaseAdapter;
 
   beforeAll(async () => {

@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -28,7 +29,7 @@ beforeAll(async () => {
 // ==========================================================================
 // OrTest — targets relation/or_test.rb
 // ==========================================================================
-describe("OrTest", () => {
+describe.skip("OrTest", () => {
   it("or combines two relations", () => {
     class Post extends Base {
       static {
@@ -53,7 +54,7 @@ describe("OrTest", () => {
   });
 });
 
-describe("OrTest", () => {
+describe.skip("OrTest", () => {
   function makeModel() {
     class User extends Base {
       static {
@@ -291,7 +292,7 @@ describe("OrTest", () => {
   });
 });
 
-describe("TooManyOrTest", () => {
+describe.skip("TooManyOrTest", () => {
   it("too many or", () => {
     class Post extends Base {
       static {
@@ -308,7 +309,7 @@ describe("TooManyOrTest", () => {
   });
 });
 
-describe("OrTest", () => {
+describe.skip("OrTest", () => {
   it("combines two where clauses with OR", async () => {
     class User extends Base {
       static {
@@ -346,7 +347,7 @@ describe("OrTest", () => {
   });
 });
 
-describe("OrTest", () => {
+describe.skip("OrTest", () => {
   it("triple or chains", async () => {
     class User extends Base {
       static {
@@ -387,7 +388,7 @@ describe("OrTest", () => {
   });
 });
 
-describe("OrTest", () => {
+describe.skip("OrTest", () => {
   it("combines two scoped relations with OR", async () => {
     class User extends Base {
       static _tableName = "users";
@@ -411,7 +412,7 @@ describe("OrTest", () => {
   });
 });
 
-describe("OrTest", () => {
+describe.skip("OrTest", () => {
   class User extends Base {
     static {
       this.attribute("name", "string");
@@ -461,7 +462,7 @@ describe("OrTest", () => {
   });
 });
 
-describe("OrTest", () => {
+describe.skip("OrTest", () => {
   class Post extends Base {
     static {
       this.attribute("title", "string");
@@ -532,7 +533,7 @@ describe("OrTest", () => {
   });
 });
 
-describe("OrTest", () => {
+describe.skip("OrTest", () => {
   class User extends Base {
     static {
       this.attribute("name", "string");

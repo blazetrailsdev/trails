@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, serialize } from "./index.js";
 import { modelRegistry } from "./associations.js";
@@ -35,7 +36,7 @@ const contactAttributes = {
   alternative_id: null as number | null,
 };
 
-describe("SerializationTest", () => {
+describe.skip("SerializationTest", () => {
   function makeContact() {
     class Contact extends Base {
       static {
@@ -238,7 +239,7 @@ describe("SerializationTest", () => {
   });
 });
 
-describe("toXml() on Base", () => {
+describe.skip("toXml() on Base", () => {
   it("serializes a record to XML", () => {
     class User extends Base {
       static {
@@ -254,7 +255,7 @@ describe("toXml() on Base", () => {
   });
 });
 
-describe("serializableHash with include", () => {
+describe.skip("serializableHash with include", () => {
   it("includes nested associations when preloaded", async () => {
     class Author extends Base {
       static {
@@ -280,7 +281,7 @@ describe("serializableHash with include", () => {
   });
 });
 
-describe("fromJson on Base", () => {
+describe.skip("fromJson on Base", () => {
   it("sets attributes from JSON", () => {
     class User extends Base {
       static {

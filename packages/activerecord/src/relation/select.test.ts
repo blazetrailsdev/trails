@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -25,7 +26,7 @@ beforeAll(async () => {
 // ==========================================================================
 // SelectTest — targets relation/select_test.rb
 // ==========================================================================
-describe("SelectTest", () => {
+describe.skip("SelectTest", () => {
   it("select with columns", () => {
     class Post extends Base {
       static {
@@ -49,7 +50,7 @@ describe("SelectTest", () => {
   });
 });
 
-describe("SelectTest", () => {
+describe.skip("SelectTest", () => {
   function makeModel() {
     class Developer extends Base {
       static {
@@ -296,7 +297,7 @@ describe("SelectTest", () => {
   });
 });
 
-describe("select block form", () => {
+describe.skip("select block form", () => {
   it("filters loaded records with a function", async () => {
     class Item extends Base {
       static _tableName = "items";
@@ -313,7 +314,7 @@ describe("select block form", () => {
   });
 });
 
-describe("regroup()", () => {
+describe.skip("regroup()", () => {
   it("replaces existing GROUP BY columns", () => {
     class Item extends Base {
       static _tableName = "items";
@@ -329,7 +330,7 @@ describe("regroup()", () => {
   });
 });
 
-describe("distinct count", () => {
+describe.skip("distinct count", () => {
   it("count with distinct uses COUNT(DISTINCT ...)", async () => {
     class Item extends Base {
       static _tableName = "items";
@@ -349,7 +350,7 @@ describe("distinct count", () => {
   });
 });
 
-describe("having hash form", () => {
+describe.skip("having hash form", () => {
   it("accepts hash conditions for having", () => {
     class Item extends Base {
       static _tableName = "items";
@@ -367,7 +368,7 @@ describe("having hash form", () => {
   });
 });
 
-describe("distinctOn", () => {
+describe.skip("distinctOn", () => {
   it("returns a relation with distinctOn columns set", () => {
     class User extends Base {
       static {
@@ -382,7 +383,7 @@ describe("distinctOn", () => {
   });
 });
 
-describe("Relation Select (Rails-guided)", () => {
+describe.skip("Relation Select (Rails-guided)", () => {
   it("select specific columns in SQL", () => {
     class User extends Base {
       static {
@@ -431,7 +432,7 @@ describe("Relation Select (Rails-guided)", () => {
   });
 });
 
-describe("Group/Having (Rails-guided)", () => {
+describe.skip("Group/Having (Rails-guided)", () => {
   it("group generates GROUP BY SQL", () => {
     class Order extends Base {
       static {

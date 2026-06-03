@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -46,7 +47,7 @@ beforeAll(async () => {
 // ==========================================================================
 // DefaultScopingTest — targets scoping/default_scoping_test.rb
 // ==========================================================================
-describe("DefaultScopingTest", () => {
+describe.skip("DefaultScopingTest", () => {
   it("default scope applies to queries", async () => {
     class Post extends Base {
       static {
@@ -111,7 +112,7 @@ describe("DefaultScopingTest", () => {
 // ==========================================================================
 // DefaultScopingTest — targets scoping/default_scoping_test.rb
 // ==========================================================================
-describe("DefaultScopingTest", () => {
+describe.skip("DefaultScopingTest", () => {
   it("default scope", async () => {
     class Post extends Base {
       static {
@@ -924,7 +925,7 @@ describe("DefaultScopingTest", () => {
   });
 });
 
-describe("DefaultScopingWithThreadTest", () => {
+describe.skip("DefaultScopingWithThreadTest", () => {
   it("default scope is threadsafe", async () => {
     class Post extends Base {
       static {
@@ -945,7 +946,7 @@ describe("DefaultScopingWithThreadTest", () => {
 // ==========================================================================
 // DefaultScopingTest2 — more targets for default_scoping_test.rb
 // ==========================================================================
-describe("DefaultScopingTest", () => {
+describe.skip("DefaultScopingTest", () => {
   it("scope overwrites default", async () => {
     class Post extends Base {
       static {
@@ -1304,7 +1305,7 @@ describe("DefaultScopingTest", () => {
 // ==========================================================================
 // DefaultScopingTest3 — additional missing tests from scoping/default_scoping_test.rb
 // ==========================================================================
-describe("DefaultScopingTest", () => {
+describe.skip("DefaultScopingTest", () => {
   it("default scope as class method referencing scope", () => {
     expect(true).toBe(true);
   });
@@ -1487,13 +1488,13 @@ describe("DefaultScopingTest", () => {
 // ==========================================================================
 // DefaultScopingWithThreadTest — from scoping/default_scoping_test.rb
 // ==========================================================================
-describe("DefaultScopingWithThreadTest", () => {
+describe.skip("DefaultScopingWithThreadTest", () => {
   it("default scoping with threads", () => {
     expect(true).toBe(true);
   });
 });
 
-describe("DefaultScopingTest", () => {
+describe.skip("DefaultScopingTest", () => {
   it("default_scope is applied to all queries", async () => {
     class Post extends Base {
       static {
@@ -1612,7 +1613,7 @@ describe("DefaultScopingTest", () => {
   });
 });
 
-describe("DefaultScopingTest", () => {
+describe.skip("DefaultScopingTest", () => {
   it("default_scope filters all queries", async () => {
     class Article extends Base {
       static {

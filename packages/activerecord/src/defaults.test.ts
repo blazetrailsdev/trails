@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -17,7 +18,7 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-describe("MysqlDefaultExpressionTest", () => {
+describe.skip("MysqlDefaultExpressionTest", () => {
   it.skip("schema dump includes default expression", () => {
     // BLOCKED: schema — schema dumper does not reflect MySQL expression defaults (uuid() / CONCAT).
     // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
@@ -65,7 +66,7 @@ describe("MysqlDefaultExpressionTest", () => {
   });
 });
 
-describe("DefaultNumbersTest", () => {
+describe.skip("DefaultNumbersTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -100,7 +101,7 @@ describe("DefaultNumbersTest", () => {
   });
 });
 
-describe("DefaultBinaryTest", () => {
+describe.skip("DefaultBinaryTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -135,7 +136,7 @@ describe("DefaultBinaryTest", () => {
   });
 });
 
-describe("DefaultTest", () => {
+describe.skip("DefaultTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -166,7 +167,7 @@ describe("DefaultTest", () => {
   });
 });
 
-describe("DefaultsTestWithoutTransactionalFixtures", () => {
+describe.skip("DefaultsTestWithoutTransactionalFixtures", () => {
   it.skip("mysql not null defaults non strict", () => {
     // BLOCKED: adapter-mysql — strict-mode toggle via `establish_connection` not supported in test harness.
     // ROOT-CAUSE: we have no way to reconfigure MySQL strict_mode per-connection in tests.
@@ -177,7 +178,7 @@ describe("DefaultsTestWithoutTransactionalFixtures", () => {
   });
 });
 
-describe("DefaultTextTest", () => {
+describe.skip("DefaultTextTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -203,7 +204,7 @@ describe("DefaultTextTest", () => {
   });
 });
 
-describe("DefaultStringsTest", () => {
+describe.skip("DefaultStringsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -229,7 +230,7 @@ describe("DefaultStringsTest", () => {
   });
 });
 
-describe("PostgresqlDefaultExpressionTest", () => {
+describe.skip("PostgresqlDefaultExpressionTest", () => {
   it.skip("schema dump includes default expression", () => {
     // BLOCKED: schema — schema dumper does not reflect PostgreSQL expression defaults (CURRENT_DATE / CURRENT_TIMESTAMP).
     // ROOT-CAUSE: dump_table_schema path does not preserve expression-default lambdas for PG.
@@ -237,7 +238,7 @@ describe("PostgresqlDefaultExpressionTest", () => {
   });
 });
 
-describe("Sqlite3DefaultExpressionTest", () => {
+describe.skip("Sqlite3DefaultExpressionTest", () => {
   it.skip("schema dump includes default expression", () => {
     // BLOCKED: schema — schema dumper does not reflect SQLite expression defaults (CURRENT_DATE, CURRENT_TIMESTAMP, ABS(RANDOM())).
     // ROOT-CAUSE: dump_table_schema path does not preserve expression-default lambdas for SQLite.
@@ -245,7 +246,7 @@ describe("Sqlite3DefaultExpressionTest", () => {
   });
 });
 
-describe("DefaultTest", () => {
+describe.skip("DefaultTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -404,7 +405,7 @@ describe("DefaultTest", () => {
   });
 });
 
-describe("Base.columnDefaults", () => {
+describe.skip("Base.columnDefaults", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {

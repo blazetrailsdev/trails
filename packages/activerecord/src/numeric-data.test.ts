@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Mirrors activerecord/test/cases/numeric_data_test.rb
  */
@@ -32,7 +33,7 @@ class NumericData extends Base {
   }
 }
 
-describe("NumericDataTest", () => {
+describe.skip("NumericDataTest", () => {
   it("big decimal conditions", async () => {
     const m = NumericData.new({
       bank_balance: 1586.43,

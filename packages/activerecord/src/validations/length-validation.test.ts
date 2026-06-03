@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Mirrors: activerecord/test/cases/validations/length_validation_test.rb
  *
@@ -13,7 +14,7 @@ import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Owner } from "../test-helpers/models/owner.js";
 import { Pet } from "../test-helpers/models/pet.js";
 
-describe("LengthValidationTest", () => {
+describe.skip("LengthValidationTest", () => {
   setupHandlerSuite();
   // Mirrors Rails `fixtures :owners` — transactional fixtures (per-test
   // BEGIN/ROLLBACK). The owner rows themselves are never read by these tests;

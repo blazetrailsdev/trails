@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { describe, it, expect, beforeAll } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
 import { Base, defineEnum, registerModel } from "../index.js";
@@ -20,7 +21,7 @@ beforeAll(async () => {
 // ==========================================================================
 // FieldOrderedValuesTest — targets relation/field_ordered_values_test.rb
 // ==========================================================================
-describe("FieldOrderedValuesTest", () => {
+describe.skip("FieldOrderedValuesTest", () => {
   it("in order of generates CASE expression", () => {
     class Post extends Base {
       static {

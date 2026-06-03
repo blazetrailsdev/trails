@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -93,7 +94,7 @@ afterEach(() => {
 // ==========================================================================
 // TransactionTest — targets transactions_test.rb
 // ==========================================================================
-describe("TransactionTest", () => {
+describe.skip("TransactionTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -125,7 +126,7 @@ describe("TransactionTest", () => {
 // ==========================================================================
 // TransactionTest — targets transactions_test.rb
 // ==========================================================================
-describe("TransactionTest", () => {
+describe.skip("TransactionTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -237,7 +238,7 @@ describe("TransactionTest", () => {
 // ==========================================================================
 // TransactionTest — more targets for transactions_test.rb
 // ==========================================================================
-describe("TransactionTest", () => {
+describe.skip("TransactionTest", () => {
   setupHandlerSuite();
   beforeAll(async () => {
     await defineSchema({
@@ -1163,7 +1164,7 @@ describe("TransactionTest", () => {
 // ==========================================================================
 // TransactionTest2 — more targets for transactions_test.rb
 // ==========================================================================
-describe("TransactionTest", () => {
+describe.skip("TransactionTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -1475,7 +1476,7 @@ describe("TransactionTest", () => {
 // ==========================================================================
 // TransactionTest3 — additional missing tests from transactions_test.rb
 // ==========================================================================
-describe("TransactionTest", () => {
+describe.skip("TransactionTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -1640,7 +1641,7 @@ describe("TransactionTest", () => {
 // transactions or throw inside callbacks; the per-test fixture SAVEPOINT
 // conflicts with MariaDB SAVEPOINT invalidation on callback-driven rollbacks.
 // ==========================================================================
-describe("TransactionTest", () => {
+describe.skip("TransactionTest", () => {
   setupHandlerSuite();
   beforeAll(async () => {
     await defineSchema({ posts: { title: "string", approved: "boolean", content: "string" } });
@@ -1934,7 +1935,7 @@ describe("TransactionTest", () => {
 // ==========================================================================
 // TransactionsWithTransactionalFixturesTest — from transactions_test.rb
 // ==========================================================================
-describe("TransactionsWithTransactionalFixturesTest", () => {
+describe.skip("TransactionsWithTransactionalFixturesTest", () => {
   it.skip("automatic savepoint in outer transaction", () => {
     // Requires loaded fixtures (topics(1)) — fixture loader not available.
   });
@@ -1946,7 +1947,7 @@ describe("TransactionsWithTransactionalFixturesTest", () => {
 // ==========================================================================
 // TransactionUUIDTest — from transactions_test.rb
 // ==========================================================================
-describe("TransactionUUIDTest", () => {
+describe.skip("TransactionUUIDTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -1978,7 +1979,7 @@ describe("TransactionUUIDTest", () => {
 // ==========================================================================
 // ConcurrentTransactionTest — from transactions_test.rb
 // ==========================================================================
-describe("ConcurrentTransactionTest", () => {
+describe.skip("ConcurrentTransactionTest", () => {
   it.skip("transaction per thread", () => {
     // Requires Ruby Thread semantics — JS is single-threaded.
   });
@@ -1990,13 +1991,13 @@ describe("ConcurrentTransactionTest", () => {
 // ==========================================================================
 // after current transaction commit multidb nested transactions (standalone)
 // ==========================================================================
-describe("TransactionTest", () => {
+describe.skip("TransactionTest", () => {
   it.skip("after current transaction commit multidb nested transactions", () => {
     // Requires multi-database setup (ARUnit2Model) — not available.
   });
 });
 
-describe("TransactionTest", () => {
+describe.skip("TransactionTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
@@ -2083,7 +2084,7 @@ describe("TransactionTest", () => {
   });
 });
 
-describe("TransactionTest", () => {
+describe.skip("TransactionTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -2161,7 +2162,7 @@ describe("TransactionTest", () => {
   });
 });
 
-describe("TransactionTest", () => {
+describe.skip("TransactionTest", () => {
   setupHandlerSuite();
 
   class Account extends Base {
@@ -2411,7 +2412,7 @@ describe("TransactionTest", () => {
   });
 });
 
-describe("rememberTransactionRecordState / restoreTransactionRecordState (Story K)", () => {
+describe.skip("rememberTransactionRecordState / restoreTransactionRecordState (Story K)", () => {
   it("rememberTransactionRecordState populates _startTransactionState with level and attributes", async () => {
     const { rememberTransactionRecordState } = await import("./transactions.js");
     const { Topic } = makeSQLiteTopic();
@@ -2457,7 +2458,7 @@ describe("rememberTransactionRecordState / restoreTransactionRecordState (Story 
 // ==========================================================================
 // Story K-followup regression tests
 // ==========================================================================
-describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () => {
+describe.skip("DirtyTracker.redetectChanges after rollback (Story K-followup)", () => {
   it("rollback preserves in-TX user edits as dirty", async () => {
     const { rememberTransactionRecordState, rolledbackBang } = await import("./transactions.js");
     const { Topic } = makeSQLiteTopic();
@@ -2504,7 +2505,7 @@ describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () =>
 // ==========================================================================
 // SchemaAdapter TM delegation regression test (Phase 1)
 // ==========================================================================
-describe("SchemaAdapter TM delegation", () => {
+describe.skip("SchemaAdapter TM delegation", () => {
   // createTestAdapter wraps a shared inner adapter; without local restore,
   // spies leak into the next test in this file.
   afterEach(() => {

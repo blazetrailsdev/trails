@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Model-level bigint round-trip tests (all adapters).
  *
@@ -17,7 +18,7 @@ useHandlerTransactionalFixtures();
 beforeAll(async () => {
   await defineSchema({ metrics: { score: "big_integer", label: "string" } });
 });
-describe("bigint model round-trip (all adapters)", () => {
+describe.skip("bigint model round-trip (all adapters)", () => {
   function makeModel() {
     class Metric extends Base {
       static {

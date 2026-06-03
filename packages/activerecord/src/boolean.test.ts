@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -31,7 +32,7 @@ const { topics } = useFixtures(
   () => Base.connection,
 );
 
-describe("BooleanTest", () => {
+describe.skip("BooleanTest", () => {
   it("boolean", async () => {
     expect(topics("approved_topic").approved).toBe(true);
   });

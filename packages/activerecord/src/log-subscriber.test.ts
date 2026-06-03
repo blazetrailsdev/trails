@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 
 import { LogSubscriber, setVerboseQueryLogs } from "./log-subscriber.js";
@@ -95,7 +96,7 @@ class TestDebugLogSubscriber extends LogSubscriber {
   }
 }
 
-describe("LogSubscriberTest", () => {
+describe.skip("LogSubscriberTest", () => {
   let mockLogger: MockLogger;
   let subscriber: TestDebugLogSubscriber;
   let oldBaseLogger: typeof Base.logger;

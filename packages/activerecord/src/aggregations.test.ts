@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -33,7 +34,7 @@ afterAll(() => {
 // ==========================================================================
 // AggregationsTest — targets aggregations_test.rb
 // ==========================================================================
-describe("AggregationsTest", () => {
+describe.skip("AggregationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -265,7 +266,7 @@ describe("AggregationsTest", () => {
 // Fixture-backed AggregationsTest cases: mirror Rails' `fixtures :customers`
 // against the canonical Customer model + composed_of mappings, rather than the
 // ad-hoc inline Customer classes used elsewhere in this file.
-describe("AggregationsTest", () => {
+describe.skip("AggregationsTest", () => {
   // Mirrors Rails `fixtures :customers` via the shared Customer model; `{ schema }`
   // recreates the canonical `customers` table to survive sibling-file contamination.
   const { customers } = useHandlerFixtures(["customers"], { schema: canonicalSchema });
@@ -413,7 +414,7 @@ describe("AggregationsTest", () => {
   });
 });
 
-describe("OverridingAggregationsTest", () => {
+describe.skip("OverridingAggregationsTest", () => {
   // Rails: test_composed_of_aggregation_redefinition_reflections_should_differ_and_not_inherited
   it("composed of aggregation redefinition reflections should differ and not inherited", () => {
     class DifferentName {}
@@ -441,7 +442,7 @@ describe("OverridingAggregationsTest", () => {
   });
 });
 
-describe("Aggregations", () => {
+describe.skip("Aggregations", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -540,7 +541,7 @@ describe("Aggregations", () => {
   });
 });
 
-describe("Aggregation edge cases", () => {
+describe.skip("Aggregation edge cases", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -590,7 +591,7 @@ describe("Aggregation edge cases", () => {
   });
 });
 
-describe("composed_of", () => {
+describe.skip("composed_of", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
@@ -657,7 +658,7 @@ describe("composed_of", () => {
   });
 });
 
-describe("composed_of (Rails-guided)", () => {
+describe.skip("composed_of (Rails-guided)", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {

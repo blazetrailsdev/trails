@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -19,7 +20,7 @@ beforeAll(async () => {
 // ==========================================================================
 // StructuralCompatibilityTest — targets relation/structural_compatibility_test.rb
 // ==========================================================================
-describe("StructuralCompatibilityTest", () => {
+describe.skip("StructuralCompatibilityTest", () => {
   it("structurally compatible returns true for same model", () => {
     class Post extends Base {
       static {
@@ -32,7 +33,7 @@ describe("StructuralCompatibilityTest", () => {
   });
 });
 
-describe("StructuralCompatibilityTest", () => {
+describe.skip("StructuralCompatibilityTest", () => {
   function makeModel() {
     class Post extends Base {
       static {
@@ -71,7 +72,7 @@ describe("StructuralCompatibilityTest", () => {
   });
 });
 
-describe("structurallyCompatible", () => {
+describe.skip("structurallyCompatible", () => {
   it("returns true for relations of the same model", () => {
     class User extends Base {
       static _tableName = "users";

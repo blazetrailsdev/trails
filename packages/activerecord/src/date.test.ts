@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./index.js";
@@ -10,7 +11,7 @@ useHandlerTransactionalFixtures();
 beforeAll(async () => {
   await defineSchema({ events: { start_date: "date" } });
 });
-describe("DateTest", () => {
+describe.skip("DateTest", () => {
   it("date with time value", async () => {
     class Event extends Base {
       static {

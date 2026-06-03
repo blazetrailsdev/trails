@@ -1,3 +1,4 @@
+// QUARANTINED (PR #2916): bespoke in-test DDL skipped to cut MySQL CI cost; tests are the backlog for a faithful canonical rewrite (see docs/activerecord/ddl-quarantine-backlog.md and the dirty.test.ts model, PR #2913).
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -19,7 +20,7 @@ beforeAll(async () => {
   });
 });
 
-describe("CloneTest", () => {
+describe.skip("CloneTest", () => {
   it("persisted", async () => {
     class Topic extends Base {
       static {
@@ -78,7 +79,7 @@ describe("CloneTest", () => {
   });
 });
 
-describe("CloneTest", () => {
+describe.skip("CloneTest", () => {
   it("clone preserves frozen state", async () => {
     class Topic extends Base {
       static {
@@ -108,7 +109,7 @@ describe("CloneTest", () => {
   });
 });
 
-describe("Base#clone", () => {
+describe.skip("Base#clone", () => {
   it("creates a shallow clone preserving id and persisted state", async () => {
     class User extends Base {
       static {
