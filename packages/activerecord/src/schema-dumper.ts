@@ -221,6 +221,8 @@ const DSL_HELPER_METHODS = new Set([
   "path",
   "polygon",
   "circle",
+  // Generated/virtual columns — t.virtual(name, { type:, as:, stored: }) DSL.
+  "virtual",
 ]);
 
 /**
@@ -1188,6 +1190,16 @@ export class SchemaDumper {
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       lines.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
     }
+  }
+
+  /**
+   * Returns true when `dslType` is a TableDefinition helper method
+   * (e.g. `"string"`, `"integer"`, `"virtual"`, `"serial"`). Used by the
+   * adapter subclass's `emitTable` override to dispatch column lines.
+   * @internal
+   */
+  protected _isDslHelper(dslType: string): boolean {
+    return DSL_HELPER_METHODS.has(dslType);
   }
 
   /** @internal */

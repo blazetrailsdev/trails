@@ -24,7 +24,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (column.array) spec["array"] = true;
 
     const adapter = this.pgAdapter();
-    if (adapter?.supportsVirtualColumns?.() && column.isVirtual()) {
+    if (adapter?.supportsVirtualColumns?.() && this._isVirtual(column)) {
       spec["as"] = this.extractExpressionForVirtualColumn(column);
       spec["stored"] = true;
       // enum_type must be set before the early return — Rails adds it after the virtual
@@ -46,6 +46,54 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return this.schemaType(column) === "bigserial";
   }
 
+  /**
+   * For PG array columns the OID::Array wrapper has no `limit` of its own;
+   * the limit belongs to the element type and is encoded in the SQL type
+   * string (e.g. `"character varying(255)"`, `"bit(8)"`). Parse it when
+   * `column.limit` is absent.
+   * @internal
+   */
+  protected override schemaLimit(column: Column): string | undefined {
+    const base = super.schemaLimit(column);
+    if (base !== undefined) return base;
+    const sqlType = (column.sqlType ?? "").toLowerCase();
+    if (/^(?:character varying|varchar|char(?:acter)?|bpchar)\b/.test(sqlType)) {
+      const m = /\((\d+)\)/.exec(sqlType);
+      return m ? m[1] : undefined;
+    }
+    if (/^(?:bit|varbit|bit varying)\b/.test(sqlType)) {
+      const m = /\((\d+)\)/.exec(sqlType);
+      return m ? m[1] : undefined;
+    }
+    return undefined;
+  }
+
+  /**
+   * For PG array columns where `column.precision` is absent, parse precision
+   * from the element type's SQL type string (e.g. `"numeric(10,2)"`).
+   * @internal
+   */
+  protected override schemaPrecision(column: Column): string | undefined {
+    const base = super.schemaPrecision(column);
+    if (base !== undefined) return base;
+    const sqlType = (column.sqlType ?? "").toLowerCase();
+    const m = /^numeric\((\d+)/.exec(sqlType);
+    return m ? m[1] : undefined;
+  }
+
+  /**
+   * For PG array columns where `column.scale` is absent, parse scale from
+   * the element type's SQL type string (e.g. `"numeric(10,2)"`).
+   * @internal
+   */
+  protected override schemaScale(column: Column): string | undefined {
+    const base = super.schemaScale(column);
+    if (base !== undefined) return base;
+    const sqlType = (column.sqlType ?? "").toLowerCase();
+    const m = /^numeric\(\d+,\s*(\d+)\)/.exec(sqlType);
+    return m ? m[1] : undefined;
+  }
+
   /** @internal */
   protected isExplicitPrimaryKeyDefault(column: Column): boolean {
     return column.type === "uuid" || (column.type === "integer" && !column.isSerial);
@@ -53,19 +101,33 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override schemaType(column: Column): string {
-    if (column.isSerial) return column.isBigint() ? "bigserial" : "serial";
-    if (column.isBigint()) return "bigint";
+    // Use sqlType to detect bigint (works with both real Column objects and
+    // plain ColumnInfo from AdapterSchemaSource, which has no isBigint() method).
+    const isBigSql = /^bigint\b/i.test(column.sqlType ?? "");
+    if (column.isSerial) return isBigSql ? "bigserial" : "serial";
+    if (isBigSql || column.type === "bigint") return "bigint";
     const semantic = column.type ?? undefined;
-    // BigIntegerType.name is "big_integer" — normalize to "bigint" for schema output
+    // BigIntegerType.name is "big_integer" — normalize to "bigint" for schema output.
     if (semantic === "big_integer") return "bigint";
+    // OID::BitVarying.type() returns Rails-style "bit_varying"; map to DSL "bitVarying".
+    if (semantic === "bit_varying") return "bitVarying";
     return semantic ?? super.schemaType(column as any);
   }
 
   /** @internal */
   protected override schemaTypeWithVirtual(column: Column): string {
-    // Abstract base checks column.virtual (property); PG Column exposes isVirtual() instead
-    if (column.isVirtual()) return "virtual";
+    if (this._isVirtual(column)) return "virtual";
     return this.schemaType(column);
+  }
+
+  /**
+   * Handles both real PG Column objects (which expose `isVirtual()`) and plain
+   * `ColumnInfo` objects from `AdapterSchemaSource` (which expose `virtual`).
+   */
+  private _isVirtual(column: Column): boolean {
+    return typeof (column as any).isVirtual === "function"
+      ? (column as any).isVirtual()
+      : !!(column as any).virtual;
   }
 
   /** @internal */
