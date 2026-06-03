@@ -31,6 +31,8 @@ const SHARED_EXCLUDE = [
 //     MySQL dialect (collation, warnings, temp-table DDL).
 // Enabling them is Story I-5: a dedicated TEST_ADAPTER step (own process) plus
 // the §4/§5 fixes — see docs/activerecord/adapter-test-ci-coverage-plan.md.
+// Remaining MySQL blockers: M-1a (addColumn charset propagation) + M-1b
+// (isCaseSensitive / LOWER / BINARY uniqueness path). M-2/M-3/M-4 resolved.
 const ADAPTER_SPECIFIC_EXCLUDE = [
   "packages/activerecord/src/adapters/postgresql/**",
   "packages/activerecord/src/tasks/postgresql-*.test.ts",
