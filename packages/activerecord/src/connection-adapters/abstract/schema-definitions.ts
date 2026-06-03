@@ -679,7 +679,11 @@ export class TableDefinition {
       this.compositePrimaryKey = tdOptions.primaryKey as string[];
     }
 
-    if (this._id !== false) {
+    // Mirrors Rails TableDefinition#set_primary_key: `if id && !as` — when a
+    // CTAS (`as: "SELECT ..."`) is used the SELECT defines the columns, so no
+    // auto-generated PK column should be emitted. Rails relies on this to keep
+    // `o.columns` empty in visit_TableDefinition when `as:` is set.
+    if (this._id !== false && !this.as) {
       let pkType: ColumnType;
       let pkOpts: ColumnOptions;
       if (typeof this._id === "object" && this._id !== null && !Array.isArray(this._id)) {

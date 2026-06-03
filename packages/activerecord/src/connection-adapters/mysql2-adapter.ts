@@ -475,10 +475,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       waitTimeout,
       variables,
     };
-    // Validate charset/collation early so misconfigured values fail at construction
-    // time rather than on the first query (mirrors Rails' eager validation in
-    // AbstractMysqlAdapter#initialize). _buildInitSql() performs the same check
-    // before each connection — this call makes it synchronous and constructor-time.
+    // Validate charset/collation at construction time so a misconfigured value
+    // raises immediately rather than on the first query. Rails defers this to
+    // connection-open time (no constructor validation in AbstractMysqlAdapter);
+    // we validate early as a fail-fast safety measure. _buildInitSql() re-applies
+    // the same regex before each new connection as the authoritative guard.
     const _charset =
       (mysqlConfig.charset as string | undefined) ??
       (mysqlConfig as { encoding?: string }).encoding;
