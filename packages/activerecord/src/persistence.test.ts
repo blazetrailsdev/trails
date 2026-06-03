@@ -14,7 +14,7 @@ function isTemporalDatetime(v: unknown): boolean {
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, RecordNotFound } from "./index.js";
+import { Base, RecordNotFound, RecordInvalid } from "./index.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -421,6 +421,24 @@ describe("PersistenceTest", () => {
     // Invoke through `any` to bypass the overloads — we're verifying the
     // runtime guard rejects a Base instance, not testing a supported form.
     await expect((Topic as any).update(t, { title: "x" })).rejects.toThrow(/ActiveRecord::Base/);
+  });
+
+  it("saveBang throws RecordInvalid with record reference", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.validates("title", { presence: true });
+      }
+    }
+    const topic = new Topic({});
+    try {
+      await topic.saveBang();
+      expect.unreachable("should throw");
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(RecordInvalid);
+      expect(e.record).toBe(topic);
+      expect(e.message).toMatch(/Validation failed/);
+    }
   });
 });
 

@@ -3666,3 +3666,44 @@ describe("FinderTest", () => {
 // ==========================================================================
 // FinderTest — targets finder_test.rb (continued)
 // ==========================================================================
+describe("FinderTest", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+
+  it("find raises RecordNotFound with model, primary_key, and id", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("id", "integer");
+      }
+    }
+    try {
+      await Topic.find(42);
+      expect.unreachable("should throw");
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(RecordNotFound);
+      expect(e.model).toBe("Topic");
+      expect(e.primaryKey).toBe("id");
+      expect(e.id).toBe(42);
+      expect(e.message).toContain("42");
+    }
+  });
+
+  it("find with multiple IDs raises RecordNotFound listing missing IDs", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("id", "integer");
+      }
+    }
+    try {
+      await Topic.find([99991, 99992, 99993]);
+      expect.unreachable("should throw");
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(RecordNotFound);
+      expect(e.message).toContain("99991");
+      expect(e.message).toContain("99992");
+    }
+  });
+});

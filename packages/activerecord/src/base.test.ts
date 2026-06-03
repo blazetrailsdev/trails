@@ -9,6 +9,7 @@ import {
   AttributeAssignmentError,
   NotImplementedError,
   ReadonlyAttributeError,
+  UnknownPrimaryKey,
   getRaiseOnAssignToAttrReadonly,
   setRaiseOnAssignToAttrReadonly,
 } from "./index.js";
@@ -3554,6 +3555,26 @@ describe("_applyScopeAttributes — STI type column wins over scope", () => {
       const car = new Car({});
       expect(car.readAttribute("type")).toBe("Car");
     });
+  });
+});
+
+// ==========================================================================
+// UnknownPrimaryKeyTest — targets base_test.rb
+// ==========================================================================
+describe("UnknownPrimaryKeyTest", () => {
+  it("no-arg constructor produces generic message", () => {
+    const err = new UnknownPrimaryKey();
+    expect(err.message).toBe("Unknown primary key.");
+    expect(err.model).toBeNull();
+  });
+
+  it("description is separated by newline+space", () => {
+    class Dummy extends Base {}
+    const err = new UnknownPrimaryKey(Dummy, "No PK configured.");
+    expect(err.message).toBe(
+      "Unknown primary key for table dummies in model Dummy.\nNo PK configured.",
+    );
+    expect(err.model).toBe(Dummy);
   });
 });
 
