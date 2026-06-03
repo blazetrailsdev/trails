@@ -87,7 +87,7 @@ Each branches from `main`. PR1↔PR2 both touch `sqlite3-adapter.ts`, so they sh
 **sequentially** (PR1 merges, then PR2 off updated `main`) — not as parallel
 siblings. Target ≤500 LOC each.
 
-### PR1 — `newClient()` seam + register `better_sqlite3` + retire `config.driver`
+### PR1 — `newClient()` seam + soft-load better-sqlite3 + retire `config.driver`
 
 _Node-agnostic; ships independent of #2909. Behavior-preserving: default backend
 stays better-sqlite3 (works on Node 20+, CI-stable) so PR1 is not coupled to the
