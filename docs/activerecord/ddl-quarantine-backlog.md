@@ -13,7 +13,7 @@ The quarantine header in each file reads:
 // and the dirty.test.ts model, PR #2913).
 ```
 
-## Phase 1 — Giants (PR #TBD)
+## Phase 1 — Giants (PR #2916)
 
 These are the largest files by test count; quarantining them drops the most DDL
 per PR. The PR ceiling is waived (mechanical sweep).
