@@ -3,3 +3,10 @@ packages:
   - "examples/*"
   - "scripts/guides-typecheck"
   - "scripts/parity"
+
+# pnpm 11 replaced the package.json `pnpm.onlyBuiltDependencies` list with
+# this `allowBuilds` map (onlyBuiltDependencies was removed). These native
+# deps need their install/build scripts to run. https://pnpm.io/settings
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
