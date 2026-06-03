@@ -83,16 +83,54 @@ export class SchemaCreation {
   }
 
   protected visitTableDefinition(o: TableDefinition): string {
-    let sql = "CREATE TABLE ";
-    sql += `${this.adapter.quoteTableName(o.tableName)} `;
+    let sql = `CREATE${this.tableModifierInCreate(o)} TABLE`;
+    if (o.ifNotExists) sql += " IF NOT EXISTS";
+    sql += ` ${this.adapter.quoteTableName(o.tableName)}`;
 
     const statements: string[] = o.columns.map((c) => this.visitColumnDefinition(c));
 
-    if (statements.length > 0) {
-      sql += `(${statements.join(", ")})`;
+    if (o.compositePrimaryKey && o.compositePrimaryKey.length > 0) {
+      statements.push(this.visitPrimaryKeyDefinition({ name: o.compositePrimaryKey }));
     }
 
+    if (this.useForeignKeys()) {
+      for (const fk of o.foreignKeys) {
+        statements.push(this.visitForeignKeyDefinition(fk));
+      }
+    }
+
+    if (this.supportsCheckConstraints()) {
+      for (const chk of o.checkConstraints) {
+        statements.push(this.visitCheckConstraintDefinition(chk));
+      }
+    }
+
+    statements.push(...this.tableConstraintStatements(o));
+
+    if (statements.length > 0) sql += ` (${statements.join(", ")})`;
+    sql = this.addTableOptionsBang(sql, o);
+    if (o.as) sql += ` AS ${this.toSql(o.as)}`;
+
     return sql;
+  }
+
+  /** @internal */
+  protected useForeignKeys(): boolean {
+    return true;
+  }
+
+  /** @internal */
+  protected supportsCheckConstraints(): boolean {
+    return true;
+  }
+
+  /**
+   * Adapter-specific constraints to append to the CREATE TABLE statement
+   * (e.g. PostgreSQL exclusion/unique constraints). Returns empty by default.
+   * @internal
+   */
+  protected tableConstraintStatements(_o: TableDefinition): string[] {
+    return [];
   }
 
   protected visitColumnDefinition(o: ColumnDefinition): string {

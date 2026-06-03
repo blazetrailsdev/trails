@@ -9,6 +9,7 @@ import {
   type ForeignKeyDefinition,
   type ReferentialAction,
   type ColumnOptions,
+  type TableDefinition as AbstractTableDefinition,
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
   CheckConstraintDefinition,
@@ -20,6 +21,11 @@ import type {
 } from "./schema-definitions.js";
 import { singularize, underscore } from "@blazetrails/activesupport";
 import { Utils } from "./utils.js";
+
+type PgTableDef = AbstractTableDefinition & {
+  exclusionConstraints: ExclusionConstraintDefinition[];
+  uniqueConstraints: UniqueConstraintDefinition[];
+};
 
 /**
  * Narrowed host interface for the PG-specific schema-creation overrides:
@@ -75,6 +81,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
     type: Parameters<AbstractSchemaCreation["typeToSql"]>[0],
     options: Parameters<AbstractSchemaCreation["typeToSql"]>[1] = {},
   ): string {
+    if ((type as string) === "primary_key") {
+      // PostgreSQLAdapter.typeToSql has no primary_key case and returns the
+      // string literal "primary_key" (invalid SQL). Use the base which returns
+      // "SERIAL PRIMARY KEY" for postgres.
+      return super.typeToSql(type, options);
+    }
     return this.adapter.typeToSql(type as string, options as Record<string, unknown>);
   }
 
@@ -291,7 +303,11 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (opts["collation"]) {
       sql += ` COLLATE ${this.adapter.quoteIdentifier(String(opts["collation"]))}`;
     }
-    const colName = opts["column"] ? ((opts["column"] as any).name as string) : "unknown";
+    const col = opts["column"] as { type?: string; name?: string } | undefined;
+    if (col?.type === "uuid" && opts["primaryKey"] && !("default" in opts)) {
+      sql += " DEFAULT gen_random_uuid()";
+    }
+    const colName = col?.name ?? "unknown";
     sql += _pgGeneratedClause(
       colName,
       opts["as"] as string | undefined,
@@ -304,6 +320,19 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected override visitCheckConstraintDefinition(o: CheckConstraintDefinition): string {
     const sql = super.visitCheckConstraintDefinition(o);
     return o.validate ? sql : `${sql} NOT VALID`;
+  }
+
+  /** @internal */
+  protected override tableConstraintStatements(o: AbstractTableDefinition): string[] {
+    const pg = o as PgTableDef;
+    const result: string[] = [];
+    for (const exc of pg.exclusionConstraints ?? []) {
+      result.push(this.visitExclusionConstraintDefinition(exc));
+    }
+    for (const uc of pg.uniqueConstraints ?? []) {
+      result.push(this.visitUniqueConstraintDefinition(uc));
+    }
+    return result;
   }
 
   /** @internal */
