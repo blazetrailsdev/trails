@@ -129,7 +129,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(nervousIdx).toBe(okIdx + 1);
     });
 
-    it("enum schema dump", async () => {
+    it("schema dump", async () => {
       await adapter.exec(
         `ALTER TABLE "postgresql_enums" ADD COLUMN "good_mood" mood DEFAULT 'happy' NOT NULL`,
       );
@@ -219,7 +219,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     // Needs migration framework
-    it.skip("enum migration", async () => {
+    it.skip("schema load", async () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
       // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
