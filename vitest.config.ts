@@ -26,9 +26,8 @@ const SHARED_EXCLUDE = [
 // that invocation yet — cross-file isolation: concentrating the PG adapter files
 // under AR_DB_FORKS parallel forks exhausts the per-worker advisory-lock pool
 // and leaks search_path / schema_cache across files (the plan's §4 prerequisite).
-// Remaining MySQL blockers: M-1a (addColumn charset propagation) + M-1b
-// (isCaseSensitive / LOWER / BINARY uniqueness path). M-2/M-3/M-4 resolved.
-// P-9 PG schema-dump shorthands resolved (serial/bigserial/bitVarying/array).
+// P-9 PG schema-dump shorthands resolved. M-1a/M-1b MySQL resolved. All bucket
+// failures resolved — see docs/activerecord/adapter-test-ci-coverage-plan.md.
 //
 // Set RUN_ADAPTER_DIRS=1 to drop this exclude for a dedicated adapter-dirs run
 // (see docs/activerecord/adapter-test-ci-coverage-plan.md §5).

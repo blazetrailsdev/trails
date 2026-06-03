@@ -2017,7 +2017,24 @@ export class AbstractAdapter implements Quoting {
     relation: { name: string };
     name: string;
   }): Promise<import("./column.js").Column | undefined> {
-    const hash = await (this.schemaCache as any).columnsHash(this.pool, attribute.relation.name);
+    let hash = await (this.schemaCache as any).columnsHash(this.pool, attribute.relation.name);
+    if (!hash && this.pool == null && typeof (this as any).columns === "function") {
+      // Bare-adapter path (no pool): the null-pool guard in columnsHash blocks the
+      // DB fallback. Fetch directly so callers like caseSensitiveComparison can
+      // resolve collations even when the schema cache was cleared by model
+      // class creation (resetColumnInformation).
+      try {
+        const cols: import("./column.js").Column[] = await (this as any).columns(
+          attribute.relation.name,
+        );
+        if (cols?.length) {
+          this.schemaCache.setColumns(attribute.relation.name, cols);
+          hash = this.schemaCache.getCachedColumnsHash(attribute.relation.name);
+        }
+      } catch {
+        // no connection — return undefined below
+      }
+    }
     return hash?.[attribute.name];
   }
 
