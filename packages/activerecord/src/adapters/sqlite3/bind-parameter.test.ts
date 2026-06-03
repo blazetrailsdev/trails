@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/bind_parameter_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
 let adapter: SQLite3Adapter;
@@ -14,7 +15,7 @@ afterEach(() => {
   adapter.close();
 });
 
-describe("SQLite3Adapter", () => {
+describeIfSqlite("SQLite3Adapter", () => {
   beforeEach(() => {
     adapter.exec(`CREATE TABLE "topics" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "title" TEXT)`);
   });

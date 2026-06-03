@@ -6,7 +6,8 @@
  * that require shared-cache cross-connection reads are kept as close to Rails
  * semantics as possible within that constraint.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { it, expect, afterEach } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 
@@ -37,7 +38,7 @@ function readUncommitted(conn: SQLite3Adapter): boolean {
   return row.read_uncommitted !== 0;
 }
 
-describe("SQLite3TransactionTest", () => {
+describeIfSqlite("SQLite3TransactionTest", () => {
   it("shared_cached? is true when cache-mode is enabled", () => {
     const conn = withConn({ sharedCache: true });
     expect(conn.isSharedCache()).toBe(true);

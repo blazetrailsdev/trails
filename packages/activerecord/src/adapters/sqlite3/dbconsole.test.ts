@@ -1,6 +1,7 @@
-import { describe, it } from "vitest";
+import { it } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 
-describe("SQLite3DbConsoleTest", () => {
+describeIfSqlite("SQLite3DbConsoleTest", () => {
   it.skip("sqlite3", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — dbconsole
   });
