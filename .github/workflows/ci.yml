@@ -536,23 +536,23 @@ jobs:
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
 
-  mariadb-tests:
-    name: MariaDB Tests
+  mysql-tests:
+    name: MySQL Tests
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ubuntu-latest
     services:
-      mariadb:
-        image: mariadb:11
+      mysql:
+        image: mysql:8
         env:
-          MARIADB_DATABASE: rails_js_test
-          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+          MYSQL_DATABASE: rails_js_test
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
         ports:
           - 3306:3306
         options: >-
-          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-cmd "mysqladmin ping -h localhost --silent"
           --health-interval 2s
           --health-timeout 5s
           --health-retries 10
@@ -970,7 +970,7 @@ jobs:
       - tse-compiler-tests
       - sqlite-tests
       - postgres-tests
-      - mariadb-tests
+      - mysql-tests
       - website
       - pr-attribution
       - rails-comparison
@@ -1034,7 +1034,7 @@ jobs:
                   # legitimate (non-PR events, or any other author).
                   continue
                   ;;
-                sqlite-tests|postgres-tests|mariadb-tests)
+                sqlite-tests|postgres-tests|mysql-tests)
                   # AR test skip is legitimate when no AR-affecting paths changed.
                   [ "$AR_AFFECTED" = "false" ] && continue
                   ;;
