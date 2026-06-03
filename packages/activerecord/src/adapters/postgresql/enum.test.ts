@@ -24,7 +24,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.exec(`DROP TYPE IF EXISTS "mood" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "feeling" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "unused" CASCADE`);
-    await adapter.exec(`DROP SCHEMA IF EXISTS "test_schema" CASCADE`);
+    await adapter.exec(`DROP SCHEMA IF EXISTS "enum_test_schema" CASCADE`);
     await adapter.close();
   });
 
@@ -306,8 +306,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("enum type scoped to schemas", async () => {
       await adapter.beginTransaction();
       try {
-        await adapter.createSchema("test_schema");
-        await adapter.exec(`SET LOCAL search_path TO test_schema, public`);
+        await adapter.createSchema("enum_test_schema");
+        await adapter.exec(`SET LOCAL search_path TO enum_test_schema, public`);
         await adapter.createEnum("mood_in_other_schema", ["sad", "ok", "happy"]);
         await adapter.exec(`
           CREATE TABLE "postgresql_enums_in_other_schema" (
@@ -325,15 +325,17 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("enum type explicit schema", async () => {
-      await adapter.createSchema("test_schema");
-      await adapter.createEnum("test_schema.mood_in_other_schema", ["sad", "ok", "happy"]);
+      await adapter.createSchema("enum_test_schema");
+      await adapter.createEnum("enum_test_schema.mood_in_other_schema", ["sad", "ok", "happy"]);
       await adapter.exec(`
-        CREATE TABLE "test_schema"."postgresql_enums_in_other_schema" (
+        CREATE TABLE "enum_test_schema"."postgresql_enums_in_other_schema" (
           "id" SERIAL PRIMARY KEY,
-          "current_mood" "test_schema"."mood_in_other_schema"
+          "current_mood" "enum_test_schema"."mood_in_other_schema"
         )
       `);
-      const exists = await adapter.dataSourceExists("test_schema.postgresql_enums_in_other_schema");
+      const exists = await adapter.dataSourceExists(
+        "enum_test_schema.postgresql_enums_in_other_schema",
+      );
       expect(exists).toBe(true);
     });
 
