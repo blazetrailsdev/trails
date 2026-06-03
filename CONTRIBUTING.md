@@ -41,6 +41,13 @@ Primary signals: `pnpm run api:compare` (use `--package <name>` for one
 package) and `pnpm run test:compare`. "Misplaced" means tests exist but are in
 the wrong file per Rails layout — they need to be moved, not rewritten.
 
+Secondary signal: `pnpm test:types` — Vitest typecheck suites in
+`packages/*/dx-tests/` that pin the public type contract and encode DX gaps
+as assertions. When a gap closes, the assertion flips. A dedicated
+`DX Type Tests` CI job runs on every push, as does a
+`Virtualized DX Type Tests` job covering
+`packages/activerecord/virtualized-dx-tests/` (compiled by `trails-tsc`).
+
 The canonical manual-`declare` reference is
 `packages/activerecord/dx-tests/declare-patterns.test-d.ts`; the zero-declare
 virtualized reference is
