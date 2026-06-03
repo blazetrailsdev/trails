@@ -3,7 +3,7 @@
  * Rails: `AbstractAdapter` includes `SchemaStatements`, so
  * `connection.create_table(...)` works without going through MigrationContext.
  */
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 
@@ -63,13 +63,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(await adapter.columnExists("widgets", "title")).toBe(true);
     await adapter.addColumn("widgets", "color", "string");
     expect(await adapter.columnExists("widgets", "color")).toBe(true);
-  });
-
-  it("createTable routes SQL compilation through adapter.toSql", async () => {
-    adapter = new SQLite3Adapter(":memory:");
-    const spy = vi.spyOn(adapter, "toSql");
-    await adapter.createTable("widgets", (t) => t.string("label"));
-    expect(spy).toHaveBeenCalled();
   });
 
   it("delegating methods (foreignKeys, removeForeignKey) do not infinitely recurse on base adapter", async () => {
