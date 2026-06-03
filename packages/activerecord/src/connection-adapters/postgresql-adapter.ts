@@ -1639,6 +1639,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // the 16-byte cancel message, close. Leaves the original
       // transaction socket untouched; does NOT consume a pool slot.
       const cancelCon = new pg.Connection() as PgConnectionWithCancel;
+      cancelCon.on("error", () => {});
       cancelCon.once("connect", () => {
         cancelCon.cancel(txClient.processID!, txClient.secretKey ?? 0);
       });
