@@ -97,7 +97,7 @@ use `include()` / `Included<>` from `@blazetrails/activesupport`. See
 When NOT to use this:
 
 - Ruby lifecycle hooks (`extended`, `included`, `inherited`) — no TS
-  equivalent. Don't stub them; add them to the skip list in
-  `scripts/api-compare/compare.ts`.
+  equivalent. Don't stub them; add them to a `SKIP_GROUPS` entry (with a
+  reason) in `scripts/api-compare/conventions.ts`.
 - If the method needs Model-specific state beyond the host interface,
   keep it in `model.ts` directly.
