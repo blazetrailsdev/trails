@@ -1,7 +1,8 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/sqlite3_create_folder_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
 let adapter: SQLite3Adapter;
@@ -15,7 +16,7 @@ afterEach(() => {
 });
 
 // -- Rails test class: sqlite3_create_folder_test.rb --
-describe("SQLite3CreateFolder", () => {
+describeIfSqlite("SQLite3CreateFolder", () => {
   it("sqlite creates directory", async () => {
     const fs = await import("fs");
     const path = await import("path");

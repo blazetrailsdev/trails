@@ -1,7 +1,8 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/copy_table_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
 let adapter: SQLite3Adapter;
@@ -15,7 +16,7 @@ afterEach(() => {
 });
 
 // -- Rails test class: copy_table_test.rb --
-describe("CopyTableTest", () => {
+describeIfSqlite("CopyTableTest", () => {
   it("copy table", async () => {
     adapter.exec(`CREATE TABLE "source" ("id" INTEGER PRIMARY KEY, "name" TEXT, "age" INTEGER)`);
     await adapter.executeMutation(`INSERT INTO "source" ("name", "age") VALUES ('Alice', 30)`);

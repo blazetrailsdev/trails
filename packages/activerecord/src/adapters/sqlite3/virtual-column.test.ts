@@ -1,7 +1,8 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/virtual_column_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
 let adapter: SQLite3Adapter;
@@ -15,7 +16,7 @@ afterEach(() => {
 });
 
 // -- Rails test class: virtual_column_test.rb --
-describe("SQLite3VirtualColumnTest", () => {
+describeIfSqlite("SQLite3VirtualColumnTest", () => {
   it("stored column", async () => {
     adapter.exec(
       `CREATE TABLE "stored_gen" ("id" INTEGER PRIMARY KEY, "price" INTEGER, "tax" INTEGER, "total" INTEGER GENERATED ALWAYS AS ("price" + "tax") STORED)`,

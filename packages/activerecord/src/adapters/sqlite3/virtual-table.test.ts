@@ -1,7 +1,8 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/virtual_table_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
@@ -20,7 +21,7 @@ afterEach(() => {
   adapter.close();
 });
 
-describe("SQLite3VirtualTableTest", () => {
+describeIfSqlite("SQLite3VirtualTableTest", () => {
   it("schema dump", async () => {
     const output = await SchemaDumper.dump(adapter);
 

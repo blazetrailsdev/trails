@@ -1,7 +1,8 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/sqlite3_adapter_prevent_writes_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
 let adapter: SQLite3Adapter;
@@ -15,7 +16,7 @@ afterEach(() => {
 });
 
 // -- Rails test class: sqlite3_adapter_prevent_writes_test.rb --
-describe("SQLite3AdapterPreventWritesTest", () => {
+describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
   it("errors when an insert query is called while preventing writes", async () => {
     adapter.exec(`CREATE TABLE "pw" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await adapter.withPreventedWrites(async () => {
