@@ -1147,6 +1147,59 @@ export class TableDefinition {
           case "char":
             parts.push(`CHAR(${col.options.limit ?? 1})`);
             break;
+          case "virtual": {
+            // Resolve to the real SQL type from options.type, mirroring SchemaCreation's virtual branch.
+            // Note: PgTableDefinition.newColumnDefinition resolves "virtual" to the real type before
+            // toSql() runs, so this case handles only the abstract-TableDefinition path.
+            const realType =
+              ((col.options as Record<string, unknown>)["type"] as string | undefined) ?? "string";
+            switch (realType) {
+              case "string":
+                parts.push(`VARCHAR(${col.options.limit ?? 255})`);
+                break;
+              case "text":
+                parts.push("TEXT");
+                break;
+              case "integer":
+                parts.push("INTEGER");
+                break;
+              case "bigint":
+                parts.push("BIGINT");
+                break;
+              case "float":
+                parts.push(this._adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL");
+                break;
+              case "decimal":
+                parts.push(`DECIMAL(${col.options.precision ?? 10}, ${col.options.scale ?? 0})`);
+                break;
+              case "boolean":
+                parts.push("BOOLEAN");
+                break;
+              case "date":
+                parts.push("DATE");
+                break;
+              case "time":
+                parts.push("TIME");
+                break;
+              case "datetime":
+              case "timestamp":
+                parts.push(this._adapterName === "postgres" ? "TIMESTAMP" : "DATETIME");
+                break;
+              case "binary":
+                parts.push(this._adapterName === "postgres" ? "BYTEA" : "BLOB");
+                break;
+              case "json":
+                parts.push("JSON");
+                break;
+              case "jsonb":
+                parts.push(this._adapterName === "postgres" ? "JSONB" : "JSON");
+                break;
+              default:
+                parts.push(String(realType).toUpperCase());
+                break;
+            }
+            break;
+          }
           default:
             if (!col.type || !col.type.trim()) {
               throw new Error(
@@ -1186,6 +1239,26 @@ export class TableDefinition {
         // Append [] to the last part (the type)
         const lastIdx = parts.length - 1;
         parts[lastIdx] = parts[lastIdx] + "[]";
+      }
+
+      // Emit GENERATED ALWAYS AS (...) STORED for PG generated columns.
+      // Must come after the type (incl. array []) but before NOT NULL / DEFAULT.
+      // Mirrors PostgreSQL::SchemaCreation#add_column_options! (as: / stored: branch).
+      // PgTableDefinition.newColumnDefinition resolves "virtual" → real type before toSql()
+      // runs, so options.as may be set on any column type — not just type:"virtual".
+      const asExpr = (col.options as Record<string, unknown>)["as"] as string | undefined;
+      if (asExpr != null) {
+        if (this._adapterName !== "postgres") {
+          throw new Error("Generated columns (as: ...) are only supported on PostgreSQL");
+        }
+        const isStored = (col.options as Record<string, unknown>)["stored"] as boolean | undefined;
+        if (!isStored) {
+          throw new Error(
+            `PostgreSQL currently does not support VIRTUAL (not persisted) generated columns.\n` +
+              `Specify 'stored: true' option for '${col.name}'`,
+          );
+        }
+        parts.push(`GENERATED ALWAYS AS (${asExpr}) STORED`);
       }
 
       if (col.options.null === false && col.type !== "primary_key") {
