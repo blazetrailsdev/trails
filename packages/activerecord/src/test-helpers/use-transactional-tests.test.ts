@@ -60,8 +60,8 @@ describe.skipIf(adapterType === "mysql")(
         `CREATE TABLE txn_smoke_ddl (id INTEGER PRIMARY KEY, label TEXT)`,
       );
       const rows = await conn().execute(`SELECT 1 AS ok FROM txn_smoke_ddl`);
-      // Table exists — zero rows but no error.
-      expect(Array.isArray(rows)).toBe(true);
+      // Table exists and is empty — CREATE TABLE ran, no rows inserted yet.
+      expect(rows).toHaveLength(0);
     });
 
     it("table does not exist because DDL was rolled back in afterEach", async () => {

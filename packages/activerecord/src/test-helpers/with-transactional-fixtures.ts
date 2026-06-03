@@ -145,13 +145,28 @@ export interface WithTransactionalFixturesOptions {
    *   it("after commit callback fires", async () => { ... }); // no outer txn
    */
   usesTransaction?: string[];
+
+  /**
+   * Optional async hook that runs at the very start of the `beforeAll`
+   * registered by this helper — before `pushSkipGlobalReset()`. Used by
+   * {@link useTransactionalTests} to co-locate `bootstrapTestHandler` and
+   * `pushSkipGlobalReset` in a single `beforeAll` (matches the idiom in
+   * `setupHandlerSuite`).
+   *
+   * @internal
+   */
+  _beforeAll?: () => Promise<void>;
 }
 
 export function withTransactionalFixtures(
   getAdapter: () => TransactionalFixturesAdapter,
   options: WithTransactionalFixturesOptions = {},
 ): void {
-  const { invalidateSchemaCache = true, usesTransaction: usesTransactionNames = [] } = options;
+  const {
+    invalidateSchemaCache = true,
+    usesTransaction: usesTransactionNames = [],
+    _beforeAll: beforeAllHook,
+  } = options;
   // Snapshots of defineSchema's per-adapter signature cache taken at the
   // start of each test. On rollback we restore — preserving signatures for
   // tables created outside the test transaction (e.g. in `beforeAll`) while
@@ -168,7 +183,8 @@ export function withTransactionalFixtures(
   // hook to ConnectionPool#newConnection (production code change).
   let _txnOpenedForTest = false;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    await beforeAllHook?.();
     pushSkipGlobalReset();
   });
 
