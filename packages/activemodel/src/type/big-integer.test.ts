@@ -18,10 +18,9 @@ describe("BigIntegerTest", () => {
   it("BigInteger large values", () => {
     const type = Types.typeRegistry.lookup("big_integer");
     const large = "9999999999999999999999";
-    // Values beyond Number.MAX_SAFE_INTEGER are stored as number (same as
-    // Rails Integer on any finite-precision runtime). Precision loss above
-    // 2^53 is accepted — identical to how Rails behaves on 64-bit MRI with
-    // values that overflow Fixnum.
+    // JS Number (float64) loses precision above 2^53 — an inherent JS
+    // limitation. Rails uses arbitrary-precision Bignum for large integers,
+    // so Rails preserves full precision where TS cannot.
     expect(type.cast(large)).toBe(Number(large));
   });
 
