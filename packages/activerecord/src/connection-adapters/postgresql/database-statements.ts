@@ -96,8 +96,8 @@ interface CancelAnyRunningQueryHost {
 }
 
 /**
- * Delegates to the adapter's `_cancelAnyRunningQuery` which uses node-pg's
- * internal `client.cancel()` to send a CancelRequest before ROLLBACK.
+ * Delegates to the adapter's `_cancelAnyRunningQuery` which sends a
+ * CancelRequest before ROLLBACK.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#cancel_any_running_query
  * @internal
