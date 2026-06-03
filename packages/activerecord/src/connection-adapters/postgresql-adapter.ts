@@ -1626,24 +1626,28 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       processID?: number | null;
       secretKey?: number | null;
     };
+    // connect() and cancel() exist at runtime but are not in @types/pg Connection.
     type PgConnectionWithCancel = pg.Connection & {
-      connect(portOrPath: number | string, host?: string): void;
+      connect(portOrPath: string | number, host?: string): void;
       cancel(processID: number, secretKey: number): void;
     };
     const txClient = this._client as PgClientWithPid | null;
     if (!this._queryInFlight || txClient?.processID == null) return;
     try {
-      const con = txClient.connection as PgConnectionWithCancel;
-      // Reconnect the underlying socket to send a CancelRequest on a fresh
-      // TCP connection — mirrors libpq cancel, does NOT consume a pool slot.
-      if (txClient.host.startsWith("/")) {
-        con.connect(`${txClient.host}/.s.PGSQL.${txClient.port}`);
-      } else {
-        con.connect(txClient.port, txClient.host);
-      }
-      con.on("connect", () => {
-        con.cancel(txClient.processID!, txClient.secretKey ?? 0);
+      // Open a FRESH TCP connection to send a CancelRequest — mirrors
+      // libpq PQcancel / Ruby PG::Connection#cancel: new socket, send
+      // the 16-byte cancel message, close. Leaves the original
+      // transaction socket untouched; does NOT consume a pool slot.
+      const cancelCon = new pg.Connection() as PgConnectionWithCancel;
+      cancelCon.once("connect", () => {
+        cancelCon.cancel(txClient.processID!, txClient.secretKey ?? 0);
       });
+      const { host, port } = txClient;
+      if (host?.startsWith("/")) {
+        cancelCon.connect(`${host}/.s.PGSQL.${port}`);
+      } else {
+        cancelCon.connect(port, host);
+      }
     } catch {
       // cancel is best-effort
     }
