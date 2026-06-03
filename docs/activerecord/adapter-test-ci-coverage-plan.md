@@ -11,9 +11,8 @@ adapter-only job path. The ~40-LOC wiring is the last step, after the remaining
 bucket fixes below land.
 
 **Progress:** the exploratory probe surfaced ~38 pre-existing failures; bucket
-fixes have brought that down to **3** (run `26880196064` baseline): **MySQL 3**
-(M-1a/M-1b). PG 6 (P-9) resolved. Everything else is resolved — this doc tracks
-only what remains.
+fixes have brought that down to **0**. PG (P-9) and MySQL (M-1a/M-1b) all
+resolved. Everything else is resolved — this doc tracks only what remains.
 
 ---
 
@@ -100,20 +99,17 @@ against current `main` before scoping it (the set drifts as fixes land).
 | ------- | --------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | ~~P-9~~ | ~~schema-dumper: type shorthand~~ | ~~`serial.test.ts` (4), `array.test.ts` (1), `bit-string.test.ts` (1)~~ | ~~dumper didn't emit shorthand DSL for serial/bigserial/bitVarying/array~~ | Resolved: `isDefaultPrimaryKey` widened to include `"serial"`; `RUN_ADAPTER_DIRS` gate on main. |
 
-### MySQL — 3 failed (mysql:8)
+### MySQL — 0 failed ✓
 
-| #    | Bucket                                                                   | Files / tests                                                                                                          | Root cause                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Likely fix                                                                                                                                                    |
-| ---- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M-1a | **changeColumn drops the existing collation on a type change**           | `charset-collation.test.ts` `change column preserves collation for string to text` (1)                                 | `changeColumn(col, "text")` with no explicit charset/collation re-creates the column at the DB default (`utf8mb4_0900_ai_ci` on mysql:8) instead of carrying the column's current collation forward. (The sibling `add column with charset and collation` test — explicit `{charset, collation}` on `addColumn` — now **passes**, so addColumn's CHARACTER SET / COLLATE propagation works; the gap is specifically changeColumn's preserve-on-type-change path. Re-confirm against current `main` before scoping.) Not dialect-specific. | Mirror Rails MySQL `change_column`: look up the existing column's collation and re-emit COLLATE when the change request doesn't restate it. ~30–50 LOC.       |
-| M-1b | **`isCaseSensitive()` + uniqueness validator LOWER/BINARY path missing** | `case-sensitivity.test.ts` `case insensitive comparison for cs column` + `case sensitive comparison for ci column` (2) | For a `utf8mb4_bin` column with `caseSensitive: false` the uniqueness query should wrap the column in `LOWER()`; for `utf8mb4_general_ci` with `caseSensitive: true` it should use `BINARY`. Both emit a plain WHERE — `isCaseSensitive()` isn't wired into the validator. Not dialect-specific.                                                                                                                                                                                                                                          | Implement `isCaseSensitive()` on the MySQL `Column` class (consult `collation`) and wire it into `validates_uniqueness_of` LOWER/BINARY emission. ~30–50 LOC. |
+M-1a and M-1b resolved. See §4 for next steps.
 
 ---
 
 ## 4. Remaining steps
 
 1. ~~**P-9**~~ — resolved.
-2. **M-1a** — changeColumn drops collation on type change (~30–50 LOC).
-3. **M-1b** — `isCaseSensitive()` + uniqueness LOWER/BINARY wiring (~30–50 LOC).
+2. ~~**M-1a**~~ — resolved.
+3. ~~**M-1b**~~ — resolved.
 4. **Wire the lane in** (~40 LOC) — add the adapter-dir step to `postgres-tests`
    / `mysql-tests` (relocate from PR #2863's prototype jobs). The `RUN_ADAPTER_DIRS`
    gate is now on `main`. Recommend non-blocking (`continue-on-error`) for PG now
