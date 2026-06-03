@@ -68,7 +68,9 @@ describe("SchemaDumper schemaDefault with adapter type deserialize", () => {
       { hasDefault: true, default: "2.789", type: "decimal" },
       new DecimalType({ precision: 5, scale: 2 }),
     );
-    expect(result).toBe('"2.79"');
+    // DecimalType.typeCastForSchema now returns the unquoted numeric string
+    // (String(value) not JSON.stringify), matching the schema dump format.
+    expect(result).toBe("2.79");
   });
 
   it("null default falls through to schemaExpression", () => {
