@@ -245,6 +245,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // "in TX?" check at call sites that mirror the prior shape.
   private _client: pg.Client | null = null;
   private _inTransaction = false;
+  private _queryInFlight = false;
   private _databaseVersion: number | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
   private _maxIdentifierLength: number | null = null;
@@ -1140,20 +1141,26 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
       return (await client.query(sql, binds)) as R;
     };
+    const isTxConn = client === this._rawConnection;
+    if (isTxConn) this._queryInFlight = true;
     try {
-      return await attempt();
-    } catch (e) {
-      if (prepare && this._isInvalidCachedPlan(e)) {
-        this._poolFor(client).delete(sql);
-        if (this._inTransaction) {
-          throw new PreparedStatementCacheExpired(
-            (e as { message?: string })?.message ?? "cached plan expired",
-            { sql, binds, cause: e },
-          );
-        }
+      try {
         return await attempt();
+      } catch (e) {
+        if (prepare && this._isInvalidCachedPlan(e)) {
+          this._poolFor(client).delete(sql);
+          if (this._inTransaction) {
+            throw new PreparedStatementCacheExpired(
+              (e as { message?: string })?.message ?? "cached plan expired",
+              { sql, binds, cause: e },
+            );
+          }
+          return await attempt();
+        }
+        throw e;
       }
-      throw e;
+    } finally {
+      if (isTxConn) this._queryInFlight = false;
     }
   }
 
@@ -1615,18 +1622,28 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // before issuing ROLLBACK / ROLLBACK AND CHAIN, so the rollback isn't blocked
   // waiting for a long-running query to finish. Best-effort: errors are swallowed.
   private _cancelAnyRunningQuery(): void {
-    type PgClientInternals = {
-      activeQuery?: unknown;
+    type PgClientWithPid = pg.Client & {
       processID?: number | null;
-      cancel: (target: PgClientInternals, query: unknown) => void;
+      secretKey?: number | null;
     };
-    const txClient = this._client as (pg.Client & PgClientInternals) | null;
-    if (!txClient?.activeQuery || txClient.processID == null) return;
+    type PgConnectionWithCancel = pg.Connection & {
+      connect(portOrPath: number | string, host?: string): void;
+      cancel(processID: number, secretKey: number): void;
+    };
+    const txClient = this._client as PgClientWithPid | null;
+    if (!this._queryInFlight || txClient?.processID == null) return;
     try {
-      // pg.Client.cancel(target, query) opens a fresh raw TCP connection to send
-      // the libpq CancelRequest — it does NOT consume a pool slot, so this is
-      // safe even when the pool is at max capacity.
-      txClient.cancel(txClient, txClient.activeQuery);
+      const con = txClient.connection as PgConnectionWithCancel;
+      // Reconnect the underlying socket to send a CancelRequest on a fresh
+      // TCP connection — mirrors libpq cancel, does NOT consume a pool slot.
+      if (txClient.host.startsWith("/")) {
+        con.connect(`${txClient.host}/.s.PGSQL.${txClient.port}`);
+      } else {
+        con.connect(txClient.port, txClient.host);
+      }
+      con.on("connect", () => {
+        con.cancel(txClient.processID!, txClient.secretKey ?? 0);
+      });
     } catch {
       // cancel is best-effort
     }
