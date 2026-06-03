@@ -22,7 +22,7 @@ inputs:
   pnpm-version:
     description: pnpm version. Hosted installs this; self-hosted asserts the preinstalled pnpm matches.
     required: false
-    default: "10.34.1"
+    default: "11.5.1"
   node-version:
     description: Node.js version for setup-node.
     required: false
