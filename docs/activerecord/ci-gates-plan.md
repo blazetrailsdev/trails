@@ -50,12 +50,11 @@ if (adapterSupports("savepoints")) { … }                                // imp
   keys), so a Rails `skip unless supports_json?` maps 1:1 to
   `itIfSupports("json", …)`.
 - Support is resolved off `adapterType` for the CI matrix (postgres:17,
-  mariadb:11, in-memory sqlite) — the same idiom as
+  mysql:8, in-memory sqlite) — the same idiom as
   `adapterType !== "mysql"` in `insert-all.test.ts`. The table mirrors **Rails'**
   `supports_<feature>?` (incl. its `mariadb?` / `database_version` branching).
-  Where our own adapter's `supports*()` diverged from Rails it's being
-  reconciled to match (e.g. `supportsJson`/`supportsExpressionIndex` now return
-  `false` on MariaDB, mirroring Rails) — the end state is to **power
+  The CI lane switched from MariaDB 11 to MySQL 8 in #2897; `json` and
+  `expression_index` now cover all three backends. The end state is to **power
   `adapterSupports` from the connected adapter** and drop this static table once
   every adapter capability is Rails-faithful.
 - **An unknown feature key throws** — add it to the `SUPPORTS` table when a
@@ -63,19 +62,19 @@ if (adapterSupports("savepoints")) { … }                                // imp
 
 Currently seeded (`SUPPORTS` in `supports.ts`):
 
-| key                                               | runs on          | note                                                         |
-| ------------------------------------------------- | ---------------- | ------------------------------------------------------------ |
-| `savepoints`, `foreign_keys`, `check_constraints` | all three        |                                                              |
-| `json`                                            | postgres, sqlite | Rails `supports_json?` is `!mariadb?`; mysql lane is MariaDB |
-| `comments`                                        | postgres, mysql  | SQL COMMENT ON — not SQLite                                  |
-| `concurrent_connections`                          | postgres, mysql  | in-memory SQLite can't run concurrently                      |
-| `insert_conflict_target`                          | postgres, sqlite | MySQL has no `ON CONFLICT (target)`                          |
-| `advisory_locks`                                  | postgres, mysql  | abstract default false → not SQLite                          |
-| `exclusion_constraints`, `unique_constraints`     | postgres         | PostgreSQL only                                              |
-| `expression_index`                                | postgres, sqlite | Rails `!mariadb? && >= 8.0.13`; mysql lane is MariaDB → out  |
+| key                                               | runs on          | note                                                                           |
+| ------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------ |
+| `savepoints`, `foreign_keys`, `check_constraints` | all three        |                                                                                |
+| `json`                                            | all three        | `!mariadb? && >= 5.7.8` — MySQL 8 qualifies; was postgres/sqlite (MariaDB CI)  |
+| `comments`                                        | postgres, mysql  | SQL COMMENT ON — not SQLite                                                    |
+| `concurrent_connections`                          | postgres, mysql  | in-memory SQLite can't run concurrently                                        |
+| `insert_conflict_target`                          | postgres, sqlite | MySQL has no `ON CONFLICT (target)`                                            |
+| `advisory_locks`                                  | postgres, mysql  | abstract default false → not SQLite                                            |
+| `exclusion_constraints`, `unique_constraints`     | postgres         | PostgreSQL only                                                                |
+| `expression_index`                                | all three        | `!mariadb? && >= 8.0.13` — MySQL 8 qualifies; was postgres/sqlite (MariaDB CI) |
 
 > Adding a key: verify the cell against the vendored Rails
-> `supports_<key>?` for pg17 / mariadb11 / recent sqlite before adding it.
+> `supports_<key>?` for pg17 / mysql:8 / recent sqlite before adding it.
 
 ---
 
