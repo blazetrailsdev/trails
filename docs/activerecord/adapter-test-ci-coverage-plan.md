@@ -59,7 +59,6 @@ a dedicated config. Conceptually:
 - run: >
     pnpm vitest run
     packages/activerecord/src/adapters/postgresql
-    packages/activerecord/src/connection-adapters/postgresql
     packages/activerecord/src/tasks/postgresql-database-tasks.test.ts
   env:
     RUN_ADAPTER_DIRS: "1"
@@ -67,14 +66,20 @@ a dedicated config. Conceptually:
     AR_DB_FORKS: 4
 ```
 
+The PG step lists only the two **excluded** targets (`adapters/postgresql/**`
+and `tasks/postgresql-database-tasks.test.ts`) — `connection-adapters/postgresql/**`
+and the top-level `postgresql-adapter*.test.ts` files are **not** in
+`ADAPTER_SPECIFIC_EXCLUDE`, so they already run in the shared suite; adding them
+here would just double-run them.
+
 The MySQL mirror inside `mysql-tests` uses `MYSQL_TEST_URL` + the filter list
 `adapters/abstract-mysql-adapter`, `adapters/mysql2`, `connection-adapters/mysql`,
-**and `tasks/mysql-database-tasks.test.ts`**. The `tasks/` file must be listed
-explicitly — vitest positional filters are substring matches and no dir prefix
-is a substring of `tasks/mysql-…` (the hyphenated `connection-adapters/<db>-*.test.ts`
-files _are_ covered, since `connection-adapters/mysql` is a substring of
-`connection-adapters/mysql2-adapter.test.ts`). The PG step lists
-`tasks/postgresql-database-tasks.test.ts` for the same reason.
+**and `tasks/mysql-database-tasks.test.ts`**. Two MySQL-specific subtleties: the
+`tasks/` file must be listed explicitly (vitest positional filters are substring
+matches and no dir prefix is a substring of `tasks/mysql-…`); and
+`connection-adapters/mysql` **is** needed here — unlike the PG side — because it
+is the substring that catches the excluded `connection-adapters/mysql2-adapter.test.ts`
+(PG has no equivalently-excluded top-level connection-adapter file).
 
 Why a separate **step** (not folding the dirs into the core invocation): a
 separate process avoids the shared-suite table-drop collision; keeps
@@ -97,10 +102,10 @@ against current `main` before scoping it (the set drifts as fixes land).
 
 ### MySQL — 3 failed (mysql:8)
 
-| #    | Bucket                                                                   | Files / tests                                                                                                          | Root cause                                                                                                                                                                                                                                                                                                       | Likely fix                                                                                                                                                    |
-| ---- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M-1a | **charset/collation not propagated by addColumn/changeColumn**           | `charset-collation.test.ts` `change column preserves collation for string to text` (1; the `add column…` case cleared) | `addColumn`/`changeColumn` produce DDL without CHARACTER SET / COLLATE, so the column gets the DB default (`utf8mb4_0900_ai_ci` on mysql:8). The included `addColumn` mixin uses the base `SchemaCreation`, not `MysqlSchemaCreation`, so its CHARACTER SET / COLLATE branches never fire. Not dialect-specific. | Route the included `addColumn`/`changeColumn` mixins through `MysqlSchemaCreation`. ~30–50 LOC.                                                               |
-| M-1b | **`isCaseSensitive()` + uniqueness validator LOWER/BINARY path missing** | `case-sensitivity.test.ts` `case insensitive comparison for cs column` + `case sensitive comparison for ci column` (2) | For a `utf8mb4_bin` column with `caseSensitive: false` the uniqueness query should wrap the column in `LOWER()`; for `utf8mb4_general_ci` with `caseSensitive: true` it should use `BINARY`. Both emit a plain WHERE — `isCaseSensitive()` isn't wired into the validator. Not dialect-specific.                 | Implement `isCaseSensitive()` on the MySQL `Column` class (consult `collation`) and wire it into `validates_uniqueness_of` LOWER/BINARY emission. ~30–50 LOC. |
+| #    | Bucket                                                                   | Files / tests                                                                                                          | Root cause                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Likely fix                                                                                                                                                    |
+| ---- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M-1a | **changeColumn drops the existing collation on a type change**           | `charset-collation.test.ts` `change column preserves collation for string to text` (1)                                 | `changeColumn(col, "text")` with no explicit charset/collation re-creates the column at the DB default (`utf8mb4_0900_ai_ci` on mysql:8) instead of carrying the column's current collation forward. (The sibling `add column with charset and collation` test — explicit `{charset, collation}` on `addColumn` — now **passes**, so addColumn's CHARACTER SET / COLLATE propagation works; the gap is specifically changeColumn's preserve-on-type-change path. Re-confirm against current `main` before scoping.) Not dialect-specific. | Mirror Rails MySQL `change_column`: look up the existing column's collation and re-emit COLLATE when the change request doesn't restate it. ~30–50 LOC.       |
+| M-1b | **`isCaseSensitive()` + uniqueness validator LOWER/BINARY path missing** | `case-sensitivity.test.ts` `case insensitive comparison for cs column` + `case sensitive comparison for ci column` (2) | For a `utf8mb4_bin` column with `caseSensitive: false` the uniqueness query should wrap the column in `LOWER()`; for `utf8mb4_general_ci` with `caseSensitive: true` it should use `BINARY`. Both emit a plain WHERE — `isCaseSensitive()` isn't wired into the validator. Not dialect-specific.                                                                                                                                                                                                                                          | Implement `isCaseSensitive()` on the MySQL `Column` class (consult `collation`) and wire it into `validates_uniqueness_of` LOWER/BINARY emission. ~30–50 LOC. |
 
 ---
 
@@ -119,6 +124,14 @@ against current `main` before scoping it (the set drifts as fixes land).
 ---
 
 ## 5. Local verification recipe
+
+> **Prerequisite:** the `RUN_ADAPTER_DIRS` env gate currently lives **only** on
+> the exploratory branch `tc100-i5-test-compare-100-phase-1-story` — it is not on
+> `main` yet, where the var is silently ignored and `ADAPTER_SPECIFIC_EXCLUDE`
+> keeps the adapter dirs out of the run (the opposite of what the recipe below
+> intends). Check that branch out first, or temporarily delete the relevant
+> entries from `ADAPTER_SPECIFIC_EXCLUDE` in `vitest.config.ts`. Productionizing
+> the gate is step 4 in §4.
 
 No per-worktree DB is auto-created. Spin one up, set `RUN_ADAPTER_DIRS=1`, and
 target the dirs:
@@ -145,9 +158,3 @@ RUN_ADAPTER_DIRS=1 MYSQL_TEST_URL="mysql://root@localhost:<port>/rails_js_test" 
 Run a single file alone first to distinguish a real bug from an isolation
 collision (`docker compose` env interpolation was unreliable on this host —
 use raw `docker run`).
-
-> **Note:** the `RUN_ADAPTER_DIRS` env gate currently lives only on the
-> exploratory branch `tc100-i5-test-compare-100-phase-1-story` (it is not on
-> `main` yet). Check that branch out to use the recipe above, or temporarily
-> delete the relevant entries from `ADAPTER_SPECIFIC_EXCLUDE` in
-> `vitest.config.ts`. Productionizing the gate is part of step 4 in §4.
