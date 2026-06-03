@@ -11,8 +11,9 @@ export class DecimalType extends NumericValueType {
   }
 
   typeCastForSchema(value: unknown): string {
-    // Rails: BigDecimal.to_s returns the plain numeric string without quoting.
-    // Emit the raw string so schema dumps produce `default: 1.5` not `default: "1.5"`.
+    // Rails uses `value.to_s.inspect` which quotes the string (e.g. '"150.55"').
+    // TS emits an unquoted number literal instead — more idiomatic JS, and
+    // DecimalType.castValue accepts both the string and number forms on replay.
     if (value === null || value === undefined) return "null";
     return String(value);
   }
