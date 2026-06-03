@@ -42,6 +42,15 @@ const ADAPTER_SPECIFIC_EXCLUDE = [
   "packages/activerecord/src/tasks/mysql-*.test.ts",
 ];
 
+// Low-level SQLite driver wrappers + the driver registry. These are pure unit
+// tests (they register/swap drivers directly) and must NOT load test-setup-ar,
+// whose connection bootstrap calls getSqlite() with no name and throws once a
+// test has registered a second driver. Run them in their own setup-free project.
+const SQLITE_DRIVER_TESTS = [
+  "packages/activerecord/src/sqlite/**/*.test.ts",
+  "packages/activerecord/src/sqlite-adapter.test.ts",
+];
+
 const _parsedForks = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "", 10);
 const TEST_FORKS = Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : 6;
 
@@ -53,18 +62,6 @@ const alias = {
   "@blazetrails/activesupport/temporal": path.resolve(
     __dirname,
     "packages/activesupport/src/temporal.ts",
-  ),
-  "@blazetrails/activesupport/sqlite-adapter": path.resolve(
-    __dirname,
-    "packages/activesupport/src/sqlite-adapter.ts",
-  ),
-  "@blazetrails/activesupport/sqlite/better-sqlite3": path.resolve(
-    __dirname,
-    "packages/activesupport/src/sqlite-drivers/better-sqlite3.ts",
-  ),
-  "@blazetrails/activesupport/sqlite/node-sqlite": path.resolve(
-    __dirname,
-    "packages/activesupport/src/sqlite-drivers/node-sqlite.ts",
   ),
   "@blazetrails/activesupport/key-generator": path.resolve(
     __dirname,
@@ -88,6 +85,10 @@ const alias = {
   "@blazetrails/activesupport/fs-adapter": path.resolve(
     __dirname,
     "packages/activesupport/src/fs-adapter.ts",
+  ),
+  "@blazetrails/activesupport/os-adapter": path.resolve(
+    __dirname,
+    "packages/activesupport/src/os-adapter.ts",
   ),
   "@blazetrails/activesupport/encrypted-file": path.resolve(
     __dirname,
@@ -137,6 +138,22 @@ const alias = {
     __dirname,
     "packages/activerecord/src/type-virtualization/resolve-target.ts",
   ),
+  "@blazetrails/activerecord/sqlite-adapter": path.resolve(
+    __dirname,
+    "packages/activerecord/src/sqlite-adapter.ts",
+  ),
+  "@blazetrails/activerecord/sqlite/better-sqlite3": path.resolve(
+    __dirname,
+    "packages/activerecord/src/sqlite/better-sqlite3.ts",
+  ),
+  "@blazetrails/activerecord/sqlite/node-sqlite": path.resolve(
+    __dirname,
+    "packages/activerecord/src/sqlite/node-sqlite.ts",
+  ),
+  "@blazetrails/activerecord/sqlite/expo-sqlite": path.resolve(
+    __dirname,
+    "packages/activerecord/src/sqlite/expo-sqlite.ts",
+  ),
   "@blazetrails/activerecord": path.resolve(__dirname, "packages/activerecord/src/index.ts"),
   "@blazetrails/rack": path.resolve(__dirname, "packages/rack/src/index.ts"),
   "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/src/index.ts"),
@@ -166,7 +183,7 @@ export default defineConfig({
         test: {
           name: "activerecord",
           include: ["packages/activerecord/src/**/*.test.ts"],
-          exclude: [...SHARED_EXCLUDE, ...ADAPTER_SPECIFIC_EXCLUDE],
+          exclude: [...SHARED_EXCLUDE, ...ADAPTER_SPECIFIC_EXCLUDE, ...SQLITE_DRIVER_TESTS],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
           // instead of re-issuing the DDL per file. No-op on PG/MySQL runs.
@@ -205,6 +222,18 @@ export default defineConfig({
           // beforeAll-side existence checks no longer batch.
           hookTimeout: 30_000,
           pool: "forks",
+          poolOptions: { forks: { maxForks: TEST_FORKS } },
+        },
+      },
+      {
+        // SQLite driver wrappers + registry: pure unit tests, no AR setup
+        // (see SQLITE_DRIVER_TESTS). Excluded from the "activerecord" project
+        // above so they don't load the connection bootstrap.
+        resolve: { alias },
+        test: {
+          name: "sqlite-drivers",
+          include: SQLITE_DRIVER_TESTS,
+          exclude: [...SHARED_EXCLUDE],
           poolOptions: { forks: { maxForks: TEST_FORKS } },
         },
       },

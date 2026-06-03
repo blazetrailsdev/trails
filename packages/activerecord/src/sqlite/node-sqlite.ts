@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { getFs } from "../fs-adapter.js";
+import { getFs } from "@blazetrails/activesupport/fs-adapter";
 import {
   registerSqliteDriver,
   type ColumnInfo,

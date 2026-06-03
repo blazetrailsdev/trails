@@ -37,7 +37,7 @@
 import type { FsAdapter } from "@blazetrails/activesupport/fs-adapter";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { getOsAsync } from "@blazetrails/activesupport";
-import { getSqliteAsync } from "@blazetrails/activesupport/sqlite-adapter";
+import { getSqliteAsync } from "../sqlite-adapter.js";
 
 /** WAL sidecars sqlite writes alongside a file DB, plus the DB file itself. */
 const DB_FILE_SUFFIXES = ["", "-wal", "-shm"] as const;

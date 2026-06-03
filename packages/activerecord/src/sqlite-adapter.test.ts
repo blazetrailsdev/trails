@@ -7,7 +7,7 @@ import {
   type SqliteDriver,
   type SyncSqliteConnection,
 } from "./sqlite-adapter.js";
-import { betterSqlite3Driver } from "./sqlite-drivers/better-sqlite3.js";
+import { betterSqlite3Driver } from "./sqlite/better-sqlite3.js";
 
 function stubDriver(name: string): SqliteDriver {
   return {

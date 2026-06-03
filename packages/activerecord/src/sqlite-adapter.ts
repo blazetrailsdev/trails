@@ -163,7 +163,7 @@ export interface SqliteDriver {
 // drop driver registrations. Drivers self-register on import; without this,
 // the second module instance starts empty and breaks any consumer holding the
 // first instance's getSqlite reference (and vice versa).
-const REGISTRY_KEY = Symbol.for("@blazetrails/activesupport/sqlite-adapter/registry");
+const REGISTRY_KEY = Symbol.for("@blazetrails/activerecord/sqlite-adapter/registry");
 type GlobalWithRegistry = typeof globalThis & {
   [REGISTRY_KEY]?: Map<string, SqliteDriver>;
 };
@@ -193,7 +193,7 @@ function resolveName(name?: string): string {
   if (registry.size === 1) return registry.keys().next().value as string;
   if (registry.size === 0) {
     throw new Error(
-      "No SQLite driver registered. Import `@blazetrails/activesupport/sqlite/better-sqlite3` " +
+      "No SQLite driver registered. Import `@blazetrails/activerecord/sqlite/better-sqlite3` " +
         "or register a custom driver via `registerSqliteDriver()`.",
     );
   }

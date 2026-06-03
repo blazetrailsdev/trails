@@ -15,7 +15,7 @@
 
 import pg from "pg";
 import mysql from "mysql2/promise";
-import "@blazetrails/activesupport/sqlite/better-sqlite3";
+import "../sqlite/better-sqlite3.js";
 import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import type { DatabaseAdapter } from "../adapter.js";
 import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";

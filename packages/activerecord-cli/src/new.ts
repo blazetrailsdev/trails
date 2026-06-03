@@ -62,7 +62,7 @@ export default config;
 
 // node-sqlite is a Node.js built-in (22.5+) — no npm install needed, but the
 // driver must be registered explicitly before establishConnection() is called.
-const DB_GLUE_NODE_SQLITE = `import "@blazetrails/activesupport/sqlite/node-sqlite";
+const DB_GLUE_NODE_SQLITE = `import "@blazetrails/activerecord/sqlite/node-sqlite";
 import { Base } from "@blazetrails/activerecord";
 import { models } from "./app/models/index.js";
 

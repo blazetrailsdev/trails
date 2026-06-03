@@ -1012,7 +1012,7 @@ dist
 };
 `;
       default:
-        return `import "@blazetrails/activesupport/sqlite/${this.sqliteDriver}";
+        return `import "@blazetrails/activerecord/sqlite/${this.sqliteDriver}";
 
 export default {
   development: {
