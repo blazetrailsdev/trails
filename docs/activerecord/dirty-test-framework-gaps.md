@@ -29,10 +29,11 @@ Ordered by yield (tests un-skipped per fix).
 
 ## Impossible in JS/Ruby (can never match without stubs)
 
-| Test                                                                                                                                             | Why                                                                                                                             |
-| ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `attribute will change!`, `in place mutation detection`, `in place mutation for binary`, `mutating and then assigning doesn't remove the change` | Rails mutates a string in place (`catchphrase << " matey!"`); JS strings are immutable.                                         |
-| `changes is correct if override attribute reader`, `getters with side effects are allowed`                                                       | Rails defines a singleton method on one instance (`def obj.catchphrase ...`); no per-instance method-with-super override in JS. |
+| Test                                                                                                                                             | Why                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `attribute will change!`, `in place mutation detection`, `in place mutation for binary`, `mutating and then assigning doesn't remove the change` | Rails mutates a string in place (`catchphrase << " matey!"`); JS strings are immutable.                                                                                                                |
+| `changes is correct if override attribute reader`, `getters with side effects are allowed`                                                       | Rails defines a singleton method on one instance (`def obj.catchphrase ...`); no per-instance method-with-super override in JS.                                                                        |
+| `string attribute should compare with typecast symbol after update`                                                                              | Tests that a Ruby symbol (`:foo`) passed to `create!`/`update_column` casts to `"foo"` and so isn't dirty. JS has no auto-coercing symbol; substituting `"foo"` would test `"foo" == "foo"` vacuously. |
 
 ## Intentional (out of scope)
 

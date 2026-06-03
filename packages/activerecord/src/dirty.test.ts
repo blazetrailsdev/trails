@@ -16,7 +16,7 @@
  * (immutable strings, Ruby singleton methods) are `it.skip` with a precise
  * reason rather than silently adapted or stubbed.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base } from "./index.js";
 import { TimeWithZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -76,21 +76,23 @@ describe("DirtyTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
-  // Rails: `def setup; Person.create first_name: "foo"; end` (and teardown
-  // delete_by). A dummy row so the `Person.select(:id).first` tests have a row.
-  // Transactional rollback cleans it up — no explicit teardown needed.
-  //
-  // The `first()` warm-ups force schema reflection on every canonical model the
-  // suite touches: trails reflects columns lazily on first query, and in-memory
-  // dirty tracking (`new Model()` then assign) needs the attribute accessors to
-  // already exist. This mirrors the spirit of Rails' "force column loads" dummy,
-  // extended to the other models the ported tests construct in-memory.
-  beforeEach(async () => {
+  // Force schema reflection ONCE per worker: trails reflects columns lazily on
+  // first query, and in-memory dirty tracking (`new Model()` then assign) needs
+  // the attribute accessors to already exist. Reflection is cached on the model
+  // prototype (per worker), so a single warm-up suffices — no need to repeat it
+  // per test.
+  beforeAll(async () => {
     await Promise.all(
       [Person, Pirate, Parrot, Topic, NumericData, Aircraft, LiveParrot].map((m) =>
         m.first().catch(() => null),
       ),
     );
+  });
+
+  // Rails: `def setup; Person.create first_name: "foo"; end` (and teardown
+  // delete_by). A dummy row so the `Person.select(:id).first` tests have a row.
+  // Transactional rollback cleans it up — no explicit teardown needed.
+  beforeEach(async () => {
     await Person.create({ first_name: "foo" });
   });
 
@@ -188,9 +190,12 @@ describe("DirtyTest", () => {
       expect(pirate.attributeChange("created_on")).toBeNull();
 
       // Change created_on.
+      const oldCreatedOn = pirate.created_on;
       pirate.created_on = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       expect(pirate.attributeChanged("created_on")).toBe(true);
+      // kind_of does not work because ActiveSupport::TimeWithZone.name == 'Time'.
       expect(pirate.attributeWas("created_on")).not.toBeInstanceOf(TimeWithZone);
+      expect(pirate.attributeWas("created_on")).toEqual(oldCreatedOn);
     });
   });
 
@@ -212,9 +217,12 @@ describe("DirtyTest", () => {
       expect(pirate.attributeChange("created_on")).toBeNull();
 
       // Change created_on.
+      const oldCreatedOn = pirate.created_on;
       pirate.created_on = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       expect(pirate.attributeChanged("created_on")).toBe(true);
+      // kind_of does not work because ActiveSupport::TimeWithZone.name == 'Time'.
       expect(pirate.attributeWas("created_on")).not.toBeInstanceOf(TimeWithZone);
+      expect(pirate.attributeWas("created_on")).toEqual(oldCreatedOn);
     });
   });
 
@@ -421,11 +429,13 @@ describe("DirtyTest", () => {
     // defaults on `new`, separate PR.
   });
 
-  it("string attribute should compare with typecast symbol after update", async () => {
-    const pirate = (await Pirate.create({ catchphrase: "foo" })) as Rec;
-    await pirate.updateColumn("catchphrase", "foo");
-    void pirate.catchphrase; // Rails reads it to trigger any lazy comparison.
-    expect(pirate.attributeChanged("catchphrase")).toBe(false);
+  it.skip("string attribute should compare with typecast symbol after update", () => {
+    // BLOCKED: Ruby language — the test's whole point is that a Ruby symbol
+    // (`create!(catchphrase: :foo)` / `update_column :catchphrase, :foo`) is
+    // type-cast to the string `"foo"` and so compares equal to the persisted
+    // value (not dirty). JS has no auto-coercing symbol; substituting `"foo"`
+    // would test `"foo" == "foo"` vacuously (no cast exercised). SCOPE: none —
+    // no faithful JS equivalent.
   });
 
   it.skip("partial update", () => {
@@ -782,6 +792,11 @@ describeIfPg("DirtyTest", () => {
         CONSTRAINT cpk_pg_identity_dirty_pkey PRIMARY KEY (another_id, id)
       )
     `);
+  });
+
+  afterEach(async () => {
+    await adapter.execute(`DROP TABLE IF EXISTS cpk_pg_identity_dirty CASCADE`);
+    await adapter.close();
   });
 
   it.skip("partial insert off with changed composite identity primary key attribute", () => {
