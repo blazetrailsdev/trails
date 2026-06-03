@@ -130,9 +130,18 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("enum schema dump", async () => {
+      await adapter.exec(
+        `ALTER TABLE "postgresql_enums" ADD COLUMN "good_mood" mood DEFAULT 'happy' NOT NULL`,
+      );
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
-      expect(output).toContain("postgresql_enums");
-      expect(output).toContain('t.enum("current_mood"');
+      expect(output).toContain(
+        "Note that some types may not work with other database engines. Be careful if changing database.",
+      );
+      expect(output).toContain('await ctx.createEnum("mood", ["sad","ok","happy"]);');
+      expect(output).toContain('t.enum("current_mood", { enum_type: "mood" })');
+      expect(output).toContain(
+        't.enum("good_mood", { default: "happy", null: false, enum_type: "mood" })',
+      );
     });
 
     it("enum where", async () => {
@@ -337,6 +346,12 @@ describeIfPg("PostgreSQLAdapter", () => {
         "enum_test_schema.postgresql_enums_in_other_schema",
       );
       expect(exists).toBe(true);
+      await expect(
+        adapter.dropTable("enum_test_schema.postgresql_enums_in_other_schema"),
+      ).resolves.not.toThrow();
+      await expect(
+        adapter.dropEnum("enum_test_schema.mood_in_other_schema"),
+      ).resolves.not.toThrow();
     });
 
     // Needs schema dumper with schema-scoped enum support
