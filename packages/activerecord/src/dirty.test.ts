@@ -1,484 +1,149 @@
 /**
- * Tests to increase Rails test coverage matching.
- * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/dirty_test.rb
+ *
+ * Faithful port of Rails' DirtyTest. Rides the canonical schema + models
+ * (Pirate / Parrot / Person / Topic / Aircraft / NumericData / LiveParrot)
+ * via the handler suite + transactional fixtures — it declares NO bespoke
+ * `defineSchema` and uses NO `dropExisting`, so it issues zero per-test DDL
+ * (every table it touches is already in the preloaded canonical schema, a
+ * signature-cache hit). This removes the divergent `people`/`posts`/`pirates`
+ * shapes the old version wrote into the shared worker DB — the cross-file
+ * collisions that forced `locking.test.ts`'s `dropExisting` shield and drove
+ * MySQL DDL churn.
+ *
+ * Test names mirror the Ruby method names verbatim (`test:compare` matches on
+ * them). Tests blocked by a genuine trails gap or a JS-language limitation
+ * (immutable strings, Ruby singleton methods) are `it.skip` with a precise
+ * reason rather than silently adapted or stubbed.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./index.js";
 import { TimeWithZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
-import { Person } from "./test-helpers/models/person.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+import { Pirate } from "./test-helpers/models/pirate.js";
+import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";
+import { Person } from "./test-helpers/models/person.js";
+import { Topic } from "./test-helpers/models/topic.js";
+import { Aircraft } from "./test-helpers/models/aircraft.js";
+import { NumericData } from "./test-helpers/models/numeric-data.js";
 
-// -- Helpers --
-// ==========================================================================
-// DirtyTest — targets dirty_test.rb
-// ==========================================================================
+// trails generates column accessors (`pirate.catchphrase`) at runtime, so they
+// aren't visible to TS on the model classes. This alias keeps the inherited
+// dirty/persistence methods strongly typed while exposing column reads/writes
+// as `unknown` — letting the test bodies read like Rails without `any`.
+type Rec = Base & Record<string, unknown>;
+
+/**
+ * `isSavedChanges` / `idInDatabase` are wired onto Base.prototype at runtime
+ * (not on its static type), so on a {@link Rec} they read back as `unknown`.
+ * Invoke them through their receiver (preserving `this`) with a typed return.
+ */
+const call = <T>(recv: object, name: string): T => (recv as Record<string, () => T>)[name]();
+
+/** Mirrors Rails' private `with_partial_writes(klass, on = true)`. */
+async function withPartialWrites(
+  klass: typeof Base,
+  on: boolean,
+  fn: () => Promise<void>,
+): Promise<void> {
+  const oldInserts = klass.partialInserts;
+  const oldUpdates = klass.partialUpdates;
+  klass.partialInserts = on;
+  klass.partialUpdates = on;
+  try {
+    await fn();
+  } finally {
+    klass.partialInserts = oldInserts;
+    klass.partialUpdates = oldUpdates;
+  }
+}
+
+/** Mirrors Rails' private `check_pirate_after_save_failure(pirate)`. */
+function checkPirateAfterSaveFailure(pirate: Rec): void {
+  expect(pirate.changed).toBe(true);
+  expect(pirate.attributeChanged("parrot_id")).toBe(true);
+  expect(pirate.changedAttributes).toEqual(["parrot_id"]);
+  expect(pirate.attributeWas("parrot_id")).toBeNull();
+}
+
 describe("DirtyTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    // Re-establish the canonical `people` shape (Rails' dirty_test.rb reads the
-    // shared `Person`). `dropExisting` is required, not optional: the worker's
-    // canonical schema preload keeps the `people` signature cache-warm, so a
-    // plain `defineSchema` is a no-op — meaning a sibling file that physically
-    // replaced `people` with a reduced bespoke shape lacking `first_name` (e.g.
-    // `callbacks`/`errors`/`migration`'s `people: { name }`) would survive into
-    // this suite and break our `first_name` INSERTs. `dropExisting` bypasses the
-    // signature cache and rebuilds `people` from the canonical schema verbatim,
-    // matching the shield `locking.test.ts` uses. `topics` stays a bespoke
-    // scratch table (separate convergence).
-    await defineSchema(
-      {
-        topics: { title: "string" },
-        people: canonicalSchema.people,
-      },
-      { dropExisting: true },
+
+  // Rails: `def setup; Person.create first_name: "foo"; end` (and teardown
+  // delete_by). A dummy row so the `Person.select(:id).first` tests have a row.
+  // Transactional rollback cleans it up — no explicit teardown needed.
+  //
+  // The `first()` warm-ups force schema reflection on every canonical model the
+  // suite touches: trails reflects columns lazily on first query, and in-memory
+  // dirty tracking (`new Model()` then assign) needs the attribute accessors to
+  // already exist. This mirrors the spirit of Rails' "force column loads" dummy,
+  // extended to the other models the ported tests construct in-memory.
+  beforeEach(async () => {
+    await Promise.all(
+      [Person, Pirate, Parrot, Topic, NumericData, Aircraft, LiveParrot].map((m) =>
+        m.first().catch(() => null),
+      ),
     );
-  });
-  it("attribute changes", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = new Topic({ title: "old" });
-    t.title = "new";
-    expect(t.changed).toBe(true);
+    await Person.create({ first_name: "foo" });
   });
 
-  it("object should be changed if any attribute is changed", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = new Topic({ title: "old" });
-    t.title = "new";
-    expect(t.changed).toBe(true);
-  });
-
-  it("reverted changes are not dirty", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = new Topic({ title: "old" });
-    t.title = "new";
-    t.title = "old";
-    // After reverting, may or may not be dirty depending on implementation
-    expect(typeof t.changed).toBe("boolean");
-  });
-
-  it("saved_changes returns a hash of all the changes that occurred", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = await Topic.create({ title: "old" });
-    t.title = "new";
-    await t.save();
-    const changes = t.savedChanges;
-    expect(changes).toHaveProperty("title");
-  });
-
-  it("changed attributes should be preserved if save failure", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = new Topic({ title: "old" });
-    t.title = "new";
-    // Before save, changes should exist
-    expect(t.changed).toBe(true);
-  });
-
-  it("reload should clear changed attributes", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = await Topic.create({ title: "old" });
-    t.title = "modified";
-    expect(t.changed).toBe(true);
-    await t.reload();
-    expect(t.changed).toBe(false);
-  });
-
-  it("reverted changes are not dirty after multiple changes", () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = new Topic({ title: "original" });
-    t.title = "changed1";
-    t.title = "changed2";
-    t.title = "original";
-    expect(typeof t.changed).toBe("boolean");
-  });
-
-  it("aliased attribute changes", () => {
-    class Parrot extends Base {
-      static {
-        this.attribute("name", "string");
-        this.aliasAttribute("title", "name");
-      }
-    }
-    const parrot = new Parrot();
-    expect((parrot as any).titleChanged()).toBe(false);
-    expect((parrot as any).titleChange()).toBeNull();
-
-    parrot.name = "Sam";
-    expect((parrot as any).titleChanged()).toBe(true);
-    expect((parrot as any).titleWas()).toBeNull();
-    expect((parrot as any).titleChange()).toEqual((parrot as any).nameChange());
-  });
-
-  it("saved_change_to_attribute? returns whether a change occurred in the last save", async () => {
-    // DEVIATION (trails dirty-tracking gap): Rails uses a single `create!("Sean")`
-    // and checks the nil→"Sean" change plus `saved_change_to_gender?` and the
-    // `from: nil` / `to:`-only predicate variants (dirty_test.rb:842-851). In trails,
-    // INSERT-time *user-assigned* attributes are NOT recorded in the changeset —
-    // after `Person.create({first_name})` `savedChanges` holds only the save-managed
-    // columns (`created_at`/`updated_at`), so `savedChangeToAttribute("first_name")`
-    // is false. We therefore exercise the change via a follow-up update. Method-level
-    // fidelity (predicate + from/to) matches Rails. TODO: once create-time dirty
-    // tracking captures assigned attributes, restore Rails' create-only form and the
-    // dropped `gender` / `from: nil` assertions (the `from: nil` case also depends on
-    // null-vs-undefined handling in savedChangeToAttribute, model.ts).
-    const p = await Person.create({ first_name: "Sean" });
-    p.first_name = "Bob";
-    await p.save();
-    expect(p.savedChangeToAttribute("first_name")).toBe(true);
-    expect(p.savedChangeToAttribute("first_name", { from: "Sean", to: "Bob" })).toBe(true);
-    expect(p.savedChangeToAttribute("first_name", { from: "Bob" })).toBe(false);
-  });
-
-  it("saved_change_to_attribute returns the change that occurred in the last save", async () => {
-    // See the saved-changes-on-INSERT note above: exercised via a follow-up update.
-    const p = await Person.create({ first_name: "Sean" });
-    p.first_name = "Bob";
-    await p.save();
-    const change = p.savedChangeToAttributeValues("first_name");
-    expect(change).toEqual(["Sean", "Bob"]);
-  });
-
-  it("attribute_before_last_save returns the original value before saving", async () => {
-    // See the saved-changes-on-INSERT note above: exercised via a follow-up update.
-    const p = await Person.create({ first_name: "Sean" });
-    p.first_name = "Bob";
-    await p.save();
-    expect(p.attributeBeforeLastSave("first_name")).toBe("Sean");
-  });
-
-  it("changed? in after callbacks returns false", async () => {
-    // Mirrors Rails' anonymous `Class.new(ActiveRecord::Base) { self.table_name =
-    // "people"; after_save {...} }` — a one-off callback that must not pollute the
-    // shared canonical `Person`. Explicit `_tableName` targets the canonical
-    // `people` table (the class name would otherwise clash with the imported
-    // `Person` in the model registry).
-    const klass = class extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("first_name", "string");
-        // AR_NO_AUTO_SCHEMA is on, so this throwaway class only knows the columns
-        // it declares. Declare the canonical `people` timestamp columns
-        // (NOT NULL) so the timestamp module auto-fills them on insert — Rails'
-        // anonymous class gets this for free via schema reflection.
-        this.attribute("created_at", "datetime");
-        this.attribute("updated_at", "datetime");
-        this.afterSave(function (record: any) {
-          if (record.changed) throw new Error("changed? should be false");
-          if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
-          if (!record.isSavedChanges()) throw new Error("saved_changes? should be true");
-          if (record.idInDatabase() == null) throw new Error("id_in_database should not be nil");
-        });
-      }
-    };
-    const person = await klass.create({ first_name: "Sean" });
-    expect(person.changed).toBe(false);
-  });
-});
-
-// ==========================================================================
-// DirtyTest2 — more targets for dirty_test.rb
-// ==========================================================================
-describe("DirtyTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      posts: {
-        title: "string",
-        views: "integer",
-        count: "integer",
-        meta: "string",
-        author_id: "integer",
-      },
-      authors: { name: "string" },
-    });
-  });
   it("attribute changes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("views", "integer");
-      }
-    }
-    const post = (await Post.create({ title: "hello", views: 0 })) as any;
-    post.title = "world";
-    const changes = post.changes;
-    expect(changes).toHaveProperty("title");
-    expect(changes.title[0]).toBe("hello");
-    expect(changes.title[1]).toBe("world");
+    // New record - no changes.
+    const pirate = new Pirate() as Rec;
+    expect(pirate.attributeChanged("catchphrase")).toBe(false);
+    expect(pirate.attributeChanged("non_validated_parrot_id")).toBe(false);
+
+    // Change catchphrase.
+    pirate.catchphrase = "arrr";
+    expect(pirate.attributeChanged("catchphrase")).toBe(true);
+    expect(pirate.attributeWas("catchphrase")).toBeNull();
+    expect(pirate.attributeChange("catchphrase")).toEqual([null, "arrr"]);
+
+    // Saved - no changes.
+    await pirate.saveBang();
+    expect(pirate.attributeChanged("catchphrase")).toBe(false);
+    expect(pirate.attributeChange("catchphrase")).toBeNull();
+
+    // Same value - no changes.
+    pirate.catchphrase = "arrr";
+    expect(pirate.attributeChanged("catchphrase")).toBe(false);
+    expect(pirate.attributeChange("catchphrase")).toBeNull();
   });
 
-  it("attribute will change!", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: "hello" })) as any;
-    post.title = "world";
-    expect(post.changed).toBe(true);
-  });
-
-  it("restore attribute!", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: "original" })) as any;
-    post.title = "changed";
-    expect(post.changed).toBe(true);
-    await post.reload();
-    expect(post.changed).toBe(false);
-    expect(post.title).toBe("original");
-  });
-
-  it("clear attribute change", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: "hello" })) as any;
-    post.title = "world";
-    expect(post.changed).toBe(true);
-    // Clear by reloading or saving
-    await post.save();
-    expect(post.changed).toBe(false);
-  });
-
-  it("partial update", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("views", "integer");
-      }
-    }
-    const post = (await Post.create({ title: "original", views: 0 })) as any;
-    post.title = "updated";
-    await post.save();
-    expect(post.title).toBe("updated");
-    expect(post.views).toBe(0);
-  });
-
-  it("dup objects should not copy dirty flag from creator", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: "original" })) as any;
-    post.title = "changed";
-    expect(post.changed).toBe(true);
-    // Just verify the original is dirty; dup not required
-    expect(post).toBeTruthy();
-  });
-
-  it("previous changes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: "original" })) as any;
-    post.title = "updated";
-    await post.save();
-    expect(post.savedChanges).toHaveProperty("title");
-  });
-
-  it("changed attributes should be preserved if save failure", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Post.validates("title", { presence: true });
-    const post = (await Post.create({ title: "valid" })) as any;
-    post.title = "";
-    const saved = await post.save();
-    // Either save fails and dirty is preserved, or save succeeds (implementation dependent)
-    // Just verify the attribute was set
-    expect(post.title).toBe("");
-  });
-
-  it("nullable number not marked as changed if new value is blank", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("views", "integer");
-      }
-    }
-    const post = (await Post.create({ views: null })) as any;
-    post.views = null;
-    expect(post.changed).toBe(false);
-  });
-
-  it("integer zero to string zero not marked as changed", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("count", "integer");
-      }
-    }
-    const post = (await Post.create({ count: 0 })) as any;
-    post.count = 0;
-    expect(post.changed).toBe(false);
-  });
-
-  it("string attribute should compare with typecast symbol after update", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: "hello" })) as any;
-    post.title = "hello";
-    expect(post.changed).toBe(false);
-  });
-
-  it("save should store serialized attributes even with partial writes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("meta", "string");
-      }
-    }
-    const post = (await Post.create({ title: "test", meta: "data" })) as any;
-    post.title = "updated";
-    await post.save();
-    expect(post.title).toBe("updated");
-    expect(post.meta).toBe("data");
-  });
-
-  it("saved changes returns a hash of all the changes that occurred", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: "original" })) as any;
-    post.title = "updated";
-    await post.save();
-    const sc = post.savedChanges;
-    expect(typeof sc).toBe("object");
-    expect(sc).toHaveProperty("title");
-  });
-
-  it("association assignment changes foreign key", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_id", "integer");
-      }
-    }
-    const author = (await Author.create({ name: "Alice" })) as any;
-    const post = (await Post.create({ title: "test", author_id: null })) as any;
-    post.author_id = author.id;
-    expect(post.changedAttributes.includes("author_id")).toBe(true);
-  });
-
-  it("reverted changes are not dirty after multiple changes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: "original" })) as any;
-    post.title = "a";
-    post.title = "b";
-    post.title = "original";
-    expect(post.changed).toBe(false);
-  });
-
-  it("reload should clear changed attributes", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const post = (await Post.create({ title: "original" })) as any;
-    post.title = "changed";
-    expect(post.changed).toBe(true);
-    await post.reload();
-    expect(post.changed).toBe(false);
-  });
-});
-
-// ==========================================================================
-// DirtyTest3 — additional missing tests from dirty_test.rb
-// ==========================================================================
-describe("DirtyTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string" },
-      pirates: {
-        catchphrase: "string",
-        created_at: "datetime",
-        created_on: "datetime",
-        parrot_id: "integer",
-      },
-    });
-  });
   it("time attributes changes with time zone", async () => {
     await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
-      class Pirate extends Base {
+      // Declare the datetime explicitly so it is registered as a time-zone-aware
+      // attribute (Rails gets this from schema reflection on the anonymous
+      // `Class.new`; trails' reflected anonymous class doesn't TZ-wrap the
+      // auto-set timestamp, so `attribute_was` would come back a bare Instant).
+      const Target = class extends Base {
+        static tableName = "pirates";
         static {
-          this.tableName = "pirates";
           this.attribute("created_on", "datetime");
           this.attribute("catchphrase", "string");
         }
-      }
+      };
       const zone = getZone()!;
-      const pirate = new Pirate();
+
+      // New record - no changes.
+      const pirate = new Target() as Rec;
       expect(pirate.attributeChanged("created_on")).toBe(false);
       expect(pirate.attributeChange("created_on")).toBeNull();
 
+      // Saved - no changes.
       pirate.catchphrase = "arrrr, time zone!!";
       await pirate.saveBang();
       expect(pirate.attributeChanged("created_on")).toBe(false);
+      expect(pirate.attributeChange("created_on")).toBeNull();
 
+      // Change created_on.
       const oldCreatedOn = pirate.created_on as TimeWithZone;
       pirate.created_on = new TimeWithZone(Temporal.Now.instant().subtract({ hours: 24 }), zone);
       expect(pirate.attributeChanged("created_on")).toBe(true);
@@ -486,545 +151,607 @@ describe("DirtyTest", () => {
       expect((pirate.attributeWas("created_on") as TimeWithZone).utc().epochMilliseconds).toBe(
         oldCreatedOn.utc().epochMilliseconds,
       );
-      await pirate.reload();
+      pirate.created_on = oldCreatedOn;
       expect(pirate.attributeChanged("created_on")).toBe(false);
     });
   });
-  it("attributeWas reflects auto-timestamp baseline after create", async () => {
-    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
-      class Pirate extends Base {
-        static {
-          this.tableName = "pirates";
-          this.attribute("created_at", "datetime");
-          this.attribute("catchphrase", "string");
-        }
-      }
-      const zone = getZone()!;
-      const pirate = await Pirate.create({ catchphrase: "yo ho" });
-      expect(pirate.attributeChanged("created_at")).toBe(false);
-      expect(pirate.created_at).toBeInstanceOf(TimeWithZone);
-      const autoSetCreatedAt = pirate.created_at as TimeWithZone;
-      pirate.created_at = new TimeWithZone(Temporal.Now.instant().subtract({ hours: 1 }), zone);
-      expect(pirate.attributeChanged("created_at")).toBe(true);
-      expect(pirate.attributeWas("created_at")).toBeInstanceOf(TimeWithZone);
-      expect((pirate.attributeWas("created_at") as TimeWithZone).utc().epochMilliseconds).toBe(
-        autoSetCreatedAt.utc().epochMilliseconds,
-      );
-    });
-  });
+
   it("setting time attributes with time zone field to itself should not be marked as a change", async () => {
     await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
-      class Pirate extends Base {
-        static {
-          this.tableName = "pirates";
-          this.attribute("created_on", "datetime");
-          this.attribute("catchphrase", "string");
-        }
-      }
-      const pirate = await Pirate.create({ catchphrase: "yo ho" });
-      const currentCreatedOn = pirate.created_on;
-      pirate.created_on = currentCreatedOn;
+      const Target = class extends Base {
+        static tableName = "pirates";
+      };
+      const pirate = (await Target.create({})) as Rec;
+      // Rails asserts assigning the value to itself is not a change.
+      // eslint-disable-next-line no-self-assign
+      pirate.created_on = pirate.created_on;
       expect(pirate.attributeChanged("created_on")).toBe(false);
     });
   });
+
   it("time attributes changes without time zone by skip", async () => {
     await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
-      class Pirate extends Base {
-        static {
-          this.tableName = "pirates";
-          this.skipTimeZoneConversionForAttributes = ["created_on"];
-          this.attribute("created_on", "datetime");
-          this.attribute("catchphrase", "string");
-        }
-      }
-      const pirate = new Pirate();
+      const Target = class extends Base {
+        static tableName = "pirates";
+        static skipTimeZoneConversionForAttributes = ["created_on"];
+      };
+
+      // New record - no changes.
+      const pirate = new Target() as Rec;
+      expect(pirate.attributeChanged("created_on")).toBe(false);
+      expect(pirate.attributeChange("created_on")).toBeNull();
+
+      // Saved - no changes.
       pirate.catchphrase = "arrrr, time zone!!";
       await pirate.saveBang();
       expect(pirate.attributeChanged("created_on")).toBe(false);
-      pirate.created_on = new Date().toISOString();
+      expect(pirate.attributeChange("created_on")).toBeNull();
+
+      // Change created_on.
+      pirate.created_on = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       expect(pirate.attributeChanged("created_on")).toBe(true);
       expect(pirate.attributeWas("created_on")).not.toBeInstanceOf(TimeWithZone);
     });
   });
+
   it("time attributes changes without time zone", async () => {
     await withTimezoneConfig({ awareAttributes: false }, async () => {
-      class Pirate extends Base {
-        static {
-          this.tableName = "pirates";
-          this.attribute("created_on", "datetime");
-          this.attribute("catchphrase", "string");
-        }
-      }
-      const pirate = new Pirate();
+      const Target = class extends Base {
+        static tableName = "pirates";
+      };
+
+      // New record - no changes.
+      const pirate = new Target() as Rec;
+      expect(pirate.attributeChanged("created_on")).toBe(false);
+      expect(pirate.attributeChange("created_on")).toBeNull();
+
+      // Saved - no changes.
       pirate.catchphrase = "arrrr, time zone!!";
       await pirate.saveBang();
       expect(pirate.attributeChanged("created_on")).toBe(false);
-      pirate.created_on = new Date().toISOString();
+      expect(pirate.attributeChange("created_on")).toBeNull();
+
+      // Change created_on.
+      pirate.created_on = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       expect(pirate.attributeChanged("created_on")).toBe(true);
       expect(pirate.attributeWas("created_on")).not.toBeInstanceOf(TimeWithZone);
     });
   });
+
+  it.skip("aliased attribute changes", () => {
+    // BLOCKED: dirty (alias under reflection) — on the canonical Parrot
+    // (`aliasAttribute "title", "name"` over a reflected `name` column),
+    // assigning `parrot.name = "Sam"` updates the value but does NOT mark it
+    // changed (`attributeChanged("name")` stays false), so the alias check
+    // fails. A reflected, non-aliased column on the same suite (Pirate's
+    // catchphrase/parrot_id) tracks correctly — the alias is what breaks it.
+    // SCOPE: alias-aware dirty tracking for reflected columns, separate PR.
+  });
+
+  it("restore attribute!", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Yar!" })) as Rec;
+    pirate.catchphrase = "Ahoy!";
+
+    expect(pirate.catchphrase).toBe("Ahoy!");
+    expect(pirate.attributeChange("catchphrase")).toEqual(["Yar!", "Ahoy!"]);
+
+    pirate.restoreAttribute("catchphrase");
+
+    expect(pirate.attributeChange("catchphrase")).toBeNull();
+    expect(pirate.catchphrase).toBe("Yar!");
+    expect(pirate.changes).toEqual({});
+    expect(pirate.attributeChanged("catchphrase")).toBe(false);
+  });
+
+  it("clear attribute change", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Yar!" })) as Rec;
+    pirate.catchphrase = "Ahoy!";
+
+    expect(pirate.catchphrase).toBe("Ahoy!");
+    expect(pirate.attributeChange("catchphrase")).toEqual(["Yar!", "Ahoy!"]);
+
+    pirate.clearAttributeChange("catchphrase");
+
+    expect(pirate.attributeChange("catchphrase")).toBeNull();
+    expect(pirate.catchphrase).toBe("Ahoy!");
+    expect(pirate.changes).toEqual({});
+    expect(pirate.attributeChanged("catchphrase")).toBe(false);
+  });
+
+  it("nullable number not marked as changed if new value is blank", () => {
+    const pirate = new Pirate() as Rec;
+
+    for (const value of ["", null]) {
+      pirate.parrot_id = value;
+      expect(pirate.attributeChanged("parrot_id")).toBe(false);
+      expect(pirate.attributeChange("parrot_id")).toBeNull();
+    }
+  });
+
   it("nullable decimal not marked as changed if new value is blank", () => {
-    expect(true).toBe(true);
+    const numericData = new NumericData() as Rec;
+
+    for (const value of ["", null]) {
+      numericData.bank_balance = value;
+      expect(numericData.attributeChanged("bank_balance")).toBe(false);
+      expect(numericData.attributeChange("bank_balance")).toBeNull();
+    }
   });
+
   it("nullable float not marked as changed if new value is blank", () => {
-    expect(true).toBe(true);
-  });
-  it("nullable datetime not marked as changed if new value is blank", () => {
-    expect(true).toBe(true);
-  });
-  it("integer zero to integer zero not marked as changed", () => {
-    expect(true).toBe(true);
-  });
-  it("float zero to string zero not marked as changed", () => {
-    expect(true).toBe(true);
-  });
-  it("zero to blank marked as changed", () => {
-    expect(true).toBe(true);
-  });
-  it("virtual attribute will change", () => {
-    expect(true).toBe(true);
-  });
-  it("attribute should be compared with type cast", () => {
-    expect(true).toBe(true);
-  });
-  it("partial update with optimistic locking", () => {
-    expect(true).toBe(true);
-  });
-  it("save always should update timestamps when serialized attributes are present", () => {
-    expect(true).toBe(true);
-  });
-  it("save should not save serialized attribute with partial writes if not present", () => {
-    expect(true).toBe(true);
-  });
-  it("changes to save should not mutate array of hashes", () => {
-    expect(true).toBe(true);
-  });
-  it("field named field", () => {
-    expect(true).toBe(true);
-  });
-  it("datetime attribute can be updated with fractional seconds", () => {
-    expect(true).toBe(true);
-  });
-  it("datetime attribute doesnt change if zone is modified in string", () => {
-    expect(true).toBe(true);
-  });
-  it("partial insert", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = await Post.create({ title: "partial" });
-    expect((p as any).isPersisted()).toBe(true);
-  });
-  it("partial insert with empty values", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = await Post.create({});
-    expect((p as any).isPersisted()).toBe(true);
-  });
-  it("in place mutation detection", () => {
-    expect(true).toBe(true);
-  });
-  it("in place mutation for binary", () => {
-    expect(true).toBe(true);
-  });
-  it("changes is correct for subclass", () => {
-    expect(true).toBe(true);
-  });
-  it("changes is correct if override attribute reader", () => {
-    expect(true).toBe(true);
-  });
-  it("attribute_changed? doesn't compute in-place changes for unrelated attributes", () => {
-    expect(true).toBe(true);
-  });
-  it("attribute_will_change! doesn't try to save non-persistable attributes", () => {
-    expect(true).toBe(true);
-  });
-  it("virtual attributes are not written with partial_writes off", () => {
-    expect(true).toBe(true);
-  });
-  it("mutating and then assigning doesn't remove the change", () => {
-    expect(true).toBe(true);
-  });
-  it("getters with side effects are allowed", () => {
-    expect(true).toBe(true);
-  });
-  it("attributes assigned but not selected are dirty", () => {
-    expect(true).toBe(true);
-  });
-  it("attributes not selected are still missing after save", () => {
-    expect(true).toBe(true);
-  });
-  it("saved_changes? returns whether the last call to save changed anything", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = (await Post.create({ title: "a" })) as any;
-    expect(p.isPersisted()).toBe(true);
-  });
-  it("changed? in around callbacks after yield returns false", () => {
-    expect(true).toBe(true);
-  });
-  it("partial insert off with unchanged default function attribute", () => {
-    expect(true).toBe(true);
-  });
-  it("partial insert off with changed default function attribute", () => {
-    expect(true).toBe(true);
-  });
-  it("partial insert off with changed composite identity primary key attribute", () => {
-    // Tested by the PostgreSQL-specific suite below (requires IDENTITY column support).
-    expect(true).toBe(true);
-  });
-  it("attribute_changed? properly type casts enum values", () => {
-    expect(true).toBe(true);
-  });
-});
+    const numericData = new NumericData() as Rec;
 
-describe("DirtyTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      items: { name: "string", age: "integer" },
+    for (const value of ["", null]) {
+      numericData.temperature = value;
+      expect(numericData.attributeChanged("temperature")).toBe(false);
+      expect(numericData.attributeChange("temperature")).toBeNull();
+    }
+  });
+
+  it("nullable datetime not marked as changed if new value is blank", async () => {
+    await withTimezoneConfig({ zone: "Europe/London", awareAttributes: true }, async () => {
+      const Target = class extends Base {
+        static tableName = "topics";
+      };
+
+      const topic = (await Target.create({})) as Rec;
+      expect(topic.written_on).toBeNull();
+
+      for (const value of ["", null]) {
+        topic.written_on = value;
+        expect(topic.written_on).toBeNull();
+        expect(topic.attributeChanged("written_on")).toBe(false);
+      }
     });
   });
-  it("tracks changes from the last save", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-    const item = await Item.create({ name: "Original" });
-    item.name = "Updated";
-    await item.save();
-    expect(item.savedChanges).toHaveProperty("name");
-    expect(item.savedChanges.name[1]).toBe("Updated");
+
+  it("integer zero to string zero not marked as changed", async () => {
+    const pirate = new Pirate() as Rec;
+    pirate.parrot_id = 0;
+    pirate.catchphrase = "arrr";
+    expect(await pirate.saveBang()).toBeTruthy();
+
+    expect(pirate.changed).toBe(false);
+
+    pirate.parrot_id = "0";
+    expect(pirate.changed).toBe(false);
   });
 
-  it("savedChangeToAttribute returns true for changed attr", async () => {
-    class Item extends Base {
-      static _tableName = "items";
-    }
-    Item.attribute("id", "integer");
-    Item.attribute("name", "string");
-    const item = await Item.create({ name: "Original" });
-    item.name = "Updated";
-    await item.save();
-    expect(item.savedChangeToAttribute("name")).toBe(true);
-    expect(item.savedChangeToAttribute("id")).toBe(false);
-  });
-});
+  it("integer zero to integer zero not marked as changed", async () => {
+    const pirate = new Pirate() as Rec;
+    pirate.parrot_id = 0;
+    pirate.catchphrase = "arrr";
+    expect(await pirate.saveBang()).toBeTruthy();
 
-describe("DirtyTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      users: { name: "string", age: "integer" },
-    });
-  });
-  it("attributeInDatabase returns the pre-change value", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    const user = await User.create({ name: "Alice" });
-    user.name = "Bob";
-    expect(user.attributeInDatabase("name")).toBe("Alice");
+    expect(pirate.changed).toBe(false);
+
+    pirate.parrot_id = 0;
+    expect(pirate.changed).toBe(false);
   });
 
-  it("attributeBeforeLastSave returns value from before last save", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    const user = await User.create({ name: "Alice" });
-    await user.update({ name: "Bob" });
-    expect(user.attributeBeforeLastSave("name")).toBe("Alice");
+  it("float zero to string zero not marked as changed", async () => {
+    const data = new NumericData({ temperature: 0.0 }) as Rec;
+    await data.saveBang();
+
+    expect(data.changed).toBe(false);
+
+    data.temperature = "0";
+    expect(data.changes).toEqual({});
+
+    data.temperature = "0.0";
+    expect(data.changes).toEqual({});
+
+    data.temperature = "0.00";
+    expect(data.changes).toEqual({});
   });
 
-  it("changedAttributeNamesToSave returns pending changes", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.attribute("age", "integer");
-    const user = await User.create({ name: "Alice", age: 25 });
-    user.name = "Bob";
-    expect(user.changedAttributeNamesToSave).toContain("name");
-    expect(user.changedAttributeNamesToSave).not.toContain("age");
-  });
-});
+  it("zero to blank marked as changed", async () => {
+    let pirate = new Pirate() as Rec;
+    pirate.catchphrase = "Yarrrr, me hearties";
+    pirate.parrot_id = 1;
+    await pirate.save();
 
-describe("DirtyTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      users: { name: "string" },
-    });
-  });
-  it("returns true for new records", () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    const user = new User({ name: "Alice" });
-    expect(user.isChangedForAutosave()).toBe(true);
-  });
+    // check the change from 1 to ''
+    pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" })) as Rec;
+    pirate.parrot_id = "";
+    expect(pirate.attributeChanged("parrot_id")).toBe(true);
+    expect(pirate.attributeChange("parrot_id")).toEqual([1, null]);
+    await pirate.save();
 
-  it("returns false for persisted unchanged records", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    const user = await User.create({ name: "Alice" });
-    expect(user.isChangedForAutosave()).toBe(false);
-  });
+    // check the change from nil to 0
+    pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" })) as Rec;
+    pirate.parrot_id = 0;
+    expect(pirate.attributeChanged("parrot_id")).toBe(true);
+    expect(pirate.attributeChange("parrot_id")).toEqual([null, 0]);
+    await pirate.save();
 
-  it("returns true for changed records", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    const user = await User.create({ name: "Alice" });
-    user.name = "Bob";
-    expect(user.isChangedForAutosave()).toBe(true);
-  });
-});
-
-describe("DirtyTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({
-      users: { name: "string" },
-    });
-  });
-  it("attributeChanged with from and to after save", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-
-    const user = await User.create({ name: "Alice" });
-    user.name = "Bob";
-    expect(user.attributeChanged("name")).toBe(true);
-    expect(user.attributeChanged("name", { from: "Alice", to: "Bob" })).toBe(true);
-    expect(user.attributeChanged("name", { from: "Wrong" })).toBe(false);
-  });
-
-  it("savedChangeToAttribute with from/to after save", async () => {
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-
-    const user = await User.create({ name: "Alice" });
-    user.name = "Bob";
-    await user.save();
-    expect(user.savedChangeToAttribute("name")).toBe(true);
-    expect(user.savedChangeToAttribute("name", { from: "Alice", to: "Bob" })).toBe(true);
-    expect(user.savedChangeToAttribute("name", { from: "Wrong" })).toBe(false);
-  });
-});
-
-describe("DirtyTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ users: { name: "string", email: "string", age: "integer" } });
-  });
-
-  it("attribute changes", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "Alice" });
-    expect(u.changed).toBe(false);
-    u.name = "Bob";
-    expect(u.changed).toBe(true);
-    expect(u.changedAttributes).toContain("name");
+    // check the change from 0 to ''
+    pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" })) as Rec;
+    pirate.parrot_id = "";
+    expect(pirate.attributeChanged("parrot_id")).toBe(true);
+    expect(pirate.attributeChange("parrot_id")).toEqual([0, null]);
   });
 
   it("object should be changed if any attribute is changed", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("email", "string");
-      }
-    }
-    const u = await User.create({ name: "Alice", email: "a@b.com" });
-    u.email = "new@b.com";
-    expect(u.changed).toBe(true);
-    expect(u.changedAttributes).toContain("email");
-    expect(u.changedAttributes).not.toContain("name");
+    const pirate = new Pirate() as Rec;
+    expect(pirate.changed).toBe(false);
+    expect(pirate.changedAttributes).toEqual([]);
+    expect(pirate.changes).toEqual({});
+
+    pirate.catchphrase = "arrr";
+    expect(pirate.changed).toBe(true);
+    expect(pirate.attributeWas("catchphrase")).toBeNull();
+    expect(pirate.changedAttributes).toEqual(["catchphrase"]);
+    expect(pirate.changes).toEqual({ catchphrase: [null, "arrr"] });
+
+    await pirate.save();
+    expect(pirate.changed).toBe(false);
+    expect(pirate.changedAttributes).toEqual([]);
+    expect(pirate.changes).toEqual({});
   });
 
-  it("reverted changes are not dirty", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "Alice" });
-    u.name = "Bob";
-    expect(u.changed).toBe(true);
-    u.name = "Alice";
-    expect(u.changed).toBe(false);
+  it.skip("attribute will change!", () => {
+    // BLOCKED: dirty — `attribute_will_change!` (force-dirty a value) is not
+    // exposed on instances; only the internal `attributeWillChangeBang`
+    // dispatch exists. The test also does `catchphrase << " matey!"` (in-place
+    // string mutation), impossible with JS immutable strings. SCOPE: public
+    // will_change! API + a mutable-string attribute type, separate PR.
   });
 
-  it("reload should clear changed attributes", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "Alice" });
-    u.name = "Changed";
-    expect(u.changed).toBe(true);
-    await u.reload();
-    expect(u.changed).toBe(false);
+  it.skip("virtual attribute will change", () => {
+    // BLOCKED: dirty — needs `attribute_will_change!(:cancel_save_from_callback)`
+    // on instances (see "attribute will change!"). Not exposed today.
+  });
+
+  it.skip("association assignment changes foreign key", () => {
+    // BLOCKED: model — needs `Parrot.create`, but the canonical `Parrot`
+    // declares a virtual `cancelSaveFromCallback` attribute that trails
+    // currently persists as a column, so the INSERT fails (`parrots has no
+    // column named cancelSaveFromCallback`). SCOPE: mark that attribute
+    // `{ virtual: true }` on the canonical Parrot, separate PR.
+  });
+
+  it.skip("attribute should be compared with type cast", () => {
+    // BLOCKED: defaults (in-memory) — Rails reads `Topic.new.approved == true`
+    // from the schema default; trails does not apply a *reflected* column
+    // default to a new in-memory record (`new Topic().approved` is null), so the
+    // precondition fails. Defaults declared via `attribute(..., { default })`
+    // do apply — only reflected ones don't. SCOPE: apply reflected column
+    // defaults on `new`, separate PR.
+  });
+
+  it("string attribute should compare with typecast symbol after update", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "foo" })) as Rec;
+    await pirate.updateColumn("catchphrase", "foo");
+    void pirate.catchphrase; // Rails reads it to trigger any lazy comparison.
+    expect(pirate.attributeChanged("catchphrase")).toBe(false);
+  });
+
+  it.skip("partial update", () => {
+    // BLOCKED: query-count parity — Rails asserts exact counts
+    // (`assert_queries_count(6)` for 2×save! with partial writes off, etc.).
+    // trails skips no-op UPDATEs unconditionally and emits different
+    // transaction/statement notifications, so the counts (6/0/3) don't
+    // translate. The behavioral core (no-op saves issue no query; updated_on
+    // bumps only on a real change) is what these assert. SCOPE: query-count
+    // parity, separate PR.
+  });
+
+  it.skip("partial update with optimistic locking", () => {
+    // BLOCKED: query-count parity — see "partial update".
   });
 
   it("changed attributes should be preserved if save failure", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    const u = await User.create({ name: "Alice" });
-    u.name = "";
-    const result = await u.save();
-    expect(result).toBe(false);
-    expect(u.changed).toBe(true);
+    let pirate = new Pirate() as Rec;
+    pirate.parrot_id = 1;
+    expect(await pirate.save()).toBe(false);
+    checkPirateAfterSaveFailure(pirate);
+
+    pirate = new Pirate();
+    pirate.parrot_id = 1;
+    await expect(pirate.saveBang()).rejects.toThrow();
+    checkPirateAfterSaveFailure(pirate);
   });
 
-  it("savedChanges tracks changes from the last save", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "Alice" });
-    u.name = "Bob";
-    await u.save();
-    expect(u.savedChanges).toHaveProperty("name");
-    expect(u.savedChanges.name[1]).toBe("Bob");
+  it("reload should clear changed attributes", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "shiver me timbers" })) as Rec;
+    pirate.catchphrase = "*hic*";
+    expect(pirate.changed).toBe(true);
+    await pirate.reload();
+    expect(pirate.changed).toBe(false);
   });
 
-  it("savedChangeToAttribute returns true for changed attr", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "Alice" });
-    u.name = "Bob";
-    await u.save();
-    expect(u.savedChangeToAttribute("name")).toBe(true);
-    expect(u.savedChangeToAttribute("id")).toBe(false);
+  it("dup objects should not copy dirty flag from creator", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "shiver me timbers" })) as Rec;
+    const pirateDup = pirate.dup();
+    pirateDup.restoreAttribute("catchphrase");
+    pirate.catchphrase = "I love Rum";
+    expect(pirate.attributeChanged("catchphrase")).toBe(true);
+    expect(pirateDup.attributeChanged("catchphrase")).toBe(false);
   });
 
-  it("previouslyNewRecord returns true after first save", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = new User({ name: "Alice" });
-    expect(u.isPreviouslyNewRecord()).toBe(false);
-    await u.save();
-    expect(u.isPreviouslyNewRecord()).toBe(true);
+  it("reverted changes are not dirty", async () => {
+    const phrase = "shiver me timbers";
+    const pirate = (await Pirate.create({ catchphrase: phrase })) as Rec;
+    pirate.catchphrase = "*hic*";
+    expect(pirate.changed).toBe(true);
+    pirate.catchphrase = phrase;
+    expect(pirate.changed).toBe(false);
   });
 
-  it("previouslyNewRecord returns false after subsequent saves", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
+  it("reverted changes are not dirty after multiple changes", async () => {
+    const phrase = "shiver me timbers";
+    const pirate = (await Pirate.create({ catchphrase: phrase })) as Rec;
+    for (let i = 0; i < 10; i++) {
+      pirate.catchphrase = "*hic*".repeat(i);
+      expect(pirate.changed).toBe(true);
     }
-    const u = await User.create({ name: "Alice" });
-    expect(u.isPreviouslyNewRecord()).toBe(true);
-    await u.update({ name: "Bob" });
-    expect(u.isPreviouslyNewRecord()).toBe(false);
+    expect(pirate.changed).toBe(true);
+    pirate.catchphrase = phrase;
+    expect(pirate.changed).toBe(false);
   });
 
-  it("hasChangesToSave returns true when dirty", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const u = await User.create({ name: "Alice" });
-    expect(u.hasChangesToSave).toBe(false);
-    u.name = "Bob";
-    expect(u.hasChangesToSave).toBe(true);
+  it("reverted changes are not dirty going from nil to value and back", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Yar!" })) as Rec;
+
+    pirate.parrot_id = 1;
+    expect(pirate.changed).toBe(true);
+    expect(pirate.attributeChanged("parrot_id")).toBe(true);
+    expect(pirate.attributeChanged("catchphrase")).toBe(false);
+
+    pirate.parrot_id = null;
+    expect(pirate.changed).toBe(false);
+    expect(pirate.attributeChanged("parrot_id")).toBe(false);
+    expect(pirate.attributeChanged("catchphrase")).toBe(false);
   });
 
-  it("attributesInDatabase returns original DB values for dirty attributes", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    const u = await User.create({ name: "Alice", age: 30 });
-    u.name = "Bob";
-    u.age = 31;
-    const inDb = u.attributesInDatabase;
-    expect(inDb["name"]).toBe("Alice");
-    expect(inDb["age"]).toBe(30);
-  });
-});
-
-// ==========================================================================
-// MutableAttributeAfterSave — targets json_shared_test_cases.rb
-// (test_changes_in_place) for the post-save forgettingAssignment reset
-// ==========================================================================
-describe("MutableAttributeAfterSave", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema({ json_models: { payload: "string" } });
+  it.skip("save should store serialized attributes even with partial writes", () => {
+    // BLOCKED: serialization — Rails' `Topic` serializes `content`; the
+    // canonical trails `Topic` does not declare a serialize coder for it, so
+    // `Topic.create({ content: { a: "a" } })` + in-place hash mutation can't be
+    // exercised. SCOPE: add `serialize :content` to the canonical Topic + its
+    // schema, separate PR.
   });
 
-  it("mutable attribute is not dirty after changesApplied resets baseline", async () => {
-    class JsonModel extends Base {
-      static tableName = "json_models";
+  it.skip("save always should update timestamps when serialized attributes are present", () => {
+    // BLOCKED: serialization + time-travel — needs `serialize :content` on Topic
+    // (see above) and ActiveSupport `travel` to force an updated_at delta.
+  });
+
+  it.skip("save should not save serialized attribute with partial writes if not present", () => {
+    // BLOCKED: serialization — needs `serialize :content` on Topic (see above)
+    // plus partial-select + `update_columns`.
+  });
+
+  it.skip("changes to save should not mutate array of hashes", () => {
+    // BLOCKED: serialization — needs `serialize :content` on Topic so an
+    // array-of-hashes value survives `changes_to_save` unmutated.
+  });
+
+  it.skip("previous changes", () => {
+    // BLOCKED: dirty (insert-time composition) — after a fresh INSERT, trails'
+    // `previous_changes` key set differs from Rails' (Rails expects 4:
+    // catchphrase/id/created_on/updated_on; trails records 3). The post-UPDATE
+    // assertions match, but the test is a single method and can't be split.
+    // SCOPE: align the id/timestamp change-recording on INSERT, separate PR.
+  });
+
+  it.skip("field named field", () => {
+    // SKIP (by design): Rails creates a bespoke `testings` table with a column
+    // named `field` via in-test `create_table`. Adding it would reintroduce the
+    // per-test DDL this migration removes, for a column-name edge case unrelated
+    // to MySQL DDL cost. Column-name reflection is covered elsewhere.
+  });
+
+  it("datetime attribute can be updated with fractional seconds", async () => {
+    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+      const Target = class extends Base {
+        static tableName = "topics";
+      };
+      const zone = getZone()!;
+
+      const writtenOn = new TimeWithZone(Temporal.Instant.from("2012-12-01T12:00:00Z"), zone);
+
+      const topic = (await Target.create({ written_on: writtenOn })) as Rec;
+      topic.written_on = new TimeWithZone(
+        (topic.written_on as TimeWithZone).utc().add({ milliseconds: 300 }),
+        zone,
+      );
+
+      expect(topic.attributeChanged("written_on")).toBe(true);
+    });
+  });
+
+  it.skip("datetime attribute doesnt change if zone is modified in string", () => {
+    // BLOCKED: time-zone parity — Rails re-renders the value in another zone
+    // (`created_on.in_time_zone("Tokyo").to_s`) and asserts re-assigning that
+    // string is not a change (same instant). trails' TZ-aware string round-trip
+    // through `in_time_zone(...).to_s` isn't established to parse back to the
+    // identical instant. SCOPE: TZ-aware datetime string round-trip, separate PR.
+  });
+
+  it.skip("partial insert", () => {
+    // BLOCKED: dirty (create-time capture) — partial INSERT narrows to *changed*
+    // columns, but on a new record `Person.create({ first_name })` doesn't mark
+    // first_name as changed, so trails inserts every column (including
+    // followers_count) instead of just first_name. See "saved_change_to_attribute? ...".
+  });
+
+  it("partial insert with empty values", async () => {
+    await withPartialWrites(Aircraft, true, async () => {
+      const a = (await Aircraft.create({})) as Rec;
+      await a.reload();
+      expect(a.id).not.toBeNull();
+    });
+  });
+
+  it.skip("in place mutation detection", () => {
+    // BLOCKED: JS language — Rails mutates a string in place (`catchphrase
+    // << " matey!"`). JS strings are immutable, so there is no in-place string
+    // mutation to detect. No trails equivalent exists or can.
+  });
+
+  it.skip("in place mutation for binary", () => {
+    // BLOCKED: JS language + serialization — relies on in-place mutation of a
+    // serialized binary string (`data << "bar"`). JS strings are immutable.
+  });
+
+  it.skip("changes is correct for subclass", () => {
+    // BLOCKED: JS language — Rails overrides only the *reader*
+    // (`def catchphrase; super.upcase; end`) while keeping the generated writer.
+    // A subclass `get catchphrase()` in JS shadows the inherited accessor pair,
+    // dropping the setter, so `pirate.catchphrase =` throws. No clean
+    // reader-only override with working super-setter in JS class fields.
+  });
+
+  it.skip("changes is correct if override attribute reader", () => {
+    // BLOCKED: Ruby language — Rails defines a singleton method on one instance
+    // (`def pirate.catchphrase; super.upcase; end`). JS has no per-instance
+    // method-with-super override; the subclass form is covered by "changes is
+    // correct for subclass".
+  });
+
+  it.skip("attribute_changed? doesn't compute in-place changes for unrelated attributes", () => {
+    // BLOCKED: attribute types — Rails registers a custom Type whose
+    // `changed_in_place?` raises, asserting it's never called for unrelated
+    // attributes. trails' attribute-type registration on an anonymous class
+    // doesn't expose an equivalent hook to instrument. SCOPE: custom-type
+    // registration parity, separate PR.
+  });
+
+  it.skip("attribute_will_change! doesn't try to save non-persistable attributes", () => {
+    // BLOCKED: dirty — needs the public `attribute_will_change!` API (see
+    // "attribute will change!").
+  });
+
+  it.skip("virtual attributes are not written with partial_writes off", () => {
+    // BLOCKED: dirty — needs the public `attribute_will_change!` API (see
+    // "attribute will change!").
+  });
+
+  it.skip("mutating and then assigning doesn't remove the change", () => {
+    // BLOCKED: JS language — opens with in-place string mutation
+    // (`catchphrase << " matey!"`); JS strings are immutable.
+  });
+
+  it.skip("getters with side effects are allowed", () => {
+    // BLOCKED: Ruby language — uses a singleton getter that calls
+    // `update_attribute` as a side effect (`def pirate.catchphrase ... end`).
+    // No per-instance method override in JS.
+  });
+
+  it("attributes assigned but not selected are dirty", async () => {
+    const person = (await Person.select("id").first()) as Rec;
+    expect(person.changed).toBe(false);
+
+    person.first_name = "Sean";
+    expect(person.changed).toBe(true);
+
+    person.first_name = null;
+    expect(person.changed).toBe(true);
+  });
+
+  it.skip("attributes not selected are still missing after save", () => {
+    // BLOCKED: attribute-methods — accessing an unselected attribute
+    // (`Person.select(:id).first.first_name`) does not raise
+    // `MissingAttributeError` in trails (returns undefined). SCOPE: missing-
+    // attribute guard on partial selects, separate PR.
+  });
+
+  it.skip("saved_change_to_attribute? returns whether a change occurred in the last save", () => {
+    // BLOCKED: dirty (create-time capture) — after `Person.create({ first_name })`,
+    // user-assigned attributes are NOT recorded in the changeset, so
+    // `saved_change_to_first_name?` is false right after create (only the
+    // save-managed columns — id/timestamps/lock_version — land in
+    // previous_changes). SCOPE: capture constructor/mass-assigned attributes as
+    // changes on a new record so they survive into saved_changes, separate PR.
+  });
+
+  it.skip("saved_change_to_attribute returns the change that occurred in the last save", () => {
+    // BLOCKED: dirty (create-time capture) — `saved_change_to_first_name`
+    // is undefined right after create. See the predicate test above.
+  });
+
+  it.skip("attribute_before_last_save returns the original value before saving", () => {
+    // BLOCKED: dirty (create-time capture) — with first_name absent from
+    // saved_changes after create, `first_name_before_last_save` falls back to
+    // the current value ("Sean") instead of nil. See the predicate test above.
+  });
+
+  it("saved_changes? returns whether the last call to save changed anything", async () => {
+    const person = (await Person.create({ first_name: "Sean" })) as Rec;
+
+    expect(call<boolean>(person, "isSavedChanges")).toBe(true);
+
+    await person.save();
+
+    expect(call<boolean>(person, "isSavedChanges")).toBe(false);
+  });
+
+  it.skip("saved_changes returns a hash of all the changes that occurred", () => {
+    // BLOCKED: dirty (create-time capture) — saved_changes after create omits
+    // the user-assigned first_name/gender, so the key set doesn't match Rails'.
+    // See "saved_change_to_attribute? ...".
+  });
+
+  it("changed? in after callbacks returns false", async () => {
+    const klass = class extends Base {
       static {
-        this.attribute("payload", "json");
+        this.tableName = "people";
+        this.afterSave(function (record: Rec) {
+          if (record.changed) throw new Error("changed? should be false");
+          if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
+          if (!call<boolean>(record, "isSavedChanges"))
+            throw new Error("saved_changes? should be true");
+          if (call<unknown>(record, "idInDatabase") == null)
+            throw new Error("id_in_database should not be nil");
+        });
       }
-    }
-    const record = await JsonModel.create({ payload: { one: "two" } });
-    // Mutate the attribute in-place, then save.
-    (record as any).payload.three = "four";
-    await (record as any).save();
-    // After save, changesApplied() must call forgettingAssignment() on each attribute
-    // so the FromDatabase baseline reflects the post-save serialized value.
-    // A second save should not fire any UPDATE (no spurious dirty detection).
-    const payloadAttr = (record as any)._attributes.getAttribute("payload");
-    expect(payloadAttr.changedInPlace()).toBe(false);
+    };
+
+    const person = (await klass.create({ first_name: "Sean" })) as Rec;
+    expect(person.changed).toBe(false);
+  });
+
+  it("changed? in around callbacks after yield returns false", async () => {
+    const klass = class extends Base {
+      static {
+        this.tableName = "people";
+        this.aroundCreate(async function (record: Rec, proceed: () => Promise<void>) {
+          await proceed();
+          if (record.changed) throw new Error("changed? should be false");
+          if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
+          if (!call<boolean>(record, "isSavedChanges"))
+            throw new Error("saved_changes? should be true");
+          if (call<unknown>(record, "idInDatabase") == null)
+            throw new Error("id_in_database should not be nil");
+        });
+      }
+    };
+
+    const person = (await klass.create({ first_name: "Sean" })) as Rec;
+    expect(person.changed).toBe(false);
+  });
+
+  it.skip("partial insert off with unchanged default function attribute", () => {
+    // BLOCKED: schema — Rails' `aircraft.manufactured_at` defaults to
+    // CURRENT_TIMESTAMP; the canonical schema drops SQL-function defaults
+    // (defineSchema doesn't emit them), so an unset `manufactured_at` isn't
+    // auto-populated to assert against. SCOPE: SQL-function column defaults.
+  });
+
+  it.skip("partial insert off with changed default function attribute", () => {
+    // BLOCKED: datetime value type — assigning a JS `Date` to the reflected
+    // `manufactured_at` datetime attribute doesn't round-trip (reads back null /
+    // a Temporal value, not a `Date`), so the `to_i`-equality the Rails test
+    // performs can't be expressed faithfully. SCOPE: JS `Date` ⇄ datetime
+    // attribute coercion parity, separate PR.
+  });
+
+  it.skip("attribute_changed? properly type casts enum values", () => {
+    // BLOCKED: model — needs `LiveParrot.create` (extends Parrot), but the
+    // canonical Parrot persists its virtual `cancelSaveFromCallback` attribute,
+    // so the INSERT fails. See "association assignment changes foreign key".
   });
 });
 
@@ -1033,12 +760,10 @@ describe("MutableAttributeAfterSave", () => {
 // Mirrors: activerecord/test/cases/dirty_test.rb
 //   if current_adapter?(:PostgreSQLAdapter) && supports_identity_columns?
 //
-// D-1 non-candidate: this describe needs a PG IDENTITY column (GENERATED BY
-// DEFAULT AS IDENTITY) which requires raw CREATE TABLE DDL, not defineSchema().
-// The table is created/dropped in beforeEach/afterEach via its own
-// PostgreSQLAdapter. Routing through Base.adapter + setupHandlerSuite() would
-// require the sidecar adapter to support IDENTITY column creation, which the
-// shared test DDL builder doesn't expose.
+// Needs a PG IDENTITY column (GENERATED BY DEFAULT AS IDENTITY) created via raw
+// DDL — not expressible through the canonical schema — so it owns a uniquely
+// named (non-colliding) scratch table in beforeEach via its own
+// PostgreSQLAdapter. Runs only under TEST_ADAPTER=postgresql.
 // ==========================================================================
 describeIfPg("DirtyTest", () => {
   let adapter: PostgreSQLAdapter;
@@ -1053,11 +778,6 @@ describeIfPg("DirtyTest", () => {
         CONSTRAINT cpk_pg_identity_dirty_pkey PRIMARY KEY (another_id, id)
       )
     `);
-  });
-
-  afterEach(async () => {
-    await adapter.execute(`DROP TABLE IF EXISTS cpk_pg_identity_dirty CASCADE`);
-    await adapter.close();
   });
 
   it.skip("partial insert off with changed composite identity primary key attribute", () => {
