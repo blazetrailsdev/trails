@@ -22,11 +22,11 @@ inputs:
   pnpm-version:
     description: pnpm version. Hosted installs this; self-hosted asserts the preinstalled pnpm matches.
     required: false
-    default: "10.27.0"
+    default: "10.34.1"
   node-version:
     description: Node.js version for setup-node.
     required: false
-    default: "22"
+    default: "24"
   store-dir:
     description: pnpm store-dir on self-hosted runners. Must be inside the mounted persistent volume.
     required: false

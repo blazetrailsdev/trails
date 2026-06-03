@@ -5,14 +5,14 @@
 # `dokku ps:scale gh-runner runner=N`.
 #
 # Pinned toolchain matches `.github/workflows/ci.yml`:
-#   - Node 22 (matches `actions/setup-node@v4` with `node-version: 22`)
-#   - pnpm 10.27.0 (matches `pnpm/action-setup@v4` with `version: 10.27.0`)
+#   - Node 24 (matches `actions/setup-node@v4` with `node-version: 24`)
+#   - pnpm 10.34.1 (matches `pnpm/action-setup@v4` with `version: 10.34.1`)
 # Pre-installing both means jobs skip the install step entirely.
 FROM ubuntu:24.04
 
 ARG RUNNER_VERSION=2.334.0
-ARG NODE_MAJOR=22
-ARG PNPM_VERSION=10.27.0
+ARG NODE_MAJOR=24
+ARG PNPM_VERSION=10.34.1
 
 ENV DEBIAN_FRONTEND=noninteractive
 
