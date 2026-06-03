@@ -1,15 +1,12 @@
 /**
  * Parses a committed `db/schema.ts` into `IntrospectedTable[]` for the
- * `trails-models-dump` codegen path — the offline analogue of the live-DB
- * introspection pipeline (introspectTables + introspectPrimaryKey +
- * introspectColumns + introspectForeignKeys).
+ * `ar models:dump` codegen path.
  *
  * Why a sibling file (not `schema-ts-parser.ts`): that file is on the
  * `trails-tsc` typecheck barrel and must stay free of any
  * `@blazetrails/activerecord` value import. This file needs the real
  * `ForeignKeyDefinition` class (object literals are not assignable to the
- * class type), so the AR-runtime coupling is confined here, on the
- * `trails-models-dump` path that already depends on AR.
+ * class type), so the AR-runtime coupling is confined here.
  */
 
 import ts from "typescript";
