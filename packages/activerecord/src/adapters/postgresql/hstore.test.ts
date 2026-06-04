@@ -274,7 +274,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("parse7", async () => {
-      await assertCycle({ '"a': '"w' });
+      await assertCycle({ '"a': 'q"w' });
     });
 
     it("rewrite", async () => {
@@ -360,18 +360,18 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("hstore with serialized attributes", async () => {
       await HstoreWithSerialize.createBang({ tags: new TagCollection({ one: "two" }) });
-      const record = await HstoreWithSerialize.first();
+      const record = (await HstoreWithSerialize.first())!;
       expect(record.tags).toBeInstanceOf(TagCollection);
       expect((record.tags as TagCollection).toHash()).toEqual({ one: "two" });
       (record as any).tags = new TagCollection({ three: "four" });
       await (record as any).saveBang();
-      const reloaded = await HstoreWithSerialize.first();
+      const reloaded = (await HstoreWithSerialize.first())!;
       expect((reloaded.tags as TagCollection).toHash()).toEqual({ three: "four" });
     });
 
     it("clone hstore with serialized attributes", async () => {
       await HstoreWithSerialize.createBang({ tags: new TagCollection({ one: "two" }) });
-      const record = await HstoreWithSerialize.first();
+      const record = (await HstoreWithSerialize.first())!;
       const dupe = (record as any).dup();
       expect((dupe.tags as TagCollection).toHash()).toEqual({ one: "two" });
     });
