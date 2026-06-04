@@ -59,8 +59,7 @@ const call = <T>(recv: object, name: string): T => (recv as Record<string, () =>
 // recorded in `saved_changes` after an INSERT on PG, so `saved_changes?` /
 // `changed?` come back empty. They're gated with
 // `it.skipIf(adapterType === "postgres")` — the inline form `test:compare`'s
-// gate extractor recognizes — keeping SQLite/MySQL coverage. Tracked in
-// dirty-test-framework-gaps.md.
+// gate extractor recognizes — keeping SQLite/MySQL coverage.
 
 /** Mirrors Rails' private `with_partial_writes(klass, on = true)`. */
 async function withPartialWrites(
