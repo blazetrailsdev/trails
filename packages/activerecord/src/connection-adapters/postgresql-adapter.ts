@@ -5193,11 +5193,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Mirrors: PostgreSQLAdapter#retryable_query_error?
    * @internal
    */
-  isRetryableQueryError(_exception: unknown): boolean {
-    // Rails checks @raw_connection.transaction_status != PG::PQTRANS_INERROR.
-    // node-pg doesn't expose the PG transaction status byte, so we conservatively
-    // return true (same as the base class). Callers already guard on open_transactions.
-    return true;
+  isRetryableQueryError(exception: unknown): boolean {
+    // Rails additionally guards on `@raw_connection.transaction_status !=
+    // PG::PQTRANS_INERROR`. node-pg does not expose the PG transaction status
+    // byte, so that guard is omitted; the abstract predicate (Deadlocked |
+    // LockWaitTimeout) is still the authoritative gate.
+    return super.isRetryableQueryError(exception);
   }
 
   /**
