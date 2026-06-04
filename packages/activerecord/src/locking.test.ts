@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, StaleObjectError, ReadonlyAttributeError } from "./index.js";
-import { Associations } from "./associations.js";
+import { Associations, association } from "./associations.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -14,42 +14,24 @@ import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Person } from "./test-helpers/models/person.js";
 import { Frog } from "./test-helpers/models/frog.js";
+import { Treasure } from "./test-helpers/models/treasure.js";
 import { StringKeyObject } from "./test-helpers/models/string-key-object.js";
 import { LegacyThing } from "./test-helpers/models/legacy-thing.js";
 import { Reference } from "./test-helpers/models/reference.js";
 import { Ship } from "./test-helpers/models/ship.js";
-
-const TEST_SCHEMA = {
-  people: { name: "string", first_name: "string", lock_version: "integer", updated_at: "datetime" },
-  pets: { name: "string", person_id: "integer" },
-  references: { favorite: "boolean", lock_version: "integer" },
-  posts: { title: "string", lock_version: "integer" },
-  frogs: { name: "string" },
-  legacy_things: {
-    tps_report_number: { type: "integer" as const },
-    version: { type: "integer" as const, null: false, default: 0 },
-  },
-  lock_without_defaults: { title: "string", lock_version: "integer", updated_at: "datetime" },
-  lock_without_defaults_cust: { title: "string", custom_lock_version: "integer" },
-  string_key_objects: {
-    columns: {
-      id: { type: "string" as const, null: false },
-      name: "string" as const,
-      lock_version: { type: "integer" as const, default: 0 },
-    },
-    primaryKey: ["id"] as ["id"],
-  },
-} as const;
+import { LockWithoutDefault } from "./test-helpers/models/lock-without-default.js";
+import { LockWithCustomColumnWithoutDefault } from "./test-helpers/models/lock-with-custom-column-without-default.js";
 
 describe("OptimisticLockingTest", () => {
   // Mirrors Rails `fixtures :people, :legacy_things, :references,
-  // :string_key_objects`: seed the canonical rows and read them with the shared
-  // Person/LegacyThing/Reference/StringKeyObject models (Rails' `Person.find(1)`
-  // etc.) instead of constructing records inline. The bespoke `LockWithoutDefault*`
-  // (Rails declares these top-level, no fixtures) and `ReadonlyNameShip < Ship`
-  // tables are canonical too, so they come from the same canonical schema.
+  // :string_key_objects, :peoples_treasures`: seed the canonical rows and read
+  // them with the shared Person/LegacyThing/Reference/StringKeyObject models
+  // (Rails' `Person.find(1)` etc.) instead of constructing records inline. The
+  // bespoke `LockWithoutDefault*` (Rails declares these top-level, no fixtures)
+  // and `ReadonlyNameShip < Ship` tables are canonical too. Treasures are listed
+  // before peoples_treasures so their IDs are resolved first (ref ordering).
   const { people, stringKeyObjects, legacyThings, references } = useHandlerFixtures(
-    ["people", "stringKeyObjects", "legacyThings", "references"],
+    ["people", "stringKeyObjects", "legacyThings", "references", "treasures", "peoplesTreasures"],
     { schema: canonicalSchema },
   );
   beforeAll(async () => {
@@ -72,9 +54,12 @@ describe("OptimisticLockingTest", () => {
         ships: canonicalSchema.ships,
         lock_without_defaults: canonicalSchema.lock_without_defaults,
         lock_without_defaults_cust: canonicalSchema.lock_without_defaults_cust,
+        treasures: canonicalSchema.treasures,
+        peoples_treasures: canonicalSchema.peoples_treasures,
       },
       { dropExisting: true },
     );
+    registerModel(Treasure);
   });
 
   it("quote value passed lock col", async () => {
@@ -277,14 +262,6 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock without default sets version to zero", async () => {
-    class LockWithoutDefault extends Base {
-      static {
-        this._tableName = "lock_without_defaults";
-        this.attribute("title", "string");
-        this.attribute("lock_version", "integer");
-        this.attribute("updated_at", "datetime");
-      }
-    }
     const t1 = new LockWithoutDefault();
     expect(t1.lock_version).toBe(0);
     await t1.saveBang();
@@ -293,14 +270,6 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("touch existing lock without default should work with null in the database", async () => {
-    class LockWithoutDefault extends Base {
-      static {
-        this._tableName = "lock_without_defaults";
-        this.attribute("title", "string");
-        this.attribute("lock_version", "integer");
-        this.attribute("updated_at", "datetime");
-      }
-    }
     // Mirrors Rails: raw INSERT so lock_version and updated_at start as NULL in DB
     await Base.connection.executeMutation(
       "INSERT INTO lock_without_defaults(title) VALUES('title1')",
@@ -317,14 +286,6 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("touch stale object with lock without default", async () => {
-    class LockWithoutDefault extends Base {
-      static {
-        this._tableName = "lock_without_defaults";
-        this.attribute("title", "string");
-        this.attribute("lock_version", "integer");
-        this.attribute("updated_at", "datetime");
-      }
-    }
     const t1 = await LockWithoutDefault.create({ title: "title1" });
     const staleObject = await LockWithoutDefault.find(t1.id);
     await t1.update({ title: "title2" });
@@ -333,14 +294,6 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock without default should work with null in the database", async () => {
-    class LockWithoutDefault extends Base {
-      static {
-        this._tableName = "lock_without_defaults";
-        this.attribute("title", "string");
-        this.attribute("lock_version", "integer");
-        this.attribute("updated_at", "datetime");
-      }
-    }
     // Mirrors Rails: raw INSERT so lock_version starts as NULL in DB
     await Base.connection.executeMutation(
       "INSERT INTO lock_without_defaults(title) VALUES('title1')",
@@ -362,14 +315,6 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("update with lock version without default should work on dirty value before type cast", async () => {
-    class LockWithoutDefault extends Base {
-      static {
-        this._tableName = "lock_without_defaults";
-        this.attribute("title", "string");
-        this.attribute("lock_version", "integer");
-        this.attribute("updated_at", "datetime");
-      }
-    }
     // Mirrors Rails: raw INSERT so lock_version starts as NULL in DB
     await Base.connection.executeMutation(
       "INSERT INTO lock_without_defaults(title) VALUES('title1')",
@@ -387,14 +332,6 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("destroy with lock version without default should work on dirty value before type cast", async () => {
-    class LockWithoutDefault extends Base {
-      static {
-        this._tableName = "lock_without_defaults";
-        this.attribute("title", "string");
-        this.attribute("lock_version", "integer");
-        this.attribute("updated_at", "datetime");
-      }
-    }
     // Mirrors Rails: raw INSERT so lock_version starts as NULL in DB
     await Base.connection.executeMutation(
       "INSERT INTO lock_without_defaults(title) VALUES('title1')",
@@ -415,15 +352,7 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock with custom column without default sets version to zero", async () => {
-    class LockCustom extends Base {
-      static {
-        this._tableName = "lock_without_defaults_cust";
-        this.lockingColumn = "custom_lock_version";
-        this.attribute("title", "string");
-        this.attribute("custom_lock_version", "integer");
-      }
-    }
-    const t1 = new LockCustom();
+    const t1 = new LockWithCustomColumnWithoutDefault();
     expect(t1.custom_lock_version).toBe(0);
     await t1.saveBang();
     await t1.reload();
@@ -431,20 +360,12 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock with custom column without default should work with null in the database", async () => {
-    class LockCustom extends Base {
-      static {
-        this._tableName = "lock_without_defaults_cust";
-        this.lockingColumn = "custom_lock_version";
-        this.attribute("title", "string");
-        this.attribute("custom_lock_version", "integer");
-      }
-    }
     // Mirrors Rails: raw INSERT so custom_lock_version starts as NULL in DB
     await Base.connection.executeMutation(
       "INSERT INTO lock_without_defaults_cust(title) VALUES('title1')",
     );
-    const t1 = (await LockCustom.last())!;
-    const t2 = await LockCustom.find(t1.id);
+    const t1 = (await LockWithCustomColumnWithoutDefault.last())!;
+    const t2 = await LockWithCustomColumnWithoutDefault.find(t1.id);
     expect(t1.custom_lock_version).toBe(0);
     expect(t1.readAttributeBeforeTypeCast("custom_lock_version")).toBeNull();
     expect(t2.custom_lock_version).toBe(0);
@@ -500,19 +421,41 @@ describe("OptimisticLockingTest", () => {
   it.skip("polymorphic destroy with dependencies and lock version", () => {
     // BLOCKED: associations — polymorphic + locking not supported
   });
-  it.skip("removing has and belongs to many associations upon destroy", () => {
-    // BLOCKED: associations — habtm not supported
-  });
-
-  it("yaml dumping with lock column", async () => {
-    class LockWithoutDefault extends Base {
+  it("removing has and belongs to many associations upon destroy", async () => {
+    // RichPerson's async beforeValidation callbacks conflict with the sync
+    // validation chain, so we use a local class with the same HABTM.
+    class TestRichPerson extends Base {
       static {
-        this._tableName = "lock_without_defaults";
-        this.attribute("title", "string");
-        this.attribute("lock_version", "integer");
+        this._tableName = "people";
+        this.attribute("first_name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+        this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
       }
     }
+    registerModel("TestRichPerson", TestRichPerson);
+    Associations.hasAndBelongsToMany.call(TestRichPerson, "treasures", {
+      className: "Treasure",
+      joinTable: "peoples_treasures",
+      foreignKey: "rich_person_id",
+    });
+    const p = await TestRichPerson.createBang({ first_name: "Jon" });
+    const proxy = association(p, "treasures");
+    await proxy.create({});
+    expect(await proxy.isEmpty()).toBe(false);
+    await p.destroy();
+    // Rails clears the association cache on destroy; in TS the proxy cache is
+    // not invalidated automatically, so force a reload to mirror Rails' fresh-
+    // query behavior before asserting empty.
+    await proxy.reload();
+    expect(await proxy.isEmpty()).toBe(true);
+    const rows = await (Base.connection as any).selectRows(
+      `SELECT * FROM peoples_treasures WHERE rich_person_id = ${p.id}`,
+    );
+    expect(rows.length).toBe(0);
+  });
+
+  it("yaml dumping with lock column", async () => {
     const t1 = new LockWithoutDefault();
     const attrs = t1.attributes;
     const t2 = new LockWithoutDefault(attrs);
@@ -524,7 +467,15 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
+    await defineSchema(
+      {
+        people: canonicalSchema.people,
+        personal_legacy_things: canonicalSchema.personal_legacy_things,
+        lock_without_defaults: canonicalSchema.lock_without_defaults,
+        lock_without_defaults_cust: canonicalSchema.lock_without_defaults_cust,
+      },
+      { dropExisting: true },
+    );
   });
 
   it.skip("increment counter updates lock version", () => {
@@ -547,45 +498,41 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   it("destroy dependents", async () => {
+    // Mirrors Rails: Person with PersonalLegacyThing (dependent: :destroy).
+    // Uses inline classes to avoid counterCache on the canonical PersonalLegacyThing.
     class LockPerson extends Base {
       static {
         this._tableName = "people";
         this.attribute("first_name", "string");
         this.attribute("lock_version", "integer", { default: 0 });
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
       }
     }
-    class LockPet extends Base {
+    class LockPersonalLegacyThing extends Base {
       static {
-        this._tableName = "pets";
-        this.attribute("name", "string");
+        this._tableName = "personal_legacy_things";
+        this.lockingColumn = "version";
         this.attribute("person_id", "integer");
       }
     }
     registerModel("LockPerson", LockPerson);
-    registerModel("LockPet", LockPet);
-    Associations.hasMany.call(LockPerson, "lock_pets", {
-      className: "LockPet",
+    registerModel("LockPersonalLegacyThing", LockPersonalLegacyThing);
+    Associations.hasMany.call(LockPerson, "lockPersonalLegacyThings", {
+      className: "LockPersonalLegacyThing",
       foreignKey: "person_id",
       dependent: "destroy",
     });
     const p1 = await LockPerson.create({ first_name: "fjord" });
-    const t = await LockPet.create({ name: "Fido", person_id: p1.id });
+    const t = await LockPersonalLegacyThing.create({ person_id: p1.id });
     await p1.reload();
     await p1.destroy();
     expect(p1.isDestroyed()).toBe(true);
     await expect(LockPerson.find(p1.id)).rejects.toThrow();
-    await expect(LockPet.find(t.id)).rejects.toThrow();
+    await expect(LockPersonalLegacyThing.find(t.id)).rejects.toThrow();
   });
 
   it("destroy existing object with locking column value null in the database", async () => {
-    class LockWithoutDefault extends Base {
-      static {
-        this._tableName = "lock_without_defaults";
-        this.attribute("title", "string");
-        this.attribute("lock_version", "integer");
-        this.attribute("updated_at", "datetime");
-      }
-    }
     // Mirrors Rails: raw INSERT so lock_version starts as NULL in DB
     await Base.connection.executeMutation(
       "INSERT INTO lock_without_defaults(title) VALUES('title1')",
@@ -598,14 +545,6 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   it("destroy stale object", async () => {
-    class LockWithoutDefault extends Base {
-      static {
-        this._tableName = "lock_without_defaults";
-        this.attribute("title", "string");
-        this.attribute("lock_version", "integer");
-        this.attribute("updated_at", "datetime");
-      }
-    }
     const t1 = await LockWithoutDefault.create({ title: "title1" });
     const staleObject = await LockWithoutDefault.find(t1.id);
     await t1.update({ title: "title2" });
