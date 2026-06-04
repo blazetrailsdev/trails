@@ -26,7 +26,7 @@
 > per-file tracker is now **Part 2** of this doc (below the batch list).
 > This doc owns both the batch list (Part 1) and the per-file backlog table
 > (Part 2). Residual blocked/done gap items live in
-> [`activerecord-gaps.md`](activerecord-gaps.md).
+> [`activerecord-gaps.md`](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0005-activerecord-gaps).
 
 The api:compare scoreboard is **closed**. Everything below is post-100% Rails-fidelity work — test:compare un-skips driven by audit clusters plus accumulated fidelity polish. PRs target ~250 LOC (CLAUDE.md hard ceiling 500; range 220–280).
 
@@ -901,7 +901,7 @@ Distilled from `~/.btwhooks/data/github/blazetrailsdev/trails/<PR#>/post-pr/*.md
 ## See also
 
 - [`scripts/api-compare/unported-files.ts`](../scripts/api-compare/unported-files.ts) — canonical not-portable list.
-- [`activerecord-type-audit.md`](activerecord-type-audit.md) — supersedes the `as any` legacy-cast cleanup sweep.
+- [`activerecord-type-audit.md`](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0009-type-audit) — supersedes the `as any` legacy-cast cleanup sweep.
 
 ---
 
