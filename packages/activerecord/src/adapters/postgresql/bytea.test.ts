@@ -62,6 +62,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("type cast binary converts the encoding", () => {
+      // Rails: assert @column
+      expect(column).toBeDefined();
       // Rails: data = "\x8B"
       // Rails: assert_equal("ASCII-8BIT", @type.deserialize(data).encoding.name)
       // JS equivalent: deserializing a string returns a Uint8Array (binary, not a string)
