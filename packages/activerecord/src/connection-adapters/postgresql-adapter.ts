@@ -82,6 +82,8 @@ import {
   executeBatch as pgExecuteBatch,
   suppressCompositePrimaryKey,
   castResult,
+  performQuery,
+  handleWarnings,
 } from "./postgresql/database-statements.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./postgresql/schema-statements.js";
 import {
@@ -710,6 +712,25 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const result = (rows[0]?.can_lower as boolean) === true;
     this._caseInsensitiveCache.set(sqlType, result);
     return result;
+  }
+
+  /**
+   * Mirrors: AbstractAdapter#with_raw_connection
+   */
+  override async withRawConnection<T>(
+    optsOrCallback:
+      | { allowRetry?: boolean; materializeTransactions?: boolean }
+      | ((raw: AbstractAdapter | null) => T | Promise<T>),
+    callback?: (raw: AbstractAdapter | null) => T | Promise<T>,
+  ): Promise<T> {
+    const isFn = typeof optsOrCallback === "function";
+    const opts = (isFn ? {} : (optsOrCallback ?? {})) as {
+      materializeTransactions?: boolean;
+    };
+    const block = (isFn ? optsOrCallback : callback) as unknown as (raw: pg.Client) => Promise<T>;
+    if (typeof block !== "function") throw new TypeError("withRawConnection requires a callback");
+    if (opts.materializeTransactions !== false) await this.materializeTransactions();
+    return this.withClient(block);
   }
 
   /**
@@ -5557,6 +5578,10 @@ const FORMAT_TYPE_ALIASES: Record<string, string> = {
   "time with time zone": "timetz",
   boolean: "bool",
 };
+
+(PostgreSQLAdapter.prototype as any).performQuery = performQuery;
+(PostgreSQLAdapter.prototype as any).castResult = castResult;
+(PostgreSQLAdapter.prototype as any).handleWarnings = handleWarnings;
 
 // `executeMutation` is this adapter's write/DDL primitive (reads go through the
 // overridden `execQuery`), so dirtying it clears the query cache on writes and
