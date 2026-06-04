@@ -1000,25 +1000,26 @@ export class SchemaStatements {
   }
 
   async viewExists(viewName: string): Promise<boolean> {
-    let rows: Record<string, unknown>[];
-    switch (this.adapterName) {
-      case "sqlite":
-        rows = await this.adapter.execute(
-          `SELECT name FROM sqlite_master WHERE type='view' AND name='${viewName}'`,
-        );
-        break;
-      case "postgres":
-        rows = await this.adapter.execute(
-          `SELECT 1 FROM pg_views WHERE schemaname = 'public' AND viewname = '${viewName}' LIMIT 1`,
-        );
-        break;
-      case "mysql":
-        rows = await this.adapter.execute(
-          `SELECT 1 FROM information_schema.views WHERE table_schema = DATABASE() AND table_name = '${viewName}' LIMIT 1`,
-        );
-        break;
+    // Mirrors Rails:
+    //   query_values(data_source_sql(view_name, type: "VIEW"), "SCHEMA").any?
+    //     if view_name.present?
+    //   rescue NotImplementedError
+    //     views.include?(view_name.to_s)
+    //
+    // present? covers blank strings including whitespace-only.
+    // dataSourceSql dispatches through this.adapter so PG's override fires;
+    // MySQL/SQLite don't override → NotImplementedError → views() fallback.
+    if (!viewName || viewName.trim().length === 0) return false;
+    try {
+      const sql = (this.adapter as any).dataSourceSql(viewName, { type: "VIEW" });
+      const rows = await this.adapter.execute(sql);
+      return rows.length > 0;
+    } catch (e) {
+      if (e instanceof NotImplementedError) {
+        return (await this.views()).includes(viewName);
+      }
+      throw e;
     }
-    return rows.length > 0;
   }
 
   async indexExists(
