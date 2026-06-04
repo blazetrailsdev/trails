@@ -1,253 +1,130 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/bytea_test.rb
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import pg from "pg";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { Bytea } from "../../connection-adapters/postgresql/oid/bytea.js";
-import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
 import { Base } from "../../index.js";
+import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
-
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
-
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
+// Rails: class ByteaDataType < ActiveRecord::Base
+//   self.table_name = "bytea_data_type"
+class ByteaDataType extends Base {
+  static {
+    this.tableName = "bytea_data_type";
+  }
+}
 
 describeIfPg("PostgreSQLAdapter", () => {
-  let adapter: PostgreSQLAdapter;
-  beforeAll(async () => {
-    adapter = Base.connection as PostgreSQLAdapter;
-    await adapter.exec(`DROP TABLE IF EXISTS bytea_data_type`);
-    await defineSchema({
-      bytea_data_type: { payload: "binary", serialized: "binary" },
+  setupHandlerSuite();
+
+  let connection: PostgreSQLAdapter;
+  let column: PgColumn;
+  let type: any;
+
+  beforeEach(async () => {
+    // Rails: @connection = ActiveRecord::Base.lease_connection
+    connection = Base.connection as PostgreSQLAdapter;
+    // Rails: @connection.transaction { @connection.create_table("bytea_data_type") { |t| ... } }
+    await connection.createTable("bytea_data_type", (t) => {
+      t.binary("payload");
+      t.binary("serialized");
     });
+    ByteaDataType.resetColumnInformation();
+    await ByteaDataType.loadSchema();
+    // Rails: @column = ByteaDataType.columns_hash["payload"]
+    column = ByteaDataType.columnsHash()["payload"] as unknown as PgColumn;
+    // Rails: @type = ByteaDataType.type_for_attribute("payload")
+    type = ByteaDataType.typeForAttribute("payload");
   });
-  afterAll(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS bytea_data_type`);
+
+  afterEach(async () => {
+    // Rails: @connection.drop_table "bytea_data_type", if_exists: true
+    await connection.dropTable("bytea_data_type", { ifExists: true });
+    ByteaDataType.resetColumnInformation();
   });
+
   describe("PostgresqlByteaTest", () => {
-    it("column", async () => {
-      class ByteaDataType extends Base {
-        static tableName = "bytea_data_type";
-      }
-      await ByteaDataType.loadSchema();
-      const col = ByteaDataType.columnsHash()["payload"];
-      expect(col).toBeDefined();
-      // Rails: @column.type == :binary. Our Column.type returns sqlType ("bytea") first.
-      // The AR type name ("binary") is in sqlTypeMetadata.type but not the primary getter.
-      expect(col.sqlType).toBe("bytea");
-    });
-
-    it("default", async () => {
-      class ByteaDataType extends Base {
-        static tableName = "bytea_data_type";
-      }
-      await ByteaDataType.loadSchema();
-      const col = ByteaDataType.columnsHash()["payload"];
-      expect(col).toBeDefined();
-      expect(col.default ?? null).toBeNull();
-    });
-
-    it.skip("type cast binary column", async () => {
-      // BLOCKED: adapter-pg — no test body — Rails checks column.type == :binary and
-      // typeForAttribute returns the Bytea OID subclass. columns() now
-      // batch-loads all OIDs via loadAdditionalTypes before building Column
-      // objects, so OID 17 is registered as Bytea in the type map and
-      // typeForAttribute("payload") returns Bytea after loadSchema().
-      // SCOPE: ~5 LOC to implement the test body; nothing blocking the impl.
-    });
-
-    it("type cast bytea", () => {
-      const type = new Bytea();
-      const result = type.deserialize("\\x1f8b");
-      expect(result).toBeInstanceOf(Uint8Array);
-      expect(Array.from(result as Uint8Array)).toEqual([0x1f, 0x8b]);
-    });
-
-    it("type cast bytea empty string", () => {
-      const type = new Bytea();
-      const result = type.deserialize("\\x");
-      expect(result).toBeInstanceOf(Uint8Array);
-      expect((result as Uint8Array).length).toBe(0);
-    });
-
-    it("type cast bytea nil", () => {
-      const type = new Bytea();
-      expect(type.deserialize(null)).toBeNull();
-    });
-
-    it("write and read", async () => {
-      class ByteaDataType extends Base {
-        static tableName = "bytea_data_type";
-      }
-      await ByteaDataType.loadSchema();
-      const data = Buffer.from([0x1f, 0x8b]);
-      const record = await (ByteaDataType as any).create({ payload: data });
-      expect((record as any).isNewRecord()).toBe(false);
-      const reloaded = await ByteaDataType.find((record as any).id);
-      expect((reloaded as any).payload instanceof Uint8Array).toBe(true);
-      expect(Buffer.from((reloaded as any).payload as Uint8Array)).toEqual(data);
-
-      // Also exercise the UPDATE path (binary quoting in _performUpdate)
-      const updated = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
-      await (reloaded as any).update({ payload: updated });
-      const reloaded2 = await ByteaDataType.find((record as any).id);
-      expect(Buffer.from((reloaded2 as any).payload as Uint8Array)).toEqual(updated);
-    });
-
-    it.skip("write and read with url safe base64", async () => {
-      // BLOCKED: adapter-pg — URL-safe base64 round-trip for bytea
-      // ROOT-CAUSE: Bytea OID only handles hex (\x...) and octal-escape PG wire formats;
-      // URL-safe base64 encoding requires explicit encode/decode wiring in Bytea or a
-      // higher-level serializer. Rails doesn't implement this directly; this is a custom test.
-      // SCOPE: ~30 LOC in bytea.ts + test; no Rails source to mirror.
-    });
-
-    it("write nothing", async () => {
-      class ByteaDataType extends Base {
-        static tableName = "bytea_data_type";
-      }
-      await ByteaDataType.loadSchema();
-      const record = await (ByteaDataType as any).create({});
-      expect((record as any).isNewRecord()).toBe(false);
-      expect((record as any).payload).toBeNull();
-    });
-
-    it("write nil", async () => {
-      class ByteaDataType extends Base {
-        static tableName = "bytea_data_type";
-      }
-      await ByteaDataType.loadSchema();
-      const record = await (ByteaDataType as any).create({ payload: null });
-      expect((record as any).isNewRecord()).toBe(false);
-      expect((record as any).payload).toBeNull();
-      const reloaded = await ByteaDataType.find((record as any).id);
-      expect((reloaded as any).payload).toBeNull();
-    });
-
-    it("write empty string", async () => {
-      class ByteaDataType extends Base {
-        static tableName = "bytea_data_type";
-      }
-      await ByteaDataType.loadSchema();
-      const record = await (ByteaDataType as any).create({ payload: Buffer.alloc(0) });
-      expect((record as any).isNewRecord()).toBe(false);
-      const reloaded = await ByteaDataType.find((record as any).id);
-      const payload = (reloaded as any).payload as Buffer | null;
-      expect(payload != null && (payload as Uint8Array).length === 0).toBe(true);
-    });
-
-    it.skip("write with hex format", async () => {
-      // BLOCKED: adapter-pg — raw hex-format bytea insert via adapter.execute
-      // ROOT-CAUSE: adapter.execute parameterized binding sends Buffer as bytea but
-      // raw SQL hex literal insert (E'\\xDEAD') requires server_encoding match;
-      // the pg node driver handles parameterized bytea but not raw hex literals in
-      // $1 placeholders without explicit ::bytea cast. Not a type-system gap but a
-      // wire-protocol edge case.
-      // SCOPE: ~10 LOC test-only; no impl change needed.
-    });
-
-    it.skip("write with escape format", async () => {
-      // BLOCKED: adapter-pg — raw octal-escape bytea insert via adapter.execute
-      // ROOT-CAUSE: same as "write with hex format" — octal-escaped bytea literals
-      // (E'\\001\\002') require standard_conforming_strings=on or SET escape_string_warning;
-      // interacts with session-level PG settings. Not wired.
-      // SCOPE: ~15 LOC test-only + session config; no impl change needed.
-    });
-
-    it.skip("write via fixture", async () => {
-      // BLOCKED: adapter-pg — fixture framework not implemented
-      // ROOT-CAUSE: ActiveRecord fixture loading (fixtures :bytea_data_type) requires
-      // the fixture infrastructure (YAML loading, transactional fixture setup) which
-      // is not yet ported to the TS adapter layer.
-      // SCOPE: fixture loading is a separate multi-PR effort.
+    it("column", () => {
+      // Rails: assert @column.is_a?(ActiveRecord::ConnectionAdapters::PostgreSQLColumn)
+      expect(column).toBeInstanceOf(PgColumn);
+      // Rails: assert_equal :binary, @column.type
+      expect(column.type).toBe("binary");
     });
 
     it("binary columns are limitless the upper limit is one GB", () => {
-      expect(adapter.typeToSql("binary", { limit: 100_000 })).toBe("bytea");
-      expect(() => adapter.typeToSql("binary", { limit: 4_294_967_295 })).toThrow();
+      // Rails: assert_equal "bytea", @connection.type_to_sql(:binary, limit: 100_000)
+      expect(connection.typeToSql("binary", { limit: 100_000 })).toBe("bytea");
+      // Rails: assert_raise ArgumentError { @connection.type_to_sql(:binary, limit: 4294967295) }
+      expect(() => connection.typeToSql("binary", { limit: 4_294_967_295 })).toThrow();
     });
 
     it("type cast binary converts the encoding", () => {
-      const type = new Bytea();
-      // In Ruby this checks ASCII-8BIT encoding; in JS, the equivalent is
-      // that deserializing a binary string returns a Buffer/Uint8Array,
-      // not a string.
+      // Rails: data = "\x8B"
+      // Rails: assert_equal("ASCII-8BIT", @type.deserialize(data).encoding.name)
+      // JS equivalent: deserializing a string returns a Uint8Array (binary, not a string)
       const data = "\x8B";
       const result = type.deserialize(data);
-      expect(result instanceof Uint8Array).toBe(true);
+      expect(result).toBeInstanceOf(Uint8Array);
     });
 
     it("type cast binary value", () => {
-      const type = new Bytea();
+      // Rails: data = (+"\x8B").force_encoding("BINARY")
+      // Rails: assert_equal(data, @type.deserialize(data))
       const data = Buffer.from([0x1f, 0x8b]);
       const result = type.deserialize(data);
-      expect(result instanceof Uint8Array).toBe(true);
+      expect(result).toBeInstanceOf(Uint8Array);
       expect(Buffer.from(result as Uint8Array)).toEqual(data);
     });
 
     it("type case nil", () => {
-      const type = new Bytea();
+      // Rails: assert_nil(@type.deserialize(nil))
       expect(type.deserialize(null)).toBeNull();
     });
 
     it("read value", async () => {
-      class ByteaDataType extends Base {
-        static tableName = "bytea_data_type";
-      }
-      await ByteaDataType.loadSchema();
+      // Rails: data = ""
+      // Rails: @connection.execute "insert into bytea_data_type (payload) VALUES ('#{data}')"
       const data = Buffer.from([0x1f]);
-      await adapter.execute(`INSERT INTO bytea_data_type (payload) VALUES ($1)`, [data]);
+      await connection.execute(`INSERT INTO bytea_data_type (payload) VALUES ($1)`, [data]);
+      // Rails: record = ByteaDataType.first
       const record = await (ByteaDataType as any).first();
-      expect((record as any).payload instanceof Uint8Array).toBe(true);
+      // Rails: assert_equal(data, record.payload)
+      expect((record as any).payload).toBeInstanceOf(Uint8Array);
       expect(Buffer.from((record as any).payload as Uint8Array)).toEqual(data);
     });
 
     it("read nil value", async () => {
-      class ByteaDataType extends Base {
-        static tableName = "bytea_data_type";
-      }
-      await ByteaDataType.loadSchema();
-      await adapter.execute(`INSERT INTO bytea_data_type (payload) VALUES (null)`);
+      // Rails: @connection.execute "insert into bytea_data_type (payload) VALUES (null)"
+      await connection.execute(`INSERT INTO bytea_data_type (payload) VALUES (null)`);
+      // Rails: record = ByteaDataType.first
       const record = await (ByteaDataType as any).first();
+      // Rails: assert_nil(record.payload)
       expect((record as any).payload).toBeNull();
     });
 
     it("write value", async () => {
-      class ByteaDataType extends Base {
-        static tableName = "bytea_data_type";
-      }
-      await ByteaDataType.loadSchema();
+      // Rails: data = ""
       const data = Buffer.from([0x1f]);
+      // Rails: record = ByteaDataType.create(payload: data)
       const record = await (ByteaDataType as any).create({ payload: data });
+      // Rails: assert_not_predicate record, :new_record?
       expect((record as any).isNewRecord()).toBe(false);
-      expect((record as any).payload instanceof Uint8Array).toBe(true);
+      // Rails: assert_equal(data, record.payload)
+      expect((record as any).payload).toBeInstanceOf(Uint8Array);
       expect(Buffer.from((record as any).payload as Uint8Array)).toEqual(data);
     });
 
-    // Mirrors Rails' test_via_to_sql body; the "complicating connection" test
-    // re-runs it after another session disables standard_conforming_strings.
+    // Rails: re-used by test_via_to_sql and test_via_to_sql_with_complicating_connection
     async function runViaToSql(): Promise<void> {
-      class ByteaDataType extends Base {
-        static tableName = "bytea_data_type";
-      }
-      await ByteaDataType.loadSchema();
-      // Rails data = "'\\" — a quote, a unit-separator, and a backslash:
-      // bytes chosen to stress SQL-literal quoting of bytea.
+      // Rails: data = "'\\"
       const data = Buffer.from([0x27, 0x1f, 0x5c]);
       await (ByteaDataType as any).create({ payload: data });
       const sql = (ByteaDataType as any).where({ payload: data }).select("payload").toSql();
-      const result = (await adapter.execute(sql)) as Array<{ payload: Uint8Array }>;
-      // Rails asserts [[data]] — a single row whose payload round-trips to data.
+      const result = (await connection.execute(sql)) as Array<{ payload: Uint8Array }>;
+      // Rails: assert_equal([[data]], result)
       expect(result.length).toBe(1);
       expect(Buffer.from(result[0].payload)).toEqual(data);
     }
@@ -257,15 +134,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("via to sql with complicating connection", async () => {
-      // Rails sets these flags on a SEPARATE thread-leased connection, never on
-      // the @connection that builds/runs the query — PG's escape_bytea reads the
-      // *query* connection's standard_conforming_strings, so the off-settings are
-      // deliberately isolated from the connection under test. We mirror that: the
-      // flags go on a throwaway connection that is closed before runViaToSql, so
-      // the main `adapter` connection's quoting is what's exercised. Do NOT "fix"
-      // this by SET-ing the main connection — that would test a scenario Rails
-      // specifically avoids. The guard proves our hex `\x` bytea literals are
-      // immune to another session's string settings either way.
+      // Rails: Thread.new { other_conn = ...; SET standard_conforming_strings = off; ... }.join
       const other = new pg.Client({ connectionString: PG_TEST_URL });
       await other.connect();
       try {
@@ -278,33 +147,48 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write binary", async () => {
-      class ByteaDataType extends Base {
-        static tableName = "bytea_data_type";
-      }
-      await ByteaDataType.loadSchema();
-      // Round-trip all byte values 0x00–0xFF — none should be corrupted.
+      // Rails: data = File.read(File.join(__dir__, "..", "..", "..", "assets", "example.log"))
+      // Rails: assert(data.size > 1)
+      // JS: round-trip all byte values 0x00–0xFF (same intent, no file dependency)
       const data = Buffer.from(Array.from({ length: 256 }, (_, i) => i));
+      expect(data.length).toBeGreaterThan(1);
+      // Rails: record = ByteaDataType.create(payload: data)
       const record = await (ByteaDataType as any).create({ payload: data });
+      // Rails: assert_not_predicate record, :new_record?
+      expect((record as any).isNewRecord()).toBe(false);
+      // Rails: assert_equal(data, record.payload)
+      expect(Buffer.from((record as any).payload as Uint8Array)).toEqual(data);
+      // Rails: assert_equal(data, ByteaDataType.where(id: record.id).first.payload)
       const reloaded = await ByteaDataType.find((record as any).id);
       expect(Buffer.from((reloaded as any).payload as Uint8Array)).toEqual(data);
     });
 
+    it("write nil", async () => {
+      // Rails: record = ByteaDataType.create(payload: nil)
+      const record = await (ByteaDataType as any).create({ payload: null });
+      // Rails: assert_not_predicate record, :new_record?
+      expect((record as any).isNewRecord()).toBe(false);
+      // Rails: assert_nil(record.payload)
+      expect((record as any).payload).toBeNull();
+      // Rails: assert_nil(ByteaDataType.where(id: record.id).first.payload)
+      const reloaded = await ByteaDataType.find((record as any).id);
+      expect((reloaded as any).payload).toBeNull();
+    });
+
     it.skip("serialize", () => {
-      // BLOCKED: binary-subtype coder bridge (follow-up to the general serialize
-      // write-path). Base.serialize now decorates the cast type with
-      // Type::Serialized (dump-on-write works for json/array/hash — verified on
-      // SQLite + PG array/hstore). What remains is bytea-specific: on read,
-      // Bytea#deserialize yields a Uint8Array, but the JSON coder's load() needs
-      // a string, so Type::Serialized#deserialize must bridge binary Buffer→string
-      // for binary subtypes (Rails' Binary#deserialize returns a String). That
-      // bridge interacts with encryption's deliberate binary handling
-      // (encrypted-attribute-type.ts), so it's split out to avoid coupling.
-      // SCOPE: ~15 LOC binary bridge in type/serialized.ts + this test body.
+      // BLOCKED: binary-subtype coder bridge
+      // Rails: klass = Class.new(ByteaDataType) { serialize :serialized, coder: Serializer.new }
+      // On read, Bytea#deserialize yields a Uint8Array, but coder.load() needs a string.
+      // Type::Serialized#deserialize must bridge binary Buffer→string for binary subtypes.
+      // SCOPE: ~15 LOC binary bridge in type/serialized.ts.
     });
 
     it("schema dumping", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "bytea_data_type");
+      // Rails: output = dump_table_schema("bytea_data_type")
+      const output = await SchemaDumper.dumpTableSchema(connection, "bytea_data_type");
+      // Rails: assert_match %r{t\.binary\s+"payload"$}, output
       expect(output).toMatch(/t\.binary\s*\("payload"\)/);
+      // Rails: assert_match %r{t\.binary\s+"serialized"$}, output
       expect(output).toMatch(/t\.binary\s*\("serialized"\)/);
     });
   });
