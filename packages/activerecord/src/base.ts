@@ -1732,13 +1732,18 @@ export class Base extends Model {
     if (!methodName.startsWith("findBy")) return false;
     const attrPart = methodName.slice(6); // remove "findBy"
     if (!attrPart) return false;
-    // Convert camelCase to snake_case: findByFirstName → first_name
-    const attr = attrPart
+    // Convert camelCase suffix to snake_case: TitleAndAuthorName → title_and_author_name
+    const snakePart = attrPart
       .replace(/^./, (c) => c.toLowerCase())
       .replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-    if (this._attributeDefinitions.has(attr)) return true;
+    // Split on "_and_" like Rails' DynamicFinder#attribute_names
+    const attrNames = snakePart.split("_and_");
     const aliases = (this as any)._attributeAliases as Record<string, string> | undefined;
-    return !!aliases && Object.prototype.hasOwnProperty.call(aliases, attr);
+    // Rails: resolve each name through attribute_aliases, then validate against columns_hash
+    return attrNames.every((name) => {
+      const resolved = aliases?.[name] ?? name;
+      return this._attributeDefinitions.has(resolved);
+    });
   }
 
   /**

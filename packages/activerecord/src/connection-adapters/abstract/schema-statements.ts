@@ -1000,28 +1000,11 @@ export class SchemaStatements {
   }
 
   async viewExists(viewName: string): Promise<boolean> {
-    let rows: Record<string, unknown>[];
-    // Use the adapter's quote() to produce a properly escaped SQL string
-    // literal — mirrors Rails' quoted_scope which calls quote_string(name).
-    const quotedName = quote(viewName);
-    switch (this.adapterName) {
-      case "sqlite":
-        rows = await this.adapter.execute(
-          `SELECT name FROM sqlite_master WHERE type='view' AND name=${quotedName}`,
-        );
-        break;
-      case "postgres":
-        rows = await this.adapter.execute(
-          `SELECT 1 FROM pg_views WHERE schemaname = 'public' AND viewname = ${quotedName} LIMIT 1`,
-        );
-        break;
-      case "mysql":
-        rows = await this.adapter.execute(
-          `SELECT 1 FROM information_schema.views WHERE table_schema = DATABASE() AND table_name = ${quotedName} LIMIT 1`,
-        );
-        break;
-    }
-    return rows.length > 0;
+    // Mirrors Rails' abstract fallback: `views.include?(view_name.to_s)`.
+    // Rails' primary path (data_source_sql) is adapter-specific; each
+    // adapter already implements a correct views() — delegate through that.
+    const allViews = await this.views();
+    return allViews.includes(viewName);
   }
 
   async indexExists(
