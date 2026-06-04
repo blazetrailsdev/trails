@@ -24,13 +24,14 @@ import { LockWithCustomColumnWithoutDefault } from "./test-helpers/models/lock-w
 
 describe("OptimisticLockingTest", () => {
   // Mirrors Rails `fixtures :people, :legacy_things, :references,
-  // :string_key_objects`: seed the canonical rows and read them with the shared
-  // Person/LegacyThing/Reference/StringKeyObject models (Rails' `Person.find(1)`
-  // etc.) instead of constructing records inline. The bespoke `LockWithoutDefault*`
-  // (Rails declares these top-level, no fixtures) and `ReadonlyNameShip < Ship`
-  // tables are canonical too, so they come from the same canonical schema.
+  // :string_key_objects, :peoples_treasures`: seed the canonical rows and read
+  // them with the shared Person/LegacyThing/Reference/StringKeyObject models
+  // (Rails' `Person.find(1)` etc.) instead of constructing records inline. The
+  // bespoke `LockWithoutDefault*` (Rails declares these top-level, no fixtures)
+  // and `ReadonlyNameShip < Ship` tables are canonical too. Treasures are listed
+  // before peoples_treasures so their IDs are resolved first (ref ordering).
   const { people, stringKeyObjects, legacyThings, references } = useHandlerFixtures(
-    ["people", "stringKeyObjects", "legacyThings", "references"],
+    ["people", "stringKeyObjects", "legacyThings", "references", "treasures", "peoplesTreasures"],
     { schema: canonicalSchema },
   );
   beforeAll(async () => {
@@ -443,6 +444,11 @@ describe("OptimisticLockingTest", () => {
     await proxy.create({});
     expect(await proxy.isEmpty()).toBe(false);
     await p.destroy();
+    // Rails clears the association cache on destroy; in TS the proxy cache is
+    // not invalidated automatically, so force a reload to mirror Rails' fresh-
+    // query behavior before asserting empty.
+    await proxy.reload();
+    expect(await proxy.isEmpty()).toBe(true);
     const rows = await (Base.connection as any).selectRows(
       `SELECT * FROM peoples_treasures WHERE rich_person_id = ${p.id}`,
     );
