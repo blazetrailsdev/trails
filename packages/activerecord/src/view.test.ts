@@ -205,7 +205,9 @@ describe("UpdateableViewTest", () => {
     expect((newBook as any).name).toBe("Rails in Action");
   });
 
-  it.skipIf(adapterType === "sqlite")("insert record populates primary key", async () => {
+  // Rails: only runs on PostgreSQL (and SQLite) with supports_insert_returning?.
+  // The outer UpdateableViewTest block already excludes SQLite, leaving PG only.
+  it.skipIf(adapterType !== "postgres")("insert record populates primary key", async () => {
     const book = await PrintedBook.create({
       name: "Rails in Action",
       status: 0,
