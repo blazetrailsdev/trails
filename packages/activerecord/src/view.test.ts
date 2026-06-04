@@ -13,7 +13,6 @@ import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
-import { quoteTableName } from "./connection-adapters/abstract/quoting.js";
 
 // In Rails, AbstractAdapter includes SchemaStatements, so introspection
 // methods (views, viewExists, tableExists, isDataSourceExists) live directly
@@ -24,12 +23,14 @@ function conn(): AbstractAdapter {
 
 // Rails view tests create/drop views with raw execute, not schema statement
 // helpers (create_view / drop_view don't exist in the vendored Rails source).
+// Use conn().quoteTableName so the adapter's own quoting is used (backticks on
+// MySQL, double-quotes on PG/SQLite) — mirrors Rails' quote_table_name(name).
 async function createView(name: string, sql: string): Promise<void> {
-  await conn().executeMutation(`CREATE VIEW ${quoteTableName(name)} AS ${sql}`);
+  await conn().executeMutation(`CREATE VIEW ${conn().quoteTableName(name)} AS ${sql}`);
 }
 async function dropView(name: string): Promise<void> {
   if (await conn().viewExists(name)) {
-    await conn().executeMutation(`DROP VIEW ${quoteTableName(name)}`);
+    await conn().executeMutation(`DROP VIEW ${conn().quoteTableName(name)}`);
   }
 }
 
