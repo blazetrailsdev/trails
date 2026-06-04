@@ -13,6 +13,7 @@ import type { ExplainOption } from "./abstract/database-statements.js";
 import type { SQLite3AdapterOptions } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
+import { dataSourceSql as sqliteDataSourceSql } from "./sqlite3/schema-statements.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -1339,6 +1340,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       "SCHEMA",
     )) as Array<{ name: string }>;
     return rows.map((r) => r.name);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#data_source_sql
+   *
+   * Wired onto the adapter so SchemaStatements#viewExists dispatches here
+   * (via this.adapter.dataSourceSql) instead of hitting the abstract
+   * NotImplementedError stub. The helper uses (name, type) positional args;
+   * we translate the Rails-shaped { type } options object here.
+   *
+   * @internal
+   */
+  dataSourceSql(name?: string | null, options: { type?: string } = {}): string {
+    return sqliteDataSourceSql(name ?? undefined, options.type);
   }
 
   /**

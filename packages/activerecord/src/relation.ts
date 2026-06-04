@@ -11,6 +11,7 @@ import {
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import { ConnectionNotEstablished, RecordNotSaved, RecordNotUnique } from "./errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
 import { disallowRawSqlBang } from "./sanitization.js";
 import { sanitizeAsSqlComment } from "./connection-adapters/abstract/quoting.js";
@@ -898,6 +899,12 @@ export class Relation<T extends Base> {
   select(fn: (record: T) => boolean): Promise<T[]>;
   select(...columns: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T>;
   select(...args: any[]): Relation<T> | Promise<T[]> {
+    if (args.length === 0) {
+      throw new ArgumentError("Call `select' with at least one field.");
+    }
+    if (args.length > 1 && typeof args[args.length - 1] === "function") {
+      throw new ArgumentError("`select' with block doesn't take arguments.");
+    }
     if (args.length === 1 && typeof args[0] === "function") {
       return this.toArray().then((records) => records.filter(args[0]));
     }
