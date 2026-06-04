@@ -2,12 +2,16 @@
  * Mirrors: activerecord/test/cases/errors_test.rb
  *
  * Faithful port of Rails' ErrorsTest — one test, no database, no fixtures,
- * no inline `class extends Base`. Enumerates every exported ActiveRecordError
- * subclass and asserts each can be constructed with no arguments.
+ * no inline `class extends Base`. Enumerates every implemented exported
+ * ActiveRecordError subclass and asserts each can be constructed with no
+ * arguments. Two Rails classes (TableNotSpecified,
+ * AsynchronousQueryInsideTransactionError) are not yet implemented and are
+ * therefore absent from the list.
  *
- * AmbiguousSourceReflectionForThroughAssociation is excluded because its
- * constructor calls sources.join() which throws when sources is undefined —
- * matching Rails' exclusion of the same class for the same reason.
+ * AmbiguousSourceReflectionForThroughAssociation is excluded (same exclusion
+ * as Rails). In Rails the no-arg constructor raises ArgumentError (wrong number
+ * of arguments); in TS it raises TypeError (sources.join is not a function).
+ * Different mechanism, same observable outcome: construction fails.
  */
 import { describe, it } from "vitest";
 import {
@@ -82,7 +86,6 @@ import {
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
   HasOneThroughCantAssociateThroughHasOneOrManyReflection,
   CompositePrimaryKeyMismatchError,
-  AmbiguousSourceReflectionForThroughAssociation,
   ThroughNestedAssociationsAreReadonly,
   HasManyThroughNestedAssociationsAreReadonly,
   HasOneThroughNestedAssociationsAreReadonly,
@@ -165,7 +168,6 @@ describe("ErrorsTest", () => {
       HasManyThroughCantAssociateThroughHasOneOrManyReflection,
       HasOneThroughCantAssociateThroughHasOneOrManyReflection,
       CompositePrimaryKeyMismatchError,
-      AmbiguousSourceReflectionForThroughAssociation,
       ThroughNestedAssociationsAreReadonly,
       HasManyThroughNestedAssociationsAreReadonly,
       HasOneThroughNestedAssociationsAreReadonly,
@@ -173,9 +175,7 @@ describe("ErrorsTest", () => {
       DeleteRestrictionError,
       TooManyRecords,
     ];
-    const excluded = [AmbiguousSourceReflectionForThroughAssociation];
     for (const errorKlass of errorKlasses) {
-      if (excluded.includes(errorKlass as any)) continue;
       try {
         new (errorKlass as any)();
       } catch {

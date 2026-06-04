@@ -820,8 +820,13 @@ describe("FinderTest", () => {
     }
     try {
       await Topic.find(0);
+      expect.unreachable("should throw");
     } catch (e: any) {
-      expect(e.message).toContain("not found");
+      expect(e).toBeInstanceOf(RecordNotFound);
+      expect(e.id).toBe(0);
+      expect(e.primaryKey).toBe("id");
+      expect(e.model).toBe("Topic");
+      expect(e.message).toBe("Topic with id=0 not found");
     }
   });
 
@@ -2312,7 +2317,13 @@ describe("FinderTest", () => {
   it("find by ids missing one", async () => {
     const Topic = makeTopic();
     const t = await Topic.create({ title: "A" });
-    await expect(Topic.find([t.id, 999999])).rejects.toThrow();
+    try {
+      await Topic.find([t.id, 999999]);
+      expect.unreachable("should throw");
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(RecordNotFound);
+      expect(e.message).toContain("999999");
+    }
   });
 
   it.skip("find with eager loading collection and ordering by collection primary key", async () => {
@@ -3666,44 +3677,3 @@ describe("FinderTest", () => {
 // ==========================================================================
 // FinderTest — targets finder_test.rb (continued)
 // ==========================================================================
-describe("FinderTest", () => {
-  setupHandlerSuite();
-  useHandlerTransactionalFixtures();
-  beforeAll(async () => {
-    await defineSchema(TEST_SCHEMA);
-  });
-
-  it("find raises RecordNotFound with model, primary_key, and id", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("id", "integer");
-      }
-    }
-    try {
-      await Topic.find(42);
-      expect.unreachable("should throw");
-    } catch (e: any) {
-      expect(e).toBeInstanceOf(RecordNotFound);
-      expect(e.model).toBe("Topic");
-      expect(e.primaryKey).toBe("id");
-      expect(e.id).toBe(42);
-      expect(e.message).toContain("42");
-    }
-  });
-
-  it("find with multiple IDs raises RecordNotFound listing missing IDs", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("id", "integer");
-      }
-    }
-    try {
-      await Topic.find([99991, 99992, 99993]);
-      expect.unreachable("should throw");
-    } catch (e: any) {
-      expect(e).toBeInstanceOf(RecordNotFound);
-      expect(e.message).toContain("99991");
-      expect(e.message).toContain("99992");
-    }
-  });
-});

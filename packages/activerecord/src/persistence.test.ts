@@ -422,24 +422,6 @@ describe("PersistenceTest", () => {
     // runtime guard rejects a Base instance, not testing a supported form.
     await expect((Topic as any).update(t, { title: "x" })).rejects.toThrow(/ActiveRecord::Base/);
   });
-
-  it("saveBang throws RecordInvalid with record reference", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { presence: true });
-      }
-    }
-    const topic = new Topic({});
-    try {
-      await topic.saveBang();
-      expect.unreachable("should throw");
-    } catch (e: any) {
-      expect(e).toBeInstanceOf(RecordInvalid);
-      expect(e.record).toBe(topic);
-      expect(e.message).toMatch(/Validation failed/);
-    }
-  });
 });
 
 // ==========================================================================
@@ -4505,9 +4487,14 @@ describe("PersistenceTest", () => {
       }
     }
     const r = new Required();
-    const result = await r.save();
-    expect(result).toBe(false);
-    expect(r.isNewRecord()).toBe(true);
+    try {
+      await r.saveBang();
+      expect.unreachable("should throw");
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(RecordInvalid);
+      expect(e.record).toBe(r);
+      expect(e.message).toContain("Validation failed");
+    }
   });
 
   it("update object", async () => {
