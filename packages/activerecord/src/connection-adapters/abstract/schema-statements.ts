@@ -1005,15 +1005,18 @@ export class SchemaStatements {
     //     if view_name.present?
     //   rescue NotImplementedError
     //     views.include?(view_name.to_s)
-    if (!viewName) return false;
+    //
+    // present? covers blank strings including whitespace-only.
+    // dataSourceSql dispatches through this.adapter so PG's override fires;
+    // MySQL/SQLite don't override → NotImplementedError → views() fallback.
+    if (!viewName || viewName.trim().length === 0) return false;
     try {
-      const sql = this.dataSourceSql(viewName, { type: "VIEW" });
+      const sql = (this.adapter as any).dataSourceSql(viewName, { type: "VIEW" });
       const rows = await this.adapter.execute(sql);
       return rows.length > 0;
     } catch (e) {
       if (e instanceof NotImplementedError) {
-        const allViews = await this.views();
-        return allViews.includes(viewName);
+        return (await this.views()).includes(viewName);
       }
       throw e;
     }
