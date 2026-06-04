@@ -1808,6 +1808,7 @@ export class AbstractAdapter implements Quoting {
     const materializeTransactions = opts.materializeTransactions ?? true;
 
     const run = async (): Promise<T> => {
+      if (this._connection === null && this.isReconnectCanRestoreState()) this.connectBang();
       if (materializeTransactions) await this.materializeTransactions();
 
       let retriesAvailable = allowRetry ? this.connectionRetries : 0;
@@ -1821,26 +1822,26 @@ export class AbstractAdapter implements Quoting {
         try {
           return await block(await this.rawConnectionForBlock());
         } catch (e) {
-          const err = e as Error;
-          this.invalidateTransaction(err);
+          const translated = this.translateExceptionClass(e, null, null) as Error;
+          this.invalidateTransaction(translated);
           const expired = deadline !== null && deadline < Date.now();
           if (!expired && retriesAvailable > 0) {
             retriesAvailable -= 1;
-            if (this.isRetryableQueryError(err)) {
+            if (this.isRetryableQueryError(translated)) {
               await this.backoff(this.connectionRetries - retriesAvailable);
               continue;
             }
-            if (reconnectable && this.isRetryableConnectionError(err)) {
+            if (reconnectable && this.isRetryableConnectionError(translated)) {
               await this.reconnectBang({ restoreTransactions: true });
               reconnectable = false;
               continue;
             }
           }
-          if (!this.isRetryableQueryError(err)) {
+          if (!this.isRetryableQueryError(translated)) {
             this._lastActivity = 0;
             this._verified = false;
           }
-          throw err;
+          throw translated;
         } finally {
           if (materializeTransactions) this.dirtyCurrentTransaction();
         }
@@ -1855,20 +1856,16 @@ export class AbstractAdapter implements Quoting {
 
   /**
    * @internal
-   * Overridable async seam for the connection acquired inside
-   * withRawConnection's retry loop. The default reproduces the
-   * base behaviour: lazily call connectBang() if the connection
-   * is absent and reconnectable, then return _connection.
+   * Overridable async seam yielding the raw connection on each iteration of
+   * withRawConnection's retry loop. The default returns _connection, which
+   * is set by the pre-loop connectBang() call and updated by reconnectBang()
+   * on retry. Adapters with async acquisition (e.g. PostgreSQLAdapter via
+   * getClient()) override this to re-await their driver-level connect so
+   * reconnectBang() + continue picks up a fresh handle automatically.
    *
-   * Adapters with async acquisition (e.g. PostgreSQLAdapter via
-   * getClient()) override this to await their driver-level connect
-   * on each loop iteration so that reconnectBang() + continue
-   * picks up a fresh handle automatically.
-   *
-   * Mirrors: AbstractAdapter#with_raw_connection (acquisition step)
+   * Mirrors: AbstractAdapter#with_raw_connection (yield @raw_connection)
    */
   protected async rawConnectionForBlock(): Promise<AbstractAdapter | null> {
-    if (this._connection === null && this.isReconnectCanRestoreState()) this.connectBang();
     return this._connection;
   }
 
