@@ -14,7 +14,7 @@ function isTemporalDatetime(v: unknown): boolean {
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, RecordNotFound } from "./index.js";
+import { Base, RecordNotFound, RecordInvalid } from "./index.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -4487,9 +4487,14 @@ describe("PersistenceTest", () => {
       }
     }
     const r = new Required();
-    const result = await r.save();
-    expect(result).toBe(false);
-    expect(r.isNewRecord()).toBe(true);
+    try {
+      await r.saveBang();
+      expect.unreachable("should throw");
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(RecordInvalid);
+      expect(e.record).toBe(r);
+      expect(e.message).toContain("Validation failed");
+    }
   });
 
   it("update object", async () => {
