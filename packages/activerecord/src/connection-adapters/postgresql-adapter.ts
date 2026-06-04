@@ -82,6 +82,7 @@ import {
   executeBatch as pgExecuteBatch,
   suppressCompositePrimaryKey,
   castResult,
+  performQuery,
 } from "./postgresql/database-statements.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./postgresql/schema-statements.js";
 import {
@@ -713,41 +714,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Mirrors: PostgreSQLAdapter#raw_execute. Runs the SQL against a pool
-   * client and returns the raw pg.QueryResult so the shared
-   * `internalExecQuery` → `castResult` chain can attach OID types.
-   * Called by `internalExecute` (mixin) which is invoked by
-   * `queryValue` / `query` / `internalExecQuery`.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#raw_execute
+   * Mirrors: AbstractAdapter#with_raw_connection
    */
-  override async rawExecute(
-    sql: string,
-    _name?: string | null,
-    binds?: unknown[],
-  ): Promise<pg.QueryResult> {
-    const bindArray = typeCastedBinds(binds ?? []).map((v) => this._bindForPg(v));
-    const rewritten = this.rewriteBinds(sql, bindArray);
-    this._noticeReceiverSqlWarnings = [];
-    try {
-      const result = await this.withClient((client) =>
-        this._runQuery<pg.QueryResult>(client, rewritten, bindArray, { rowMode: "array" }),
-      );
-      this._flushWarnings(rewritten);
-      return result;
-    } catch (e: any) {
-      throw this._translateException(e, rewritten, bindArray);
-    }
-  }
-
-  /**
-   * Shadows the mixin's throwing stub so `internalExecQuery` (which checks
-   * `this.castResult`) picks up the PG-specific implementation.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#cast_result
-   */
-  castResult(rawResult: pg.QueryResult): Promise<Result> {
-    return castResult.call(this, rawResult);
+  override async withRawConnection<T>(
+    optsOrCallback:
+      | { allowRetry?: boolean; materializeTransactions?: boolean }
+      | ((raw: AbstractAdapter | null) => T | Promise<T>),
+    callback?: (raw: AbstractAdapter | null) => T | Promise<T>,
+  ): Promise<T> {
+    const isFn = typeof optsOrCallback === "function";
+    const opts = (isFn ? {} : (optsOrCallback ?? {})) as {
+      materializeTransactions?: boolean;
+    };
+    const block = (isFn ? optsOrCallback : callback) as unknown as (raw: pg.Client) => Promise<T>;
+    if (typeof block !== "function") throw new TypeError("withRawConnection requires a callback");
+    if (opts.materializeTransactions !== false) await this.materializeTransactions();
+    return this.withClient(block);
   }
 
   /**
@@ -5595,6 +5577,9 @@ const FORMAT_TYPE_ALIASES: Record<string, string> = {
   "time with time zone": "timetz",
   boolean: "bool",
 };
+
+(PostgreSQLAdapter.prototype as any).performQuery = performQuery;
+(PostgreSQLAdapter.prototype as any).castResult = castResult;
 
 // `executeMutation` is this adapter's write/DDL primitive (reads go through the
 // overridden `execQuery`), so dirtying it clears the query cache on writes and

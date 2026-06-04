@@ -1611,19 +1611,22 @@ export const DatabaseStatements = {
 };
 
 /** @internal */
-export function rawExecute(
-  sql: any,
-  name?: any,
-  binds?: any,
-  prepare?: any,
-  async?: any,
-  allowRetry?: any,
-  materializeTransactions?: any,
-  batch?: any,
-): never {
-  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:552
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#raw_execute is not implemented",
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#raw_execute
+ */
+export async function rawExecute(
+  this: DatabaseStatementsHost,
+  sql: string,
+  _name?: string | null,
+  binds?: unknown[],
+  prepare = false,
+  _async = false,
+  allowRetry = false,
+  materializeTransactions = true,
+): Promise<unknown> {
+  const tcBinds = typeCastedBinds(binds ?? []);
+  return (this as any).withRawConnection({ allowRetry, materializeTransactions }, (conn: unknown) =>
+    (this as any).performQuery(conn, sql, binds ?? [], tcBinds, { prepare }),
   );
 }
 
