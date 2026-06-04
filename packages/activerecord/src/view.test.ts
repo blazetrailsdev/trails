@@ -111,8 +111,13 @@ describe("ViewWithPrimaryKeyTest", () => {
 // ---------------------------------------------------------------------------
 // ViewWithoutPrimaryKeyTest
 // ---------------------------------------------------------------------------
+// Rails sets `self.use_transactional_tests = false` on this class
+// (vendor/rails/activerecord/test/cases/view_test.rb:100).
 describe("ViewWithoutPrimaryKeyTest", () => {
-  const { books } = useHandlerFixtures(["books", "authors"], { schema: canonicalSchema });
+  setupHandlerSuite();
+  const { books } = useFixtures(["books", "authors"], () => Base.connection, {
+    schema: canonicalSchema,
+  });
 
   class Paperback extends Base {
     static override _tableName = "paperbacks";
