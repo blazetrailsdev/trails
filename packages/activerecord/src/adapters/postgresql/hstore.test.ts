@@ -6,6 +6,7 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { Base, serialize } from "../../index.js";
+import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
 
 // Rails: class TagCollection
 class TagCollection {
@@ -203,8 +204,20 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((y as any).timezone).toBe("GMT");
     });
 
-    it.skip("yaml round trip with store accessors", () => {
-      // PERMANENT-SKIP: Ruby-only — YAML.dump/Marshal.dump for ActiveRecord instances.
+    it("yaml round trip with store accessors", () => {
+      const x = Hstore.new({ language: "fr", timezone: "GMT" });
+      expect((x as any).language).toBe("fr");
+      expect((x as any).timezone).toBe("GMT");
+
+      // Rails: YAML.dump(x) / YAML.unsafe_load(payload) round-trips the full Ruby
+      // object. In TS, yaml.stringify/parse the record's serializable attribute hash
+      // and reconstruct a Hstore from it — same semantics: store accessor state
+      // must survive the serialization round-trip.
+      const payload = yamlStringify((x as any).serializableHash());
+      const data = yamlParse(payload) as Record<string, unknown>;
+      const y = Hstore.new(data);
+      expect((y as any).language).toBe("fr");
+      expect((y as any).timezone).toBe("GMT");
     });
 
     it("changes with store accessors", async () => {
