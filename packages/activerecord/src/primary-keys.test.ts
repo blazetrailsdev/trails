@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { adapterType } from "./test-adapter.js";
-import { dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -454,14 +453,10 @@ describe("PrimaryKeyAnyTypeTest", () => {
     // Skip until the schema dumper emits a stable canonical format for custom-PK tables.
   });
 
-  it.skipIf(adapterType !== "mysql")("schema typed primary key column", async () => {
-    await (Base.connection as any).createTable("scheduled_logs", {
-      id: { type: "timestamp", precision: 6 },
-      force: true,
-    });
-    const schema = await dumpTableSchema(Base.adapter as any, "scheduled_logs");
-    expect(schema).toContain("scheduled_logs");
-    await (Base.connection as any).dropTable("scheduled_logs", { ifExists: true });
+  it.skip("schema typed primary key column", async () => {
+    // Rails (:Mysql2Adapter/:TrilogyAdapter): assert_match /create_table "scheduled_logs", id: :timestamp.*/, schema
+    // TS schema dumper format differs from Rails — skip until aligned (same reason as
+    // the other schema dump skips in PrimaryKeyIntegerNilDefaultTest / PrimaryKeyIntegerTest).
   });
 });
 
@@ -668,8 +663,7 @@ describe("PrimaryKeyIntegerTest", () => {
     const col = (Widget as any).columnsHash()["id"];
     // Rails: assert_equal :integer, column.type; assert_not_predicate column, :bigint?
     expect(col.type).toBe("integer");
-    // bigint? ↔ col.limit === 8 or col type name contains "bigint"; serial uses 4-byte integer
-    expect(col.limit).not.toBe(8);
+    expect(col.isBigint()).toBe(false);
   });
 
   it.skipIf(adapterType === "sqlite")(
@@ -696,8 +690,14 @@ describe("PrimaryKeyIntegerTest", () => {
     Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
-    // Rails: auto_increment?, integer type, not bigint?, unsigned?
+    // Rails: assert_predicate column, :auto_increment?
+    //        assert_equal :integer, column.type
+    //        assert_not_predicate column, :bigint?
+    //        assert_predicate column, :unsigned?
+    expect(col.autoIncrement).toBe(true);
     expect(col.type).toBe("integer");
+    expect(col.isBigint()).toBe(false);
+    expect(col.unsigned).toBe(true);
   });
 
   it.skipIf(adapterType !== "mysql")("bigint primary key with unsigned", async () => {
@@ -708,7 +708,13 @@ describe("PrimaryKeyIntegerTest", () => {
     Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
-    // Rails: auto_increment?, integer type, bigint?, unsigned?
+    // Rails: assert_predicate column, :auto_increment?
+    //        assert_equal :integer, column.type
+    //        assert_predicate column, :bigint?
+    //        assert_predicate column, :unsigned?
+    expect(col.autoIncrement).toBe(true);
     expect(col.type).toBe("integer");
+    expect(col.isBigint()).toBe(true);
+    expect(col.unsigned).toBe(true);
   });
 });

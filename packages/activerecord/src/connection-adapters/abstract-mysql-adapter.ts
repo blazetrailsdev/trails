@@ -995,11 +995,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {
+    // Mirrors Rails: AbstractMysqlAdapter#primary_keys (mysql/schema_statements.rb)
     const rows = await this.execute(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ${this.quote(tableName)} AND INDEX_NAME = 'PRIMARY' ORDER BY SEQ_IN_INDEX`,
+      `SELECT column_name FROM information_schema.key_column_usage WHERE constraint_name = 'PRIMARY' AND table_schema = DATABASE() AND table_name = ${this.quote(tableName)} ORDER BY ordinal_position`,
     );
-    return (rows as { COLUMN_NAME?: string; column_name?: string }[]).map(
-      (r) => (r.COLUMN_NAME ?? r.column_name) as string,
+    return (rows as { column_name?: string; COLUMN_NAME?: string }[]).map(
+      (r) => (r.column_name ?? r.COLUMN_NAME) as string,
     );
   }
 
