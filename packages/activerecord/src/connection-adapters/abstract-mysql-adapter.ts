@@ -67,6 +67,7 @@ import {
 import type { ColumnType, ColumnOptions } from "./abstract/schema-definitions.js";
 import { TableDefinition as MysqlTableDefinition } from "./mysql/schema-definitions.js";
 import {
+  dataSourceSql as mysqlDataSourceSql,
   isRowFormatDynamicByDefault,
   newColumnFromField,
   quotedScope,
@@ -561,6 +562,19 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   async collation(): Promise<string> {
     return (await this.showVariable("collation_database")) ?? "";
+  }
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#data_source_sql
+   *
+   * Wired here so SchemaStatements#viewExists can dispatch
+   * this.adapter.dataSourceSql and reach the MySQL implementation instead of
+   * the abstract NotImplementedError stub.
+   *
+   * @internal
+   */
+  dataSourceSql(name?: string | null, options: { type?: string } = {}): string {
+    return mysqlDataSourceSql(name, options);
   }
 
   async tableComment(tableName: string): Promise<string | null> {
