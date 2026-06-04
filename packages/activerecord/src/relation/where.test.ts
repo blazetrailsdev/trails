@@ -10,6 +10,7 @@ import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { quoteTableName, quoteColumnName, escapeRegExp } from "../test-helpers/quote-regex.js";
+import { seconds } from "@blazetrails/activesupport";
 
 // -- Helpers --
 const woaCols = {
@@ -1427,9 +1428,14 @@ describe("WhereTest", () => {
     // PERMANENTLY BLOCKED: Ruby Rational has no JavaScript equivalent.
     // Rails: Post.where(title: Rational(0)).count == 0 (Rational cast to "0/1").
   });
-  it.skip("where with duration for string column", () => {
-    // PERMANENTLY BLOCKED: ActiveSupport::Duration has no JavaScript equivalent.
-    // Rails: Post.where(title: 0.seconds).count == 0 (Duration.inspect cast to string).
+  it("where with duration for string column", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    const sql = Post.where({ title: seconds(0) }).toSql();
+    expect(sql).toContain("0");
   });
   it("where with integer for binary column", () => {
     class Post extends Base {
