@@ -820,8 +820,13 @@ describe("FinderTest", () => {
     }
     try {
       await Topic.find(0);
+      expect.unreachable("should throw");
     } catch (e: any) {
-      expect(e.message).toContain("not found");
+      expect(e).toBeInstanceOf(RecordNotFound);
+      expect(e.id).toBe(0);
+      expect(e.primaryKey).toBe("id");
+      expect(e.model).toBe("Topic");
+      expect(e.message).toBe("Topic with id=0 not found");
     }
   });
 
@@ -2312,7 +2317,13 @@ describe("FinderTest", () => {
   it("find by ids missing one", async () => {
     const Topic = makeTopic();
     const t = await Topic.create({ title: "A" });
-    await expect(Topic.find([t.id, 999999])).rejects.toThrow();
+    try {
+      await Topic.find([t.id, 999999]);
+      expect.unreachable("should throw");
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(RecordNotFound);
+      expect(e.message).toContain("999999");
+    }
   });
 
   it.skip("find with eager loading collection and ordering by collection primary key", async () => {
