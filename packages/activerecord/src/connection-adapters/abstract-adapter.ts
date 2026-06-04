@@ -1820,28 +1820,28 @@ export class AbstractAdapter implements Quoting {
 
       for (;;) {
         try {
-          return await block(this._connection);
+          return await block(await this.rawConnectionForBlock());
         } catch (e) {
-          const err = e as Error;
-          this.invalidateTransaction(err);
+          const translated = this.translateExceptionClass(e, null, null) as Error;
+          this.invalidateTransaction(translated);
           const expired = deadline !== null && deadline < Date.now();
           if (!expired && retriesAvailable > 0) {
             retriesAvailable -= 1;
-            if (this.isRetryableQueryError(err)) {
+            if (this.isRetryableQueryError(translated)) {
               await this.backoff(this.connectionRetries - retriesAvailable);
               continue;
             }
-            if (reconnectable && this.isRetryableConnectionError(err)) {
+            if (reconnectable && this.isRetryableConnectionError(translated)) {
               await this.reconnectBang({ restoreTransactions: true });
               reconnectable = false;
               continue;
             }
           }
-          if (!this.isRetryableQueryError(err)) {
+          if (!this.isRetryableQueryError(translated)) {
             this._lastActivity = 0;
             this._verified = false;
           }
-          throw err;
+          throw translated;
         } finally {
           if (materializeTransactions) this.dirtyCurrentTransaction();
         }
@@ -1852,6 +1852,21 @@ export class AbstractAdapter implements Quoting {
     const next = prev.then(run, run);
     this._lockQueue = next.catch(() => undefined);
     return next as Promise<T>;
+  }
+
+  /**
+   * @internal
+   * Overridable async seam yielding the raw connection on each iteration of
+   * withRawConnection's retry loop. The default returns _connection, which
+   * is set by the pre-loop connectBang() call and updated by reconnectBang()
+   * on retry. Adapters with async acquisition (e.g. PostgreSQLAdapter via
+   * getClient()) override this to re-await their driver-level connect so
+   * reconnectBang() + continue picks up a fresh handle automatically.
+   *
+   * Mirrors: AbstractAdapter#with_raw_connection (yield @raw_connection)
+   */
+  protected async rawConnectionForBlock(): Promise<AbstractAdapter | null> {
+    return this._connection;
   }
 
   /** @internal Mirrors: AbstractAdapter#verified! */

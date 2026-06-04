@@ -715,25 +715,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Mirrors: AbstractAdapter#with_raw_connection
-   */
-  override async withRawConnection<T>(
-    optsOrCallback:
-      | { allowRetry?: boolean; materializeTransactions?: boolean }
-      | ((raw: AbstractAdapter | null) => T | Promise<T>),
-    callback?: (raw: AbstractAdapter | null) => T | Promise<T>,
-  ): Promise<T> {
-    const isFn = typeof optsOrCallback === "function";
-    const opts = (isFn ? {} : (optsOrCallback ?? {})) as {
-      materializeTransactions?: boolean;
-    };
-    const block = (isFn ? optsOrCallback : callback) as unknown as (raw: pg.Client) => Promise<T>;
-    if (typeof block !== "function") throw new TypeError("withRawConnection requires a callback");
-    if (opts.materializeTransactions !== false) await this.materializeTransactions();
-    return this.withClient(block);
-  }
-
-  /**
    * Mirrors: PostgreSQLAdapter#exec_query. Executes a query and returns
    * an ActiveRecord::Result with `columnTypes` populated from the
    * adapter's type_map — each field's dataTypeID resolves to a
@@ -1095,6 +1076,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
       throw error;
     }
+  }
+
+  /**
+   * Overrides the abstract acquisition seam so the base withRawConnection
+   * retry loop acquires a pg.Client instead of the generic _connection.
+   * Called on every loop iteration so a reconnectBang() + continue picks
+   * up a fresh client automatically via _acquireFreshClient().
+   *
+   * @internal
+   */
+  protected override async rawConnectionForBlock(): Promise<AbstractAdapter | null> {
+    return (await this.getClient()) as unknown as AbstractAdapter;
   }
 
   /**
@@ -5200,11 +5193,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Mirrors: PostgreSQLAdapter#retryable_query_error?
    * @internal
    */
-  isRetryableQueryError(_exception: unknown): boolean {
-    // Rails checks @raw_connection.transaction_status != PG::PQTRANS_INERROR.
-    // node-pg doesn't expose the PG transaction status byte, so we conservatively
-    // return true (same as the base class). Callers already guard on open_transactions.
-    return true;
+  isRetryableQueryError(exception: unknown): boolean {
+    // Rails additionally guards on `@raw_connection.transaction_status !=
+    // PG::PQTRANS_INERROR`. node-pg does not expose the PG transaction status
+    // byte, so that guard is omitted; the abstract predicate (Deadlocked |
+    // LockWaitTimeout) is still the authoritative gate.
+    return super.isRetryableQueryError(exception);
   }
 
   /**
