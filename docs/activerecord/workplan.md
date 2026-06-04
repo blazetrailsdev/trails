@@ -26,9 +26,9 @@
 > Sources: [`test-compare-100-attack-plan.md`](test-compare-100-attack-plan.md)
 > (ordering + inventory), [`activerecord-index.md`](activerecord-index.md),
 > [`activerecord-100-plan.md`](activerecord-100-plan.md),
-> [`activerecord-gaps.md`](activerecord-gaps.md),
-> [`adapter-architecture-cleanup.md`](adapter-architecture-cleanup.md),
-> [`activerecord-type-audit.md`](activerecord-type-audit.md).
+> [RFC 0005 (activerecord gaps)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0005-activerecord-gaps),
+> [RFC 0010 (adapter-cleanup)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0010-adapter-cleanup),
+> [RFC 0009 (type-audit)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0009-type-audit).
 >
 > **Goals:** (1) `test:compare` 100%; (2) Rails fidelity.
 > `api:compare` is already closed (4969/4969).

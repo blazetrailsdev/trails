@@ -27,10 +27,9 @@ const SHARED_EXCLUDE = [
 // under AR_DB_FORKS parallel forks exhausts the per-worker advisory-lock pool
 // and leaks search_path / schema_cache across files (the plan's §4 prerequisite).
 // P-9 PG schema-dump shorthands resolved. M-1a/M-1b MySQL resolved. All bucket
-// failures resolved — see docs/activerecord/adapter-test-ci-coverage-plan.md.
+// failures resolved.
 //
-// Set RUN_ADAPTER_DIRS=1 to drop this exclude for a dedicated adapter-dirs run
-// (see docs/activerecord/adapter-test-ci-coverage-plan.md §5).
+// Set RUN_ADAPTER_DIRS=1 to drop this exclude for a dedicated adapter-dirs run.
 const ADAPTER_SPECIFIC_EXCLUDE =
   process.env.RUN_ADAPTER_DIRS === "1"
     ? []

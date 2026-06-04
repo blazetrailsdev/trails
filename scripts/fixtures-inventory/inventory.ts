@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 const REPO = new URL("../../", import.meta.url);
 const AR_SRC = fileURLToPath(new URL("packages/activerecord/src/", REPO));
 const MODELS_DIR = `${AR_SRC}test-helpers/models/`;
-const OUT_REL = "docs/activerecord/fixtures-adoption-inventory.md";
+const OUT_REL = "fixtures-adoption-inventory.md";
 const OUT = fileURLToPath(new URL(OUT_REL, REPO));
 
 type Tier = 1 | 2 | 3 | 4;
