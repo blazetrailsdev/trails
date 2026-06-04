@@ -356,6 +356,7 @@ export interface AbstractAdapter {
   selectValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
   selectValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
   selectRows(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
+  queryValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
   execQuery(
     sql: string,
     name?: string | null,
