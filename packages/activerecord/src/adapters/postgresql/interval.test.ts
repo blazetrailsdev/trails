@@ -66,7 +66,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("interval type", async () => {
       await IntervalDataType.createBang({
         maximum_term: Duration.parse("P6Y5M4DT3H2M1S"),
-        minimum_term: Duration.parse("P1Y2M3DT4H5M6.235S"),
+        minimum_term: Duration.parse("P1Y2M3DT4H5M6.234567S"),
         all_terms: [Duration.parse("P1M"), Duration.parse("P1Y"), Duration.parse("PT1H")],
         legacy_term: "33 years",
       });
@@ -114,6 +114,10 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("schema dump with default value", async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter, "interval_data_types");
+      // Rails asserts: t.interval "default_term", default: "P3Y"
+      // Our schema dumper emits TS DSL (parentheses, object options), and may emit
+      // t.column(...) instead of t.interval(...) for interval columns. Accept either
+      // spelling so long as the default round-trips as "P3Y".
       expect(output).toMatch(
         /t\.interval\("default_term",\s*\{[^}]*default:\s*"P3Y"|t\.column\("default_term",\s*"interval"(?:\([^)]*\))?,\s*\{[^}]*default:\s*"P3Y"/,
       );
