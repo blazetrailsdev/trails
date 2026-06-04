@@ -10,6 +10,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { useFixtures } from "./test-helpers/use-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
@@ -170,8 +172,16 @@ describe("ViewWithoutPrimaryKeyTest", () => {
 // ---------------------------------------------------------------------------
 // UpdateableViewTest — MySQL/PG only (SQLite views do not support DML)
 // ---------------------------------------------------------------------------
+// Rails sets `self.use_transactional_tests = false` here because DML through
+// views must commit to be visible across connections. useHandlerFixtures wraps
+// each test in a savepoint; on MySQL a different pool connection for
+// PrintedBook.last() cannot see the uncommitted row. Mirror Rails by using
+// useFixtures (per-test reload via beforeEach/afterEach, no savepoint) instead.
 describe("UpdateableViewTest", () => {
-  const { books } = useHandlerFixtures(["books", "authors"], { schema: canonicalSchema });
+  setupHandlerSuite();
+  const { books } = useFixtures(["books", "authors"], () => Base.connection, {
+    schema: canonicalSchema,
+  });
 
   class PrintedBook extends Base {
     static override _tableName = "printed_books";
