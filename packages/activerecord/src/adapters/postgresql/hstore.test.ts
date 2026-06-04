@@ -14,10 +14,10 @@ class TagCollection {
     return this.hash;
   }
   static load(hash: unknown): TagCollection {
-    return new TagCollection((hash ?? {}) as Record<string, string | null>);
+    return new TagCollection(hash as Record<string, string | null>);
   }
   static dump(value: unknown): unknown {
-    return value instanceof TagCollection ? value.toHash() : value;
+    return (value as TagCollection).toHash();
   }
 }
 
@@ -114,6 +114,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await connection.extensionEnabled("hstore")).toBe(false);
       await connection.enableExtension("hstore");
       expect(await connection.extensionEnabled("hstore")).toBe(true);
+      // Rails: ensure { load_schema } restores columns dropped by CASCADE.
+      // Here afterEach dropTable(ifExists)+disableExtension and the next
+      // beforeEach enableExtension+createTable achieve the same effect.
+      // No assertions below this point may assume the hstores table exists.
     });
 
     it("column", async () => {
@@ -378,7 +382,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("schema dump with shorthand", async () => {
       const output = await SchemaDumper.dumpTableSchema(connection, "hstores");
-      expect(output).toMatch(/t\.hstore\("tags",\s*\{?\s*default:\s*\{\}/);
+      expect(output).toMatch(/t\.hstore\("tags",\s+\{?\s*default:\s*\{\}/);
     });
 
     it.skip("supports to unsafe h values", () => {
