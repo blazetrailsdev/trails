@@ -83,6 +83,10 @@ interface PerformQueryHost {
   handleWarnings?(result: pg.QueryResult): void;
   verified?(): void;
   updateTypemapForDefaultTimezone?(): Promise<void>;
+  /** Rewrites ? placeholders to $1, $2, … for PG. */
+  rewriteBinds?(sql: string, binds: unknown[]): string;
+  /** Normalizes a bind value (Temporal/BinaryData) for the pg driver. */
+  _bindForPg?(v: unknown): unknown;
 }
 
 /** @internal */
@@ -126,18 +130,25 @@ export async function performQuery(
 
   await this.updateTypemapForDefaultTimezone?.();
 
+  // Apply PG-specific bind normalization (Temporal/BinaryData) and rewrite
+  // ? → $N placeholders so this path agrees with execQuery's bind handling.
+  const pgBinds = this._bindForPg
+    ? typeCastedBinds.map((v) => this._bindForPg!(v))
+    : typeCastedBinds;
+  const pgSql = this.rewriteBinds ? this.rewriteBinds(sql, pgBinds) : sql;
+
   let result: pg.QueryResult;
 
   if (prepare && this.prepareStatement) {
     // prepareStatement issues SQL PREPARE on the server. Omitting `text` here sends
     // Bind+Execute only — passing it would re-PARSE under the same name, which the
     // server rejects. @types/pg requires text but node-pg accepts {name,values} at runtime.
-    const stmtKey = await this.prepareStatement(sql, binds, rawConnection);
+    const stmtKey = await this.prepareStatement(pgSql, binds, rawConnection);
     if (notificationPayload) notificationPayload["statement_name"] = stmtKey;
     const execPrepared = (name: string) =>
       rawConnection.query({
         name,
-        values: typeCastedBinds as unknown[],
+        values: pgBinds as unknown[],
         rowMode: "array",
       } as unknown as pg.QueryConfig);
     try {
@@ -148,18 +159,18 @@ export async function performQuery(
           throw new PreparedStatementCacheExpired((err as Error).message);
         }
         // Flush the cache entry; prepareStatement allocates a fresh name and re-PREPAREs.
-        this.deleteStatementKey?.(sql);
-        result = await execPrepared(await this.prepareStatement(sql, binds, rawConnection));
+        this.deleteStatementKey?.(pgSql);
+        result = await execPrepared(await this.prepareStatement(pgSql, binds, rawConnection));
       } else {
         throw err;
       }
     }
   } else if (binds == null || binds.length === 0) {
-    result = await rawConnection.query({ text: sql, rowMode: "array" });
+    result = await rawConnection.query({ text: pgSql, rowMode: "array" });
   } else {
     result = await rawConnection.query({
-      text: sql,
-      values: typeCastedBinds as unknown[],
+      text: pgSql,
+      values: pgBinds as unknown[],
       rowMode: "array",
     });
   }
