@@ -77,7 +77,6 @@ const TEST_SCHEMA = {
   pa_clubs: { name: "string" },
   pa_members: { name: "string", admittable_id: "integer", admittable_type: "string" },
   many_members: { name: "string" },
-  things: {},
   cpk_clubs3: {
     columns: { region_id: "integer", id: "integer", name: "string" },
     primaryKey: ["region_id", "id"],
