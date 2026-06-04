@@ -209,10 +209,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((x as any).language).toBe("fr");
       expect((x as any).timezone).toBe("GMT");
 
-      // Rails: YAML.dump(x) / YAML.unsafe_load(payload) round-trips the full Ruby
-      // object. In TS, yaml.stringify/parse the record's serializable attribute hash
-      // and reconstruct a Hstore from it — same semantics: store accessor state
-      // must survive the serialization round-trip.
+      // Rails: YAML.dump(x) / YAML.unsafe_load(payload) exercises AR's encode_with /
+      // init_with hooks. TS has no AR object-graph YAML, so we go one level down:
+      // verify that (a) serializableHash() captures store accessor state in the
+      // settings column, (b) Hstore.new() restores it, and (c) the attribute hash
+      // is YAML-safe (no non-serializable values sneak in from the hstore OID type).
       const payload = yamlStringify((x as any).serializableHash());
       const data = yamlParse(payload) as Record<string, unknown>;
       const y = Hstore.new(data);
