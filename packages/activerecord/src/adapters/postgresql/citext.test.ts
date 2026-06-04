@@ -24,7 +24,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     await connection.createTable("citexts", (t: any) => {
       t.citext("cival");
     });
+    // resetColumnInformation does not clear _schemaLoadPromise; clear it explicitly
+    // so that the loadSchema() below fetches the freshly-created table's columns
+    // rather than reusing the resolved promise from a prior test run.
+    (Citext as any)._schemaLoadPromise = undefined;
     Citext.resetColumnInformation();
+    await Citext.loadSchema();
   });
 
   afterEach(async () => {
@@ -39,16 +44,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("column", async () => {
-      const cols = await connection.columns("citexts");
-      const column = cols.find((c) => c.name === "cival")!;
+      const column = Citext.columnsHash()["cival"];
       expect(column).toBeDefined();
       expect(column.type).toBe("citext");
       expect(column.sqlType).toBe("citext");
       expect((column as any).array).toBeFalsy();
-      // Rails: type = Citext.type_for_attribute("cival"); assert_not_predicate type, :binary?
-      // BLOCKED: typeForAttribute requires async schema load across test runs (#_schemaLoadPromise
-      //   not cleared by resetColumnInformation); check via column.type instead
-      expect(column.type).not.toBe("binary");
+
+      const type = Citext.typeForAttribute("cival");
+      expect(type.isBinary()).toBe(false);
     });
 
     it("change table supports json", async () => {
@@ -75,7 +78,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write", async () => {
-      await Citext.loadSchema();
       const x = Citext.new({ cival: "Some CI Text" });
       await (x as any).saveBang();
       const citext = await (Citext as any).first();
@@ -89,7 +91,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("select case insensitive", async () => {
       await connection.execute("insert into citexts (cival) values('Cased Text')");
-      await Citext.loadSchema();
       const x = await (Citext as any).where({ cival: "cased text" }).first();
       expect((x as any).cival).toBe("Cased Text");
     });
