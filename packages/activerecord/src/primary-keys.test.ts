@@ -32,8 +32,6 @@ describe("PrimaryKeysTest", () => {
         topics: canonicalSchema.topics,
         subscribers: canonicalSchema.subscribers,
         movies: canonicalSchema.movies,
-        mixed_case_monkeys: canonicalSchema.mixed_case_monkeys,
-        keyboards: canonicalSchema.keyboards,
         dashboards: canonicalSchema.dashboards,
         non_primary_keys: canonicalSchema.non_primary_keys,
         developers: canonicalSchema.developers,
@@ -42,6 +40,22 @@ describe("PrimaryKeysTest", () => {
       },
       { dropExisting: true },
     );
+    // keyboards and mixed_case_monkeys use non-id primary keys that Rails creates
+    // as SERIAL/AUTO_INCREMENT (t.primary_key). Use the string primaryKey form so
+    // our adapter creates the auto-increment sequence on PG/MySQL too.
+    const conn = Base.connection as any;
+    await conn.dropTable("keyboards", { ifExists: true });
+    await conn.createTable("keyboards", { primaryKey: "key_number" }, (t: any) => {
+      t.string("name");
+    });
+    await conn.dropTable("mixed_case_monkeys", { ifExists: true });
+    await conn.createTable("mixed_case_monkeys", { primaryKey: "monkeyID" }, (t: any) => {
+      t.integer("fleaCount");
+    });
+    Keyboard.resetColumnInformation();
+    MixedCaseMonkey.resetColumnInformation();
+    await Keyboard.loadSchema();
+    await MixedCaseMonkey.loadSchema();
   });
 
   it("to key with default primary key", async () => {
@@ -375,7 +389,7 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
   // BIGINT PKs require explicit values on SQLite. Skip on SQLite.
   it.skipIf(adapterType === "sqlite")("primary key with bigint", async () => {
     await (Base.connection as any).createTable("auto_increments", {
-      id: { type: "big_integer" },
+      id: { type: "bigint" },
       force: true,
     });
     await assertAutoIncremented();
@@ -622,7 +636,7 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
 
   it("schema dump primary key bigint with default nil", async () => {
     await (Base.connection as any).createTable("int_defaults", {
-      id: { type: "big_integer", default: null },
+      id: { type: "bigint", default: null },
       force: true,
     });
     const schema = await dumpTableSchema(Base.adapter as any, "int_defaults");
