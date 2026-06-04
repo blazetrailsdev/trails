@@ -15,6 +15,7 @@ class Ltree extends Base {
   static {
     this.tableName = "ltrees";
   }
+  declare path: string;
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -74,7 +75,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: ltree = Ltree.first
       const ltree = await Ltree.first();
       // Rails: assert_equal "1.2.3", ltree.path
-      expect((ltree as any).path).toBe("1.2.3");
+      expect(ltree!.path).toBe("1.2.3");
     });
 
     it("schema dump with shorthand", async () => {
