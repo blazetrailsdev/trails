@@ -41,7 +41,12 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   protected override replace(record: Base | null, save = true): void {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
     const assigningAnother = this.target !== record;
-    if (assigningAnother || (record as any)?.hasChangesToSave?.()) {
+    // When assigning nil to an unloaded association, the through record may
+    // still exist in the DB. Schedule the pending replace so persistReplace
+    // loads the through proxy and destroys it when present — matching Rails'
+    // create_through_record(nil) which calls through_proxy.load_target first.
+    const mightNeedDelete = record === null && !this.isLoaded();
+    if (assigningAnother || mightNeedDelete || (record as any)?.hasChangesToSave?.()) {
       if (save) {
         // Store pending regardless of owner.isPersisted() — for new owners,
         // persistReplace runs after owner.save() when owner is now persisted.

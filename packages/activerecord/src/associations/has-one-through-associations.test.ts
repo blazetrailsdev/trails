@@ -77,7 +77,6 @@ const TEST_SCHEMA = {
   pa_clubs: { name: "string" },
   pa_members: { name: "string", admittable_id: "integer", admittable_type: "string" },
   many_members: { name: "string" },
-  things: {},
   cpk_clubs3: {
     columns: { region_id: "integer", id: "integer", name: "string" },
     primaryKey: ["region_id", "id"],
@@ -363,49 +362,42 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it("replace target record", async () => {
-    // Replace club by updating the through record's FK
-    const club1 = await Club.create({ name: "Club1" });
-    const club2 = await Club.create({ name: "Club2" });
+    const club1 = await Club.create({ name: "Boring Club" });
     const member = await Member.create({ name: "Replacer" });
-    const membership = await Membership.create({ member_id: member.id, club_id: club1.id });
-    // Replace: update membership to point to club2
-    membership.club_id = club2.id;
-    await membership.save();
-    const reloaded = await loadHasOne(member, "membership", {
-      className: "Membership",
-      foreignKey: "member_id",
-    });
-    expect(reloaded!.club_id).toBe(club2.id);
+    await Membership.create({ member_id: member.id, club_id: club1.id });
+    const newClub = await Club.create({ name: "Marx Bros" });
+    (member.association("club") as any).writer(newClub);
+    await member.save();
+    const freshMember = await Member.find(member.id as number);
+    const loadedClub = await freshMember.association("club").loadTarget();
+    expect((loadedClub as any)?.id).toBe(newClub.id);
   });
 
   it("replacing target record deletes old association", async () => {
-    // Delete old membership and create new one
-    const club1 = await Club.create({ name: "OldClub" });
-    const club2 = await Club.create({ name: "NewClub" });
-    const member = await Member.create({ name: "Deleter" });
-    const oldMembership = await Membership.create({ member_id: member.id, club_id: club1.id });
-    await oldMembership.destroy();
-    await Membership.create({ member_id: member.id, club_id: club2.id });
+    const club1 = await Club.create({ name: "Old Club" });
+    const member = await Member.create({ name: "Replacer" });
+    await Membership.create({ member_id: member.id, club_id: club1.id });
+    const beforeCount = (await Membership.count()) as number;
+    const newClub = await Club.create({ name: "Bananarama" });
+    (member.association("club") as any).writer(newClub);
+    await member.save();
+    const afterCount = (await Membership.count()) as number;
+    expect(afterCount).toBe(beforeCount);
+  });
+
+  it("set record to nil should delete association", async () => {
+    const club = await Club.create({ name: "Nil Club" });
+    const member = await Member.create({ name: "NilMember" });
+    await Membership.create({ member_id: member.id, club_id: club.id });
+    (member.association("club") as any).writer(null);
+    await member.save();
     const membership = await loadHasOne(member, "membership", {
       className: "Membership",
       foreignKey: "member_id",
     });
-    expect(membership).not.toBeNull();
-    expect(membership!.club_id).toBe(club2.id);
-  });
-
-  it("set record to nil should delete association", async () => {
-    // When the through record is destroyed, the through association is nil
-    const club = await Club.create({ name: "Nil Club" });
-    const member = await Member.create({ name: "NilMember" });
-    const membership = await Membership.create({ member_id: member.id, club_id: club.id });
-    // Destroy the membership (through record)
-    await membership.destroy();
-    const loaded = await loadHasOne(member, "membership", {
-      className: "Membership",
-      foreignKey: "member_id",
-    });
-    expect(loaded).toBeNull();
+    expect(membership).toBeNull();
+    const loadedClub = await member.association("club").loadTarget();
+    expect(loadedClub).toBeNull();
   });
 
   it("has one through polymorphic", async () => {
@@ -899,22 +891,10 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it("assigning association correctly assigns target", async () => {
-    // Assign a club to a member through membership and verify the target is correct
-    const club = await Club.create({ name: "AssignClub" });
-    const member = await Member.create({ name: "AssignMember" });
-    await Membership.create({ member_id: member.id, club_id: club.id });
-    const membership = await loadHasOne(member, "membership", {
-      className: "Membership",
-      foreignKey: "member_id",
-    });
-    expect(membership).not.toBeNull();
-    const loadedClub = await loadHasOne(membership!, "club", {
-      className: "Club",
-      foreignKey: "id",
-      primaryKey: "club_id",
-    });
-    expect(loadedClub).not.toBeNull();
-    expect(loadedClub!.name).toBe("AssignClub");
+    const member = await Member.create({ name: "Chris" });
+    const newClub = await Club.create({ name: "LRUG" });
+    (member.association("club") as any).writer(newClub);
+    expect(member.association("club").target).toBe(newClub);
   });
 
   it.skip("has one through proxy should not respond to private methods", () => {
@@ -1618,20 +1598,22 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it("set record after delete association", async () => {
-    const club = await Club.create({ name: "Rails Club" });
+    const club1 = await Club.create({ name: "Boring Club" });
+    const moustacheClub = await Club.create({ name: "Moustache Club" });
     const member = await Member.create({ name: "DHH" });
-    const membership = await Membership.create({ member_id: member.id, club_id: club.id });
-    // Delete the membership
-    await membership.destroy();
-    // Create a new membership
-    const newMembership = await Membership.create({ member_id: member.id, club_id: club.id });
-    expect(newMembership.isPersisted()).toBe(true);
-    // Load the membership again for the member
-    const loaded = await loadHasOne(member, "membership", {
+    await Membership.create({ member_id: member.id, club_id: club1.id });
+    (member.association("club") as any).writer(null);
+    await member.save();
+    // Verify through record is actually gone before reassigning
+    const membershipAfterNil = await loadHasOne(member, "membership", {
       className: "Membership",
       foreignKey: "member_id",
     });
-    expect(loaded).not.toBeNull();
-    expect(loaded!.club_id).toBe(club.id);
+    expect(membershipAfterNil).toBeNull();
+    (member.association("club") as any).writer(moustacheClub);
+    await member.save();
+    const freshMember = await Member.find(member.id as number);
+    const loadedClub = await freshMember.association("club").loadTarget();
+    expect((loadedClub as any)?.id).toBe(moustacheClub.id);
   });
 });
