@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   Base,
   transaction,
@@ -29,7 +29,11 @@ const TEST_SCHEMA: Schema = {
   auto_slugs: { title: "string", slug: "string" },
   counteds: { name: "string" },
   multis: { name: "string" },
-  things: { name: "string", status: "string" },
+  // File-scoped name (cf. cb_posts) so this in-memory after_initialize probe
+  // never leaks a public `things` into the shared per-worker DB, where the PG
+  // adapters/postgresql/schema.test.ts reserves an unqualified `things` and
+  // asserts its absence on the public search path.
+  cb_things: { name: "string", status: "string" },
   records: { name: "string" },
   tasks: { name: "string", important: "boolean", skip: "boolean" },
   blocked: { name: "string" },
@@ -51,6 +55,15 @@ setupHandlerSuite();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
   await defineSchema(TEST_SCHEMA);
+});
+
+// setupHandlerSuite() skips the global resetTestAdapterState(), so tables this
+// file's defineSchema() created persist in the shared per-worker DB after the
+// suite. Guarantee the de-collided probe table is gone (cf. #2937 ds_probe).
+afterAll(async () => {
+  await (Base.connection as { executeMutation(sql: string): Promise<unknown> })
+    .executeMutation(`DROP TABLE IF EXISTS "cb_things"`)
+    .catch(() => {});
 });
 
 // ==========================================================================
@@ -690,7 +703,7 @@ describe("CallbacksTest", () => {
 describe("CallbacksTest", () => {
   it("fires after_initialize on new records", () => {
     class Thing extends Base {
-      static _tableName = "things";
+      static _tableName = "cb_things";
     }
     Thing.attribute("id", "integer");
     Thing.attribute("name", "string");
