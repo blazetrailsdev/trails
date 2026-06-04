@@ -83,6 +83,7 @@ import {
   suppressCompositePrimaryKey,
   castResult,
   performQuery,
+  handleWarnings,
 } from "./postgresql/database-statements.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./postgresql/schema-statements.js";
 import {
@@ -5580,6 +5581,7 @@ const FORMAT_TYPE_ALIASES: Record<string, string> = {
 
 (PostgreSQLAdapter.prototype as any).performQuery = performQuery;
 (PostgreSQLAdapter.prototype as any).castResult = castResult;
+(PostgreSQLAdapter.prototype as any).handleWarnings = handleWarnings;
 
 // `executeMutation` is this adapter's write/DDL primitive (reads go through the
 // overridden `execQuery`), so dirtying it clears the query cache on writes and

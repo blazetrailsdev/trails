@@ -1623,10 +1623,11 @@ export async function rawExecute(
   _async = false,
   allowRetry = false,
   materializeTransactions = true,
+  batch = false,
 ): Promise<unknown> {
   const tcBinds = typeCastedBinds(binds ?? []);
   return (this as any).withRawConnection({ allowRetry, materializeTransactions }, (conn: unknown) =>
-    (this as any).performQuery(conn, sql, binds ?? [], tcBinds, { prepare }),
+    (this as any).performQuery(conn, sql, binds ?? [], tcBinds, { prepare, batch }),
   );
 }
 

@@ -87,6 +87,12 @@ interface PerformQueryHost {
   rewriteBinds?(sql: string, binds: unknown[]): string;
   /** Normalizes a bind value (Temporal/BinaryData) for the pg driver. */
   _bindForPg?(v: unknown): unknown;
+  /** Notice warnings accumulated during the query; reset before each query. */
+  _noticeReceiverSqlWarnings?: unknown[];
+  /** Flushes accumulated notices to the configured db_warnings_action. */
+  _flushWarnings?(sql: string): void;
+  /** Translates a driver error into an AR exception type. */
+  _translateException?(e: unknown, sql: string, binds: unknown[]): Error;
 }
 
 /** @internal */
@@ -130,53 +136,59 @@ export async function performQuery(
 
   await this.updateTypemapForDefaultTimezone?.();
 
-  // Apply PG-specific bind normalization (Temporal/BinaryData) and rewrite
-  // ? → $N placeholders so this path agrees with execQuery's bind handling.
   const pgBinds = this._bindForPg
     ? typeCastedBinds.map((v) => this._bindForPg!(v))
     : typeCastedBinds;
   const pgSql = this.rewriteBinds ? this.rewriteBinds(sql, pgBinds) : sql;
 
+  if (this._noticeReceiverSqlWarnings) this._noticeReceiverSqlWarnings = [];
+
   let result: pg.QueryResult;
 
-  if (prepare && this.prepareStatement) {
-    // prepareStatement issues SQL PREPARE on the server. Omitting `text` here sends
-    // Bind+Execute only — passing it would re-PARSE under the same name, which the
-    // server rejects. @types/pg requires text but node-pg accepts {name,values} at runtime.
-    const stmtKey = await this.prepareStatement(pgSql, binds, rawConnection);
-    if (notificationPayload) notificationPayload["statement_name"] = stmtKey;
-    const execPrepared = (name: string) =>
-      rawConnection.query({
-        name,
+  try {
+    if (prepare && this.prepareStatement) {
+      // prepareStatement issues SQL PREPARE on the server. Omitting `text` here sends
+      // Bind+Execute only — passing it would re-PARSE under the same name, which the
+      // server rejects. @types/pg requires text but node-pg accepts {name,values} at runtime.
+      const stmtKey = await this.prepareStatement(pgSql, binds, rawConnection);
+      if (notificationPayload) notificationPayload["statement_name"] = stmtKey;
+      const execPrepared = (name: string) =>
+        rawConnection.query({
+          name,
+          values: pgBinds as unknown[],
+          rowMode: "array",
+        } as unknown as pg.QueryConfig);
+      try {
+        result = await execPrepared(stmtKey);
+      } catch (err) {
+        if (this.isCachedPlanFailure?.(err)) {
+          if (this.inTransaction) {
+            throw new PreparedStatementCacheExpired((err as Error).message);
+          }
+          this.deleteStatementKey?.(pgSql);
+          result = await execPrepared(await this.prepareStatement(pgSql, binds, rawConnection));
+        } else {
+          throw err;
+        }
+      }
+    } else if (binds == null || binds.length === 0) {
+      result = await rawConnection.query({ text: pgSql, rowMode: "array" });
+    } else {
+      result = await rawConnection.query({
+        text: pgSql,
         values: pgBinds as unknown[],
         rowMode: "array",
-      } as unknown as pg.QueryConfig);
-    try {
-      result = await execPrepared(stmtKey);
-    } catch (err) {
-      if (this.isCachedPlanFailure?.(err)) {
-        if (this.inTransaction) {
-          throw new PreparedStatementCacheExpired((err as Error).message);
-        }
-        // Flush the cache entry; prepareStatement allocates a fresh name and re-PREPAREs.
-        this.deleteStatementKey?.(pgSql);
-        result = await execPrepared(await this.prepareStatement(pgSql, binds, rawConnection));
-      } else {
-        throw err;
-      }
+      });
     }
-  } else if (binds == null || binds.length === 0) {
-    result = await rawConnection.query({ text: pgSql, rowMode: "array" });
-  } else {
-    result = await rawConnection.query({
-      text: pgSql,
-      values: pgBinds as unknown[],
-      rowMode: "array",
-    });
+  } catch (e: any) {
+    if (e instanceof PreparedStatementCacheExpired) throw e;
+    if (this._translateException) throw this._translateException(e, pgSql, pgBinds);
+    throw e;
   }
 
   this.verified?.();
   this.handleWarnings?.(result);
+  this._flushWarnings?.(pgSql);
   if (notificationPayload) notificationPayload["row_count"] = result.rows.length;
 
   return result;
