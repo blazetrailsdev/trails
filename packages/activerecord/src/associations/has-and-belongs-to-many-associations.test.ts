@@ -1905,6 +1905,5 @@ describe("HABTM join-table self-join aliasing", () => {
     //   2. JoinDependency#addAssociation bails when the target's primaryKey is
     //      composite (HABTM join models use `[ownerFk, targetFk]`), so the join
     //      model can never be the JOIN target.
-    // Tracked in docs/activerecord/activerecord-gaps.md.
   });
 });
