@@ -45,7 +45,8 @@ const SCHEMA: Schema = {
     active: "boolean",
     status: "string",
   },
-  people: { name: "string", age: "integer", status: "string", role: "string" },
+  wr_people: { name: "string", age: "integer" },
+  rawsql_people: { name: "string", age: "integer", status: "string", role: "string" },
   products: { name: "string", price: "integer" },
   topics: { title: "string", body: "string" },
   enum_posts: { title: "string", status: "integer" },
@@ -91,6 +92,27 @@ const SCHEMA: Schema = {
   },
   poly_treasures: { name: "string" },
   poly_cars: { name: "string" },
+  // whor_* tables for has-one where-with-relation test (skip 8).
+  whor_authors: { name: "string", author_address_id: "integer" },
+  whor_addresses: { name: "string" },
+  // whmr_* tables for has-many where-with-relation test (skip 7).
+  whmr_authors: { name: "string" },
+  whmr_essays: { writer_id: "string", author_id: "integer" },
+  // wcpr_* tables for where-with-collection-polymorphic-relation test (skip 10).
+  wcpr_treasures: { name: "string" },
+  wcpr_price_estimates: { estimate_of_type: "string", estimate_of_id: "integer" },
+  // wsel_* tables for where-with-select-relation test (skip 9).
+  wsel_authors: { name: "string" },
+  wsel_essays: { writer_id: "string" },
+  // ponand_* tables for polymorphic WHERE NOT NAND tests (skips 2/3/4 — now un-skipped).
+  ponand_treasures: { name: "string" },
+  ponand_cars: { name: "string" },
+  ponand_price_estimates: {
+    estimate_of_type: "string",
+    estimate_of_id: "integer",
+    price: "integer",
+    currency: "string",
+  },
   cpk_books: {
     columns: {
       author_id: "integer",
@@ -879,10 +901,9 @@ describe("WhereTest", () => {
     expect(actual.toSql()).toEqual(expected.toSql());
   });
   it.skip("belongs to nested where with relation", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs belongs_to association with automatic JOIN */
+    // BLOCKED: nested WHERE with subquery inside association hash not yet implemented.
+    // Rails: Author.where(posts: { author_id: Author.where(id: author.id) }).joins(:posts)
+    // Needs: whereClauseFor to support Relation values inside nested association hashes.
   });
   it("polymorphic shallow where", () => {
     class PolyTreasure extends Base {
@@ -913,14 +934,202 @@ describe("WhereTest", () => {
 
     expect(actual.toSql()).toEqual(expected.toSql());
   });
-  it.skip("where not polymorphic id and type as nand", () => {
-    /* needs polymorphic DB fixtures */
+  it("where not polymorphic id and type as nand", async () => {
+    class PonandTreasure extends Base {
+      static {
+        this._tableName = "ponand_treasures";
+        this.attribute("name", "string");
+      }
+    }
+    class PonandCar extends Base {
+      static {
+        this._tableName = "ponand_cars";
+        this.attribute("name", "string");
+      }
+    }
+    class PonandPriceEstimate extends Base {
+      static {
+        this._tableName = "ponand_price_estimates";
+        this.attribute("estimate_of_type", "string");
+        this.attribute("estimate_of_id", "integer");
+        this.attribute("price", "integer");
+      }
+    }
+    registerModel("PonandTreasure", PonandTreasure);
+    registerModel("PonandCar", PonandCar);
+    Associations.belongsTo.call(PonandPriceEstimate, "estimateOf", { polymorphic: true });
+
+    const diamond = (await PonandTreasure.create({ name: "diamond" })) as any;
+    const sapphire = (await PonandTreasure.create({ name: "sapphire" })) as any;
+    const honda = (await PonandCar.create({ name: "honda" })) as any;
+
+    const diamondEst = (await PonandPriceEstimate.create({
+      estimate_of_type: "PonandTreasure",
+      estimate_of_id: diamond.id,
+      price: 10,
+    })) as any;
+    await PonandPriceEstimate.create({
+      estimate_of_type: "PonandTreasure",
+      estimate_of_id: sapphire.id,
+      price: 20,
+    });
+    await PonandPriceEstimate.create({
+      estimate_of_type: "PonandTreasure",
+      estimate_of_id: sapphire.id,
+      price: 25,
+    });
+    const hondaEst = (await PonandPriceEstimate.create({
+      estimate_of_type: "PonandCar",
+      estimate_of_id: honda.id,
+      price: 30,
+    })) as any;
+
+    // NAND: NOT (type='PonandTreasure' AND id=sapphire.id) → diamond + honda estimates
+    const actual = await PonandPriceEstimate.whereNot({
+      estimate_of_type: "PonandTreasure",
+      estimate_of_id: sapphire.id,
+    }).toArray();
+
+    const actualIds = actual.map((r: any) => r.id).sort();
+    const expectedIds = [diamondEst.id, hondaEst.id].sort();
+    expect(actualIds).toEqual(expectedIds);
+
+    // Positive: WHERE (type='PonandTreasure' AND id=sapphire.id) → only sapphire estimates
+    const only = await PonandPriceEstimate.where({
+      estimate_of_type: "PonandTreasure",
+      estimate_of_id: sapphire.id,
+    }).toArray();
+    expect(only).toHaveLength(2);
+    expect(only.every((r: any) => r.estimate_of_id === sapphire.id)).toBe(true);
   });
-  it.skip("where not association as nand", () => {
-    /* needs joins + polymorphic DB fixtures */
+  it("where not association as nand", async () => {
+    class PonandNandTreasure extends Base {
+      static {
+        this._tableName = "ponand_treasures";
+        this.attribute("name", "string");
+      }
+    }
+    class PonandNandPriceEstimate extends Base {
+      static {
+        this._tableName = "ponand_price_estimates";
+        this.attribute("estimate_of_type", "string");
+        this.attribute("estimate_of_id", "integer");
+        this.attribute("price", "integer");
+        this.attribute("currency", "string");
+      }
+    }
+    registerModel("PonandNandTreasure", PonandNandTreasure);
+    registerModel("PonandNandPriceEstimate", PonandNandPriceEstimate);
+    Associations.belongsTo.call(PonandNandPriceEstimate, "estimateOf", { polymorphic: true });
+    Associations.hasMany.call(PonandNandTreasure, "priceEstimates", {
+      className: "PonandNandPriceEstimate",
+      as: "estimateOf",
+    });
+
+    const diamond = (await PonandNandTreasure.create({ name: "diamond" })) as any;
+    const sapphire = (await PonandNandTreasure.create({ name: "sapphire" })) as any;
+    const myTreasure = (await PonandNandTreasure.create({ name: "my_treasure" })) as any;
+
+    // diamond + sapphire (×2) get estimates with price != 2 or currency != "USD"
+    await PonandNandPriceEstimate.create({
+      estimate_of_type: "PonandNandTreasure",
+      estimate_of_id: diamond.id,
+      price: 5,
+      currency: "USD",
+    });
+    await PonandNandPriceEstimate.create({
+      estimate_of_type: "PonandNandTreasure",
+      estimate_of_id: sapphire.id,
+      price: 15,
+      currency: "USD",
+    });
+    await PonandNandPriceEstimate.create({
+      estimate_of_type: "PonandNandTreasure",
+      estimate_of_id: sapphire.id,
+      price: 15,
+      currency: "GBP",
+    });
+    // my_treasure: the one with (price=2, currency="USD") that should be excluded
+    await PonandNandPriceEstimate.create({
+      estimate_of_type: "PonandNandTreasure",
+      estimate_of_id: myTreasure.id,
+      price: 2,
+      currency: "USD",
+    });
+
+    // NAND: NOT (price=2 AND currency="USD") → diamond + sapphire(×2), NOT my_treasure
+    const actual = await PonandNandTreasure.joins("priceEstimates")
+      .whereNot({ ponand_price_estimates: { price: 2, currency: "USD" } })
+      .toArray();
+
+    const actualIds = actual.map((r: any) => r.id).sort();
+    const expectedIds = [diamond.id, sapphire.id, sapphire.id].sort();
+    expect(actualIds).toEqual(expectedIds);
+    expect(actualIds).not.toContain(myTreasure.id);
   });
-  it.skip("polymorphic nested array where not", () => {
-    /* needs polymorphic DB fixtures */
+  it("polymorphic nested array where not", async () => {
+    class PonandArrTreasure extends Base {
+      static {
+        this._tableName = "ponand_treasures";
+        this.attribute("name", "string");
+      }
+    }
+    class PonandArrCar extends Base {
+      static {
+        this._tableName = "ponand_cars";
+        this.attribute("name", "string");
+      }
+    }
+    class PonandArrPriceEstimate extends Base {
+      static {
+        this._tableName = "ponand_price_estimates";
+        this.attribute("estimate_of_type", "string");
+        this.attribute("estimate_of_id", "integer");
+        this.attribute("price", "integer");
+      }
+    }
+    registerModel("PonandArrTreasure", PonandArrTreasure);
+    registerModel("PonandArrCar", PonandArrCar);
+    Associations.belongsTo.call(PonandArrPriceEstimate, "estimateOf", { polymorphic: true });
+
+    const diamond = (await PonandArrTreasure.create({ name: "diamond" })) as any;
+    const sapphire = (await PonandArrTreasure.create({ name: "sapphire" })) as any;
+    const honda = (await PonandArrCar.create({ name: "honda" })) as any;
+
+    await PonandArrPriceEstimate.create({
+      estimate_of_type: "PonandArrTreasure",
+      estimate_of_id: diamond.id,
+      price: 10,
+    });
+    const sapphireEst1 = (await PonandArrPriceEstimate.create({
+      estimate_of_type: "PonandArrTreasure",
+      estimate_of_id: sapphire.id,
+      price: 20,
+    })) as any;
+    const sapphireEst2 = (await PonandArrPriceEstimate.create({
+      estimate_of_type: "PonandArrTreasure",
+      estimate_of_id: sapphire.id,
+      price: 25,
+    })) as any;
+    await PonandArrPriceEstimate.create({
+      estimate_of_type: "PonandArrCar",
+      estimate_of_id: honda.id,
+      price: 30,
+    });
+
+    // WHERE NOT estimateOf IN [diamond, honda] → only sapphire estimates remain
+    const treasureInst = new PonandArrTreasure() as any;
+    treasureInst.id = diamond.id;
+    const carInst = new PonandArrCar() as any;
+    carInst.id = honda.id;
+
+    const actual = await PonandArrPriceEstimate.whereNot({
+      estimateOf: [treasureInst, carInst],
+    }).toArray();
+
+    const actualIds = actual.map((r: any) => r.id).sort();
+    const expectedIds = [sapphireEst1.id, sapphireEst2.id].sort();
+    expect(actualIds).toEqual(expectedIds);
   });
   it("polymorphic array where multiple types", async () => {
     class PolyMTreasure extends Base {
@@ -1215,16 +1424,12 @@ describe("WhereTest", () => {
     expect(sql).toContain("123.456");
   });
   it.skip("where with rational for string column", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* Rational is a Ruby type with no JS equivalent */
+    // PERMANENTLY BLOCKED: Ruby Rational has no JavaScript equivalent.
+    // Rails: Post.where(title: Rational(0)).count == 0 (Rational cast to "0/1").
   });
   it.skip("where with duration for string column", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* ActiveSupport::Duration exists, but where predicate building/type-casting for Duration values is not implemented yet */
+    // PERMANENTLY BLOCKED: ActiveSupport::Duration has no JavaScript equivalent.
+    // Rails: Post.where(title: 0.seconds).count == 0 (Duration.inspect cast to string).
   });
   it("where with integer for binary column", () => {
     class Post extends Base {
@@ -1299,29 +1504,156 @@ describe("WhereTest", () => {
     const essay = await Essay.where({ writer: ["David"] }).first();
     expect(essay!.writer_id).toBe("David");
   });
-  it.skip("where with relation on has many association", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs association-scoped WHERE with automatic JOIN */
+  it("where with relation on has many association", async () => {
+    class WhmrAuthor extends Base {
+      static {
+        this._tableName = "whmr_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    class WhmrEssay extends Base {
+      static {
+        this._tableName = "whmr_essays";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.attribute("writer_id", "string");
+      }
+    }
+    registerModel("WhmrAuthor", WhmrAuthor);
+    registerModel("WhmrEssay", WhmrEssay);
+    Associations.hasMany.call(WhmrAuthor, "essays", {
+      className: "WhmrEssay",
+      foreignKey: "author_id",
+    });
+
+    const david = (await WhmrAuthor.create({ name: "David" })) as any;
+    await WhmrAuthor.create({ name: "Other" });
+    const essay = (await WhmrEssay.create({ author_id: david.id, writer_id: "David" })) as any;
+
+    const result = await WhmrAuthor.where({
+      essays: WhmrEssay.where({ id: essay.id }),
+    }).first();
+    expect(result).not.toBeNull();
+    expect((result as any).id).toBe(david.id);
   });
-  it.skip("where with relation on has one association", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs association-scoped WHERE with automatic JOIN */
+  it("where with relation on has one association", async () => {
+    class WhorAddress extends Base {
+      static {
+        this._tableName = "whor_addresses";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    class WhorAuthor extends Base {
+      static {
+        this._tableName = "whor_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("author_address_id", "integer");
+      }
+    }
+    registerModel("WhorAddress", WhorAddress);
+    registerModel("WhorAuthor", WhorAuthor);
+    // AuthorAddress has_one :author — FK lives on the author side
+    Associations.hasOne.call(WhorAddress, "author", {
+      className: "WhorAuthor",
+      foreignKey: "author_address_id",
+    });
+
+    const address = (await WhorAddress.create({ name: "addr1" })) as any;
+    await WhorAddress.create({ name: "addr2" });
+    const author = (await WhorAuthor.create({
+      name: "David",
+      author_address_id: address.id,
+    })) as any;
+
+    const result = await WhorAddress.where({
+      author: WhorAuthor.where({ id: author.id }),
+    }).first();
+    expect(result).not.toBeNull();
+    expect((result as any).id).toBe(address.id);
   });
-  it.skip("where on association with select relation", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs association-scoped WHERE with automatic JOIN */
+  it("where on association with select relation", async () => {
+    class WselAuthor extends Base {
+      static {
+        this._tableName = "wsel_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    class WselEssay extends Base {
+      static {
+        this._tableName = "wsel_essays";
+        this.attribute("id", "integer");
+        this.attribute("writer_id", "string");
+      }
+    }
+    registerModel("WselAuthor", WselAuthor);
+    Associations.belongsTo.call(WselEssay, "author", {
+      className: "WselAuthor",
+      foreignKey: "writer_id",
+      primaryKey: "name",
+    });
+
+    const david = await WselAuthor.create({ name: "David" });
+    const essay = await WselEssay.create({ writer_id: "David" });
+    await WselEssay.create({ writer_id: "Other" });
+
+    const result = await WselEssay.where({
+      author: WselAuthor.where({ name: "David" }).select("name"),
+    }).first();
+    expect(result).not.toBeNull();
+    expect((result as any).id).toBe((essay as any).id);
   });
-  it.skip("where on association with collection polymorphic relation", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs polymorphic association setup */
+  it("where on association with collection polymorphic relation", async () => {
+    class WcprTreasure extends Base {
+      static {
+        this._tableName = "wcpr_treasures";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    class WcprPriceEstimate extends Base {
+      static {
+        this._tableName = "wcpr_price_estimates";
+        this.attribute("id", "integer");
+        this.attribute("estimate_of_type", "string");
+        this.attribute("estimate_of_id", "integer");
+      }
+    }
+    registerModel("WcprTreasure", WcprTreasure);
+    registerModel("WcprPriceEstimate", WcprPriceEstimate);
+    Associations.belongsTo.call(WcprPriceEstimate, "estimateOf", { polymorphic: true });
+    Associations.hasMany.call(WcprTreasure, "priceEstimates", {
+      className: "WcprPriceEstimate",
+      as: "estimateOf",
+    });
+
+    const diamond = (await WcprTreasure.create({ name: "diamond" })) as any;
+    const emerald = (await WcprTreasure.create({ name: "emerald" })) as any;
+    const ruby = (await WcprTreasure.create({ name: "ruby" })) as any;
+
+    // diamond and emerald have price estimates; ruby does not
+    await WcprPriceEstimate.create({
+      estimate_of_type: "WcprTreasure",
+      estimate_of_id: diamond.id,
+    });
+    await WcprPriceEstimate.create({
+      estimate_of_type: "WcprTreasure",
+      estimate_of_id: emerald.id,
+    });
+
+    // Rails: Treasure.where(name: ["diamond", "emerald"], price_estimates: PriceEstimate.all)
+    // Returns only treasures with matching name AND at least one price estimate
+    const result = await WcprTreasure.where({
+      name: ["diamond", "emerald"],
+      priceEstimates: WcprPriceEstimate.all(),
+    }).toArray();
+
+    const names = result.map((r: any) => r.name).sort();
+    expect(names).toEqual(["diamond", "emerald"]);
+    expect(names).not.toContain("ruby");
   });
   it("where with unsupported arguments", () => {
     class Post extends Base {
@@ -1723,22 +2055,23 @@ describe("Relation Where (Rails-guided)", () => {
 });
 
 describe("where with Range (Rails-guided)", () => {
-  class Person extends Base {
+  class WrPerson extends Base {
     static {
+      this._tableName = "wr_people";
       this.attribute("name", "string");
       this.attribute("age", "integer");
     }
   }
 
   beforeEach(async () => {
-    await Person.create({ name: "Child", age: 10 });
-    await Person.create({ name: "Teen", age: 16 });
-    await Person.create({ name: "Adult", age: 25 });
-    await Person.create({ name: "Senior", age: 70 });
+    await WrPerson.create({ name: "Child", age: 10 });
+    await WrPerson.create({ name: "Teen", age: 16 });
+    await WrPerson.create({ name: "Adult", age: 25 });
+    await WrPerson.create({ name: "Senior", age: 70 });
   });
 
   it("Range in where generates BETWEEN", async () => {
-    const result = await Person.where({ age: new Range(15, 30) }).toArray();
+    const result = await WrPerson.where({ age: new Range(15, 30) }).toArray();
     expect(result).toHaveLength(2);
     const names = result.map((r: Base) => r.name);
     expect(names).toContain("Teen");
@@ -1746,12 +2079,12 @@ describe("where with Range (Rails-guided)", () => {
   });
 
   it("Range is inclusive", async () => {
-    const result = await Person.where({ age: new Range(16, 25) }).toArray();
+    const result = await WrPerson.where({ age: new Range(16, 25) }).toArray();
     expect(result).toHaveLength(2);
   });
 
   it("Range combined with other conditions", async () => {
-    const result = await Person.where({ age: new Range(10, 20) })
+    const result = await WrPerson.where({ age: new Range(10, 20) })
       .where({ name: "Teen" })
       .toArray();
     expect(result).toHaveLength(1);
@@ -1759,7 +2092,7 @@ describe("where with Range (Rails-guided)", () => {
   });
 
   it("Range generates valid SQL", () => {
-    const sql = Person.where({ age: new Range(18, 65) }).toSql();
+    const sql = WrPerson.where({ age: new Range(18, 65) }).toSql();
     expect(sql).toContain("BETWEEN");
     expect(sql).toContain("18");
     expect(sql).toContain("65");
@@ -1808,56 +2141,41 @@ describe("Range / BETWEEN (Rails-guided)", () => {
 });
 
 describe("Raw SQL Where (Rails-guided)", () => {
+  class RawsqlPerson extends Base {
+    static {
+      this._tableName = "rawsql_people";
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.attribute("age", "integer");
+      this.attribute("status", "string");
+      this.attribute("role", "string");
+    }
+  }
+
   // Rails: test "where with SQL string and bind values"
   it("where accepts raw SQL string with ? placeholders", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
+    await RawsqlPerson.create({ name: "Alice", age: 25 });
+    await RawsqlPerson.create({ name: "Bob", age: 17 });
+    await RawsqlPerson.create({ name: "Charlie", age: 30 });
 
-    await Person.create({ name: "Alice", age: 25 });
-    await Person.create({ name: "Bob", age: 17 });
-    await Person.create({ name: "Charlie", age: 30 });
-
-    const sql = Person.where('"people"."age" > ?', 18).toSql();
+    const sql = RawsqlPerson.where('"rawsql_people"."age" > ?', 18).toSql();
     const a = Base.connection as unknown as { castBoundValue?(v: unknown): unknown };
     const cast18 = typeof a.castBoundValue === "function" ? a.castBoundValue(18) : 18;
-    expect(sql).toContain(`"people"."age" > ${Base.connection.quote(cast18)}`);
+    expect(sql).toContain(`"rawsql_people"."age" > ${Base.connection.quote(cast18)}`);
   });
 
   // Rails: test "where with string bind for LIKE"
   it("where with LIKE query", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-
-    const sql = Person.where('"people"."name" LIKE ?', "%ali%").toSql();
+    const sql = RawsqlPerson.where('"rawsql_people"."name" LIKE ?', "%ali%").toSql();
     expect(sql).toContain("LIKE '%ali%'");
   });
 
   // Rails: test "rewhere replaces existing conditions"
   it("rewhere replaces conditions on the same column", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("status", "string");
-      }
-    }
+    await RawsqlPerson.create({ name: "Alice", status: "active" });
+    await RawsqlPerson.create({ name: "Bob", status: "inactive" });
 
-    await Person.create({ name: "Alice", status: "active" });
-    await Person.create({ name: "Bob", status: "inactive" });
-
-    const base = Person.where({ status: "active" });
+    const base = RawsqlPerson.where({ status: "active" });
     const rewritten = base.rewhere({ status: "inactive" });
 
     const records = await rewritten.toArray();
@@ -1867,21 +2185,11 @@ describe("Raw SQL Where (Rails-guided)", () => {
 
   // Rails: test "rewhere preserves other conditions"
   it("rewhere only replaces the specified keys", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "people";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("status", "string");
-        this.attribute("role", "string");
-      }
-    }
+    await RawsqlPerson.create({ name: "Alice", status: "active", role: "admin" });
+    await RawsqlPerson.create({ name: "Bob", status: "inactive", role: "admin" });
+    await RawsqlPerson.create({ name: "Charlie", status: "inactive", role: "user" });
 
-    await Person.create({ name: "Alice", status: "active", role: "admin" });
-    await Person.create({ name: "Bob", status: "inactive", role: "admin" });
-    await Person.create({ name: "Charlie", status: "inactive", role: "user" });
-
-    const base = Person.where({ status: "active", role: "admin" });
+    const base = RawsqlPerson.where({ status: "active", role: "admin" });
     const rewritten = base.rewhere({ status: "inactive" });
 
     const records = await rewritten.toArray();
@@ -2018,18 +2326,18 @@ describe("WhereTest", () => {
     expect(found.length).toBe(1);
   });
 
-  it.skip("type casting nested joins", async () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs join fixture setup */
+  it.skip("type casting nested joins", () => {
+    // BLOCKED: joins({post: "author"}) nested hash join syntax not yet implemented.
+    // Rails: Comment.joins(post: :author).where(authors: {id: "2-foo"}) — type-casts
+    // the string "2-foo" to integer 2 for an integer PK column.
+    // Needs: Relation#joins to accept nested association hash like Rails joins(post: :author).
   });
 
   it.skip("where with through association", async () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs has_many :through */
+    // BLOCKED: where(table: modelInstance) on a joined-through table not yet implemented.
+    // Rails: Author.joins(:comments).where(comments: comments(:greetings))
+    // Needs: whereClauseFor to handle table-name key + model-instance value by
+    // generating WHERE table.pk = ? using the instance's primary key.
   });
 
   it("polymorphic nested array where", async () => {
