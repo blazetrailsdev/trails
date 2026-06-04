@@ -1428,14 +1428,17 @@ describe("WhereTest", () => {
     // PERMANENTLY BLOCKED: Ruby Rational has no JavaScript equivalent.
     // Rails: Post.where(title: Rational(0)).count == 0 (Rational cast to "0/1").
   });
-  it("where with duration for string column", () => {
+  it("where with duration for string column", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.where({ title: seconds(0) }).toSql();
-    expect(sql).toContain("0");
+    // Mirrors Rails: empty table → 0 matches (no post has title "0").
+    expect(await Post.where({ title: seconds(0) }).count()).toBe(0);
+    // Positive: Duration.toString() → "0"; a post titled "0" must be found.
+    await Post.create({ title: "0" });
+    expect(await Post.where({ title: seconds(0) }).count()).toBe(1);
   });
   it("where with integer for binary column", () => {
     class Post extends Base {
