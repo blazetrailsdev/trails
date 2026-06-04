@@ -3,7 +3,7 @@
 **Status:** Phase 1 shipped (PR #2919 — opt-in harness + smoke test).
 Prerequisite for running the live-DB `adapters/<db>/**`
 dirs in CI the Rails way (one `TEST_ADAPTER=<db>` invocation of the whole AR
-suite). See [`adapter-test-ci-coverage-plan.md`](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0012-adapter-test-ci).
+suite). See [RFC 0012 (adapter-test-ci)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0012-adapter-test-ci).
 
 **Owner decision:** commit to Path A (true Rails model) rather than the
 pragmatic in-job separate-step workaround.

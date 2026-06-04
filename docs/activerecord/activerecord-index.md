@@ -20,29 +20,29 @@ For the audit reports that produced the original sequencing, see
 
 ## Doc map (post-consolidation)
 
-| Doc                                                                                                                         | Owns                                                                                                                                                        |
-| --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `activerecord-index.md` (this)                                                                                              | doc map + high-level state                                                                                                                                  |
-| [`test-compare-100-attack-plan.md`](test-compare-100-attack-plan.md)                                                        | **authoritative test:compare 100% ordering** — complete grouped skip inventory, CI-lane analysis, phase sequence (0–4), per-file table, source-verification |
-| [`workplan.md`](workplan.md)                                                                                                | **per-story specs** (anchors, Rails refs, LOC, deps, acceptance) for the open waves; ordering deferred to the attack plan via a wave→phase crosswalk        |
-| [`activerecord-100-plan.md`](activerecord-100-plan.md)                                                                      | test:compare drive — batch list (Part 1) + per-file backlog table (Part 2); historical batch detail                                                         |
-| [`activerecord-gaps.md`](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0005-activerecord-gaps)                     | residual gaps from the 5 merged gap plans (associations, relation, connection-pool, database-tasks, query-cache) — mostly blocked/done                      |
-| [`adapter-architecture-cleanup.md`](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0010-adapter-cleanup)            | adapter→connection collapse, global-Arel-visitor removal, hash-only constructor, `this.adapter` audit                                                       |
-| [`activerecord-type-audit.md`](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0009-type-audit)                      | type cleanup (W1b, small follow-ups, W4)                                                                                                                    |
-| [`parity-verification.md`](parity-verification.md)                                                                          | reference: schema + query parity pipelines                                                                                                                  |
-| [`fixtures-adoption-inventory.md`](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0014-fixtures-adoption)           | reference: script-generated fixture tiering                                                                                                                 |
-| [`trails-models-dump-schema-ts-migration.md`](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0003-activerecord-cli) | plan: make `trails-models-dump` derive models from committed `db/schema.ts` instead of a live DB                                                            |
+| Doc                                                                                                           | Owns                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `activerecord-index.md` (this)                                                                                | doc map + high-level state                                                                                                                                  |
+| [`test-compare-100-attack-plan.md`](test-compare-100-attack-plan.md)                                          | **authoritative test:compare 100% ordering** — complete grouped skip inventory, CI-lane analysis, phase sequence (0–4), per-file table, source-verification |
+| [`workplan.md`](workplan.md)                                                                                  | **per-story specs** (anchors, Rails refs, LOC, deps, acceptance) for the open waves; ordering deferred to the attack plan via a wave→phase crosswalk        |
+| [`activerecord-100-plan.md`](activerecord-100-plan.md)                                                        | test:compare drive — batch list (Part 1) + per-file backlog table (Part 2); historical batch detail                                                         |
+| [RFC 0005 (activerecord gaps)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0005-activerecord-gaps) | residual gaps from the 5 merged gap plans (associations, relation, connection-pool, database-tasks, query-cache) — mostly blocked/done                      |
+| [RFC 0010 (adapter-cleanup)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0010-adapter-cleanup)     | adapter→connection collapse, global-Arel-visitor removal, hash-only constructor, `this.adapter` audit                                                       |
+| [RFC 0009 (type-audit)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0009-type-audit)               | type cleanup (W1b, small follow-ups, W4)                                                                                                                    |
+| [`parity-verification.md`](parity-verification.md)                                                            | reference: schema + query parity pipelines                                                                                                                  |
+| [RFC 0014 (fixtures-adoption)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0014-fixtures-adoption) | reference: script-generated fixture tiering                                                                                                                 |
+| [RFC 0003 (activerecord-cli)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0003-activerecord-cli)   | plan: make `trails-models-dump` derive models from committed `db/schema.ts` instead of a live DB                                                            |
 
 ## Focused work set (what's actually buildable)
 
 1. **test:compare drive** — [`test-compare-100-attack-plan.md`](test-compare-100-attack-plan.md)
    is the authoritative phase plan (pick a phase/story there, get its spec from
    `workplan.md`). The main live backlog.
-2. **adapter-architecture** — `adapter-architecture-cleanup.md`: global-Arel-visitor
+2. **adapter-architecture** — RFC 0010 (adapter-cleanup): global-Arel-visitor
    removal (Phases A–C, **unblocked**), adapter→connection PR A/B/C, hash-only
    constructor (gated on #2700).
-3. **type cleanup** — `activerecord-type-audit.md` (~250 LOC, bundleable).
-4. **Small unblocked gap items** — `activerecord-gaps.md` "Unblocked" section
+3. **type cleanup** — RFC 0009 (type-audit) (~250 LOC, bundleable).
+4. **Small unblocked gap items** — RFC 0005 (activerecord gaps) "Unblocked" section
    (DatabaseTasks P3-5 migrateStatus stdout ~30 LOC; associations Track 9; a
    2-LOC JSDoc fix). Everything else in that doc is blocked or done.
 
@@ -59,10 +59,10 @@ For the audit reports that produced the original sequencing, see
 - **Fixtures adoption** — empirical yield ~8% (most AR tests use bespoke
   per-describe models with no canonical counterpart). **Do NOT spin up a
   sweep.** 5 unconverted Tier 1 files remain — convert opportunistically when
-  touching those files. Tiering data in `fixtures-adoption-inventory.md`. Plan
+  touching those files. Tiering data in RFC 0014 (fixtures-adoption). Plan
   doc retired into this note.
 - **Query-cache mixin** — all 3 phases shipped (#2662/#2672/#2684). See
-  `activerecord-gaps.md`.
+  RFC 0005 (activerecord gaps).
 - **TM Phase 9b-3** (delete dormant fallback) — **closed-don't-reopen**; live
   Rails-parity code for HABTM join models.
 - **SQLite driver abstraction** — PR 1/2/3/4/5/7/M shipped; only PR 6 (CI

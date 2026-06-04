@@ -26,7 +26,7 @@
 > per-file tracker is now **Part 2** of this doc (below the batch list).
 > This doc owns both the batch list (Part 1) and the per-file backlog table
 > (Part 2). Residual blocked/done gap items live in
-> [`activerecord-gaps.md`](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0005-activerecord-gaps).
+> [RFC 0005 (activerecord gaps)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0005-activerecord-gaps).
 
 The api:compare scoreboard is **closed**. Everything below is post-100% Rails-fidelity work — test:compare un-skips driven by audit clusters plus accumulated fidelity polish. PRs target ~250 LOC (CLAUDE.md hard ceiling 500; range 220–280).
 
@@ -155,7 +155,7 @@ Permanently not-portable tests are excluded via `UNPORTED_FILES` in `scripts/api
 
 ~98 queued batches (some lettered sub-batches: 28b, 86a/b, 121a/b/c, 122a/b, 129a/b/c), ~16k LOC. Batches numbered sequentially; the next-to-ship is the lowest-numbered open batch. test:compare standing at 6568/7885 (83.3%) per snapshot above. GitHub is the source of truth for which batches have PRs in flight — search `feat(activerecord): batch N` in open PRs.
 
-The `as any` legacy-cast cleanup sweep has been **superseded by `docs/activerecord-type-audit.md`** — the type-audit's 4-wave plan covers the same `(record as any)._readAttribute` / `.save` / `.destroy` removals more precisely. The 2 `bug-suspected` candidates remain in batches below for surgical verification.
+The `as any` legacy-cast cleanup sweep has been **superseded by RFC 0009 (type-audit)** — the type-audit's 4-wave plan covers the same `(record as any)._readAttribute` / `.save` / `.destroy` removals more precisely. The 2 `bug-suspected` candidates remain in batches below for surgical verification.
 
 ---
 
@@ -901,7 +901,7 @@ Distilled from `~/.btwhooks/data/github/blazetrailsdev/trails/<PR#>/post-pr/*.md
 ## See also
 
 - [`scripts/api-compare/unported-files.ts`](../scripts/api-compare/unported-files.ts) — canonical not-portable list.
-- [`activerecord-type-audit.md`](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0009-type-audit) — supersedes the `as any` legacy-cast cleanup sweep.
+- [RFC 0009 (type-audit)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0009-type-audit) — supersedes the `as any` legacy-cast cleanup sweep.
 
 ---
 
