@@ -3,7 +3,7 @@
 **Status:** Phase 1 shipped (PR #2919 — opt-in harness + smoke test).
 Prerequisite for running the live-DB `adapters/<db>/**`
 dirs in CI the Rails way (one `TEST_ADAPTER=<db>` invocation of the whole AR
-suite). See [`adapter-test-ci-coverage-plan.md`](adapter-test-ci-coverage-plan.md).
+suite). See [RFC 0012 (adapter-test-ci)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0012-adapter-test-ci).
 
 **Owner decision:** commit to Path A (true Rails model) rather than the
 pragmatic in-job separate-step workaround.
@@ -119,7 +119,7 @@ that holds the open transaction. Today most core tests go through
    names (§4.1).
 5. **Re-attempt the lane.** Re-key `ADAPTER_SPECIFIC_EXCLUDE` on `TEST_ADAPTER`
    and set it on `postgres-tests`/`mysql-tests` — the combined run should now be
-   green. (This is the [adapter-test-ci-coverage-plan](adapter-test-ci-coverage-plan.md)
+   green. (This is the [adapter-test-ci-coverage-plan](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0012-adapter-test-ci)
    §4 step, unblocked.)
 
 ## 6. Risks
@@ -140,5 +140,5 @@ shared-DB flakes — but it is a multi-phase harness change, and **MySQL's DDL
 auto-commit means it fully delivers single-invocation for PG, and for MySQL only
 once the schema-DDL tests get complementary teardown.** Recommend executing the
 phases in order, each as its own ≤500-LOC PR with full-suite CI validation, and
-keeping the [adapter CI lane](adapter-test-ci-coverage-plan.md) on hold (PR #2863
+keeping the [adapter CI lane](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0012-adapter-test-ci) on hold (PR #2863
 probe stays the green reference) until Phase 5.

@@ -12,7 +12,7 @@ Rails-mirroring file paths. It does **not** validate **structure within a file**
 data-driven ESLint rule (`blazetrails/rails-file-structure`) backed by a
 cached Ruby analysis of `vendor/rails/`.
 
-Style match: [activerecord-type-audit.md](../activerecord/activerecord-type-audit.md) +
+Style match: [RFC 0009 (type-audit)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0009-type-audit) +
 [actionpack-100-percent.md](../actionpack-100-percent.md).
 This is the _within-file_ analog of the actionpack restructure audit.
 
@@ -634,7 +634,7 @@ reason="rails-source-is-itself-disordered"` is the escape hatch and
 
 ## 9. Cross-references
 
-- [docs/activerecord-type-audit.md](../activerecord/activerecord-type-audit.md) — audit →
+- [RFC 0009 (type-audit)](https://github.com/blazetrailsdev/tasks/tree/main/rfcs/0009-type-audit) — audit →
   wave-plan style precedent.
 - [docs/actionpack-100-percent.md](../actionpack-100-percent.md) —
   the directory-level analog to this within-file plan.
