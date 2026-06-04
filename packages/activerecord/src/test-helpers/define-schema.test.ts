@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { adapterType, createSidecarTestAdapter, createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import {
@@ -15,10 +15,14 @@ beforeEach(() => {
   adapter = createTestAdapter();
 });
 
+afterAll(async () => {
+  await adapter.executeMutation(`DROP TABLE IF EXISTS "ds_probe"`).catch(() => {});
+});
+
 describe("defineSchema", () => {
   it("creates a single table with common column types", async () => {
     await defineSchema(adapter, {
-      things: {
+      ds_probe: {
         name: "string",
         body: "text",
         count: "integer",
@@ -33,9 +37,9 @@ describe("defineSchema", () => {
     });
 
     await adapter.executeMutation(
-      `INSERT INTO "things" ("name","body","count","big_count","ratio","price","created_at","born_on","start_time","meta") VALUES ('x','y',1,2,1.5,9.99,'2024-01-01','2024-01-01','11:30:00','{}')`,
+      `INSERT INTO "ds_probe" ("name","body","count","big_count","ratio","price","created_at","born_on","start_time","meta") VALUES ('x','y',1,2,1.5,9.99,'2024-01-01','2024-01-01','11:30:00','{}')`,
     );
-    const rows = await adapter.execute(`SELECT * FROM "things"`);
+    const rows = await adapter.execute(`SELECT * FROM "ds_probe"`);
     expect(rows).toHaveLength(1);
   });
 
