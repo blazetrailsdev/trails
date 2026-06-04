@@ -275,6 +275,12 @@ export interface AbstractAdapter {
   tables(): Promise<string[]>;
   views(): Promise<string[]>;
   viewExists(viewName: string): Promise<boolean>;
+  createView(
+    viewName: string,
+    sqlDefinition: string,
+    options?: { force?: boolean; replace?: boolean },
+  ): Promise<void>;
+  dropView(viewName: string, options?: { ifExists?: boolean }): Promise<void>;
   columns(tableName: string): Promise<Column[]>;
   primaryKey(tableName: string): Promise<string | string[] | null>;
   indexes(tableName: string): Promise<unknown[]>;

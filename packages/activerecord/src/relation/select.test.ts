@@ -265,10 +265,9 @@ describe("SelectTest", () => {
     // BLOCKED: associations — joins + includes attribute key inspection not yet supported
   });
 
-  it.skip("select without any arguments", () => {
-    // BLOCKED: relation — select() with no args should raise ArgumentError "Call `select' with at least one field."
-    // ROOT-CAUSE: relation.ts#select does not validate arity; no-arg call is a no-op
-    // SCOPE: ~5 LOC in relation.ts
+  it("select without any arguments", () => {
+    const { Post } = makePost();
+    expect(() => Post.all().select()).toThrow("Call `select' with at least one field.");
   });
 
   it.skip("reselect with default scope select", () => {
@@ -288,11 +287,14 @@ describe("SelectTest", () => {
     expect(sql).toContain(quoteColumnName("salary"));
   });
 
-  it.skip("select with block without any arguments", () => {
-    // BLOCKED: relation — Relation API gap in select
-    // ROOT-CAUSE: relation/select.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in select.test.ts
-    /* needs select with block form */
+  it("select with block without any arguments", () => {
+    const { Post } = makePost();
+    // In Ruby, `Post.select("arg") { }` passes both a column arg and a block;
+    // in TS the closest equivalent is passing a string and a function together.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(() => (Post.all().select as any)("invalid_argument", () => {})).toThrow(
+      "`select' with block doesn't take arguments.",
+    );
   });
 });
 

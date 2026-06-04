@@ -1,115 +1,225 @@
-import { describe, it } from "vitest";
+/**
+ * Mirrors: activerecord/test/cases/view_test.rb
+ *
+ * Rails conditionally runs this entire file under `if supports_views?`.
+ * SQLite, PostgreSQL, and MySQL all support views, so we run unconditionally.
+ * The UpdateableViewTest block is guarded to non-SQLite adapters because
+ * SQLite does not support DML (INSERT/UPDATE/DELETE) through views.
+ */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { Base } from "./index.js";
+import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { adapterType } from "./test-adapter.js";
+import { dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
 
+// In Rails, AbstractAdapter includes SchemaStatements, so view DDL and
+// introspection methods live directly on the connection object.
+function conn(): AbstractAdapter {
+  return Base.connection as unknown as AbstractAdapter;
+}
+
+// ---------------------------------------------------------------------------
+// ViewWithPrimaryKeyTest
+// ---------------------------------------------------------------------------
 describe("ViewWithPrimaryKeyTest", () => {
-  it.skip("reading", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+  const { books } = useHandlerFixtures(["books", "authors"], { schema: canonicalSchema });
+
+  class Ebook extends Base {
+    static override _tableName = "ebooks'";
+    static override _primaryKey = "id";
+  }
+
+  beforeAll(async () => {
+    await conn().createView(
+      "ebooks'",
+      `SELECT id, name, cover, status FROM books WHERE format = 'ebook'`,
+    );
+    await Ebook.loadSchema();
   });
-  it.skip("views", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  afterAll(async () => {
+    if (await conn().viewExists("ebooks'")) {
+      await conn().dropView("ebooks'");
+    }
   });
-  it.skip("view exists", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  it("reading", async () => {
+    const ebookRecords = await Ebook.all();
+    expect(ebookRecords.map((b: any) => b.id)).toEqual([books("rfr").id]);
+    expect(ebookRecords.map((b: any) => b.name)).toEqual(["Ruby for Rails"]);
   });
-  it.skip("table exists", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  it("views", async () => {
+    const viewList = await conn().views();
+    expect(viewList).toContain(Ebook._tableName);
   });
-  it.skip("views ara valid data sources", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  it("view exists", async () => {
+    expect(await conn().viewExists(Ebook._tableName)).toBe(true);
   });
-  it.skip("column definitions", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  it("table exists", async () => {
+    expect(await conn().tableExists(Ebook._tableName)).toBe(false);
   });
-  it.skip("attributes", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  it("views ara valid data sources", async () => {
+    expect(await conn().isDataSourceExists(Ebook._tableName)).toBe(true);
   });
+
+  it("column definitions", async () => {
+    expect(Ebook.columns().map((c: any) => [c.name, c.type])).toEqual([
+      ["id", "integer"],
+      ["name", "string"],
+      ["cover", "string"],
+      ["status", "integer"],
+    ]);
+  });
+
+  it("attributes", async () => {
+    const ebook = await Ebook.first();
+    expect((ebook as any).attributes).toEqual({
+      id: 2,
+      name: "Ruby for Rails",
+      cover: "hard",
+      status: 0,
+    });
+  });
+
   it.skip("does not assume id column as primary key", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+    // BLOCKED: primary-key detection — our default pk is "id"; detecting nil
+    // requires schema-based reset_primary_key (queries PRAGMA table_info for pk=0).
   });
-  it.skip("does not dump view as table", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  it("does not dump view as table", async () => {
+    const schema = await dumpTableSchema(conn() as any, "ebooks'");
+    expect(schema).not.toMatch(/create_table "ebooks'"/);
   });
 });
 
+// ---------------------------------------------------------------------------
+// ViewWithoutPrimaryKeyTest
+// ---------------------------------------------------------------------------
 describe("ViewWithoutPrimaryKeyTest", () => {
-  it.skip("reading", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+  const { books } = useHandlerFixtures(["books", "authors"], { schema: canonicalSchema });
+
+  class Paperback extends Base {
+    static override _tableName = "paperbacks";
+  }
+
+  beforeAll(async () => {
+    await conn().createView(
+      "paperbacks",
+      `SELECT name, status FROM books WHERE format = 'paperback'`,
+    );
+    await Paperback.loadSchema();
   });
-  it.skip("views", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  afterAll(async () => {
+    if (await conn().viewExists("paperbacks")) {
+      await conn().dropView("paperbacks");
+    }
   });
-  it.skip("view exists", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  it("reading", async () => {
+    const records = await Paperback.all();
+    expect(records.map((b: any) => b.name)).toEqual([books("awdr").name]);
   });
-  it.skip("table exists", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  it("views", async () => {
+    const viewList = await conn().views();
+    expect(viewList).toContain(Paperback._tableName);
   });
-  it.skip("column definitions", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  it("view exists", async () => {
+    expect(await conn().viewExists(Paperback._tableName)).toBe(true);
   });
-  it.skip("attributes", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  it("table exists", async () => {
+    expect(await conn().tableExists(Paperback._tableName)).toBe(false);
   });
+
+  it("column definitions", async () => {
+    expect(Paperback.columns().map((c: any) => [c.name, c.type])).toEqual([
+      ["name", "string"],
+      ["status", "integer"],
+    ]);
+  });
+
+  it("attributes", async () => {
+    const record = await Paperback.first();
+    expect((record as any).attributes).toEqual({
+      name: "Agile Web Development with Rails",
+      status: 2,
+    });
+  });
+
   it.skip("does not have a primary key", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+    // BLOCKED: primary-key detection — see ViewWithPrimaryKeyTest note.
   });
-  it.skip("does not dump view as table", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  it("does not dump view as table", async () => {
+    const schema = await dumpTableSchema(conn() as any, "paperbacks");
+    expect(schema).not.toMatch(/create_table "paperbacks"/);
   });
 });
 
+// ---------------------------------------------------------------------------
+// UpdateableViewTest — MySQL/PG only (SQLite views do not support DML)
+// ---------------------------------------------------------------------------
 describe("UpdateableViewTest", () => {
-  it.skip("update record", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+  const { books } = useHandlerFixtures(["books", "authors"], { schema: canonicalSchema });
+
+  class PrintedBook extends Base {
+    static override _tableName = "printed_books";
+    static override _primaryKey = "id";
+  }
+
+  beforeAll(async () => {
+    if (adapterType === "sqlite") return;
+    await conn().createView(
+      "printed_books",
+      `SELECT id, name, status, format FROM books WHERE format = 'paperback'`,
+    );
+    await PrintedBook.loadSchema();
   });
-  it.skip("insert record", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  afterAll(async () => {
+    if (adapterType === "sqlite") return;
+    if (await conn().viewExists("printed_books")) {
+      await conn().dropView("printed_books");
+    }
   });
-  it.skip("insert record populates primary key", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  it.skipIf(adapterType === "sqlite")("update record", async () => {
+    const book = await PrintedBook.find(books("awdr").id);
+    (book as any).name = "AWDwR";
+    await (book as any).save();
+    await (book as any).reload();
+    expect((book as any).name).toBe("AWDwR");
   });
-  it.skip("update record to fail view conditions", () => {
-    // BLOCKED: schema — database view DDL not implemented (createView / dropView)
-    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#createView not implemented
-    // SCOPE: ~50 LOC in abstract/schema-statements.ts; affects ~21 tests in view.test.ts
+
+  it.skipIf(adapterType === "sqlite")("insert record", async () => {
+    await PrintedBook.create({ name: "Rails in Action", status: 0, format: "paperback" });
+    const newBook = await PrintedBook.last();
+    expect((newBook as any).name).toBe("Rails in Action");
+  });
+
+  it.skipIf(adapterType === "sqlite")("insert record populates primary key", async () => {
+    const book = await PrintedBook.create({
+      name: "Rails in Action",
+      status: 0,
+      format: "paperback",
+    });
+    expect((book as any).id).not.toBeNull();
+    expect((book as any).id).toBeGreaterThan(0);
+  });
+
+  it.skipIf(adapterType === "sqlite")("update record to fail view conditions", async () => {
+    const book = await PrintedBook.find(books("awdr").id);
+    (book as any).format = "ebook";
+    await (book as any).save();
+    await expect((book as any).reload()).rejects.toThrow();
   });
 });

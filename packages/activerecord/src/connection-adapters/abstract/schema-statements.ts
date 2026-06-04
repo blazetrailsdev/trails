@@ -1001,24 +1001,55 @@ export class SchemaStatements {
 
   async viewExists(viewName: string): Promise<boolean> {
     let rows: Record<string, unknown>[];
+    // Escape single quotes in view name for safe SQL string literal embedding.
+    const safe = viewName.replace(/'/g, "''");
     switch (this.adapterName) {
       case "sqlite":
         rows = await this.adapter.execute(
-          `SELECT name FROM sqlite_master WHERE type='view' AND name='${viewName}'`,
+          `SELECT name FROM sqlite_master WHERE type='view' AND name='${safe}'`,
         );
         break;
       case "postgres":
         rows = await this.adapter.execute(
-          `SELECT 1 FROM pg_views WHERE schemaname = 'public' AND viewname = '${viewName}' LIMIT 1`,
+          `SELECT 1 FROM pg_views WHERE schemaname = 'public' AND viewname = '${safe}' LIMIT 1`,
         );
         break;
       case "mysql":
         rows = await this.adapter.execute(
-          `SELECT 1 FROM information_schema.views WHERE table_schema = DATABASE() AND table_name = '${viewName}' LIMIT 1`,
+          `SELECT 1 FROM information_schema.views WHERE table_schema = DATABASE() AND table_name = '${safe}' LIMIT 1`,
         );
         break;
     }
     return rows.length > 0;
+  }
+
+  /**
+   * Creates a database view.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#create_view
+   */
+  async createView(
+    viewName: string,
+    sqlDefinition: string,
+    options: { force?: boolean; replace?: boolean } = {},
+  ): Promise<void> {
+    if (options.force) {
+      await this.dropView(viewName, { ifExists: true });
+    }
+    const orReplace = options.replace ? " OR REPLACE" : "";
+    await this.adapter.executeMutation(
+      `CREATE${orReplace} VIEW ${this._qt(viewName)} AS ${sqlDefinition}`,
+    );
+  }
+
+  /**
+   * Drops a database view.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#drop_view
+   */
+  async dropView(viewName: string, options: { ifExists?: boolean } = {}): Promise<void> {
+    const ifExists = options.ifExists ? " IF EXISTS" : "";
+    await this.adapter.executeMutation(`DROP VIEW${ifExists} ${this._qt(viewName)}`);
   }
 
   async indexExists(

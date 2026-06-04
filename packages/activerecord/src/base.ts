@@ -1736,7 +1736,9 @@ export class Base extends Model {
     const attr = attrPart
       .replace(/^./, (c) => c.toLowerCase())
       .replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-    return this._attributeDefinitions.has(attr);
+    if (this._attributeDefinitions.has(attr)) return true;
+    const aliases = (this as any)._attributeAliases as Record<string, string> | undefined;
+    return !!aliases && Object.prototype.hasOwnProperty.call(aliases, attr);
   }
 
   /**
