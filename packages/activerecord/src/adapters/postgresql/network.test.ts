@@ -85,7 +85,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       address.mac_address = "bc:de:f0:12:34:56";
 
       await address.saveBang();
-      await address.reload();
+      expect(await address.reload()).toBeTruthy();
       expect(address.cidr_address).toMatchObject({ address: "10.1.2.3", prefixLength: 32 });
       expect(address.inet_address).toMatchObject({ address: "10.0.0.0", prefixLength: 8 });
       expect(address.mac_address).toBe("bc:de:f0:12:34:56");
@@ -100,7 +100,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(invalidAddress.inet_address).toBeNull();
       expect(invalidAddress.cidr_addressBeforeTypeCast).toBe("invalid addr");
       expect(invalidAddress.inet_addressBeforeTypeCast).toBe("invalid addr");
-      await invalidAddress.save();
+      expect(await invalidAddress.save()).toBe(true);
 
       await invalidAddress.reload();
       expect(invalidAddress.cidr_address).toBeNull();
