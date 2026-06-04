@@ -28,9 +28,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     // Rails: @connection = ActiveRecord::Base.lease_connection
     connection = Base.connection as PostgreSQLAdapter;
     // Rails: @connection.transaction { @connection.create_table("bytea_data_type") { |t| ... } }
-    await connection.createTable("bytea_data_type", (t) => {
-      t.binary("payload");
-      t.binary("serialized");
+    await connection.transaction(async () => {
+      await connection.createTable("bytea_data_type", (t) => {
+        t.binary("payload");
+        t.binary("serialized");
+      });
     });
     ByteaDataType.resetColumnInformation();
     await ByteaDataType.loadSchema();
@@ -64,16 +66,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("type cast binary converts the encoding", () => {
       // Rails: assert @column
       expect(column).toBeDefined();
-      // Rails: data = "\x8B"
+      // Rails: data = "\u001F\x8B"
       // Rails: assert_equal("ASCII-8BIT", @type.deserialize(data).encoding.name)
       // JS equivalent: deserializing a string returns a Uint8Array (binary, not a string)
-      const data = "\x8B";
+      const data = "\u001F\x8B";
       const result = type.deserialize(data);
       expect(result).toBeInstanceOf(Uint8Array);
     });
 
     it("type cast binary value", () => {
-      // Rails: data = (+"\x8B").force_encoding("BINARY")
+      // Rails: data = (+"\u001F\x8B").force_encoding("BINARY")
       // Rails: assert_equal(data, @type.deserialize(data))
       const data = Buffer.from([0x1f, 0x8b]);
       const result = type.deserialize(data);
@@ -87,7 +89,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("read value", async () => {
-      // Rails: data = ""
+      // Rails: data = "\u001F"
       // Rails: @connection.execute "insert into bytea_data_type (payload) VALUES ('#{data}')"
       const data = Buffer.from([0x1f]);
       await connection.execute(`INSERT INTO bytea_data_type (payload) VALUES ($1)`, [data]);
@@ -108,7 +110,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write value", async () => {
-      // Rails: data = ""
+      // Rails: data = "\u001F"
       const data = Buffer.from([0x1f]);
       // Rails: record = ByteaDataType.create(payload: data)
       const record = await (ByteaDataType as any).create({ payload: data });
@@ -121,7 +123,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     // Rails: re-used by test_via_to_sql and test_via_to_sql_with_complicating_connection
     async function runViaToSql(): Promise<void> {
-      // Rails: data = "'\\"
+      // Rails: data = "'\u001F\\"
       const data = Buffer.from([0x27, 0x1f, 0x5c]);
       await (ByteaDataType as any).create({ payload: data });
       const sql = (ByteaDataType as any).where({ payload: data }).select("payload").toSql();
@@ -189,9 +191,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: output = dump_table_schema("bytea_data_type")
       const output = await SchemaDumper.dumpTableSchema(connection, "bytea_data_type");
       // Rails: assert_match %r{t\.binary\s+"payload"$}, output
-      expect(output).toMatch(/t\.binary\s*\("payload"\)/);
+      expect(output).toMatch(/t\.binary\s*\("payload"\);$/m);
       // Rails: assert_match %r{t\.binary\s+"serialized"$}, output
-      expect(output).toMatch(/t\.binary\s*\("serialized"\)/);
+      expect(output).toMatch(/t\.binary\s*\("serialized"\);$/m);
     });
   });
 });
