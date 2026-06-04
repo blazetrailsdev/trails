@@ -24,10 +24,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     await connection.createTable("citexts", (t: any) => {
       t.citext("cival");
     });
-    // resetColumnInformation does not clear _schemaLoadPromise; clear it explicitly
-    // so that the loadSchema() below fetches the freshly-created table's columns
-    // rather than reusing the resolved promise from a prior test run.
-    (Citext as any)._schemaLoadPromise = undefined;
     Citext.resetColumnInformation();
     await Citext.loadSchema();
   });
@@ -57,16 +53,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("change table supports json", async () => {
       try {
         await connection.transaction(async () => {
-          // Rails: t.citext "username" — Table (change_table) lacks citext(); use generic column()
-          await connection.changeTable("citexts", (t: any) => {
-            t.column("username", "citext");
+          // Rails: t.citext "username" — PgTable (change_table builder) lacks citext();
+          // TODO: add citext() to PgTable so this mirrors t.citext "username" exactly.
+          await connection.changeTable("citexts", async (t: any) => {
+            await t.column("username", "citext");
           });
           Citext.resetColumnInformation();
-          // Rails asserts Citext.columns_hash["username"].type == :citext here.
-          // BLOCKED: any execute() call after DDL inside connection.transaction()
-          //   triggers InstrumentationAlreadyStartedError in our PG driver — the
-          //   transaction instrumenter doesn't survive the DDL→DML hand-off.
-          //   Column type is already verified in the "column" test for "cival".
+          // Rails: assert_equal :citext, Citext.columns_hash["username"].type (citext_test.rb:47-48)
+          // TODO: restore once InstrumentationAlreadyStartedError after DDL inside
+          //   connection.transaction() is fixed in the PG driver.
           throw new Rollback();
         });
       } finally {
