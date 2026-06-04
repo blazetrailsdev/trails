@@ -1000,11 +1000,23 @@ export class SchemaStatements {
   }
 
   async viewExists(viewName: string): Promise<boolean> {
-    // Mirrors Rails' abstract fallback: `views.include?(view_name.to_s)`.
-    // Rails' primary path (data_source_sql) is adapter-specific; each
-    // adapter already implements a correct views() — delegate through that.
-    const allViews = await this.views();
-    return allViews.includes(viewName);
+    // Mirrors Rails:
+    //   query_values(data_source_sql(view_name, type: "VIEW"), "SCHEMA").any?
+    //     if view_name.present?
+    //   rescue NotImplementedError
+    //     views.include?(view_name.to_s)
+    if (!viewName) return false;
+    try {
+      const sql = this.dataSourceSql(viewName, { type: "VIEW" });
+      const rows = await this.adapter.execute(sql);
+      return rows.length > 0;
+    } catch (e) {
+      if (e instanceof NotImplementedError) {
+        const allViews = await this.views();
+        return allViews.includes(viewName);
+      }
+      throw e;
+    }
   }
 
   async indexExists(

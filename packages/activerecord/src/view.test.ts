@@ -195,13 +195,13 @@ describe("UpdateableViewTest", () => {
   it.skipIf(adapterType === "sqlite")("update record", async () => {
     const book = await PrintedBook.find(books("awdr").id);
     (book as any).name = "AWDwR";
-    await (book as any).save();
+    await (book as any).saveBang();
     await (book as any).reload();
     expect((book as any).name).toBe("AWDwR");
   });
 
   it.skipIf(adapterType === "sqlite")("insert record", async () => {
-    await PrintedBook.create({ name: "Rails in Action", status: 0, format: "paperback" });
+    await PrintedBook.createBang({ name: "Rails in Action", status: 0, format: "paperback" });
     const newBook = await PrintedBook.last();
     expect((newBook as any).name).toBe("Rails in Action");
   });
@@ -209,7 +209,7 @@ describe("UpdateableViewTest", () => {
   // Rails: only runs on PostgreSQL (and SQLite) with supports_insert_returning?.
   // The outer UpdateableViewTest block already excludes SQLite, leaving PG only.
   it.skipIf(adapterType !== "postgres")("insert record populates primary key", async () => {
-    const book = await PrintedBook.create({
+    const book = await PrintedBook.createBang({
       name: "Rails in Action",
       status: 0,
       format: "paperback",
@@ -221,7 +221,7 @@ describe("UpdateableViewTest", () => {
   it.skipIf(adapterType === "sqlite")("update record to fail view conditions", async () => {
     const book = await PrintedBook.find(books("awdr").id);
     (book as any).format = "ebook";
-    await (book as any).save();
+    await (book as any).saveBang();
     await expect((book as any).reload()).rejects.toThrow();
   });
 });
