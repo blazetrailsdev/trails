@@ -579,6 +579,7 @@ jobs:
       # / perturb fork scheduling — see trails-models-dump tests).
       - run: pnpm vitest run packages/activerecord/
         env:
+          ARCONN: postgresql
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
           AR_DB_FORKS: 4
       - run: pnpm vitest run packages/activerecord-cli
@@ -633,6 +634,7 @@ jobs:
       # / perturb fork scheduling — see trails-models-dump tests).
       - run: pnpm vitest run packages/activerecord/
         env:
+          ARCONN: mysql2
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
           AR_DB_FORKS: 4
       # No MYSQL_TEST_URL: no mysql-happy-path E2E exists yet. This run
