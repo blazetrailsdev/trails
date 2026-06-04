@@ -6,11 +6,14 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Base, Rollback } from "../../index.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import type { TableDefinition as PgTableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
+import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
 class Citext extends Base {
   static {
     this.tableName = "citexts";
   }
+  declare cival: string;
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -21,8 +24,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   beforeEach(async () => {
     connection = Base.connection as PostgreSQLAdapter;
     await connection.enableExtension("citext");
-    await connection.createTable("citexts", (t: any) => {
-      t.citext("cival");
+    await connection.createTable("citexts", (t) => {
+      (t as PgTableDefinition).citext("cival");
     });
     Citext.resetColumnInformation();
     await Citext.loadSchema();
@@ -40,11 +43,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("column", async () => {
-      const column = Citext.columnsHash()["cival"];
+      const column = Citext.columnsHash()["cival"] as unknown as PgColumn;
       expect(column).toBeDefined();
       expect(column.type).toBe("citext");
       expect(column.sqlType).toBe("citext");
-      expect((column as any).array).toBeFalsy();
+      expect(column.array).toBeFalsy();
 
       const type = Citext.typeForAttribute("cival");
       expect(type.isBinary()).toBe(false);
@@ -55,7 +58,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await connection.transaction(async () => {
           // Rails: t.citext "username" — PgTable (change_table builder) lacks citext();
           // TODO: add citext() to PgTable so this mirrors t.citext "username" exactly.
-          await connection.changeTable("citexts", async (t: any) => {
+          await connection.changeTable("citexts", async (t) => {
             await t.column("username", "citext");
           });
           Citext.resetColumnInformation();
@@ -74,20 +77,20 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("write", async () => {
       const x = Citext.new({ cival: "Some CI Text" });
-      await (x as any).saveBang();
-      const citext = await (Citext as any).first();
-      expect((citext as any).cival).toBe("Some CI Text");
+      await x.saveBang();
+      const citext = await Citext.first();
+      expect(citext!.cival).toBe("Some CI Text");
 
-      (citext as any).cival = "Some NEW CI Text";
-      await (citext as any).saveBang();
-      await (citext as any).reload();
-      expect((citext as any).cival).toBe("Some NEW CI Text");
+      citext!.cival = "Some NEW CI Text";
+      await citext!.saveBang();
+      await citext!.reload();
+      expect(citext!.cival).toBe("Some NEW CI Text");
     });
 
     it("select case insensitive", async () => {
       await connection.execute("insert into citexts (cival) values('Cased Text')");
-      const x = await (Citext as any).where({ cival: "cased text" }).first();
-      expect((x as any).cival).toBe("Cased Text");
+      const x = await Citext.where({ cival: "cased text" }).first();
+      expect(x!.cival).toBe("Cased Text");
     });
 
     it("case insensitiveness", async () => {
