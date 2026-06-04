@@ -995,8 +995,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {
-    void tableName;
-    return [];
+    const rows = await this.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ${this.quote(tableName)} AND INDEX_NAME = 'PRIMARY' ORDER BY SEQ_IN_INDEX`,
+    );
+    return (rows as { COLUMN_NAME?: string; column_name?: string }[]).map(
+      (r) => (r.COLUMN_NAME ?? r.column_name) as string,
+    );
   }
 
   /**
