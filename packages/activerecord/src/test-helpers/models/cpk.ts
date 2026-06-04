@@ -20,6 +20,7 @@ export class CpkBook extends Base {
   failDestroy = false;
 
   static {
+    this._primaryKey = ["author_id", "id"];
     this.belongsTo("order", {
       className: "CpkOrder",
       autosave: true,

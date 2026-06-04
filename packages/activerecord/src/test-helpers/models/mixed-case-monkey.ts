@@ -2,6 +2,8 @@
 import { Base } from "../../base.js";
 
 export class MixedCaseMonkey extends Base {
+  static _primaryKey = "monkeyID";
+
   static {
     this.belongsTo("human");
   }
