@@ -450,6 +450,30 @@ describe("PrimaryKeyAnyTypeTest", () => {
   });
 });
 
+/** Cross-adapter: return ordered list of PK column names for a table. */
+async function primaryKeysOf(tableName: string): Promise<string[]> {
+  const conn = Base.connection as any;
+  if (adapterType === "postgres") {
+    const rows = await conn.execute(
+      `SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = $1::regclass AND i.indisprimary ORDER BY array_position(i.indkey, a.attnum)`,
+      [tableName],
+    );
+    return (rows as any[]).map((r: any) => r.attname);
+  }
+  if (adapterType === "mysql") {
+    const rows = await conn.execute(
+      `SHOW KEYS FROM \`${tableName}\` WHERE Key_name = 'PRIMARY' ORDER BY Seq_in_index`,
+    );
+    return (rows as any[]).map((r: any) => r.Column_name ?? r.column_name);
+  }
+  // SQLite
+  const rows = await conn.execute(`PRAGMA table_info("${tableName}")`);
+  return (rows as any[])
+    .filter((r: any) => r.pk > 0)
+    .sort((a: any, b: any) => a.pk - b.pk)
+    .map((r: any) => r.name);
+}
+
 describe("CompositePrimaryKeyTest", () => {
   const { cpkBooks } = useHandlerFixtures(["cpkAuthors", "cpkOrders", "cpkBooks"], {
     schema: canonicalSchema,
@@ -498,30 +522,15 @@ describe("CompositePrimaryKeyTest", () => {
   });
 
   it("composite primary key", async () => {
-    const rows = await (Base.connection as any).execute(`PRAGMA table_info("uber_barcodes")`);
-    const pks = (rows as any[])
-      .filter((r: any) => r.pk > 0)
-      .sort((a: any, b: any) => a.pk - b.pk)
-      .map((r: any) => r.name);
-    expect(pks).toEqual(["region", "code"]);
+    expect(await primaryKeysOf("uber_barcodes")).toEqual(["region", "code"]);
   });
 
   it("composite primary key with reserved words", async () => {
-    const rows = await (Base.connection as any).execute(`PRAGMA table_info("travels")`);
-    const pks = (rows as any[])
-      .filter((r: any) => r.pk > 0)
-      .sort((a: any, b: any) => a.pk - b.pk)
-      .map((r: any) => r.name);
-    expect(pks).toEqual(["from", "to"]);
+    expect(await primaryKeysOf("travels")).toEqual(["from", "to"]);
   });
 
   it("composite primary key out of order", async () => {
-    const rows = await (Base.connection as any).execute(`PRAGMA table_info("barcodes_reverse")`);
-    const pks = (rows as any[])
-      .filter((r: any) => r.pk > 0)
-      .sort((a: any, b: any) => a.pk - b.pk)
-      .map((r: any) => r.name);
-    expect(pks).toEqual(["code", "region"]);
+    expect(await primaryKeysOf("barcodes_reverse")).toEqual(["code", "region"]);
   });
 
   it("assigning a composite primary key", async () => {
