@@ -728,9 +728,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   ): Promise<pg.QueryResult> {
     const bindArray = typeCastedBinds(binds ?? []).map((v) => this._bindForPg(v));
     const rewritten = this.rewriteBinds(sql, bindArray);
-    return this.withClient((client) =>
-      this._runQuery<pg.QueryResult>(client, rewritten, bindArray, { rowMode: "array" }),
-    );
+    this._noticeReceiverSqlWarnings = [];
+    try {
+      const result = await this.withClient((client) =>
+        this._runQuery<pg.QueryResult>(client, rewritten, bindArray, { rowMode: "array" }),
+      );
+      this._flushWarnings(rewritten);
+      return result;
+    } catch (e: any) {
+      throw this._translateException(e, rewritten, bindArray);
+    }
   }
 
   /**
