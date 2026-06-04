@@ -1,303 +1,197 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/money_test.rb
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { SchemaDumper } from "../../schema-dumper.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { Base } from "../../index.js";
 import { sql as arelSql } from "@blazetrails/arel";
-import { Money } from "../../connection-adapters/postgresql/oid/money.js";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import type { TableDefinition as PgTableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
+import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
-
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
+// Rails: class PostgresqlMoney < ActiveRecord::Base
+//   validates :depth, numericality: true
+class PostgresqlMoney extends Base {
+  static {
+    this.tableName = "postgresql_moneys";
+    this.validates("depth", { numericality: true });
+  }
+}
 
 describeIfPg("PostgreSQLAdapter", () => {
-  let adapter: PostgreSQLAdapter;
+  setupHandlerSuite();
+
+  // Rails: @connection = ActiveRecord::Base.lease_connection
+  let connection: PostgreSQLAdapter;
+
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    // Mirrors Rails setup: lc_monetary = 'C' fixes the money output format so
-    // values come back as "$123.45" regardless of the server's host locale.
-    await adapter.exec(`set lc_monetary = 'C'`);
-    await adapter.exec(`DROP TABLE IF EXISTS "postgresql_moneys"`);
-    await adapter.exec(`
-      CREATE TABLE "postgresql_moneys" (
-        "id" SERIAL PRIMARY KEY,
-        "wealth" money,
-        "depth" money DEFAULT 150.55::numeric::money
-      )
-    `);
-  });
-  afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS "postgresql_moneys"`);
-    await adapter.close();
+    connection = Base.connection as PostgreSQLAdapter;
+    // Rails: @connection.execute("set lc_monetary = 'C'")
+    await connection.execute("set lc_monetary = 'C'");
+    // Rails: @connection.create_table("postgresql_moneys", force: true) { |t| ... }
+    await connection.createTable("postgresql_moneys", { force: true }, (t) => {
+      (t as PgTableDefinition).money("wealth");
+      (t as PgTableDefinition).money("depth", { default: "150.55" });
+    });
+    PostgresqlMoney.resetColumnInformation();
+    await PostgresqlMoney.loadSchema();
   });
 
-  // Rails maps the `postgresql_moneys` table to a `PostgresqlMoney` model;
-  // its `wealth` / `depth` columns resolve to the OID::Money type so that
-  // calculations and writes carry numeric values. Mirrors infinity_test.rb's
-  // model wiring — the model shares the test's `adapter` connection.
-  async function modelClass() {
-    const { Base } = await import("../../index.js");
-    const a = adapter;
-    class PostgresqlMoney extends Base {
-      static tableName = "postgresql_moneys";
-      static {
-        this.adapter = a;
-      }
-    }
-    await PostgresqlMoney.loadSchema();
-    return PostgresqlMoney;
-  }
+  afterEach(async () => {
+    // Rails: @connection.drop_table "postgresql_moneys", if_exists: true
+    await connection.dropTable("postgresql_moneys", { ifExists: true });
+    PostgresqlMoney.resetColumnInformation();
+  });
 
   describe("PostgresqlMoneyTest", () => {
     it("column", async () => {
-      const cols = await adapter.columns("postgresql_moneys");
-      const col = cols.find((c) => c.name === "wealth");
-      expect(col).toBeDefined();
-      expect(col!.type).toBe("money");
+      // Rails: column = PostgresqlMoney.columns_hash["wealth"]
+      const column = PostgresqlMoney.columnsHash()["wealth"] as unknown as PgColumn;
+      // Rails: assert_equal :money, column.type
+      expect(column.type).toBe("money");
+      // Rails: assert_equal "money", column.sql_type
+      expect(column.sqlType).toBe("money");
+      // Rails: assert_equal 2, column.scale
+      expect(column.scale).toBe(2);
+      // Rails: assert_not_predicate column, :array?
+      expect(column.array).toBeFalsy();
+
+      // Rails: type = PostgresqlMoney.type_for_attribute("wealth")
+      const type = PostgresqlMoney.typeForAttribute("wealth");
+      // Rails: assert_not_predicate type, :binary?
+      expect(type.isBinary()).toBe(false);
     });
 
     it("default", async () => {
-      const cols = await adapter.columns("postgresql_moneys");
-      const col = cols.find((c) => c.name === "depth");
-      expect(col).toBeDefined();
-      expect(col!.default).toContain("150.55");
-    });
-
-    it("money type cast", async () => {
-      const rows = await adapter.execute("SELECT '567.89'::money::numeric AS val");
-      expect(Number(rows[0].val)).toBeCloseTo(567.89, 2);
-    });
-
-    it("money write", async () => {
-      const id = await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('567.89'::money)`,
-      );
-      const rows = await adapter.execute(
-        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
-        [id],
-      );
-      expect(Number(rows[0].wealth)).toBeCloseTo(567.89, 2);
-    });
-
-    it("money select", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('123.45'::money)`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('678.90'::money)`,
-      );
-      const rows = await adapter.execute(
-        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" ORDER BY "id"`,
-      );
-      expect(rows).toHaveLength(2);
-      expect(Number(rows[0].wealth)).toBeCloseTo(123.45, 2);
-      expect(Number(rows[1].wealth)).toBeCloseTo(678.9, 2);
-    });
-
-    it("money arithmetic", async () => {
-      const rows = await adapter.execute(
-        "SELECT ('100.00'::money + '50.25'::money)::numeric AS val",
-      );
-      expect(Number(rows[0].val)).toBeCloseTo(150.25, 2);
-    });
-
-    it("money comparison", async () => {
-      const rows = await adapter.execute("SELECT ('100.00'::money > '50.00'::money) AS val");
-      expect(rows[0].val).toBe(true);
-    });
-
-    it("money schema dump", async () => {
-      const { SchemaDumper } = await import("../../connection-adapters/abstract/schema-dumper.js");
-      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_moneys");
-      expect(output).toMatch(/t\.money\("wealth"/);
-      expect(output).toMatch(/t\.money\("depth"/);
-      expect(output).toContain("scale: 2");
-    });
-
-    it("schema dumping", async () => {
-      const { SchemaDumper } = await import("../../connection-adapters/abstract/schema-dumper.js");
-      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_moneys");
-      expect(output).toMatch(/t\.money\("wealth",\s*\{[^}]*scale:\s*2/);
-      expect(output).toMatch(/t\.money\("depth",\s*\{[^}]*scale:\s*2[^}]*default:\s*"150\.55"/);
-    });
-
-    it("money where", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('100.00'::money)`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('200.00'::money)`,
-      );
-      const rows = await adapter.execute(
-        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" WHERE "wealth" = '100.00'::money`,
-      );
-      expect(rows).toHaveLength(1);
-      expect(Number(rows[0].wealth)).toBeCloseTo(100, 2);
-    });
-
-    it("money order", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('300.00'::money)`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('100.00'::money)`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('200.00'::money)`,
-      );
-      const rows = await adapter.execute(
-        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" ORDER BY "wealth" ASC`,
-      );
-      expect(rows.map((r) => Number(r.wealth))).toEqual([100, 200, 300]);
-    });
-
-    it("money sum", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('100.50'::money)`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('200.75'::money)`,
-      );
-      const rows = await adapter.execute(
-        `SELECT SUM("wealth")::numeric AS total FROM "postgresql_moneys"`,
-      );
-      expect(Number(rows[0].total)).toBeCloseTo(301.25, 2);
-    });
-
-    it("money format", async () => {
-      const rows = await adapter.execute("SELECT 1234.56::numeric::money::text AS val");
-      // Formatted text includes thousands separator (locale-dependent, but value is preserved)
-      const numeric = parseFloat(String(rows[0].val).replace(/[^0-9.-]/g, ""));
-      expect(numeric).toBeCloseTo(1234.56, 2);
+      // Rails: assert_equal BigDecimal("150.55"), PostgresqlMoney.column_defaults["depth"]
+      // TS: Money.deserialize returns the decimal string "150.55" (JS has no BigDecimal)
+      expect(Number(PostgresqlMoney.columnDefaults["depth"])).toBeCloseTo(150.55, 2);
+      // Rails: assert_equal BigDecimal("150.55"), PostgresqlMoney.new.depth
+      expect(Number((PostgresqlMoney.new() as any).depth)).toBeCloseTo(150.55, 2);
+      // Rails: assert_equal "150.55", PostgresqlMoney.new.depth_before_type_cast
+      expect((PostgresqlMoney.new() as any).depthBeforeTypeCast).toBe("150.55");
     });
 
     it("money values", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("id", "wealth") VALUES (1, '567.89'::money)`,
+      // Rails: @connection.execute("INSERT INTO postgresql_moneys (id, wealth) VALUES (1, '567.89'::money)")
+      await connection.execute(
+        "INSERT INTO postgresql_moneys (id, wealth) VALUES (1, '567.89'::money)",
       );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("id", "wealth") VALUES (2, '-567.89'::money)`,
+      await connection.execute(
+        "INSERT INTO postgresql_moneys (id, wealth) VALUES (2, '-567.89'::money)",
       );
-      const positive = await adapter.execute(
-        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
-        [1],
-      );
-      const negative = await adapter.execute(
-        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
-        [2],
-      );
-      expect(Number(positive[0].wealth)).toBeCloseTo(567.89, 2);
-      expect(Number(negative[0].wealth)).toBeCloseTo(-567.89, 2);
+      // Rails: first_money = PostgresqlMoney.find(1)
+      const firstMoney = (await PostgresqlMoney.find(1)) as any;
+      const secondMoney = (await PostgresqlMoney.find(2)) as any;
+      // Rails: assert_equal 567.89, first_money.wealth
+      expect(Number(firstMoney.wealth)).toBeCloseTo(567.89, 2);
+      // Rails: assert_equal(-567.89, second_money.wealth)
+      expect(Number(secondMoney.wealth)).toBeCloseTo(-567.89, 2);
+      // Rails: assert_equal 567.89, @connection.query_value("SELECT wealth FROM postgresql_moneys WHERE id = 1")
+      // TS: queryValue calls rawExecute (not implemented on pool); selectValue goes through execQuery.
+      const v1 = await connection.selectValue("SELECT wealth FROM postgresql_moneys WHERE id = 1");
+      expect(Number(v1)).toBeCloseTo(567.89, 2);
+      const v2 = await connection.selectValue("SELECT wealth FROM postgresql_moneys WHERE id = 2");
+      expect(Number(v2)).toBeCloseTo(-567.89, 2);
     });
 
-    // Rails: assert_equal BigDecimal("123.45"), PostgresqlMoney.sum("id * wealth")
-    // The aggregate is over a raw SQL expression (id * wealth), whose result
-    // column is the PG money type — MoneyDecoder deserializes it to the decimal
-    // string "123.45"; sum's numeric coercion then yields the number.
+    it("money type cast", () => {
+      // Rails: type = PostgresqlMoney.type_for_attribute("wealth")
+      const type = PostgresqlMoney.typeForAttribute("wealth");
+      for (const [str, num] of [
+        ["12,345,678.12", 12345678.12],
+        ["12.345.678,12", 12345678.12],
+        ["0.12", 0.12],
+        ["0,12", 0.12],
+      ] as const) {
+        expect(Number(type.cast(str))).toBeCloseTo(num);
+        expect(Number(type.cast(`$${str}`))).toBeCloseTo(num);
+        expect(Number(type.cast(`-${str}`))).toBeCloseTo(-num);
+        expect(Number(type.cast(`-$${str}`))).toBeCloseTo(-num);
+        expect(Number(type.cast(`(${str})`))).toBeCloseTo(-num);
+        expect(Number(type.cast(`($${str})`))).toBeCloseTo(-num);
+      }
+    });
+
+    it("money regex backtracking", () => {
+      // Rails: type = PostgresqlMoney.type_for_attribute("wealth")
+      const type = PostgresqlMoney.typeForAttribute("wealth");
+      // Rails: Timeout.timeout(0.1) { assert_equal(0.0, type.cast(...)) }
+      // Ruby uses possessive quantifiers to prevent ReDoS; JS avoids it via
+      // [^0-9,.] in the currency-prefix pattern (no overlap with [\d,]+ / [\d.]+).
+      expect(Number(type.cast("$" + ",".repeat(100000) + ".11!"))).toBeCloseTo(0, 2);
+      expect(Number(type.cast("$" + ".".repeat(100000) + ",11!"))).toBeCloseTo(0, 2);
+    });
+
     it("sum with type cast", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("id", "wealth") VALUES (1, '123.45'::money)`,
+      // Rails: @connection.execute("INSERT INTO postgresql_moneys (id, wealth) VALUES (1, '123.45'::money)")
+      await connection.execute(
+        "INSERT INTO postgresql_moneys (id, wealth) VALUES (1, '123.45'::money)",
       );
-      const M = await modelClass();
-      expect(Number(await (M as any).sum("id * wealth"))).toBeCloseTo(123.45, 2);
+      // Rails: assert_equal BigDecimal("123.45"), PostgresqlMoney.sum("id * wealth")
+      expect(Number(await (PostgresqlMoney as any).sum("id * wealth"))).toBeCloseTo(123.45, 2);
     });
 
-    // Rails: assert_equal [BigDecimal("123.45")], PostgresqlMoney.pluck(Arel.sql("id * wealth"))
     it("pluck with type cast", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("id", "wealth") VALUES (1, '123.45'::money)`,
+      // Rails: @connection.execute("INSERT INTO postgresql_moneys (id, wealth) VALUES (1, '123.45'::money)")
+      await connection.execute(
+        "INSERT INTO postgresql_moneys (id, wealth) VALUES (1, '123.45'::money)",
       );
-      const M = await modelClass();
-      const plucked = await (M as any).pluck(arelSql("id * wealth"));
+      // Rails: assert_equal [BigDecimal("123.45")], PostgresqlMoney.pluck(Arel.sql("id * wealth"))
+      const plucked = await (PostgresqlMoney as any).pluck(arelSql("id * wealth"));
       expect(plucked).toHaveLength(1);
       expect(Number(plucked[0])).toBeCloseTo(123.45, 2);
     });
 
-    it("create and update money", async () => {
-      const id = await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('987.65'::money)`,
-      );
-      const rows = await adapter.execute(
-        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
-        [id],
-      );
-      expect(Number(rows[0].wealth)).toBeCloseTo(987.65, 2);
+    it("schema dumping", async () => {
+      // Rails: output = dump_table_schema("postgresql_moneys")
+      const output = await SchemaDumper.dumpTableSchema(connection, "postgresql_moneys");
+      // Rails: assert_match %r{t\.money\s+"wealth",\s+scale: 2$}, output
+      expect(output).toMatch(/t\.money\s*\("wealth",\s*\{[^}]*scale:\s*2/);
+      // Rails: assert_match %r{t\.money\s+"depth",\s+scale: 2,\s+default: "150\.55"$}, output
+      expect(output).toMatch(/t\.money\s*\("depth",\s*\{[^}]*scale:\s*2[^}]*default:\s*"150\.55"/);
+    });
 
-      await adapter.executeMutation(
-        `UPDATE "postgresql_moneys" SET "wealth" = '123.45'::money WHERE "id" = ?`,
-        [id],
-      );
-      const updated = await adapter.execute(
-        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys" WHERE "id" = ?`,
-        [id],
-      );
-      expect(Number(updated[0].wealth)).toBeCloseTo(123.45, 2);
+    it("create and update money", async () => {
+      // Rails: money = PostgresqlMoney.create(wealth: +"987.65")
+      const money = (await (PostgresqlMoney as any).create({ wealth: "987.65" })) as any;
+      // Rails: assert_equal 987.65, money.wealth
+      expect(Number(money.wealth)).toBeCloseTo(987.65, 2);
+      // Rails: new_value = BigDecimal("123.45"); money.wealth = new_value; money.save!; money.reload
+      money.wealth = "123.45";
+      await money.saveBang();
+      await money.reload();
+      // Rails: assert_equal new_value, money.wealth
+      expect(Number(money.wealth)).toBeCloseTo(123.45, 2);
     });
 
     it("update all with money string", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('0.00'::money)`,
-      );
-      await adapter.executeMutation(`UPDATE "postgresql_moneys" SET "wealth" = '987.65'::money`);
-      const rows = await adapter.execute(
-        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys"`,
-      );
-      expect(Number(rows[0].wealth)).toBeCloseTo(987.65, 2);
+      // Rails: money = PostgresqlMoney.create!; PostgresqlMoney.update_all(wealth: "987.65"); money.reload
+      const money = (await (PostgresqlMoney as any).createBang({})) as any;
+      await (PostgresqlMoney as any).updateAll({ wealth: "987.65" });
+      await money.reload();
+      // Rails: assert_equal 987.65, money.wealth
+      expect(Number(money.wealth)).toBeCloseTo(987.65, 2);
     });
 
-    // Rails: PostgresqlMoney.update_all(wealth: "123.45".to_d). Trails has no
-    // BigDecimal; DecimalType represents it as the decimal string "123.45",
-    // which update_all binds and PG coerces to money.
     it("update all with money big decimal", async () => {
-      const M = await modelClass();
-      const money = await (M as any).create({});
-      await (M as any).updateAll({ wealth: "123.45" });
+      // Rails: money = PostgresqlMoney.create!; PostgresqlMoney.update_all(wealth: "123.45".to_d); money.reload
+      // Trails has no BigDecimal; decimal string "123.45" is the JS equivalent.
+      const money = (await (PostgresqlMoney as any).createBang({})) as any;
+      await (PostgresqlMoney as any).updateAll({ wealth: "123.45" });
       await money.reload();
+      // Rails: assert_equal 123.45, money.wealth
       expect(Number(money.wealth)).toBeCloseTo(123.45, 2);
     });
 
     it("update all with money numeric", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_moneys" ("wealth") VALUES ('0.00'::money)`,
-      );
-      await adapter.executeMutation(`UPDATE "postgresql_moneys" SET "wealth" = 123.45::money`);
-      const rows = await adapter.execute(
-        `SELECT "wealth"::numeric AS "wealth" FROM "postgresql_moneys"`,
-      );
-      expect(Number(rows[0].wealth)).toBeCloseTo(123.45, 2);
+      // Rails: money = PostgresqlMoney.create!; PostgresqlMoney.update_all(wealth: 123.45); money.reload
+      const money = (await (PostgresqlMoney as any).createBang({})) as any;
+      await (PostgresqlMoney as any).updateAll({ wealth: 123.45 });
+      await money.reload();
+      // Rails: assert_equal 123.45, money.wealth
+      expect(Number(money.wealth)).toBeCloseTo(123.45, 2);
     });
-  });
-});
-
-// Unit-level tests that don't need a live PG connection — Rails test
-// names so api:compare matches.
-describe("PostgresqlMoneyTest", () => {
-  it("money regex backtracking", () => {
-    // Ruby uses possessive quantifiers (\D*+) to prevent ReDoS; JS has none.
-    // [^0-9,.] in the prefix avoids overlap with [\d,]+ / [\d.]+ so no O(n²) path.
-    const type = new Money();
-    expect(Number(type.cast("$" + ",".repeat(100000) + ".11!"))).toBeCloseTo(0, 2);
-    expect(Number(type.cast("$" + ".".repeat(100000) + ",11!"))).toBeCloseTo(0, 2);
-  });
-
-  it("money type cast", () => {
-    const type = new Money();
-    for (const [str, num] of [
-      ["12,345,678.12", 12345678.12],
-      ["12.345.678,12", 12345678.12],
-      ["0.12", 0.12],
-      ["0,12", 0.12],
-    ] as const) {
-      expect(Number(type.cast(str))).toBeCloseTo(num);
-      expect(Number(type.cast(`$${str}`))).toBeCloseTo(num);
-      expect(Number(type.cast(`-${str}`))).toBeCloseTo(-num);
-      expect(Number(type.cast(`-$${str}`))).toBeCloseTo(-num);
-      expect(Number(type.cast(`(${str})`))).toBeCloseTo(-num);
-      expect(Number(type.cast(`($${str})`))).toBeCloseTo(-num);
-    }
   });
 });
