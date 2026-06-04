@@ -92,30 +92,19 @@ const SCHEMA: Schema = {
   },
   poly_treasures: { name: "string" },
   poly_cars: { name: "string" },
-  // tcnj_* tables for type-casting-nested-joins test (skip 11).
-  tcnj_authors: { name: "string" },
-  tcnj_posts: { title: "string", author_id: "integer" },
-  tcnj_comments: { body: "string", post_id: "integer" },
-  // wta_* tables for where-with-through-association test (skip 12).
-  wta_authors: { name: "string" },
-  wta_posts: { title: "string", author_id: "integer" },
-  wta_comments: { body: "string", post_id: "integer" },
-  // bnwr_* tables for belongs-to-nested-where-with-relation test (skip 1).
-  bnwr_authors: { name: "string" },
-  bnwr_posts: { author_id: "integer" },
+  // whor_* tables for has-one where-with-relation test (skip 8).
+  whor_authors: { name: "string", author_address_id: "integer" },
+  whor_addresses: { name: "string" },
   // whmr_* tables for has-many where-with-relation test (skip 7).
   whmr_authors: { name: "string" },
   whmr_essays: { writer_id: "string", author_id: "integer" },
-  // whor_* tables for has-one where-with-relation test (skip 8).
-  whor_authors: { name: "string" },
-  whor_addresses: { author_id: "integer" },
-  // wsel_* tables for where-with-select-relation test (skip 9).
-  wsel_authors: { name: "string" },
-  wsel_essays: { writer_id: "string" },
   // wcpr_* tables for where-with-collection-polymorphic-relation test (skip 10).
   wcpr_treasures: { name: "string" },
   wcpr_price_estimates: { estimate_of_type: "string", estimate_of_id: "integer" },
-  // ponand_* tables for polymorphic WHERE NOT NAND tests (skips 2/3/4).
+  // wsel_* tables for where-with-select-relation test (skip 9).
+  wsel_authors: { name: "string" },
+  wsel_essays: { writer_id: "string" },
+  // ponand_* tables for polymorphic WHERE NOT NAND tests (skips 2/3/4 — now un-skipped).
   ponand_treasures: { name: "string" },
   ponand_cars: { name: "string" },
   ponand_price_estimates: {
@@ -1515,30 +1504,156 @@ describe("WhereTest", () => {
     const essay = await Essay.where({ writer: ["David"] }).first();
     expect(essay!.writer_id).toBe("David");
   });
-  it.skip("where with relation on has many association", () => {
-    // BLOCKED: has_many WHERE with Relation value not yet implemented.
-    // Rails: Author.where(essays: Essay.where(id: essay.id)).first → subquery on has_many FK.
-    // Needs: whereClauseFor to detect has_many association and generate
-    // WHERE owner.pk IN (SELECT assoc.fk FROM assoc WHERE ...) subquery form.
+  it("where with relation on has many association", async () => {
+    class WhmrAuthor extends Base {
+      static {
+        this._tableName = "whmr_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    class WhmrEssay extends Base {
+      static {
+        this._tableName = "whmr_essays";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.attribute("writer_id", "string");
+      }
+    }
+    registerModel("WhmrAuthor", WhmrAuthor);
+    registerModel("WhmrEssay", WhmrEssay);
+    Associations.hasMany.call(WhmrAuthor, "essays", {
+      className: "WhmrEssay",
+      foreignKey: "author_id",
+    });
+
+    const david = (await WhmrAuthor.create({ name: "David" })) as any;
+    await WhmrAuthor.create({ name: "Other" });
+    const essay = (await WhmrEssay.create({ author_id: david.id, writer_id: "David" })) as any;
+
+    const result = await WhmrAuthor.where({
+      essays: WhmrEssay.where({ id: essay.id }),
+    }).first();
+    expect(result).not.toBeNull();
+    expect((result as any).id).toBe(david.id);
   });
-  it.skip("where with relation on has one association", () => {
-    // BLOCKED: has_one WHERE with Relation value not yet implemented.
-    // Rails: AuthorAddress.where(author: Author.where(id: author.id)).first
-    // Needs: same subquery generation for has_one FK direction.
+  it("where with relation on has one association", async () => {
+    class WhorAddress extends Base {
+      static {
+        this._tableName = "whor_addresses";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    class WhorAuthor extends Base {
+      static {
+        this._tableName = "whor_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("author_address_id", "integer");
+      }
+    }
+    registerModel("WhorAddress", WhorAddress);
+    registerModel("WhorAuthor", WhorAuthor);
+    // AuthorAddress has_one :author — FK lives on the author side
+    Associations.hasOne.call(WhorAddress, "author", {
+      className: "WhorAuthor",
+      foreignKey: "author_address_id",
+    });
+
+    const address = (await WhorAddress.create({ name: "addr1" })) as any;
+    await WhorAddress.create({ name: "addr2" });
+    const author = (await WhorAuthor.create({
+      name: "David",
+      author_address_id: address.id,
+    })) as any;
+
+    const result = await WhorAddress.where({
+      author: WhorAuthor.where({ id: author.id }),
+    }).first();
+    expect(result).not.toBeNull();
+    expect((result as any).id).toBe(address.id);
   });
-  it.skip("where on association with select relation", () => {
-    // BLOCKED: belongs_to WHERE with select'd Relation not yet implemented.
-    // Rails: Essay.where(author: Author.where(name: "David").select(:name)).take
-    // Needs: whereClauseFor to use the selected column (name) rather than pk (id)
-    // as the IN subquery value list.
+  it("where on association with select relation", async () => {
+    class WselAuthor extends Base {
+      static {
+        this._tableName = "wsel_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    class WselEssay extends Base {
+      static {
+        this._tableName = "wsel_essays";
+        this.attribute("id", "integer");
+        this.attribute("writer_id", "string");
+      }
+    }
+    registerModel("WselAuthor", WselAuthor);
+    Associations.belongsTo.call(WselEssay, "author", {
+      className: "WselAuthor",
+      foreignKey: "writer_id",
+      primaryKey: "name",
+    });
+
+    const david = await WselAuthor.create({ name: "David" });
+    const essay = await WselEssay.create({ writer_id: "David" });
+    await WselEssay.create({ writer_id: "Other" });
+
+    const result = await WselEssay.where({
+      author: WselAuthor.where({ name: "David" }).select("name"),
+    }).first();
+    expect(result).not.toBeNull();
+    expect((result as any).id).toBe((essay as any).id);
   });
-  it.skip("where on association with collection polymorphic relation", () => {
-    // BLOCKED: collection polymorphic WHERE with Relation value not yet implemented.
-    // Rails: Treasure.where(name: [...], price_estimates: PriceEstimate.all)
-    // Needs: whereClauseFor to handle has_many polymorphic (inverse) association.
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs polymorphic association setup */
+  it("where on association with collection polymorphic relation", async () => {
+    class WcprTreasure extends Base {
+      static {
+        this._tableName = "wcpr_treasures";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    class WcprPriceEstimate extends Base {
+      static {
+        this._tableName = "wcpr_price_estimates";
+        this.attribute("id", "integer");
+        this.attribute("estimate_of_type", "string");
+        this.attribute("estimate_of_id", "integer");
+      }
+    }
+    registerModel("WcprTreasure", WcprTreasure);
+    registerModel("WcprPriceEstimate", WcprPriceEstimate);
+    Associations.belongsTo.call(WcprPriceEstimate, "estimateOf", { polymorphic: true });
+    Associations.hasMany.call(WcprTreasure, "priceEstimates", {
+      className: "WcprPriceEstimate",
+      as: "estimateOf",
+    });
+
+    const diamond = (await WcprTreasure.create({ name: "diamond" })) as any;
+    const emerald = (await WcprTreasure.create({ name: "emerald" })) as any;
+    const ruby = (await WcprTreasure.create({ name: "ruby" })) as any;
+
+    // diamond and emerald have price estimates; ruby does not
+    await WcprPriceEstimate.create({
+      estimate_of_type: "WcprTreasure",
+      estimate_of_id: diamond.id,
+    });
+    await WcprPriceEstimate.create({
+      estimate_of_type: "WcprTreasure",
+      estimate_of_id: emerald.id,
+    });
+
+    // Rails: Treasure.where(name: ["diamond", "emerald"], price_estimates: PriceEstimate.all)
+    // Returns only treasures with matching name AND at least one price estimate
+    const result = await WcprTreasure.where({
+      name: ["diamond", "emerald"],
+      priceEstimates: WcprPriceEstimate.all(),
+    }).toArray();
+
+    const names = result.map((r: any) => r.name).sort();
+    expect(names).toEqual(["diamond", "emerald"]);
+    expect(names).not.toContain("ruby");
   });
   it("where with unsupported arguments", () => {
     class Post extends Base {
