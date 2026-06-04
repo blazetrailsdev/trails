@@ -2,13 +2,50 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/enum_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
+import { Base, Schema } from "../../index.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+
+// Rails: class PostgresqlEnum < ActiveRecord::Base
+//   enum :current_mood, { sad: "sad", okay: "ok", happy: "happy", aliased_field: "happy" }, prefix: true
+// Note: the public enumMethod only accepts integer values (Record<string, number>); string-value
+// enum DSL is not yet exposed via the public API. The bang/predicate methods for "works with
+// activerecord enum" require the enum DSL and are blocked until the API is extended.
+class PostgresqlEnum extends Base {
+  static {
+    this.tableName = "postgresql_enums";
+  }
+}
+
+// Mirrors Rails' private with_test_schema helper in enum_test.rb:
+//   create_schema(name) / SET search_path / yield / ensure { drop_schema(name) / restore search_path }
+// Only used for tests that scope enums/tables to a named schema.
+async function withTestSchema(
+  adapter: PostgreSQLAdapter,
+  name: string,
+  fn: () => Promise<void>,
+  options: { drop?: boolean } = {},
+): Promise<void> {
+  const { drop = true } = options;
+  const oldSearchPath = await adapter.schemaSearchPath();
+  await adapter.createSchema(name);
+  await adapter.setSchemaSearchPath(`${name}, public`);
+  try {
+    await fn();
+  } finally {
+    if (drop) await adapter.dropSchema(name, { cascade: true });
+    await adapter.setSchemaSearchPath(oldSearchPath);
+    adapter.schemaCache.clear();
+  }
+}
 
 describeIfPg("PostgreSQLAdapter", () => {
+  setupHandlerSuite();
+
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = Base.connection as PostgreSQLAdapter;
     await adapter.exec(`DROP TABLE IF EXISTS "postgresql_enums" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "mood" CASCADE`);
     await adapter.createEnum("mood", ["sad", "ok", "happy"]);
@@ -18,14 +55,16 @@ describeIfPg("PostgreSQLAdapter", () => {
         "current_mood" mood
       )
     `);
+    PostgresqlEnum.resetColumnInformation();
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS "postgresql_enums" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "mood" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "feeling" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "unused" CASCADE`);
-    await adapter.exec(`DROP SCHEMA IF EXISTS "test_schema" CASCADE`);
-    await adapter.close();
+    await adapter.exec(`DROP TYPE IF EXISTS "color" CASCADE`);
+    // test_schema is managed by withTestSchema — no DROP here
+    PostgresqlEnum.resetColumnInformation();
   });
 
   describe("PostgresqlEnumTest", () => {
@@ -34,234 +73,84 @@ describeIfPg("PostgreSQLAdapter", () => {
       const col = cols.find((c) => c.name === "current_mood");
       expect(col).toBeDefined();
       expect(col!.type).toBe("enum");
-      expect(col!.sqlType).toContain("mood");
-    });
-
-    it("enum default", async () => {
-      await adapter.exec(
-        `ALTER TABLE "postgresql_enums" ADD COLUMN "good_mood" mood DEFAULT 'happy'`,
-      );
-      const cols = await adapter.columns("postgresql_enums");
-      const col = cols.find((c) => c.name === "good_mood");
-      expect(col).toBeDefined();
-      expect(col!.default).toContain("happy");
-    });
-
-    it("enum type cast", async () => {
-      const rows = await adapter.execute("SELECT 'happy'::mood AS val");
-      expect(rows[0].val).toBe("happy");
-    });
-
-    it("enum mapping", async () => {
-      const id = await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('sad')`,
-      );
-      const rows = await adapter.execute(
-        `SELECT "current_mood" FROM "postgresql_enums" WHERE "id" = ?`,
-        [id],
-      );
-      expect(rows[0].current_mood).toBe("sad");
-
-      await adapter.executeMutation(
-        `UPDATE "postgresql_enums" SET "current_mood" = 'happy' WHERE "id" = ?`,
-        [id],
-      );
-      const updated = await adapter.execute(
-        `SELECT "current_mood" FROM "postgresql_enums" WHERE "id" = ?`,
-        [id],
-      );
-      expect(updated[0].current_mood).toBe("happy");
-    });
-
-    it("invalid enum value", async () => {
-      await expect(
-        adapter.executeMutation(`INSERT INTO "postgresql_enums" ("current_mood") VALUES ('angry')`),
-      ).rejects.toThrow();
-    });
-
-    it("create enum", async () => {
-      const values = await adapter.enumValues("mood");
-      expect(values).toEqual(["sad", "ok", "happy"]);
-    });
-
-    it("drop enum", async () => {
-      await adapter.createEnum("unused", ["dummy"]);
-      await adapter.dropEnum("unused");
-      await expect(adapter.dropEnum("unused")).rejects.toThrow();
-      await expect(adapter.dropEnum("unused", { ifExists: true })).resolves.toBeUndefined();
-    });
-
-    it("rename enum", async () => {
-      await adapter.renameEnum("mood", "feeling");
-      const values = await adapter.enumValues("feeling");
-      expect(values).toEqual(["sad", "ok", "happy"]);
-
-      // Also verify renameEnumValue
-      await adapter.renameEnumValue("feeling", { from: "ok", to: "okay" });
-      const updated = await adapter.enumValues("feeling");
-      expect(updated).toEqual(["sad", "okay", "happy"]);
-
-      // Clean up — rename back so afterEach can drop "mood"
-      await adapter.renameEnumValue("feeling", { from: "okay", to: "ok" });
-      await adapter.renameEnum("feeling", "mood");
-    });
-
-    it("add enum value", async () => {
-      await adapter.addEnumValue("mood", "angry");
-      const values = await adapter.enumValues("mood");
-      expect(values).toContain("angry");
-      expect(values[values.length - 1]).toBe("angry");
-    });
-
-    it("add enum value before", async () => {
-      await adapter.addEnumValue("mood", "angry", { before: "ok" });
-      const values = await adapter.enumValues("mood");
-      const angryIdx = values.indexOf("angry");
-      const okIdx = values.indexOf("ok");
-      expect(angryIdx).toBeLessThan(okIdx);
-    });
-
-    it("add enum value after", async () => {
-      await adapter.addEnumValue("mood", "nervous", { after: "ok" });
-      const values = await adapter.enumValues("mood");
-      const okIdx = values.indexOf("ok");
-      const nervousIdx = values.indexOf("nervous");
-      expect(nervousIdx).toBe(okIdx + 1);
-    });
-
-    it("enum schema dump", async () => {
-      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
-      expect(output).toContain("postgresql_enums");
-      expect(output).toContain('t.enum("current_mood"');
-    });
-
-    it("enum where", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('sad')`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('happy')`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('sad')`,
-      );
-      const rows = await adapter.execute(
-        `SELECT * FROM "postgresql_enums" WHERE "current_mood" = 'sad'`,
-      );
-      expect(rows).toHaveLength(2);
-    });
-
-    it("enum order", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('happy')`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('sad')`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('ok')`,
-      );
-      const rows = await adapter.execute(
-        `SELECT "current_mood" FROM "postgresql_enums" ORDER BY "current_mood" ASC`,
-      );
-      // Enum ordering follows creation order: sad, ok, happy
-      expect(rows.map((r) => r.current_mood)).toEqual(["sad", "ok", "happy"]);
-    });
-
-    // Needs ORM layer (pluck)
-    it.skip("enum pluck", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
-      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
-    });
-
-    it("enum distinct", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('sad')`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('sad')`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('happy')`,
-      );
-      const rows = await adapter.execute(
-        `SELECT DISTINCT "current_mood" FROM "postgresql_enums" ORDER BY "current_mood"`,
-      );
-      expect(rows).toHaveLength(2);
-    });
-
-    it("enum group", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('sad')`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('sad')`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('happy')`,
-      );
-      const rows = await adapter.execute(
-        `SELECT "current_mood", COUNT(*) AS cnt FROM "postgresql_enums" GROUP BY "current_mood" ORDER BY "current_mood"`,
-      );
-      expect(rows).toHaveLength(2);
-      const sadRow = rows.find((r) => r.current_mood === "sad");
-      expect(Number(sadRow!.cnt)).toBe(2);
-    });
-
-    // Needs migration framework
-    it.skip("enum migration", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
-      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
-    });
-
-    it("enum array", async () => {
-      await adapter.exec(`ALTER TABLE "postgresql_enums" ADD COLUMN "past_moods" mood[]`);
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood", "past_moods") VALUES ('happy', '{sad,ok}')`,
-      );
-      const rows = await adapter.execute(`SELECT "past_moods" FROM "postgresql_enums"`);
-      // pg driver may return enum arrays as raw strings since it doesn't know the enum OID
-      const pastMoods = rows[0].past_moods;
-      const values =
-        typeof pastMoods === "string"
-          ? pastMoods.replace(/[{}]/g, "").split(",")
-          : (pastMoods as string[]);
-      expect(values).toEqual(["sad", "ok"]);
+      expect(col!.sqlType).toBe("mood");
+      expect((col as any).array).toBeFalsy();
+      // Rails also asserts: type_for_attribute("current_mood").binary? → false
+      // BLOCKED: typeForAttribute is not yet ported to the adapter layer
     });
 
     it("enum defaults", async () => {
       await adapter.exec(
         `ALTER TABLE "postgresql_enums" ADD COLUMN "good_mood" mood DEFAULT 'happy'`,
       );
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES ('sad')`,
-      );
-      const rows = await adapter.execute(`SELECT "good_mood" FROM "postgresql_enums"`);
-      expect(rows[0].good_mood).toBe("happy");
+      PostgresqlEnum.resetColumnInformation();
+      const cols = await adapter.columns("postgresql_enums");
+      const col = cols.find((c) => c.name === "good_mood");
+      expect(col).toBeDefined();
+      expect(col!.default).toBe("happy");
+      // Rails also asserts: PostgresqlEnum.column_defaults["good_mood"] and
+      // PostgresqlEnum.new.good_mood — both require async schema cache refresh
+      // after ALTER TABLE, not yet wired for synchronous ORM column_defaults.
     });
 
-    // Needs ORM layer (ActiveRecord enum DSL)
+    it("enum mapping", async () => {
+      await adapter.exec(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
+      const enumRecord = await PostgresqlEnum.first();
+      // prefer enumRecord.current_mood when string-enum getter is ported (enum.ts:509)
+      expect((enumRecord as any).readAttribute("current_mood")).toBe("sad");
+      // prefer enumRecord.current_mood = "happy" when string-enum setter is ported
+      (enumRecord as any).writeAttribute("current_mood", "happy");
+      const saved = await enumRecord!.save();
+      expect(saved).toBeTruthy();
+      await (enumRecord as any).reload();
+      expect((enumRecord as any).readAttribute("current_mood")).toBe("happy");
+    });
+
+    // Needs ORM enum validation (string enum setter does not call assertValidValue)
     it.skip("invalid enum update", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
-      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+      // BLOCKED: enum — _enum setter silently writes invalid values; assertValidValue
+      //   is declared on EnumType but not wired into the string-enum attribute setter
+      // SCOPE: ~5 LOC fix in enum.ts; affects this test
     });
 
-    // Needs ORM layer
+    // Needs stderr capture
     it.skip("no oid warning", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
-      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+      // BLOCKED: infra — no vitest equivalent of Ruby capture(:stderr)
+      // SCOPE: process stream mocking; affects this test
+    });
+
+    it("enum type cast", async () => {
+      // Rails: enum.current_mood = :happy (Ruby symbol → string via EnumType cast)
+      // TS has no symbol type; write the mapped string value directly.
+      // The cast path (symbol → string) is not exercisable in TS.
+      const enumRecord = new PostgresqlEnum();
+      (enumRecord as any).writeAttribute("current_mood", "happy");
+      expect((enumRecord as any).readAttribute("current_mood")).toBe("happy");
     });
 
     it("assigning enum to nil", async () => {
-      await adapter.executeMutation(
-        `INSERT INTO "postgresql_enums" ("current_mood") VALUES (NULL)`,
+      const model = new PostgresqlEnum();
+      (model as any).writeAttribute("current_mood", null);
+      expect((model as any).readAttribute("current_mood")).toBeNull();
+      const saved = await model.save();
+      expect(saved).toBeTruthy();
+      await (model as any).reload();
+      expect((model as any).readAttribute("current_mood")).toBeNull();
+    });
+
+    it("schema dump", async () => {
+      await adapter.exec(
+        `ALTER TABLE "postgresql_enums" ADD COLUMN "good_mood" mood DEFAULT 'happy' NOT NULL`,
       );
-      const rows = await adapter.execute(`SELECT "current_mood" FROM "postgresql_enums"`);
-      expect(rows[0].current_mood).toBeNull();
+      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
+      expect(output).toContain(
+        "Note that some types may not work with other database engines. Be careful if changing database.",
+      );
+      expect(output).toContain('await ctx.createEnum("mood", ["sad","ok","happy"]);');
+      expect(output).toContain('t.enum("current_mood", { enum_type: "mood" })');
+      expect(output).toContain(
+        't.enum("good_mood", { default: "happy", null: false, enum_type: "mood" })',
+      );
     });
 
     it("schema dump renamed enum", async () => {
@@ -278,7 +167,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(output).toContain('enum_type: "feeling"');
     });
 
-    it("schema dump added enum value", async () => {
+    it.skipIf(pgServerVersion < 100000)("schema dump added enum value", async () => {
       await adapter.addEnumValue("mood", "angry", { before: "ok" });
       await adapter.addEnumValue("mood", "nervous", { after: "ok" });
       await adapter.addEnumValue("mood", "glad");
@@ -290,24 +179,47 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
     });
 
-    it("schema dump renamed enum value", async () => {
+    it.skipIf(pgServerVersion < 100000)("schema dump renamed enum value", async () => {
       await adapter.renameEnumValue("mood", { from: "ok", to: "okay" });
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
       expect(output).toContain('await ctx.createEnum("mood", ["sad","okay","happy"]);');
     });
 
-    // Needs ORM layer (ActiveRecord enum DSL)
+    it("schema load", async () => {
+      await Schema.define(adapter, async (schema) => {
+        await schema.createEnum("color", ["blue", "green"]);
+        await schema.changeTable("postgresql_enums", async (t) => {
+          // ColumnType accepts arbitrary strings (string & {}), so no cast needed
+          await t.column("best_color", "color", { default: "blue", null: false });
+        });
+      });
+      PostgresqlEnum.resetColumnInformation();
+      const cols = await adapter.columns("postgresql_enums");
+      const col = cols.find((c) => c.name === "best_color");
+      expect(col).toBeDefined();
+      expect(col!.sqlType).toBe("color");
+      expect(col!.default).toBe("blue");
+      expect(col!.null).toBe(false);
+    });
+
+    it("drop enum", async () => {
+      await adapter.createEnum("unused", []);
+      // Rails order: drop (succeeds) → drop if_exists (succeeds, gone) → bare drop (raises)
+      await adapter.dropEnum("unused");
+      await expect(adapter.dropEnum("unused", { ifExists: true })).resolves.toBeUndefined();
+      await expect(adapter.dropEnum("unused")).rejects.toThrow();
+    });
+
+    // Needs ORM enum getter for label/value asymmetry (okay: "ok")
     it.skip("works with activerecord enum", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
-      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+      // BLOCKED: enum — string enum getter returns raw DB value ("ok") instead of
+      //   label name ("okay") when label ≠ DB value; reverseMap lookup at line 509
+      //   of enum.ts guards on typeof raw === "number", missing the string case
+      // SCOPE: ~3 LOC fix in enum.ts getter; affects this test
     });
 
     it("enum type scoped to schemas", async () => {
-      await adapter.beginTransaction();
-      try {
-        await adapter.createSchema("test_schema");
-        await adapter.exec(`SET LOCAL search_path TO test_schema, public`);
+      await withTestSchema(adapter, "test_schema", async () => {
         await adapter.createEnum("mood_in_other_schema", ["sad", "ok", "happy"]);
         await adapter.exec(`
           CREATE TABLE "postgresql_enums_in_other_schema" (
@@ -315,38 +227,45 @@ describeIfPg("PostgreSQLAdapter", () => {
             "current_mood" mood_in_other_schema DEFAULT 'happy' NOT NULL
           )
         `);
-        const exists = await adapter.dataSourceExists("postgresql_enums_in_other_schema");
-        expect(exists).toBe(true);
-        await adapter.commit();
-      } catch (error) {
-        await adapter.rollback();
-        throw error;
+        expect(await adapter.dataSourceExists("postgresql_enums_in_other_schema")).toBe(true);
+      });
+    });
+
+    // Rails uses create_schema + ensure { drop_schema } without changing search_path.
+    // withTestSchema is intentionally NOT used here — qualified names are used throughout.
+    it("enum type explicit schema", async () => {
+      await adapter.createSchema("test_schema");
+      try {
+        await adapter.createEnum("test_schema.mood_in_other_schema", ["sad", "ok", "happy"]);
+        await adapter.exec(`
+          CREATE TABLE "test_schema"."postgresql_enums_in_other_schema" (
+            "id" SERIAL PRIMARY KEY,
+            "current_mood" "test_schema"."mood_in_other_schema"
+          )
+        `);
+        expect(await adapter.dataSourceExists("test_schema.postgresql_enums_in_other_schema")).toBe(
+          true,
+        );
+        await expect(
+          adapter.dropTable("test_schema.postgresql_enums_in_other_schema"),
+        ).resolves.not.toThrow();
+        await expect(adapter.dropEnum("test_schema.mood_in_other_schema")).resolves.not.toThrow();
+      } finally {
+        await adapter.dropSchema("test_schema", { ifExists: true });
       }
     });
 
-    it("enum type explicit schema", async () => {
-      await adapter.createSchema("test_schema");
-      await adapter.createEnum("test_schema.mood_in_other_schema", ["sad", "ok", "happy"]);
-      await adapter.exec(`
-        CREATE TABLE "test_schema"."postgresql_enums_in_other_schema" (
-          "id" SERIAL PRIMARY KEY,
-          "current_mood" "test_schema"."mood_in_other_schema"
-        )
-      `);
-      const exists = await adapter.dataSourceExists("test_schema.postgresql_enums_in_other_schema");
-      expect(exists).toBe(true);
+    // Needs schema dumper with search-path-scoped enum filtering
+    it.skip("schema dump scoped to schemas", () => {
+      // BLOCKED: schema-dumper — enumTypes() returns all enums in all schemas; needs
+      //   search-path-aware filtering to match Rails' dump_all_table_schema behavior
+      // SCOPE: ~20 LOC in PG schema-dumper types(); affects this test
     });
 
-    // Needs schema dumper with schema-scoped enum support
-    it.skip("schema dump scoped to schemas", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
-      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
-    });
     it.skip("schema load scoped to schemas", () => {
-      // BLOCKED: schema — schema loading / cache invalidation gap
-      // ROOT-CAUSE: schema-cache.ts#clear or connection-handler.ts#clearCache not fully wired
-      // SCOPE: ~20 LOC fix in schema-cache.ts; affects ~1 test
+      // BLOCKED: schema — schema cache does not clear across search-path switches;
+      //   Schema.define inside withTestSchema leaves stale OID mappings
+      // SCOPE: schema cache invalidation work; affects this test
     });
   });
 });
