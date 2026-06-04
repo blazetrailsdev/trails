@@ -267,7 +267,7 @@ describe("SelectTest", () => {
 
   it("select without any arguments", () => {
     const { Post } = makePost();
-    expect(() => Post.all().select()).toThrow("Call `select' with at least one field.");
+    expect(() => Post.select()).toThrow("Call `select' with at least one field.");
   });
 
   it.skip("reselect with default scope select", () => {

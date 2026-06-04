@@ -13,11 +13,24 @@ import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
+import { quoteTableName } from "./connection-adapters/abstract/quoting.js";
 
-// In Rails, AbstractAdapter includes SchemaStatements, so view DDL and
-// introspection methods live directly on the connection object.
+// In Rails, AbstractAdapter includes SchemaStatements, so introspection
+// methods (views, viewExists, tableExists, isDataSourceExists) live directly
+// on the connection object. Cast once here; all helpers pass through.
 function conn(): AbstractAdapter {
   return Base.connection as unknown as AbstractAdapter;
+}
+
+// Rails view tests create/drop views with raw execute, not schema statement
+// helpers (create_view / drop_view don't exist in the vendored Rails source).
+async function createView(name: string, sql: string): Promise<void> {
+  await conn().executeMutation(`CREATE VIEW ${quoteTableName(name)} AS ${sql}`);
+}
+async function dropView(name: string): Promise<void> {
+  if (await conn().viewExists(name)) {
+    await conn().executeMutation(`DROP VIEW ${quoteTableName(name)}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -32,17 +45,12 @@ describe("ViewWithPrimaryKeyTest", () => {
   }
 
   beforeAll(async () => {
-    await conn().createView(
-      "ebooks'",
-      `SELECT id, name, cover, status FROM books WHERE format = 'ebook'`,
-    );
+    await createView("ebooks'", `SELECT id, name, cover, status FROM books WHERE format = 'ebook'`);
     await Ebook.loadSchema();
   });
 
   afterAll(async () => {
-    if (await conn().viewExists("ebooks'")) {
-      await conn().dropView("ebooks'");
-    }
+    await dropView("ebooks'");
   });
 
   it("reading", async () => {
@@ -52,8 +60,7 @@ describe("ViewWithPrimaryKeyTest", () => {
   });
 
   it("views", async () => {
-    const viewList = await conn().views();
-    expect(viewList).toContain(Ebook._tableName);
+    expect(await conn().views()).toEqual([Ebook._tableName]);
   });
 
   it("view exists", async () => {
@@ -109,17 +116,12 @@ describe("ViewWithoutPrimaryKeyTest", () => {
   }
 
   beforeAll(async () => {
-    await conn().createView(
-      "paperbacks",
-      `SELECT name, status FROM books WHERE format = 'paperback'`,
-    );
+    await createView("paperbacks", `SELECT name, status FROM books WHERE format = 'paperback'`);
     await Paperback.loadSchema();
   });
 
   afterAll(async () => {
-    if (await conn().viewExists("paperbacks")) {
-      await conn().dropView("paperbacks");
-    }
+    await dropView("paperbacks");
   });
 
   it("reading", async () => {
@@ -128,8 +130,7 @@ describe("ViewWithoutPrimaryKeyTest", () => {
   });
 
   it("views", async () => {
-    const viewList = await conn().views();
-    expect(viewList).toContain(Paperback._tableName);
+    expect(await conn().views()).toEqual([Paperback._tableName]);
   });
 
   it("view exists", async () => {
@@ -178,7 +179,7 @@ describe("UpdateableViewTest", () => {
 
   beforeAll(async () => {
     if (adapterType === "sqlite") return;
-    await conn().createView(
+    await createView(
       "printed_books",
       `SELECT id, name, status, format FROM books WHERE format = 'paperback'`,
     );
@@ -187,9 +188,7 @@ describe("UpdateableViewTest", () => {
 
   afterAll(async () => {
     if (adapterType === "sqlite") return;
-    if (await conn().viewExists("printed_books")) {
-      await conn().dropView("printed_books");
-    }
+    await dropView("printed_books");
   });
 
   it.skipIf(adapterType === "sqlite")("update record", async () => {

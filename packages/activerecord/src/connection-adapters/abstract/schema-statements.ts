@@ -1023,35 +1023,6 @@ export class SchemaStatements {
     return rows.length > 0;
   }
 
-  /**
-   * Creates a database view.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#create_view
-   */
-  async createView(
-    viewName: string,
-    sqlDefinition: string,
-    options: { force?: boolean; replace?: boolean } = {},
-  ): Promise<void> {
-    if (options.force) {
-      await this.dropView(viewName, { ifExists: true });
-    }
-    const orReplace = options.replace ? " OR REPLACE" : "";
-    await this.adapter.executeMutation(
-      `CREATE${orReplace} VIEW ${this._qt(viewName)} AS ${sqlDefinition}`,
-    );
-  }
-
-  /**
-   * Drops a database view.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#drop_view
-   */
-  async dropView(viewName: string, options: { ifExists?: boolean } = {}): Promise<void> {
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
-    await this.adapter.executeMutation(`DROP VIEW${ifExists} ${this._qt(viewName)}`);
-  }
-
   async indexExists(
     tableName: string,
     columnName: string | string[],
