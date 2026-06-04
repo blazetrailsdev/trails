@@ -104,7 +104,8 @@ describe("ViewWithPrimaryKeyTest", () => {
 
   it("does not dump view as table", async () => {
     const schema = await dumpTableSchema(conn() as any, "ebooks'");
-    expect(schema).not.toMatch(/create_table "ebooks'"/);
+    // TS schema DSL: ctx.createTable("ebooks'", ...) — not the Ruby create_table form
+    expect(schema).not.toMatch(/ctx\.createTable\("ebooks'"/);
   });
 });
 
@@ -170,7 +171,8 @@ describe("ViewWithoutPrimaryKeyTest", () => {
 
   it("does not dump view as table", async () => {
     const schema = await dumpTableSchema(conn() as any, "paperbacks");
-    expect(schema).not.toMatch(/create_table "paperbacks"/);
+    // TS schema DSL: ctx.createTable("paperbacks", ...) — not the Ruby create_table form
+    expect(schema).not.toMatch(/ctx\.createTable\("paperbacks"/);
   });
 });
 
