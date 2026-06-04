@@ -36,7 +36,7 @@ async function withTestSchema(
   } finally {
     if (drop) await adapter.dropSchema(name, { cascade: true });
     await adapter.setSchemaSearchPath(oldSearchPath);
-    adapter.schemaCache?.clear();
+    adapter.schemaCache.clear();
   }
 }
 
