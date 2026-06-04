@@ -389,8 +389,6 @@ describe("HasOneThroughAssociationsTest", () => {
     const club = await Club.create({ name: "Nil Club" });
     const member = await Member.create({ name: "NilMember" });
     await Membership.create({ member_id: member.id, club_id: club.id });
-    // Pre-load so the nil assignment is seen as a change (Rails loads lazily on first access)
-    await member.association("club").loadTarget();
     (member.association("club") as any).writer(null);
     await member.save();
     const membership = await loadHasOne(member, "membership", {
@@ -1604,9 +1602,14 @@ describe("HasOneThroughAssociationsTest", () => {
     const moustacheClub = await Club.create({ name: "Moustache Club" });
     const member = await Member.create({ name: "DHH" });
     await Membership.create({ member_id: member.id, club_id: club1.id });
-    // Pre-load so the nil assignment is seen as a change
-    await member.association("club").loadTarget();
     (member.association("club") as any).writer(null);
+    await member.save();
+    // Verify through record is actually gone before reassigning
+    const membershipAfterNil = await loadHasOne(member, "membership", {
+      className: "Membership",
+      foreignKey: "member_id",
+    });
+    expect(membershipAfterNil).toBeNull();
     (member.association("club") as any).writer(moustacheClub);
     await member.save();
     const freshMember = await Member.find(member.id as number);
