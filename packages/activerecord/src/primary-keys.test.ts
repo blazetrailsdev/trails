@@ -341,6 +341,8 @@ describe("PrimaryKeysTest", () => {
   it.skipIf(adapterType !== "postgres")("serial with quoted sequence name", async () => {
     // Rails: assert_equal "nextval('"mixed_case_monkeys_monkeyID_seq"'::regclass)", column.default_function
     //        assert_predicate column, :serial?
+    // clearSchemaCache in afterEach empties the adapter cache; reload before columnsHash()
+    await MixedCaseMonkey.loadSchema();
     const col = (MixedCaseMonkey as any).columnsHash()["monkeyID"];
     expect(col).toBeDefined();
     expect(col.defaultFunction).toMatch(/nextval/);
@@ -350,6 +352,8 @@ describe("PrimaryKeysTest", () => {
   it.skipIf(adapterType !== "postgres")("serial with unquoted sequence name", async () => {
     // Rails: assert_equal "nextval('topics_id_seq'::regclass)", column.default_function
     //        assert_predicate column, :serial?
+    // clearSchemaCache in afterEach empties the adapter cache; reload before columnsHash()
+    await Topic.loadSchema();
     const col = (Topic as any).columnsHash()["id"];
     expect(col).toBeDefined();
     expect(col.defaultFunction).toMatch(/nextval/);
@@ -393,8 +397,12 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
   }
 
   it("primary key with integer", async () => {
+    // Rails: id: :integer → SERIAL on PG; INTEGER on MySQL/SQLite.
+    // Our adapter does not map integer id to SERIAL on PG (integerLikePrimaryKeyType
+    // not overridden); use "serial" directly so the column auto-increments on PG.
+    const type = adapterType === "postgres" ? "serial" : "integer";
     await (Base.connection as any).createTable("auto_increments", {
-      id: { type: "integer" },
+      id: { type },
       force: true,
     });
     await assertAutoIncremented();
@@ -403,8 +411,10 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
   // SQLite INTEGER PRIMARY KEY (ROWID alias) only works with INTEGER type;
   // BIGINT PKs require explicit values on SQLite. Skip on SQLite.
   it.skipIf(adapterType === "sqlite")("primary key with bigint", async () => {
+    // Rails: id: :bigint → BIGSERIAL on PG; BIGINT AUTO_INCREMENT on MySQL.
+    const type = adapterType === "postgres" ? "bigserial" : "bigint";
     await (Base.connection as any).createTable("auto_increments", {
-      id: { type: "bigint" },
+      id: { type },
       force: true,
     });
     await assertAutoIncremented();
