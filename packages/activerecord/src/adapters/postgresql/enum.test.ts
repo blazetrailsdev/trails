@@ -18,8 +18,9 @@ class PostgresqlEnum extends Base {
   }
 }
 
-// Mirrors Rails' with_test_schema helper (schema_test.rb):
+// Mirrors Rails' private with_test_schema helper in enum_test.rb:
 //   create_schema(name) / SET search_path / yield / ensure { drop_schema(name) / restore search_path }
+// Only used for tests that scope enums/tables to a named schema.
 async function withTestSchema(
   adapter: PostgreSQLAdapter,
   name: string,
@@ -33,7 +34,7 @@ async function withTestSchema(
   try {
     await fn();
   } finally {
-    if (drop) await adapter.dropSchema(name, { ifExists: true, cascade: true });
+    if (drop) await adapter.dropSchema(name, { cascade: true });
     await adapter.setSchemaSearchPath(oldSearchPath);
     adapter.schemaCache?.clear();
   }
@@ -72,8 +73,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       const col = cols.find((c) => c.name === "current_mood");
       expect(col).toBeDefined();
       expect(col!.type).toBe("enum");
-      expect(col!.sqlType).toContain("mood");
+      expect(col!.sqlType).toBe("mood");
       expect((col as any).array).toBeFalsy();
+      // Rails also asserts: type_for_attribute("current_mood").binary? → false
+      // BLOCKED: typeForAttribute is not yet ported to the adapter layer
     });
 
     it("enum defaults", async () => {
@@ -84,15 +87,21 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("postgresql_enums");
       const col = cols.find((c) => c.name === "good_mood");
       expect(col).toBeDefined();
-      expect(col!.default).toContain("happy");
+      expect(col!.default).toBe("happy");
+      // Rails also asserts: PostgresqlEnum.column_defaults["good_mood"] and
+      // PostgresqlEnum.new.good_mood — both require async schema cache refresh
+      // after ALTER TABLE, not yet wired for synchronous ORM column_defaults.
     });
 
     it("enum mapping", async () => {
       await adapter.exec(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
       const enumRecord = await PostgresqlEnum.first();
+      // prefer enumRecord.current_mood when string-enum getter is ported (enum.ts:509)
       expect((enumRecord as any).readAttribute("current_mood")).toBe("sad");
+      // prefer enumRecord.current_mood = "happy" when string-enum setter is ported
       (enumRecord as any).writeAttribute("current_mood", "happy");
-      await enumRecord!.save();
+      const saved = await enumRecord!.save();
+      expect(saved).toBeTruthy();
       await (enumRecord as any).reload();
       expect((enumRecord as any).readAttribute("current_mood")).toBe("happy");
     });
@@ -111,16 +120,22 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("enum type cast", async () => {
+      // Rails: enum.current_mood = :happy (Ruby symbol → string via EnumType cast)
+      // TS has no symbol type; write the mapped string value directly.
+      // The cast path (symbol → string) is not exercisable in TS.
       const enumRecord = new PostgresqlEnum();
-      // Rails: enum.current_mood = :happy (symbol cast to string)
       (enumRecord as any).writeAttribute("current_mood", "happy");
       expect((enumRecord as any).readAttribute("current_mood")).toBe("happy");
     });
 
     it("assigning enum to nil", async () => {
-      await adapter.exec(`INSERT INTO "postgresql_enums" ("current_mood") VALUES (NULL)`);
-      const rows = await adapter.execute(`SELECT "current_mood" FROM "postgresql_enums"`);
-      expect(rows[0].current_mood).toBeNull();
+      const model = new PostgresqlEnum();
+      (model as any).writeAttribute("current_mood", null);
+      expect((model as any).readAttribute("current_mood")).toBeNull();
+      const saved = await model.save();
+      expect(saved).toBeTruthy();
+      await (model as any).reload();
+      expect((model as any).readAttribute("current_mood")).toBeNull();
     });
 
     it("schema dump", async () => {
@@ -174,7 +189,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await Schema.define(adapter, async (schema) => {
         await schema.createEnum("color", ["blue", "green"]);
         await schema.changeTable("postgresql_enums", async (t) => {
-          await (t as any).column("best_color", "color", { default: "blue", null: false });
+          // ColumnType accepts arbitrary strings (string & {}), so no cast needed
+          await t.column("best_color", "color", { default: "blue", null: false });
         });
       });
       PostgresqlEnum.resetColumnInformation();
@@ -182,14 +198,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       const col = cols.find((c) => c.name === "best_color");
       expect(col).toBeDefined();
       expect(col!.sqlType).toBe("color");
+      expect(col!.default).toBe("blue");
       expect(col!.null).toBe(false);
     });
 
     it("drop enum", async () => {
       await adapter.createEnum("unused", []);
+      // Rails order: drop (succeeds) → drop if_exists (succeeds, gone) → bare drop (raises)
       await adapter.dropEnum("unused");
-      await expect(adapter.dropEnum("unused")).rejects.toThrow();
       await expect(adapter.dropEnum("unused", { ifExists: true })).resolves.toBeUndefined();
+      await expect(adapter.dropEnum("unused")).rejects.toThrow();
     });
 
     // Needs ORM enum getter for label/value asymmetry (okay: "ok")
@@ -213,8 +231,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
     });
 
+    // Rails uses create_schema + ensure { drop_schema } without changing search_path.
+    // withTestSchema is intentionally NOT used here — qualified names are used throughout.
     it("enum type explicit schema", async () => {
-      await withTestSchema(adapter, "test_schema", async () => {
+      await adapter.createSchema("test_schema");
+      try {
         await adapter.createEnum("test_schema.mood_in_other_schema", ["sad", "ok", "happy"]);
         await adapter.exec(`
           CREATE TABLE "test_schema"."postgresql_enums_in_other_schema" (
@@ -229,7 +250,9 @@ describeIfPg("PostgreSQLAdapter", () => {
           adapter.dropTable("test_schema.postgresql_enums_in_other_schema"),
         ).resolves.not.toThrow();
         await expect(adapter.dropEnum("test_schema.mood_in_other_schema")).resolves.not.toThrow();
-      });
+      } finally {
+        await adapter.dropSchema("test_schema", { ifExists: true });
+      }
     });
 
     // Needs schema dumper with search-path-scoped enum filtering
