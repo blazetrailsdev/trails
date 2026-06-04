@@ -1808,7 +1808,6 @@ export class AbstractAdapter implements Quoting {
     const materializeTransactions = opts.materializeTransactions ?? true;
 
     const run = async (): Promise<T> => {
-      if (this._connection === null && this.isReconnectCanRestoreState()) this.connectBang();
       if (materializeTransactions) await this.materializeTransactions();
 
       let retriesAvailable = allowRetry ? this.connectionRetries : 0;
@@ -1820,7 +1819,7 @@ export class AbstractAdapter implements Quoting {
 
       for (;;) {
         try {
-          return await block(this._connection);
+          return await block(await this.rawConnectionForBlock());
         } catch (e) {
           const err = e as Error;
           this.invalidateTransaction(err);
@@ -1852,6 +1851,25 @@ export class AbstractAdapter implements Quoting {
     const next = prev.then(run, run);
     this._lockQueue = next.catch(() => undefined);
     return next as Promise<T>;
+  }
+
+  /**
+   * @internal
+   * Overridable async seam for the connection acquired inside
+   * withRawConnection's retry loop. The default reproduces the
+   * base behaviour: lazily call connectBang() if the connection
+   * is absent and reconnectable, then return _connection.
+   *
+   * Adapters with async acquisition (e.g. PostgreSQLAdapter via
+   * getClient()) override this to await their driver-level connect
+   * on each loop iteration so that reconnectBang() + continue
+   * picks up a fresh handle automatically.
+   *
+   * Mirrors: AbstractAdapter#with_raw_connection (acquisition step)
+   */
+  protected async rawConnectionForBlock(): Promise<AbstractAdapter | null> {
+    if (this._connection === null && this.isReconnectCanRestoreState()) this.connectBang();
+    return this._connection;
   }
 
   /** @internal Mirrors: AbstractAdapter#verified! */
