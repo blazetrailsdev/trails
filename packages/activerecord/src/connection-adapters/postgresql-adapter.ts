@@ -713,6 +713,37 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
+   * Mirrors: PostgreSQLAdapter#raw_execute. Runs the SQL against a pool
+   * client and returns the raw pg.QueryResult so the shared
+   * `internalExecQuery` → `castResult` chain can attach OID types.
+   * Called by `internalExecute` (mixin) which is invoked by
+   * `queryValue` / `query` / `internalExecQuery`.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#raw_execute
+   */
+  override async rawExecute(
+    sql: string,
+    _name?: string | null,
+    binds?: unknown[],
+  ): Promise<pg.QueryResult> {
+    const bindArray = typeCastedBinds(binds ?? []).map((v) => this._bindForPg(v));
+    const rewritten = this.rewriteBinds(sql, bindArray);
+    return this.withClient((client) =>
+      this._runQuery<pg.QueryResult>(client, rewritten, bindArray, { rowMode: "array" }),
+    );
+  }
+
+  /**
+   * Shadows the mixin's throwing stub so `internalExecQuery` (which checks
+   * `this.castResult`) picks up the PG-specific implementation.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#cast_result
+   */
+  castResult(rawResult: pg.QueryResult): Promise<Result> {
+    return castResult.call(this, rawResult);
+  }
+
+  /**
    * Mirrors: PostgreSQLAdapter#exec_query. Executes a query and returns
    * an ActiveRecord::Result with `columnTypes` populated from the
    * adapter's type_map — each field's dataTypeID resolves to a

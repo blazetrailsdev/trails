@@ -89,10 +89,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: assert_equal(-567.89, second_money.wealth)
       expect(Number(secondMoney.wealth)).toBeCloseTo(-567.89, 2);
       // Rails: assert_equal 567.89, @connection.query_value("SELECT wealth FROM postgresql_moneys WHERE id = 1")
-      // TS: queryValue calls rawExecute (not implemented on pool); selectValue goes through execQuery.
-      const v1 = await connection.selectValue("SELECT wealth FROM postgresql_moneys WHERE id = 1");
+      const v1 = await connection.queryValue("SELECT wealth FROM postgresql_moneys WHERE id = 1");
       expect(Number(v1)).toBeCloseTo(567.89, 2);
-      const v2 = await connection.selectValue("SELECT wealth FROM postgresql_moneys WHERE id = 2");
+      const v2 = await connection.queryValue("SELECT wealth FROM postgresql_moneys WHERE id = 2");
       expect(Number(v2)).toBeCloseTo(-567.89, 2);
     });
 
@@ -148,9 +147,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: output = dump_table_schema("postgresql_moneys")
       const output = await SchemaDumper.dumpTableSchema(connection, "postgresql_moneys");
       // Rails: assert_match %r{t\.money\s+"wealth",\s+scale: 2$}, output
-      expect(output).toMatch(/t\.money\s*\("wealth",\s*\{[^}]*scale:\s*2/);
+      expect(output).toMatch(/t\.money\s*\("wealth",\s*\{\s*scale:\s*2\s*\}/);
       // Rails: assert_match %r{t\.money\s+"depth",\s+scale: 2,\s+default: "150\.55"$}, output
-      expect(output).toMatch(/t\.money\s*\("depth",\s*\{[^}]*scale:\s*2[^}]*default:\s*"150\.55"/);
+      expect(output).toMatch(
+        /t\.money\s*\("depth",\s*\{[^}]*scale:\s*2[^}]*default:\s*"150\.55"[^}]*\}/,
+      );
     });
 
     it("create and update money", async () => {
