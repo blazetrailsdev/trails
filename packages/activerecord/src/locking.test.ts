@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, StaleObjectError, ReadonlyAttributeError } from "./index.js";
-import { Associations } from "./associations.js";
+import { Associations, association } from "./associations.js";
 
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -14,6 +14,7 @@ import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Person } from "./test-helpers/models/person.js";
 import { Frog } from "./test-helpers/models/frog.js";
+import { Treasure } from "./test-helpers/models/treasure.js";
 import { StringKeyObject } from "./test-helpers/models/string-key-object.js";
 import { LegacyThing } from "./test-helpers/models/legacy-thing.js";
 import { Reference } from "./test-helpers/models/reference.js";
@@ -52,9 +53,12 @@ describe("OptimisticLockingTest", () => {
         ships: canonicalSchema.ships,
         lock_without_defaults: canonicalSchema.lock_without_defaults,
         lock_without_defaults_cust: canonicalSchema.lock_without_defaults_cust,
+        treasures: canonicalSchema.treasures,
+        peoples_treasures: canonicalSchema.peoples_treasures,
       },
       { dropExisting: true },
     );
+    registerModel(Treasure);
   });
 
   it("quote value passed lock col", async () => {
@@ -416,8 +420,33 @@ describe("OptimisticLockingTest", () => {
   it.skip("polymorphic destroy with dependencies and lock version", () => {
     // BLOCKED: associations — polymorphic + locking not supported
   });
-  it.skip("removing has and belongs to many associations upon destroy", () => {
-    // BLOCKED: associations — habtm not supported
+  it("removing has and belongs to many associations upon destroy", async () => {
+    // RichPerson's async beforeValidation callbacks conflict with the sync
+    // validation chain, so we use a local class with the same HABTM.
+    class TestRichPerson extends Base {
+      static {
+        this._tableName = "people";
+        this.attribute("first_name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
+      }
+    }
+    registerModel("TestRichPerson", TestRichPerson);
+    Associations.hasAndBelongsToMany.call(TestRichPerson, "treasures", {
+      className: "Treasure",
+      joinTable: "peoples_treasures",
+      foreignKey: "rich_person_id",
+    });
+    const p = await TestRichPerson.createBang({ first_name: "Jon" });
+    const proxy = association(p, "treasures");
+    await proxy.create({});
+    expect(await proxy.isEmpty()).toBe(false);
+    await p.destroy();
+    const rows = await (Base.connection as any).selectRows(
+      `SELECT * FROM peoples_treasures WHERE rich_person_id = ${p.id}`,
+    );
+    expect(rows.length).toBe(0);
   });
 
   it("yaml dumping with lock column", async () => {
