@@ -227,6 +227,7 @@ describe("RelationTest", () => {
       expect(posts[0].category).toBe("art");
     });
 
+    // trails integration variant of test_finding_with_reorder
     it("reorder replaces existing order", async () => {
       const posts = await Post.all().order("title").reorder({ views: "asc" }).toArray();
       expect(posts[0].views).toBe(10);
@@ -2056,6 +2057,7 @@ describe("RelationTest", () => {
     expect(sql).toContain("GROUP BY");
   });
 
+  // trails integration variant of test_finding_with_reorder
   // -- reorder replaces existing order --
   it("reorder replaces existing order", async () => {
     const items = await Widget.all().order({ name: "asc" }).reorder({ name: "desc" }).toArray();
@@ -4038,17 +4040,6 @@ describe("RelationTest", () => {
     expect(sql).toContain("GROUP BY");
   });
 
-  // -- reorder --
-
-  it("reorder replaces existing order", () => {
-    const rel = Product.all().order("name").reorder({ price: "desc" });
-    const sql = rel.toSql();
-    // reorder replaces "name" with "price DESC". Quote char varies by adapter
-    // (" on SQLite/PG, ` on MySQL/MariaDB), so match quote-agnostically.
-    expect(sql).toMatch(/price.{0,2}\s+DESC/i);
-    expect(sql).not.toMatch(/name.{0,2}\s+ASC/i);
-  });
-
   // -- reverseOrder --
 
   it.skip("reverseOrder flips ASC to DESC", () => {
@@ -4853,24 +4844,36 @@ describe("RelationTest", () => {
     expect(sql2).toContain("ORDER BY");
   });
 
-  it("finding with desc order with string", () => {
+  it("finding with desc order with string", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.order({ title: "desc" }).toSql();
-    expect(sql).toContain("DESC");
+    // Rails: assert_equal [fifth, fourth, third, second, first], topics.to_a
+    await Post.create({ title: "Alpha" });
+    await Post.create({ title: "Beta" });
+    await Post.create({ title: "Gamma" });
+    const posts = await Post.order({ title: "desc" }).toArray();
+    expect(posts).toHaveLength(3);
+    expect(posts[0].title).toBe("Gamma");
+    expect(posts[2].title).toBe("Alpha");
   });
 
-  it("finding with asc order with string", () => {
+  it("finding with asc order with string", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.order({ title: "asc" }).toSql();
-    expect(sql).toContain("ASC");
+    // Rails: assert_equal [first, second, third, fourth, fifth], topics.to_a
+    await Post.create({ title: "Gamma" });
+    await Post.create({ title: "Alpha" });
+    await Post.create({ title: "Beta" });
+    const posts = await Post.order({ title: "asc" }).toArray();
+    expect(posts).toHaveLength(3);
+    expect(posts[0].title).toBe("Alpha");
+    expect(posts[2].title).toBe("Gamma");
   });
 
   it("support upper and lower case directions", () => {
@@ -4879,10 +4882,11 @@ describe("RelationTest", () => {
         this.attribute("title", "string");
       }
     }
-    const sql1 = Post.order({ title: "asc" }).toSql();
-    const sql2 = Post.order({ title: "desc" }).toSql();
-    expect(sql1).toContain("ASC");
-    expect(sql2).toContain("DESC");
+    // Rails tests all 8 variants ("ASC"/"asc"/:ASC/:asc + DESC equivalents)
+    expect(Post.order({ title: "ASC" }).toSql()).toContain("ASC");
+    expect(Post.order({ title: "asc" }).toSql()).toContain("ASC");
+    expect(Post.order({ title: "DESC" }).toSql()).toContain("DESC");
+    expect(Post.order({ title: "desc" }).toSql()).toContain("DESC");
   });
 
   it("raising exception on invalid hash params", () => {
@@ -4891,24 +4895,45 @@ describe("RelationTest", () => {
         this.attribute("title", "string");
       }
     }
-    // where with hash should not raise
-    expect(() => Post.where({ title: "x" }).toSql()).not.toThrow();
+    // Rails: assert_raise(ArgumentError) { Topic.order(:name, "id DESC", id: :asfsdf) }
+    // Cast past TS types to exercise the runtime direction validation.
+    expect(() => Post.order({ title: "asfsdf" as "asc" }).toSql()).toThrow(
+      'Direction "asfsdf" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]',
+    );
   });
 
-  it("finding with order concatenated", () => {
-    class Post extends Base {
+  it("finding with order concatenated", async () => {
+    class Topic extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
       }
     }
-    const sql = Post.order("title").order("body").toSql();
-    expect(sql).toContain("ORDER BY");
+    // Rails: assert_equal 5, topics.size; assert_equal topics(:fourth).title, topics.first.title
+    await Topic.create({ title: "B", body: "z" });
+    await Topic.create({ title: "A", body: "y" });
+    await Topic.create({ title: "A", body: "x" });
+    const topics = await Topic.order("title").order("body").toArray();
+    expect(topics).toHaveLength(3);
+    // Both orders apply: title-primary, body-secondary — "A/x" beats "A/y"
+    expect(topics[0].title).toBe("A");
+    expect(topics[0].body).toBe("x");
   });
 
-  it("finding with assoc order by aliased attributes", () => {
-    const sql = Post.order("title").toSql();
-    expect(sql).toContain("ORDER BY");
+  it("finding with assoc order by aliased attributes", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.aliasAttribute("heading", "title");
+      }
+    }
+    // Rails: Topic.order(heading: :desc) where heading = alias_attribute for title
+    await Post.create({ title: "Alpha" });
+    await Post.create({ title: "Gamma" });
+    await Post.create({ title: "Beta" });
+    const posts = await Post.order({ heading: "desc" }).toArray();
+    expect(posts[0].title).toBe("Gamma");
+    expect(posts[2].title).toBe("Alpha");
   });
 
   it("finding with reorder", async () => {
@@ -4917,9 +4942,18 @@ describe("RelationTest", () => {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.order("title").reorder({ title: "desc" }).toSql();
-    expect(sql).toContain("ORDER BY");
-    expect(sql).toContain("DESC");
+    // Rails: Topic.order("author_name").order("title").reorder("id").to_a
+    // Verifies reorder() replaces all previous order() calls.
+    await Post.create({ title: "Charlie" });
+    await Post.create({ title: "Alice" });
+    await Post.create({ title: "Bob" });
+    const rel = Post.order("title").order("title").reorder("id");
+    // Assert the replacement ORDER BY is present in the SQL (not just cleared)
+    expect(rel.toSql()).toMatch(/ORDER BY.+\bid\b/i);
+    const posts = await rel.toArray();
+    const ids = posts.map((p) => p.id as number);
+    // Must be sorted by id (insertion order), not alphabetically by title
+    expect(ids).toEqual([...ids].sort((a, b) => a - b));
   });
 
   it("reorder deduplication", () => {
@@ -4928,13 +4962,27 @@ describe("RelationTest", () => {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.order("title").order("title").reorder("title").toSql();
-    expect(sql).toContain("ORDER BY");
+    // Rails: assert_equal ["id desc"], topics.order_values
+    // Duplicate args to one reorder() call must be collapsed to a single ORDER BY term.
+    const sql = Post.reorder("title", "title").toSql();
+    const afterOrderBy = sql.split(/ORDER BY\s+/i)[1] ?? "";
+    expect((afterOrderBy.match(/\btitle\b/gi) ?? []).length).toBe(1);
   });
 
-  it("finding with assoc reorder by aliased attributes", () => {
-    const sql = Post.order("title").reorder("body").toSql();
-    expect(sql).toContain("ORDER BY");
+  it("finding with assoc reorder by aliased attributes", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.aliasAttribute("heading", "title");
+      }
+    }
+    // Rails: Topic.order("author_name").reorder(heading: :desc) where heading aliases title
+    await Post.create({ title: "Alpha" });
+    await Post.create({ title: "Gamma" });
+    await Post.create({ title: "Beta" });
+    const posts = await Post.order("title").reorder({ heading: "desc" }).toArray();
+    expect(posts[0].title).toBe("Gamma");
+    expect(posts[2].title).toBe("Alpha");
   });
 
   it("finding with order and take", async () => {
