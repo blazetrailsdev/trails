@@ -1278,7 +1278,10 @@ export class Base extends Model {
     this._recordTimestamps = value;
   }
 
-  // Mirrors: ActiveRecord::AttributeMethods::Dirty — class_attribute :partial_updates/:partial_inserts, default: true
+  // Mirrors: ActiveRecord::AttributeMethods::Dirty — class_attribute
+  // :partial_updates/:partial_inserts, default: true (dirty.rb:49-50). Apps flip
+  // partial_inserts to false via `config.load_defaults 7.0`; that belongs in a
+  // config layer, not this framework default.
   static partialUpdates = true;
   static partialInserts = true;
 
@@ -2702,7 +2705,7 @@ export class Base extends Model {
             ? (ctor.connection as any).lastInsertedId(rawId)
             : rawId;
         if (!Array.isArray(ctor.primaryKey) && this.id === null) {
-          this._attributes.set(ctor.primaryKey, insertedId);
+          this._writeAttribute(ctor.primaryKey as string, insertedId);
         } else if (
           Array.isArray(ctor.primaryKey) &&
           insertedId != null &&
@@ -2813,7 +2816,7 @@ export class Base extends Model {
       }
       const lockIdx = declaredChanges.indexOf(lockCol);
       if (lockIdx !== -1) updateValues.splice(lockIdx, 1);
-      this._attributes.set(lockCol, currentVersion + 1);
+      this._writeAttribute(lockCol, currentVersion + 1);
       updateValues.push([table.get(lockCol), currentVersion + 1]);
     }
 
@@ -2834,9 +2837,23 @@ export class Base extends Model {
       .execUpdate(ctor.connection.toSql(um), `${ctor.name} Update`)
       .then((affected) => {
         if (ctor.lockingEnabled && affected === 0) {
-          // Mirrors Rails _update_row rescue Exception: restore attribute snapshot so
-          // NULL-in-DB records don't lose their original null valueBeforeTypeCast.
-          if (lockAttributeWas !== null) this._attributes.set(lockCol, lockAttributeWas);
+          // Mirrors Rails _update_row rescue: `@attributes[locking_column] =
+          // lock_attribute_was` restores the attribute snapshot so NULL-in-DB
+          // records don't lose their original null valueBeforeTypeCast.
+          if (lockAttributeWas !== null) {
+            this._attributes.set(lockCol, lockAttributeWas);
+            // Rails derives dirty state from @attributes, so restoring
+            // lock_attribute_was also reverts the auto-increment bump's dirty
+            // entry. Our DirtyTracker is a separate map, so recompute lockCol
+            // against the snapshot baseline: this drops the auto-bump (clean →
+            // clean) while preserving any user-set lock_version change.
+            (this as any)._dirty.attributeWritten(
+              lockCol,
+              lockAttributeWas.value,
+              lockAttributeWas.valueBeforeTypeCast,
+              lockAttributeWas.type,
+            );
+          }
           throw new StaleObjectError(this, "update");
         }
       });
