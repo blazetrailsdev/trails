@@ -936,7 +936,9 @@ describe("WhereTest", () => {
     const author = await BnwrAuthor.create({});
     const decoy = await BnwrAuthor.create({});
     await BnwrPost.create({ author_id: author.id });
-    // decoy author has no posts — should not appear in either result
+    await BnwrPost.create({ author_id: decoy.id });
+    // decoy has a post, but its author_id does not match the subquery — without the
+    // nested relation predicate the JOIN alone would return both authors
 
     // Rails: expected = Author.where(id: author).joins(:posts)
     // Rails: actual   = Author.where(posts: { author_id: Author.where(id: author.id) }).joins(:posts)
