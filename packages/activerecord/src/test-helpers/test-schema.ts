@@ -972,9 +972,8 @@ export const TEST_SCHEMA: Schema = {
     message: "string",
   },
 
-  // Rails declares precision/scale on each decimal/numeric column; the
-  // current Schema shape doesn't carry those, so we drop them (per the
-  // header note on features defineSchema doesn't express yet).
+  // precision/scale mirror schema.rb exactly. Rails' `t.numeric :numeric_number`
+  // maps to a bare decimal here — the Schema DSL has no separate numeric primitive.
   numeric_data: {
     bank_balance: { type: "decimal", precision: 10, scale: 2 },
     big_bank_balance: { type: "decimal", precision: 15, scale: 2 },
