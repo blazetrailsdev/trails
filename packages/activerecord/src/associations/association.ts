@@ -135,11 +135,20 @@ export class Association {
     };
     const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
     if (this._cachedScope === undefined) {
-      this._cachedScope = AssociationScope.scope({
+      // Rails' private `association_scope` = memoized AssociationScope.scope(self)
+      const assocScope = AssociationScope.scope({
         owner: this.owner,
         reflection: richReflection as never,
         klass: klass as never,
       });
+      // Rails' public `scope` = target_scope.merge!(association_scope)
+      // (association.rb:116). `targetScope()` is `klass.all` for regular
+      // associations; the HMT override further merges through-chain scopes.
+      const target = this.targetScope();
+      this._cachedScope =
+        target != null && typeof (target as any).merge === "function"
+          ? (target as any).merge(assocScope)
+          : assocScope;
     }
     return this._cachedScope;
   }
