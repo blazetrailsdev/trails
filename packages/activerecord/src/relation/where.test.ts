@@ -153,6 +153,10 @@ const SCHEMA: Schema = {
   // "type casting nested joins" uses the canonical comments table (post_id only).
   // posts + authors are already in this schema with author_id / name columns.
   comments: { post_id: "integer" },
+  // "where with through association" second assertion: author → wta_categorizations → categories
+  // Table name "categories" matches association name so associatedTable() skips aliasing.
+  categories: { name: "string" },
+  wta_categorizations: { author_id: "integer", category_id: "integer" },
 };
 
 setupHandlerSuite();
@@ -2376,6 +2380,8 @@ describe("WhereTest", () => {
   });
 
   it("where with through association", async () => {
+    // --- assertion 1: Author.joins(:comments).where(comments: <record>) ---
+    // Rails: Author has_many :comments, through: :posts
     class WtaAuthor extends Base {
       static {
         this._tableName = "authors";
@@ -2405,22 +2411,55 @@ describe("WhereTest", () => {
       className: "WtaComment",
       foreignKey: "post_id",
     });
-    // Rails: Author has_many :comments, through: :posts
     Associations.hasMany.call(WtaAuthor, "comments", {
       className: "WtaComment",
       through: "posts",
     });
 
-    const author1 = await WtaAuthor.create({ name: "David" });
-    const author2 = await WtaAuthor.create({ name: "Bob" });
-    const post1 = await WtaPost.create({ author_id: author1.id });
-    await WtaPost.create({ author_id: author2.id });
+    const david = await WtaAuthor.create({ name: "David" });
+    const post1 = await WtaPost.create({ author_id: david.id });
+    await WtaPost.create({ author_id: (await WtaAuthor.create({ name: "Other" })).id });
     const greetings = await WtaComment.create({ post_id: post1.id });
 
-    // Rails: Author.joins(:comments).where(comments: comments(:greetings))
-    // Generates: WHERE comments.id = ? using the instance's primary key.
-    const result = await WtaAuthor.joins("comments").where({ comments: greetings }).toArray();
-    expect(result.map((a) => a.id)).toStrictEqual([author1.id]);
+    const result1 = await WtaAuthor.joins("comments").where({ comments: greetings }).toArray();
+    expect(result1.map((a) => a.id)).toStrictEqual([david.id]);
+
+    // --- assertion 2: Author.joins(:categories).where(categories: <record>) ---
+    // Rails: Author has_many :categorizations; has_many :categories, through: :categorizations
+    class WtaCategory extends Base {
+      static {
+        this._tableName = "categories";
+        this.attribute("name", "string");
+      }
+    }
+    class WtaCategorization extends Base {
+      static {
+        this._tableName = "wta_categorizations";
+        this.attribute("author_id", "integer");
+        this.attribute("category_id", "integer");
+      }
+    }
+    registerModel("WtaCategory", WtaCategory);
+    registerModel("WtaCategorization", WtaCategorization);
+    Associations.belongsTo.call(WtaCategorization, "category", {
+      className: "WtaCategory",
+      foreignKey: "category_id",
+    });
+    Associations.hasMany.call(WtaAuthor, "categorizations", {
+      className: "WtaCategorization",
+      foreignKey: "author_id",
+    });
+    Associations.hasMany.call(WtaAuthor, "categories", {
+      className: "WtaCategory",
+      through: "categorizations",
+    });
+
+    const bob = await WtaAuthor.create({ name: "Bob" });
+    const technology = await WtaCategory.create({ name: "technology" });
+    await WtaCategorization.create({ author_id: bob.id, category_id: technology.id });
+
+    const result2 = await WtaAuthor.joins("categories").where({ categories: technology }).toArray();
+    expect(result2.map((a) => a.id)).toStrictEqual([bob.id]);
   });
 
   it("polymorphic nested array where", async () => {
