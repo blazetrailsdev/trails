@@ -3982,15 +3982,13 @@ export class Relation<T extends Base> {
       } else if (raw instanceof Nodes.Node) {
         // Compile via the same visitor _compileSelectSql uses so identifier
         // quoting stays dialect-consistent across the whole SELECT.
-        const sv = this._selectVisitor();
-        fromExpr = sv ? sv.compile(raw) : raw.toSql();
+        const av = this._arelVisitor();
+        fromExpr = av.compile(raw);
         // Rails compiles the whole arel (including the FROM clause) through a
         // single collector, so a non-retryable FROM node lowers the overall
         // classification. We compile it separately, so AND its retryability
         // into the captured SELECT flag rather than letting it clobber.
-        if (sv) {
-          this._lastSelectRetryable &&= (sv as any).collector?.retryable ?? false;
-        }
+        this._lastSelectRetryable &&= (av as any).collector?.retryable ?? false;
       } else if (alias) {
         fromExpr = `${raw} ${_safeAlias(alias)}`;
       } else {
@@ -4071,32 +4069,23 @@ export class Relation<T extends Base> {
     return adapter?.visitor ?? new Visitors.ToSql(adapter ?? undefined);
   }
 
-  /**
-   * Returns the adapter's SELECT visitor when one is defined, or null.
-   *
-   * Real adapters (PG, SQLite, MySQL) expose `visitor` — use it to
-   * get dialect-correct quoting. Returns null when no
-   * adapter is established (e.g. HABTM join models where adapter resolution throws) or
-   * when the adapter is a mock/partial that doesn't define `visitor`;
-   * callers then fall back to `manager.toSql()` / `node.toSql()` (global
-   * registry visitor = ANSI double-quotes).
-   */
+  /** Returns the adapter's visitor when defined, or null. */
   private _selectVisitor(): Visitors.ToSql | null {
     return this._resolveAdapter()?.visitor ?? null;
   }
 
   /**
-   * Compile a SelectManager's AST using the adapter-specific visitor when one
-   * is defined (real PG/SQLite/MySQL adapter), or manager.toSql() otherwise.
+   * Compile a SelectManager's AST through the adapter visitor (`_arelVisitor`).
+   * Falls back to the default ANSI ToSql when no connection is established.
    */
   private _compileSelectSql(manager: { ast: Nodes.Node; toSql(): string }): string {
-    const v = this._selectVisitor();
-    const sql = v ? v.compile(manager.ast) : manager.toSql();
+    const v = this._arelVisitor();
+    const sql = v.compile(manager.ast);
     // Capture the SELECT's retryability immediately after compilation. The
     // shared adapter visitor's collector is reset on every compile() call, and
     // _toSqlWithoutSetOp may compile again for from(ArelNode) FROM clauses —
     // which would clobber the flag before toArray() reads it.
-    this._lastSelectRetryable = v ? ((v as any).collector?.retryable ?? false) : false;
+    this._lastSelectRetryable = (v as any).collector?.retryable ?? false;
     return sql;
   }
 
