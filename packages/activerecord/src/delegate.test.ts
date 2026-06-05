@@ -4,14 +4,15 @@ import { Associations } from "./associations.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
 
 beforeAll(async () => {
   await defineSchema({
-    authors: { name: "string", city: "string" },
-    posts: { title: "string", author_id: "integer" },
+    authors: TEST_SCHEMA.authors,
+    posts: TEST_SCHEMA.posts,
   });
 });
 

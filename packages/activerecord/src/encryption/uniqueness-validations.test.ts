@@ -16,6 +16,7 @@ import { UniquenessValidator } from "../validations.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Relation } from "../relation.js";
 import { Base } from "../index.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
@@ -33,7 +34,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
 
   beforeAll(async () => {
     await defineSchema({
-      encrypted_books: { name: { type: "string", limit: 1024, default: "<untitled>" } },
+      encrypted_books: TEST_SCHEMA.encrypted_books,
     });
   });
 

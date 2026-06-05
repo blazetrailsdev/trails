@@ -4,12 +4,13 @@ import { Error as ActiveModelError, I18n } from "@blazetrails/activemodel";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
   await defineSchema({
-    topics: { title: "string" },
+    topics: TEST_SCHEMA.topics,
   });
 });
 

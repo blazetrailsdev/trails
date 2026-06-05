@@ -4,6 +4,7 @@ import { Associations } from "./associations.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 // Mirrors vendor/rails/activerecord/test/models/lesson.rb — `class LessonError`.
 class LessonError extends Error {}
@@ -13,9 +14,9 @@ useHandlerTransactionalFixtures();
 
 beforeAll(async () => {
   await defineSchema({
-    students: { name: "string" },
-    lessons: { name: "string" },
-    lessons_students: { lesson_id: "integer", student_id: "integer" },
+    students: TEST_SCHEMA.students,
+    lessons: TEST_SCHEMA.lessons,
+    lessons_students: TEST_SCHEMA.lessons_students,
   });
 });
 
