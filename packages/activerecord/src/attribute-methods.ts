@@ -395,6 +395,11 @@ export function attributesForUpdate(this: InstanceMethodHost, attributeNames: st
 /** @internal */
 export function attributesForCreate(this: InstanceMethodHost, attributeNames: string[]): string[] {
   const mc = this.constructor as any;
+  // Rails: attribute_names = attribute_names_for_partial_inserts if partial_inserts
+  if (mc.partialInserts) {
+    const partial = (this as any).changedAttributeNamesToSave as string[] | undefined;
+    if (partial !== undefined) attributeNames = partial;
+  }
   const colNames = new Set<string>(mc.columnNames?.() ?? []);
   return attributeNames.filter((name) => {
     if (!colNames.has(name)) return false;

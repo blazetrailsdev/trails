@@ -38,6 +38,7 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { NumericData } from "./test-helpers/models/numeric-data.js";
 import { adapterType } from "./test-adapter.js";
+import { assertNoQueriesMatch, assertQueriesMatch } from "./testing/query-assertions.js";
 
 // trails generates column accessors (`pirate.catchphrase`) at runtime, so they
 // aren't visible to TS on the model classes. This alias keeps the inherited
@@ -581,12 +582,48 @@ describe("DirtyTest", () => {
     // array-of-hashes value survives `changes_to_save` unmutated.
   });
 
-  it.skip("previous changes", () => {
-    // BLOCKED: dirty (insert-time composition) — after a fresh INSERT, trails'
-    // `previous_changes` key set differs from Rails' (Rails expects 4:
-    // catchphrase/id/created_on/updated_on; trails records 3). The post-UPDATE
-    // assertions match, but the test is a single method and can't be split.
-    // SCOPE: align the id/timestamp change-recording on INSERT, separate PR.
+  it.skipIf(adapterType === "postgres")("previous changes", async () => {
+    let pirate = new Pirate() as Rec;
+    expect(pirate.previousChanges).toEqual({});
+    pirate.catchphrase = "arrr";
+    await (pirate as unknown as Pirate).save();
+
+    expect(Object.keys(pirate.previousChanges)).toHaveLength(4);
+    expect(pirate.previousChanges["catchphrase"]).toEqual([null, "arrr"]);
+    expect(pirate.attributePreviouslyWas("catchphrase")).toBeNull();
+    expect(pirate.previousChanges["id"]).toEqual([null, (pirate as any).id]);
+    expect(pirate.previousChanges["updated_on"][0]).toBeNull();
+    expect(pirate.previousChanges["updated_on"][1]).not.toBeNull();
+    expect(pirate.previousChanges["created_on"][0]).toBeNull();
+    expect(pirate.previousChanges["created_on"][1]).not.toBeNull();
+    expect(pirate.previousChanges).not.toHaveProperty("parrot_id");
+
+    pirate = new Pirate() as Rec;
+    expect(pirate.previousChanges).toEqual({});
+    pirate.catchphrase = "arrr";
+    await (pirate as unknown as Pirate).save();
+
+    expect(Object.keys(pirate.previousChanges)).toHaveLength(4);
+    expect(pirate.previousChanges["catchphrase"]).toEqual([null, "arrr"]);
+    expect(pirate.attributePreviouslyWas("catchphrase")).toBeNull();
+    expect(pirate.previousChanges["id"]).toEqual([null, (pirate as any).id]);
+    expect(pirate.previousChanges).toHaveProperty("updated_on");
+    expect(pirate.previousChanges).toHaveProperty("created_on");
+    expect(pirate.previousChanges).not.toHaveProperty("parrot_id");
+
+    pirate.catchphrase = "Yar!!";
+    await (pirate as unknown as Pirate).reload();
+    expect(pirate.previousChanges).toEqual({});
+
+    pirate = (await Pirate.findBy({ catchphrase: "arrr" })) as Rec;
+    pirate.catchphrase = "Me Maties!";
+    await (pirate as unknown as Pirate).save();
+
+    expect(Object.keys(pirate.previousChanges)).toHaveLength(2);
+    expect(pirate.previousChanges["catchphrase"]).toEqual(["arrr", "Me Maties!"]);
+    expect(pirate.attributePreviouslyWas("catchphrase")).toBe("arrr");
+    expect(pirate.previousChanges["updated_on"][0]).not.toBeNull();
+    expect(pirate.previousChanges["updated_on"][1]).not.toBeNull();
   });
 
   it.skip("field named field", () => {
@@ -626,11 +663,19 @@ describe("DirtyTest", () => {
     // identical instant. SCOPE: TZ-aware datetime string round-trip, separate PR.
   });
 
-  it.skip("partial insert", () => {
-    // BLOCKED: dirty (create-time capture) — partial INSERT narrows to *changed*
-    // columns, but on a new record `Person.create({ first_name })` doesn't mark
-    // first_name as changed, so trails inserts every column (including
-    // followers_count) instead of just first_name. See "saved_change_to_attribute? ...".
+  it("partial insert", async () => {
+    await withPartialWrites(Person, true, async () => {
+      let jon: Rec | undefined;
+      await assertNoQueriesMatch(/followers_count/, false, async () => {
+        await assertQueriesMatch(/first_name/, undefined, false, async () => {
+          jon = (await Person.create({ first_name: "Jon" })) as Rec;
+        });
+      });
+      await (jon as unknown as Person).reload();
+      expect((jon as Rec).first_name).toBe("Jon");
+      expect((jon as Rec).followers_count).toBe(0);
+      expect((jon as Rec).id).not.toBeNull();
+    });
   });
 
   it("partial insert with empty values", async () => {
@@ -717,24 +762,46 @@ describe("DirtyTest", () => {
     // attribute guard on partial selects, separate PR.
   });
 
-  it.skip("saved_change_to_attribute? returns whether a change occurred in the last save", () => {
-    // BLOCKED: dirty (create-time capture) — after `Person.create({ first_name })`,
-    // user-assigned attributes are NOT recorded in the changeset, so
-    // `saved_change_to_first_name?` is false right after create (only the
-    // save-managed columns — id/timestamps/lock_version — land in
-    // previous_changes). SCOPE: capture constructor/mass-assigned attributes as
-    // changes on a new record so they survive into saved_changes, separate PR.
+  it("saved_change_to_attribute? returns whether a change occurred in the last save", async () => {
+    const person = (await Person.create({ first_name: "Sean" })) as Rec;
+
+    expect(person.savedChangeToAttribute("first_name")).toBe(true);
+    expect(person.savedChangeToAttribute("gender")).toBe(false);
+    expect(person.savedChangeToAttribute("first_name", { from: null, to: "Sean" })).toBe(true);
+    expect(person.savedChangeToAttribute("first_name", { from: null })).toBe(true);
+    expect(person.savedChangeToAttribute("first_name", { to: "Sean" })).toBe(true);
+    expect(person.savedChangeToAttribute("first_name", { from: "Jim", to: "Sean" })).toBe(false);
+    expect(person.savedChangeToAttribute("first_name", { from: "Jim" })).toBe(false);
+    expect(person.savedChangeToAttribute("first_name", { to: "Jim" })).toBe(false);
   });
 
-  it.skip("saved_change_to_attribute returns the change that occurred in the last save", () => {
-    // BLOCKED: dirty (create-time capture) — `saved_change_to_first_name`
-    // is undefined right after create. See the predicate test above.
+  it("saved_change_to_attribute returns the change that occurred in the last save", async () => {
+    const person = (await Person.create({ first_name: "Sean", gender: "M" })) as Rec;
+
+    expect(person.savedChanges["first_name"]).toEqual([null, "Sean"]);
+    expect(person.savedChanges["gender"]).toEqual([null, "M"]);
+
+    await (person as unknown as Person).update({ first_name: "Jim" });
+
+    expect(person.savedChanges["first_name"]).toEqual(["Sean", "Jim"]);
+    expect(person.savedChanges["gender"]).toBeUndefined();
   });
 
-  it.skip("attribute_before_last_save returns the original value before saving", () => {
-    // BLOCKED: dirty (create-time capture) — with first_name absent from
-    // saved_changes after create, `first_name_before_last_save` falls back to
-    // the current value ("Sean") instead of nil. See the predicate test above.
+  it("attribute_before_last_save returns the original value before saving", async () => {
+    const person = (await Person.create({ first_name: "Sean", gender: "M" })) as Rec;
+
+    expect(person.attributeBeforeLastSave("first_name")).toBeNull();
+    expect(person.attributeBeforeLastSave("gender")).toBeNull();
+
+    person.first_name = "Jim";
+
+    expect(person.attributeBeforeLastSave("first_name")).toBeNull();
+    expect(person.attributeBeforeLastSave("gender")).toBeNull();
+
+    await (person as unknown as Person).save();
+
+    expect(person.attributeBeforeLastSave("first_name")).toBe("Sean");
+    expect(person.attributeBeforeLastSave("gender")).toBe("M");
   });
 
   it.skipIf(adapterType === "postgres")(
@@ -750,11 +817,25 @@ describe("DirtyTest", () => {
     },
   );
 
-  it.skip("saved_changes returns a hash of all the changes that occurred", () => {
-    // BLOCKED: dirty (create-time capture) — saved_changes after create omits
-    // the user-assigned first_name/gender, so the key set doesn't match Rails'.
-    // See "saved_change_to_attribute? ...".
-  });
+  it.skipIf(adapterType === "postgres")(
+    "saved_changes returns a hash of all the changes that occurred",
+    async () => {
+      const person = (await Person.create({ first_name: "Sean", gender: "M" })) as Rec;
+
+      expect(person.savedChanges["first_name"]).toEqual([null, "Sean"]);
+      expect(person.savedChanges["gender"]).toEqual([null, "M"]);
+      expect(Object.keys(person.savedChanges).sort()).toEqual(
+        ["id", "first_name", "gender", "created_at", "updated_at"].sort(),
+      );
+
+      await (person as unknown as Person).update({ first_name: "Jim" });
+
+      expect(person.savedChanges["first_name"]).toEqual(["Sean", "Jim"]);
+      expect(Object.keys(person.savedChanges).sort()).toEqual(
+        ["first_name", "lock_version", "updated_at"].sort(),
+      );
+    },
+  );
 
   it.skipIf(adapterType === "postgres")("changed? in after callbacks returns false", async () => {
     const klass = class extends Base {

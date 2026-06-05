@@ -315,6 +315,30 @@ export class DirtyTracker {
   }
 
   /**
+   * After the Base constructor snapshots, re-mark attributes that differ from
+   * their schema defaults as dirty so they appear in `saved_changes` /
+   * `previous_changes` after INSERT.
+   *
+   * Called only for new records, immediately before after_initialize.
+   *
+   * @internal
+   */
+  reinstateNewRecordChanges(attributes: AttributeSet, defaultSnap: Map<string, unknown>): void {
+    for (const name of attributes.keys()) {
+      const attr = attributes.getAttribute(name);
+      const currentVal = attr.value ?? null;
+      const rawDefault = defaultSnap.has(name) ? defaultSnap.get(name) : undefined;
+      const defaultVal: unknown =
+        rawDefault !== undefined ? (AttributeSet.resolveSnapshotValue(rawDefault) ?? null) : null;
+      if (attr.type.isChanged(defaultVal, currentVal, attr.valueBeforeTypeCast)) {
+        this._originalAttributes.set(name, rawDefault !== undefined ? rawDefault : null);
+        this._originalHas.add(name);
+        this._changedAttributes.set(name, [defaultVal, currentVal]);
+      }
+    }
+  }
+
+  /**
    * Type-aware write notification. Compares `newValue` against the snapshot
    * original using `type.isChanged(original, newValue, rawValue)` so numeric
    * semantics (equal_nan?, number_to_non_number?) are respected. Replaces the

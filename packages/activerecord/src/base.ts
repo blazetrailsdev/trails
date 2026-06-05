@@ -2385,6 +2385,12 @@ export class Base extends Model {
           (this as any)._dirty.snapshot((this as any)._attributes);
           assocPending = null;
         }
+        // Reinstate constructor-assigned attrs as dirty vs schema defaults so
+        // they appear in saved_changes / previous_changes after INSERT.
+        (this as any)._dirty.reinstateNewRecordChanges(
+          (this as any)._attributes,
+          (ctor as any)._defaultAttributes().snapshotValues(),
+        );
         cbRunAfter(ctor.prototype, "initialize", this, { strict: "sync" });
       }
     } else {
@@ -2469,6 +2475,12 @@ export class Base extends Model {
           (this as any)._dirty.snapshot((this as any)._attributes);
           assocPending = null;
         }
+        // Reinstate constructor-assigned attrs as dirty vs schema defaults so
+        // they appear in saved_changes / previous_changes after INSERT.
+        (this as any)._dirty.reinstateNewRecordChanges(
+          (this as any)._attributes,
+          (ctor2 as any)._defaultAttributes().snapshotValues(),
+        );
         cbRunAfter(ctor2.prototype, "initialize", this, { strict: "sync" });
       }
     }
@@ -2702,7 +2714,7 @@ export class Base extends Model {
             ? (ctor.connection as any).lastInsertedId(rawId)
             : rawId;
         if (!Array.isArray(ctor.primaryKey) && this.id === null) {
-          this._attributes.set(ctor.primaryKey, insertedId);
+          this._writeAttribute(ctor.primaryKey as string, insertedId);
         } else if (
           Array.isArray(ctor.primaryKey) &&
           insertedId != null &&
@@ -2813,7 +2825,7 @@ export class Base extends Model {
       }
       const lockIdx = declaredChanges.indexOf(lockCol);
       if (lockIdx !== -1) updateValues.splice(lockIdx, 1);
-      this._attributes.set(lockCol, currentVersion + 1);
+      this._writeAttribute(lockCol, currentVersion + 1);
       updateValues.push([table.get(lockCol), currentVersion + 1]);
     }
 
