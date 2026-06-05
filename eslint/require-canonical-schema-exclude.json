@@ -69,7 +69,6 @@
   "packages/activerecord/src/explain.test.ts",
   "packages/activerecord/src/finder-respond-to.test.ts",
   "packages/activerecord/src/habtm-destroy-order.test.ts",
-  "packages/activerecord/src/i18n.test.ts",
   "packages/activerecord/src/inheritance.test.ts",
   "packages/activerecord/src/inherited.test.ts",
   "packages/activerecord/src/insert-all.test.ts",
