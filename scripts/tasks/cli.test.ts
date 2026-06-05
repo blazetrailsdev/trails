@@ -42,6 +42,7 @@ function story(over: Partial<StoryEntry>): StoryEntry {
     deps: [],
     deps_rfc: [],
     est_loc: 100,
+    updated: null,
     pr: null,
     claim: null,
     assignee: null,
