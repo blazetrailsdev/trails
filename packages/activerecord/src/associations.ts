@@ -42,13 +42,17 @@ export async function eagerLoadBang(): Promise<void> {
  * associations) that forced the late-binding in the first place.
  */
 export async function initializeAssociations(): Promise<void> {
-  // Load both ctor slots. `association-relation.js` imports
+  // Load all late-binding slots. `association-relation.js` imports
   // `collection-proxy.js` for the late-bind ctor setter, so importing
   // AR first also registers CP transitively; we still import CP
-  // explicitly as a belt-and-suspenders guarantee.
+  // explicitly as a belt-and-suspenders guarantee. DJAS registers its
+  // scope builder via the same slot pattern (_scope-slots.ts) so it is
+  // TDZ-safe here — all static imports are resolved by the time this
+  // function is called.
   await Promise.all([
     import("./associations/collection-proxy.js"),
     import("./association-relation.js"),
+    import("./associations/disable-joins-association-scope.js"),
   ]);
 }
 import { ConfigurationError, Rollback } from "./errors.js";

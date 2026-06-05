@@ -125,7 +125,11 @@ export class Association {
     // Branch 1: disable_joins — delegate to DisableJoinsAssociationScope.
     if (this.disableJoins) {
       const djas = getDjasScopeBuilder();
-      if (djas) return djas({ owner: this.owner, reflection: richReflection, klass });
+      if (!djas)
+        throw new Error(
+          "DisableJoinsAssociationScope not initialized — call initializeAssociations() before using disable_joins associations",
+        );
+      return djas({ owner: this.owner, reflection: richReflection, klass });
     }
     // Memoize @association_scope (JOIN-based constraints only).
     if (this._cachedScope === undefined) {
