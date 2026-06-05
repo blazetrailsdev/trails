@@ -14,7 +14,8 @@ const tester = new RuleTester({
 });
 
 const IMPORT = 'import { TEST_SCHEMA } from "../test-helpers/test-schema.js";\n';
-const ALIAS_IMPORT = 'import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";\n';
+const ALIAS_IMPORT =
+  'import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";\n';
 
 tester.run("require-canonical-schema", rule, {
   valid: [
@@ -35,6 +36,10 @@ tester.run("require-canonical-schema", rule, {
     IMPORT + "await defineSchema(adapter, TEST_SCHEMA, { dropExisting: true });",
     // Module-scope const resolving to all-canonical tables.
     IMPORT + "const SCHEMA = { posts: TEST_SCHEMA.posts };\nawait defineSchema(SCHEMA);",
+    // Whole canonical schema passed by its aliased name.
+    ALIAS_IMPORT + "await defineSchema(canonicalSchema);",
+    // Exported const resolving to all-canonical tables.
+    IMPORT + "export const SCHEMA = { posts: TEST_SCHEMA.posts };\nawait defineSchema(SCHEMA);",
     // Unresolvable identifier (e.g. an imported *_SCHEMA const) is left alone.
     'import { HM_SCHEMA } from "./fixtures.js";\nawait defineSchema(HM_SCHEMA);',
     // Empty schema has no tables to flag.
@@ -57,13 +62,20 @@ tester.run("require-canonical-schema", rule, {
     {
       code:
         IMPORT +
-        "const SCHEMA = { categories: TEST_SCHEMA.categories, comments: { post_id: \"integer\" } };\n" +
+        'const SCHEMA = { categories: TEST_SCHEMA.categories, comments: { post_id: "integer" } };\n' +
         "await defineSchema(SCHEMA);",
       errors: [{ messageId: "inlineTable", data: { table: "comments" } }],
     },
     // A local `const TEST_SCHEMA` is NOT canonical — its inline tables are flagged.
     {
       code: 'const TEST_SCHEMA = { posts: { title: "string" } };\nawait defineSchema(TEST_SCHEMA);',
+      errors: [{ messageId: "inlineTable", data: { table: "posts" } }],
+    },
+    // Describe-scoped const resolves via scope analysis and is flagged.
+    {
+      code:
+        IMPORT +
+        'describe("x", () => {\n  const SCHEMA = { posts: { title: "string" } };\n  beforeAll(() => defineSchema(SCHEMA));\n});',
       errors: [{ messageId: "inlineTable", data: { table: "posts" } }],
     },
     // Spread of a non-canonical object.

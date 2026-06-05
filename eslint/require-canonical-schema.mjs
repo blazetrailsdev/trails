@@ -124,14 +124,36 @@ const rule = {
     // Grandfathered file → no-op (ratchet baseline).
     if (rel && loadExclude().has(rel)) return {};
 
+    const sourceCode = context.sourceCode ?? context.getSourceCode();
     /** Local names bound to the canonical TEST_SCHEMA import (handles `as` aliases). */
     const canonicalNames = new Set();
-    /** Module-scope `const NAME = { ... }` → its ObjectExpression. */
-    const constObjects = new Map();
     const calls = [];
 
     function isCanonicalIdentifier(node) {
       return node?.type === "Identifier" && canonicalNames.has(node.name);
+    }
+
+    /**
+     * Resolve an identifier to the `ObjectExpression` it was `const`-initialised
+     * with, via scope analysis (so it works for module-scope, describe-scoped,
+     * and `export const` declarations alike, and never crosses scopes by name).
+     * Returns null for imports, reassigned vars, and non-object inits.
+     */
+    function resolveObject(node) {
+      let scope = sourceCode.getScope(node);
+      while (scope) {
+        const variable = scope.variables.find((v) => v.name === node.name);
+        if (variable) {
+          if (variable.defs.length !== 1) return null;
+          const def = variable.defs[0];
+          if (def.type === "Variable" && def.node.init?.type === "ObjectExpression") {
+            return def.node.init;
+          }
+          return null;
+        }
+        scope = scope.upper;
+      }
+      return null;
     }
 
     /** A table value that points at the canonical schema (e.g. `TEST_SCHEMA.posts`). */
@@ -173,19 +195,13 @@ const rule = {
         }
       },
 
-      // Collect module-scope const objects so identifier schema args resolve.
-      "Program > VariableDeclaration > VariableDeclarator"(node) {
-        if (node.id.type === "Identifier" && node.init?.type === "ObjectExpression") {
-          constObjects.set(node.id.name, node.init);
-        }
-      },
-
       CallExpression(node) {
         if (node.callee.type !== "Identifier" || node.callee.name !== "defineSchema") return;
         const arg = schemaArgOf(node);
         if (arg) calls.push(arg);
       },
 
+      // Deferred so every ImportDeclaration is seen before resolving canonical names.
       "Program:exit"() {
         for (const arg of calls) {
           let obj = null;
@@ -194,7 +210,7 @@ const rule = {
           } else if (arg.type === "Identifier") {
             // Whole canonical schema passed by name → fully canonical.
             if (canonicalNames.has(arg.name)) continue;
-            obj = constObjects.get(arg.name) ?? null;
+            obj = resolveObject(arg);
           }
           // Unresolvable identifiers (e.g. an imported `*_SCHEMA` const) and
           // non-object args (adapters, member expressions) are left alone.
