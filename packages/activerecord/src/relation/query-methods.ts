@@ -385,7 +385,9 @@ function orderHashEntry(
   dir: unknown,
 ): Nodes.Node | [string, "asc" | "desc"] {
   if (!/^(asc|desc)$/i.test(String(dir))) {
-    throw argumentError(`Direction "${dir}" is invalid. Valid directions are: asc, desc`);
+    throw argumentError(
+      `Direction "${dir}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
+    );
   }
   const direction = String(dir).toLowerCase() as "asc" | "desc";
   if (key instanceof Nodes.Node) {
@@ -465,7 +467,9 @@ function orderBang(
       for (const [col, dir] of Object.entries(arg)) {
         disallowRawSqlBang([col], resolveOrderMatcher(this));
         if (!/^(asc|desc)$/i.test(String(dir))) {
-          throw argumentError(`Direction "${dir}" is invalid. Valid directions are: asc, desc`);
+          throw argumentError(
+            `Direction "${dir}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
+          );
         }
         this._orderClauses.push([col, (dir as string).toLowerCase() as "asc" | "desc"]);
       }
@@ -543,7 +547,9 @@ function reorderBang(
       for (const [col, dir] of Object.entries(arg as Record<string, string>)) {
         disallowRawSqlBang([col], resolveOrderMatcher(this));
         if (!/^(asc|desc)$/i.test(String(dir))) {
-          throw argumentError(`Direction "${dir}" is invalid. Valid directions are: asc, desc`);
+          throw argumentError(
+            `Direction "${dir}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
+          );
         }
         this._orderClauses.push([col, (dir as string).toLowerCase() as "asc" | "desc"]);
       }
@@ -553,6 +559,14 @@ function reorderBang(
     }
     i++;
   }
+  // Deduplicate identical order terms — mirrors Rails' order_values.uniq
+  const seen = new Set<string>();
+  this._orderClauses = this._orderClauses.filter((c) => {
+    const key = JSON.stringify(c);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   return this;
 }
 
@@ -1431,7 +1445,9 @@ export function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void
       if (isPlainObject(value)) {
         validateOrderArgs.call(this, [value]);
       } else if (!VALID_DIRECTIONS.has(String(value).toLowerCase())) {
-        throw argumentError(`Direction "${value}" is invalid. Valid directions are: asc, desc`);
+        throw argumentError(
+          `Direction "${value}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
+        );
       }
     }
   }
