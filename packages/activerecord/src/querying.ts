@@ -5,7 +5,7 @@
  * Mirrors: ActiveRecord::Querying
  */
 
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
 import { argumentError } from "./relation/query-methods.js";
@@ -199,11 +199,21 @@ export function joins<T extends typeof Base>(
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
+  hashSpec: Record<string, AssociationSpec | AssociationSpec[]>,
+): Relation<InstanceType<T>>;
+export function joins<T extends typeof Base>(
+  this: T,
   ...args: Array<string | import("@blazetrails/arel").Nodes.Join>
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
-  ...args: Array<string | string[] | import("@blazetrails/arel").Nodes.Join | undefined>
+  ...args: Array<
+    | string
+    | string[]
+    | import("@blazetrails/arel").Nodes.Join
+    | Record<string, AssociationSpec | AssociationSpec[]>
+    | undefined
+  >
 ): Relation<InstanceType<T>> {
   const relation = this.all();
   // Flatten string array passed as single argument: joins(["a", "b"])
@@ -214,6 +224,9 @@ export function joins<T extends typeof Base>(
     (args[0] as unknown[]).every((x) => typeof x === "string")
   ) {
     return relation.joins(args[0] as string[]);
+  }
+  if (args.length === 1 && _isPlainObject(args[0])) {
+    return relation.joins(args[0] as Record<string, AssociationSpec | AssociationSpec[]>);
   }
   if (args.length === 0 || typeof args[0] === "string" || args[0] === undefined) {
     // Forward all string args so the variadic association-list form

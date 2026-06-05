@@ -150,6 +150,10 @@ const SCHEMA: Schema = {
     },
     primaryKey: ["shop_id", "number"],
   },
+  // tcnj_* tables for "type casting nested joins" (joins({ post: "author" }))
+  tcnj_authors: {},
+  tcnj_posts: { author_id: "integer" },
+  tcnj_comments: { post_id: "integer" },
 };
 
 setupHandlerSuite();
@@ -2335,11 +2339,46 @@ describe("WhereTest", () => {
     expect(found.length).toBe(1);
   });
 
-  it.skip("type casting nested joins", () => {
-    // BLOCKED: joins({post: "author"}) nested hash join syntax not yet implemented.
-    // Rails: Comment.joins(post: :author).where(authors: {id: "2-foo"}) — type-casts
-    // the string "2-foo" to integer 2 for an integer PK column.
-    // Needs: Relation#joins to accept nested association hash like Rails joins(post: :author).
+  it("type casting nested joins", async () => {
+    // Rails: Comment.joins(post: :author).where(authors: {id: "2-foo"})
+    // The string "2-foo" is type-cast to integer 2 for the integer PK column.
+    class TcnjAuthor extends Base {
+      static {
+        this._tableName = "tcnj_authors";
+      }
+    }
+    class TcnjPost extends Base {
+      static {
+        this._tableName = "tcnj_posts";
+        this.attribute("author_id", "integer");
+      }
+    }
+    class TcnjComment extends Base {
+      static {
+        this._tableName = "tcnj_comments";
+        this.attribute("post_id", "integer");
+      }
+    }
+    registerModel("TcnjAuthor", TcnjAuthor);
+    registerModel("TcnjPost", TcnjPost);
+    registerModel("TcnjComment", TcnjComment);
+    Associations.belongsTo.call(TcnjPost, "author", { className: "TcnjAuthor" });
+    Associations.belongsTo.call(TcnjComment, "post", { className: "TcnjPost" });
+
+    const alice = await TcnjAuthor.create({});
+    const bob = await TcnjAuthor.create({});
+    const alicePost = await TcnjPost.create({ author_id: alice.id });
+    const bobPost = await TcnjPost.create({ author_id: bob.id });
+    const comment = await TcnjComment.create({ post_id: alicePost.id });
+    await TcnjComment.create({ post_id: bobPost.id }); // decoy for bob's post
+
+    // joins({ post: "author" }) mirrors Rails joins(post: :author):
+    // TcnjComment INNER JOIN tcnj_posts INNER JOIN tcnj_authors.
+    // where({ tcnj_authors: { id: "X-foo" } }) type-casts "X-foo" to integer X.
+    const found = await TcnjComment.joins({ post: "author" })
+      .where({ tcnj_authors: { id: `${alice.id}-foo` } })
+      .toArray();
+    expect(found.map((c) => c.id)).toStrictEqual([comment.id]);
   });
 
   it.skip("where with through association", async () => {
