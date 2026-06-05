@@ -124,7 +124,7 @@ describe("DatabaseConfigurationsTest", () => {
   });
 
   it("resolve returns current-env config when same name exists in multiple envs", () => {
-    DatabaseConfigurations.defaultEnv = "development";
+    // currentEnv()="test" (NODE_ENV=test in vitest), so the test config is returned.
     const configs = new DatabaseConfigurations({
       development: {
         primary: { adapter: "sqlite3", database: "dev.db" },
@@ -134,7 +134,7 @@ describe("DatabaseConfigurationsTest", () => {
       },
     });
     const resolved = configs.resolve("primary");
-    expect(resolved.database).toBe("dev.db");
+    expect(resolved.database).toBe("test.db");
   });
 
   describe("currentEnv resolution", () => {
