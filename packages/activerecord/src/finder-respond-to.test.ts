@@ -32,11 +32,15 @@ describe("FinderRespondToTest", () => {
 
   it("should preserve normal respond to behavior and respond to newly added method", () => {
     // Rails: `Topic.singleton_class.define_method(:method_added_for_finder_respond_to_test){}`
-    // then `assert_respond_to Topic, :method_added_for_finder_respond_to_test`. A normal
-    // method added to the class must still be found — the dynamic-finder
-    // respond_to_missing? override must not mask it. (Topic is recreated per
-    // test, so no cleanup is needed where Rails uses an `ensure` remove_method.)
+    // then `assert_respond_to Topic, :method_added_for_finder_respond_to_test`. Rails'
+    // dynamic-finder hook is `match && match.valid? || super` (dynamic_matchers.rb),
+    // so respond_to of a non-finder method must fall through to normal lookup, not be
+    // masked. Our `respondToMissingFinder` is that hook: it must defer (return false)
+    // on a non-`findBy` name while the method is still found by normal lookup — this
+    // assertion fails if the finder responder ever claims an ordinary method.
+    // (Topic is recreated per test, so no cleanup is needed where Rails uses `ensure`.)
     (Topic as unknown as Record<string, unknown>).methodAddedForFinderRespondToTest = () => {};
+    expect(Topic.respondToMissingFinder("methodAddedForFinderRespondToTest")).toBe(false);
     expect(
       typeof (Topic as unknown as Record<string, unknown>).methodAddedForFinderRespondToTest,
     ).toBe("function");
