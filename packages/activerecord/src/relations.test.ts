@@ -227,6 +227,7 @@ describe("RelationTest", () => {
       expect(posts[0].category).toBe("art");
     });
 
+    // trails integration variant of test_finding_with_reorder
     it("reorder replaces existing order", async () => {
       const posts = await Post.all().order("title").reorder({ views: "asc" }).toArray();
       expect(posts[0].views).toBe(10);
@@ -2056,6 +2057,7 @@ describe("RelationTest", () => {
     expect(sql).toContain("GROUP BY");
   });
 
+  // trails integration variant of test_finding_with_reorder
   // -- reorder replaces existing order --
   it("reorder replaces existing order", async () => {
     const items = await Widget.all().order({ name: "asc" }).reorder({ name: "desc" }).toArray();
@@ -4038,17 +4040,6 @@ describe("RelationTest", () => {
     expect(sql).toContain("GROUP BY");
   });
 
-  // -- reorder --
-
-  it("reorder replaces existing order", () => {
-    const rel = Product.all().order("name").reorder({ price: "desc" });
-    const sql = rel.toSql();
-    // reorder replaces "name" with "price DESC". Quote char varies by adapter
-    // (" on SQLite/PG, ` on MySQL/MariaDB), so match quote-agnostically.
-    expect(sql).toMatch(/price.{0,2}\s+DESC/i);
-    expect(sql).not.toMatch(/name.{0,2}\s+ASC/i);
-  });
-
   // -- reverseOrder --
 
   it.skip("reverseOrder flips ASC to DESC", () => {
@@ -4928,7 +4919,11 @@ describe("RelationTest", () => {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.order("title").order("title").reorder("title").toSql();
+    // Rails: assert_equal ["id desc"], topics.order_values — checks internal
+    // order_values deduplication (Ruby-internal array state). The equivalent
+    // SQL-level dedup of duplicate reorder args is not yet implemented, so we
+    // only assert the ORDER BY clause is present.
+    const sql = Post.reorder("title", "title").toSql();
     expect(sql).toContain("ORDER BY");
   });
 
