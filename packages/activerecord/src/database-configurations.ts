@@ -485,8 +485,10 @@ DatabaseConfigurations.registerDbConfigHandler((envName, name, url, config) => {
   return new HashConfig(envName, name, config);
 });
 
-// Register the default env getter so DatabaseConfig.forCurrentEnv works
-_setDefaultEnvGetter(() => DatabaseConfigurations.defaultEnv);
+// forCurrentEnv must agree with fromEnv() when TRAILS_ENV is set: both resolve
+// TRAILS_ENV → defaultEnv (skipping NODE_ENV so test suites that set defaultEnv
+// explicitly aren't affected).
+_setDefaultEnvGetter(() => getEnv("TRAILS_ENV") ?? DatabaseConfigurations.defaultEnv);
 
 // Register the primary checker so HashConfig.isPrimary can consult the
 // current DatabaseConfigurations instance (matching Rails' global Base.configurations).
