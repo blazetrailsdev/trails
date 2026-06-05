@@ -77,11 +77,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return throughTargetScope(this, super["targetScope"]());
   }
 
-  // Rails uses scope.pluck(*reflection.association_primary_key) where `scope`
-  // is a JOIN-aware AssociationScope relation.  Our `scope()` only builds a
-  // direct-FK WHERE clause, which produces "no such column: target.owner_id"
-  // for through/HABTM associations.  Load via doAsyncFindTarget (which
-  // correctly uses the join-table path) and cache the PKs instead.
+  // Rails uses scope.pluck(*reflection.association_primary_key). We load via
+  // doAsyncFindTarget (the join-table path) and cache the PKs so that
+  // repeated calls don't re-issue the join query.
   override async idsReader(): Promise<unknown[]> {
     if (this.isLoaded()) {
       return this.target.map((r) => this.primaryKeyValue(r));
