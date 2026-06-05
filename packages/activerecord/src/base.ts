@@ -2387,9 +2387,16 @@ export class Base extends Model {
         }
         // Reinstate constructor-assigned attrs as dirty vs schema defaults so
         // they appear in saved_changes / previous_changes after INSERT.
+        // Skip the PK — it's null for new records and handled post-INSERT.
+        const _pkSet = new Set(
+          Array.isArray((ctor as any).primaryKey)
+            ? (ctor as any).primaryKey
+            : [(ctor as any).primaryKey],
+        );
         (this as any)._dirty.reinstateNewRecordChanges(
           (this as any)._attributes,
           (ctor as any)._defaultAttributes().snapshotValues(),
+          _pkSet,
         );
         cbRunAfter(ctor.prototype, "initialize", this, { strict: "sync" });
       }
@@ -2477,9 +2484,16 @@ export class Base extends Model {
         }
         // Reinstate constructor-assigned attrs as dirty vs schema defaults so
         // they appear in saved_changes / previous_changes after INSERT.
+        // Skip the PK — it's null for new records and handled post-INSERT.
+        const _pkSet2 = new Set(
+          Array.isArray((ctor2 as any).primaryKey)
+            ? (ctor2 as any).primaryKey
+            : [(ctor2 as any).primaryKey],
+        );
         (this as any)._dirty.reinstateNewRecordChanges(
           (this as any)._attributes,
           (ctor2 as any)._defaultAttributes().snapshotValues(),
+          _pkSet2,
         );
         cbRunAfter(ctor2.prototype, "initialize", this, { strict: "sync" });
       }

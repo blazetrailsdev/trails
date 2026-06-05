@@ -395,12 +395,14 @@ export function attributesForUpdate(this: InstanceMethodHost, attributeNames: st
 /** @internal */
 export function attributesForCreate(this: InstanceMethodHost, attributeNames: string[]): string[] {
   const mc = this.constructor as any;
-  // Rails: attribute_names = attribute_names_for_partial_inserts if partial_inserts
-  if (mc.partialInserts) {
-    const partial = (this as any).changedAttributeNamesToSave as string[] | undefined;
-    if (partial !== undefined) attributeNames = partial;
-  }
   const colNames = new Set<string>(mc.columnNames?.() ?? []);
+  // Rails: attribute_names = attribute_names_for_partial_inserts if partial_inserts
+  // Only include dirty attributes, PLUS columns with no DB default whose current
+  // value differs from null (AR-only defaults must be included or the DB stores NULL).
+  const partialSet =
+    mc.partialInserts && (this as any).changedAttributeNamesToSave != null
+      ? new Set<string>((this as any).changedAttributeNamesToSave as string[])
+      : null;
   return attributeNames.filter((name) => {
     if (!colNames.has(name)) return false;
     // Rails: pk_attribute?(name) && id.nil? — check per-column PK value so
@@ -409,6 +411,18 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
     // Rails: column_for_attribute(name).virtual?
     const col = mc.columnForAttribute?.(name);
     if (col?.virtual || col?.isVirtual?.()) return false;
+    if (partialSet !== null && !partialSet.has(name)) {
+      // Include back columns with a DB function default (e.g. nextval()).
+      if (col?.defaultFunction != null) return true;
+      // Include columns with a DB scalar default — the DB provides the value.
+      // Exclude them only when they also have a non-null current value that
+      // matches what the DB would store anyway (omitting is safe).
+      if (col?.default != null) return false;
+      // No DB default: include if the current value is non-null so the AR-level
+      // default is persisted. If null, the DB stores NULL either way.
+      const currentVal = this._readAttribute(name) ?? null;
+      if (currentVal == null) return false;
+    }
     return true;
   });
 }

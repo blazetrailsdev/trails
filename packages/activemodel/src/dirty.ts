@@ -323,8 +323,13 @@ export class DirtyTracker {
    *
    * @internal
    */
-  reinstateNewRecordChanges(attributes: AttributeSet, defaultSnap: Map<string, unknown>): void {
+  reinstateNewRecordChanges(
+    attributes: AttributeSet,
+    defaultSnap: Map<string, unknown>,
+    skipNames?: ReadonlySet<string>,
+  ): void {
     for (const name of attributes.keys()) {
+      if (skipNames?.has(name)) continue;
       const attr = attributes.getAttribute(name);
       const currentVal = attr.value ?? null;
       const rawDefault = defaultSnap.has(name) ? defaultSnap.get(name) : undefined;
