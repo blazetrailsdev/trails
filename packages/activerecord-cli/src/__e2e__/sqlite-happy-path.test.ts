@@ -94,13 +94,14 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
     expect(versionLines.join("\n")).toContain(`Current version: ${version}`);
 
     // 7. ar db:migrate:status — should show the migration as "up"
-    const statusLines: string[] = [];
-    vi.spyOn(console, "log").mockImplementation(
-      (...args) => void statusLines.push(args.map(String).join(" ")),
-    );
+    const statusChunks: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
+      statusChunks.push(String(chunk));
+      return true;
+    });
     const statusCode = await run(["db:migrate:status"], tmpDir);
     expect(statusCode, "ar db:migrate:status should exit 0").toBe(0);
-    const statusText = statusLines.join("\n");
+    const statusText = statusChunks.join("");
     expect(statusText).toContain("up");
     expect(statusText).toContain(version);
 

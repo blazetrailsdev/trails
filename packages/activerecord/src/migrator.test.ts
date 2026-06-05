@@ -185,8 +185,8 @@ describe("MigratorTest", () => {
     await migrator.up(1);
     const status = await migrator.migrationsStatus();
     expect(status).toHaveLength(2);
-    expect(status[0]).toEqual({ status: "up", version: "1", name: "CreateUsers" });
-    expect(status[1]).toEqual({ status: "down", version: "2", name: "CreatePosts" });
+    expect(status[0]).toEqual({ status: "up", version: "001", name: "CreateUsers" });
+    expect(status[1]).toEqual({ status: "down", version: "002", name: "CreatePosts" });
   });
 
   it("migrations status order new and old version", async () => {
@@ -242,9 +242,9 @@ describe("MigratorTest", () => {
 
       const status = await m.migrationsStatus();
       expect(status).toHaveLength(3);
-      expect(status[0]).toMatchObject({ status: "down", version: "1" });
-      expect(status[1]).toMatchObject({ status: "up", version: "2" });
-      expect(status[2]).toMatchObject({ status: "down", version: "3" });
+      expect(status[0]).toMatchObject({ status: "down", version: "001" });
+      expect(status[1]).toMatchObject({ status: "up", version: "002" });
+      expect(status[2]).toMatchObject({ status: "down", version: "003" });
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -279,9 +279,9 @@ describe("MigratorTest", () => {
       const m = new Migrator(adapter, proxies);
       const status = await m.migrationsStatus();
       expect(status).toHaveLength(3);
-      expect(status[0]).toMatchObject({ status: "up", version: "1" });
-      expect(status[1]).toMatchObject({ status: "up", version: "2" });
-      expect(status[2]).toMatchObject({ status: "up", version: "3" });
+      expect(status[0]).toMatchObject({ status: "up", version: "001" });
+      expect(status[1]).toMatchObject({ status: "up", version: "002" });
+      expect(status[2]).toMatchObject({ status: "up", version: "003" });
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -300,12 +300,12 @@ describe("MigratorTest", () => {
     ]);
     const status = await migrator.migrationsStatus();
     expect(status).toHaveLength(4);
-    expect(status[0]).toEqual({ status: "down", version: "1", name: "ValidPeopleHaveLastNames" });
-    expect(status[1]).toEqual({ status: "up", version: "2", name: "WeNeedReminders" });
-    expect(status[2]).toEqual({ status: "down", version: "3", name: "InnocentJointable" });
+    expect(status[0]).toEqual({ status: "down", version: "001", name: "ValidPeopleHaveLastNames" });
+    expect(status[1]).toEqual({ status: "up", version: "002", name: "WeNeedReminders" });
+    expect(status[2]).toEqual({ status: "down", version: "003", name: "InnocentJointable" });
     expect(status[3]).toEqual({
       status: "up",
-      version: "10",
+      version: "010",
       name: "********** NO FILE **********",
     });
   });

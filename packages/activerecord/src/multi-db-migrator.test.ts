@@ -126,19 +126,19 @@ describe("MultiDbMigratorTest", () => {
     const migratorA = new Migrator(adapterA, migrationsA);
     const statusA = await migratorA.migrationsStatus();
     expect(statusA).toEqual([
-      { status: "down", version: "1", name: "ValidPeopleHaveLastNames" },
-      { status: "up", version: "2", name: "WeNeedReminders" },
-      { status: "down", version: "3", name: "InnocentJointable" },
-      { status: "up", version: "10", name: "********** NO FILE **********" },
+      { status: "down", version: "001", name: "ValidPeopleHaveLastNames" },
+      { status: "up", version: "002", name: "WeNeedReminders" },
+      { status: "down", version: "003", name: "InnocentJointable" },
+      { status: "up", version: "010", name: "********** NO FILE **********" },
     ]);
 
     await smB.createVersion("4");
     const migratorB = new Migrator(adapterB, migrationsB);
     const statusB = await migratorB.migrationsStatus();
     expect(statusB).toEqual([
-      { status: "down", version: "1", name: "PeopleHaveHobbies" },
-      { status: "down", version: "2", name: "PeopleHaveDescriptions" },
-      { status: "up", version: "4", name: "********** NO FILE **********" },
+      { status: "down", version: "001", name: "PeopleHaveHobbies" },
+      { status: "down", version: "002", name: "PeopleHaveDescriptions" },
+      { status: "up", version: "004", name: "********** NO FILE **********" },
     ]);
   });
 
