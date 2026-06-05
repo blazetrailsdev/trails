@@ -908,10 +908,38 @@ describe("WhereTest", () => {
     const actual = BnwPost.where({ comments: { parent: parent } }).joins("comments");
     expect(actual.toSql()).toEqual(expected.toSql());
   });
-  it.skip("belongs to nested where with relation", () => {
-    // BLOCKED: nested WHERE with subquery inside association hash not yet implemented.
+  it("belongs to nested where with relation", () => {
+    class BnwrAuthor extends Base {
+      static {
+        this._tableName = "bnwr_authors";
+        this.attribute("id", "integer");
+      }
+    }
+    class BnwrPost extends Base {
+      static {
+        this._tableName = "bnwr_posts";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+      }
+    }
+    registerModel("BnwrAuthor", BnwrAuthor);
+    registerModel("BnwrPost", BnwrPost);
+    Associations.hasMany.call(BnwrAuthor, "posts", {
+      className: "BnwrPost",
+      foreignKey: "author_id",
+    });
+
+    const authorId = 1;
     // Rails: Author.where(posts: { author_id: Author.where(id: author.id) }).joins(:posts)
-    // Needs: whereClauseFor to support Relation values inside nested association hashes.
+    // nested WHERE with a Relation value inside an association-hash should produce a subquery predicate
+    const actual = BnwrAuthor.where({
+      posts: { author_id: BnwrAuthor.where({ id: authorId }) },
+    }).joins("posts");
+    // dot-notation equivalent (convertDotNotationToHash produces the same structure)
+    const expected = BnwrAuthor.where({
+      "posts.author_id": BnwrAuthor.where({ id: authorId }),
+    }).joins("posts");
+    expect(actual.toSql()).toEqual(expected.toSql());
   });
   it("polymorphic shallow where", () => {
     class PolyTreasure extends Base {
