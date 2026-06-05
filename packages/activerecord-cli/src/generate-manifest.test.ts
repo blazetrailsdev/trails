@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { mkdtemp, readFile, writeFile } from "fs/promises";
 import { tmpdir } from "os";
-import { join } from "path";
+import { join, relative, isAbsolute } from "path";
 import { scanModels, buildManifest, generateManifest } from "./generate-manifest.js";
 
 async function writeModel(dir: string, file: string, body: string): Promise<void> {
@@ -226,6 +226,14 @@ describe("ArGenerateManifestTest", () => {
     const second = await generateManifest(dir);
     expect(second.changed).toBe(false);
     expect(await readFile(second.path, "utf8")).toBe(onDisk);
+  });
+
+  it("returns an absolute path even when modelsDir is relative", async () => {
+    await seedModels(dir);
+    const rel = relative(process.cwd(), dir);
+    const result = await generateManifest(rel);
+    expect(isAbsolute(result.path)).toBe(true);
+    expect(result.path).toBe(join(dir, "index.ts"));
   });
 
   it("--check reports drift without writing, and passes once current", async () => {

@@ -315,7 +315,7 @@ export async function generateManifest(
   options: { check?: boolean } = {},
 ): Promise<ManifestResult> {
   const fs = await getFsAsync();
-  const path = (await getPathAsync()).join(modelsDir, MANIFEST_NAME);
+  const path = (await getPathAsync()).resolve(modelsDir, MANIFEST_NAME);
   const content = await buildManifest(modelsDir);
   const existing = await readIfPresent(fs, path);
   const changed = existing !== content;
