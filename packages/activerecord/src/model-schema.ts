@@ -675,14 +675,10 @@ export function loadSchema(this: SchemaHost): void {
     const ignored = new Set(workHost._ignoredColumns ?? []);
     for (const [name, def] of workHost._attributeDefinitions) {
       if (ignored.has(name)) continue;
-      const dbDefault =
-        (def.source ?? (def.userProvided === false ? "schema" : "user")) === "schema"
-          ? (def.defaultValue ?? null)
-          : null;
       hash[name] = {
         name,
         type: def.type?.name ?? null,
-        default: dbDefault,
+        default: def.defaultValue ?? null,
         limit: (def as any).limit ?? null,
       };
     }
