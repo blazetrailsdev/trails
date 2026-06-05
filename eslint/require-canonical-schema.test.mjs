@@ -78,6 +78,22 @@ tester.run("require-canonical-schema", rule, {
         'describe("x", () => {\n  const SCHEMA = { posts: { title: "string" } };\n  beforeAll(() => defineSchema(SCHEMA));\n});',
       errors: [{ messageId: "inlineTable", data: { table: "posts" } }],
     },
+    // Bare canonical identifier as a *table value* (not the whole arg) is rejected:
+    // it backs `posts` with the entire schema, not the `posts` declaration.
+    {
+      code: IMPORT + "await defineSchema({ posts: TEST_SCHEMA });",
+      errors: [{ messageId: "inlineTable", data: { table: "posts" } }],
+    },
+    // Member access whose property does not match the table key is rejected
+    // (gives `posts` the wrong canonical shape) — dot and computed forms.
+    {
+      code: IMPORT + "await defineSchema({ posts: TEST_SCHEMA.comments });",
+      errors: [{ messageId: "inlineTable", data: { table: "posts" } }],
+    },
+    {
+      code: IMPORT + 'await defineSchema({ posts: TEST_SCHEMA["comments"] });',
+      errors: [{ messageId: "inlineTable", data: { table: "posts" } }],
+    },
     // Spread of a non-canonical object.
     {
       code: IMPORT + "const base = {};\nawait defineSchema({ ...base, posts: TEST_SCHEMA.posts });",

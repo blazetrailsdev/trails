@@ -20,8 +20,11 @@
  * `relation/where.test.ts`) reports only the inline ones.
  *
  * A "canonical" table value is one of:
- *   - a member access into the canonical schema: `TEST_SCHEMA.posts`,
- *     `TEST_SCHEMA["posts"]` (or its aliased local name);
+ *   - member access into the canonical schema *for that same table key*:
+ *     `posts: TEST_SCHEMA.posts` / `posts: TEST_SCHEMA["posts"]` (or its
+ *     aliased local name). A bare `posts: TEST_SCHEMA` or a mismatched
+ *     `posts: TEST_SCHEMA.comments` is rejected — both back the key with the
+ *     wrong canonical shape, which is exactly the divergence this rule prevents;
  *   - a spread of the whole canonical schema: `...TEST_SCHEMA`;
  *   - the bare canonical identifier passed as the whole argument:
  *     `defineSchema(TEST_SCHEMA)`.
@@ -156,31 +159,52 @@ const rule = {
       return null;
     }
 
-    /** A table value that points at the canonical schema (e.g. `TEST_SCHEMA.posts`). */
-    function isCanonicalValue(node) {
-      if (!node) return false;
-      if (isCanonicalIdentifier(node)) return true;
-      if (node.type === "MemberExpression") return isCanonicalIdentifier(node.object);
-      return false;
+    /** Static property name of `obj.foo` / `obj["foo"]`; null for dynamic access. */
+    function memberPropName(node) {
+      if (node.type !== "MemberExpression") return null;
+      if (!node.computed && node.property.type === "Identifier") return node.property.name;
+      if (node.computed && node.property.type === "Literal") return String(node.property.value);
+      return null;
+    }
+
+    /** Literal table key (`posts:` / `"1_need_quoting":`); null for computed/dynamic keys. */
+    function tableKey(prop) {
+      if (prop.key.type === "Identifier" && !prop.computed) return prop.key.name;
+      if (prop.key.type === "Literal") return String(prop.key.value);
+      return null;
+    }
+
+    /**
+     * A per-table value is canonical only when it is member access into the
+     * canonical schema for *that same table*: `posts: TEST_SCHEMA.posts` or
+     * `posts: TEST_SCHEMA["posts"]`. The bare identifier (`posts: TEST_SCHEMA`)
+     * and a mismatched member (`posts: TEST_SCHEMA.comments`) are rejected —
+     * both would back the key with the wrong canonical shape.
+     */
+    function isCanonicalTableValue(value, key) {
+      if (value?.type !== "MemberExpression") return false;
+      if (!isCanonicalIdentifier(value.object)) return false;
+      return key !== null && memberPropName(value) === key;
     }
 
     function analyzeObject(obj) {
       for (const prop of obj.properties) {
         if (prop.type === "SpreadElement" || prop.type === "ExperimentalSpreadProperty") {
-          if (!isCanonicalValue(prop.argument)) {
+          // Spreading the whole canonical schema (`...TEST_SCHEMA`) is the only
+          // canonical spread.
+          if (!isCanonicalIdentifier(prop.argument)) {
             context.report({ node: prop, messageId: "inlineSpread" });
           }
           continue;
         }
         if (prop.type !== "Property") continue;
-        if (isCanonicalValue(prop.value)) continue;
-        const table =
-          prop.key.type === "Identifier"
-            ? prop.key.name
-            : prop.key.type === "Literal"
-              ? String(prop.key.value)
-              : "<table>";
-        context.report({ node: prop, messageId: "inlineTable", data: { table } });
+        const key = tableKey(prop);
+        if (isCanonicalTableValue(prop.value, key)) continue;
+        context.report({
+          node: prop,
+          messageId: "inlineTable",
+          data: { table: key ?? "<table>" },
+        });
       }
     }
 
