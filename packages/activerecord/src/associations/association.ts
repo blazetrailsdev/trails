@@ -504,25 +504,6 @@ export class Association {
 
   /**
    * Mirrors Rails' `Association#target_scope` (association.rb:310-314):
-   * `AssociationRelation.create(klass, self).merge!(klass.scope_for_association)`.
-   *
-   * Uses `scopeForAssociation()` (not `all()`) so ordinary
-   * `Model.where(...).scoping {}` blocks don't leak in — only default scopes
-   * and the empty-scope sentinel are respected (matching `scope_for_association`).
-   *
-   * The `AssociationRelation.create(klass, self)` base is not yet used here:
-   * our `AssociationRelation` takes a `CollectionProxy`, not a generic
-   * `Association`, so singular associations (belongs_to, has_one) cannot
-   * produce one. Aligning fully would require changing `AssociationRelation`'s
-   * constructor to accept a generic `Association` — tracked as a follow-up.
-   *
-   * The through-association chain merge is in the
-   * `ThroughAssociation#target_scope` override (`throughTargetScope`).
-   *
-   * @internal
-   */
-  /**
-   * Mirrors Rails' `Association#target_scope` (association.rb:310-314):
    *
    *   AssociationRelation.create(klass, self)
    *     .merge!(klass.scope_for_association)
@@ -530,9 +511,11 @@ export class Association {
    * Returns an `AssociationRelation` bound to `this` association so that
    * `klass.current_scope.proxyAssociation === this` (branch 2 of `scope()`)
    * can hold when a future `CollectionProxy.scoping` implementation sets the
-   * AR as the class-level current scope. Falls back to `scopeForAssociation()`
-   * when the AR factory slot has not been populated yet (should not occur in
-   * normal flow since `initializeAssociations()` loads it at startup).
+   * AR as the class-level current scope. Uses `scopeForAssociation()` (not
+   * `all()`) so ordinary `Model.where(...).scoping {}` blocks don't leak in.
+   * The through-association chain merge is in `throughTargetScope`.
+   *
+   * @internal
    */
   protected targetScope(): any {
     const klass = this.klass as typeof Base | undefined;
