@@ -187,8 +187,8 @@ export class HasManyAssociation extends CollectionAssociation {
           : (this as CollectionAssociation).target.length;
       },
       limitValue: () =>
-        ((this as CollectionAssociation).associationScope() as { limitValue?: number | null })
-          ?.limitValue ?? null,
+        ((this as CollectionAssociation).scope() as { limitValue?: number | null })?.limitValue ??
+        null,
       retainOnlyNewRecords: () => {
         const self = this as CollectionAssociation;
         self.target = self.target.filter((r) => r.isNewRecord());

@@ -77,11 +77,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return throughTargetScope(this, super["targetScope"]());
   }
 
-  // Rails uses scope.pluck(*reflection.association_primary_key) where `scope`
-  // is a JOIN-aware AssociationScope relation.  Our `scope()` only builds a
-  // direct-FK WHERE clause, which produces "no such column: target.owner_id"
-  // for through/HABTM associations.  Load via doAsyncFindTarget (which
-  // correctly uses the join-table path) and cache the PKs instead.
+  // Rails uses scope.pluck(*reflection.association_primary_key). We load via
+  // doAsyncFindTarget (the join-table path) and cache the PKs so that
+  // repeated calls don't re-issue the join query.
   override async idsReader(): Promise<unknown[]> {
     if (this.isLoaded()) {
       return this.target.map((r) => this.primaryKeyValue(r));
@@ -434,14 +432,15 @@ function throughScopeAttributes(assoc: HasManyThroughAssociation): Record<string
   // Rails: `scope = through_scope || self.scope` (hmt:72). The `_throughScope`
   // ivar is set during `buildRecord` (hmt:93) and cleared after; consult it
   // first so a record built within that window picks up the scope captured at
-  // build time, then fall back to `self.scope` (the HMT relation). The last
-  // fallback to the through association's own scope covers the lightweight
-  // `{ owner, reflection }` stand-in used by `buildThroughInverseFor` (called
-  // from `buildRecord` and `CollectionProxy._buildThrough`), which has no
-  // `scope()` of its own. `whereValuesHash(throughTable)` below filters the
-  // equality predicates to the through model's table, so target-table
-  // predicates carried by any of these relations are dropped rather than
-  // leaking into the join row / delete query.
+  // build time, then fall back to `self.scope` (the HMT relation). Both are
+  // JOIN-aware; `scope()` builds a JOIN-based WHERE that correctly targets the
+  // join table FK. The last fallback to the through association's own `scope()`
+  // covers the lightweight `{ owner, reflection }` stand-in used by
+  // `buildThroughInverseFor` (called from `buildRecord` and
+  // `CollectionProxy._buildThrough`). `whereValuesHash(throughTable)` below
+  // filters the equality predicates to the through model's table, so
+  // target-table predicates carried by any of these relations are dropped
+  // rather than leaking into the join row / delete query.
   const scope: any = throughScope(assoc) ?? (assoc as any).scope?.() ?? throughAssoc.scope?.();
   if (!scope || typeof scope.whereValuesHash !== "function") return {};
   const throughTable = (throughAssoc.klass as any)?.tableName ?? "";

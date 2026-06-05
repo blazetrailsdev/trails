@@ -42,13 +42,17 @@ export async function eagerLoadBang(): Promise<void> {
  * associations) that forced the late-binding in the first place.
  */
 export async function initializeAssociations(): Promise<void> {
-  // Load both ctor slots. `association-relation.js` imports
+  // Load all late-binding slots. `association-relation.js` imports
   // `collection-proxy.js` for the late-bind ctor setter, so importing
   // AR first also registers CP transitively; we still import CP
-  // explicitly as a belt-and-suspenders guarantee.
+  // explicitly as a belt-and-suspenders guarantee. DJAS registers its
+  // scope builder via the same slot pattern (_scope-slots.ts) so it is
+  // TDZ-safe here — all static imports are resolved by the time this
+  // function is called.
   await Promise.all([
     import("./associations/collection-proxy.js"),
     import("./association-relation.js"),
+    import("./associations/disable-joins-association-scope.js"),
   ]);
 }
 import { ConfigurationError, Rollback } from "./errors.js";
@@ -688,11 +692,10 @@ export function applyAssociationScope<R>(
 /**
  * Build (or return cached) base AssociationScope. When the owner has
  * a registered `Association` instance for this name, route through
- * its `associationScope()` so calls hit Rails' `@association_scope`-
- * style memoization (cleared on `reload()`). Without an instance,
- * fall back to a fresh `AssociationScope.scope(...)` build — matches
- * test paths that exercise loaders without going through
- * `record.association(name)`.
+ * its `scope()` so calls hit Rails' `@association_scope`-style
+ * memoization (cleared on `reload()`). Without an instance, fall back
+ * to a fresh `AssociationScope.scope(...)` build — matches test paths
+ * that exercise loaders without going through `record.association(name)`.
  *
  * Disable-joins associations bypass the cache (Rails' `Association#scope`
  * creates a fresh `DisableJoinsAssociationScope` per call,
@@ -714,7 +717,7 @@ function _builtAssociationScope(
   // Association instance too, but Rails' proxy IS the Association so
   // the instance always exists. Calling `record.association(name)`
   // here bridges that gap.
-  let instance: { disableJoins?: boolean; associationScope?: () => unknown } | undefined;
+  let instance: { disableJoins?: boolean; scope?: () => unknown } | undefined;
   const assocFn = (record as { association?: (n: string) => unknown }).association;
   if (typeof assocFn === "function") {
     try {
@@ -732,8 +735,8 @@ function _builtAssociationScope(
       }
     }
   }
-  if (instance && !instance.disableJoins && typeof instance.associationScope === "function") {
-    return instance.associationScope() as Relation<Base>;
+  if (instance && !instance.disableJoins && typeof instance.scope === "function") {
+    return instance.scope() as Relation<Base>;
   }
   return AssociationScope.scope({
     owner: record,
