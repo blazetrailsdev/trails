@@ -1040,7 +1040,7 @@ interface ReloadRecord {
     set(name: string, value: unknown): void;
     writeFromDatabase(name: string, value: unknown): void;
   };
-  _dirty: { snapshot(attrs: unknown): void };
+  _dirty: { snapshot(attrs: unknown): void; clearChangesInformation(): void };
   _collectionProxies: Map<string, unknown>;
   _preloadedAssociations: Map<string, unknown>;
   _associationInstances: Map<string, unknown>;
@@ -1087,6 +1087,7 @@ export async function reload<T extends ReloadRecord>(this: T): Promise<T> {
   }
 
   this._dirty.snapshot(this._attributes);
+  this._dirty.clearChangesInformation();
 
   // Rails' Persistence#reload re-preloads `strict_loaded_associations` so that
   // re-reading an association that was loaded before the reload does not
