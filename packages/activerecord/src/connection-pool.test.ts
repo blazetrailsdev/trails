@@ -458,6 +458,22 @@ it("flush", () => {
   expect(pool.stat().connections).toBe(0);
 });
 
+it("flush survivors are re-leasable (no double-lease)", () => {
+  // flush() clears _available then re-adds connections not yet idle enough to
+  // drop. Those connections were already expire()d by checkin, so re-adding
+  // without a second expire() is correct. Verify the survivor can be checked
+  // out again — if flush() corrupted the lease state, lease() would throw.
+  const pool = makePool(2);
+  const conn = pool.checkout();
+  pool.checkin(conn);
+  expect(pool.stat().idle).toBe(1);
+  pool.flush(9999); // high threshold → conn stays in _available
+  expect(pool.stat().idle).toBe(1);
+  const reused = pool.checkout();
+  expect(reused).toBe(conn);
+  pool.checkin(reused);
+});
+
 it("flush bang", () => {
   const pool = makePool(5);
   const c1 = pool.checkout();
