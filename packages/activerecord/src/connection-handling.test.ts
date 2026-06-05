@@ -3,6 +3,7 @@ import { Base } from "./base.js";
 import { setPermanentConnectionCheckout } from "./ar-config.js";
 import { ActiveRecordError } from "./errors.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
+import { DatabaseConfigurations } from "./database-configurations.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import {
@@ -725,8 +726,9 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
     try {
       __resetPrimaryAbstractClass();
       primaryAbstractClass(AppRecord);
+      const env = DatabaseConfigurations.currentEnv();
       (AppRecord as any).configurations = {
-        development: { primary: { adapter: "sqlite3", database: ":memory:" } },
+        [env]: { primary: { adapter: "sqlite3", database: ":memory:" } },
       };
       (SecondaryAbstract as any).configurations = (AppRecord as any).configurations;
 

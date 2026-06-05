@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 
@@ -22,6 +22,7 @@ describe("ShardsKeysTest", () => {
     prevDefaultEnv = DatabaseConfigurations.defaultEnv;
     prevCurrent = (DatabaseConfigurations as any).current;
     DatabaseConfigurations.defaultEnv = "default_env";
+    vi.stubEnv("TRAILS_ENV", "default_env");
     (Base as any).configurations = {
       default_env: {
         primary: { adapter: "sqlite3", database: ":memory:" },
@@ -48,6 +49,7 @@ describe("ShardsKeysTest", () => {
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
     (DatabaseConfigurations as any).current = prevCurrent;
     (Base as any)._shardKeys = undefined;
+    vi.unstubAllEnvs();
   });
 
   it("connects to sets shard keys", () => {
