@@ -251,6 +251,16 @@ export async function _createRecord(this: any): Promise<boolean> {
     }
     this._previouslyNewRecord = true;
     this._newRecord = false;
+    // Reinstate constructor-assigned attrs as dirty vs schema defaults so
+    // they appear in saved_changes / previous_changes after INSERT.
+    // PK: already tracked via _writeAttribute(pk, insertedId) in _performInsert.
+    const _pk = ctor.primaryKey;
+    const _pkSet = new Set(Array.isArray(_pk) ? _pk : [_pk]);
+    this._dirty.reinstateNewRecordChanges(
+      this._attributes,
+      ctor._defaultAttributes().snapshotValues(),
+      _pkSet,
+    );
     this.changesApplied();
   });
 }
