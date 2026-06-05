@@ -6,19 +6,13 @@ import { Base } from "./index.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
 
 beforeAll(async () => {
-  await defineSchema({
-    numeric_data: {
-      bank_balance: { type: "decimal", precision: 10, scale: 2 },
-      big_bank_balance: { type: "decimal", precision: 15, scale: 2 },
-      world_population: { type: "decimal", precision: 20, scale: 0 },
-      my_house_population: { type: "decimal", precision: 2, scale: 0 },
-    },
-  });
+  await defineSchema({ numeric_data: TEST_SCHEMA.numeric_data });
   await NumericData.loadSchema();
 });
 
