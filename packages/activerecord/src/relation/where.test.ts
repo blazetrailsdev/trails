@@ -153,10 +153,10 @@ const SCHEMA: Schema = {
   // "type casting nested joins" uses the canonical comments table (post_id only).
   // posts + authors are already in this schema with author_id / name columns.
   comments: { post_id: "integer" },
-  // "where with through association" second assertion: author → wta_categorizations → categories
-  // Table name "categories" matches association name so associatedTable() skips aliasing.
+  // "where with through association": canonical categorizations + categories tables.
+  // Table names match association names so associatedTable() skips aliasing.
   categories: { name: "string" },
-  wta_categorizations: { author_id: "integer", category_id: "integer" },
+  categorizations: { author_id: "integer", category_id: "integer" },
 };
 
 setupHandlerSuite();
@@ -2380,18 +2380,24 @@ describe("WhereTest", () => {
   });
 
   it("where with through association", async () => {
-    // --- assertion 1: Author.joins(:comments).where(comments: <record>) ---
-    // Rails: Author has_many :comments, through: :posts
     class WtaAuthor extends Base {
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
+        this.hasMany("posts", { className: "WtaPost", foreignKey: "author_id" });
+        this.hasMany("comments", { className: "WtaComment", through: "posts" });
+        this.hasMany("categorizations", {
+          className: "WtaCategorization",
+          foreignKey: "author_id",
+        });
+        this.hasMany("categories", { className: "WtaCategory", through: "categorizations" });
       }
     }
     class WtaPost extends Base {
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
+        this.hasMany("comments", { className: "WtaComment", foreignKey: "post_id" });
       }
     }
     class WtaComment extends Base {
@@ -2400,21 +2406,25 @@ describe("WhereTest", () => {
         this.attribute("post_id", "integer");
       }
     }
+    class WtaCategory extends Base {
+      static {
+        this._tableName = "categories";
+        this.attribute("name", "string");
+      }
+    }
+    class WtaCategorization extends Base {
+      static {
+        this._tableName = "categorizations";
+        this.attribute("author_id", "integer");
+        this.attribute("category_id", "integer");
+        this.belongsTo("category", { className: "WtaCategory", foreignKey: "category_id" });
+      }
+    }
     registerModel("WtaAuthor", WtaAuthor);
     registerModel("WtaPost", WtaPost);
     registerModel("WtaComment", WtaComment);
-    Associations.hasMany.call(WtaAuthor, "posts", {
-      className: "WtaPost",
-      foreignKey: "author_id",
-    });
-    Associations.hasMany.call(WtaPost, "comments", {
-      className: "WtaComment",
-      foreignKey: "post_id",
-    });
-    Associations.hasMany.call(WtaAuthor, "comments", {
-      className: "WtaComment",
-      through: "posts",
-    });
+    registerModel("WtaCategory", WtaCategory);
+    registerModel("WtaCategorization", WtaCategorization);
 
     // Mirror Rails fixture contrast: David has greetings on post 1; Bob has a
     // different comment on his post. joins("comments") returns both authors so
@@ -2426,42 +2436,11 @@ describe("WhereTest", () => {
     const greetings = await WtaComment.create({ post_id: davidPost.id });
     await WtaComment.create({ post_id: bobPost.id }); // does_it_hurt analogue
 
-    // Both authors are joined — joins alone does not narrow to david.
     const joined = await WtaAuthor.joins("comments").toArray();
     expect(joined.length).toBe(2);
 
     const result1 = await WtaAuthor.joins("comments").where({ comments: greetings }).toArray();
     expect(result1.map((a) => a.id)).toStrictEqual([david.id]);
-
-    // --- assertion 2: Author.joins(:categories).where(categories: <record>) ---
-    // Rails: Author has_many :categorizations; has_many :categories, through: :categorizations
-    class WtaCategory extends Base {
-      static {
-        this._tableName = "categories";
-        this.attribute("name", "string");
-      }
-    }
-    class WtaCategorization extends Base {
-      static {
-        this._tableName = "wta_categorizations";
-        this.attribute("author_id", "integer");
-        this.attribute("category_id", "integer");
-      }
-    }
-    registerModel("WtaCategory", WtaCategory);
-    registerModel("WtaCategorization", WtaCategorization);
-    Associations.belongsTo.call(WtaCategorization, "category", {
-      className: "WtaCategory",
-      foreignKey: "category_id",
-    });
-    Associations.hasMany.call(WtaAuthor, "categorizations", {
-      className: "WtaCategorization",
-      foreignKey: "author_id",
-    });
-    Associations.hasMany.call(WtaAuthor, "categories", {
-      className: "WtaCategory",
-      through: "categorizations",
-    });
 
     // Mirror Rails fixture contrast: David→general, Bob→technology.
     // joins("categories") returns both authors so only the where predicate narrows.
