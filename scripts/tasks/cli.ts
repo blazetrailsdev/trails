@@ -66,6 +66,7 @@ export interface StoryEntry {
   est_loc: number | null;
   updated: string | null;
   pr: number | null;
+  priority: number | null;
   claim: string | null;
   assignee: string | null;
   blocked_by: string | null;
@@ -231,6 +232,37 @@ function git(args: string[], opts: { silent?: boolean; cwd?: string } = {}): str
   }).trim();
 }
 
+// Generated artifacts the tasks repo's pre-commit hook rebuilds and
+// re-stages on every commit (scripts/build-index.mjs). `loadIndex()` runs
+// that same build script when it finds the index stale, which rewrites
+// these tracked files in the working tree — see restoreGeneratedFiles.
+const GENERATED_INDEX_FILES = ["index.md", "index.json", "search.json"];
+
+// `loadIndex()` runs before every mutation reaches commitAndPush, and when it
+// finds the index stale it invokes build-index.mjs, which rewrites the tracked
+// GENERATED_INDEX_FILES in the working tree. With git's default
+// rebase.autoStash=false (CI, fresh checkouts) a subsequent `git pull --rebase`
+// then aborts: "cannot pull with rebase: You have unstaged changes". With
+// autoStash on it instead stashes the throwaway copy and can conflict against
+// upstream's own regenerated index on reapply — so neither config is safe.
+// These files are regenerated and re-staged by the tasks repo's pre-commit hook
+// on every commit, so the locally-rebuilt copies are throwaway — restore them
+// to HEAD before pulling, leaving a clean tree regardless of git config.
+// Restore each path independently: `git checkout -- a b c` is atomic — if any
+// single path is unknown to git (e.g. a checkout predating search.json) the
+// whole command fails and restores *nothing*, leaving the others dirty and the
+// pull still aborting. Per-file checkout means a path git doesn't track can't
+// block the rest; a path git doesn't know isn't dirty, so skipping it is fine.
+function restoreGeneratedFiles(cwd: string | undefined): void {
+  for (const file of GENERATED_INDEX_FILES) {
+    try {
+      git(["checkout", "--", file], { silent: true, cwd });
+    } catch {
+      /* path unknown to git or already clean — nothing to restore here */
+    }
+  }
+}
+
 function storyFilePath(index: Index, id: string): string {
   const entry = index.stories.find((s) => s.id === id);
   if (!entry) {
@@ -271,6 +303,27 @@ export function editFrontmatter(file: string, edits: Record<string, string>): vo
   writeFileSync(file, m[1] + lines.join("\n") + m[3] + m[4]);
 }
 
+// Deletes a **single-line scalar** frontmatter key. No-op when the key is
+// already absent. Refuses list/nested keys for the same reason editFrontmatter
+// does — removing the key alone would orphan its indented children.
+export function removeFrontmatterKey(file: string, key: string): void {
+  const text = readFileSync(file, "utf8");
+  const m = text.match(/^(---\n)([\s\S]*?)(\n---\n)([\s\S]*)$/);
+  if (!m) {
+    console.error(`error: ${file} has no frontmatter block`);
+    process.exit(1);
+  }
+  const lines = m[2].split("\n");
+  const i = lines.findIndex((l) => new RegExp(`^${key}:(\\s|$)`).test(l));
+  if (i === -1) return;
+  if (lines[i + 1] && /^[ \t]/.test(lines[i + 1])) {
+    console.error(`error: refusing to remove list-valued frontmatter key "${key}" in ${file}`);
+    process.exit(1);
+  }
+  lines.splice(i, 1);
+  writeFileSync(file, m[1] + lines.join("\n") + m[3] + m[4]);
+}
+
 // Pull-rebase → run mutator → commit → push, retrying once on
 // non-fast-forward. `mutator` is run inside each attempt so a rebased
 // index file is re-read between tries. Throws (and asks caller to
@@ -289,6 +342,10 @@ export function commitAndPush(opts: {
 }): void {
   const cwd = opts.cwd;
   const pushRefspec = opts.pushRefspec ?? "main";
+  // Clear any loadIndex()-regenerated artifacts so the pull below sees a clean
+  // tree. Only needed before the first attempt — the retry path resets hard to
+  // origin/main, which already discards them.
+  restoreGeneratedFiles(cwd);
   for (let attempt = 0; attempt < 2; attempt++) {
     git(["pull", "--rebase", "--quiet", "origin", "main"], { cwd });
     opts.mutator();
@@ -381,6 +438,35 @@ function block(id: string, reason: string): void {
     editFrontmatter(file, { status: "blocked", "blocked-by": JSON.stringify(reason) }),
   );
   console.log(`blocked ${id}: ${reason}`);
+}
+
+// Set (or, with `priority === null`, clear) a story's ready-queue priority.
+// Lower sorts first; absent = unprioritized (sorts last). Unlike the other
+// mutations this leaves `status` untouched — it only reorders the queue. The
+// caller validates the integer; build-index/validate enforce non-negative.
+function setPriority(id: string, priority: number | null): void {
+  // Short-circuit a no-op. Unlike the status mutations (which always change a
+  // field), re-running priority with the unchanged value would leave nothing
+  // to commit — `git commit` then errors "nothing to commit". Compare against
+  // the indexed value and report cleanly instead of pushing an empty change.
+  const entry = loadIndex().stories.find((s) => s.id === id);
+  if (entry && entry.priority === priority) {
+    // loadIndex() may have rebuilt — and so dirtied — the generated index files
+    // in the canonical checkout. The status mutations let commitAndPush restore
+    // them before its pull; this early return skips that, so clean up here to
+    // avoid leaving the tasks checkout dirty.
+    restoreGeneratedFiles(TASKS_DIR);
+    console.log(
+      priority === null ? `priority already clear on ${id}` : `${id} already priority ${priority}`,
+    );
+    return;
+  }
+  const message = priority === null ? `priority clear: ${id}` : `priority ${priority}: ${id}`;
+  flip(id, message, RETRY_MSG(id), 4, (file) => {
+    if (priority === null) removeFrontmatterKey(file, "priority");
+    else editFrontmatter(file, { priority: String(priority) });
+  });
+  console.log(priority === null ? `cleared priority on ${id}` : `set ${id} priority ${priority}`);
 }
 
 // Single exit point for a refine agent: commit whatever it edited in the
@@ -517,7 +603,7 @@ export function stringFlag(
 // Known boolean flags. Everything else with a non-`--` following token
 // is treated as `--key value`. Boolean flags never consume the next
 // token, removing the `--json <id>` ambiguity.
-const BOOLEAN_FLAGS = new Set(["json"]);
+const BOOLEAN_FLAGS = new Set(["json", "clear"]);
 
 export function parseFlags(
   args: string[],
@@ -634,6 +720,20 @@ function main(): void {
       refine(id, numberFlag(flags, "pr"), stringFlag(flags, "dir") ?? TASKS_DIR);
       break;
     }
+    case "priority": {
+      const id = pos[0];
+      if (!id) usage();
+      if (flags.clear) {
+        setPriority(id, null);
+      } else {
+        // Positional integer; lower = higher priority. Reject non-integers and
+        // negatives so a typo can't write a value `validate.mjs` will reject.
+        const n = pos[1];
+        if (n === undefined || !/^\d+$/.test(n)) usage();
+        setPriority(id, Number(n));
+      }
+      break;
+    }
     default:
       usage();
   }
@@ -652,6 +752,7 @@ function usage(): never {
   done <id> --pr <N>
   block <id> --reason "<text>"
   refine <id> [--pr <N>] [--dir <tasks worktree>]
+  priority <id> <N> | priority <id> --clear    (lower N = higher priority)
 
 Set $TASKS_DIR to override the default ~/github/blazetrailsdev/tasks.
 ($RFCS_DIR is honored as a transition fallback after the rfcs → tasks rename.)`);
