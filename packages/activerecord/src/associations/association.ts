@@ -2,6 +2,7 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import { resolveModel } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
+import { ScopeRegistry } from "../scoping.js";
 import { validateThroughReflection } from "./validate-through-reflection.js";
 import { camelize, singularize, underscore } from "@blazetrails/activesupport";
 import { AssociationTypeMismatch } from "../errors.js";
@@ -97,25 +98,20 @@ export class Association {
   }
 
   /**
-   * Build (or return cached) JOIN-based association scope. Mirrors
-   * Rails' `Association#scope` (association.rb:107-117), which merges
-   * `target_scope` and `association_scope` into the final relation.
+   * Mirrors Rails' `Association#scope` (association.rb:107-117).
    *
-   * Memoized per-instance; reset by `resetScope()` (called from
-   * `reload()` and on init). Mirror Rails' `if klass` guard
-   * (association.rb:301): polymorphic belongs_to with a blank type
-   * column returns `undefined` and skips caching.
+   * The `@association_scope` equivalent (memoized `AssociationScope.scope`)
+   * is cached in `_cachedScope`; `targetScope()` and `global_current_scope`
+   * are re-evaluated fresh on each call, matching Rails' split between the
+   * memoized private `@association_scope` and the non-memoized public `scope`.
    *
-   * **Disable-joins routing happens upstream of this method.** Loaders
-   * detect `disable_joins: true` early and route to the dedicated
-   * DJAS loader (`_loadThroughViaDisableJoinsScope`); they never call
-   * `scope()` for disable_joins associations. Keeping that branch here
-   * would create a TDZ cycle:
-   * base.ts → associations/association.ts → DJAS → DJAR → relation.ts
-   * → base.ts. So `scope()` is JOIN-only; calling it on a disable-joins
-   * instance returns the JOIN-based scope (which is not what
-   * disable_joins users want, but is also not how loaders reach this
-   * code).
+   * Two Rails branches are intentionally deferred:
+   * - **disable_joins**: loaders detect it early and route to the DJAS loader
+   *   (`_loadThroughViaDisableJoinsScope`). Keeping this branch here would
+   *   create a TDZ cycle (base.ts → this file → DJAS → relation.ts → base.ts).
+   * - **current_scope.proxy_association == self**: requires CollectionProxy to
+   *   register itself as `klass.currentScope` with a `proxyAssociation`
+   *   back-pointer that our Relation does not carry.
    */
   scope(): any {
     // Mirror Rails' `if klass` guard (association.rb:301): polymorphic
@@ -145,14 +141,24 @@ export class Association {
         klass: klass as never,
       });
     }
-    // Rails' public `scope` = target_scope.merge!(association_scope)
-    // (association.rb:116). targetScope() is called fresh every time —
-    // not memoized — mirroring Rails' split between the public `scope`
-    // method and the private `@association_scope` ivar.
+    // Rails association.rb:107-117 branch structure.
+    // Branch 1 (disable_joins): handled upstream in loaders — a TDZ cycle
+    // prevents importing DJAS here (base.ts → this file → DJAS → relation.ts
+    // → base.ts). Loaders never call scope() for disable_joins associations.
+    // Branch 2 (current_scope.proxy_association == this): requires
+    // CollectionProxy to set itself as klass.currentScope with a proxyAssociation
+    // back-pointer. Our Relation carries no such pointer; unreachable for now.
+    // Branch 3 (global_current_scope): implemented below.
+    // Branch 4 (else): target_scope.merge!(association_scope).
     const target = this.targetScope();
-    return target != null && typeof (target as any).merge === "function"
-      ? (target as any).merge(this._cachedScope)
-      : this._cachedScope;
+    const base =
+      target != null && typeof (target as any).merge === "function"
+        ? (target as any).merge(this._cachedScope)
+        : this._cachedScope;
+    const globalScope = ScopeRegistry.globalCurrentScope(klass as unknown as object);
+    return globalScope && typeof (base as any)?.merge === "function"
+      ? (base as any).merge(globalScope)
+      : base;
   }
 
   resetScope(): void {
@@ -498,16 +504,19 @@ export class Association {
   }
 
   /**
-   * Mirrors Rails' `Association#target_scope` (association.rb): returns
-   * `klass.all`. The through-association chain merge that propagates
-   * intermediate `default_scope` is the
-   * `ThroughAssociation#target_scope` override — see
-   * `through-association.ts` / `_throughTargetScope`.
+   * Mirrors Rails' `Association#target_scope` (association.rb:310-314):
+   * `AssociationRelation.create(klass, self).merge!(klass.scope_for_association)`.
+   * Uses `scopeForAssociation()` rather than `all()` so that an ordinary
+   * `Model.where(...).scoping { }` block does not leak into the association
+   * base — only default scopes and the empty-scope sentinel are respected
+   * (matching Rails' `scope_for_association` contract). The through-association
+   * chain merge is the `ThroughAssociation#target_scope` override — see
+   * `through-association.ts` / `throughTargetScope`.
    *
    * @internal
    */
   protected targetScope(): any {
-    return (this.klass as any)?.all?.() ?? null;
+    return (this.klass as any)?.scopeForAssociation?.() ?? null;
   }
 
   /** @internal */
