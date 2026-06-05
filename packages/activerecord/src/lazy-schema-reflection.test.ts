@@ -10,6 +10,7 @@ import { Base } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 describe("lazy async schema reflection", () => {
   setupHandlerSuite();
@@ -17,7 +18,7 @@ describe("lazy async schema reflection", () => {
 
   beforeAll(async () => {
     await defineSchema({
-      topics: { title: "string", body: "string" },
+      topics: TEST_SCHEMA.topics,
     });
   });
 

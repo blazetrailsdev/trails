@@ -12,6 +12,7 @@ import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 const REGEXP_CLEAR_STR = `\\x1b\\[${BaseLogSubscriber.MODES.clear}m`;
 const REGEXP_BOLD_STR = `\\x1b\\[${BaseLogSubscriber.MODES.bold}m`;
@@ -107,7 +108,7 @@ describe("LogSubscriberTest", () => {
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({
-      developers: { name: "string", lastName: "string", salary: "integer" },
+      developers: TEST_SCHEMA.developers,
     });
   });
 

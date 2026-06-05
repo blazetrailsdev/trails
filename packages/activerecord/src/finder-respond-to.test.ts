@@ -3,6 +3,7 @@ import { Base, RecordNotFound } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 let Topic: typeof Base;
 setupHandlerSuite();
@@ -13,7 +14,7 @@ beforeAll(async () => {
   // a later test's INSERT doesn't trigger ALTER ADD COLUMN inside the
   // transactional fixture (MariaDB implicit-commits on DDL).
   await defineSchema({
-    topics: { title: "string", author_name: "string", status: "string" },
+    topics: TEST_SCHEMA.topics,
   });
 });
 // Recreate the model per test so a test that mutates the class (adds an
