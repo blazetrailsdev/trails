@@ -2416,10 +2416,19 @@ describe("WhereTest", () => {
       through: "posts",
     });
 
+    // Mirror Rails fixture contrast: David has greetings on post 1; Bob has a
+    // different comment on his post. joins("comments") returns both authors so
+    // only the where({comments: greetings}) predicate can narrow to [david].
     const david = await WtaAuthor.create({ name: "David" });
-    const post1 = await WtaPost.create({ author_id: david.id });
-    await WtaPost.create({ author_id: (await WtaAuthor.create({ name: "Other" })).id });
-    const greetings = await WtaComment.create({ post_id: post1.id });
+    const bob = await WtaAuthor.create({ name: "Bob" });
+    const davidPost = await WtaPost.create({ author_id: david.id });
+    const bobPost = await WtaPost.create({ author_id: bob.id });
+    const greetings = await WtaComment.create({ post_id: davidPost.id });
+    await WtaComment.create({ post_id: bobPost.id }); // does_it_hurt analogue
+
+    // Both authors are joined — joins alone does not narrow to david.
+    const joined = await WtaAuthor.joins("comments").toArray();
+    expect(joined.length).toBe(2);
 
     const result1 = await WtaAuthor.joins("comments").where({ comments: greetings }).toArray();
     expect(result1.map((a) => a.id)).toStrictEqual([david.id]);
@@ -2454,9 +2463,16 @@ describe("WhereTest", () => {
       through: "categorizations",
     });
 
-    const bob = await WtaAuthor.create({ name: "Bob" });
+    // Mirror Rails fixture contrast: David→general, Bob→technology.
+    // joins("categories") returns both authors so only the where predicate narrows.
+    const general = await WtaCategory.create({ name: "general" });
     const technology = await WtaCategory.create({ name: "technology" });
+    await WtaCategorization.create({ author_id: david.id, category_id: general.id });
     await WtaCategorization.create({ author_id: bob.id, category_id: technology.id });
+
+    // Both authors are joined — joins alone does not narrow to bob.
+    const joinedCat = await WtaAuthor.joins("categories").toArray();
+    expect(joinedCat.length).toBe(2);
 
     const result2 = await WtaAuthor.joins("categories").where({ categories: technology }).toArray();
     expect(result2.map((a) => a.id)).toStrictEqual([bob.id]);
