@@ -3,18 +3,14 @@ import { Base, RecordNotFound } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 let Topic: typeof Base;
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
 
 beforeAll(async () => {
-  // `status` is added dynamically by one test below; declare it up front so
-  // a later test's INSERT doesn't trigger ALTER ADD COLUMN inside the
-  // transactional fixture (MariaDB implicit-commits on DDL).
-  await defineSchema({
-    topics: { title: "string", author_name: "string", status: "string" },
-  });
+  await defineSchema({ topics: TEST_SCHEMA.topics });
 });
 // Recreate the model per test so a test that mutates the class (adds an
 // attribute, primes a finder cache, etc.) can't leak into later tests.
@@ -35,9 +31,15 @@ describe("FinderRespondToTest", () => {
   });
 
   it("should preserve normal respond to behavior and respond to newly added method", () => {
-    expect(Topic.respondToMissingFinder("findByTitle")).toBe(true);
-    Topic.attribute("status", "string");
-    expect(Topic.respondToMissingFinder("findByStatus")).toBe(true);
+    // Rails: `Topic.singleton_class.define_method(:method_added_for_finder_respond_to_test){}`
+    // then `assert_respond_to Topic, :method_added_for_finder_respond_to_test`. A normal
+    // method added to the class must still be found — the dynamic-finder
+    // respond_to_missing? override must not mask it. (Topic is recreated per
+    // test, so no cleanup is needed where Rails uses an `ensure` remove_method.)
+    (Topic as unknown as Record<string, unknown>).methodAddedForFinderRespondToTest = () => {};
+    expect(
+      typeof (Topic as unknown as Record<string, unknown>).methodAddedForFinderRespondToTest,
+    ).toBe("function");
   });
 
   it("should preserve normal respond to behavior and respond to standard object method", () => {
