@@ -938,14 +938,12 @@ export class DatabaseTasks {
       const left = Math.floor(pad / 2);
       return " ".repeat(left) + s + " ".repeat(pad - left);
     };
-    // Mirrors SchemaMigration#normalize_migration_number: "%.3d" % version.to_i
-    const normVersion = (v: string) => v.padStart(3, "0");
     const puts = (s: string) => stdout.write(s + "\n");
     puts(`\ndatabase: ${dbName}\n`);
     puts(`${center("Status", 8)}  ${"Migration ID".padEnd(14)}  Migration Name`);
     puts("-".repeat(50));
     for (const row of rows) {
-      puts(`${center(row.status, 8)}  ${normVersion(row.version).padEnd(14)}  ${row.name}`);
+      puts(`${center(row.status, 8)}  ${row.version.padEnd(14)}  ${row.name}`);
     }
     puts("");
   }

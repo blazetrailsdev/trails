@@ -2850,13 +2850,19 @@ export class Migrator {
     Array<{ status: "up" | "down"; version: string; name: string }>
   > {
     await this._ensureSchemaTable();
-    const applied = new Set(await this._appliedVersions());
+    // Mirrors Rails: db_list uses schema_migration.normalized_versions and file
+    // versions go through schema_migration.normalize_migration_number before
+    // matching (migration.rb:1319-1328 / schema_migration.rb:69-70).
+    const applied = new Set(
+      [...(await this._appliedVersions())].map((v) => SchemaMigration.normalizeMigrationNumber(v)),
+    );
 
     const fileList = this._migrations.map((m) => {
-      const isUp = applied.delete(m.version);
+      const normV = SchemaMigration.normalizeMigrationNumber(m.version);
+      const isUp = applied.delete(normV);
       return {
         status: (isUp ? "up" : "down") as "up" | "down",
-        version: m.version,
+        version: normV,
         name: m.name,
       };
     });
