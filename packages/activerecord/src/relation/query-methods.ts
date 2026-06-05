@@ -414,7 +414,8 @@ function orderBang(
       if (first instanceof Nodes.Node) {
         // Bind array: [Arel.sql("col = ?"), bind1, ...] — Arel bypasses check.
         // Store as { raw } so _applyOrderToManager emits it verbatim.
-        const rawSql = (first as any).value ?? (first as Nodes.Node).toSql();
+        const rawSql =
+          (first as any).value ?? this._modelClass.connection.toSql(first as Nodes.Node);
         const interpolated =
           rest.length > 0 ? this._modelClass.sanitizeSqlArray(rawSql, ...rest) : rawSql;
         if (interpolated.trim() !== "") this._orderClauses.push({ raw: String(interpolated) });
@@ -497,7 +498,8 @@ function reorderBang(
     if (Array.isArray(arg)) {
       const [first, ...rest] = arg as unknown[];
       if (first instanceof Nodes.Node) {
-        const rawSql = (first as any).value ?? (first as Nodes.Node).toSql();
+        const rawSql =
+          (first as any).value ?? this._modelClass.connection.toSql(first as Nodes.Node);
         const interpolated =
           rest.length > 0 ? this._modelClass.sanitizeSqlArray(rawSql, ...rest) : rawSql;
         if (interpolated.trim() !== "") this._orderClauses.push({ raw: String(interpolated) });
@@ -1470,7 +1472,7 @@ export function buildNamedBoundSqlLiteral(
   const namedBinds: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(values)) {
     if (value instanceof Nodes.Node) {
-      namedBinds[key] = arelSql(value.toSql());
+      namedBinds[key] = arelSql(this._modelClass.connection.toSql(value));
     } else {
       namedBinds[key] = value;
     }
@@ -1490,7 +1492,7 @@ export function buildBoundSqlLiteral(
 ): Nodes.BoundSqlLiteral {
   const positionalBinds = values.map((value) => {
     if (value instanceof Nodes.Node) {
-      return arelSql(value.toSql());
+      return arelSql(this._modelClass.connection.toSql(value));
     }
     return value;
   });
