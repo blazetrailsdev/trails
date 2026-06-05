@@ -4897,7 +4897,9 @@ describe("RelationTest", () => {
     }
     // Rails: assert_raise(ArgumentError) { Topic.order(:name, "id DESC", id: :asfsdf) }
     // Cast past TS types to exercise the runtime direction validation.
-    expect(() => Post.order({ title: "asfsdf" as "asc" }).toSql()).toThrow(/invalid/i);
+    expect(() => Post.order({ title: "asfsdf" as "asc" }).toSql()).toThrow(
+      'Direction "asfsdf" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]',
+    );
   });
 
   it("finding with order concatenated", async () => {
@@ -4918,11 +4920,20 @@ describe("RelationTest", () => {
     expect(topics[0].body).toBe("x");
   });
 
-  it("finding with assoc order by aliased attributes", () => {
-    // Rails: Topic.order(heading: :desc) where heading is alias_attribute for title.
-    // Aliased-attribute ordering is not yet set up in this test context; SQL shape only.
-    const sql = Post.order({ title: "desc" }).toSql();
-    expect(sql).toContain("DESC");
+  it("finding with assoc order by aliased attributes", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.aliasAttribute("heading", "title");
+      }
+    }
+    // Rails: Topic.order(heading: :desc) where heading = alias_attribute for title
+    await Post.create({ title: "Alpha" });
+    await Post.create({ title: "Gamma" });
+    await Post.create({ title: "Beta" });
+    const posts = await Post.order({ heading: "desc" }).toArray();
+    expect(posts[0].title).toBe("Gamma");
+    expect(posts[2].title).toBe("Alpha");
   });
 
   it("finding with reorder", async () => {
@@ -4936,7 +4947,10 @@ describe("RelationTest", () => {
     await Post.create({ title: "Charlie" });
     await Post.create({ title: "Alice" });
     await Post.create({ title: "Bob" });
-    const posts = await Post.order("title").order("title").reorder("id").toArray();
+    const rel = Post.order("title").order("title").reorder("id");
+    // Assert the replacement ORDER BY is present in the SQL (not just cleared)
+    expect(rel.toSql()).toMatch(/ORDER BY.+\bid\b/i);
+    const posts = await rel.toArray();
     const ids = posts.map((p) => p.id as number);
     // Must be sorted by id (insertion order), not alphabetically by title
     expect(ids).toEqual([...ids].sort((a, b) => a - b));
@@ -4948,19 +4962,27 @@ describe("RelationTest", () => {
         this.attribute("title", "string");
       }
     }
-    // Rails: assert_equal ["id desc"], topics.order_values — checks internal
-    // order_values deduplication (Ruby-internal array state). The equivalent
-    // SQL-level dedup of duplicate reorder args is not yet implemented, so we
-    // only assert the ORDER BY clause is present.
+    // Rails: assert_equal ["id desc"], topics.order_values
+    // Duplicate args to one reorder() call must be collapsed to a single ORDER BY term.
     const sql = Post.reorder("title", "title").toSql();
-    expect(sql).toContain("ORDER BY");
+    const afterOrderBy = sql.split(/ORDER BY\s+/i)[1] ?? "";
+    expect((afterOrderBy.match(/\btitle\b/gi) ?? []).length).toBe(1);
   });
 
-  it("finding with assoc reorder by aliased attributes", () => {
-    // Rails: Topic.order("author_name").reorder(heading: :desc) where heading aliases title.
-    // Aliased-attribute reordering not set up here; SQL shape only.
-    const sql = Post.order("title").reorder({ title: "desc" }).toSql();
-    expect(sql).toContain("DESC");
+  it("finding with assoc reorder by aliased attributes", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.aliasAttribute("heading", "title");
+      }
+    }
+    // Rails: Topic.order("author_name").reorder(heading: :desc) where heading aliases title
+    await Post.create({ title: "Alpha" });
+    await Post.create({ title: "Gamma" });
+    await Post.create({ title: "Beta" });
+    const posts = await Post.order("title").reorder({ heading: "desc" }).toArray();
+    expect(posts[0].title).toBe("Gamma");
+    expect(posts[2].title).toBe("Alpha");
   });
 
   it("finding with order and take", async () => {
