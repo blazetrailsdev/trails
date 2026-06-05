@@ -910,8 +910,7 @@ describe("DatabaseTasks migration connection resolves from the pool", () => {
   it("leases from an established Base pool", async () => {
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
     DatabaseTasks.registerMigrations([]);
-    const status = await DatabaseTasks.migrateStatus();
-    expect(Array.isArray(status)).toBe(true);
+    await expect(DatabaseTasks.migrateStatus()).resolves.toBeUndefined();
   });
 
   it("raises ConnectionNotDefined when no pool is present", async () => {
@@ -1045,12 +1044,52 @@ describe("DatabaseTasksMigrateScopeTest", () => {
 });
 
 describe("DatabaseTasksMigrateStatusTest", () => {
-  it.skip("migrate status table", () => {
-    // P3 skip: migrateStatus() returns structured data but does not print to stdout.
-    // Rails' migrate_status prints a formatted table including "database: :memory:" header
-    // and up/down rows per migration. Requires ~30 LOC stdout-printing wrapper in
-    // DatabaseTasks or a separate displayMigrateStatus helper.
-    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:1169
+  let stdoutChunks: string[];
+  let stdoutSpy: MockInstance;
+
+  beforeEach(async () => {
+    stdoutChunks = [];
+    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      stdoutChunks.push(typeof chunk === "string" ? chunk : chunk.toString());
+      return true;
+    });
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    DatabaseTasks.registerMigrations([
+      {
+        version: "1",
+        name: "Valid people have last names",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+      {
+        version: "2",
+        name: "We need reminders",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+      {
+        version: "3",
+        name: "Innocent jointable",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      },
+    ]);
+  });
+
+  afterEach(() => {
+    stdoutSpy.mockRestore();
+    DatabaseTasks.registerMigrations([]);
+    try {
+      Base.removeConnection();
+    } catch {
+      /* no pool */
+    }
+  });
+
+  it("migrate status table", async () => {
+    await DatabaseTasks.migrateStatus();
+    const output = stdoutChunks.join("");
+    expect(output).toMatch(/database: :memory:/);
+    expect(output).toMatch(/down\s+1\s+Valid people have last names/);
+    expect(output).toMatch(/down\s+2\s+We need reminders/);
+    expect(output).toMatch(/down\s+3\s+Innocent jointable/);
   });
 });
 
