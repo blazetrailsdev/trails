@@ -64,6 +64,7 @@ export interface StoryEntry {
   deps: string[];
   deps_rfc: string[];
   est_loc: number | null;
+  updated: string | null;
   pr: number | null;
   claim: string | null;
   assignee: string | null;
@@ -202,6 +203,15 @@ export function listFiltered(
 
 // ──────────────────── mutations ────────────────────
 
+// Today's date (UTC, YYYY-MM-DD) for the `updated:` frontmatter stamp. Every
+// mutation that writes a story file stamps this so the backlog page can show
+// staleness; build-index passes `updated` through to index.json verbatim, so
+// the index stays deterministic (the wall-clock read happens here, at edit
+// time, not at build time). Day granularity matches the day-level display.
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function inGitTasks(): void {
   if (!existsSync(join(TASKS_DIR, ".git"))) {
     console.error(
@@ -211,8 +221,11 @@ function inGitTasks(): void {
   }
 }
 
-function git(args: string[], opts: { silent?: boolean } = {}): string {
-  return execFileSync("git", ["-C", TASKS_DIR, ...args], {
+// `cwd` defaults to TASKS_DIR (the canonical checkout the status mutations
+// operate on). `refine` overrides it with an agent's worktree, which lives in
+// the same repo but on a feature branch.
+function git(args: string[], opts: { silent?: boolean; cwd?: string } = {}): string {
+  return execFileSync("git", ["-C", opts.cwd ?? TASKS_DIR, ...args], {
     encoding: "utf8",
     stdio: opts.silent ? ["ignore", "pipe", "pipe"] : ["inherit", "pipe", "inherit"],
   }).trim();
@@ -268,14 +281,21 @@ export function commitAndPush(opts: {
   mutator: () => void;
   raceMessage: string;
   raceExitCode: number;
+  // Defaults target the canonical checkout on `main`. `refine` overrides
+  // both: it commits in an agent's worktree (on a feature branch) and pushes
+  // `HEAD:main` so the branch name is irrelevant to where the work lands.
+  cwd?: string;
+  pushRefspec?: string;
 }): void {
+  const cwd = opts.cwd;
+  const pushRefspec = opts.pushRefspec ?? "main";
   for (let attempt = 0; attempt < 2; attempt++) {
-    git(["pull", "--rebase", "--quiet", "origin", "main"]);
+    git(["pull", "--rebase", "--quiet", "origin", "main"], { cwd });
     opts.mutator();
-    git(["add", opts.fileToStage]);
-    git(["commit", "-q", "-m", opts.message]);
+    git(["add", opts.fileToStage], { cwd });
+    git(["commit", "-q", "-m", opts.message], { cwd });
     try {
-      git(["push", "--quiet", "origin", "main"], { silent: true });
+      git(["push", "--quiet", "origin", pushRefspec], { silent: true, cwd });
       return;
     } catch (e) {
       const stderr = String(((e as { stderr?: unknown }).stderr ?? "") || "");
@@ -287,7 +307,7 @@ export function commitAndPush(opts: {
         console.error(stderr.trim() || "git push failed (no stderr)");
         process.exit(1);
       }
-      git(["reset", "--hard", "origin/main"], { silent: true });
+      git(["reset", "--hard", "origin/main"], { silent: true, cwd });
       if (attempt === 1) {
         console.error(opts.raceMessage);
         process.exit(opts.raceExitCode);
@@ -316,7 +336,10 @@ function flip(
     fileToStage: file,
     raceMessage,
     raceExitCode,
-    mutator: () => mutate(file),
+    mutator: () => {
+      mutate(file);
+      editFrontmatter(file, { updated: today() });
+    },
   });
 }
 
@@ -358,6 +381,82 @@ function block(id: string, reason: string): void {
     editFrontmatter(file, { status: "blocked", "blocked-by": JSON.stringify(reason) }),
   );
   console.log(`blocked ${id}: ${reason}`);
+}
+
+// Single exit point for a refine agent: commit whatever it edited in the
+// story file in place, push with the same rebase-retry as the other
+// mutations, and print a machine-readable summary the orchestration layer
+// forwards to btwhooks (POST /cleanup-pane without a PR).
+//
+// `dir` is the agent's tasks worktree (its cwd) — a checkout of the same
+// repo on a feature branch. The CLI script itself resolves via the trails
+// package.json, so the agent runs `cd <trails> && pnpm tasks refine <id>
+// --dir <its-worktree>`; without `--dir` we operate on TASKS_DIR. We read
+// the story's repo-relative path from the canonical index, then act on the
+// copy inside `dir`.
+//
+// The agent leaves its edits in the worktree (citations, path:line fixes,
+// priority, an optional done-note). We capture that content, then `git
+// checkout` the file back to HEAD so `commitAndPush`'s leading `pull
+// --rebase` runs against a clean tree; the captured content is re-applied
+// inside each attempt (so a rebase between tries can't drop it), and the
+// push is `HEAD:main`. With `--pr <N>` the story is also flipped to done —
+// making this one command replace the old "edit + git push" / "pnpm tasks
+// done" fork.
+//
+// Caveat: re-applying the full captured file clobbers any concurrent
+// upstream edit to the SAME story file rather than 3-way merging it. One
+// refine agent runs per story, so same-file races are effectively
+// nonexistent; the scalar-field mutations above don't have this property
+// because they re-read and edit specific keys.
+function refine(id: string, pr: number | null, dir: string): void {
+  inGitTasks();
+  if (!existsSync(join(dir, ".git"))) {
+    console.error(`error: ${dir} is not a git worktree (pass --dir <tasks worktree>)`);
+    process.exit(1);
+  }
+  const entry = loadIndex().stories.find((s) => s.id === id);
+  if (!entry) {
+    console.error(`error: story "${id}" not found in index`);
+    process.exit(1);
+  }
+  const file = join(dir, entry.file_path);
+  if (!existsSync(file)) {
+    console.error(`error: ${file} not found in worktree`);
+    process.exit(1);
+  }
+
+  const edited = readFileSync(file, "utf8");
+  git(["checkout", "--", file], { silent: true, cwd: dir });
+  const changed = edited !== readFileSync(file, "utf8");
+
+  if (!changed && pr === null) {
+    console.log(`refine: ${id} no-change`);
+    console.log(JSON.stringify({ id, outcome: "no-change", pushed: false, pr: null }));
+    return;
+  }
+
+  commitAndPush({
+    cwd: dir,
+    pushRefspec: "HEAD:main",
+    message: pr !== null ? `refine: ${id} #${pr}` : `refine: ${id}`,
+    fileToStage: file,
+    raceMessage: RETRY_MSG(id),
+    raceExitCode: 4,
+    mutator: () => {
+      writeFileSync(file, edited);
+      const fields: Record<string, string> = { updated: today() };
+      if (pr !== null) {
+        fields.status = "done";
+        fields.pr = String(pr);
+      }
+      editFrontmatter(file, fields);
+    },
+  });
+
+  const outcome = pr !== null ? "done" : "changed";
+  console.log(`refine: ${id} ${outcome}${pr !== null ? ` #${pr}` : ""}`);
+  console.log(JSON.stringify({ id, outcome, pushed: true, pr }));
 }
 
 // ──────────────────── presentation ────────────────────
@@ -456,7 +555,7 @@ function main(): void {
   const { flags, rest: pos } = parseFlags(rest);
   // `flags[k] === true` means the user wrote `--k` with no following
   // value. For value-flags that's a usage error, not a boolean.
-  const valueFlags = ["rfc", "cluster", "status", "max-loc", "pr", "assignee", "reason"];
+  const valueFlags = ["rfc", "cluster", "status", "max-loc", "pr", "assignee", "reason", "dir"];
   for (const k of valueFlags) if (flags[k] === true) usage();
 
   switch (cmd) {
@@ -527,6 +626,14 @@ function main(): void {
       block(id, reason);
       break;
     }
+    case "refine": {
+      const id = pos[0];
+      if (!id) usage();
+      // --pr is optional here: present ⇒ also flip the story to done.
+      // --dir is the agent's tasks worktree; defaults to the canonical checkout.
+      refine(id, numberFlag(flags, "pr"), stringFlag(flags, "dir") ?? TASKS_DIR);
+      break;
+    }
     default:
       usage();
   }
@@ -544,6 +651,7 @@ function usage(): never {
   in-progress <id> --pr <N>
   done <id> --pr <N>
   block <id> --reason "<text>"
+  refine <id> [--pr <N>] [--dir <tasks worktree>]
 
 Set $TASKS_DIR to override the default ~/github/blazetrailsdev/tasks.
 ($RFCS_DIR is honored as a transition fallback after the rfcs → tasks rename.)`);
