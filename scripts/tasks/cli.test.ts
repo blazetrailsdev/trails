@@ -28,6 +28,7 @@ import {
   numberFlag,
   parseFlags,
   ready,
+  removeFrontmatterKey,
   stringFlag,
   StoryEntry,
 } from "./cli.ts";
@@ -44,6 +45,7 @@ function story(over: Partial<StoryEntry>): StoryEntry {
     est_loc: 100,
     updated: null,
     pr: null,
+    priority: null,
     claim: null,
     assignee: null,
     blocked_by: null,
@@ -185,6 +187,12 @@ describe("editFrontmatter", () => {
     expect(out).toContain(`body`);
   });
 
+  it("appends a key that is not yet present (e.g. first-time priority)", () => {
+    const file = writeStory(`---\nstatus: ready\n---\nbody\n`);
+    editFrontmatter(file, { priority: "3" });
+    expect(readFileSync(file, "utf8")).toContain(`priority: 3`);
+  });
+
   it("refuses to edit a list-valued key", () => {
     const file = writeStory(`---\ndeps:\n  - a\n  - b\nstatus: ready\n---\nbody\n`);
     vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
@@ -194,6 +202,42 @@ describe("editFrontmatter", () => {
     expect(() => editFrontmatter(file, { deps: "[a, b, c]" })).toThrow(/exit 1/);
     expect(errSpy.mock.calls[0]?.[0]).toMatch(/refusing to edit list-valued/);
     // afterEach restores all mocks; no manual restore needed.
+  });
+});
+
+describe("removeFrontmatterKey (priority --clear)", () => {
+  function writeStory(body: string): string {
+    const dir = mkdtempSync(join(tmpdir(), "rfcs-cli-"));
+    const file = join(dir, "story.md");
+    writeFileSync(file, body);
+    return file;
+  }
+
+  it("deletes a scalar key, leaving the rest of the frontmatter intact", () => {
+    const file = writeStory(`---\nstatus: ready\npriority: 3\nest_loc: 80\n---\nbody\n`);
+    removeFrontmatterKey(file, "priority");
+    const out = readFileSync(file, "utf8");
+    expect(out).not.toContain("priority");
+    expect(out).toContain("status: ready");
+    expect(out).toContain("est_loc: 80");
+    expect(out).toContain("body");
+  });
+
+  it("is a no-op when the key is already absent", () => {
+    const body = `---\nstatus: ready\n---\nbody\n`;
+    const file = writeStory(body);
+    removeFrontmatterKey(file, "priority");
+    expect(readFileSync(file, "utf8")).toBe(body);
+  });
+
+  it("refuses to remove a list-valued key", () => {
+    const file = writeStory(`---\ndeps:\n  - a\n  - b\nstatus: ready\n---\nbody\n`);
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => removeFrontmatterKey(file, "deps")).toThrow(/exit 1/);
+    expect(errSpy.mock.calls[0]?.[0]).toMatch(/refusing to remove list-valued/);
   });
 });
 
