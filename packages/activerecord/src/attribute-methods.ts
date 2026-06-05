@@ -396,14 +396,31 @@ export function attributesForUpdate(this: InstanceMethodHost, attributeNames: st
 export function attributesForCreate(this: InstanceMethodHost, attributeNames: string[]): string[] {
   const mc = this.constructor as any;
   const colNames = new Set<string>(mc.columnNames?.() ?? []);
-  // Rails: attribute_names = attribute_names_for_partial_inserts if partial_inserts
-  // Only include dirty attributes, PLUS columns with no DB default whose current
-  // value differs from null (AR-only defaults must be included or the DB stores NULL).
-  const partialSet =
-    mc.partialInserts && (this as any).changedAttributeNamesToSave != null
-      ? new Set<string>((this as any).changedAttributeNamesToSave as string[])
-      : null;
-  return attributeNames.filter((name) => {
+
+  // Rails AttributeMethods::Dirty#attribute_names_for_partial_inserts:
+  //   partial_inserts? ? changed_attribute_names_to_save
+  //                    : attribute_names.reject { |n|
+  //                        column_for_attribute(n).auto_populated_on_insert? &&
+  //                          !attribute_changed?(n) }
+  // (dirty.rb:260-268). The dirty set is populated before the INSERT by
+  // reinstateNewRecordChanges (see callbacks.ts _createRecord), so for a new
+  // record changed_attribute_names_to_save holds the attrs assigned away from
+  // their schema defaults — exactly as Rails' construction-time dirty does.
+  let candidates: string[];
+  if (mc.partialInserts) {
+    const changed = (this as any).changedAttributeNamesToSave as string[] | undefined;
+    candidates = changed ?? attributeNames;
+  } else {
+    candidates = attributeNames.filter((name) => {
+      const col = mc.columnForAttribute?.(name);
+      const autoPopulated = col?.isAutoPopulated?.() ?? col?.defaultFunction != null;
+      return !(autoPopulated && !(this as any).attributeChanged?.(name));
+    });
+  }
+
+  // Rails Persistence#attributes_for_create: & column_names, drop the nil pk,
+  // drop virtual columns (persistence.rb / attribute_methods.rb:519-524).
+  return candidates.filter((name) => {
     if (!colNames.has(name)) return false;
     // Rails: pk_attribute?(name) && id.nil? — check per-column PK value so
     // composite PKs work correctly (this.id would be an array, not null).
@@ -411,18 +428,6 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
     // Rails: column_for_attribute(name).virtual?
     const col = mc.columnForAttribute?.(name);
     if (col?.virtual || col?.isVirtual?.()) return false;
-    if (partialSet !== null && !partialSet.has(name)) {
-      // Include back columns with a DB function default (e.g. nextval()).
-      if (col?.defaultFunction != null) return true;
-      // Include columns with a DB scalar default — the DB provides the value.
-      // Exclude them only when they also have a non-null current value that
-      // matches what the DB would store anyway (omitting is safe).
-      if (col?.default != null) return false;
-      // No DB default: include if the current value is non-null so the AR-level
-      // default is persisted. If null, the DB stores NULL either way.
-      const currentVal = this._readAttribute(name) ?? null;
-      if (currentVal == null) return false;
-    }
     return true;
   });
 }

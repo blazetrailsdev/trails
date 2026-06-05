@@ -1278,9 +1278,13 @@ export class Base extends Model {
     this._recordTimestamps = value;
   }
 
-  // Mirrors: ActiveRecord::AttributeMethods::Dirty — class_attribute :partial_updates/:partial_inserts, default: true
+  // Mirrors: ActiveRecord::AttributeMethods::Dirty — class_attribute
+  // :partial_updates/:partial_inserts. Framework default for both is true, but
+  // `config.load_defaults 7.0` flips partial_inserts to false (partial_updates
+  // stays true). We mirror that 7.0+ default: partial inserts send every column
+  // so a column without a DB default is persisted rather than relying on one.
   static partialUpdates = true;
-  static partialInserts = true;
+  static partialInserts = false;
 
   static async noTouching<R>(fn: () => R | Promise<R>): Promise<R> {
     return _noTouchingBlock(this, fn);
