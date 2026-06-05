@@ -11,11 +11,11 @@ import { defineSchema } from "../../test-helpers/define-schema.js";
 // The schema-test tables (`test_schema.things`, `music.songs`, …) are
 // PG-schema-qualified — defineSchema can't express the cross-schema
 // `CREATE TABLE schema.name` shape, so the schema.test.ts setup builds
-// them via raw DDL. Callers should await defineSchema(adapter, {}) before
+// them via raw DDL. Callers should await defineSchema(connection, {}) before
 // invoking the factories below so the file participates in the TM-Phase-5
 // AR_NO_AUTO_SCHEMA gate.
-export async function markPhase5(adapter: PostgreSQLAdapter): Promise<void> {
-  await defineSchema(adapter as any, {});
+export async function markPhase5(connection: PostgreSQLAdapter): Promise<void> {
+  await defineSchema(connection as any, {});
 }
 
 type ModelCtor = typeof Base;
