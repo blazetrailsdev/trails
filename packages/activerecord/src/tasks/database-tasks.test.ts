@@ -29,6 +29,7 @@ import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { NoDatabaseError } from "../errors.js";
 import { NoEnvironmentInSchemaError } from "../migration.js";
+import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
@@ -909,6 +910,8 @@ describe("DatabaseTasks migration connection resolves from the pool", () => {
 
   it("leases from an established Base pool", async () => {
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    const pool = Base.connectionPool();
+    await new SchemaMigration(pool.leaseConnection()).createTable();
     DatabaseTasks.registerMigrations([]);
     await expect(DatabaseTasks.migrateStatus()).resolves.toBeUndefined();
   });
@@ -1054,6 +1057,9 @@ describe("DatabaseTasksMigrateStatusTest", () => {
       return true;
     });
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    // Mirror Rails test setup: @schema_migration.create_table (database_tasks_test.rb:1169)
+    const pool = Base.connectionPool();
+    await new SchemaMigration(pool.leaseConnection()).createTable();
     DatabaseTasks.registerMigrations([
       {
         version: "1",
@@ -1087,9 +1093,9 @@ describe("DatabaseTasksMigrateStatusTest", () => {
     await DatabaseTasks.migrateStatus();
     const output = stdoutChunks.join("");
     expect(output).toMatch(/database: :memory:/);
-    expect(output).toMatch(/down\s+1\s+Valid people have last names/);
-    expect(output).toMatch(/down\s+2\s+We need reminders/);
-    expect(output).toMatch(/down\s+3\s+Innocent jointable/);
+    expect(output).toMatch(/down\s+001\s+Valid people have last names/);
+    expect(output).toMatch(/down\s+002\s+We need reminders/);
+    expect(output).toMatch(/down\s+003\s+Innocent jointable/);
   });
 });
 
