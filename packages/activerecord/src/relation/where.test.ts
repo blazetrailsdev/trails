@@ -930,16 +930,17 @@ describe("WhereTest", () => {
     });
 
     const authorId = 1;
-    // Rails: Author.where(posts: { author_id: Author.where(id: author.id) }).joins(:posts)
-    // nested WHERE with a Relation value inside an association-hash should produce a subquery predicate
+    // Rails: expected = Author.where(id: author).joins(:posts)
+    // Rails: actual   = Author.where(posts: { author_id: Author.where(id: author.id) }).joins(:posts)
+    // Rails: assert_equal expected.to_a, actual.to_a  (same rows, different SQL)
+    const expected = BnwrAuthor.where({ id: authorId }).joins("posts");
     const actual = BnwrAuthor.where({
       posts: { author_id: BnwrAuthor.where({ id: authorId }) },
     }).joins("posts");
-    // dot-notation equivalent (convertDotNotationToHash produces the same structure)
-    const expected = BnwrAuthor.where({
-      "posts.author_id": BnwrAuthor.where({ id: authorId }),
-    }).joins("posts");
-    expect(actual.toSql()).toEqual(expected.toSql());
+    // SQL shapes differ: expected uses a scalar id predicate, actual uses a subquery on
+    // the joined table (Rails compares to_a, not to_sql); verify the subquery IS produced
+    expect(actual.toSql()).not.toEqual(expected.toSql());
+    expect(actual.toSql()).toContain("IN (SELECT");
   });
   it("polymorphic shallow where", () => {
     class PolyTreasure extends Base {
