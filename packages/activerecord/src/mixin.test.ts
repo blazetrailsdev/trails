@@ -3,13 +3,14 @@ import { Base } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 describe("TouchTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({
-      mixins: { lft: "integer", updated_at: "datetime", created_at: "datetime" },
+      mixins: TEST_SCHEMA.mixins,
     });
   });
   afterEach(() => {

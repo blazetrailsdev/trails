@@ -5,12 +5,13 @@ import { defineSchema } from "../test-helpers/define-schema.js";
 import { Base } from "../index.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  await defineSchema({ tasks: { starting: "datetime" } });
+  await defineSchema({ tasks: TEST_SCHEMA.tasks });
 });
 
 describe("DateTimeTest", () => {
