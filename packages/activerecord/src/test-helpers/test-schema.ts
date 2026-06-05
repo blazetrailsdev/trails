@@ -976,18 +976,18 @@ export const TEST_SCHEMA: Schema = {
   // current Schema shape doesn't carry those, so we drop them (per the
   // header note on features defineSchema doesn't express yet).
   numeric_data: {
-    bank_balance: "decimal",
-    big_bank_balance: "decimal",
-    unscaled_bank_balance: "decimal",
-    world_population: "decimal",
-    my_house_population: "decimal",
+    bank_balance: { type: "decimal", precision: 10, scale: 2 },
+    big_bank_balance: { type: "decimal", precision: 15, scale: 2 },
+    unscaled_bank_balance: { type: "decimal", precision: 10 },
+    world_population: { type: "decimal", precision: 20, scale: 0 },
+    my_house_population: { type: "decimal", precision: 2, scale: 0 },
     decimal_number: "decimal",
-    decimal_number_with_default: { type: "decimal", default: 2.78 },
+    decimal_number_with_default: { type: "decimal", precision: 3, scale: 2, default: 2.78 },
     numeric_number: "decimal",
     temperature: "float",
     temperature_with_limit: { type: "float", limit: 24 },
-    decimal_number_big_precision: "decimal",
-    atoms_in_universe: "decimal",
+    decimal_number_big_precision: { type: "decimal", precision: 20 },
+    atoms_in_universe: { type: "decimal", precision: 55, scale: 0 },
   },
 
   orders: {
