@@ -203,7 +203,11 @@ export function joins<T extends typeof Base>(
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
-  ...args: Array<string | import("@blazetrails/arel").Nodes.Join>
+  ...args: Array<
+    | string
+    | import("@blazetrails/arel").Nodes.Join
+    | Record<string, AssociationSpec | AssociationSpec[]>
+  >
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
