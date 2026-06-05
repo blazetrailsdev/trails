@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
@@ -36,13 +36,17 @@ describe("ConnectionHandlersMultiDbTest", () => {
   ): void {
     const prevConfigs = (Base as any).configurations;
     const prevDefaultEnv = DatabaseConfigurations.defaultEnv;
-    if (opts.defaultEnv) DatabaseConfigurations.defaultEnv = opts.defaultEnv;
+    if (opts.defaultEnv) {
+      DatabaseConfigurations.defaultEnv = opts.defaultEnv;
+      vi.stubEnv("TRAILS_ENV", opts.defaultEnv);
+    }
     (Base as any).configurations = raw;
     try {
       fn();
     } finally {
       (Base as any).configurations = prevConfigs;
       DatabaseConfigurations.defaultEnv = prevDefaultEnv;
+      if (opts.defaultEnv) vi.unstubAllEnvs();
       Base.connectionHandler.clearAllConnectionsBang();
     }
   }

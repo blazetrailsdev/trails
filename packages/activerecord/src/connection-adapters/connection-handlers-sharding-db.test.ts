@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as fs from "node:fs";
@@ -17,7 +17,10 @@ async function withBaseConfigs(
   const prevConfigs = (Base as any).configurations;
   const prevDefaultEnv = DatabaseConfigurations.defaultEnv;
   const prevCurrent = (DatabaseConfigurations as any).current;
-  if (opts.defaultEnv) DatabaseConfigurations.defaultEnv = opts.defaultEnv;
+  if (opts.defaultEnv) {
+    DatabaseConfigurations.defaultEnv = opts.defaultEnv;
+    vi.stubEnv("TRAILS_ENV", opts.defaultEnv);
+  }
   (Base as any).configurations = raw;
   try {
     await fn();
@@ -25,6 +28,7 @@ async function withBaseConfigs(
     (Base as any).configurations = prevConfigs;
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
     (DatabaseConfigurations as any).current = prevCurrent;
+    if (opts.defaultEnv) vi.unstubAllEnvs();
     Base.connectionHandler.clearAllConnectionsBang();
   }
 }

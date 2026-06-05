@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "../base.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { currentRole, currentPreventingWrites } from "../core.js";
@@ -31,6 +31,7 @@ describe("ConnectionSwappingNestedTest", () => {
     prevDefaultEnv = DatabaseConfigurations.defaultEnv;
     prevCurrent = (DatabaseConfigurations as any).current;
     DatabaseConfigurations.defaultEnv = "default_env";
+    vi.stubEnv("TRAILS_ENV", "default_env");
   });
 
   afterEach(() => {
@@ -41,6 +42,7 @@ describe("ConnectionSwappingNestedTest", () => {
     (PrimaryBase as any).connectionClass = false;
     (SecondaryBase as any).connectionClass = false;
     (TertiaryBase as any).connectionClass = false;
+    vi.unstubAllEnvs();
   });
 
   it("roles can be swapped granularly", () => {

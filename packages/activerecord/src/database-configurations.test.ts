@@ -124,7 +124,7 @@ describe("DatabaseConfigurationsTest", () => {
   });
 
   it("resolve returns current-env config when same name exists in multiple envs", () => {
-    DatabaseConfigurations.defaultEnv = "development";
+    // currentEnv()="test" (NODE_ENV=test in vitest), so the test config is returned.
     const configs = new DatabaseConfigurations({
       development: {
         primary: { adapter: "sqlite3", database: "dev.db" },
@@ -134,7 +134,7 @@ describe("DatabaseConfigurationsTest", () => {
       },
     });
     const resolved = configs.resolve("primary");
-    expect(resolved.database).toBe("dev.db");
+    expect(resolved.database).toBe("test.db");
   });
 
   describe("currentEnv resolution", () => {
@@ -168,6 +168,29 @@ describe("DatabaseConfigurationsTest", () => {
       const synthesized = configs.configsFor({ envName: env, name: "primary" });
       expect(env).toBe("production");
       expect(synthesized).toHaveLength(1);
+    });
+
+    it("forCurrentEnv and fromEnv resolve the same env when TRAILS_ENV differs from defaultEnv", () => {
+      // Regression: forCurrentEnv previously used defaultEnv while fromEnv() used
+      // currentEnv(), so findDbConfig by DB name failed when TRAILS_ENV != defaultEnv.
+      DatabaseConfigurations.defaultEnv = "development";
+      vi.stubEnv("TRAILS_ENV", "production");
+
+      const configs = DatabaseConfigurations.fromEnv({
+        production: {
+          primary: { adapter: "sqlite3", database: "prod.db" },
+          animals: { adapter: "sqlite3", database: "prod_animals.db" },
+        },
+      });
+
+      // forCurrentEnv must agree with currentEnv() = "production"
+      const productionConfigs = configs.configsFor({ envName: "production" });
+      expect(productionConfigs.every((c) => c.forCurrentEnv)).toBe(true);
+
+      // findDbConfig by name must locate the production animals config
+      const animalConfig = configs.findDbConfig("animals");
+      expect(animalConfig).toBeDefined();
+      expect(animalConfig!.database).toBe("prod_animals.db");
     });
   });
 

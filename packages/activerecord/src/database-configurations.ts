@@ -485,8 +485,11 @@ DatabaseConfigurations.registerDbConfigHandler((envName, name, url, config) => {
   return new HashConfig(envName, name, config);
 });
 
-// Register the default env getter so DatabaseConfig.forCurrentEnv works
-_setDefaultEnvGetter(() => DatabaseConfigurations.defaultEnv);
+// forCurrentEnv must use the same resolver as fromEnv() so that findDbConfig by
+// DB name locates the config built for the active env. Mirrors Rails:
+// DatabaseConfig#for_current_env? and DatabaseConfigurations#build_configs both
+// call ConnectionHandling::DEFAULT_ENV.call (RAILS_ENV → RACK_ENV → "development").
+_setDefaultEnvGetter(() => DatabaseConfigurations.currentEnv());
 
 // Register the primary checker so HashConfig.isPrimary can consult the
 // current DatabaseConfigurations instance (matching Rails' global Base.configurations).
