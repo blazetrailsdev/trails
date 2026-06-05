@@ -7,6 +7,7 @@ import { Base, Range, defineEnum, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { quoteTableName, quoteColumnName, escapeRegExp } from "../test-helpers/quote-regex.js";
@@ -153,10 +154,9 @@ const SCHEMA: Schema = {
   // "type casting nested joins" uses the canonical comments table (post_id only).
   // posts + authors are already in this schema with author_id / name columns.
   comments: { post_id: "integer" },
-  // "where with through association": canonical categorizations + categories tables.
-  // Table names match association names so associatedTable() skips aliasing.
-  categories: { name: "string" },
-  categorizations: { author_id: "integer", category_id: "integer" },
+  // "where with through association": canonical tables from TEST_SCHEMA.
+  categories: TEST_SCHEMA.categories,
+  categorizations: TEST_SCHEMA.categorizations,
 };
 
 setupHandlerSuite();
