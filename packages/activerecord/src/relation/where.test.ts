@@ -81,6 +81,8 @@ const SCHEMA: Schema = {
   btav_posts: { author_id: "integer" },
   btnr_authors: {},
   btnr_posts: { author_id: "integer" },
+  bnwr_authors: {},
+  bnwr_posts: { author_id: "integer" },
   // wnil_* tables for "where with nil cpk association": wnil_orders uses auto-id
   // + shop_id; wnil_books uses shop_id + order_id as the composite FK.
   // Model-level CPK ["shop_id", "id"] is set on WnilOrder at runtime.
@@ -908,7 +910,7 @@ describe("WhereTest", () => {
     const actual = BnwPost.where({ comments: { parent: parent } }).joins("comments");
     expect(actual.toSql()).toEqual(expected.toSql());
   });
-  it("belongs to nested where with relation", () => {
+  it("belongs to nested where with relation", async () => {
     class BnwrAuthor extends Base {
       static {
         this._tableName = "bnwr_authors";
@@ -924,23 +926,33 @@ describe("WhereTest", () => {
     }
     registerModel("BnwrAuthor", BnwrAuthor);
     registerModel("BnwrPost", BnwrPost);
-    Associations.hasMany.call(BnwrAuthor, "posts", {
+    // Use table name as association name so the WHERE predicate references the real table
+    // column (bnwr_posts.author_id) rather than an alias that the JOIN doesn't expose.
+    Associations.hasMany.call(BnwrAuthor, "bnwr_posts", {
       className: "BnwrPost",
       foreignKey: "author_id",
     });
 
-    const authorId = 1;
+    const author = await BnwrAuthor.create({});
+    const decoy = await BnwrAuthor.create({});
+    await BnwrPost.create({ author_id: author.id });
+    // decoy author has no posts — should not appear in either result
+
     // Rails: expected = Author.where(id: author).joins(:posts)
     // Rails: actual   = Author.where(posts: { author_id: Author.where(id: author.id) }).joins(:posts)
-    // Rails: assert_equal expected.to_a, actual.to_a  (same rows, different SQL)
-    const expected = BnwrAuthor.where({ id: authorId }).joins("posts");
-    const actual = BnwrAuthor.where({
-      posts: { author_id: BnwrAuthor.where({ id: authorId }) },
-    }).joins("posts");
-    // SQL shapes differ: expected uses a scalar id predicate, actual uses a subquery on
-    // the joined table (Rails compares to_a, not to_sql); verify the subquery IS produced
-    expect(actual.toSql()).not.toEqual(expected.toSql());
-    expect(actual.toSql()).toContain("IN (SELECT");
+    // Rails: assert_equal expected.to_a, actual.to_a
+    const expected = await BnwrAuthor.where({ id: author.id }).joins("bnwr_posts").toArray();
+    const actual = await BnwrAuthor.where({
+      bnwr_posts: { author_id: BnwrAuthor.where({ id: author.id }) },
+    })
+      .joins("bnwr_posts")
+      .toArray();
+
+    const expectedIds = expected.map((r: any) => r.id);
+    const actualIds = actual.map((r: any) => r.id);
+    expect(actualIds).toEqual(expectedIds);
+    expect(actualIds).toContain(author.id);
+    expect(actualIds).not.toContain(decoy.id);
   });
   it("polymorphic shallow where", () => {
     class PolyTreasure extends Base {
