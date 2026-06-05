@@ -134,23 +134,25 @@ export class Association {
       _reflectOnAssociation?: (n: string) => unknown;
     };
     const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
+    // Rails' private `@association_scope ||= AssociationScope.scope(self)`
+    // (association.rb:300-307): only the AssociationScope constraints are
+    // memoized; `target_scope` is re-evaluated on each `scope` call so that
+    // enclosing `scoping`/`unscoped` blocks see the right base (association.rb:294-299).
     if (this._cachedScope === undefined) {
-      // Rails' private `association_scope` = memoized AssociationScope.scope(self)
-      const assocScope = AssociationScope.scope({
+      this._cachedScope = AssociationScope.scope({
         owner: this.owner,
         reflection: richReflection as never,
         klass: klass as never,
       });
-      // Rails' public `scope` = target_scope.merge!(association_scope)
-      // (association.rb:116). `targetScope()` is `klass.all` for regular
-      // associations; the HMT override further merges through-chain scopes.
-      const target = this.targetScope();
-      this._cachedScope =
-        target != null && typeof (target as any).merge === "function"
-          ? (target as any).merge(assocScope)
-          : assocScope;
     }
-    return this._cachedScope;
+    // Rails' public `scope` = target_scope.merge!(association_scope)
+    // (association.rb:116). targetScope() is called fresh every time —
+    // not memoized — mirroring Rails' split between the public `scope`
+    // method and the private `@association_scope` ivar.
+    const target = this.targetScope();
+    return target != null && typeof (target as any).merge === "function"
+      ? (target as any).merge(this._cachedScope)
+      : this._cachedScope;
   }
 
   resetScope(): void {
