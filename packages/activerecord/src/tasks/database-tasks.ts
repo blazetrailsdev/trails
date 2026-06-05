@@ -8,7 +8,7 @@ import { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { ProtectedEnvironmentError } from "../migration.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
-import { getFs, getPath, getCryptoAsync, getOs, getEnv } from "@blazetrails/activesupport";
+import { getFs, getPath, getCryptoAsync, getOs, getEnv, stdout } from "@blazetrails/activesupport";
 import { ConnectionNotDefined } from "../errors.js";
 
 /**
@@ -920,13 +920,32 @@ export class DatabaseTasks {
     await this.seedLoader.loadSeed();
   }
 
-  static async migrateStatus(): Promise<
-    Array<{ status: "up" | "down"; version: string; name: string }>
-  > {
-    const adapter = await this._migrationAdapter();
+  static async migrateStatus(): Promise<void> {
+    const { Base } = await import("../base.js");
+    this._baseClass = Base;
+    const pool = Base.connectionPool();
+    const adapter = pool.leaseConnection();
     const { Migrator } = await import("../migration.js");
     const migrator = new Migrator(adapter, this._migrations);
-    return migrator.migrationsStatus();
+    // Mirrors database_tasks.rb:302-305: abort unless schema_migrations exists.
+    if (!(await migrator.schemaMigrationTableExists())) {
+      throw new Error("Schema migrations table does not exist yet.");
+    }
+    const rows = await migrator.migrationsStatus();
+    const dbName = pool.dbConfig.database ?? ":memory:";
+    const center = (s: string, w: number) => {
+      const pad = w - s.length;
+      const left = Math.floor(pad / 2);
+      return " ".repeat(left) + s + " ".repeat(pad - left);
+    };
+    const puts = (s: string) => stdout.write(s + "\n");
+    puts(`\ndatabase: ${dbName}\n`);
+    puts(`${center("Status", 8)}  ${"Migration ID".padEnd(14)}  Migration Name`);
+    puts("-".repeat(50));
+    for (const row of rows) {
+      puts(`${center(row.status, 8)}  ${row.version.padEnd(14)}  ${row.name}`);
+    }
+    puts("");
   }
 
   /**

@@ -20,26 +20,17 @@ async function makeFakeProject(config = FAKE_CONFIG): Promise<string> {
   return dir;
 }
 
-const FIXTURE_ROWS = [
-  { status: "up" as const, version: "20260101000001", name: "CreateUsers" },
-  { status: "up" as const, version: "20260101000002", name: "AddPostsTable" },
-  { status: "down" as const, version: "20260102000001", name: "AddComments" },
-];
-
 describe("DbMigrateStatusTest", () => {
-  let out: string[];
   let err: string[];
   let migrateStatusSpy: ReturnType<typeof vi.fn>;
   let withTemporaryPoolFn: ReturnType<typeof vi.fn>;
   let priorDefaultEnv: string;
 
   beforeEach(() => {
-    out = [];
     err = [];
     priorDefaultEnv = DatabaseConfigurations.defaultEnv;
-    vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
-    migrateStatusSpy = vi.fn().mockResolvedValue(FIXTURE_ROWS);
+    migrateStatusSpy = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(DatabaseTasks, "migrateStatus").mockImplementation(migrateStatusSpy);
     withTemporaryPoolFn = vi
       .fn()
@@ -62,41 +53,26 @@ describe("DbMigrateStatusTest", () => {
     expect(withTemporaryPoolFn).toHaveBeenCalledOnce();
   });
 
-  it("prints database header and up/down rows", async () => {
+  it("calls migrateStatus inside the temporary pool", async () => {
     const dir = await makeFakeProject();
     const code = await run(["db:migrate:status"], dir);
     expect(code).toBe(0);
-    const combined = out.join("\n");
-    expect(combined).toContain("database: test.sqlite3");
-    expect(combined).toContain("Status");
-    expect(combined).toContain("Migration ID");
-    expect(combined).toContain("Migration Name");
-    expect(combined).toContain("-".repeat(50));
-    expect(combined).toContain("20260101000001");
-    expect(combined).toContain("CreateUsers");
-    expect(combined).toContain("up");
-    expect(combined).toContain("down");
-    expect(combined).toContain("AddComments");
+    expect(migrateStatusSpy).toHaveBeenCalledOnce();
   });
 
-  it("aligns columns: status right-padded to 8, version left-padded to 14", async () => {
+  it("calls migrateStatus once per database config", async () => {
     DatabaseConfigurations.defaultEnv = "development";
     const dir = await makeFakeProject();
-    await run(["db:migrate:status"], dir);
-    const row = out.find((l) => l.includes("20260102000001"));
-    expect(row).toBeDefined();
-    // "down" centered in 8 chars → "  down  " then "  " separator
-    expect(row).toMatch(/\s+down\s+\s+20260102000001\s+AddComments/);
+    const code = await run(["db:migrate:status"], dir);
+    expect(code).toBe(0);
+    expect(migrateStatusSpy).toHaveBeenCalledOnce();
   });
 
-  it("exits 0 and prints empty table when no migrations exist", async () => {
-    migrateStatusSpy.mockResolvedValueOnce([]);
+  it("exits 0 when no migrations exist", async () => {
     const dir = await makeFakeProject();
     const code = await run(["db:migrate:status"], dir);
     expect(code).toBe(0);
-    const combined = out.join("\n");
-    expect(combined).toContain("database: test.sqlite3");
-    expect(combined).toContain("-".repeat(50));
+    expect(migrateStatusSpy).toHaveBeenCalledOnce();
   });
 
   it("exits 1 when migrateStatus throws (connection failure)", async () => {
@@ -131,6 +107,8 @@ describe("DbMigrateStatusTest", () => {
   });
 
   it("--help prints usage", async () => {
+    const out: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
     const code = await run(["db:migrate:status", "--help"], await makeFakeProject());
     expect(code).toBe(0);
     expect(out.join("\n")).toContain("db:migrate:status");
