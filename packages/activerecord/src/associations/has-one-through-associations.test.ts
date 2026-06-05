@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/associations/has_one_through_associations_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import {
@@ -129,9 +129,6 @@ const TEST_SCHEMA = {
   ds_authors: { name: "string" },
   ds_posts: { author_id: "integer", title: "string" },
   ds_comments: { post_id: "integer", body: "string" },
-  css_clubs: { name: "string" },
-  css_memberships: { member_id: "integer", club_id: "integer" },
-  css_members: { name: "string" },
   cc_customers: {},
   cc_carriers: {},
   cc_customer_carriers: { customer_id: "integer", carrier_id: "integer" },
@@ -162,15 +159,29 @@ describe("HasOneThroughAssociationsTest", () => {
     }
   }
 
+  // Mirrors Rails' SelectedMembership (membership.rb): STI subclass of Membership
+  // with a default_scope that strips the SELECT so the JOIN-based through query
+  // works correctly only when throughTargetScope strips :select (Rails behaviour).
+  class SelectedMembership extends Membership {
+    static {
+      this.defaultScope((rel: any) => rel.select("'1' as foo"));
+      this.belongsTo("club", { className: "Club", foreignKey: "club_id" });
+    }
+  }
+
   beforeAll(async () => {
     await defineSchema(TEST_SCHEMA);
     registerModel(Club);
+    enableSti(Membership);
     registerModel(Membership);
     registerModel(Member);
+    registerModel(SelectedMembership);
+    registerSubclass(SelectedMembership);
     // Set up associations: Member has_one :membership, has_one :club through :membership
     (Member as any)._associations = [];
     (Membership as any)._associations = [];
     (Club as any)._associations = [];
+    (SelectedMembership as any)._associations = [];
     Associations.hasOne.call(Member, "membership", {
       className: "Membership",
       foreignKey: "member_id",
@@ -181,12 +192,24 @@ describe("HasOneThroughAssociationsTest", () => {
       through: "membership",
       source: "club",
     });
+    Associations.hasOne.call(Member, "selectedMembership", {
+      className: "SelectedMembership",
+      foreignKey: "member_id",
+    });
+    Associations.hasOne.call(Member, "selectedClub", {
+      className: "Club",
+      through: "selectedMembership",
+      source: "club",
+    });
     Associations.belongsTo.call(Membership, "member", {
       className: "Member",
       foreignKey: "member_id",
     });
-
     Associations.belongsTo.call(Membership, "club", { className: "Club", foreignKey: "club_id" });
+    Associations.belongsTo.call(SelectedMembership, "club", {
+      className: "Club",
+      foreignKey: "club_id",
+    });
   });
 
   it("has one through with has one", async () => {
@@ -1383,39 +1406,9 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it("has one through with custom select on join model default scope", async () => {
-    class CssClub extends Base {
-      static {
-        this._tableName = "css_clubs";
-        this.attribute("name", "string");
-      }
-    }
-    class CssMembership extends Base {
-      static {
-        this._tableName = "css_memberships";
-        this.attribute("member_id", "integer");
-        this.attribute("club_id", "integer");
-        this.defaultScope((rel: any) => rel.select("'1' as foo"));
-        this.belongsTo("club", { className: "CssClub", foreignKey: "club_id" });
-      }
-    }
-    class CssMember extends Base {
-      static {
-        this._tableName = "css_members";
-        this.attribute("name", "string");
-        this.hasOne("selectedMembership", { className: "CssMembership", foreignKey: "member_id" });
-        this.hasOne("selectedClub", {
-          className: "CssClub",
-          through: "selectedMembership",
-          source: "club",
-        });
-      }
-    }
-    registerModel("CssClub", CssClub);
-    registerModel("CssMembership", CssMembership);
-    registerModel("CssMember", CssMember);
-    const boringClub = await CssClub.create({ name: "Boring Club" });
-    const groucho = await CssMember.create({ name: "Groucho" });
-    await CssMembership.create({ member_id: groucho.id, club_id: boringClub.id });
+    const boringClub = await Club.create({ name: "Boring Club" });
+    const groucho = await Member.create({ name: "Groucho" });
+    await SelectedMembership.create({ member_id: groucho.id, club_id: boringClub.id });
 
     const selectedClub = await groucho.association("selectedClub").loadTarget();
     expect((selectedClub as any)?.name).toBe("Boring Club");

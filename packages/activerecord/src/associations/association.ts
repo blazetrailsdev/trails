@@ -3,6 +3,7 @@ import type { AssociationDefinition, AssociationOptions } from "../associations.
 import { resolveModel } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { ScopeRegistry } from "../scoping.js";
+import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateThroughReflection } from "./validate-through-reflection.js";
 import { camelize, singularize, underscore } from "@blazetrails/activesupport";
 import { AssociationTypeMismatch } from "../errors.js";
@@ -98,48 +99,35 @@ export class Association {
   }
 
   /**
-   * Mirrors Rails' `Association#scope` (association.rb:107-117) for the branches
-   * reachable given two architectural constraints in this codebase.
+   * Mirrors Rails' `Association#scope` (association.rb:107-117).
    *
-   * **Implemented:**
-   * - Branch 2 — `klass.current_scope.proxyAssociation === this`: structurally
-   *   present; returns `currentScope.spawn()` when the condition holds.
-   *   Currently unreachable because `CollectionProxy.scoping()` (which would
-   *   set an `AssociationRelation` as `klass.currentScope`) does not yet exist.
-   * - Branch 3 — `global_current_scope`: merges `ScopeRegistry.globalCurrentScope`.
-   * - Branch 4 — else: `targetScope().merge(association_scope)`.
-   * - Cache split: only the `AssociationScope.scope` result is memoized in
-   *   `_cachedScope` (Rails' `@association_scope`); `targetScope()` and the
-   *   current-scope branches are re-evaluated every call (association.rb:294-307).
+   * Four branches, in order:
+   * 1. `disable_joins`: delegate to `DisableJoinsAssociationScope` via a
+   *    late-binding slot (populated when DJAS is first loaded; avoids the
+   *    TDZ cycle DJAS→DJAR→relation.ts→associations.ts→association.ts).
+   * 2. `klass.current_scope.proxyAssociation === this`: spawn the current
+   *    scope (fires only inside a CollectionProxy.scoping block — not yet
+   *    implemented, so this branch is structurally present but unreachable).
+   * 3. `global_current_scope` present: merge it into the result.
+   * 4. else: `targetScope().merge!(association_scope)`.
    *
-   * **Deferred — branch 1 (disable_joins):** `DisableJoinsAssociationScope` is
-   *   loaded lazily via `await import(...)` in `associations.ts` to avoid a TDZ
-   *   cycle (`DJAS → DJAR → relation.ts → associations.ts`). Importing it
-   *   statically here shifts initialization order and crashes the builder
-   *   hierarchy (`TypeError: Class extends value undefined`). The loaders detect
-   *   `disableJoins` early and call `_loadThroughViaDisableJoinsScope` directly,
-   *   so this path is never reached via the normal load pipeline.
+   * Cache: only the `AssociationScope.scope` result is memoized in
+   * `_cachedScope` (Rails' `@association_scope`); `targetScope()` and
+   * current-scope branches are re-evaluated each call (association.rb:294-307).
    */
   scope(): any {
-    // Mirror Rails' `if klass` guard (association.rb:301): polymorphic
-    // belongs_to with a blank type column has no resolvable target
-    // class. Return undefined and skip caching so the next access
-    // (after the type column is set) builds a fresh scope.
     const klass = this.klass as typeof Base | undefined;
     if (!klass) return undefined;
-    // `this.reflection` here is the lightweight AssociationDefinition
-    // attached at macro time. AssociationScope needs the rich
-    // Reflection (with `chain`, `joinPrimaryKey`, etc.) that lives on
-    // the model class via `_reflectOnAssociation(name)`. Resolve once
-    // per call — the result is small and the cache stores the BUILT
-    // scope, not the reflection.
     const ctor = this.owner.constructor as typeof Base & {
       _reflectOnAssociation?: (n: string) => unknown;
     };
     const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
-    // Rails' private `@association_scope ||= AssociationScope.scope(self)`
-    // (association.rb:300-307): only the JOIN-based constraints are memoized;
-    // `target_scope` and `global_current_scope` are re-evaluated each call.
+    // Branch 1: disable_joins — delegate to DisableJoinsAssociationScope.
+    if (this.disableJoins) {
+      const djas = getDjasScopeBuilder();
+      if (djas) return djas({ owner: this.owner, reflection: richReflection, klass });
+    }
+    // Memoize @association_scope (JOIN-based constraints only).
     if (this._cachedScope === undefined) {
       this._cachedScope = AssociationScope.scope({
         owner: this.owner,
@@ -147,17 +135,16 @@ export class Association {
         klass: klass as never,
       });
     }
-    // Branch 2: if klass.current_scope.proxy_association == self, spawn it
-    // (association.rb:110-111). The comparison fires only when CollectionProxy
-    // sets itself as klass.currentScope inside a scoping block (not yet
-    // implemented), so this branch is currently a structural no-op.
+    // Branch 2: klass.current_scope.proxy_association == self.
+    // Fires when CollectionProxy.scoping sets an AssociationRelation as
+    // klass.currentScope; not yet implemented, so this is unreachable.
     const currentScope = (klass as any).currentScope;
     if (currentScope && (currentScope as any).proxyAssociation === this) {
       return typeof (currentScope as any).spawn === "function"
         ? (currentScope as any).spawn()
         : currentScope;
     }
-    // Branches 3 + 4: target_scope.merge!(association_scope)[.merge!(global_scope)]
+    // Branches 3 + 4.
     const target = this.targetScope();
     const base =
       target != null && typeof (target as any).merge === "function"
@@ -530,8 +517,27 @@ export class Association {
    *
    * @internal
    */
+  /**
+   * Mirrors Rails' `Association#target_scope` (association.rb:310-314):
+   *
+   *   AssociationRelation.create(klass, self)
+   *     .merge!(klass.scope_for_association)
+   *
+   * Returns an `AssociationRelation` bound to `this` association so that
+   * `klass.current_scope.proxyAssociation === this` (branch 2 of `scope()`)
+   * can hold when a future `CollectionProxy.scoping` implementation sets the
+   * AR as the class-level current scope. Falls back to `scopeForAssociation()`
+   * when the AR factory slot has not been populated yet (should not occur in
+   * normal flow since `initializeAssociations()` loads it at startup).
+   */
   protected targetScope(): any {
-    return (this.klass as any)?.scopeForAssociation?.() ?? null;
+    const klass = this.klass as typeof Base | undefined;
+    if (!klass) return null;
+    const sfa = (klass as any).scopeForAssociation?.() ?? null;
+    const arFactory = getAssociationRelationFactory();
+    if (!arFactory) return sfa;
+    const ar = arFactory(klass, this);
+    return sfa ? (ar as any).merge(sfa) : ar;
   }
 
   /** @internal */
