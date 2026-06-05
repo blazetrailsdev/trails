@@ -98,31 +98,27 @@ export class Association {
   }
 
   /**
-   * Implements Rails' `Association#scope` (association.rb:107-117) for the
-   * branches reachable without circular-initialization constraints.
+   * Mirrors Rails' `Association#scope` (association.rb:107-117) for the branches
+   * reachable given two architectural constraints in this codebase.
    *
    * **Implemented:**
-   * - Branch 3 — `global_current_scope`: merges `ScopeRegistry.globalCurrentScope`
-   *   after `target_scope.merge!(association_scope)`.
+   * - Branch 2 — `klass.current_scope.proxyAssociation === this`: structurally
+   *   present; returns `currentScope.spawn()` when the condition holds.
+   *   Currently unreachable because `CollectionProxy.scoping()` (which would
+   *   set an `AssociationRelation` as `klass.currentScope`) does not yet exist.
+   * - Branch 3 — `global_current_scope`: merges `ScopeRegistry.globalCurrentScope`.
    * - Branch 4 — else: `targetScope().merge(association_scope)`.
    * - Cache split: only the `AssociationScope.scope` result is memoized in
-   *   `_cachedScope` (Rails' `@association_scope`); `targetScope()` and
-   *   `globalCurrentScope` are re-evaluated on every call (association.rb:294-307).
+   *   `_cachedScope` (Rails' `@association_scope`); `targetScope()` and the
+   *   current-scope branches are re-evaluated every call (association.rb:294-307).
    *
-   * **Deferred — branch 1 (disable_joins):** `DisableJoinsAssociationScope`
-   *   cannot be imported here — `association.ts` is loaded before `relation.ts`
-   *   finishes initializing (the chain `association.ts → DJAS → DJAR → relation.ts
-   *   → associations.ts → association.ts` causes a TDZ). The loaders detect
-   *   `disableJoins` early and route to `_loadThroughViaDisableJoinsScope`, so
-   *   this path is never reached via the normal load pipeline; a direct
-   *   `assoc.scope()` call on a disable-joins instance returns the JOIN-based
-   *   scope rather than a DJAS relation.
-   *
-   * **Deferred — branch 2 (proxy_association == self):** Requires two pieces of
-   *   infrastructure not yet present: `CollectionProxy.scoping()` (to set
-   *   `klass.currentScope` to an `AssociationRelation` inside a block) and
-   *   `AssociationRelation.proxyAssociation` returning the `Association` instance
-   *   rather than the `CollectionProxy` wrapper — currently unreachable.
+   * **Deferred — branch 1 (disable_joins):** `DisableJoinsAssociationScope` is
+   *   loaded lazily via `await import(...)` in `associations.ts` to avoid a TDZ
+   *   cycle (`DJAS → DJAR → relation.ts → associations.ts`). Importing it
+   *   statically here shifts initialization order and crashes the builder
+   *   hierarchy (`TypeError: Class extends value undefined`). The loaders detect
+   *   `disableJoins` early and call `_loadThroughViaDisableJoinsScope` directly,
+   *   so this path is never reached via the normal load pipeline.
    */
   scope(): any {
     // Mirror Rails' `if klass` guard (association.rb:301): polymorphic
@@ -150,6 +146,16 @@ export class Association {
         reflection: richReflection as never,
         klass: klass as never,
       });
+    }
+    // Branch 2: if klass.current_scope.proxy_association == self, spawn it
+    // (association.rb:110-111). The comparison fires only when CollectionProxy
+    // sets itself as klass.currentScope inside a scoping block (not yet
+    // implemented), so this branch is currently a structural no-op.
+    const currentScope = (klass as any).currentScope;
+    if (currentScope && (currentScope as any).proxyAssociation === this) {
+      return typeof (currentScope as any).spawn === "function"
+        ? (currentScope as any).spawn()
+        : currentScope;
     }
     // Branches 3 + 4: target_scope.merge!(association_scope)[.merge!(global_scope)]
     const target = this.targetScope();
