@@ -2375,11 +2375,52 @@ describe("WhereTest", () => {
     expect(found.map((c) => c.id)).toStrictEqual([comment.id]);
   });
 
-  it.skip("where with through association", async () => {
-    // BLOCKED: where(table: modelInstance) on a joined-through table not yet implemented.
+  it("where with through association", async () => {
+    class WtaAuthor extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("name", "string");
+      }
+    }
+    class WtaPost extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("author_id", "integer");
+      }
+    }
+    class WtaComment extends Base {
+      static {
+        this._tableName = "comments";
+        this.attribute("post_id", "integer");
+      }
+    }
+    registerModel("WtaAuthor", WtaAuthor);
+    registerModel("WtaPost", WtaPost);
+    registerModel("WtaComment", WtaComment);
+    Associations.hasMany.call(WtaAuthor, "posts", {
+      className: "WtaPost",
+      foreignKey: "author_id",
+    });
+    Associations.hasMany.call(WtaPost, "comments", {
+      className: "WtaComment",
+      foreignKey: "post_id",
+    });
+    // Rails: Author has_many :comments, through: :posts
+    Associations.hasMany.call(WtaAuthor, "comments", {
+      className: "WtaComment",
+      through: "posts",
+    });
+
+    const author1 = await WtaAuthor.create({ name: "David" });
+    const author2 = await WtaAuthor.create({ name: "Bob" });
+    const post1 = await WtaPost.create({ author_id: author1.id });
+    await WtaPost.create({ author_id: author2.id });
+    const greetings = await WtaComment.create({ post_id: post1.id });
+
     // Rails: Author.joins(:comments).where(comments: comments(:greetings))
-    // Needs: whereClauseFor to handle table-name key + model-instance value by
-    // generating WHERE table.pk = ? using the instance's primary key.
+    // Generates: WHERE comments.id = ? using the instance's primary key.
+    const result = await WtaAuthor.joins("comments").where({ comments: greetings }).toArray();
+    expect(result.map((a) => a.id)).toStrictEqual([author1.id]);
   });
 
   it("polymorphic nested array where", async () => {
