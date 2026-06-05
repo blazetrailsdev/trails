@@ -16,6 +16,7 @@ import expectedFixtures from "./eslint/expected-fixtures.mjs";
 import manifestComplete from "./eslint/manifest-complete.mjs";
 import testFixtureParity from "./eslint/test-fixture-parity.mjs";
 import useFixturesSchema from "./eslint/use-fixtures-schema.mjs";
+import requireCanonicalSchema from "./eslint/require-canonical-schema.mjs";
 
 export default defineConfig(
   {
@@ -118,6 +119,7 @@ export default defineConfig(
           "expected-fixtures": expectedFixtures,
           "test-fixture-parity": testFixtureParity,
           "use-fixtures-schema": useFixturesSchema,
+          "require-canonical-schema": requireCanonicalSchema,
           // Off by default — opt in per project (see eslint/manifest-complete.mjs).
           "manifest-complete": manifestComplete,
         },
@@ -257,6 +259,20 @@ export default defineConfig(
     ignores: ["packages/activerecord/src/test-helpers/**"],
     rules: {
       "blazetrails/use-fixtures-schema": "warn",
+    },
+  },
+
+  // ── require-canonical-schema: tables passed to defineSchema() must
+  //    reference the canonical TEST_SCHEMA rather than being re-declared
+  //    inline. Keeps per-worker tables structurally identical and avoids
+  //    shared-DB shape collisions under parallel forks. ──
+  {
+    // test-helpers/ tests exercise defineSchema itself and intentionally pass
+    // inline schemas as part of the infrastructure test surface.
+    files: ["packages/activerecord/src/**/*.test.ts"],
+    ignores: ["packages/activerecord/src/test-helpers/**"],
+    rules: {
+      "blazetrails/require-canonical-schema": "error",
     },
   },
 
