@@ -150,6 +150,9 @@ const SCHEMA: Schema = {
     },
     primaryKey: ["shop_id", "number"],
   },
+  // "type casting nested joins" uses the canonical comments table (post_id only).
+  // posts + authors are already in this schema with author_id / name columns.
+  comments: { post_id: "integer" },
 };
 
 setupHandlerSuite();
@@ -2335,11 +2338,41 @@ describe("WhereTest", () => {
     expect(found.length).toBe(1);
   });
 
-  it.skip("type casting nested joins", () => {
-    // BLOCKED: joins({post: "author"}) nested hash join syntax not yet implemented.
-    // Rails: Comment.joins(post: :author).where(authors: {id: "2-foo"}) — type-casts
-    // the string "2-foo" to integer 2 for an integer PK column.
-    // Needs: Relation#joins to accept nested association hash like Rails joins(post: :author).
+  it("type casting nested joins", async () => {
+    class TcnjAuthor extends Base {
+      static {
+        this._tableName = "authors";
+      }
+    }
+    class TcnjPost extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("author_id", "integer");
+      }
+    }
+    class TcnjComment extends Base {
+      static {
+        this._tableName = "comments";
+        this.attribute("post_id", "integer");
+      }
+    }
+    registerModel("TcnjAuthor", TcnjAuthor);
+    registerModel("TcnjPost", TcnjPost);
+    registerModel("TcnjComment", TcnjComment);
+    Associations.belongsTo.call(TcnjPost, "author", { className: "TcnjAuthor" });
+    Associations.belongsTo.call(TcnjComment, "post", { className: "TcnjPost" });
+
+    const author = await TcnjAuthor.create({});
+    const otherAuthor = await TcnjAuthor.create({});
+    const post = await TcnjPost.create({ author_id: author.id });
+    const otherPost = await TcnjPost.create({ author_id: otherAuthor.id });
+    const comment = await TcnjComment.create({ post_id: post.id });
+    await TcnjComment.create({ post_id: otherPost.id });
+
+    const found = await TcnjComment.joins({ post: "author" })
+      .where({ authors: { id: `${author.id}-foo` } })
+      .toArray();
+    expect(found.map((c) => c.id)).toStrictEqual([comment.id]);
   });
 
   it.skip("where with through association", async () => {

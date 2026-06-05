@@ -28,6 +28,7 @@ import {
   camelize as _camelize,
   singularize as _singularize,
   pluralize as _pluralize,
+  isPlainObject as _isPlainObject,
 } from "@blazetrails/activesupport";
 
 import { Range } from "./connection-adapters/postgresql/oid/range.js";
@@ -1352,13 +1353,28 @@ export class Relation<T extends Base> {
    * - Any mix of the above as variadic args
    *
    * Mirrors: ActiveRecord::Relation#joins — Rails' `joins(*args)` is variadic
-   * and accepts strings, symbol association names, or Arel join nodes.
+   * and accepts strings, symbol association names, Arel join nodes, or a nested
+   * association hash like `joins({ post: "author" })` (mirrors Rails
+   * `joins(post: :author)`).
    */
   joins(tableOrSql?: string, on?: string): Relation<T>;
   joins(...nodes: Nodes.Join[]): Relation<T>;
   joins(stringArray: string[]): Relation<T>;
-  joins(...args: Array<string | string[] | Nodes.Join>): Relation<T>;
-  joins(...args: Array<string | string[] | Nodes.Join | undefined>): Relation<T> {
+  joins(hashSpec: Record<string, AssociationSpec | AssociationSpec[]>): Relation<T>;
+  joins(
+    ...args: Array<
+      string | string[] | Nodes.Join | Record<string, AssociationSpec | AssociationSpec[]>
+    >
+  ): Relation<T>;
+  joins(
+    ...args: Array<
+      | string
+      | string[]
+      | Nodes.Join
+      | Record<string, AssociationSpec | AssociationSpec[]>
+      | undefined
+    >
+  ): Relation<T> {
     const rel = this._clone();
     // Two-string-argument form: joins(table, onClause) — a trails-only
     // extension preserved for back-compat. Rails has no such form: it
@@ -1379,7 +1395,9 @@ export class Relation<T extends Base> {
       rel._joinClauses.push({ type: "inner", table: args[0], on: args[1] });
       return rel;
     }
-    // Flatten string arrays: joins(["str1", "str2"]) mirrors Rails array form
+    // Flatten string arrays: joins(["str1", "str2"]) mirrors Rails array form.
+    // Plain objects are kept as-is (not array-flattened) so { post: "author" }
+    // survives the flatMap step.
     const flatArgs = args.flatMap((a) => (Array.isArray(a) ? a : [a]));
     for (const arg of flatArgs) {
       if (!arg) continue;
@@ -1388,6 +1406,14 @@ export class Relation<T extends Base> {
       // nodes and string equality for strings. JS === matches both behaviours.
       if (arg instanceof Nodes.Join) {
         if (!rel._joinValues.includes(arg)) rel._joinValues.push(arg);
+        continue;
+      }
+      // Nested association hash: joins({ post: "author" }) mirrors Rails
+      // joins(post: :author). Route through JoinDependency (InnerJoin) so the
+      // full nested chain is resolved — constructJoinDependency already walks
+      // AssociationSpec trees via walkAssociationTree/addTreeToJoinDependency.
+      if (_isPlainObject(arg)) {
+        rel._namedInnerJoins.push(arg as AssociationSpec);
         continue;
       }
       // Nested-through chains that reference a table more than once (e.g. a
@@ -1399,14 +1425,14 @@ export class Relation<T extends Base> {
         if (!rel._namedInnerJoins.includes(arg)) rel._namedInnerJoins.push(arg);
         continue;
       }
-      const resolved = rel._resolveAssociationJoin(arg);
+      const resolved = rel._resolveAssociationJoin(arg as string);
       if (resolved) {
         const entries = Array.isArray(resolved) ? resolved : [resolved];
         for (const j of entries) {
           rel._joinClauses.push({ type: "inner", table: j.table, on: j.on, quoted: true });
         }
       } else {
-        if (!rel._joinValues.includes(arg)) rel._joinValues.push(arg);
+        if (!rel._joinValues.includes(arg as string)) rel._joinValues.push(arg as string);
       }
     }
     return rel;
