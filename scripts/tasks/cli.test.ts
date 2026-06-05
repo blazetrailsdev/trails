@@ -348,4 +348,30 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(seen.filter((l) => l === "reset").length).toBe(0);
     expect(errSpy.mock.calls.at(-1)?.[0]).toMatch(/Authentication failed/);
   });
+
+  // refine commits in an agent worktree (on a feature branch) and must push
+  // HEAD:main and run git in that worktree, not the canonical checkout.
+  it("honors cwd and pushRefspec overrides (the refine path)", () => {
+    setup();
+    const fullArgs: string[][] = [];
+    execFileSyncMock.mockImplementation((_file, args) => {
+      fullArgs.push(args ?? []);
+      return "" as never;
+    });
+    commitAndPush({
+      message: "refine: story-x",
+      fileToStage: "/wt/story.md",
+      mutator: () => {},
+      raceMessage: "no",
+      raceExitCode: 4,
+      cwd: "/wt",
+      pushRefspec: "HEAD:main",
+    });
+    // Every git call targets the worktree via `-C /wt`.
+    for (const a of fullArgs) {
+      expect(a.slice(0, 2)).toEqual(["-C", "/wt"]);
+    }
+    const push = fullArgs.find((a) => a[2] === "push");
+    expect(push).toEqual(["-C", "/wt", "push", "--quiet", "origin", "HEAD:main"]);
+  });
 });
