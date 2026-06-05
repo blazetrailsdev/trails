@@ -244,16 +244,14 @@ export async function _createRecord(this: any): Promise<boolean> {
       }
     }
     if (!this._performInsert) throw new Error("_performInsert not implemented");
-    await this._performInsert();
-    if (this._pendingOperation) {
-      await this._pendingOperation;
-      this._pendingOperation = null;
-    }
-    this._previouslyNewRecord = true;
-    this._newRecord = false;
-    // Reinstate constructor-assigned attrs as dirty vs schema defaults so
-    // they appear in saved_changes / previous_changes after INSERT.
-    // PK: already tracked via _writeAttribute(pk, insertedId) in _performInsert.
+    // Reinstate constructor-assigned attrs as dirty vs schema defaults BEFORE the
+    // insert. Rails new records are dirty from construction, so partial_inserts'
+    // `attribute_names & changed_attribute_names_to_save` (attributesForCreate)
+    // correctly includes attrs the user set to a non-default value — e.g. an
+    // hstore column with a DB default of "" that was assigned {key: null}.
+    // Running this after the insert would leave the dirty set empty at column-
+    // selection time and wrongly drop such columns. PK is skipped: it's null
+    // pre-insert and tracked via _writeAttribute(pk, insertedId) in _performInsert.
     const _pk = ctor.primaryKey;
     const _pkSet = new Set(Array.isArray(_pk) ? _pk : [_pk]);
     this._dirty.reinstateNewRecordChanges(
@@ -261,6 +259,13 @@ export async function _createRecord(this: any): Promise<boolean> {
       ctor._defaultAttributes().snapshotValues(),
       _pkSet,
     );
+    await this._performInsert();
+    if (this._pendingOperation) {
+      await this._pendingOperation;
+      this._pendingOperation = null;
+    }
+    this._previouslyNewRecord = true;
+    this._newRecord = false;
     this.changesApplied();
   });
 }

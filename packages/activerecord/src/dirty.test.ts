@@ -53,14 +53,11 @@ type Rec = Base & Record<string, unknown>;
  */
 const call = <T>(recv: object, name: string): T => (recv as Record<string, () => T>)[name]();
 
-// A few tests below pass on SQLite + MySQL but expose adapter-specific
-// dirty-tracking gaps on PostgreSQL: (a) a datetime attribute on an anonymous
-// reflected class (`Class.new { table_name = "topics" }`) reads back `undefined`
-// after create on PG, and (b) the save-managed columns (id/timestamps) aren't
-// recorded in `saved_changes` after an INSERT on PG, so `saved_changes?` /
-// `changed?` come back empty. They're gated with
-// `it.skipIf(adapterType === "postgres")` — the inline form `test:compare`'s
-// gate extractor recognizes — keeping SQLite/MySQL coverage.
+// Two datetime tests below pass on SQLite + MySQL but expose a PostgreSQL-only
+// dirty-tracking gap: a datetime attribute on an anonymous reflected class
+// (`Class.new { table_name = "topics" }`) reads back `undefined` after create on
+// PG. They're gated with `it.skipIf(adapterType === "postgres")` — the form
+// `test:compare`'s gate extractor recognizes — keeping SQLite/MySQL coverage.
 
 /** Mirrors Rails' private `with_partial_writes(klass, on = true)`. */
 async function withPartialWrites(
@@ -582,7 +579,7 @@ describe("DirtyTest", () => {
     // array-of-hashes value survives `changes_to_save` unmutated.
   });
 
-  it.skipIf(adapterType === "postgres")("previous changes", async () => {
+  it("previous changes", async () => {
     let pirate = new Pirate() as Rec;
     expect(pirate.previousChanges).toEqual({});
     pirate.catchphrase = "arrr";
@@ -624,6 +621,42 @@ describe("DirtyTest", () => {
     expect(pirate.attributePreviouslyWas("catchphrase")).toBe("arrr");
     expect(pirate.previousChanges["updated_on"][0]).not.toBeNull();
     expect(pirate.previousChanges["updated_on"][1]).not.toBeNull();
+    expect(pirate.previousChanges).not.toHaveProperty("parrot_id");
+    expect(pirate.previousChanges).not.toHaveProperty("created_on");
+
+    pirate = (await Pirate.findBy({ catchphrase: "Me Maties!" })) as Rec;
+    pirate.catchphrase = "Thar She Blows!";
+    await (pirate as unknown as Pirate).save();
+
+    expect(Object.keys(pirate.previousChanges)).toHaveLength(2);
+    expect(pirate.previousChanges["catchphrase"]).toEqual(["Me Maties!", "Thar She Blows!"]);
+    expect(pirate.attributePreviouslyWas("catchphrase")).toBe("Me Maties!");
+    expect(pirate.previousChanges["updated_on"][0]).not.toBeNull();
+    expect(pirate.previousChanges["updated_on"][1]).not.toBeNull();
+    expect(pirate.previousChanges).not.toHaveProperty("parrot_id");
+    expect(pirate.previousChanges).not.toHaveProperty("created_on");
+
+    pirate = (await Pirate.findBy({ catchphrase: "Thar She Blows!" })) as Rec;
+    await (pirate as unknown as Pirate).update({ catchphrase: "Ahoy!" });
+
+    expect(Object.keys(pirate.previousChanges)).toHaveLength(2);
+    expect(pirate.previousChanges["catchphrase"]).toEqual(["Thar She Blows!", "Ahoy!"]);
+    expect(pirate.attributePreviouslyWas("catchphrase")).toBe("Thar She Blows!");
+    expect(pirate.previousChanges["updated_on"][0]).not.toBeNull();
+    expect(pirate.previousChanges["updated_on"][1]).not.toBeNull();
+    expect(pirate.previousChanges).not.toHaveProperty("parrot_id");
+    expect(pirate.previousChanges).not.toHaveProperty("created_on");
+
+    pirate = (await Pirate.findBy({ catchphrase: "Ahoy!" })) as Rec;
+    await (pirate as unknown as Pirate).updateAttribute("catchphrase", "Ninjas suck!");
+
+    expect(Object.keys(pirate.previousChanges)).toHaveLength(2);
+    expect(pirate.previousChanges["catchphrase"]).toEqual(["Ahoy!", "Ninjas suck!"]);
+    expect(pirate.attributePreviouslyWas("catchphrase")).toBe("Ahoy!");
+    expect(pirate.previousChanges["updated_on"][0]).not.toBeNull();
+    expect(pirate.previousChanges["updated_on"][1]).not.toBeNull();
+    expect(pirate.previousChanges).not.toHaveProperty("parrot_id");
+    expect(pirate.previousChanges).not.toHaveProperty("created_on");
   });
 
   it.skip("field named field", () => {
@@ -741,19 +774,16 @@ describe("DirtyTest", () => {
     // No per-instance method override in JS.
   });
 
-  it.skipIf(adapterType === "postgres")(
-    "attributes assigned but not selected are dirty",
-    async () => {
-      const person = (await Person.select("id").first()) as Rec;
-      expect(person.changed).toBe(false);
+  it("attributes assigned but not selected are dirty", async () => {
+    const person = (await Person.select("id").first()) as Rec;
+    expect(person.changed).toBe(false);
 
-      person.first_name = "Sean";
-      expect(person.changed).toBe(true);
+    person.first_name = "Sean";
+    expect(person.changed).toBe(true);
 
-      person.first_name = null;
-      expect(person.changed).toBe(true);
-    },
-  );
+    person.first_name = null;
+    expect(person.changed).toBe(true);
+  });
 
   it.skip("attributes not selected are still missing after save", () => {
     // BLOCKED: attribute-methods — accessing an unselected attribute
@@ -804,40 +834,34 @@ describe("DirtyTest", () => {
     expect(person.attributeBeforeLastSave("gender")).toBe("M");
   });
 
-  it.skipIf(adapterType === "postgres")(
-    "saved_changes? returns whether the last call to save changed anything",
-    async () => {
-      const person = (await Person.create({ first_name: "Sean" })) as Rec;
+  it("saved_changes? returns whether the last call to save changed anything", async () => {
+    const person = (await Person.create({ first_name: "Sean" })) as Rec;
 
-      expect(call<boolean>(person, "isSavedChanges")).toBe(true);
+    expect(call<boolean>(person, "isSavedChanges")).toBe(true);
 
-      await person.save();
+    await person.save();
 
-      expect(call<boolean>(person, "isSavedChanges")).toBe(false);
-    },
-  );
+    expect(call<boolean>(person, "isSavedChanges")).toBe(false);
+  });
 
-  it.skipIf(adapterType === "postgres")(
-    "saved_changes returns a hash of all the changes that occurred",
-    async () => {
-      const person = (await Person.create({ first_name: "Sean", gender: "M" })) as Rec;
+  it("saved_changes returns a hash of all the changes that occurred", async () => {
+    const person = (await Person.create({ first_name: "Sean", gender: "M" })) as Rec;
 
-      expect(person.savedChanges["first_name"]).toEqual([null, "Sean"]);
-      expect(person.savedChanges["gender"]).toEqual([null, "M"]);
-      expect(Object.keys(person.savedChanges).sort()).toEqual(
-        ["id", "first_name", "gender", "created_at", "updated_at"].sort(),
-      );
+    expect(person.savedChanges["first_name"]).toEqual([null, "Sean"]);
+    expect(person.savedChanges["gender"]).toEqual([null, "M"]);
+    expect(Object.keys(person.savedChanges).sort()).toEqual(
+      ["id", "first_name", "gender", "created_at", "updated_at"].sort(),
+    );
 
-      await (person as unknown as Person).update({ first_name: "Jim" });
+    await (person as unknown as Person).update({ first_name: "Jim" });
 
-      expect(person.savedChanges["first_name"]).toEqual(["Sean", "Jim"]);
-      expect(Object.keys(person.savedChanges).sort()).toEqual(
-        ["first_name", "lock_version", "updated_at"].sort(),
-      );
-    },
-  );
+    expect(person.savedChanges["first_name"]).toEqual(["Sean", "Jim"]);
+    expect(Object.keys(person.savedChanges).sort()).toEqual(
+      ["first_name", "lock_version", "updated_at"].sort(),
+    );
+  });
 
-  it.skipIf(adapterType === "postgres")("changed? in after callbacks returns false", async () => {
+  it("changed? in after callbacks returns false", async () => {
     const klass = class extends Base {
       static {
         this.tableName = "people";
@@ -856,28 +880,25 @@ describe("DirtyTest", () => {
     expect(person.changed).toBe(false);
   });
 
-  it.skipIf(adapterType === "postgres")(
-    "changed? in around callbacks after yield returns false",
-    async () => {
-      const klass = class extends Base {
-        static {
-          this.tableName = "people";
-          this.aroundCreate(async function (record: Rec, proceed: () => Promise<void>) {
-            await proceed();
-            if (record.changed) throw new Error("changed? should be false");
-            if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
-            if (!call<boolean>(record, "isSavedChanges"))
-              throw new Error("saved_changes? should be true");
-            if (call<unknown>(record, "idInDatabase") == null)
-              throw new Error("id_in_database should not be nil");
-          });
-        }
-      };
+  it("changed? in around callbacks after yield returns false", async () => {
+    const klass = class extends Base {
+      static {
+        this.tableName = "people";
+        this.aroundCreate(async function (record: Rec, proceed: () => Promise<void>) {
+          await proceed();
+          if (record.changed) throw new Error("changed? should be false");
+          if (record.hasChangesToSave) throw new Error("has_changes_to_save? should be false");
+          if (!call<boolean>(record, "isSavedChanges"))
+            throw new Error("saved_changes? should be true");
+          if (call<unknown>(record, "idInDatabase") == null)
+            throw new Error("id_in_database should not be nil");
+        });
+      }
+    };
 
-      const person = (await klass.create({ first_name: "Sean" })) as Rec;
-      expect(person.changed).toBe(false);
-    },
-  );
+    const person = (await klass.create({ first_name: "Sean" })) as Rec;
+    expect(person.changed).toBe(false);
+  });
 
   it.skip("partial insert off with unchanged default function attribute", () => {
     // BLOCKED: schema — Rails' `aircraft.manufactured_at` defaults to
