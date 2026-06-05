@@ -1,7 +1,9 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { resolveModel, buildHasManyRelation } from "../associations.js";
+import { resolveModel } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
+import { ScopeRegistry } from "../scoping.js";
+import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateThroughReflection } from "./validate-through-reflection.js";
 import { camelize, singularize, underscore } from "@blazetrails/activesupport";
 import { AssociationTypeMismatch } from "../errors.js";
@@ -25,7 +27,7 @@ export class Association {
 
   private _staleState: unknown = undefined;
   /**
-   * Memoized result of `associationScope()` — Rails' `@association_scope`
+   * Memoized result of `scope()` — Rails' `@association_scope`
    * (association.rb:300-308). Built lazily on first access; reset by
    * `resetScope()` (called from `reload()` and on init). Skipped for
    * `disable_joins` paths — Rails creates a fresh
@@ -33,7 +35,7 @@ export class Association {
    * because the scope's chain walk depends on owner FK snapshots that
    * a long-lived cache would mask.
    */
-  private _cachedAssociationScope: unknown = undefined;
+  private _cachedScope: unknown = undefined;
 
   constructor(owner: Base, reflection: AssociationDefinition) {
     this.owner = owner;
@@ -97,69 +99,69 @@ export class Association {
   }
 
   /**
-   * Returns the scope (Relation) for this association. The base
-   * implementation delegates to buildHasManyRelation, which builds
-   * a WHERE clause in the has_many direction. Subclasses (e.g.
-   * BelongsToAssociation) override for their own direction.
+   * Mirrors Rails' `Association#scope` (association.rb:107-117).
+   *
+   * Four branches, in order:
+   * 1. `disable_joins`: delegate to `DisableJoinsAssociationScope` via a
+   *    late-binding slot (populated when DJAS is first loaded; avoids the
+   *    TDZ cycle DJAS→DJAR→relation.ts→associations.ts→association.ts).
+   * 2. `klass.current_scope.proxyAssociation === this`: spawn the current
+   *    scope (fires only inside a CollectionProxy.scoping block — not yet
+   *    implemented, so this branch is structurally present but unreachable).
+   * 3. `global_current_scope` present: merge it into the result.
+   * 4. else: `targetScope().merge!(association_scope)`.
+   *
+   * Cache: only the `AssociationScope.scope` result is memoized in
+   * `_cachedScope` (Rails' `@association_scope`); `targetScope()` and
+   * current-scope branches are re-evaluated each call (association.rb:294-307).
    */
   scope(): any {
-    return buildHasManyRelation(this.owner, this.reflection.name, this.reflection.options);
-  }
-
-  resetScope(): void {
-    this._cachedAssociationScope = undefined;
-  }
-
-  /**
-   * Build (or return cached) JOIN-based association scope. Mirrors
-   * Rails' `Association#association_scope` (association.rb:300-308):
-   * memoized per-instance, reset on `reload()`.
-   *
-   * **Disable-joins routing happens upstream of this method.** Loaders
-   * detect `disable_joins: true` early and route to the dedicated
-   * DJAS loader (`_loadThroughViaDisableJoinsScope`); they never call
-   * `associationScope()` for disable_joins associations. Keeping that
-   * branch here would create a TDZ cycle:
-   * base.ts → associations/association.ts → DJAS → DJAR → relation.ts
-   * → base.ts. So `associationScope` is JOIN-only; calling it on a
-   * disable-joins instance returns the JOIN-based scope (which is
-   * not what disable_joins users want, but is also not how loaders
-   * reach this code).
-   *
-   * Cache contract (Rails-equivalent): the cached scope captures
-   * owner FK / polymorphic-type values at build time. Mutating the
-   * owner's FK after a first load does NOT invalidate the cache —
-   * Rails behaves the same (`@association_scope` only resets via
-   * `reset_scope`, called on init and `reload()`). Callers that
-   * mutate FKs and want a fresh query must `reload()`.
-   *
-   * @internal
-   */
-  associationScope(): unknown {
-    // Mirror Rails' `if klass` guard (association.rb:301): polymorphic
-    // belongs_to with a blank type column has no resolvable target
-    // class. Return undefined and skip caching so the next access
-    // (after the type column is set) builds a fresh scope.
     const klass = this.klass as typeof Base | undefined;
     if (!klass) return undefined;
-    // `this.reflection` here is the lightweight AssociationDefinition
-    // attached at macro time. AssociationScope needs the rich
-    // Reflection (with `chain`, `joinPrimaryKey`, etc.) that lives on
-    // the model class via `_reflectOnAssociation(name)`. Resolve once
-    // per call — the result is small and the cache stores the BUILT
-    // scope, not the reflection.
     const ctor = this.owner.constructor as typeof Base & {
       _reflectOnAssociation?: (n: string) => unknown;
     };
     const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
-    if (this._cachedAssociationScope === undefined) {
-      this._cachedAssociationScope = AssociationScope.scope({
+    // Branch 1: disable_joins — delegate to DisableJoinsAssociationScope.
+    if (this.disableJoins) {
+      const djas = getDjasScopeBuilder();
+      if (!djas)
+        throw new Error(
+          "DisableJoinsAssociationScope not initialized — call initializeAssociations() before using disable_joins associations",
+        );
+      return djas({ owner: this.owner, reflection: richReflection, klass });
+    }
+    // Memoize @association_scope (JOIN-based constraints only).
+    if (this._cachedScope === undefined) {
+      this._cachedScope = AssociationScope.scope({
         owner: this.owner,
         reflection: richReflection as never,
         klass: klass as never,
       });
     }
-    return this._cachedAssociationScope;
+    // Branch 2: klass.current_scope.proxy_association == self.
+    // Fires when CollectionProxy.scoping sets an AssociationRelation as
+    // klass.currentScope; not yet implemented, so this is unreachable.
+    const currentScope = (klass as any).currentScope;
+    if (currentScope && (currentScope as any).proxyAssociation === this) {
+      return typeof (currentScope as any).spawn === "function"
+        ? (currentScope as any).spawn()
+        : currentScope;
+    }
+    // Branches 3 + 4.
+    const target = this.targetScope();
+    const base =
+      target != null && typeof (target as any).merge === "function"
+        ? (target as any).merge(this._cachedScope)
+        : this._cachedScope;
+    const globalScope = ScopeRegistry.globalCurrentScope(klass as unknown as object);
+    return globalScope && typeof (base as any)?.merge === "function"
+      ? (base as any).merge(globalScope)
+      : base;
+  }
+
+  resetScope(): void {
+    this._cachedScope = undefined;
   }
 
   /**
@@ -501,16 +503,28 @@ export class Association {
   }
 
   /**
-   * Mirrors Rails' `Association#target_scope` (association.rb): returns
-   * `klass.all`. The through-association chain merge that propagates
-   * intermediate `default_scope` is the
-   * `ThroughAssociation#target_scope` override — see
-   * `through-association.ts` / `_throughTargetScope`.
+   * Mirrors Rails' `Association#target_scope` (association.rb:310-314):
+   *
+   *   AssociationRelation.create(klass, self)
+   *     .merge!(klass.scope_for_association)
+   *
+   * Returns an `AssociationRelation` bound to `this` association so that
+   * `klass.current_scope.proxyAssociation === this` (branch 2 of `scope()`)
+   * can hold when a future `CollectionProxy.scoping` implementation sets the
+   * AR as the class-level current scope. Uses `scopeForAssociation()` (not
+   * `all()`) so ordinary `Model.where(...).scoping {}` blocks don't leak in.
+   * The through-association chain merge is in `throughTargetScope`.
    *
    * @internal
    */
   protected targetScope(): any {
-    return (this.klass as any)?.all?.() ?? null;
+    const klass = this.klass as typeof Base | undefined;
+    if (!klass) return null;
+    const sfa = (klass as any).scopeForAssociation?.() ?? null;
+    const arFactory = getAssociationRelationFactory();
+    if (!arFactory) return sfa;
+    const ar = arFactory(klass, this);
+    return sfa ? (ar as any).merge(sfa) : ar;
   }
 
   /** @internal */
@@ -605,11 +619,6 @@ export class Association {
     }
     return fkArr.every((key) => (this.owner as any).readAttribute(key) === (record as any).id);
   }
-}
-
-/** @internal */
-function associationScope(assoc: Association): unknown {
-  return assoc.associationScope();
 }
 
 /**

@@ -2,6 +2,8 @@ import type { Base } from "./base.js";
 import { Relation } from "./relation.js";
 import type { CollectionProxy } from "./associations/collection-proxy.js";
 import { _setAssociationRelationCtor } from "./associations/collection-proxy.js";
+import type { Association } from "./associations/association.js";
+import { setAssociationRelationFactory } from "./associations/_scope-slots.js";
 
 /**
  * A Relation produced by a collection association (e.g. `blog.posts`,
@@ -13,10 +15,15 @@ import { _setAssociationRelationCtor } from "./associations/collection-proxy.js"
  * Mirrors: ActiveRecord::AssociationRelation
  */
 export class AssociationRelation<T extends Base> extends Relation<T> {
-  /** @internal The owning collection association. */
-  _association: CollectionProxy<T>;
+  /**
+   * @internal The owning association. CollectionProxy-backed when created
+   * via the collection proxy (the normal user-facing path); Association-backed
+   * when created by `Association#targetScope()` for internal scope merging
+   * (mirrors Rails' `AssociationRelation.create(klass, self)` in `target_scope`).
+   */
+  _association: CollectionProxy<T> | Association;
 
-  constructor(modelClass: typeof Base, association: CollectionProxy<T>) {
+  constructor(modelClass: typeof Base, association: CollectionProxy<T> | Association) {
     super(modelClass);
     this._association = association;
   }
@@ -26,8 +33,12 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * `ActiveRecord::AssociationRelation#proxy_association`, which extension
    * blocks use to reach the owner (`proxy_association.owner`) and the
    * reflection (`proxy_association.reflection`).
+   *
+   * Returns `CollectionProxy<T>` for user-facing association relations;
+   * returns the plain `Association` instance when this relation was built
+   * by `Association#targetScope()` for internal scope merging.
    */
-  get proxyAssociation(): CollectionProxy<T> {
+  get proxyAssociation(): CollectionProxy<T> | Association {
     return this._association;
   }
 
@@ -59,7 +70,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
       return attrs.map((a) => this.build(a, block));
     }
     const merged = { ...this.scopeForCreate(), ...attrs };
-    return this._association.build(merged, block) as T;
+    return (this._association as CollectionProxy<T>).build(merged, block) as T;
   }
 
   /**
@@ -79,7 +90,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
       return records;
     }
     const merged = { ...this.scopeForCreate(), ...attrs };
-    return this._association.create(merged, block) as Promise<T>;
+    return (this._association as CollectionProxy<T>).create(merged, block) as Promise<T>;
   }
 
   /**
@@ -102,7 +113,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
       return records;
     }
     const merged = { ...this.scopeForCreate(), ...attrs };
-    return this._association.createBang(merged, block) as Promise<T>;
+    return (this._association as CollectionProxy<T>).createBang(merged, block) as Promise<T>;
   }
 
   /**
@@ -217,3 +228,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
 }
 
 _setAssociationRelationCtor(AssociationRelation);
+setAssociationRelationFactory(
+  (klass, assoc) => new AssociationRelation(klass as typeof Base, assoc as Association),
+);

@@ -74,7 +74,7 @@ describe("Association scope cache", () => {
 
   it("AssociationScope.scope is called once across repeated scope builds (memoized)", async () => {
     // Test the scope cache directly: assert that calling
-    // associationScope() twice on the same instance only invokes
+    // scope() twice on the same instance only invokes
     // AssociationScope.scope once, and that resetScope() forces a
     // rebuild. (Going through loadTarget/reload would be ambiguous —
     // a second loadTarget short-circuits on the already-loaded target
@@ -85,25 +85,25 @@ describe("Association scope cache", () => {
     const spy = vi.spyOn(AssociationScope, "scope");
     const assoc = (author as any).association("cachePosts");
 
-    assoc.associationScope();
+    assoc.scope();
     const afterFirst = spy.mock.calls.length;
     expect(afterFirst).toBe(1);
 
     // Second call hits the cache — no new AssociationScope.scope call.
-    assoc.associationScope();
+    assoc.scope();
     expect(spy.mock.calls.length).toBe(afterFirst);
 
     // resetScope() (called by reload()) clears the cache; next call rebuilds.
     assoc.resetScope();
-    assoc.associationScope();
+    assoc.scope();
     expect(spy.mock.calls.length).toBe(afterFirst + 1);
   });
 
-  it("disable_joins associations route through the dedicated DJAS loader, not Association.associationScope()", async () => {
+  it("disable_joins associations route through the dedicated DJAS loader, not Association.scope()", async () => {
     // Loaders detect `disable_joins: true` early and route to
     // `_loadThroughViaDisableJoinsScope` (which calls DJAS directly,
     // returning a deferred-chain DJAR). They never call
-    // `Association.associationScope()` for disable-joins reflections,
+    // `Association.scope()` for disable-joins reflections,
     // so the JOIN-based cache contract doesn't apply — DJAS owns
     // its own per-call construction matching Rails' per-call DJAS
     // (association.rb:107-117).
@@ -163,10 +163,8 @@ describe("Association scope cache", () => {
     await assoc1.loadTarget();
     await assoc2.loadTarget();
     // Cache fields are per-instance; loading one doesn't pollute the other.
-    expect((assoc1 as any)._cachedAssociationScope).toBeDefined();
-    expect((assoc2 as any)._cachedAssociationScope).toBeDefined();
-    expect((assoc1 as any)._cachedAssociationScope).not.toBe(
-      (assoc2 as any)._cachedAssociationScope,
-    );
+    expect((assoc1 as any)._cachedScope).toBeDefined();
+    expect((assoc2 as any)._cachedScope).toBeDefined();
+    expect((assoc1 as any)._cachedScope).not.toBe((assoc2 as any)._cachedScope);
   });
 });

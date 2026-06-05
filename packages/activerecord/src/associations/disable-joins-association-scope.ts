@@ -10,6 +10,7 @@ import type { UnscopeType } from "../relation/query-methods.js";
 import type { Base } from "../base.js";
 import type { AbstractReflection } from "../reflection.js";
 import { argumentError } from "../relation/query-methods.js";
+import { setDjasScopeBuilder } from "./_scope-slots.js";
 
 type ChainEntry = AbstractReflection | ReflectionProxy;
 
@@ -349,3 +350,7 @@ function addConstraints(
 ): unknown {
   return (scope as any)._addConstraintsDj(reflection, key, joinIds, owner, ordered);
 }
+
+setDjasScopeBuilder((assoc) =>
+  DisableJoinsAssociationScope.INSTANCE.scope(assoc as AssociationScopeable),
+);
