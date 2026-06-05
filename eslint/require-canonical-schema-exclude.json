@@ -64,6 +64,7 @@
   "packages/activerecord/src/encryption/encryptable-record.test.ts",
   "packages/activerecord/src/excluding.test.ts",
   "packages/activerecord/src/explain.test.ts",
+  "packages/activerecord/src/finder-respond-to.test.ts",
   "packages/activerecord/src/inheritance.test.ts",
   "packages/activerecord/src/inherited.test.ts",
   "packages/activerecord/src/insert-all.test.ts",
