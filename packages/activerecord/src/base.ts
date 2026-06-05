@@ -2837,9 +2837,23 @@ export class Base extends Model {
       .execUpdate(ctor.connection.toSql(um), `${ctor.name} Update`)
       .then((affected) => {
         if (ctor.lockingEnabled && affected === 0) {
-          // Mirrors Rails _update_row rescue Exception: restore attribute snapshot so
-          // NULL-in-DB records don't lose their original null valueBeforeTypeCast.
-          if (lockAttributeWas !== null) this._attributes.set(lockCol, lockAttributeWas);
+          // Mirrors Rails _update_row rescue: `@attributes[locking_column] =
+          // lock_attribute_was` restores the attribute snapshot so NULL-in-DB
+          // records don't lose their original null valueBeforeTypeCast.
+          if (lockAttributeWas !== null) {
+            this._attributes.set(lockCol, lockAttributeWas);
+            // Rails derives dirty state from @attributes, so restoring
+            // lock_attribute_was also reverts the auto-increment bump's dirty
+            // entry. Our DirtyTracker is a separate map, so recompute lockCol
+            // against the snapshot baseline: this drops the auto-bump (clean →
+            // clean) while preserving any user-set lock_version change.
+            (this as any)._dirty.attributeWritten(
+              lockCol,
+              lockAttributeWas.value,
+              lockAttributeWas.valueBeforeTypeCast,
+              lockAttributeWas.type,
+            );
+          }
           throw new StaleObjectError(this, "update");
         }
       });
