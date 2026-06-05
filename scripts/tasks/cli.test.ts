@@ -255,7 +255,9 @@ describe("commitAndPush (git mutation flow)", () => {
       raceExitCode: 99,
     });
     expect(mutatorCalls).toBe(1);
-    expect(seen).toEqual(["pull", "add", "commit", "push"]);
+    // One leading `checkout` per generated file restores loadIndex()'s
+    // regenerated artifacts so the pull --rebase runs against a clean tree.
+    expect(seen).toEqual(["checkout", "checkout", "checkout", "pull", "add", "commit", "push"]);
   });
 
   // Mimic execFileSync's failure shape: attach .stderr to the error so
@@ -286,9 +288,13 @@ describe("commitAndPush (git mutation flow)", () => {
       raceExitCode: 99,
     });
     expect(mutatorCalls).toBe(2);
+    // Pre-loop: one checkout per generated file restores them.
     // First attempt: pull, add, commit, push(throws), reset.
     // Second attempt: pull, add, commit, push(ok).
     expect(seen).toEqual([
+      "checkout",
+      "checkout",
+      "checkout",
       "pull",
       "add",
       "commit",
@@ -348,6 +354,65 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(seen.filter((l) => l === "push").length).toBe(1);
     expect(seen.filter((l) => l === "reset").length).toBe(0);
     expect(errSpy.mock.calls.at(-1)?.[0]).toMatch(/Authentication failed/);
+  });
+
+  // loadIndex() may rewrite the tracked index.md/index.json/search.json in
+  // the working tree; a dirty tree aborts `git pull --rebase`. commitAndPush
+  // must restore each generated file to HEAD, individually, before pulling.
+  it("restores each generated index file individually before the first pull", () => {
+    setup();
+    const fullArgs: string[][] = [];
+    execFileSyncMock.mockImplementation((_file, args) => {
+      fullArgs.push(args ?? []);
+      return "" as never;
+    });
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => {},
+      raceMessage: "no",
+      raceExitCode: 4,
+    });
+    // One checkout per file (NOT a single multi-path checkout, which git fails
+    // atomically if any path is unknown), each preceding the pull.
+    expect(fullArgs.slice(0, 3).map((a) => a.slice(2))).toEqual([
+      ["checkout", "--", "index.md"],
+      ["checkout", "--", "index.json"],
+      ["checkout", "--", "search.json"],
+    ]);
+    expect(fullArgs[3]?.[2]).toBe("pull");
+  });
+
+  // Partial restore: one unknown path (e.g. a checkout predating search.json)
+  // must not block restoring the others, nor abort the mutation. This is why
+  // the restore is per-file — `git checkout -- a b c` would fail atomically.
+  it("restores the other files when one generated path is unknown to git", () => {
+    const { seen } = setup();
+    const restored: string[] = [];
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "checkout") {
+        const path = args[args.length - 1];
+        if (path === "index.json") throw new Error("pathspec 'index.json' did not match");
+        restored.push(path);
+        return "" as never;
+      }
+      seen.push(label);
+      return "" as never;
+    });
+    let mutatorCalls = 0;
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => mutatorCalls++,
+      raceMessage: "no",
+      raceExitCode: 4,
+    });
+    // index.md and search.json still restored despite index.json failing...
+    expect(restored).toEqual(["index.md", "search.json"]);
+    // ...and the mutation proceeded normally.
+    expect(mutatorCalls).toBe(1);
+    expect(seen).toEqual(["pull", "add", "commit", "push"]);
   });
 
   // refine commits in an agent worktree (on a feature branch) and must push

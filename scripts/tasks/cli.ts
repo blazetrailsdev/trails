@@ -231,6 +231,37 @@ function git(args: string[], opts: { silent?: boolean; cwd?: string } = {}): str
   }).trim();
 }
 
+// Generated artifacts the tasks repo's pre-commit hook rebuilds and
+// re-stages on every commit (scripts/build-index.mjs). `loadIndex()` runs
+// that same build script when it finds the index stale, which rewrites
+// these tracked files in the working tree — see restoreGeneratedFiles.
+const GENERATED_INDEX_FILES = ["index.md", "index.json", "search.json"];
+
+// `loadIndex()` runs before every mutation reaches commitAndPush, and when it
+// finds the index stale it invokes build-index.mjs, which rewrites the tracked
+// GENERATED_INDEX_FILES in the working tree. With git's default
+// rebase.autoStash=false (CI, fresh checkouts) a subsequent `git pull --rebase`
+// then aborts: "cannot pull with rebase: You have unstaged changes". With
+// autoStash on it instead stashes the throwaway copy and can conflict against
+// upstream's own regenerated index on reapply — so neither config is safe.
+// These files are regenerated and re-staged by the tasks repo's pre-commit hook
+// on every commit, so the locally-rebuilt copies are throwaway — restore them
+// to HEAD before pulling, leaving a clean tree regardless of git config.
+// Restore each path independently: `git checkout -- a b c` is atomic — if any
+// single path is unknown to git (e.g. a checkout predating search.json) the
+// whole command fails and restores *nothing*, leaving the others dirty and the
+// pull still aborting. Per-file checkout means a path git doesn't track can't
+// block the rest; a path git doesn't know isn't dirty, so skipping it is fine.
+function restoreGeneratedFiles(cwd: string | undefined): void {
+  for (const file of GENERATED_INDEX_FILES) {
+    try {
+      git(["checkout", "--", file], { silent: true, cwd });
+    } catch {
+      /* path unknown to git or already clean — nothing to restore here */
+    }
+  }
+}
+
 function storyFilePath(index: Index, id: string): string {
   const entry = index.stories.find((s) => s.id === id);
   if (!entry) {
@@ -289,6 +320,10 @@ export function commitAndPush(opts: {
 }): void {
   const cwd = opts.cwd;
   const pushRefspec = opts.pushRefspec ?? "main";
+  // Clear any loadIndex()-regenerated artifacts so the pull below sees a clean
+  // tree. Only needed before the first attempt — the retry path resets hard to
+  // origin/main, which already discards them.
+  restoreGeneratedFiles(cwd);
   for (let attempt = 0; attempt < 2; attempt++) {
     git(["pull", "--rebase", "--quiet", "origin", "main"], { cwd });
     opts.mutator();
