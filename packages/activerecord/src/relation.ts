@@ -3173,12 +3173,14 @@ export class Relation<T extends Base> {
         return [table.get(key), val];
       },
     );
+    // Mirrors Rails: raise ArgumentError when updates is blank (before lock injection).
+    if (updateValues.length === 0) throw new ArgumentError("Empty list of attributes to change");
     // Mirrors Rails relation.rb#update_all: bump locking_column when omitted.
+    // Uses _incrementAttribute (COALESCE(col, 0) + 1) for NULL-safe increment.
     if (this._modelClass.lockingEnabled) {
       const lockingCol = this._modelClass.lockingColumn;
       if (!Object.prototype.hasOwnProperty.call(updates, lockingCol)) {
-        const quotedCol = this._modelClass.connection.quoteColumnName(lockingCol);
-        updateValues.push([table.get(lockingCol), new Nodes.SqlLiteral(`${quotedCol} + 1`)]);
+        updateValues.push([table.get(lockingCol), this._incrementAttribute(lockingCol)]);
       }
     }
     const um = new UpdateManager().table(table).set(updateValues);
