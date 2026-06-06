@@ -377,9 +377,11 @@ export async function performCount(
   if (hasInclude(this, column ?? null)) {
     const anyRel = this as any;
     const eagerSpecs: string[] = (anyRel._eagerLoadAssociations as string[] | undefined) ?? [];
+    // Rails apply_join_dependency builds from eager_load_values | includes_values (finder_methods.rb:458)
+    const includesSpecs: string[] = (anyRel._includesAssociations as string[] | undefined) ?? [];
     const promoted: string[] =
       (anyRel._includesToPromoteFromReferences?.() as string[] | undefined) ?? [];
-    const allEager = [...new Set([...eagerSpecs, ...promoted])];
+    const allEager = [...new Set([...eagerSpecs, ...includesSpecs, ...promoted])];
     if (allEager.length > 0) {
       const pk = this._modelClass.primaryKey;
       if (!Array.isArray(pk)) {
