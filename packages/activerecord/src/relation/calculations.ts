@@ -432,7 +432,21 @@ export async function performCount(
           if (this._limitValue !== null) idSubquery.take(this._limitValue);
           if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
           const innerSql = applyFromClause(this, this._modelClass.connection.toSql(idSubquery));
-          const countManager = table.project(table.get(pk).count().as("count"));
+          // Outer count mirrors Rails recursive calculate() call: COUNT(DISTINCT requested_col).
+          // JD joins are re-applied so a cross-table column (e.g. "comments.id") is reachable.
+          const colForCount = column ?? pk;
+          const countManager = table.project(
+            (aggregateColumn(this, colForCount) as any).count(true).as("count"),
+          );
+          if (specsForJd.length > 0) {
+            const jdOuter = QueryMethodBangs.constructJoinDependency.call(
+              anyRel,
+              specsForJd,
+              Nodes.OuterJoin,
+            );
+            for (const node of jdOuter.joinConstraints([])) countManager.appendJoinNode(node);
+          }
+          this._applyJoinsToManager(countManager);
           countManager.where(table.get(pk).in(new Nodes.SqlLiteral(innerSql)));
           const limitedResult = await this._modelClass.connection.selectAll(
             prependCtes(this, this._modelClass.connection.toSql(countManager)),
@@ -441,7 +455,11 @@ export async function performCount(
           const limitedRows = limitedResult.toArray() as Record<string, unknown>[];
           return Number(limitedRows[0]?.count ?? 0);
         }
-        const manager = table.project(table.get(pk).count(true).as("count"));
+        // Mirrors Rails recursive calculate() on the JD relation: COUNT(DISTINCT requested_col).
+        const colForCount = column ?? pk;
+        const manager = table.project(
+          (aggregateColumn(this, colForCount) as any).count(true).as("count"),
+        );
         if (specsForJd.length > 0) {
           const jd = QueryMethodBangs.constructJoinDependency.call(
             anyRel,
