@@ -1461,7 +1461,14 @@ export class Relation<T extends Base> {
     } else {
       // Association name/spec form — mirrors Rails left_outer_joins! storing in
       // left_outer_joins_values for deferred resolution via JoinDependency.
-      const specs = Array.isArray(table) ? table : [table];
+      // Rails raises ArgumentError when a raw SQL string (containing spaces) is passed;
+      // association names are always single-word identifiers.
+      if (typeof table === "string" && /\s/.test(table)) {
+        throw argumentError(
+          "only associations and hashes are supported as arguments to leftOuterJoins",
+        );
+      }
+      const specs = Array.isArray(table) ? table : [table as AssociationSpec];
       for (const spec of specs) {
         if (!rel._leftOuterJoinsValues.includes(spec)) rel._leftOuterJoinsValues.push(spec);
       }

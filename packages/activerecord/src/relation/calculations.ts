@@ -13,7 +13,7 @@ import { BigIntegerType } from "@blazetrails/activemodel";
 import type { AdapterName } from "../adapter.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, type ColumnType, type Result } from "../result.js";
-import { buildJoinDependencies } from "./query-methods.js";
+import { buildJoinDependencies, QueryMethodBangs } from "./query-methods.js";
 
 /**
  * Qualify a GROUP BY column string as an Arel attribute node when it is a
@@ -370,6 +370,118 @@ export async function performCount(
   // for polymorphic specs (calculations.rb).
   this._checkEagerLoadable();
 
+  // Mirrors Rails calculations.rb: when has_include? is true, apply_join_dependency
+  // converts eager_load associations to LEFT OUTER JOINs and uses DISTINCT on PK to
+  // prevent fan-out. Without this, the INNER JOIN alone would fan-out multiple rows
+  // per record when a record has multiple associated records.
+  if (hasInclude(this, column ?? null)) {
+    const anyRel = this as any;
+    const eagerSpecs: string[] = (anyRel._eagerLoadAssociations as string[] | undefined) ?? [];
+    // Rails apply_join_dependency builds from eager_load_values | includes_values (finder_methods.rb:458)
+    const includesSpecs: string[] = (anyRel._includesAssociations as string[] | undefined) ?? [];
+    const promoted: string[] =
+      (anyRel._includesToPromoteFromReferences?.() as string[] | undefined) ?? [];
+    const allEager = [...new Set([...eagerSpecs, ...includesSpecs, ...promoted])];
+    if (allEager.length > 0) {
+      const pk = this._modelClass.primaryKey;
+      if (!Array.isArray(pk)) {
+        // Collect tables already covered by explicit _joinValues. For those,
+        // skip the JD LEFT OUTER JOIN (the explicit join already links the table)
+        // to avoid duplicate table references that cause "ambiguous column name".
+        const explicitJoinTables = new Set<string>();
+        for (const v of (anyRel._joinValues as (string | any)[] | undefined) ?? []) {
+          if (typeof v === "string") {
+            const m = v.match(/JOIN\s+(?:"([^"]+)"|`([^`]+)`|(\w+))/i);
+            if (m) explicitJoinTables.add(m[1] ?? m[2] ?? m[3] ?? "");
+          } else if (v?.left) {
+            const n: string | undefined = typeof v.left.name === "string" ? v.left.name : undefined;
+            if (n) explicitJoinTables.add(n);
+          }
+        }
+        // Only build JD for specs whose target table is NOT already in explicit joins.
+        // Specs already explicitly joined only need DISTINCT (not an extra LEFT JOIN).
+        const specsForJd: string[] = [];
+        for (const spec of allEager) {
+          if (typeof spec !== "string") {
+            specsForJd.push(spec as string);
+            continue;
+          }
+          let tname: string | undefined;
+          try {
+            tname = (this._modelClass as any)._reflectOnAssociation?.(spec)?.tableName;
+          } catch {
+            // reflection.klass may throw when model not yet registered
+          }
+          if (!tname || !explicitJoinTables.has(tname)) specsForJd.push(spec);
+        }
+        const table = this._modelClass.arelTable;
+        if (this._limitValue !== null || this._offsetValue !== null) {
+          // Rails finder_methods.rb:463-478: with limit/offset, apply_join_dependency
+          // wraps via distinct_relation_for_primary_key — a DISTINCT pk subquery that
+          // captures limit/offset, then counts distinct parent IDs outside the subquery.
+          const idSubquery = table.project(table.get(pk));
+          idSubquery.distinct();
+          if (specsForJd.length > 0) {
+            const jd = QueryMethodBangs.constructJoinDependency.call(
+              anyRel,
+              specsForJd,
+              Nodes.OuterJoin,
+            );
+            for (const node of jd.joinConstraints([])) idSubquery.appendJoinNode(node);
+          }
+          this._applyJoinsToManager(idSubquery);
+          this._applyWheresToManager(idSubquery, table);
+          if (this._limitValue !== null) idSubquery.take(this._limitValue);
+          if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
+          const innerSql = applyFromClause(this, this._modelClass.connection.toSql(idSubquery));
+          // Outer count mirrors Rails recursive calculate() call: COUNT(DISTINCT requested_col).
+          // JD joins are re-applied so a cross-table column (e.g. "comments.id") is reachable.
+          const colForCount = column ?? pk;
+          const countManager = table.project(
+            (aggregateColumn(this, colForCount) as any).count(true).as("count"),
+          );
+          if (specsForJd.length > 0) {
+            const jdOuter = QueryMethodBangs.constructJoinDependency.call(
+              anyRel,
+              specsForJd,
+              Nodes.OuterJoin,
+            );
+            for (const node of jdOuter.joinConstraints([])) countManager.appendJoinNode(node);
+          }
+          this._applyJoinsToManager(countManager);
+          countManager.where(table.get(pk).in(new Nodes.SqlLiteral(innerSql)));
+          const limitedResult = await this._modelClass.connection.selectAll(
+            prependCtes(this, this._modelClass.connection.toSql(countManager)),
+            `${this._modelClass.name} Count`,
+          );
+          const limitedRows = limitedResult.toArray() as Record<string, unknown>[];
+          return Number(limitedRows[0]?.count ?? 0);
+        }
+        // Mirrors Rails recursive calculate() on the JD relation: COUNT(DISTINCT requested_col).
+        const colForCount = column ?? pk;
+        const manager = table.project(
+          (aggregateColumn(this, colForCount) as any).count(true).as("count"),
+        );
+        if (specsForJd.length > 0) {
+          const jd = QueryMethodBangs.constructJoinDependency.call(
+            anyRel,
+            specsForJd,
+            Nodes.OuterJoin,
+          );
+          for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
+        }
+        this._applyJoinsToManager(manager);
+        this._applyWheresToManager(manager, table);
+        const result = await this._modelClass.connection.selectAll(
+          prependCtes(this, applyFromClause(this, this._modelClass.connection.toSql(manager))),
+          `${this._modelClass.name} Count`,
+        );
+        const rows = result.toArray() as Record<string, unknown>[];
+        return Number(rows[0]?.count ?? 0);
+      }
+    }
+  }
+
   if (this._limitValue !== null || this._offsetValue !== null) {
     // Rails: build_count_subquery — wraps the limited relation as a subquery
     // and counts its rows without instantiating records.
@@ -636,7 +748,17 @@ export function isAllAttributes(rel: CalculationRelation, columnNames: string[])
 
 /** @internal */
 export function hasInclude(rel: CalculationRelation, columnName: string | null): boolean {
-  return (rel as any)._includesValues?.length > 0 || (rel as any)._eagerLoadValues?.length > 0;
+  const anyRel = rel as any;
+  // eager_load_values.any? → always triggers (part of eager_loading?)
+  if (anyRel._eagerLoadAssociations?.length > 0) return true;
+  // includes_values with references → triggers via references_eager_loaded_tables?
+  const promoted = anyRel._includesToPromoteFromReferences?.() as string[] | undefined;
+  if (promoted && promoted.length > 0) return true;
+  // Plain includes: only triggers when a non-:all column is specified
+  if (anyRel._includesAssociations?.length > 0) {
+    return columnName != null && columnName !== "all" && columnName !== "*";
+  }
+  return false;
 }
 
 /** @internal */

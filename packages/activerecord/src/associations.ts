@@ -2261,18 +2261,39 @@ export async function updateCounterCaches(
         ? assoc.options.counterCache
         : `${pluralize(underscore(ctor.name))}_count`;
 
-    const parent = await targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
+    // Mirrors Rails' BelongsToAssociation#update_counters: if the target owner
+    // is already loaded in memory (wired via inverse-of from a collection proxy
+    // create/push), update it directly so the caller sees the new count without
+    // a reload. Otherwise fall back to a fresh DB fetch.
+    // `_cachedAssociations` stores a scalar Base for belongs-to and an array
+    // for has-many; skip the array branch (wrong direction) and null (no assoc).
+    // Guard against a stale cached owner: mirrors Rails' Association#target which
+    // returns nil when stale_target? (FK changed after wiring). Check the cached
+    // owner's PK still matches the record's current FK before using it.
+    const targetPk = targetModel.primaryKey as string;
+    const loadedOwner = (record as any)._cachedAssociations?.get(assoc.name) as
+      | Base
+      | Base[]
+      | null
+      | undefined;
+    const cachedPkValue =
+      loadedOwner != null && !Array.isArray(loadedOwner)
+        ? (loadedOwner as any)._readAttribute?.(targetPk)
+        : undefined;
+    const parent: Base | null =
+      cachedPkValue != null && String(cachedPkValue) === String(fkValue)
+        ? (loadedOwner as Base)
+        : await targetModel.findBy({ [targetPk]: fkValue });
     if (!parent) continue;
 
-    // Mirrors Rails' BelongsToAssociation#update_counters: forward the
-    // belongs_to(touch:) option so updated_at (and any named timestamps) get
-    // bumped in the same UPDATE that adjusts the counter column.
+    // Forward the belongs_to(touch:) option so updated_at (and any named
+    // timestamps) get bumped in the same UPDATE that adjusts the counter column.
     const touch = assoc.options.touch;
     const opts = touch != null ? { touch } : undefined;
     if (direction === "increment") {
-      await parent.incrementBang(counterCol, 1, opts);
+      await (parent as Base).incrementBang(counterCol, 1, opts);
     } else {
-      await parent.decrementBang(counterCol, 1, opts);
+      await (parent as Base).decrementBang(counterCol, 1, opts);
     }
   }
 }

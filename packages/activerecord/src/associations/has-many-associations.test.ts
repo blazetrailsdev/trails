@@ -8228,7 +8228,7 @@ describe("HasManyAssociationsTest", () => {
     expect(assoc.options.counterCache).toBeUndefined();
   });
 
-  it.skip("counter cache updates in memory after create", async () => {
+  it("counter cache updates in memory after create", async () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
@@ -8241,6 +8241,11 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
+    Associations.hasMany.call(Author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      inverseOf: "author",
+    });
     Associations.belongsTo.call(Post, "author", {
       className: "Author",
       foreignKey: "author_id",
@@ -8249,12 +8254,48 @@ describe("HasManyAssociationsTest", () => {
     registerModel(Author);
     registerModel(Post);
     const author = await Author.create({ name: "Alice", posts_count: 0 });
-    await Post.create({ author_id: author.id, title: "A" });
+    // Mirrors Rails: car.wheels.create! then check in-memory counter, association
+    // size, and reloaded counter (has_many_associations_test.rb:1368-1374).
+    await (author as any).posts.create({ title: "A" });
+    expect((author as any).readAttribute("posts_count")).toBe(1);
+    expect(await (author as any).posts.size()).toBe(1);
+    expect(((await Author.find(author.id!)) as any).readAttribute("posts_count")).toBe(1);
+  });
+
+  it("pushing association updates counter cache", async () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("posts_count", "integer");
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+      }
+    }
+    Associations.hasMany.call(Author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      inverseOf: "author",
+    });
+    Associations.belongsTo.call(Post, "author", {
+      className: "Author",
+      foreignKey: "author_id",
+      counterCache: "posts_count",
+    });
+    registerModel(Author);
+    registerModel(Post);
+    const author = await Author.create({ name: "Alice", posts_count: 0 });
+    // Mirrors Rails: car.wheels << Wheel.new then check car.reload.wheels_count.
+    const post = new Post({ title: "A" });
+    await (author as any).posts.push(post);
     const reloaded = await Author.find(author.id!);
     expect((reloaded as any).posts_count).toBe(1);
   });
 
-  it.skip("pushing association updates counter cache", async () => {
+  it("calling empty with counter cache", async () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
@@ -8267,6 +8308,11 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
+    Associations.hasMany.call(Author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      inverseOf: "author",
+    });
     Associations.belongsTo.call(Post, "author", {
       className: "Author",
       foreignKey: "author_id",
@@ -8274,32 +8320,14 @@ describe("HasManyAssociationsTest", () => {
     });
     registerModel(Author);
     registerModel(Post);
-    const author = await Author.create({ name: "Alice", posts_count: 0 });
-    await Post.create({ author_id: author.id, title: "A" });
-    const reloaded = await Author.find(author.id!);
-    expect((reloaded as any).posts_count).toBeGreaterThanOrEqual(1);
-  });
-
-  it.skip("calling empty with counter cache", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice", posts_count: 0 });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
+    // Seed a post so the DB counter is 1, then reload a fresh owner so the
+    // proxy is unloaded. Mirrors Rails: assert_no_queries { post.comments.empty? }
+    // when the counter cache shows rows exist (has_many_associations_test.rb:1473-1477).
+    const seedAuthor = await Author.create({ name: "Alice", posts_count: 0 });
+    await (seedAuthor as any).posts.create({ title: "A" });
+    const author = await Author.find(seedAuthor.id!);
+    await assertNoQueries(false, async () => {
+      expect(await (author as any).posts.isEmpty()).toBe(false);
     });
-    expect(posts.length).toBe(0);
   });
 });

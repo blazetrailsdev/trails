@@ -63,8 +63,37 @@ describe("RequiredAssociationsTest", () => {
     expect(await record.save()).toBe(true);
   });
 
-  it.skip("belongs_to associations can be required by default", () => {
-    /* Base.belongsToRequiredByDefault global config not implemented */
+  it("belongs_to associations can be required by default", async () => {
+    const prev = (Base as any).belongsToRequiredByDefault;
+    try {
+      (Base as any).belongsToRequiredByDefault = true;
+      class Parent extends Base {}
+      class Child extends Base {
+        static {
+          this.attribute("parent_id", "integer");
+        }
+      }
+      Associations.belongsTo.call(Child, "parent", {
+        inverseOf: false,
+        className: "Parent",
+      });
+      registerModel("Parent", Parent);
+      registerModel("Child", Child);
+
+      const record = new Child();
+      expect(await record.save()).toBe(false);
+      expect(record.errors.fullMessages).toEqual(["Parent must exist"]);
+
+      const parent = await Parent.create({});
+      record.writeAttribute("parent_id", parent.id);
+      expect(await record.save()).toBe(true);
+    } finally {
+      if (prev === undefined) {
+        delete (Base as any).belongsToRequiredByDefault;
+      } else {
+        (Base as any).belongsToRequiredByDefault = prev;
+      }
+    }
   });
 
   it("has_one associations are not required by default", async () => {
