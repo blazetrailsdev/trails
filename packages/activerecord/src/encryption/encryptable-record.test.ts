@@ -29,6 +29,7 @@ import {
 } from "./test-helpers.js";
 import { Configurable } from "./configurable.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
+import { itIfSupports } from "../test-helpers/supports.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { EncryptableRecord } from "./encryptable-record.js";
@@ -468,15 +469,19 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await assertEncryptedAttribute(book, "name", "<untitled>");
   });
 
-  it("loading records with encrypted attributes defined on columns with default values", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
-    new Book();
-    // Base.insert is a thin single-record wrapper around insertAll; values are
-    // serialized through the attribute type so name is encrypted in the DB.
-    await Book.insert({ name: "<untitled>" });
-    const book = await Book.last();
-    expect(book.name).toBe("<untitled>");
-  });
+  itIfSupports(
+    "insert_on_duplicate_update",
+    "loading records with encrypted attributes defined on columns with default values",
+    async () => {
+      const Book = makeEncryptedBook(await freshAdapter());
+      new Book();
+      // Base.insert is a thin single-record wrapper around insertAll; values are
+      // serialized through the attribute type so name is encrypted in the DB.
+      await Book.insert({ name: "<untitled>" });
+      const book = await Book.last();
+      expect(book.name).toBe("<untitled>");
+    },
+  );
   it("can dump and load records that use encryption", async () => {
     // Mirrors Rails' Marshal.dump/Marshal.load test: after serializing a model's raw
     // attribute state (ciphertexts) and reconstructing a new instance via the DB-load

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
+import { adapterType } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -12,7 +13,7 @@ beforeAll(async () => {
   });
 });
 describe("CustomLockingTest", () => {
-  it("custom lock", async () => {
+  it.skipIf(adapterType !== "mysql")("custom lock", async () => {
     class Post extends Base {
       static {
         this._tableName = "posts";

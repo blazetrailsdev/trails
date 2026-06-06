@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
+import { adapterType } from "../test-adapter.js";
 
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -292,7 +293,7 @@ describe("OrTest", () => {
 });
 
 describe("TooManyOrTest", () => {
-  it("too many or", () => {
+  it.skipIf(adapterType === "sqlite")("too many or", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");

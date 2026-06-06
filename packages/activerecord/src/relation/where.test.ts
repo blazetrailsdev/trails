@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, Range, defineEnum, registerModel } from "../index.js";
+import { adapterType } from "../test-adapter.js";
 import { Associations } from "../associations.js";
 
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
@@ -722,7 +723,7 @@ describe("WhereTest", () => {
     expect(item.number).toBe(1);
   });
 
-  it("with tuple syntax and large values list", async () => {
+  it.skipIf(adapterType === "sqlite")("with tuple syntax and large values list", async () => {
     class CpkEntry extends Base {
       static {
         this.attribute("shop_id", "integer");

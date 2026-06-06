@@ -14,6 +14,7 @@ import { useFixtures } from "./test-helpers/use-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 import { dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
 
 // In Rails, AbstractAdapter includes SchemaStatements, so introspection
@@ -57,21 +58,21 @@ describe("ViewWithPrimaryKeyTest", () => {
     await dropView("ebooks'");
   });
 
-  it("reading", async () => {
+  itIfSupports("views", "reading", async () => {
     const ebookRecords = await Ebook.all();
     expect(ebookRecords.map((b: any) => b.id)).toEqual([books("rfr").id]);
     expect(ebookRecords.map((b: any) => b.name)).toEqual(["Ruby for Rails"]);
   });
 
-  it("views", async () => {
+  itIfSupports("views", "views", async () => {
     expect(await conn().views()).toEqual([Ebook._tableName]);
   });
 
-  it("view exists", async () => {
+  itIfSupports("views", "view exists", async () => {
     expect(await conn().viewExists(Ebook._tableName)).toBe(true);
   });
 
-  it("table exists", async () => {
+  itIfSupports("views", "table exists", async () => {
     expect(await conn().tableExists(Ebook._tableName)).toBe(false);
   });
 
@@ -79,7 +80,7 @@ describe("ViewWithPrimaryKeyTest", () => {
     expect(await conn().isDataSourceExists(Ebook._tableName)).toBe(true);
   });
 
-  it("column definitions", async () => {
+  itIfSupports("views", "column definitions", async () => {
     expect(Ebook.columns().map((c: any) => [c.name, c.type])).toEqual([
       ["id", "integer"],
       ["name", "string"],
@@ -88,7 +89,7 @@ describe("ViewWithPrimaryKeyTest", () => {
     ]);
   });
 
-  it("attributes", async () => {
+  itIfSupports("views", "attributes", async () => {
     const ebook = await Ebook.first();
     expect((ebook as any).attributes).toEqual({
       id: 2,
@@ -103,7 +104,7 @@ describe("ViewWithPrimaryKeyTest", () => {
     // requires schema-based reset_primary_key (queries PRAGMA table_info for pk=0).
   });
 
-  it("does not dump view as table", async () => {
+  itIfSupports("views", "does not dump view as table", async () => {
     const schema = await dumpTableSchema(conn() as any, "ebooks'");
     // TS schema DSL: ctx.createTable("ebooks'", ...) — not the Ruby create_table form
     expect(schema).not.toMatch(/ctx\.createTable\("ebooks'"/);
@@ -212,7 +213,7 @@ describe("UpdateableViewTest", () => {
     await dropView("printed_books");
   });
 
-  it.skipIf(adapterType === "sqlite")("update record", async () => {
+  itIfSupports.skipIf(adapterType === "sqlite")("views", "update record", async () => {
     const book = await PrintedBook.find(books("awdr").id);
     (book as any).name = "AWDwR";
     await (book as any).saveBang();
@@ -234,20 +235,28 @@ describe("UpdateableViewTest", () => {
 
   // Rails: only runs on PostgreSQL (and SQLite) with supports_insert_returning?.
   // The outer UpdateableViewTest block already excludes SQLite, leaving PG only.
-  it.skipIf(adapterType !== "postgres")("insert record populates primary key", async () => {
-    const book = await PrintedBook.createBang({
-      name: "Rails in Action",
-      status: 0,
-      format: "paperback",
-    });
-    expect((book as any).id).not.toBeNull();
-    expect((book as any).id).toBeGreaterThan(0);
-  });
+  itIfSupports.skipIf(adapterType === "sqlite")(
+    "insert_returning",
+    "insert record populates primary key",
+    async () => {
+      const book = await PrintedBook.createBang({
+        name: "Rails in Action",
+        status: 0,
+        format: "paperback",
+      });
+      expect((book as any).id).not.toBeNull();
+      expect((book as any).id).toBeGreaterThan(0);
+    },
+  );
 
-  it.skipIf(adapterType === "sqlite")("update record to fail view conditions", async () => {
-    const book = await PrintedBook.find(books("awdr").id);
-    (book as any).format = "ebook";
-    await (book as any).saveBang();
-    await expect((book as any).reload()).rejects.toThrow();
-  });
+  itIfSupports.skipIf(adapterType === "sqlite")(
+    "views",
+    "update record to fail view conditions",
+    async () => {
+      const book = await PrintedBook.find(books("awdr").id);
+      (book as any).format = "ebook";
+      await (book as any).saveBang();
+      await expect((book as any).reload()).rejects.toThrow();
+    },
+  );
 });
