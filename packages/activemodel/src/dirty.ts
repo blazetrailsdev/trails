@@ -302,33 +302,45 @@ export class DirtyTracker {
    * the stored value is only a changed-set marker; the "was" comes from
    * `attributes[attr].original_value`, which a repeat call leaves untouched.
    *
+   * The marker is set **unconditionally**, even when the attribute is already
+   * dirty from a normal assignment: Rails' `attribute_changed?` is
+   * `forced_changes.include?(attr) || attributes[attr].changed?`
+   * (attribute_mutation_tracker.rb:78-79), so a forced attribute that is later
+   * written back to its original value stays changed via `forced_changes`.
+   * `_forcedNames` is our forced-marker set; `attributeWritten()` consults it to
+   * avoid clearing a forced change. Skipping the marker for the
+   * assigned-but-not-forced case would let such a write-back wrongly clear it.
+   *
    * trails has no separate per-attribute `original_value`, so the stored
-   * `[was, was]` tuple *is* our "was". We therefore (a) clone it on first mark so
-   * an in-place mutation can't corrupt it, and (b) keep it on a repeat call —
-   * both reproduce Rails' stable `original_value` — while still returning the
-   * current value so `attribute_will_change!` stays truthy (dirty_test.rb:317
+   * `[was, was]` tuple *is* our "was". We capture it (cloned, so an in-place
+   * mutation can't corrupt it) only the first time the attribute becomes changed,
+   * and preserve it on any later force — both reproduce Rails' stable
+   * `original_value`. The return is the live current value (Rails' `fetch_value`),
+   * so `attribute_will_change!` stays truthy (dirty_test.rb:317
    * `assert pirate.catchphrase_will_change!`).
    *
    * Mirrors: ActiveModel::AttributeMutationTracker#force_change
    */
   forceChange(name: string, currentValue: unknown): unknown {
-    // Already changed: Rails re-runs fetch_value and returns the current value;
-    // we return it too. We keep the existing "was" snapshot rather than
-    // overwriting it (matching Rails' untouched original_value).
-    if (this._changedAttributes.has(name)) return currentValue;
-    // Clone so the stored "was" side isn't mutated along with the live object.
-    let cloned: unknown;
-    try {
-      cloned =
-        currentValue !== null && typeof currentValue === "object"
-          ? structuredClone(currentValue)
-          : currentValue;
-    } catch {
-      cloned = currentValue;
-    }
-    this._changedAttributes.set(name, [cloned, cloned]);
+    // Unconditional forced marker (Rails: forced_changes[attr] = fetch_value).
     this._forcedNames.add(name);
-    return cloned;
+    // Capture the "was" only when the attribute isn't already changed (by this
+    // force or a prior assignment), so a repeat force — or a force after an
+    // assignment — never overwrites the original "was". Clone to keep the stored
+    // snapshot stable under in-place mutation of the live object.
+    if (!this._changedAttributes.has(name)) {
+      let cloned: unknown;
+      try {
+        cloned =
+          currentValue !== null && typeof currentValue === "object"
+            ? structuredClone(currentValue)
+            : currentValue;
+      } catch {
+        cloned = currentValue;
+      }
+      this._changedAttributes.set(name, [cloned, cloned]);
+    }
+    return currentValue;
   }
 
   /**
