@@ -17,6 +17,7 @@ export {
   AttributeMethodPattern,
   resolveAliasName,
   AttrNames,
+  defineDirtyAttributeMethods,
 } from "./attribute-methods.js";
 export { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 export {
