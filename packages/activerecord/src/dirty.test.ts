@@ -451,13 +451,12 @@ describe("DirtyTest", () => {
     // on instances (see "attribute will change!"). Not exposed today.
   });
 
-  it.skip("association assignment changes foreign key", () => {
-    // BLOCKED (two gaps): (1) canonical Parrot declares `cancelSaveFromCallback`
-    // as a real column instead of `{ virtual: true }`, so `Parrot.create` tries
-    // to INSERT a column `parrots` lacks; (2) without fixtures loaded the
-    // canonical models aren't in the registry, so Pirate's `belongsTo("parrot")`
-    // can't resolve the Parrot class. SCOPE: virtualize the attr + register the
-    // models (or load parrot fixtures), separate PR.
+  it("association assignment changes foreign key", async () => {
+    const pirate = (await Pirate.createBang({ catchphrase: "jarl" })) as Rec;
+    const parrot = await Parrot.createBang({ name: "Lorre" });
+    pirate.parrot = parrot;
+    expect(pirate.changed).toBe(true);
+    expect(pirate.changedAttributes).toEqual(["parrot_id"]);
   });
 
   it.skip("attribute should be compared with type cast", () => {
