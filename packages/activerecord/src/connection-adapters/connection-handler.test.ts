@@ -286,7 +286,8 @@ describe("ConnectionHandlerTest", () => {
       ).toBe(ownPool);
       expect(ownPool).not.toBe(basePool);
 
-      // Remove the connection — Klass2 should fall back to Base's pool
+      // Remove the connection — Klass2 falls back to Base's pool.
+      // connection_class stays true (Rails never resets it); connectedTo guards still pass.
       Klass2.removeConnection();
 
       expect(
@@ -294,6 +295,7 @@ describe("ConnectionHandlerTest", () => {
           role: "writing",
         }),
       ).toBe(basePool);
+      expect((Klass2 as any).connectionClass).toBe(true);
     } finally {
       (Base as any)._connectionHandler = savedHandler;
     }

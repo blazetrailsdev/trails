@@ -403,10 +403,6 @@ export function removeConnection(this: typeof Base): void {
     })
   ) {
     (this as any)._connectionSpecificationName = undefined;
-    // Reset connection_class so connectionSpecificationName delegates to the
-    // parent class (matching Rails: setting connection_specification_name = nil
-    // triggers the superclass walk in the accessor, undoing establish_connection).
-    (this as any).connectionClass = false;
   }
   this.connectionHandler.removeConnectionPool(name, {
     role: coreCurrentRole.call(this as any),
@@ -434,7 +430,16 @@ export function connectionSpecificationName(this: typeof Base): string {
   if (typeof (this as any).primaryClassQ === "function" && (this as any).primaryClassQ()) {
     return "Base";
   }
-  if ((this as any).connectionClassQ?.()) {
+  // Skip the connectionClassQ() shortcut when _connectionSpecificationName was
+  // explicitly cleared by removeConnection (own property exists but is nil).
+  // Mirrors Rails: setting connection_specification_name = nil triggers the
+  // superclass walk in the reader regardless of connection_class? — this lets
+  // the class retain connection_class = true for connectedTo guards while pool
+  // lookup delegates to the parent.
+  const specCleared =
+    Object.prototype.hasOwnProperty.call(this, "_connectionSpecificationName") &&
+    (this as any)._connectionSpecificationName == null;
+  if (!specCleared && (this as any).connectionClassQ?.()) {
     return this.name;
   }
   const parent = Object.getPrototypeOf(this);
