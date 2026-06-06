@@ -606,6 +606,16 @@ function _jsonEqual(a: unknown, b: unknown): boolean {
       ba = b as unknown[];
     return aa.length === ba.length && aa.every((v, i) => _jsonEqual(v, ba[i]));
   }
+  // Only structurally compare plain objects (Object/null prototype). Typed instances
+  // (Temporal, custom classes) carry no enumerable keys, so Object.keys returns []
+  // for any two instances, making the key-length check trivially true and causing
+  // different-valued typed objects to compare as equal. There is no universal
+  // value-equality protocol in JS, so non-identical typed instances return false
+  // (conservative false-negative rather than a wrong false-positive).
+  const protoA = Object.getPrototypeOf(a);
+  if (protoA !== Object.prototype && protoA !== null) return false;
+  if (Object.getPrototypeOf(b) !== Object.prototype && Object.getPrototypeOf(b) !== null)
+    return false;
   const oa = a as Record<string, unknown>,
     ob = b as Record<string, unknown>;
   const ka = Object.keys(oa),
