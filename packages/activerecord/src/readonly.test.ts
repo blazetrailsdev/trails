@@ -208,11 +208,12 @@ describe("ReadOnlyTest", () => {
 
   it("association collection method missing scoping not readonly", async () => {
     const developer = await Developer.find(developers("david").id);
-    const project = await (developer as any).projects.allAsMethod().first();
-    expect(project?.isReadonly()).toBe(false);
-
     const post = await Post.find(posts("welcome").id);
-    const comment = await (post as any).comments.allAsMethod().first();
-    expect(comment?.isReadonly()).toBe(false);
+
+    expect((await (developer as any).projects.allAsMethod().first())?.isReadonly()).toBe(false);
+    expect((await (developer as any).projects.allAsScope().first())?.isReadonly()).toBe(false);
+
+    expect((await (post as any).comments.allAsMethod().first())?.isReadonly()).toBe(false);
+    expect((await (post as any).comments.allAsScope().first())?.isReadonly()).toBe(false);
   });
 });

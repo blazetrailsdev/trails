@@ -2191,23 +2191,31 @@ function wrapCollectionProxy<T extends Base = Base>(
         return (...args: any[]) => scopeVal.apply(scope, args);
       }
 
-      // Rails CollectionProxy#method_missing: if the scope doesn't respond to the
-      // method, check if the model class does (e.g. custom class-level query methods
-      // like `allAsMethod`). Push the association scope as the current scope
-      // synchronously while calling the class method so `all()` / `where()` inside
-      // pick it up — mirrors Rails' `scoping { @klass.public_send(method, *args, &block) }`.
-      // Synchronous (no await) so the returned Relation can be chained immediately.
+      // Rails delegation.rb:118-131 (ClassSpecificRelation#method_missing):
+      // if the scope doesn't respond to the method, check the model class and
+      // delegate via `scoping { model.public_send(method, ...) }`.
+      // Sync methods (returning Relation) restore the scope immediately so
+      // the Relation is directly chainable. Async methods (returning a native
+      // Promise) defer restoration until the promise settles — mirrors Rails'
+      // synchronous block-scoping across the full method body.
       const modelClass = target.model;
       const classMethod = (modelClass as any)[prop];
       if (typeof classMethod === "function") {
         return (...args: any[]) => {
           const prev = ScopeRegistry.currentScope(modelClass as any);
           ScopeRegistry.setCurrentScope(modelClass as any, scope as any);
+          let result: unknown;
           try {
-            return classMethod.apply(modelClass, args);
-          } finally {
+            result = classMethod.apply(modelClass, args);
+          } catch (e) {
             ScopeRegistry.setCurrentScope(modelClass as any, prev);
+            throw e;
           }
+          if (result instanceof Promise) {
+            return result.finally(() => ScopeRegistry.setCurrentScope(modelClass as any, prev));
+          }
+          ScopeRegistry.setCurrentScope(modelClass as any, prev);
+          return result;
         };
       }
 
