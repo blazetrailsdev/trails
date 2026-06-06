@@ -36,13 +36,15 @@ export class Topic extends Base {
     this.hasMany("uniqueReplies", { dependent: "destroy", foreignKey: "parent_id" });
     this.hasMany("sillyUniqueReplies", { dependent: "destroy", foreignKey: "parent_id" });
 
+    this.serialize("content");
+
     this.aliasAttribute("heading", "title");
 
-    this.beforeCreate(async function (this: Topic) {
-      await this.defaultWrittenOn();
+    this.beforeCreate(async (record: Topic) => {
+      await (record as any).defaultWrittenOn();
     });
-    this.beforeDestroy(async function (this: Topic) {
-      await this.destroyChildren();
+    this.beforeDestroy(async (record: Topic) => {
+      await (record as any).destroyChildren();
     });
     // Rails registers these as plain synchronous method hooks
     // (`before_validation :before_validation_for_transaction`, etc. —
@@ -68,8 +70,8 @@ export class Topic extends Base {
     this.afterInitialize((record: Topic) => {
       (record as any).setEmailAddress();
     });
-    this.afterTouch(async function (this: any) {
-      this.afterTouchCalled = (this.afterTouchCalled ?? 0) + 1;
+    this.afterTouch(async (record: any) => {
+      record.afterTouchCalled = (record.afterTouchCalled ?? 0) + 1;
     });
   }
 

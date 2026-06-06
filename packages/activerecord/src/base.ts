@@ -2638,6 +2638,32 @@ export class Base extends Model {
   private _skipTouch = false;
   private _instanceRecordTimestamps: boolean | null = null;
 
+  // Mirrors: ActiveRecord::AttributeMethods::Dirty#changed? — super (ActiveModel) already
+  // covers explicit assignments; AR adds in-place mutation detection for mutable types
+  // (e.g. Serialized) so that topic.content["key"] = val makes changed? return true.
+  override get changed(): boolean {
+    if (this._dirty.changed) return true;
+    let found = false;
+    this._attributes.forEach((attr) => {
+      if (!found && attr.type.isMutable() && attr.changedInPlace()) found = true;
+    });
+    return found;
+  }
+
+  // Mirrors: ActiveRecord::AttributeMethods::Dirty#has_changes_to_save? — gated on
+  // partialUpdates (Rails' partial_writes=false => NullMutationTracker => no in-place
+  // detection for save decisions, but all columns are written anyway).
+  override get hasChangesToSave(): boolean {
+    if (this._dirty.changed) return true;
+    const ctor = this.constructor as typeof Base;
+    if (!ctor.partialUpdates) return false;
+    let found = false;
+    this._attributes.forEach((attr) => {
+      if (!found && attr.type.isMutable() && attr.changedInPlace()) found = true;
+    });
+    return found;
+  }
+
   // Mirrors: ActiveRecord class_attribute :record_timestamps instance-level override
   get recordTimestamps(): boolean {
     return this._instanceRecordTimestamps ?? (this.constructor as typeof Base).recordTimestamps;

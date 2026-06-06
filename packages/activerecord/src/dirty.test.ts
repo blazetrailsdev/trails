@@ -19,7 +19,7 @@
  * (immutable strings, Ruby singleton methods) are `it.skip` with a precise
  * reason rather than silently adapted or stubbed.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { TimeWithZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -77,6 +77,16 @@ async function withPartialWrites(
   }
 }
 
+/** Mirrors Rails' `travel(duration) { ... }` — advances the system clock by `offsetMs`. */
+async function withTravel(offsetMs: number, fn: () => Promise<void>): Promise<void> {
+  vi.useFakeTimers({ now: Date.now() + offsetMs });
+  try {
+    await fn();
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
 /** Mirrors Rails' private `check_pirate_after_save_failure(pirate)`. */
 function checkPirateAfterSaveFailure(pirate: Rec): void {
   expect(pirate.changed).toBe(true);
@@ -131,6 +141,10 @@ describe("DirtyTest", () => {
   // Transactional rollback cleans it up — no explicit teardown needed.
   beforeEach(async () => {
     await Person.create({ first_name: "foo" });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("attribute changes", async () => {
@@ -556,27 +570,63 @@ describe("DirtyTest", () => {
     expect(pirate.attributeChanged("catchphrase")).toBe(false);
   });
 
-  it.skip("save should store serialized attributes even with partial writes", () => {
-    // BLOCKED: serialization — Rails' `Topic` serializes `content`; the
-    // canonical trails `Topic` does not declare a serialize coder for it, so
-    // `Topic.create({ content: { a: "a" } })` + in-place hash mutation can't be
-    // exercised. SCOPE: add `serialize :content` to the canonical Topic + its
-    // schema, separate PR.
+  it("save should store serialized attributes even with partial writes", async () => {
+    await withPartialWrites(Topic, true, async () => {
+      const topic = (await Topic.createBang({ content: { a: "a" } })) as Rec;
+
+      expect(topic.changed).toBe(false);
+
+      (topic.content as Record<string, string>)["b"] = "b";
+
+      expect(topic.changed).toBe(true);
+
+      await (topic as unknown as Topic).saveBang();
+
+      expect(topic.changed).toBe(false);
+      expect((topic.content as Record<string, string>)["b"]).toBe("b");
+
+      await (topic as unknown as Topic).reload();
+
+      expect((topic.content as Record<string, string>)["b"]).toBe("b");
+    });
   });
 
-  it.skip("save always should update timestamps when serialized attributes are present", () => {
-    // BLOCKED: serialization + time-travel — needs `serialize :content` on Topic
-    // (see above) and ActiveSupport `travel` to force an updated_at delta.
+  it("save always should update timestamps when serialized attributes are present", async () => {
+    await withPartialWrites(Topic, true, async () => {
+      const topic = (await Topic.createBang({ content: { a: "a" } })) as Rec;
+      await (topic as unknown as Topic).saveBang();
+
+      const updatedAt = topic.updated_at;
+      await withTravel(1000, async () => {
+        (topic.content as Record<string, string>)["hello"] = "world";
+        await (topic as unknown as Topic).saveBang();
+      });
+
+      expect(topic.updated_at).not.toEqual(updatedAt);
+      expect((topic.content as Record<string, string>)["hello"]).toBe("world");
+    });
   });
 
-  it.skip("save should not save serialized attribute with partial writes if not present", () => {
-    // BLOCKED: serialization — needs `serialize :content` on Topic (see above)
-    // plus partial-select + `update_columns`.
+  it("save should not save serialized attribute with partial writes if not present", async () => {
+    await withPartialWrites(Topic, true, async () => {
+      const full = (await Topic.createBang({ author_name: "Bill", content: { a: "a" } })) as Rec;
+      const topic = (await Topic.select("id", "author_name").find(
+        (full as any).id,
+      )) as unknown as Topic;
+      await topic.updateColumns({ author_name: "John" });
+      const reloaded = (await topic.reload()) as Rec;
+      expect(reloaded.content).not.toBeNull();
+    });
   });
 
-  it.skip("changes to save should not mutate array of hashes", () => {
-    // BLOCKED: serialization — needs `serialize :content` on Topic so an
-    // array-of-hashes value survives `changes_to_save` unmutated.
+  it("changes to save should not mutate array of hashes", async () => {
+    const topic = new Topic() as Rec;
+    topic.author_name = "Bill";
+    topic.content = [{ a: "a" }];
+
+    void (topic as any).changesToSave;
+
+    expect(topic.content).toEqual([{ a: "a" }]);
   });
 
   it("previous changes", async () => {
