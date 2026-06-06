@@ -277,14 +277,17 @@ describe("DirtyTest", () => {
     });
   });
 
-  it.skip("aliased attribute changes", () => {
-    // BLOCKED: dirty (alias under reflection) — on the canonical Parrot
-    // (`aliasAttribute "title", "name"` over a reflected `name` column),
-    // assigning `parrot.name = "Sam"` updates the value but does NOT mark it
-    // changed (`attributeChanged("name")` stays false), so the alias check
-    // fails. A reflected, non-aliased column on the same suite (Pirate's
-    // catchphrase/parrot_id) tracks correctly — the alias is what breaks it.
-    // SCOPE: alias-aware dirty tracking for reflected columns, separate PR.
+  it("aliased attribute changes", () => {
+    // the actual attribute here is name, title is an
+    // alias setup via alias_attribute
+    const parrot = new Parrot() as Rec;
+    expect(call<boolean>(parrot, "titleChanged")).toBe(false);
+    expect(call<unknown>(parrot, "titleChange")).toBeNull();
+
+    parrot.name = "Sam";
+    expect(call<boolean>(parrot, "titleChanged")).toBe(true);
+    expect(call<unknown>(parrot, "titleWas")).toBeNull();
+    expect(call<unknown>(parrot, "nameChange")).toEqual(call<unknown>(parrot, "titleChange"));
   });
 
   it("restore attribute!", async () => {
