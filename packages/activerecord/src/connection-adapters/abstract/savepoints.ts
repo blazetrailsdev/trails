@@ -43,7 +43,15 @@ export function resetSavepointNumber(): void {
  * Adapters that include Savepoints must provide internalExecute.
  */
 export interface SavepointHost {
-  internalExecute(sql: string, name: string): Promise<unknown>;
+  internalExecute(
+    sql: string,
+    name: string,
+    binds?: unknown[],
+    prepare?: boolean,
+    async?: boolean,
+    allowRetry?: boolean,
+    materializeTransactions?: boolean,
+  ): Promise<unknown>;
   currentSavepointName?(): string;
 }
 
@@ -54,7 +62,15 @@ export interface SavepointHost {
  */
 export async function createSavepoint(this: SavepointHost, name?: string): Promise<void> {
   const spName = name ?? this.currentSavepointName?.() ?? currentSavepointName();
-  await this.internalExecute(createSavepointSql(spName), "TRANSACTION");
+  await this.internalExecute(
+    createSavepointSql(spName),
+    "TRANSACTION",
+    [],
+    false,
+    false,
+    false,
+    false,
+  );
 }
 
 /**
@@ -64,7 +80,15 @@ export async function createSavepoint(this: SavepointHost, name?: string): Promi
  */
 export async function execRollbackToSavepoint(this: SavepointHost, name?: string): Promise<void> {
   const spName = name ?? this.currentSavepointName?.() ?? currentSavepointName();
-  await this.internalExecute(execRollbackToSavepointSql(spName), "TRANSACTION");
+  await this.internalExecute(
+    execRollbackToSavepointSql(spName),
+    "TRANSACTION",
+    [],
+    false,
+    false,
+    false,
+    false,
+  );
 }
 
 /**
@@ -74,7 +98,15 @@ export async function execRollbackToSavepoint(this: SavepointHost, name?: string
  */
 export async function releaseSavepoint(this: SavepointHost, name?: string): Promise<void> {
   const spName = name ?? this.currentSavepointName?.() ?? currentSavepointName();
-  await this.internalExecute(releaseSavepointSql(spName), "TRANSACTION");
+  await this.internalExecute(
+    releaseSavepointSql(spName),
+    "TRANSACTION",
+    [],
+    false,
+    false,
+    false,
+    false,
+  );
 }
 
 /**

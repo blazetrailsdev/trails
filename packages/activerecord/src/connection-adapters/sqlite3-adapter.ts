@@ -394,7 +394,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   // Mirrors: SQLite3::DatabaseStatements#begin_deferred_transaction
   async beginDeferredTransaction(isolation?: string | null): Promise<void> {
     if (isolation) return this._internalBeginTransaction("DEFERRED", isolation);
-    await this._logTransaction("BEGIN DEFERRED TRANSACTION");
+    await this.internalExecute(
+      "BEGIN DEFERRED TRANSACTION",
+      "TRANSACTION",
+      [],
+      false,
+      false,
+      false,
+      false,
+    );
     this._inTransaction = true;
   }
 
@@ -417,44 +425,101 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         );
       }
     }
-    await this._logTransaction(`BEGIN ${mode} TRANSACTION`);
+    await this.internalExecute(
+      `BEGIN ${mode} TRANSACTION`,
+      "TRANSACTION",
+      [],
+      false,
+      false,
+      false,
+      false,
+    );
     this._inTransaction = true;
     if (isolation) {
       const ruStmt = await this.driver.prepare("PRAGMA read_uncommitted");
       const row = (await ruStmt.get()) as { read_uncommitted: number } | undefined;
       this._previousReadUncommitted = row?.read_uncommitted ?? 0;
-      await this._logTransaction("PRAGMA read_uncommitted=ON");
+      await this.internalExecute(
+        "PRAGMA read_uncommitted=ON",
+        "TRANSACTION",
+        [],
+        false,
+        false,
+        false,
+        false,
+      );
     }
   }
 
   // Mirrors: SQLite3::DatabaseStatements#reset_isolation_level
   async resetIsolationLevel(): Promise<void> {
     if (this._previousReadUncommitted !== null) {
-      await this._logTransaction(`PRAGMA read_uncommitted=${this._previousReadUncommitted}`);
+      await this.internalExecute(
+        `PRAGMA read_uncommitted=${this._previousReadUncommitted}`,
+        "TRANSACTION",
+        [],
+        false,
+        false,
+        false,
+        false,
+      );
       this._previousReadUncommitted = null;
     }
   }
 
-  // Mirrors Rails internal_execute(sql, "TRANSACTION", materialize_transactions: false):
-  // emit sql.active_record with name="TRANSACTION" without calling materializeTransactions
-  // (transaction SQL must not trigger re-entrant materialization).
-  private async _logTransaction(sql: string): Promise<void> {
+  // Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_execute
+  // Overrides the abstract mixin default so TRANSACTION SQL (materializeTransactions=false)
+  // skips materializeTransactions() — calling it would trigger re-entrant SAVEPOINT emission.
+  override async internalExecute(
+    sql: string,
+    name: string = "SQL",
+    binds: unknown[] = [],
+    _prepare = false,
+    _async = false,
+    _allowRetry = false,
+    materializeTransactions = true,
+  ): Promise<unknown> {
+    sql = this.preprocessQuery(sql);
+    if (materializeTransactions) await this.materializeTransactions();
+    const tcBinds = typeCastedBinds(binds);
     const payload: Record<string, unknown> = {
       sql,
-      name: "TRANSACTION",
-      binds: [],
-      type_casted_binds: [],
+      name,
+      binds,
+      type_casted_binds: tcBinds,
       connection: this,
       row_count: 0,
     };
-    await Notifications.instrumentAsync("sql.active_record", payload, async () => {
-      await this.driver.exec(sql);
+    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      try {
+        if (binds.length > 0) {
+          const stmt = await this._cachedStatement(sql);
+          const result = await stmt.run(binds as SqliteBinds);
+          payload.row_count = result.changes;
+          return result.changes;
+        }
+        await this.driver.exec(sql);
+        return 0;
+      } catch (e: any) {
+        const translated = this._translateException(e, sql, binds);
+        payload.exception = translated;
+        payload.exception_object = translated;
+        throw translated;
+      }
     });
   }
 
   async beginDbTransaction(): Promise<void> {
     if (!this._inTransaction) {
-      await this._logTransaction("BEGIN IMMEDIATE TRANSACTION");
+      await this.internalExecute(
+        "BEGIN IMMEDIATE TRANSACTION",
+        "TRANSACTION",
+        [],
+        false,
+        false,
+        false,
+        false,
+      );
       this._inTransaction = true;
     }
   }
@@ -468,7 +533,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Commit the current transaction.
    */
   async commitDbTransaction(): Promise<void> {
-    await this._logTransaction("COMMIT TRANSACTION");
+    await this.internalExecute("COMMIT TRANSACTION", "TRANSACTION", [], false, false, false, false);
     this._inTransaction = false;
   }
 
@@ -481,7 +546,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async rollbackDbTransaction(): Promise<void> {
     try {
-      await this._logTransaction("ROLLBACK TRANSACTION");
+      await this.internalExecute(
+        "ROLLBACK TRANSACTION",
+        "TRANSACTION",
+        [],
+        false,
+        false,
+        false,
+        false,
+      );
     } catch (e) {
       // Mirrors Rails: rescue ConnectionNotEstablished, ConnectionFailed.
       // A closed/dropped connection is an implicit rollback; re-throw anything else.
@@ -502,21 +575,45 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Create a savepoint (nested transaction).
    */
   async createSavepoint(name: string): Promise<void> {
-    await this._logTransaction(`SAVEPOINT "${name}"`);
+    await this.internalExecute(
+      `SAVEPOINT "${name}"`,
+      "TRANSACTION",
+      [],
+      false,
+      false,
+      false,
+      false,
+    );
   }
 
   /**
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    await this._logTransaction(`RELEASE SAVEPOINT "${name}"`);
+    await this.internalExecute(
+      `RELEASE SAVEPOINT "${name}"`,
+      "TRANSACTION",
+      [],
+      false,
+      false,
+      false,
+      false,
+    );
   }
 
   /**
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    await this._logTransaction(`ROLLBACK TO SAVEPOINT "${name}"`);
+    await this.internalExecute(
+      `ROLLBACK TO SAVEPOINT "${name}"`,
+      "TRANSACTION",
+      [],
+      false,
+      false,
+      false,
+      false,
+    );
   }
 
   /**

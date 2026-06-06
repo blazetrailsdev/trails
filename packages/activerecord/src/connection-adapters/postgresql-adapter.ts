@@ -1485,9 +1485,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async beginDbTransaction(): Promise<void> {
     this._client = await this._acquireFreshClient();
     try {
-      await this._logTransaction("BEGIN", async () => {
-        await this._client!.query("BEGIN");
-      });
+      await this.internalExecute("BEGIN", "TRANSACTION", [], false, false, false, false);
       this._inTransaction = true;
     } catch (error) {
       this._client = null;
@@ -1521,9 +1519,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
     if (!this._client) throw new Error("No active transaction");
     try {
-      await this._logTransaction("COMMIT", async () => {
-        await this._client!.query("COMMIT");
-      });
+      await this.internalExecute("COMMIT", "TRANSACTION", [], false, false, false, false);
     } catch (e) {
       // Connection-level error (08P01, broken socket, etc.) leaves the
       // single pg.Client unusable. Tear down so the next caller gets a
@@ -1563,9 +1559,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
     if (!this._client) throw new Error("No active transaction");
     try {
-      await this._logTransaction("ROLLBACK", async () => {
-        await this._client!.query("ROLLBACK");
-      });
+      await this.internalExecute("ROLLBACK", "TRANSACTION", [], false, false, false, false);
     } catch (e) {
       // Connection-level error — closing the socket implicitly aborts
       // the server-side TX. Swallow and reconnect so the next caller
@@ -1681,9 +1675,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (!level) throw new Error(`Unknown isolation level: ${isolation}`);
     this._client = await this._acquireFreshClient();
     try {
-      await this._logTransaction(`BEGIN ISOLATION LEVEL ${level}`, async () => {
-        await this._client!.query(`BEGIN ISOLATION LEVEL ${level}`);
-      });
+      await this.internalExecute(
+        `BEGIN ISOLATION LEVEL ${level}`,
+        "TRANSACTION",
+        [],
+        false,
+        false,
+        false,
+        false,
+      );
       this._inTransaction = true;
     } catch (error) {
       this._client = null;
@@ -1723,28 +1723,55 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.execute(`SET CONSTRAINTS ${list} ${deferred.toUpperCase()}`);
   }
 
-  /**
-   * Create a savepoint (nested transaction).
-   */
-  // Mirrors Rails internal_execute(sql, "TRANSACTION", materialize_transactions: false).
-  private async _logTransaction(sql: string, fn: () => Promise<void>): Promise<void> {
+  // Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_execute
+  // Overrides the abstract mixin default so TRANSACTION SQL (materializeTransactions=false)
+  // skips materializeTransactions() — calling it would trigger re-entrant SAVEPOINT emission.
+  override async internalExecute(
+    sql: string,
+    name: string = "SQL",
+    binds: unknown[] = [],
+    _prepare = false,
+    _async = false,
+    _allowRetry = false,
+    materializeTransactions = true,
+  ): Promise<unknown> {
+    if (materializeTransactions) await this.materializeTransactions();
     const payload: Record<string, unknown> = {
       sql,
-      name: "TRANSACTION",
+      name,
       binds: [],
       type_casted_binds: [],
       connection: this,
       row_count: 0,
     };
-    await Notifications.instrumentAsync("sql.active_record", payload, fn);
+    return Notifications.instrumentAsync("sql.active_record", payload, () =>
+      this.withClient(async (client) => {
+        try {
+          const result = await client.query(sql, binds.length > 0 ? (binds as any[]) : undefined);
+          const count = result.rowCount ?? 0;
+          payload.row_count = count;
+          return count;
+        } catch (e: any) {
+          payload.exception = e;
+          payload.exception_object = e;
+          throw e;
+        }
+      }),
+    );
   }
 
+  /**
+   * Create a savepoint (nested transaction).
+   */
   async createSavepoint(name: string): Promise<void> {
-    const sql = `SAVEPOINT "${name}"`;
-    await this._logTransaction(sql, () =>
-      this.withClient(async (client) => {
-        await client.query(sql);
-      }),
+    await this.internalExecute(
+      `SAVEPOINT "${name}"`,
+      "TRANSACTION",
+      [],
+      false,
+      false,
+      false,
+      false,
     );
   }
 
@@ -1752,11 +1779,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    const sql = `RELEASE SAVEPOINT "${name}"`;
-    await this._logTransaction(sql, () =>
-      this.withClient(async (client) => {
-        await client.query(sql);
-      }),
+    await this.internalExecute(
+      `RELEASE SAVEPOINT "${name}"`,
+      "TRANSACTION",
+      [],
+      false,
+      false,
+      false,
+      false,
     );
   }
 
@@ -1764,11 +1794,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    const sql = `ROLLBACK TO SAVEPOINT "${name}"`;
-    await this._logTransaction(sql, () =>
-      this.withClient(async (client) => {
-        await client.query(sql);
-      }),
+    await this.internalExecute(
+      `ROLLBACK TO SAVEPOINT "${name}"`,
+      "TRANSACTION",
+      [],
+      false,
+      false,
+      false,
+      false,
     );
   }
 
