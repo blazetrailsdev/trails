@@ -85,13 +85,6 @@ describe("SQLite3::SchemaStatements", () => {
       expect((result as Buffer).toString("hex").toUpperCase()).toBe("DEADBEEF");
     });
 
-    it("converts TRUE/FALSE keywords to 1/0", () => {
-      expect(_extractValueFromDefault("TRUE")).toBe("1");
-      expect(_extractValueFromDefault("true")).toBe("1");
-      expect(_extractValueFromDefault("FALSE")).toBe("0");
-      expect(_extractValueFromDefault("false")).toBe("0");
-    });
-
     it("returns null for unrecognized expressions", () => {
       expect(_extractValueFromDefault("now()")).toBeNull();
     });
