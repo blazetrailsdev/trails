@@ -569,14 +569,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteQuoteTableNameForAssignment(table, attr);
   }
 
-  // `quoteDefaultExpression` deliberately not overridden here. The
-  // SQLite standalone (`sqlite3/quoting.ts:114`) returns an unprefixed
-  // expression (`NULL` / `(NOW())`) — Rails-correct — but the abstract
-  // and PG adapters return a `" DEFAULT ..."`-prefixed clause. Until
-  // that contract divergence is reconciled across adapters (Phase 2
-  // call-site work), inheriting the abstract default keeps DDL output
-  // consistent across adapters in this PR.
-
   override quotedTrue(): string {
     return sqliteQuotedTrue();
   }

@@ -57,7 +57,7 @@ import {
   quoteTableName as abstractQuoteTableName,
   quoteColumnName as abstractQuoteColumnName,
   quoteTableNameForAssignment as abstractQuoteTableNameForAssignment,
-  quoteDefaultExpression as abstractQuoteDefaultExpression,
+  isSqlLiteral,
   quotedTrue as abstractQuotedTrue,
   quotedFalse as abstractQuotedFalse,
   unquotedTrue as abstractUnquotedTrue,
@@ -615,7 +615,17 @@ export class AbstractAdapter implements Quoting {
   }
 
   quoteDefaultExpression(value: unknown, _column?: unknown): string {
-    return abstractQuoteDefaultExpression(value);
+    if (value === undefined) return "";
+    if (typeof value === "function") {
+      const result = (value as () => unknown)();
+      if (typeof result === "string") return ` DEFAULT ${result}`;
+      if (isSqlLiteral(result)) return ` DEFAULT ${result.value}`;
+      throw new TypeError(
+        "quoteDefaultExpression expected function default to return a string or SqlLiteral",
+      );
+    }
+    if (isSqlLiteral(value)) return ` DEFAULT ${value.value}`;
+    return ` DEFAULT ${this.quote(value)}`;
   }
 
   quotedTrue(): string {
