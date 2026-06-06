@@ -115,17 +115,7 @@ export function buildPkWhereNode(
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#column_names
  */
 export function columnNames(this: typeof Base): string[] {
-  const ignored = new Set(this.ignoredColumns ?? []);
-  // Virtual attributes (`attribute(name, type, { virtual: true })`) are not
-  // DB-backed — Rails' `column_names` comes from the schema, so they never
-  // appear here and are excluded from INSERT/UPDATE column lists.
-  const out: string[] = [];
-  for (const [name, def] of this._attributeDefinitions) {
-    if (ignored.has(name)) continue;
-    if ((def as { virtual?: boolean }).virtual) continue;
-    out.push(name);
-  }
-  return out;
+  return Object.keys(this.columnsHash());
 }
 
 /**
@@ -198,12 +188,13 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
     }
   }
 
-  // Synthesized fallback: filter ignoredColumns to match loadSchema's
-  // fallback and Rails behavior.
+  // Synthesized fallback: filter ignoredColumns and virtual attrs to match
+  // loadSchema's fallback and Rails behavior (virtual attrs are not DB columns).
   const ignored = new Set(this.ignoredColumns ?? []);
   const result: Record<string, ColumnLike> = {};
   for (const [name, def] of this._attributeDefinitions) {
     if (ignored.has(name)) continue;
+    if ((def as any).virtual) continue;
     result[name] = { name, type: def.type?.name ?? null, default: def.defaultValue ?? null };
   }
   return result;
@@ -675,6 +666,7 @@ export function loadSchema(this: SchemaHost): void {
     const ignored = new Set(workHost._ignoredColumns ?? []);
     for (const [name, def] of workHost._attributeDefinitions) {
       if (ignored.has(name)) continue;
+      if ((def as any).virtual) continue;
       hash[name] = {
         name,
         type: def.type?.name ?? null,

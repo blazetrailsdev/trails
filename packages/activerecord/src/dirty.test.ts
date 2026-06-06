@@ -446,9 +446,10 @@ describe("DirtyTest", () => {
     // will_change! API + a mutable-string attribute type, separate PR.
   });
 
-  it.skip("virtual attribute will change", () => {
-    // BLOCKED: dirty — needs `attribute_will_change!(:cancel_save_from_callback)`
-    // on instances (see "attribute will change!"). Not exposed today.
+  it("virtual attribute will change", async () => {
+    const parrot = (await Parrot.create({ name: "Ruby" })) as Rec;
+    (parrot as any).attributeWillChange("cancelSaveFromCallback");
+    expect(parrot.hasChangesToSave).toBe(true);
   });
 
   it("association assignment changes foreign key", async () => {
@@ -752,14 +753,43 @@ describe("DirtyTest", () => {
     // registration parity, separate PR.
   });
 
-  it.skip("attribute_will_change! doesn't try to save non-persistable attributes", () => {
-    // BLOCKED: dirty — needs the public `attribute_will_change!` API (see
-    // "attribute will change!").
+  it("attribute_will_change! doesn't try to save non-persistable attributes", async () => {
+    const klass = class extends Base {
+      static {
+        this.tableName = "people";
+        this.attribute("nonPersistedAttribute", "string");
+      }
+    };
+    // trails reflects a model's real columns asynchronously; Rails does so
+    // lazily/synchronously. Reflect "people" up front so the anonymous class
+    // knows `first_name` is a real column and `non_persisted_attribute` is not.
+    await klass.loadSchema();
+
+    const record = new klass({ first_name: "Sean" }) as Rec;
+    (record as any).nonPersistedAttributeWillChange();
+
+    expect(record.attributeChanged("nonPersistedAttribute")).toBe(true);
+    expect(await record.save()).toBe(true);
   });
 
-  it.skip("virtual attributes are not written with partial_writes off", () => {
-    // BLOCKED: dirty — needs the public `attribute_will_change!` API (see
-    // "attribute will change!").
+  it("virtual attributes are not written with partial_writes off", async () => {
+    await withPartialWrites(Base, false, async () => {
+      const klass = class extends Base {
+        static {
+          this.tableName = "people";
+          this.attribute("nonPersistedAttribute", "string");
+        }
+      };
+      // See note above: reflect "people" up front (async in trails).
+      await klass.loadSchema();
+
+      const record = new klass({ first_name: "Sean" }) as Rec;
+      (record as any).nonPersistedAttributeWillChange();
+      expect(await record.save()).toBe(true);
+
+      (record as any).nonPersistedAttributeWillChange();
+      expect(await record.save()).toBe(true);
+    });
   });
 
   it.skip("mutating and then assigning doesn't remove the change", () => {

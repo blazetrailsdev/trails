@@ -1815,6 +1815,18 @@ export class Model {
   }
 
   /**
+   * Force-mark an attribute as changed without changing its value.
+   * Used for in-place mutations where the object reference stays the same
+   * but the content has changed, or to mark a virtual attribute dirty.
+   *
+   * Mirrors: ActiveModel::Dirty#attribute_will_change!
+   */
+  attributeWillChange(name: string): void {
+    const resolved = resolveAliasName(this.constructor as typeof Model, name);
+    this._dirty.forceChange(resolved, this._attributes.fetchValue(resolved));
+  }
+
+  /**
    * Restore a single attribute to its pre-change value.
    *
    * Mirrors: ActiveModel::Dirty#restore_attribute!
