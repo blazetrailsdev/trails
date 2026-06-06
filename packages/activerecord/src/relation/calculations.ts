@@ -374,7 +374,7 @@ export async function performCount(
   // converts eager_load associations to LEFT OUTER JOINs and uses DISTINCT on PK to
   // prevent fan-out. Without this, the INNER JOIN alone would fan-out multiple rows
   // per record when a record has multiple associated records.
-  if (hasInclude(this, column ?? null) && this._limitValue === null && this._offsetValue === null) {
+  if (hasInclude(this, column ?? null)) {
     const anyRel = this as any;
     const eagerSpecs: string[] = (anyRel._eagerLoadAssociations as string[] | undefined) ?? [];
     const promoted: string[] =
@@ -413,6 +413,34 @@ export async function performCount(
           if (!tname || !explicitJoinTables.has(tname)) specsForJd.push(spec);
         }
         const table = this._modelClass.arelTable;
+        if (this._limitValue !== null || this._offsetValue !== null) {
+          // Rails finder_methods.rb:463-478: with limit/offset, apply_join_dependency
+          // wraps via distinct_relation_for_primary_key — a DISTINCT pk subquery that
+          // captures limit/offset, then counts distinct parent IDs outside the subquery.
+          const idSubquery = table.project(table.get(pk));
+          idSubquery.distinct();
+          if (specsForJd.length > 0) {
+            const jd = QueryMethodBangs.constructJoinDependency.call(
+              anyRel,
+              specsForJd,
+              Nodes.OuterJoin,
+            );
+            for (const node of jd.joinConstraints([])) idSubquery.appendJoinNode(node);
+          }
+          this._applyJoinsToManager(idSubquery);
+          this._applyWheresToManager(idSubquery, table);
+          if (this._limitValue !== null) idSubquery.take(this._limitValue);
+          if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
+          const innerSql = applyFromClause(this, this._modelClass.connection.toSql(idSubquery));
+          const countManager = table.project(table.get(pk).count().as("count"));
+          countManager.where(table.get(pk).in(new Nodes.SqlLiteral(innerSql)));
+          const limitedResult = await this._modelClass.connection.selectAll(
+            prependCtes(this, this._modelClass.connection.toSql(countManager)),
+            `${this._modelClass.name} Count`,
+          );
+          const limitedRows = limitedResult.toArray() as Record<string, unknown>[];
+          return Number(limitedRows[0]?.count ?? 0);
+        }
         const manager = table.project(table.get(pk).count(true).as("count"));
         if (specsForJd.length > 0) {
           const jd = QueryMethodBangs.constructJoinDependency.call(
