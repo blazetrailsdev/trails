@@ -374,7 +374,7 @@ export async function performCount(
   // converts eager_load associations to LEFT OUTER JOINs and uses DISTINCT on PK to
   // prevent fan-out. Without this, the INNER JOIN alone would fan-out multiple rows
   // per record when a record has multiple associated records.
-  if (hasInclude(this, null) && this._limitValue === null && this._offsetValue === null) {
+  if (hasInclude(this, column ?? null) && this._limitValue === null && this._offsetValue === null) {
     const anyRel = this as any;
     const eagerSpecs: string[] = (anyRel._eagerLoadAssociations as string[] | undefined) ?? [];
     const promoted: string[] =
@@ -700,10 +700,17 @@ export function isAllAttributes(rel: CalculationRelation, columnNames: string[])
 
 /** @internal */
 export function hasInclude(rel: CalculationRelation, columnName: string | null): boolean {
-  return (
-    (rel as any)._includesAssociations?.length > 0 ||
-    (rel as any)._eagerLoadAssociations?.length > 0
-  );
+  const anyRel = rel as any;
+  // eager_load_values.any? → always triggers (part of eager_loading?)
+  if (anyRel._eagerLoadAssociations?.length > 0) return true;
+  // includes_values with references → triggers via references_eager_loaded_tables?
+  const promoted = anyRel._includesToPromoteFromReferences?.() as string[] | undefined;
+  if (promoted && promoted.length > 0) return true;
+  // Plain includes: only triggers when a non-:all column is specified
+  if (anyRel._includesAssociations?.length > 0) {
+    return columnName != null && columnName !== "all" && columnName !== "*";
+  }
+  return false;
 }
 
 /** @internal */
