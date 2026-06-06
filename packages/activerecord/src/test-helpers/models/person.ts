@@ -1,6 +1,7 @@
 // vendor/rails/activerecord/test/models/person.rb
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Person extends Base {
   static {
@@ -203,3 +204,5 @@ export class SerializedPerson extends Base {
     this.serialize("insures", { coder: Insure });
   }
 }
+
+registerModel(Person);
