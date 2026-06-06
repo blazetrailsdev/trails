@@ -484,9 +484,9 @@ export function polymorphicClassFor(_modelClass: typeof Base, name: string): typ
  * Sets the inheritance column to the proper STI class name if needed.
  *
  * Mirrors: ActiveRecord::Inheritance#initialize_internals_callback. In Rails
- * this is wired into the initialization callback chain via `super`. The
- * trails port currently exposes it as a parity helper; integrating it into
- * Base's init flow is a follow-up.
+ * this is wired into the initialization callback chain via `super`. In the
+ * trails port it is called directly from Base's constructor in both branches,
+ * after `init_internals` and before `after_initialize`.
  *
  * @internal Private method.
  */
