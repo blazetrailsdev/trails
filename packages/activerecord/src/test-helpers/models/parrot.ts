@@ -1,5 +1,6 @@
 // vendor/rails/activerecord/test/models/parrot.rb
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Parrot extends Base {
   static {
@@ -11,7 +12,7 @@ export class Parrot extends Base {
 
     this.validates("name", { presence: true });
 
-    this.attribute("cancelSaveFromCallback", "boolean");
+    this.attribute("cancelSaveFromCallback", "boolean", { virtual: true });
     this.beforeSave(
       function (this: any) {
         this.cancelSaveCallbackMethod();
@@ -51,3 +52,7 @@ export class DeadParrot extends Parrot {
     this.belongsTo("killer", { className: "Pirate", foreignKey: "killer_id" });
   }
 }
+
+registerModel(Parrot);
+registerModel(LiveParrot);
+registerModel(DeadParrot);
