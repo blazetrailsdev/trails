@@ -22,6 +22,9 @@ import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Person } from "./test-helpers/models/person.js";
 import { Post } from "./test-helpers/models/post.js";
+import "./test-helpers/models/reader.js";
+import "./associations/collection-proxy.js";
+import "./association-relation.js";
 
 describe("ReadOnlyTest", () => {
   const { developers, people, posts } = useHandlerFixtures([
@@ -29,6 +32,7 @@ describe("ReadOnlyTest", () => {
     "people",
     "posts",
     "projects", // loaded for cross-join tests; accessor not used directly
+    "readers", // join rows for Post#people through-association tests
   ]);
 
   // Force schema reflection ONCE per worker: trails reflects columns lazily on
@@ -136,27 +140,28 @@ describe("ReadOnlyTest", () => {
     // relation/collection-proxy. Affects this test only.
   });
 
-  it.skip("has many with through is not implicitly marked readonly", () => {
-    // BLOCKED: associations — requires Post.find(1).people (has_many :people,
-    // through: :readers) returning a collection whose records are NOT marked
-    // readonly (implicit through-join must not set the readonly flag).
-    // SCOPE: has_many through collection readonly flag; shared with the three
-    // finding_by_id / first / last variants below.
+  it("has many with through is not implicitly marked readonly", async () => {
+    const post = await Post.find(posts("welcome").id);
+    const loaded: Person[] = await (post as any).people.toArray();
+    expect(loaded.some((p) => p.isReadonly())).toBe(false);
   });
 
-  it.skip("has many with through is not implicitly marked readonly while finding by id", () => {
-    // BLOCKED: associations — requires posts(:welcome).people.find(1) through
-    // the readers join without readonly being set. SCOPE: same as above.
+  it("has many with through is not implicitly marked readonly while finding by id", async () => {
+    const post = await Post.find(posts("welcome").id);
+    const person: Person = await (post as any).people.find(people("michael").id);
+    expect(person.isReadonly()).toBe(false);
   });
 
-  it.skip("has many with through is not implicitly marked readonly while finding first", () => {
-    // BLOCKED: associations — requires posts(:welcome).people.first without
-    // readonly. SCOPE: same as above.
+  it("has many with through is not implicitly marked readonly while finding first", async () => {
+    const post = await Post.find(posts("welcome").id);
+    const person: Person | null = await (post as any).people.first();
+    expect(person?.isReadonly()).toBe(false);
   });
 
-  it.skip("has many with through is not implicitly marked readonly while finding last", () => {
-    // BLOCKED: associations — requires posts(:welcome).people.last without
-    // readonly. SCOPE: same as above.
+  it("has many with through is not implicitly marked readonly while finding last", async () => {
+    const post = await Post.find(posts("welcome").id);
+    const person: Person | null = await (post as any).people.last();
+    expect(person?.isReadonly()).toBe(false);
   });
 
   it("readonly scoping", async () => {

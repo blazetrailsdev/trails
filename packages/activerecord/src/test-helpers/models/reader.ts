@@ -1,5 +1,6 @@
 // vendor/rails/activerecord/test/models/reader.rb
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Reader extends Base {
   static {
@@ -35,3 +36,5 @@ export class LazyReader extends Base {
     this.belongsTo("person");
   }
 }
+
+registerModel(Reader);
