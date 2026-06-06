@@ -400,21 +400,37 @@ function flip(
   });
 }
 
+// Decides what `claim` should do given a story's current frontmatter and the
+// requesting assignee. Pure (no I/O) so the three-way branch is unit-testable
+// without a git repo. Reads frontmatter with the same raw-regex style as the
+// rest of this file rather than parsing the whole block.
+//   "available" — unclaimed (`claim: null`); proceed to write the claim.
+//   "owned"     — already claimed by `assignee`; an idempotent re-claim.
+//   "taken"     — claimed by someone else; a genuine lost race.
+export function claimState(frontmatter: string, assignee: string): "available" | "owned" | "taken" {
+  if (/^claim: null\s*$/m.test(frontmatter)) return "available";
+  const held = frontmatter.match(/^assignee:\s*"?([^"\n]*)"?\s*$/m)?.[1] ?? null;
+  return held === assignee ? "owned" : "taken";
+}
+
 function claim(id: string, assignee: string): void {
   flip(id, `claim: ${id}`, `lost claim race on ${id} — pick another story`, 3, (file) => {
     const fm = readFileSync(file, "utf8");
-    if (!/^claim: null\s*$/m.test(fm)) {
-      // Already claimed. If it's our own claim that already landed on main
-      // (attempt 0's push succeeded server-side but the client reported a
-      // transient error, so commitAndPush reset and retried — and the rebase
-      // pulled our claim back), treat it as an idempotent success rather than
-      // a conflict. Only a claim held by someone else is a real "already
-      // claimed".
-      const held = fm.match(/^assignee:\s*"?([^"\n]*)"?\s*$/m)?.[1] ?? null;
-      if (held === assignee) {
-        console.log(`claimed ${id} as ${assignee}`);
-        process.exit(0);
-      }
+    const state = claimState(fm, assignee);
+    if (state === "owned") {
+      // Idempotent re-claim. `claim` is run more than once for the same story
+      // across separate invocations — e.g. a prior `claim` pushed the claim to
+      // main but then errored client-side (commitAndPush exits 1 on a non-race
+      // push failure, without retrying), and the operator/loop re-runs it. The
+      // `git pull --rebase` inside commitAndPush brings our own already-landed
+      // claim back onto the working tree, so re-claiming what we already hold
+      // is a success, not a conflict. (A within-invocation retry can't reach
+      // here: commitAndPush only resets-and-retries on a *lost* race, where our
+      // push never landed and the claim is still null or held by someone else.)
+      console.log(`claimed ${id} as ${assignee}`);
+      process.exit(0);
+    }
+    if (state === "taken") {
       console.error(`error: ${id} is already claimed`);
       process.exit(2);
     }

@@ -20,6 +20,7 @@ afterEach(() => {
 
 import {
   bestBundle,
+  claimState,
   commitAndPush,
   editFrontmatter,
   Index,
@@ -202,6 +203,35 @@ describe("editFrontmatter", () => {
     expect(() => editFrontmatter(file, { deps: "[a, b, c]" })).toThrow(/exit 1/);
     expect(errSpy.mock.calls[0]?.[0]).toMatch(/refusing to edit list-valued/);
     // afterEach restores all mocks; no manual restore needed.
+  });
+});
+
+describe("claimState (idempotent re-claim discriminator)", () => {
+  it("reports an unclaimed story as available", () => {
+    expect(claimState(`---\nstatus: ready\nclaim: null\nassignee: null\n---\n`, "dean")).toBe(
+      "available",
+    );
+  });
+
+  it("treats a re-claim by the same assignee as owned (idempotent)", () => {
+    const fm = `---\nstatus: claimed\nclaim: "2026-01-01T00:00:00Z"\nassignee: "dean"\n---\n`;
+    expect(claimState(fm, "dean")).toBe("owned");
+  });
+
+  it("treats a claim held by someone else as taken (a real race)", () => {
+    const fm = `---\nstatus: claimed\nclaim: "2026-01-01T00:00:00Z"\nassignee: "alice"\n---\n`;
+    expect(claimState(fm, "dean")).toBe("taken");
+  });
+
+  it("matches an assignee value that contains spaces", () => {
+    const fm = `---\nclaim: "2026-01-01T00:00:00Z"\nassignee: "Dean Marano"\n---\n`;
+    expect(claimState(fm, "Dean Marano")).toBe("owned");
+  });
+
+  it("falls back to taken when a claimed story has no assignee line", () => {
+    expect(claimState(`---\nstatus: claimed\nclaim: "2026-01-01T00:00:00Z"\n---\n`, "dean")).toBe(
+      "taken",
+    );
   });
 });
 
