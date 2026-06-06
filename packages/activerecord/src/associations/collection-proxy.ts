@@ -186,6 +186,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return !!this._assocDef.options.through;
   }
 
+  /**
+   * Self-referential alias so AssociationRelation#toArray can be called
+   * with `this` = CollectionProxy via `.call(this)`. AR#toArray reads
+   * `this._association.owner` and `this._association.reflection`; both are
+   * already exposed as getters on CollectionProxy, so returning `this`
+   * satisfies the contract without extra indirection.
+   */
+  private get _association(): this {
+    return this;
+  }
+
   // ──────────────────────────────────────────────────────────────────
   // Array-likeness — sync ops over the loaded target.
   //
@@ -487,49 +498,54 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Load and return all associated records.
+   * Shared execution core for `toArray()` and `load()`. Routes both the
+   * unmutated and mutated (whereBang / orderBang / ...) proxy through a
+   * single `loadHasMany` call. When the proxy state has diverged from the
+   * seed, a `queryExecutor` callback is passed so `loadHasMany` skips cache
+   * and scope rebuild and runs the mutated Relation directly — mirrors Rails'
+   * `CollectionProxy → AssociationRelation#exec_queries → loadTarget` path
+   * which always routes through the OO association regardless of scope state.
+   *
+   * `_cascadeStrictLoading` is called exactly once here; the Relation's own
+   * `strictLoadingValue` is applied afterward so it wins over cascade (Rails
+   * applies `strict_loading_value` after `set_strict_loading` per record).
    */
-  async toArray(): Promise<T[]> {
-    // Two paths:
-    //
-    // 1. Seed-only state (nothing mutated post-ctor): hit `loadHasMany`
-    //    to reuse the owner's association cache + strict-loading
-    //    enforcement. This is the common case (`await blog.posts`).
-    // 2. State has diverged from the seed (e.g. `cp.whereBang(...)`
-    //    was called directly on the proxy): delegate to
-    //    `super.toArray()` so the query honors the mutations. The
-    //    association cache is bypassed here because it's keyed on the
-    //    unmutated scope and would return stale/incorrect data.
-    if (this._relationStateDiverged()) {
-      // Diverged path bypasses loadHasMany, which is where the
-      // association's strict-loading enforcement normally lives. Run
-      // the gate ourselves so owner._strictLoading still raises.
-      this._checkStrictLoading();
-      const results = await super.toArray();
-      this._cascadeStrictLoading(results);
-      // Relation's strict_loading wins over cascade — applied last to
-      // match Rails: AssociationRelation#exec_queries runs set_strict_loading
-      // per record inside the block, then Relation#exec_queries applies
-      // strict_loading_value (including false) to all records afterward
-      // (unless nil). Mirror with _isStrictLoading !== undefined.
-      const sv = (this as any)._isStrictLoading as boolean | undefined;
-      if (sv !== undefined) {
-        for (const r of results) (r as any)._strictLoading = sv;
-      }
-      const unsaved = this._target.filter((r) => r.isNewRecord());
-      return unsaved.length > 0 ? [...results, ...unsaved] : results;
-    }
+  private async _execLoad(): Promise<T[]> {
+    const queryExecutor = this._cpMutated
+      ? (): Promise<Base[]> =>
+          // Route through AssociationRelation#toArray (not plain Relation#toArray) so
+          // inverse wiring (set_inverse_instance_from_queries) and set_strict_loading are
+          // applied — mirrors Rails' CollectionProxy → AssociationRelation#exec_queries path.
+          // `_association` returns `this` so AR#toArray can read owner/reflection off the CP.
+          (
+            _AssociationRelationCtor!.prototype as unknown as { toArray(): Promise<Base[]> }
+          ).toArray.call(this) as Promise<Base[]>
+      : undefined;
     const results = (await loadHasMany(
       this._record,
       this._assocName,
       this._assocDef.options,
+      queryExecutor,
     )) as T[];
     this._cascadeStrictLoading(results);
-    const unsaved = this._target.filter((r) => r.isNewRecord());
-    if (unsaved.length > 0) {
-      return [...results, ...unsaved];
+    // Relation's strict_loading wins over cascade — applied last to match
+    // Rails: AssociationRelation#exec_queries runs set_strict_loading per
+    // record, then Relation#exec_queries applies strict_loading_value
+    // (including false) to all records afterward (unless nil).
+    const sv = (this as any)._isStrictLoading as boolean | undefined;
+    if (sv !== undefined) {
+      for (const r of results) (r as any)._strictLoading = sv;
     }
     return results;
+  }
+
+  /**
+   * Load and return all associated records.
+   */
+  async toArray(): Promise<T[]> {
+    const results = await this._execLoad();
+    const unsaved = this._target.filter((r) => r.isNewRecord());
+    return unsaved.length > 0 ? [...results, ...unsaved] : results;
   }
 
   // @ts-expect-error CP's load returns the hydrated T[] (loaded records);
@@ -537,27 +553,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   so T[] is the correct contract here. Permanent divergence.
   async load(): Promise<T[]> {
     if (this._targetLoaded) return this._target;
-    // Same divergence gate as `toArray()` — if the inherited Relation
-    // state has been mutated via scope bangs (whereBang / orderBang /
-    // ...), route through `super.toArray()` so `load()` / `await proxy`
-    // honor the mutation. Without this, `cp.whereBang({...}); await cp`
-    // would silently fall back to the full association-cache load.
-    let results: T[];
-    if (this._relationStateDiverged()) {
-      // Diverged path bypasses loadHasMany — enforce strict-loading
-      // explicitly, same as the toArray() diverged branch.
-      this._checkStrictLoading();
-      results = await super.toArray();
-      this._cascadeStrictLoading(results);
-      // Same ordering fix as toArray() — relation strict_loading wins.
-      const sv = (this as any)._isStrictLoading as boolean | undefined;
-      if (sv !== undefined) {
-        for (const r of results) (r as any)._strictLoading = sv;
-      }
-    } else {
-      results = (await loadHasMany(this._record, this._assocName, this._assocDef.options)) as T[];
-      this._cascadeStrictLoading(results);
-    }
+    const results = await this._execLoad();
     // Merge: prefer existing in-memory instances (from push/build) over fresh DB records
     const existingByPk = new Map<string, T>();
     for (const r of this._target) {

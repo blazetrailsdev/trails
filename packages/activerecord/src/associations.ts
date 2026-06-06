@@ -1191,16 +1191,21 @@ export async function loadHasMany(
   record: Base,
   assocName: string,
   options: AssociationOptions,
+  queryExecutor?: () => Promise<Base[]>,
 ): Promise<Base[]> {
   if (options.through) {
     validateThroughReflection(record.constructor as typeof Base, assocName);
   }
-  // Check cached (inverse_of) first, then preloaded
-  if (record._cachedAssociations?.has(assocName)) {
-    return record._cachedAssociations.get(assocName) as Base[];
-  }
-  if (record._preloadedAssociations?.has(assocName)) {
-    return record._preloadedAssociations.get(assocName) as Base[];
+  // Check cached (inverse_of) first, then preloaded — skip when a scope
+  // override is provided (the scope has been mutated; the cache would return
+  // stale/incorrect data for the diverged query).
+  if (!queryExecutor) {
+    if (record._cachedAssociations?.has(assocName)) {
+      return record._cachedAssociations.get(assocName) as Base[];
+    }
+    if (record._preloadedAssociations?.has(assocName)) {
+      return record._preloadedAssociations.get(assocName) as Base[];
+    }
   }
 
   // Strict loading check
@@ -1209,6 +1214,11 @@ export async function loadHasMany(
       className: options.className ?? camelize(singularize(assocName)),
     });
   }
+
+  // Scope-override path: CollectionProxy passes this when its Relation state
+  // has been mutated (whereBang / orderBang / ...). The executor runs the
+  // mutated scope directly; cache lookup and scope rebuild are bypassed.
+  if (queryExecutor) return queryExecutor();
 
   // Handle through associations. Routes through AssociationScope's
   // JOIN-based path for the simple shape (see

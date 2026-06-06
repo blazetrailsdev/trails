@@ -272,16 +272,48 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
 
   it("toArray honors direct bang-mutation of inherited Relation state", async () => {
     // In-place bang mutations on CP (cp.whereBang/orderBang/limitBang)
-    // change the inherited Relation state. `toArray()` detects the
-    // divergence from the seed and delegates to super.toArray() so
-    // results reflect the mutations, instead of silently returning the
-    // association-cached full load. Chaining (cp.where(...).toArray())
-    // is the normal path and already goes through AR → Relation.
+    // change the inherited Relation state. `toArray()` routes through
+    // `loadHasMany` with a scope-override executor so the query honors the
+    // mutations, bypassing the association cache. Chaining
+    // (cp.where(...).toArray()) is the normal path and already goes through
+    // AR → Relation.
     const blog = await blogWithPosts();
     const proxy = association<ApPost>(blog, "apPosts") as any;
     proxy.whereBang({ title: "b" });
     const results = await proxy.toArray();
     expect(results.map((p: ApPost) => p.title)).toEqual(["b"]);
+  });
+
+  it("await proxy (load) honors direct bang-mutation of inherited Relation state", async () => {
+    // `await proxy` calls load(), which uses the same unified _execLoad() path
+    // as toArray(). When the proxy state has been mutated (whereBang/orderBang),
+    // the scope-override executor is passed to loadHasMany so the mutated
+    // scope is executed directly rather than falling back to the association cache.
+    const blog = new ApBlog({ name: "Diverged" });
+    await blog.save();
+    for (const title of ["x", "y", "z"]) {
+      const p = new ApPost({ title, ap_blog_id: blog.id as number });
+      await p.save();
+    }
+    const proxy = association<ApPost>(blog, "apPosts") as any;
+    proxy.whereBang({ title: "y" });
+    const results = await proxy;
+    expect(results.map((p: ApPost) => p.title)).toEqual(["y"]);
+  });
+
+  it("orderBang mutation respected in the unified load path", async () => {
+    // Verify that non-where mutations (orderBang) also route through the
+    // scope-override executor and produce correctly ordered results.
+    const blog = new ApBlog({ name: "Ordered" });
+    await blog.save();
+    for (const title of ["c", "a", "b"]) {
+      const p = new ApPost({ title, ap_blog_id: blog.id as number });
+      await p.save();
+    }
+    const proxy = association<ApPost>(blog, "apPosts") as any;
+    proxy.orderBang({ title: "asc" });
+    const results = await proxy.toArray();
+    expect(results.map((p: ApPost) => p.title)).toEqual(["a", "b", "c"]);
   });
 
   // ── Phase R.2 — collection reader returns the AssociationProxy ─────
