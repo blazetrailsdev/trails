@@ -18,13 +18,17 @@
 import { describe, it, expect, beforeAll } from "vitest";
 
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { registerModel } from "./associations.js";
 
 import { Developer } from "./test-helpers/models/developer.js";
 import { Person } from "./test-helpers/models/person.js";
 import { Post } from "./test-helpers/models/post.js";
+import { Comment } from "./test-helpers/models/comment.js";
 import "./test-helpers/models/reader.js";
 import "./associations/collection-proxy.js";
 import "./association-relation.js";
+
+registerModel(Comment);
 
 describe("ReadOnlyTest", () => {
   const { developers, people, posts } = useHandlerFixtures([
@@ -33,6 +37,7 @@ describe("ReadOnlyTest", () => {
     "posts",
     "projects", // loaded for cross-join tests; accessor not used directly
     "readers", // join rows for Post#people through-association tests
+    "comments", // needed for post.comments association tests
   ]);
 
   // Force schema reflection ONCE per worker: trails reflects columns lazily on
@@ -130,14 +135,18 @@ describe("ReadOnlyTest", () => {
     }
   });
 
-  it.skip("has many find readonly", () => {
-    // BLOCKED: associations — requires post.comments collection proxy with
-    // `.any()` (shorthand for `.toArray().some()`) and `.readonly(true).all()`
-    // (chained relation on the collection proxy). The collection proxy in
-    // trails does not yet expose a chainable relation accessor that propagates
-    // readonly to lazily-loaded records.
-    // SCOPE: association collection proxy readonly propagation; ~10–30 LOC in
-    // relation/collection-proxy. Affects this test only.
+  it("has many find readonly", async () => {
+    const post = await Post.find(posts("welcome").id);
+    // assert_not_empty post.comments
+    expect(await (post as any).comments.any()).toBe(true);
+    // assert_not post.comments.any?(&:readonly?)
+    expect(await (post as any).comments.any((c: any) => c.isReadonly())).toBe(false);
+    // assert_not post.comments.to_a.any?(&:readonly?)
+    const arr = await (post as any).comments.toArray();
+    expect(arr.some((c: any) => c.isReadonly())).toBe(false);
+    // assert post.comments.readonly(true).all?(&:readonly?)
+    const readonlyComments = await (post as any).comments.readonly(true).toArray();
+    expect(readonlyComments.every((c: any) => c.isReadonly())).toBe(true);
   });
 
   it("has many with through is not implicitly marked readonly", async () => {

@@ -256,6 +256,20 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._target.every(predicate, thisArg);
   }
 
+  // Mirrors Rails' Relation#any? / CollectionProxy#any? semantics:
+  // - No predicate: returns !empty? which uses exists? when not loaded
+  //   (SELECT 1 LIMIT 1) rather than materializing all rows.
+  // - With predicate: loads all records (via Enumerable#any? / to_a.any?).
+
+  async any(
+    fn?: (record: T, index: number, all: T[]) => unknown,
+    thisArg?: unknown,
+  ): Promise<boolean> {
+    if (!fn) return !(await this.isEmpty());
+    const records = await this.toArray();
+    return records.some(fn as (v: T, i: number, a: T[]) => unknown, thisArg);
+  }
+
   // The Array-style `includes(record)` and `find(predicate)` overloads
   // are intentionally NOT added:
   //   - Array-style `includes(record)` would shadow
