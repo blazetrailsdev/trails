@@ -992,12 +992,26 @@ describe("DirtyTest", () => {
     // auto-populated to assert against. SCOPE: SQL-function column defaults.
   });
 
-  it.skip("partial insert off with changed default function attribute", () => {
-    // BLOCKED: datetime value type — assigning a JS `Date` to the reflected
-    // `manufactured_at` datetime attribute doesn't round-trip (reads back null /
-    // a Temporal value, not a `Date`), so the `to_i`-equality the Rails test
-    // performs can't be expressed faithfully. SCOPE: JS `Date` ⇄ datetime
-    // attribute coercion parity, separate PR.
+  it("partial insert off with changed default function attribute", async () => {
+    await withPartialWrites(Aircraft, false, async () => {
+      const manufacturingDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+      const aircraft = new Aircraft({ name: "Boeing2", manufactured_at: manufacturingDate }) as Rec;
+
+      expect(aircraft.name).toBe("Boeing2");
+      const castAt = aircraft.manufactured_at as Temporal.Instant;
+      expect(Math.floor(castAt.epochMilliseconds / 1000)).toBe(
+        Math.floor(manufacturingDate.getTime() / 1000),
+      );
+
+      await (aircraft as unknown as Aircraft).saveBang();
+      await (aircraft as unknown as Aircraft).reload();
+
+      expect(aircraft.name).toBe("Boeing2");
+      const reloadedAt = aircraft.manufactured_at as Temporal.Instant;
+      const expectedStr = manufacturingDate.toISOString().slice(0, 19).replace("T", " ");
+      const actualStr = reloadedAt.toString().slice(0, 19).replace("T", " ");
+      expect(actualStr).toBe(expectedStr);
+    });
   });
 
   it("attribute_changed? properly type casts enum values", async () => {

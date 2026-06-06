@@ -27,6 +27,10 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     if (value === DateInfinity) return DateInfinity;
     if (value === DateNegativeInfinity) return DateNegativeInfinity;
     if (value instanceof Temporal.Instant) return this._applySecondsPrecision(value);
+    if (value instanceof Date) {
+      // boundary: JS Date assigned to a datetime attribute (e.g. aircraft.manufactured_at = new Date())
+      return this._applySecondsPrecision(Temporal.Instant.fromEpochMilliseconds(value.getTime()));
+    }
     if (isNumericKeyHash(value)) return this.valueFromMultiparameterAssignment(value);
     const str = String(value).trim();
     if (str === "") return null;
