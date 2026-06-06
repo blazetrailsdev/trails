@@ -219,7 +219,9 @@ export function aliasAttribute(this: AttributeMethodHost, newName: string, oldNa
     },
   ) {
     if (!this._attributes.getAttribute(oldName).isInitialized()) {
-      throw new MissingAttributeError(`missing attribute '${oldName}'`);
+      throw new MissingAttributeError(
+        `missing attribute '${oldName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+      );
     }
     return this.readAttribute(oldName);
   };

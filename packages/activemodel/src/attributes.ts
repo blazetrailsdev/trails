@@ -153,7 +153,9 @@ export function attribute(
         _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
       }) {
         if (!this._attributes.getAttribute(name).isInitialized()) {
-          throw new MissingAttributeError(`missing attribute '${name}'`);
+          throw new MissingAttributeError(
+            `missing attribute '${name}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+          );
         }
         return this.readAttribute(name);
       },
