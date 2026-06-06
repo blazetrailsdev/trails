@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
+import { Table } from "@blazetrails/arel";
 
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -133,11 +134,11 @@ describe("LeftOuterJoinAssociationTest", () => {
     expect(sql).not.toContain("JOIN");
   });
 
-  it.skip("left outer joins forbids to use string as argument", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/left-outer-join-association.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in left-outer-join-association.test.ts
-    /* Rails raises on string arg; our impl accepts strings */
+  it("left outer joins forbids to use string as argument", () => {
+    const { Post } = makeModels();
+    expect(() =>
+      Post.leftOuterJoins("inner join l_comments on l_comments.post_id = posts.id"),
+    ).toThrow();
   });
 
   it("left outer joins with string join", () => {
@@ -146,11 +147,15 @@ describe("LeftOuterJoinAssociationTest", () => {
     expect(sql).toContain("LEFT OUTER JOIN");
   });
 
-  it.skip("left outer joins with arel join", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/left-outer-join-association.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in left-outer-join-association.test.ts
-    /* needs arel node support */
+  it("left outer joins with arel join", () => {
+    const { Post } = makeModels();
+    const postTable = new Table("posts");
+    const commentTable = new Table("l_comments");
+    const joinSources = postTable
+      .outerJoin(commentTable)
+      .on(postTable.get("id").eq(commentTable.get("post_id"))).joinSources;
+    const sql = Post.leftOuterJoins(joinSources).toSql();
+    expect(sql).toContain("LEFT OUTER JOIN");
   });
 
   it("join conditions added to join clause", () => {
@@ -225,9 +230,13 @@ describe("LeftOuterJoinAssociationTest", () => {
     expect(sql).toContain("comments");
   });
 
-  it.skip("merging left joins should be left joins", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/left-outer-join-association.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in left-outer-join-association.test.ts
+  it("merging left joins should be left joins", () => {
+    const { Post } = makeModels();
+    const leftJoinRel = Post.leftOuterJoins("authors", "posts.author_id = authors.id");
+    const innerJoinRel = Post.joins("l_comments", "l_comments.post_id = posts.id");
+    const merged = leftJoinRel.merge(innerJoinRel);
+    const sql = merged.toSql();
+    expect(sql).toContain("LEFT OUTER JOIN");
+    expect(sql).toContain("INNER JOIN");
   });
 });

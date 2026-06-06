@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
+import { Table } from "@blazetrails/arel";
 
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -114,11 +115,18 @@ describe("InnerJoinAssociationTest", () => {
     expect(sql).toContain("INNER JOIN authors");
   });
 
-  it.skip("eager load with arel joins", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/inner-join-association.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inner-join-association.test.ts
-    /* needs eager loading with arel nodes */
+  it("eager load with arel joins", () => {
+    const { Post } = makeModels();
+    const postTable = new Table("posts");
+    const commentTable = new Table("comments");
+    const joinSources = postTable
+      .join(commentTable)
+      .on(postTable.get("id").eq(commentTable.get("post_id"))).joinSources;
+    expect(() =>
+      Post.includes("comments")
+        .joins(...joinSources)
+        .toSql(),
+    ).not.toThrow();
   });
 
   it("construct finder sql ignores empty joins hash", () => {
@@ -376,10 +384,11 @@ describe("InnerJoinAssociationTest", () => {
     expect(sql).toContain("comments");
   });
 
-  it.skip("eager load with string joins", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/inner-join-association.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inner-join-association.test.ts
+  it("eager load with string joins", () => {
+    const { Post } = makeModels();
+    expect(() =>
+      Post.includes("comments").joins("INNER JOIN comments ON comments.post_id = posts.id").toSql(),
+    ).not.toThrow();
   });
 
   it("joins a has_and_belongs_to_many association", async () => {

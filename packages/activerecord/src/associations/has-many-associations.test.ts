@@ -8228,7 +8228,7 @@ describe("HasManyAssociationsTest", () => {
     expect(assoc.options.counterCache).toBeUndefined();
   });
 
-  it.skip("counter cache updates in memory after create", async () => {
+  it("counter cache updates in memory after create", async () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
@@ -8254,7 +8254,7 @@ describe("HasManyAssociationsTest", () => {
     expect((reloaded as any).posts_count).toBe(1);
   });
 
-  it.skip("pushing association updates counter cache", async () => {
+  it("pushing association updates counter cache", async () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");
@@ -8280,7 +8280,7 @@ describe("HasManyAssociationsTest", () => {
     expect((reloaded as any).posts_count).toBeGreaterThanOrEqual(1);
   });
 
-  it.skip("calling empty with counter cache", async () => {
+  it("calling empty with counter cache", async () => {
     class Author extends Base {
       static {
         this.attribute("name", "string");

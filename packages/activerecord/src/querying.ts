@@ -277,6 +277,10 @@ export function leftJoins<T extends typeof Base>(
 export function leftOuterJoins<T extends typeof Base>(this: T): Relation<InstanceType<T>>;
 export function leftOuterJoins<T extends typeof Base>(
   this: T,
+  nodes: import("@blazetrails/arel").Nodes.Join[],
+): Relation<InstanceType<T>>;
+export function leftOuterJoins<T extends typeof Base>(
+  this: T,
   table: string,
   on: string,
 ): Relation<InstanceType<T>>;
@@ -286,7 +290,7 @@ export function leftOuterJoins<T extends typeof Base>(
 ): Relation<InstanceType<T>>;
 export function leftOuterJoins<T extends typeof Base>(
   this: T,
-  table?: AssociationSpec | AssociationSpec[],
+  table?: AssociationSpec | AssociationSpec[] | import("@blazetrails/arel").Nodes.Join[],
   on?: string,
 ): Relation<InstanceType<T>> {
   const rel = this.all();
@@ -296,7 +300,7 @@ export function leftOuterJoins<T extends typeof Base>(
       throw argumentError("leftOuterJoins(table, on) requires a string table name");
     return rel.leftOuterJoins(table, on);
   }
-  return rel.leftOuterJoins(table);
+  return rel.leftOuterJoins(table as any);
 }
 
 /** Mirrors: ActiveRecord::Querying#none */
