@@ -24,11 +24,13 @@ import { Developer } from "./test-helpers/models/developer.js";
 import { Person } from "./test-helpers/models/person.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
+import { Project } from "./test-helpers/models/project.js";
 import "./test-helpers/models/reader.js";
 import "./associations/collection-proxy.js";
 import "./association-relation.js";
 
 registerModel(Comment);
+registerModel(Project);
 
 describe("ReadOnlyTest", () => {
   const { developers, people, posts } = useHandlerFixtures([
@@ -36,6 +38,7 @@ describe("ReadOnlyTest", () => {
     "people",
     "posts",
     "projects", // loaded for cross-join tests; accessor not used directly
+    "developersProjects", // join rows for Developer#projects HABTM tests
     "readers", // join rows for Post#people through-association tests
     "comments", // needed for post.comments association tests
   ]);
@@ -203,16 +206,14 @@ describe("ReadOnlyTest", () => {
     });
   });
 
-  it.skip("association collection method missing scoping not readonly", () => {
-    // BLOCKED (two gaps):
-    // (1) Collection proxy method_missing — developer.projects.allAsMethod().first()
-    //     and (Post.find(1) as "project").comments.allAsMethod().first() require the
-    //     proxy to surface Project.allAsMethod / Comment.allAsMethod through delegation.
-    //     `Project.allAsMethod` exists (project.ts:65); `Comment.allAsMethod` is absent
-    //     (comment.ts has `allAsScope` scope but the static `allAsMethod` from
-    //     comment.rb:58 is not ported). Delegation path not yet wired in trails.
-    // (2) Comment.allAsMethod missing — comment.rb:58 `def self.all_as_method; all; end`
-    //     has no TS equivalent; comment.ts only has the `allAsScope` named scope.
-    // SCOPE: port Comment.allAsMethod (~3 LOC) + collection proxy delegation (~30 LOC).
+  it("association collection method missing scoping not readonly", async () => {
+    const developer = await Developer.find(developers("david").id);
+    const post = await Post.find(posts("welcome").id);
+
+    expect((await (developer as any).projects.allAsMethod().first())?.isReadonly()).toBe(false);
+    expect((await (developer as any).projects.allAsScope().first())?.isReadonly()).toBe(false);
+
+    expect((await (post as any).comments.allAsMethod().first())?.isReadonly()).toBe(false);
+    expect((await (post as any).comments.allAsScope().first())?.isReadonly()).toBe(false);
   });
 });

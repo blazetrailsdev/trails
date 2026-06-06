@@ -29,6 +29,10 @@ export class Comment extends Base {
     this.enum("label", { default: 0, child: 1 });
   }
 
+  static allAsMethod() {
+    return this.all();
+  }
+
   static whatAreYou() {
     return "a comment...";
   }

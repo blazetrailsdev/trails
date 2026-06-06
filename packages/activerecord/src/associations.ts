@@ -4,6 +4,7 @@ import { Table as ArelTable } from "@blazetrails/arel";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
+import { ScopeRegistry } from "./scoping.js";
 // Re-export the slot's setter so the package entry and other internal
 // callers don't need to import the slot module directly.
 export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
@@ -2189,6 +2190,35 @@ function wrapCollectionProxy<T extends Base = Base>(
       if (typeof scopeVal === "function") {
         return (...args: any[]) => scopeVal.apply(scope, args);
       }
+
+      // Rails delegation.rb:118-131 (ClassSpecificRelation#method_missing):
+      // if the scope doesn't respond to the method, check the model class and
+      // delegate via `scoping { model.public_send(method, ...) }`.
+      // Sync methods (returning Relation) restore the scope immediately so
+      // the Relation is directly chainable. Async methods (returning a native
+      // Promise) defer restoration until the promise settles — mirrors Rails'
+      // synchronous block-scoping across the full method body.
+      const modelClass = target.model;
+      const classMethod = (modelClass as any)[prop];
+      if (typeof classMethod === "function") {
+        return (...args: any[]) => {
+          const prev = ScopeRegistry.currentScope(modelClass as any);
+          ScopeRegistry.setCurrentScope(modelClass as any, scope as any);
+          let result: unknown;
+          try {
+            result = classMethod.apply(modelClass, args);
+          } catch (e) {
+            ScopeRegistry.setCurrentScope(modelClass as any, prev);
+            throw e;
+          }
+          if (result instanceof Promise) {
+            return result.finally(() => ScopeRegistry.setCurrentScope(modelClass as any, prev));
+          }
+          ScopeRegistry.setCurrentScope(modelClass as any, prev);
+          return result;
+        };
+      }
+
       return scopeVal;
     },
   });
