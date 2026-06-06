@@ -253,8 +253,13 @@ function parseStringInZone(value: string, zone: TimeZone): TimeWithZone | null {
     const withT = trimmed.replace(" ", "T");
     // Detect offset: Z/z, ±HH:MM, ±HHMM, or short ±HH (without minutes).
     if (/[Zz]$|[+-]\d{2}(?::?\d{2})?$/.test(withT)) {
-      // Normalize short offsets ±HH → ±HH:00 so Temporal.Instant.from() accepts them.
-      const normalized = withT.replace(/([-+]\d{2})$/, "$1:00");
+      // Normalize to a form Temporal.Instant.from() accepts (RFC 3339: no spaces,
+      // colon-separated offset). TimeWithZone#toString() emits "YYYY-MM-DD HH:MM:SS ±HHMM";
+      // after the space→T step the offset remains " ±HHMM" — strip the space and insert
+      // the colon. Also handles: ±HH:MM (already canonical), ±HHMM (add colon), ±HH (add :00).
+      const normalized = withT
+        .replace(/\s*([-+])(\d{2}):?(\d{2})$/, "$1$2:$3")
+        .replace(/\s*([-+]\d{2})$/, "$1:00");
       return new TimeWithZone(Temporal.Instant.from(normalized), zone);
     }
     // No offset → wall-clock components local to the current zone.

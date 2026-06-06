@@ -744,12 +744,25 @@ describe("DirtyTest", () => {
     },
   );
 
-  it.skip("datetime attribute doesnt change if zone is modified in string", () => {
-    // BLOCKED: time-zone parity — Rails re-renders the value in another zone
-    // (`created_on.in_time_zone("Tokyo").to_s`) and asserts re-assigning that
-    // string is not a change (same instant). trails' TZ-aware string round-trip
-    // through `in_time_zone(...).to_s` isn't established to parse back to the
-    // identical instant. SCOPE: TZ-aware datetime string round-trip, separate PR.
+  it("datetime attribute doesnt change if zone is modified in string", async () => {
+    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+      const Target = class extends Base {
+        static tableName = "pirates";
+        static {
+          this.attribute("created_on", "datetime");
+          this.attribute("catchphrase", "string");
+        }
+      };
+
+      const timeInParis = new TimeWithZone(
+        Temporal.Instant.from("2014-01-01T12:00:00Z"),
+        getZone()!,
+      );
+      const pirate = (await Target.create({ catchphrase: "rrrr", created_on: timeInParis })) as Rec;
+
+      pirate.created_on = (pirate.created_on as TimeWithZone).inTimeZone("Tokyo").toString();
+      expect(pirate.attributeChanged("created_on")).toBe(false);
+    });
   });
 
   it("partial insert", async () => {
