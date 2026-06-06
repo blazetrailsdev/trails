@@ -72,7 +72,13 @@ export abstract class Attribute {
     if (this.isAssigned()) {
       return this.originalAttribute!.originalValue;
     }
-    return this.value;
+    // Re-type-cast from the raw value (mirrors Rails FromDatabase#original_value →
+    // type_cast(value_before_type_cast)).  Uses this.typeCast() so that
+    // FromDatabase attrs call type.deserialize (not type.cast), matching Rails.
+    // For mutable types (Serialized, Array) the cached this.value may have been
+    // mutated in-place; re-casting from valueBeforeTypeCast returns the clean
+    // original.  For non-mutable types the result equals this.value.
+    return this.typeCast(this.valueBeforeTypeCast);
   }
 
   get valueForDatabase(): unknown {
