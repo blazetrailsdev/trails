@@ -57,7 +57,7 @@ export function mergeBang(this: any, other: any): any {
     if (other._isDistinct) this._isDistinct = true;
     if (other._lockValue) this._lockValue = other._lockValue;
     if (other._isReadonly) this._isReadonly = true;
-    if (other._isStrictLoading) this._isStrictLoading = true;
+    if (other._isStrictLoading !== undefined) this._isStrictLoading = other._isStrictLoading;
     // mergeClauses
     if (other._havingClause && !other._havingClause.isEmpty())
       this._havingClause = this._havingClause.merge(other._havingClause);

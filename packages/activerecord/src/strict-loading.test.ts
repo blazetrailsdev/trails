@@ -528,6 +528,15 @@ describe("StrictLoadingTest", () => {
       ehosd_profiles: { bio: "string", ehosd_dev_id: "integer" },
       ehmd_devs: { name: "string" },
       ehmd_logs: { message: "string", ehmd_dev_id: "integer" },
+      slcpl_authors: { name: "string" },
+      slcpl_books: { title: "string", author_id: "integer" },
+      slcpm_developers: { name: "string", ship_id: "integer" },
+      slcpm_ships: { name: "string" },
+      slcpm_parts: { name: "string", ship_id: "integer" },
+      slcpd_authors: { name: "string" },
+      slcpd_books: { title: "string", author_id: "integer" },
+      slcpf_devs: { name: "string" },
+      slcpf_logs: { message: "string", slcpf_dev_id: "integer" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -1222,6 +1231,152 @@ describe("StrictLoadingTest", () => {
     await expect((parts[0] as any).association("npoBtShip").loadTarget()).rejects.toThrow(
       StrictLoadingViolationError,
     );
+  });
+  it("strict loading cascade on collection proxy load", async () => {
+    class SlcplAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlcplBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+      }
+    }
+    registerModel("SlcplAuthor", SlcplAuthor);
+    registerModel("SlcplBook", SlcplBook);
+    Associations.hasMany.call(SlcplAuthor, "slcplBooks", {
+      className: "SlcplBook",
+      foreignKey: "author_id",
+    });
+    Associations.belongsTo.call(SlcplBook, "slcplAuthor", {
+      className: "SlcplAuthor",
+      foreignKey: "author_id",
+    });
+    const author = await SlcplAuthor.create({ name: "Test" });
+    await SlcplBook.create({ title: "B", author_id: author.id });
+    author.strictLoadingBang(true, { mode: "n_plus_one_only" });
+
+    // Load via the thenable path (`await proxy` — CollectionProxy#load)
+    // rather than `.toArray()`. Strict loading must still cascade.
+    const books = (await association(author, "slcplBooks")) as Base[];
+
+    expect(books.every((b) => b.isStrictLoading())).toBe(true);
+    await expect((books[0] as any).association("slcplAuthor").loadTarget()).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
+  });
+  it("strict loading mode propagated via collection proxy load", async () => {
+    class SlcpmDeveloper extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("ship_id", "integer");
+      }
+    }
+    class SlcpmShip extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlcpmPart extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("ship_id", "integer");
+      }
+    }
+    registerModel("SlcpmDeveloper", SlcpmDeveloper);
+    registerModel("SlcpmShip", SlcpmShip);
+    registerModel("SlcpmPart", SlcpmPart);
+    Associations.belongsTo.call(SlcpmDeveloper, "slcpmShip", {
+      className: "SlcpmShip",
+      foreignKey: "ship_id",
+    });
+    Associations.hasMany.call(SlcpmShip, "slcpmParts", {
+      className: "SlcpmPart",
+      foreignKey: "ship_id",
+    });
+    Associations.belongsTo.call(SlcpmPart, "slcpmShip", {
+      className: "SlcpmShip",
+      foreignKey: "ship_id",
+    });
+    const ship = await SlcpmShip.create({ name: "S" });
+    await SlcpmPart.create({ name: "Keel", ship_id: ship.id });
+    const developer = await SlcpmDeveloper.create({ name: "Dev", ship_id: ship.id });
+    developer.strictLoadingBang(true, { mode: "n_plus_one_only" });
+
+    // belongs_to target receives the mode (not strict loading itself)
+    const loadedShip = (await (developer as any).association("slcpmShip").loadTarget()) as Base;
+    expect(loadedShip.isStrictLoading()).toBe(false);
+    expect((loadedShip as any).strictLoadingMode()).toBe("n_plus_one_only");
+
+    // Load parts via thenable path — mode propagated from ship enables cascade
+    const parts = (await association(loadedShip, "slcpmParts")) as Base[];
+    expect(parts.every((p) => p.isStrictLoading())).toBe(true);
+    await expect((parts[0] as any).association("slcpmShip").loadTarget()).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
+  });
+  it("proxy strict_loading chain wins over cascade in diverged path", async () => {
+    class SlcpdAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlcpdBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+      }
+    }
+    registerModel("SlcpdAuthor", SlcpdAuthor);
+    registerModel("SlcpdBook", SlcpdBook);
+    Associations.hasMany.call(SlcpdAuthor, "slcpdBooks", {
+      className: "SlcpdBook",
+      foreignKey: "author_id",
+    });
+    const author = await SlcpdAuthor.create({ name: "Test" });
+    await SlcpdBook.create({ title: "B", author_id: author.id });
+    // author is NOT strict loading — cascade would call strictLoadingBang(false)
+    // on children. Calling strictLoadingBang(true) directly on the proxy sets
+    // _cpMutated=true (diverged path) AND _isStrictLoading=true. The relation's
+    // strict_loading must win because Rails applies strict_loading_value AFTER
+    // AssociationRelation's per-record set_strict_loading block.
+    const proxy = association(author, "slcpdBooks");
+    proxy.strictLoadingBang(true);
+    const books = (await proxy.toArray()) as Base[];
+    expect(books.every((b) => b.isStrictLoading())).toBe(true);
+  });
+  it("proxy strict_loading(false) wins over n_plus_one_only cascade in diverged path", async () => {
+    class SlcpfDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlcpfLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("slcpf_dev_id", "integer");
+      }
+    }
+    registerModel("SlcpfDev", SlcpfDev);
+    registerModel("SlcpfLog", SlcpfLog);
+    Associations.hasMany.call(SlcpfDev, "slcpfLogs", {
+      className: "SlcpfLog",
+      foreignKey: "slcpf_dev_id",
+    });
+    const dev = await SlcpfDev.create({ name: "Dev" });
+    await SlcpfLog.create({ message: "entry", slcpf_dev_id: dev.id });
+    dev.strictLoadingBang(true, { mode: "n_plus_one_only" });
+
+    // n_plus_one_only cascade would normally enable strict on has_many children.
+    // An explicit strictLoadingBang(false) on the proxy sets _isStrictLoading=false
+    // (diverged path). Rails applies strict_loading_value even when false
+    // (Relation#exec_queries: `unless strict_loading_value.nil?`), so false wins.
+    const proxy = association(dev, "slcpfLogs");
+    proxy.strictLoadingBang(false);
+    const logs = (await proxy.toArray()) as Base[];
+    expect(logs.every((l) => !l.isStrictLoading())).toBe(true);
   });
   it("default mode can be changed globally", async () => {
     class GmAuthor extends Base {

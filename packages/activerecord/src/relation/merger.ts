@@ -121,7 +121,8 @@ export class Merger {
     if (this.other._isDistinct) rel._isDistinct = true;
     if (this.other._lockValue) rel._lockValue = this.other._lockValue;
     if (this.other._isReadonly) rel._isReadonly = true;
-    if (this.other._isStrictLoading) rel._isStrictLoading = true;
+    if (this.other._isStrictLoading !== undefined)
+      rel._isStrictLoading = this.other._isStrictLoading;
   }
 
   private mergeClauses(rel: any): void {
