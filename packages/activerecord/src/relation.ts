@@ -3156,6 +3156,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#update_all
    */
   async updateAll(updates: Record<string, unknown>): Promise<number> {
+    // Mirrors Rails: blank check precedes none? check (relation.rb:588-591).
+    if (Object.keys(updates).length === 0)
+      throw new ArgumentError("Empty list of attributes to change");
     if (this._isNone) return 0;
 
     const table = this._modelClass.arelTable;
@@ -3173,8 +3176,6 @@ export class Relation<T extends Base> {
         return [table.get(key), val];
       },
     );
-    // Mirrors Rails: raise ArgumentError when updates is blank (before lock injection).
-    if (updateValues.length === 0) throw new ArgumentError("Empty list of attributes to change");
     // Mirrors Rails relation.rb#update_all: bump locking_column when omitted.
     // Uses _incrementAttribute (COALESCE(col, 0) + 1) for NULL-safe increment.
     if (this._modelClass.lockingEnabled) {
