@@ -595,6 +595,27 @@ function _dispatchAssociationAttrs(
   }
 }
 
+// Deep structural equality for JSON-compatible values — mirrors Ruby Hash#== / Array#==
+// used by AttributeMutationTracker#changed? when comparing type-cast option values.
+function _jsonEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    const aa = a as unknown[],
+      ba = b as unknown[];
+    return aa.length === ba.length && aa.every((v, i) => _jsonEqual(v, ba[i]));
+  }
+  const oa = a as Record<string, unknown>,
+    ob = b as Record<string, unknown>;
+  const ka = Object.keys(oa),
+    kb = Object.keys(ob);
+  return (
+    ka.length === kb.length &&
+    ka.every((k) => Object.prototype.hasOwnProperty.call(ob, k) && _jsonEqual(oa[k], ob[k]))
+  );
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
   // --- Translation mixin (wired via extend() after class) ---
@@ -2685,17 +2706,16 @@ export class Base extends Model {
     const attr = this._attributes.getAttribute(resolved);
     if (!attr.type.isMutable() || !attr.changedInPlace()) return false;
     if (!options) return true;
-    // Mirror AttributeMutationTracker#changed?: cast option values with the attribute's
-    // type (type_cast) then compare serialized forms so { a: "a" } == { a: "a" }
-    // works structurally (Rails uses Ruby == on cast values; we serialize to string).
+    // Mirror AttributeMutationTracker#changed?: cast the option values with the attribute's
+    // type (type_cast) then compare with == (Ruby structural equality for Hash/Array).
+    // JSON.stringify is key-order-dependent so it can't be used here — use deep
+    // structural equality on the cast (decoded) objects instead.
     if ("from" in options) {
-      const castFrom = attr.type.cast(options.from);
-      if (attr.type.serialize(this._dirty.attributeWas(resolved)) !== attr.type.serialize(castFrom))
+      if (!_jsonEqual(this._dirty.attributeWas(resolved), attr.type.cast(options.from)))
         return false;
     }
     if ("to" in options) {
-      const castTo = attr.type.cast(options.to);
-      if (attr.type.serialize(attr.value) !== attr.type.serialize(castTo)) return false;
+      if (!_jsonEqual(attr.value, attr.type.cast(options.to))) return false;
     }
     return true;
   }
