@@ -292,26 +292,31 @@ export class DirtyTracker {
    * where the object reference stays the same but the content has changed.
    *
    * `currentValue` is the value at the moment the force is requested (before
-   * the in-place mutation). Rails snapshots this via `clone_value` so the
-   * stored "was" stays stable even as the live object mutates.
+   * the in-place mutation).
    *
-   * This mirrors Rails' `ForcedMutationTracker#force_change`
-   * (`forced_changes[attr] = clone_value(attr) unless attribute_changed?(attr)`,
-   * attribute_mutation_tracker.rb:121-122): the guard + `clone_value` are both
-   * reproduced below. On the first mark the `unless` body runs and the
-   * assignment returns the cloned value, so `attribute_will_change!` is truthy
-   * (dirty_test.rb:317 `assert pirate.catchphrase_will_change!`); when already
-   * changed the `unless` is skipped and Ruby returns nil — we return undefined.
+   * The AR `attribute_will_change!` path goes through `AttributeMutationTracker`
+   * (selected by `mutations_from_database` whenever `@attributes` is defined,
+   * dirty.rb:382-386 — always true for records), whose `force_change` is the
+   * unconditional `forced_changes[attr] = fetch_value(attr)` that **returns the
+   * current value** (attribute_mutation_tracker.rb:63-64) — no nil guard. There,
+   * the stored value is only a changed-set marker; the "was" comes from
+   * `attributes[attr].original_value`, which a repeat call leaves untouched.
    *
-   * Mirrors: ActiveModel::ForcedMutationTracker#force_change
+   * trails has no separate per-attribute `original_value`, so the stored
+   * `[was, was]` tuple *is* our "was". We therefore (a) clone it on first mark so
+   * an in-place mutation can't corrupt it, and (b) keep it on a repeat call —
+   * both reproduce Rails' stable `original_value` — while still returning the
+   * current value so `attribute_will_change!` stays truthy (dirty_test.rb:317
+   * `assert pirate.catchphrase_will_change!`).
+   *
+   * Mirrors: ActiveModel::AttributeMutationTracker#force_change
    */
   forceChange(name: string, currentValue: unknown): unknown {
-    // Already force-marked: the Ruby `unless attribute_changed?` guard is skipped,
-    // so `force_change` returns nil. Return undefined and keep the original "was"
-    // snapshot intact.
-    if (this._changedAttributes.has(name)) return undefined;
+    // Already changed: Rails re-runs fetch_value and returns the current value;
+    // we return it too. We keep the existing "was" snapshot rather than
+    // overwriting it (matching Rails' untouched original_value).
+    if (this._changedAttributes.has(name)) return currentValue;
     // Clone so the stored "was" side isn't mutated along with the live object.
-    // Mirrors Rails' clone_value: shallow-clone when possible, else keep as-is.
     let cloned: unknown;
     try {
       cloned =
