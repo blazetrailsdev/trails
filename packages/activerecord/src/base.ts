@@ -3485,8 +3485,15 @@ function _castEnumDirtyOpts(
 ): { from?: unknown; to?: unknown } {
   const mapping = ctor._enums?.get(name);
   if (mapping) {
-    const cast = (v: unknown): unknown =>
-      typeof v === "string" && Object.prototype.hasOwnProperty.call(mapping, v) ? mapping[v] : v;
+    // Mirrors EnumType#cast: known label → storage integer; blank string → nil
+    // (Ruby's `value.presence`); everything else passes through unchanged.
+    const cast = (v: unknown): unknown => {
+      if (typeof v === "string") {
+        if (Object.prototype.hasOwnProperty.call(mapping, v)) return mapping[v];
+        if (/^\s*$/.test(v)) return null;
+      }
+      return v;
+    };
     const result: { from?: unknown; to?: unknown } = {};
     if ("from" in opts) result.from = cast(opts.from);
     if ("to" in opts) result.to = cast(opts.to);
@@ -3494,7 +3501,9 @@ function _castEnumDirtyOpts(
   }
   const enumDef = _EnumModule.getEnumDefinitions(ctor).get(name);
   if (enumDef) {
-    const cast = (v: unknown): unknown => enumDef.type.cast(v) ?? v;
+    // EnumType.cast normalises labels, integers, and blank → null (matching
+    // Rails' `value.presence`). No fallback: we know this IS an enum attr.
+    const cast = (v: unknown): unknown => enumDef.type.cast(v);
     const result: { from?: unknown; to?: unknown } = {};
     if ("from" in opts) result.from = cast(opts.from);
     if ("to" in opts) result.to = cast(opts.to);
