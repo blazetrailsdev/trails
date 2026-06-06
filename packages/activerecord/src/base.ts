@@ -129,6 +129,7 @@ import {
   extend,
   benchmark as benchmarkable,
   runLoadHooks,
+  isBlank as _isBlankValue,
   type Included,
   type ParameterFilter,
   type BenchmarkLogger,
@@ -3493,13 +3494,12 @@ function _castEnumDirtyOpts(
 ): { from?: unknown; to?: unknown } {
   const mapping = ctor._enums?.get(name);
   if (mapping) {
-    // Mirrors EnumType#cast: known label → storage integer; blank string → nil
-    // (Ruby's `value.presence`); everything else passes through unchanged.
+    // Mirrors EnumType#cast: known label → storage integer; blank (Ruby
+    // value.presence) → null; everything else passes through unchanged.
     const cast = (v: unknown): unknown => {
-      if (typeof v === "string") {
-        if (Object.prototype.hasOwnProperty.call(mapping, v)) return mapping[v];
-        if (/^\s*$/.test(v)) return null;
-      }
+      if (typeof v === "string" && Object.prototype.hasOwnProperty.call(mapping, v))
+        return mapping[v];
+      if (_isBlankValue(v)) return null;
       return v;
     };
     const result: { from?: unknown; to?: unknown } = {};
@@ -3510,12 +3510,11 @@ function _castEnumDirtyOpts(
   const enumDef = _EnumModule.getEnumDefinitions(ctor).get(name);
   if (enumDef) {
     // Mirror EnumType#cast's `value.presence` fallback: known label/integer →
-    // normalised form; nil/blank string → null; nonblank unrecognised → preserve.
+    // normalised form; blank → null; nonblank unrecognised → preserve.
     // (Our EnumType.cast returns null for ALL unrecognised values, not just blank,
     // so we can't delegate the fallback to it directly.)
     const cast = (v: unknown): unknown => {
-      if (v === null || v === undefined) return null;
-      if (typeof v === "string" && /^\s*$/.test(v)) return null;
+      if (_isBlankValue(v)) return null;
       return enumDef.type.cast(v) ?? v;
     };
     const result: { from?: unknown; to?: unknown } = {};
