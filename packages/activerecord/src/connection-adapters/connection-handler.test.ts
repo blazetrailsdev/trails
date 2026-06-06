@@ -4,6 +4,25 @@ import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 
+// Mirrors ActiveRecord::TestFixtures#setup_shared_connection_pool (test_fixtures.rb:220).
+// For each shard in each pool manager, replaces every non-writing role's pool
+// config with the writing role's pool config so all roles share one connection.
+// Throws ArgumentError (from PoolManager#setPoolConfig) when writing pool is missing.
+function setupSharedConnectionPool(handlerArg: ConnectionHandler): void {
+  const writingRole = Base.writingRole;
+  const managerMap: Map<string, any> = (handlerArg as any)._connectionNameToPoolManager;
+  for (const [, poolManager] of managerMap) {
+    for (const shardName of poolManager.shardNames as string[]) {
+      const writingPoolConfig = poolManager.getPoolConfig(writingRole, shardName);
+      for (const role of poolManager.roleNames as string[]) {
+        const poolConfig = poolManager.getPoolConfig(role, shardName);
+        if (!poolConfig || poolConfig === writingPoolConfig) continue;
+        poolManager.setPoolConfig(role, shardName, writingPoolConfig);
+      }
+    }
+  }
+}
+
 describe("ConnectionHandlerTest", () => {
   let handler: ConnectionHandler;
 
@@ -35,22 +54,59 @@ describe("ConnectionHandlerTest", () => {
     );
   });
 
-  it.skip("not setting writing role while using another named role raises", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-handling.ts#connectsTo: no setupSharedConnectionPool helper or writing-role validation (Rails connection_handler_test.rb:81)
-    // SCOPE: ~80 LOC connectsTo shared-pool support; affects ~3 tests
+  it("not setting writing role while using another named role raises", () => {
+    const localHandler = new ConnectionHandler();
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    localHandler.establishConnection(config, {
+      owner: "Base",
+      role: "also_writing",
+      shard: "default",
+    });
+    localHandler.establishConnection(config, { owner: "Base", role: "also_writing", shard: "one" });
+    expect(() => setupSharedConnectionPool(localHandler)).toThrow(/poolConfig.*null/);
   });
 
-  it.skip("fixtures dont raise if theres no writing pool config", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-handler.ts#retrieveConnection: no reading→writing role fallback for connectsTo(database:) (Rails connection_handler_test.rb:92)
-    // SCOPE: ~30 LOC role-aliasing; affects ~3 tests
+  it("fixtures dont raise if theres no writing pool config", () => {
+    const localHandler = new ConnectionHandler();
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    localHandler.establishConnection(config, { owner: "Base", role: "writing" });
+    localHandler.establishConnection(config, { owner: "Base", role: "reading" });
+    expect(() => setupSharedConnectionPool(localHandler)).not.toThrow();
+    // After shared-pool setup reading pool IS the writing pool — same connection leased.
+    const rwPool = localHandler.retrieveConnectionPool("Base", { role: "writing" })!;
+    const roPool = localHandler.retrieveConnectionPool("Base", { role: "reading" })!;
+    expect(roPool).toBe(rwPool);
   });
 
-  it.skip("setting writing role while using another named role does not raise", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-handling.ts#connectsTo: no setupSharedConnectionPool helper or mutable writingRole (Rails connection_handler_test.rb:108)
-    // SCOPE: ~80 LOC connectsTo shared-pool support; affects ~3 tests
+  it("setting writing role while using another named role does not raise", () => {
+    const oldRole = Base.writingRole;
+    Base.writingRole = "also_writing";
+    try {
+      const localHandler = new ConnectionHandler();
+      const config = new HashConfig("development", "primary", {
+        adapter: "sqlite3",
+        database: "dev.db",
+      });
+      localHandler.establishConnection(config, {
+        owner: "Base",
+        role: "also_writing",
+        shard: "default",
+      });
+      localHandler.establishConnection(config, {
+        owner: "Base",
+        role: "also_writing",
+        shard: "one",
+      });
+      expect(() => setupSharedConnectionPool(localHandler)).not.toThrow();
+    } finally {
+      Base.writingRole = oldRole;
+    }
   });
 
   it("establish connection with primary works without deprecation", () => {
@@ -188,10 +244,61 @@ describe("ConnectionHandlerTest", () => {
     expect(handler.connectionPools).toHaveLength(2);
   });
 
-  it.skip("a class using custom pool and switching back to primary", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-handling.ts#leaseConnection: anonymous subclass→Base pool fallback after removeConnection not wired (Rails connection_handler_test.rb:282)
-    // SCOPE: ~50 LOC Base default-pool integration; affects ~1 test
+  it("a class using custom pool and switching back to primary", () => {
+    const savedHandler = (Base as any)._connectionHandler;
+    const freshHandler = new ConnectionHandler();
+    (Base as any)._connectionHandler = freshHandler;
+    try {
+      class Klass2 extends Base {}
+
+      const baseConfig = new HashConfig("development", "primary", {
+        adapter: "sqlite3",
+        database: ":memory:",
+      });
+      const ownConfig = new HashConfig("development", "Klass2", {
+        adapter: "sqlite3",
+        database: ":memory:",
+      });
+
+      const basePool = freshHandler.establishConnection(baseConfig, {
+        owner: "Base",
+        role: "writing",
+      });
+
+      // Before own pool: Klass2 delegates to Base's pool via spec-name walk
+      expect(
+        freshHandler.retrieveConnectionPool(Klass2.connectionSpecificationName, {
+          role: "writing",
+        }),
+      ).toBe(basePool);
+
+      // Give Klass2 its own pool (mirrors klass2.establish_connection in Rails)
+      const ownPool = freshHandler.establishConnection(ownConfig, {
+        owner: Klass2,
+        role: "writing",
+      });
+      (Klass2 as any).connectionClass = true;
+
+      expect(
+        freshHandler.retrieveConnectionPool(Klass2.connectionSpecificationName, {
+          role: "writing",
+        }),
+      ).toBe(ownPool);
+      expect(ownPool).not.toBe(basePool);
+
+      // Remove the connection — Klass2 falls back to Base's pool.
+      // connection_class stays true (Rails never resets it); connectedTo guards still pass.
+      Klass2.removeConnection();
+
+      expect(
+        freshHandler.retrieveConnectionPool(Klass2.connectionSpecificationName, {
+          role: "writing",
+        }),
+      ).toBe(basePool);
+      expect((Klass2 as any).connectionClass).toBe(true);
+    } finally {
+      (Base as any)._connectionHandler = savedHandler;
+    }
   });
 
   it("connection specification name should fallback to parent", () => {

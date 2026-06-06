@@ -411,25 +411,44 @@ export function removeConnection(this: typeof Base): void {
 }
 
 export function connectionSpecificationName(this: typeof Base): string {
-  // Check own property first to avoid prototype-static inheritance bleeding a
-  // value set on Base/ApplicationRecord into unrelated abstract subclasses.
-  // The recursive walk below handles cross-class inheritance explicitly.
-  if (
-    Object.prototype.hasOwnProperty.call(this, "_connectionSpecificationName") &&
-    (this as any)._connectionSpecificationName != null
-  ) {
+  // Mirrors Rails' connection_specification_name reader (connection_handling.rb:316-320):
+  //   if @connection_specification_name.nil?
+  //     return self == Base ? Base.name : superclass.connection_specification_name
+  //   @connection_specification_name
+  //
+  // Three branches, in order:
+  //   1. Non-nil own property → explicit assignment; return it.
+  //   2. Nil own property (cleared by removeConnection) → walk parent chain.
+  //      primaryClassQ/connectionClassQ are NOT consulted here, matching Rails
+  //      where nil always delegates regardless of connection_class?.
+  //   3. No own property → derive from class shape (TS-specific shortcuts).
+
+  const ownHas = Object.prototype.hasOwnProperty.call(this, "_connectionSpecificationName");
+
+  // Branch 1: explicit value.
+  if (ownHas && (this as any)._connectionSpecificationName != null) {
     return (this as any)._connectionSpecificationName;
   }
-  if (this.name === "Base") {
+
+  // Branch 2: explicitly cleared → parent walk (Base terminates).
+  if (ownHas) {
+    if (this.name === "Base") return "Base";
+    const parent = Object.getPrototypeOf(this);
+    if (parent && typeof parent === "function" && parent !== this) {
+      return connectionSpecificationName.call(parent as typeof Base);
+    }
     return "Base";
   }
-  // Primary classes (Base/ApplicationRecord) store their pool under "Base"
-  // per PoolConfig#connectionDescriptor's normalization; reflect that here
-  // so leaseConnection() lookups hit the right pool when connectsTo hasn't
-  // run yet to plant _connectionSpecificationName.
+
+  // Branch 3: no own property — derive from class shape.
+  // Base is always its own terminal; primary classes (ApplicationRecord) store
+  // their pool under "Base" per PoolConfig#connectionDescriptor's normalization.
+  if (this.name === "Base") return "Base";
   if (typeof (this as any).primaryClassQ === "function" && (this as any).primaryClassQ()) {
     return "Base";
   }
+  // connectionClass = true means establish_connection or connectsTo was called
+  // and planted a pool under this class's name without setting the ivar explicitly.
   if ((this as any).connectionClassQ?.()) {
     return this.name;
   }
