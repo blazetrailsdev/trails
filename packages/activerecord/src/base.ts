@@ -2797,10 +2797,10 @@ export class Base extends Model {
     if (Object.keys(changedAttrs).length === 0) return;
 
     const dbValues = this._attributes.valuesForDatabase();
-    // Rails: attribute_names = attributes_for_update(attribute_names)
-    const candidateNames = Object.keys(changedAttrs).filter((key) =>
-      ctor._attributeDefinitions.has(key),
-    );
+    // With partial_writes=false Rails includes all columns; with it on, only dirty ones.
+    const candidateNames = ctor.partialUpdates
+      ? Object.keys(changedAttrs).filter((key) => ctor._attributeDefinitions.has(key))
+      : ctor.attributeNames().filter((key) => ctor._attributeDefinitions.has(key));
     const declaredChanges = _attributesForUpdate.call(this, candidateNames);
 
     if (declaredChanges.length === 0) return;

@@ -394,7 +394,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   // Mirrors: SQLite3::DatabaseStatements#begin_deferred_transaction
   async beginDeferredTransaction(isolation?: string | null): Promise<void> {
     if (isolation) return this._internalBeginTransaction("DEFERRED", isolation);
-    await this.driver.exec("BEGIN DEFERRED TRANSACTION");
+    await this._logTransaction("BEGIN DEFERRED TRANSACTION");
     this._inTransaction = true;
   }
 
@@ -417,7 +417,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         );
       }
     }
-    await this.driver.exec(`BEGIN ${mode} TRANSACTION`);
+    await this._logTransaction(`BEGIN ${mode} TRANSACTION`);
     this._inTransaction = true;
     if (isolation) {
       const ruStmt = await this.driver.prepare("PRAGMA read_uncommitted");
@@ -435,9 +435,26 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
+  // Mirrors Rails internal_execute(sql, "TRANSACTION", materialize_transactions: false):
+  // emit sql.active_record with name="TRANSACTION" without calling materializeTransactions
+  // (transaction SQL must not trigger re-entrant materialization).
+  private async _logTransaction(sql: string): Promise<void> {
+    const payload: Record<string, unknown> = {
+      sql,
+      name: "TRANSACTION",
+      binds: [],
+      type_casted_binds: [],
+      connection: this,
+      row_count: 0,
+    };
+    await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      await this.driver.exec(sql);
+    });
+  }
+
   async beginDbTransaction(): Promise<void> {
     if (!this._inTransaction) {
-      await this.driver.exec("BEGIN IMMEDIATE TRANSACTION");
+      await this._logTransaction("BEGIN IMMEDIATE TRANSACTION");
       this._inTransaction = true;
     }
   }
@@ -451,7 +468,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Commit the current transaction.
    */
   async commitDbTransaction(): Promise<void> {
-    await this.driver.exec("COMMIT TRANSACTION");
+    await this._logTransaction("COMMIT TRANSACTION");
     this._inTransaction = false;
   }
 
@@ -464,7 +481,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async rollbackDbTransaction(): Promise<void> {
     try {
-      await this.driver.exec("ROLLBACK TRANSACTION");
+      await this._logTransaction("ROLLBACK TRANSACTION");
     } catch (e) {
       // Mirrors Rails: rescue ConnectionNotEstablished, ConnectionFailed.
       // A closed/dropped connection is an implicit rollback; re-throw anything else.
@@ -485,21 +502,21 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Create a savepoint (nested transaction).
    */
   async createSavepoint(name: string): Promise<void> {
-    await this.driver.exec(`SAVEPOINT "${name}"`);
+    await this._logTransaction(`SAVEPOINT "${name}"`);
   }
 
   /**
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    await this.driver.exec(`RELEASE SAVEPOINT "${name}"`);
+    await this._logTransaction(`RELEASE SAVEPOINT "${name}"`);
   }
 
   /**
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    await this.driver.exec(`ROLLBACK TO SAVEPOINT "${name}"`);
+    await this._logTransaction(`ROLLBACK TO SAVEPOINT "${name}"`);
   }
 
   /**
