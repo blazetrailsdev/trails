@@ -4,6 +4,7 @@ import { Table as ArelTable } from "@blazetrails/arel";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
+import { ScopeRegistry } from "./scoping.js";
 // Re-export the slot's setter so the package entry and other internal
 // callers don't need to import the slot module directly.
 export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
@@ -2189,6 +2190,27 @@ function wrapCollectionProxy<T extends Base = Base>(
       if (typeof scopeVal === "function") {
         return (...args: any[]) => scopeVal.apply(scope, args);
       }
+
+      // Rails CollectionProxy#method_missing: if the scope doesn't respond to the
+      // method, check if the model class does (e.g. custom class-level query methods
+      // like `allAsMethod`). Push the association scope as the current scope
+      // synchronously while calling the class method so `all()` / `where()` inside
+      // pick it up — mirrors Rails' `scoping { @klass.public_send(method, *args, &block) }`.
+      // Synchronous (no await) so the returned Relation can be chained immediately.
+      const modelClass = target.model;
+      const classMethod = (modelClass as any)[prop];
+      if (typeof classMethod === "function") {
+        return (...args: any[]) => {
+          const prev = ScopeRegistry.currentScope(modelClass as any);
+          ScopeRegistry.setCurrentScope(modelClass as any, scope as any);
+          try {
+            return classMethod.apply(modelClass, args);
+          } finally {
+            ScopeRegistry.setCurrentScope(modelClass as any, prev);
+          }
+        };
+      }
+
       return scopeVal;
     },
   });
