@@ -860,28 +860,50 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
+  // Mirrors Rails internal_execute(sql, "TRANSACTION", materialize_transactions: false).
+  private async _logTransaction(sql: string, fn: () => Promise<void>): Promise<void> {
+    const payload: Record<string, unknown> = {
+      sql,
+      name: "TRANSACTION",
+      binds: [],
+      type_casted_binds: [],
+      connection: this,
+      row_count: 0,
+    };
+    await Notifications.instrumentAsync("sql.active_record", payload, fn);
+  }
+
   /**
    * Create a savepoint (nested transaction).
    */
   async createSavepoint(name: string): Promise<void> {
-    const conn = await this.getConn();
-    await conn.query(`SAVEPOINT \`${name}\``);
+    const sql = `SAVEPOINT \`${name}\``;
+    await this._logTransaction(sql, async () => {
+      const conn = await this.getConn();
+      await conn.query(sql);
+    });
   }
 
   /**
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    const conn = await this.getConn();
-    await conn.query(`RELEASE SAVEPOINT \`${name}\``);
+    const sql = `RELEASE SAVEPOINT \`${name}\``;
+    await this._logTransaction(sql, async () => {
+      const conn = await this.getConn();
+      await conn.query(sql);
+    });
   }
 
   /**
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    const conn = await this.getConn();
-    await conn.query(`ROLLBACK TO SAVEPOINT \`${name}\``);
+    const sql = `ROLLBACK TO SAVEPOINT \`${name}\``;
+    await this._logTransaction(sql, async () => {
+      const conn = await this.getConn();
+      await conn.query(sql);
+    });
   }
 
   /**

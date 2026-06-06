@@ -1718,28 +1718,50 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   /**
    * Create a savepoint (nested transaction).
    */
+  // Mirrors Rails internal_execute(sql, "TRANSACTION", materialize_transactions: false).
+  private async _logTransaction(sql: string, fn: () => Promise<void>): Promise<void> {
+    const payload: Record<string, unknown> = {
+      sql,
+      name: "TRANSACTION",
+      binds: [],
+      type_casted_binds: [],
+      connection: this,
+      row_count: 0,
+    };
+    await Notifications.instrumentAsync("sql.active_record", payload, fn);
+  }
+
   async createSavepoint(name: string): Promise<void> {
-    await this.withClient(async (client) => {
-      await client.query(`SAVEPOINT "${name}"`);
-    });
+    const sql = `SAVEPOINT "${name}"`;
+    await this._logTransaction(sql, () =>
+      this.withClient(async (client) => {
+        await client.query(sql);
+      }),
+    );
   }
 
   /**
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    await this.withClient(async (client) => {
-      await client.query(`RELEASE SAVEPOINT "${name}"`);
-    });
+    const sql = `RELEASE SAVEPOINT "${name}"`;
+    await this._logTransaction(sql, () =>
+      this.withClient(async (client) => {
+        await client.query(sql);
+      }),
+    );
   }
 
   /**
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    await this.withClient(async (client) => {
-      await client.query(`ROLLBACK TO SAVEPOINT "${name}"`);
-    });
+    const sql = `ROLLBACK TO SAVEPOINT "${name}"`;
+    await this._logTransaction(sql, () =>
+      this.withClient(async (client) => {
+        await client.query(sql);
+      }),
+    );
   }
 
   /**
