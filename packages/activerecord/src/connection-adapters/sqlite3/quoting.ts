@@ -356,5 +356,9 @@ export function extractValueFromDefault(dfltValue: string | null): unknown {
   if (/^-?\d+(\.\d*)?$/.test(dfltValue)) return dfltValue;
   const hex = /^x'([0-9a-fA-F]*)'$/i.exec(dfltValue);
   if (hex) return Buffer.from(hex[1], "hex");
+  // SQLite accepts TRUE/FALSE keywords in DEFAULT clauses (3.23.0+); the
+  // abstract quoteDefaultExpression emits these for boolean defaults.
+  if (/^true$/i.test(dfltValue)) return "1";
+  if (/^false$/i.test(dfltValue)) return "0";
   return null;
 }

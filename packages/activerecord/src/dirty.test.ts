@@ -459,13 +459,16 @@ describe("DirtyTest", () => {
     expect(pirate.changedAttributes).toEqual(["parrot_id"]);
   });
 
-  it.skip("attribute should be compared with type cast", () => {
-    // BLOCKED: defaults (in-memory) — Rails reads `Topic.new.approved == true`
-    // from the schema default; trails does not apply a *reflected* column
-    // default to a new in-memory record (`new Topic().approved` is null), so the
-    // precondition fails. Defaults declared via `attribute(..., { default })`
-    // do apply — only reflected ones don't. SCOPE: apply reflected column
-    // defaults on `new`, separate PR.
+  it("attribute should be compared with type cast", () => {
+    const topic = new Topic() as Rec;
+    expect((topic as any).approved).toBe(true);
+    expect(topic.attributeChanged("approved")).toBe(false);
+
+    // Coming from a web form: assigning 1 type-casts to true, same as the
+    // schema default, so the attribute is still not dirty.
+    (topic as any).assignAttributes({ approved: 1 });
+    expect((topic as any).approved).toBe(true);
+    expect(topic.attributeChanged("approved")).toBe(false);
   });
 
   it.skip("string attribute should compare with typecast symbol after update", () => {
