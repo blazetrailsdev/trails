@@ -400,16 +400,26 @@ function flip(
   });
 }
 
-// Decides what `claim` should do given a story's current frontmatter and the
+// Returns the content between a story file's leading `---` fences, or "" when
+// there is no fenced block. Mirrors the tasks repo's canonical parser
+// (`tasks/scripts/lib.mjs` parseFrontmatter), which loads keys ONLY from inside
+// the fences — so probes for `claim`/`assignee` never match a same-named line
+// in the Markdown body.
+function frontmatterBlock(fileText: string): string {
+  return fileText.match(/^---\n([\s\S]*?)\n---\n?/)?.[1] ?? "";
+}
+
+// Decides what `claim` should do given a story file's full text and the
 // requesting assignee. Pure (no I/O) so the three-way branch is unit-testable
-// without a git repo. Reads frontmatter with the same raw-regex style as the
-// rest of this file rather than parsing the whole block.
+// without a git repo. Reads only the fenced frontmatter (via frontmatterBlock)
+// with the same raw-regex style as the rest of this file.
 //   "available" — unclaimed (`claim: null`); proceed to write the claim.
 //   "owned"     — already claimed by `assignee`; an idempotent re-claim.
 //   "taken"     — claimed by someone else; a genuine lost race.
-export function claimState(frontmatter: string, assignee: string): "available" | "owned" | "taken" {
-  if (/^claim: null\s*$/m.test(frontmatter)) return "available";
-  const held = frontmatter.match(/^assignee:\s*"?([^"\n]*)"?\s*$/m)?.[1] ?? null;
+export function claimState(fileText: string, assignee: string): "available" | "owned" | "taken" {
+  const fm = frontmatterBlock(fileText);
+  if (/^claim: null\s*$/m.test(fm)) return "available";
+  const held = fm.match(/^assignee:\s*"?([^"\n]*)"?\s*$/m)?.[1] ?? null;
   return held === assignee ? "owned" : "taken";
 }
 

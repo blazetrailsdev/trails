@@ -233,6 +233,20 @@ describe("claimState (idempotent re-claim discriminator)", () => {
       "taken",
     );
   });
+
+  it("ignores a `claim: null` line in the Markdown body", () => {
+    const fm =
+      `---\nstatus: claimed\nclaim: "2026-01-01T00:00:00Z"\nassignee: "alice"\n---\n` +
+      `Reset with \`claim: null\` if needed.\n`;
+    expect(claimState(fm, "dean")).toBe("taken");
+  });
+
+  it("ignores an `assignee:` line in the Markdown body", () => {
+    const fm =
+      `---\nstatus: claimed\nclaim: "2026-01-01T00:00:00Z"\nassignee: "alice"\n---\n` +
+      `assignee: "dean"\n`;
+    expect(claimState(fm, "dean")).toBe("taken");
+  });
 });
 
 describe("removeFrontmatterKey (priority --clear)", () => {
