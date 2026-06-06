@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { adapterType } from "../test-adapter.js";
 import {
   SQLCounter,
   assertQueriesCount,
@@ -112,7 +113,7 @@ describe("QueryAssertionsTest", () => {
     ).rejects.toThrow(/1 instead of 0/);
   });
 
-  it("assert queries count include schema", async () => {
+  it.skipIf(adapterType !== "postgres")("assert queries count include schema", async () => {
     await assertQueriesCount(undefined, true, async () => {
       instrumentSql("SELECT attname FROM pg_attribute", "SCHEMA");
     });
@@ -124,7 +125,7 @@ describe("QueryAssertionsTest", () => {
     ).rejects.toThrow("1 or more queries expected");
   });
 
-  it("assert no queries include schema", async () => {
+  it.skipIf(adapterType !== "postgres")("assert no queries include schema", async () => {
     await assertNoQueries(false, async () => {});
 
     await expect(
@@ -140,7 +141,7 @@ describe("QueryAssertionsTest", () => {
     ).rejects.toThrow(/\d+ instead of 0/);
   });
 
-  it("assert queries match include schema", async () => {
+  it.skipIf(adapterType !== "postgres")("assert queries match include schema", async () => {
     await expect(
       assertQueriesMatch(/SELECT/i, undefined, false, async () => {
         instrumentSql("SELECT attname FROM pg_attribute", "SCHEMA");
@@ -152,7 +153,7 @@ describe("QueryAssertionsTest", () => {
     });
   });
 
-  it("assert no queries match include schema", async () => {
+  it.skipIf(adapterType !== "postgres")("assert no queries match include schema", async () => {
     await assertNoQueriesMatch(/SELECT/i, false, async () => {
       instrumentSql("SELECT attname FROM pg_attribute", "SCHEMA");
     });

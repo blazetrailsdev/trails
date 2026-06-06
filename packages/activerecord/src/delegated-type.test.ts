@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base, delegatedType, registerModel } from "./index.js";
+import { adapterType } from "./test-adapter.js";
 import { StringInquirer } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -159,7 +160,7 @@ describe("DelegatedTypeTest", () => {
     expect((eCmt as any).messageId).toBeNull();
   });
 
-  it("association uuid", () => {
+  it.skipIf(adapterType !== "postgres")("association uuid", () => {
     // Mirrors Rails PostgreSQLDelegatedTypeTest#test_association_uuid.
     // UUID PK accessor naming: delegatedType with primaryKey: "uuid" and
     // foreignKey: "entryable_uuid" generates `uuidMessageUuid` / `uuidCommentUuid`

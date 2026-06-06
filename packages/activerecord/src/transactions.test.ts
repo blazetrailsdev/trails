@@ -14,6 +14,7 @@ import {
 } from "./index.js";
 
 import { createSidecarTestAdapter, createTestAdapter } from "./test-adapter.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
@@ -985,7 +986,7 @@ describe("TransactionTest", () => {
     expect(r1.approved).toBe(false);
     expect(r2.approved).toBe(true);
   });
-  it("force savepoint on instance", async () => {
+  itIfSupports("savepoints", "force savepoint on instance", async () => {
     const { Topic } = makeSQLiteTopic();
     const first = await Topic.create({ title: "First", approved: false });
     const second = await Topic.create({ title: "Second", approved: false });
@@ -1803,7 +1804,7 @@ describe("TransactionTest", () => {
     expect(topicTwo.isPersisted()).toBe(false);
     expect(topicThree.isPersisted()).toBe(false);
   });
-  it("no savepoint in nested transaction without force", async () => {
+  itIfSupports("savepoints", "no savepoint in nested transaction without force", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1833,7 +1834,7 @@ describe("TransactionTest", () => {
     expect(((await Post.find(first.id)) as any).approved).toBe(false);
     expect(((await Post.find(second.id)) as any).approved).toBe(false);
   });
-  it("many savepoints", async () => {
+  itIfSupports("savepoints", "many savepoints", async () => {
     class Post extends Base {
       static {
         this.attribute("content", "string");
@@ -2062,7 +2063,7 @@ describe("TransactionTest", () => {
     expect(log).toEqual(["rolled_back"]);
   });
 
-  it("force savepoint in nested transaction", async () => {
+  itIfSupports("savepoints", "force savepoint in nested transaction", async () => {
     await transaction(Account, async () => {
       await Account.create({ name: "Alice", balance: 100 });
 

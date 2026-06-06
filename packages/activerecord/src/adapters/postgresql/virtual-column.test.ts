@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { itIfSupports } from "../../test-helpers/supports.js";
 import { FixtureSet } from "../../test-helpers/fixture-set.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
@@ -51,7 +52,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.exec(`DROP TABLE IF EXISTS virtual_columns`).catch(() => {});
   });
   describe("PostgresqlVirtualColumnTest", () => {
-    it("virtual column with full inserts", async () => {
+    itIfSupports("virtual_columns", "virtual column with full inserts", async () => {
       const partialInsertsWas = VirtualColumn.partialInserts;
       VirtualColumn.partialInserts = false;
       try {
@@ -66,21 +67,21 @@ describeIfPg("PostgreSQLAdapter", () => {
       return cols.find((c: any) => c.name === name);
     };
 
-    it("virtual column", async () => {
+    itIfSupports("virtual_columns", "virtual column", async () => {
       const column = await findColumn("upper_name");
       expect(column!.isVirtual()).toBe(true);
       const row = await VirtualColumn.take();
       expect(row.upper_name).toBe("RAILS");
     });
 
-    it("stored column", async () => {
+    itIfSupports("virtual_columns", "stored column", async () => {
       const column = await findColumn("name_length");
       expect(column!.isVirtual()).toBe(true);
       const row = await VirtualColumn.take();
       expect(row.name_length).toBe(5);
     });
 
-    it("change table", async () => {
+    itIfSupports("virtual_columns", "change table", async () => {
       await adapter.changeTable("virtual_columns", async (t) => {
         await t.virtual("lower_name", { type: "string", as: "LOWER(name)", stored: true });
       });
@@ -93,7 +94,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(row.lower_name).toBe("rails");
     });
 
-    it("non persisted column", async () => {
+    itIfSupports("virtual_columns", "non persisted column", async () => {
       await expect(
         adapter.changeTable("virtual_columns", async (t) => {
           await t.virtual("invalid_definition", { type: "string", as: "LOWER(name)" });
@@ -118,7 +119,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // prepareColumnOptions for virtual columns. Affects schema_dumping mirror.
     });
 
-    it("build fixture sql", async () => {
+    itIfSupports("virtual_columns", "build fixture sql", async () => {
       const fixtures = await FixtureSet.createFixtures(adapter, VirtualColumn, {
         one: { name: "hello" },
         two: { name: "world" },

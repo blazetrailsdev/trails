@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./index.js";
-import { adapterType, newRawTestAdapter } from "./test-adapter.js";
+import { itIfSupports } from "./test-helpers/supports.js";
+import { newRawTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import {
   QueryCache,
@@ -738,7 +739,7 @@ describe("QuerySerializedParamTest", () => {
 });
 
 describe("QueryCacheExpiryTest", () => {
-  it.skipIf(adapterType === "sqlite")("cache gets cleared after migration", async () => {
+  it("cache gets cleared after migration", async () => {
     const cached = rawAdapter();
     cached._queryCache = new Store();
     const { Migration } = await import("./migration.js");
@@ -803,7 +804,7 @@ describe("QueryCacheExpiryTest", () => {
       expect(cached.queryCache.empty).toBe(true);
     });
   });
-  it("insert all", async () => {
+  itIfSupports("insert_on_duplicate_skip", "insert all", async () => {
     const { cached, Task } = await setup();
     await cached.cache(async () => {
       await Task.all().toArray();
@@ -831,7 +832,7 @@ describe("QueryCacheExpiryTest", () => {
       expect(cached.queryCache.empty).toBe(true);
     });
   });
-  it("upsert all", async () => {
+  itIfSupports("insert_on_duplicate_update", "upsert all", async () => {
     const { cached, Task } = await setup();
     await cached.cache(async () => {
       await Task.all().toArray();

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Base, TransactionIsolationError } from "./index.js";
 import { adapterType } from "./test-adapter.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
@@ -41,31 +42,39 @@ describe("TransactionIsolationTest", () => {
     await defineSchema({ tags: TEST_SCHEMA.tags });
   });
 
-  it("setting isolation when joining a transaction raises an error", async () => {
-    class Tag extends Base {
-      static {
-        this.attribute("name", "string");
+  itIfSupports(
+    "transaction_isolation",
+    "setting isolation when joining a transaction raises an error",
+    async () => {
+      class Tag extends Base {
+        static {
+          this.attribute("name", "string");
+        }
       }
-    }
-    await Tag.transaction(async () => {
-      await expect(Tag.transaction(async () => {}, { isolation: "serializable" })).rejects.toThrow(
-        TransactionIsolationError,
-      );
-    });
-  });
+      await Tag.transaction(async () => {
+        await expect(
+          Tag.transaction(async () => {}, { isolation: "serializable" }),
+        ).rejects.toThrow(TransactionIsolationError);
+      });
+    },
+  );
 
-  it("setting isolation when starting a nested transaction raises error", async () => {
-    class Tag extends Base {
-      static {
-        this.attribute("name", "string");
+  itIfSupports(
+    "transaction_isolation",
+    "setting isolation when starting a nested transaction raises error",
+    async () => {
+      class Tag extends Base {
+        static {
+          this.attribute("name", "string");
+        }
       }
-    }
-    await Tag.transaction(async () => {
-      await expect(
-        Tag.transaction(async () => {}, { requiresNew: true, isolation: "serializable" }),
-      ).rejects.toThrow(TransactionIsolationError);
-    });
-  });
+      await Tag.transaction(async () => {
+        await expect(
+          Tag.transaction(async () => {}, { requiresNew: true, isolation: "serializable" }),
+        ).rejects.toThrow(TransactionIsolationError);
+      });
+    },
+  );
 });
 
 // Rails: TransactionIsolationTest, guarded by supports_transaction_isolation? && !SQLite3.

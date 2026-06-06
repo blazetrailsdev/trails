@@ -57,6 +57,63 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // Unlock "mysql" here once the dump path is fixed. (postgresql_adapter.rb:208,
   // sqlite3_adapter.rb:155, abstract_mysql_adapter.rb:104)
   expression_index: ["postgres", "sqlite"],
+  // `supports_bulk_alter?`: PostgreSQL + MySQL true, abstract default false.
+  // (postgresql_adapter.rb:188, abstract_mysql_adapter.rb:96)
+  bulk_alter: ["postgres", "mysql"],
+  // `supports_ddl_transactions?`: PostgreSQL + SQLite true, MySQL false (abstract default).
+  // (postgresql_adapter.rb:416, sqlite3_adapter.rb:139)
+  ddl_transactions: ["postgres", "sqlite"],
+  // `supports_partial_index?`: PostgreSQL + SQLite true, abstract default false.
+  // (postgresql_adapter.rb:200, sqlite3_adapter.rb:151)
+  partial_index: ["postgres", "sqlite"],
+  // `supports_index_include?`: PostgreSQL ≥ 11.0 (pg17 qualifies), abstract default false.
+  // (postgresql_adapter.rb:204)
+  index_include: ["postgres"],
+  // `supports_identity_columns?`: PostgreSQL ≥ 10.0 (pg17 qualifies), abstract default false.
+  // (postgresql_adapter.rb:279)
+  identity_columns: ["postgres"],
+  // `supports_nulls_not_distinct?`: PostgreSQL ≥ 15.0 (pg17 qualifies), abstract default false.
+  // (postgresql_adapter.rb:283)
+  nulls_not_distinct: ["postgres"],
+  // `supports_native_partitioning?`: PostgreSQL ≥ 10.0 (pg17 qualifies), abstract default false.
+  // (postgresql_adapter.rb:287)
+  native_partitioning: ["postgres"],
+  // `supports_insert_returning?`: PostgreSQL true; MySQL only for MariaDB ≥ 10.5 (mysql:8
+  // is not MariaDB → false); SQLite ≥ 3.35.0 (current node sqlite qualifies → true).
+  // (postgresql_adapter.rb:264, abstract_mysql_adapter.rb:173, sqlite3_adapter.rb:187)
+  insert_returning: ["postgres", "sqlite"],
+  // `supports_text_column_with_default?`: MySQL only for MariaDB ≥ 10.2.1 (mysql:8 is not
+  // MariaDB → false); all other adapters true. (adapter_helper.rb:42)
+  text_column_with_default: ["postgres", "sqlite"],
+  // `supports_common_table_expressions?`: PostgreSQL true; MySQL ≥ 8.0.1 (mysql:8 qualifies);
+  // SQLite ≥ 3.8.3 (current node sqlite qualifies). (postgresql_adapter.rb:451,
+  // abstract_mysql_adapter.rb:153, sqlite3_adapter.rb:183)
+  common_table_expressions: ALL,
+  // `supports_insert_on_duplicate_skip/update?`: PG ≥ 9.5 (pg17 → true); MySQL true;
+  // SQLite ≥ 3.24.0 (current node sqlite → true). (postgresql_adapter.rb:271-272,
+  // abstract_mysql_adapter.rb, sqlite3_adapter.rb:194-195)
+  insert_on_duplicate_skip: ALL,
+  insert_on_duplicate_update: ALL,
+  // `supports_explain?`: all adapters true. (abstract default false; overridden in
+  // postgresql_adapter.rb:424, abstract_mysql_adapter.rb:116, sqlite3_adapter.rb:241)
+  explain: ALL,
+  // `supports_views?`: all adapters true. (abstract default false; overridden in
+  // postgresql_adapter.rb:240, abstract_mysql_adapter.rb:136, sqlite3_adapter.rb:171)
+  views: ALL,
+  // `supports_datetime_with_precision?`: all adapters true. (abstract default false;
+  // overridden in postgresql_adapter.rb:244, abstract_mysql_adapter.rb:140, sqlite3_adapter.rb:175)
+  datetime_with_precision: ALL,
+  // `supports_virtual_columns?`: PostgreSQL ≥ 12.0, MySQL ≥ 5.7, SQLite ≥ 3.31 — all CI targets
+  // qualify. (postgresql_adapter.rb:291, abstract_mysql_adapter.rb:144, sqlite3_adapter.rb:179)
+  virtual_columns: ALL,
+  // `supports_foreign_tables?`: PostgreSQL only. (postgresql_adapter.rb:255; abstract default false)
+  foreign_tables: ["postgres"] as readonly Backend[],
+  // `supports_optimizer_hints?`: PostgreSQL + MySQL. (postgresql_adapter.rb:295,
+  // abstract_mysql_adapter.rb:148; abstract default false)
+  optimizer_hints: ["postgres", "mysql"] as readonly Backend[],
+  // `supports_transaction_isolation?`: PostgreSQL + MySQL. (postgresql_adapter.rb:412,
+  // abstract_mysql_adapter.rb:157; abstract default false)
+  transaction_isolation: ["postgres", "mysql"] as readonly Backend[],
 };
 
 /** Does the active backend support Rails' `supports_<feature>?` capability? */
@@ -77,12 +134,21 @@ export function describeIfSupports(feature: string, name: string, factory: Suite
   (adapterSupports(feature) ? describe : describe.skip)(name, factory);
 }
 
-/** Per-test feature gate: `itIfSupports("json", "round-trips", async () => {…})`. */
-export function itIfSupports(
-  feature: string,
-  name: string,
-  fn: TestFunction,
-  timeout?: number,
-): void {
+function _itIfSupports(feature: string, name: string, fn: TestFunction, timeout?: number): void {
   (adapterSupports(feature) ? it : it.skip)(name, fn, timeout);
 }
+
+/**
+ * Per-test feature gate: `itIfSupports("json", "round-trips", async () => {…})`.
+ *
+ * Also chainable with `.skipIf`: `itIfSupports.skipIf(cond)("key", "name", fn)`
+ * adds an extra runtime condition on top of the feature check (adapter AND
+ * feature must both pass). The extractor understands this form and produces
+ * `adapters + features` gate metadata matching Rails' combined guard.
+ */
+export const itIfSupports = Object.assign(_itIfSupports, {
+  skipIf:
+    (cond: boolean) =>
+    (feature: string, name: string, fn: TestFunction, timeout?: number): void =>
+      (!cond && adapterSupports(feature) ? it : it.skip)(name, fn, timeout),
+});
