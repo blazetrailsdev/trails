@@ -561,11 +561,9 @@ describe("DirtyTest", () => {
       await Person.where({ id: person.id }).updateAll({ first_name: "baz" });
     });
 
-    // Capture lock_version after the force-UPDATE block (= 1 after the save2 increment).
-    // Mirrors: old_lock_version = person.lock_version + 1 (Rails computes + 1 because
-    // it expects reload to return that value; we record the current value directly
-    // and assert no-ops leave it unchanged).
-    const savedLockVersion = (person as any).lock_version;
+    // Mirrors: old_lock_version = person.lock_version + 1
+    // updateAll bumped the DB lock_version by 1; in-memory is still 1, so DB = 2.
+    const savedLockVersion = (person as any).lock_version + 1;
 
     await withPartialWrites(Person, true, async () => {
       // No-op saves: lazy SAVEPOINT never materializes → 0 events, lock_version unchanged.

@@ -2794,7 +2794,8 @@ export class Base extends Model {
 
     const changedAttrs = { ...this.changes };
 
-    if (Object.keys(changedAttrs).length === 0) return;
+    // With partial_writes=false Rails uses all columns and never short-circuits on clean attrs.
+    if (ctor.partialUpdates && Object.keys(changedAttrs).length === 0) return;
 
     const dbValues = this._attributes.valuesForDatabase();
     // With partial_writes=false Rails includes all columns; with it on, only dirty ones.

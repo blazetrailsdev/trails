@@ -1681,7 +1681,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (!level) throw new Error(`Unknown isolation level: ${isolation}`);
     this._client = await this._acquireFreshClient();
     try {
-      await this._client.query(`BEGIN ISOLATION LEVEL ${level}`);
+      await this._logTransaction(`BEGIN ISOLATION LEVEL ${level}`, async () => {
+        await this._client!.query(`BEGIN ISOLATION LEVEL ${level}`);
+      });
       this._inTransaction = true;
     } catch (error) {
       this._client = null;

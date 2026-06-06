@@ -3173,6 +3173,14 @@ export class Relation<T extends Base> {
         return [table.get(key), val];
       },
     );
+    // Mirrors Rails relation.rb#update_all: bump locking_column when omitted.
+    if (this._modelClass.lockingEnabled) {
+      const lockingCol = this._modelClass.lockingColumn;
+      if (!Object.prototype.hasOwnProperty.call(updates, lockingCol)) {
+        const quotedCol = this._modelClass.connection.quoteColumnName(lockingCol);
+        updateValues.push([table.get(lockingCol), new Nodes.SqlLiteral(`${quotedCol} + 1`)]);
+      }
+    }
     const um = new UpdateManager().table(table).set(updateValues);
     for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
       um.where(node);
