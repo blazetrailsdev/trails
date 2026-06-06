@@ -424,7 +424,12 @@ describe("AttributeMethodsTest", () => {
     const { Post } = makeModel();
     await Post.create({ title: "sel_test" });
     const result = await Post.select("title").first();
+    // Mirrors: computer[:developer] → assert_raises MissingAttributeError
+    expect(() => (result as any).score).toThrow("missing attribute 'score'");
+    // Mirrors: assert_nothing_raised { computer[:extendedWarranty] }
     expect(result?.readAttribute("title")).toBe("sel_test");
+    // Mirrors: assert_nothing_raised { computer[:no_column_exists] }
+    expect(result?.readAttribute("no_column_exists")).toBeNull();
   });
   it("user-defined time attribute predicate", async () => {
     const { Post } = makeModel();
