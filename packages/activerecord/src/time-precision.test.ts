@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, expect, beforeEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
@@ -7,6 +7,7 @@ import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { itIfSupports } from "./test-helpers/supports.js";
 
 function nsecTime(v: Temporal.PlainTime): number {
   return v.millisecond * 1_000_000 + v.microsecond * 1_000 + v.nanosecond;
@@ -38,7 +39,7 @@ describe("TimePrecisionTest", () => {
     return Foo;
   }
 
-  it("time data type with precision", async () => {
+  itIfSupports("datetime_with_precision", "time data type with precision", async () => {
     await ctx.createTable("foos", { force: true }, () => {});
     await ctx.addColumn("foos", "start", "time", { precision: 3 });
     await ctx.addColumn("foos", "finish", "time", { precision: 6 });
@@ -48,7 +49,7 @@ describe("TimePrecisionTest", () => {
     expect((Foo.columnsHash() as any)["finish"].precision).toBe(6);
   });
 
-  it("time precision is truncated on assignment", async () => {
+  itIfSupports("datetime_with_precision", "time precision is truncated on assignment", async () => {
     await ctx.createTable("foos", { force: true }, () => {});
     await ctx.addColumn("foos", "start", "time", { precision: 0 });
     await ctx.addColumn("foos", "finish", "time", { precision: 6 });
@@ -74,41 +75,49 @@ describe("TimePrecisionTest", () => {
   // Rails skips this on Mysql2Adapter: a `TIME` column without
   // explicit precision is `TIME(0)` on MySQL/MariaDB, so the assignment does
   // truncate. See vendor/rails/activerecord/test/cases/time_precision_test.rb.
-  it.skipIf(adapterType === "mysql")("no time precision isnt truncated on assignment", async () => {
-    await ctx.createTable("foos", { force: true }, () => {});
-    await ctx.addColumn("foos", "start", "time");
-    await ctx.addColumn("foos", "finish", "time", { precision: 6 });
-    const Foo = makeFoo();
-    await Foo.loadSchema();
-    const time = Temporal.PlainTime.from({
-      hour: 12,
-      minute: 0,
-      second: 0,
-      millisecond: 0,
-      microsecond: 0,
-      nanosecond: 123,
-    });
-    const foo = new Foo({ start: time, finish: time });
-    expect(nsecTime((foo as any).start)).toBe(123);
-    expect(nsecTime((foo as any).finish)).toBe(0);
-    await (foo as any).save();
-    await (foo as any).reload();
-    expect(nsecTime((foo as any).start)).toBe(0);
-    expect(nsecTime((foo as any).finish)).toBe(0);
-  });
+  itIfSupports.skipIf(adapterType === "mysql")(
+    "datetime_with_precision",
+    "no time precision isnt truncated on assignment",
+    async () => {
+      await ctx.createTable("foos", { force: true }, () => {});
+      await ctx.addColumn("foos", "start", "time");
+      await ctx.addColumn("foos", "finish", "time", { precision: 6 });
+      const Foo = makeFoo();
+      await Foo.loadSchema();
+      const time = Temporal.PlainTime.from({
+        hour: 12,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
+        microsecond: 0,
+        nanosecond: 123,
+      });
+      const foo = new Foo({ start: time, finish: time });
+      expect(nsecTime((foo as any).start)).toBe(123);
+      expect(nsecTime((foo as any).finish)).toBe(0);
+      await (foo as any).save();
+      await (foo as any).reload();
+      expect(nsecTime((foo as any).start)).toBe(0);
+      expect(nsecTime((foo as any).finish)).toBe(0);
+    },
+  );
 
-  it("passing precision to time does not set limit", async () => {
-    await ctx.createTable("foos", { force: true }, (t) => {
-      t.time("start", { precision: 3 });
-      t.time("finish", { precision: 6 });
-    });
-    const Foo = makeFoo();
-    await Foo.loadSchema();
-    expect((Foo.columnsHash() as any)["start"].limit).toBeNull();
-    expect((Foo.columnsHash() as any)["finish"].limit).toBeNull();
-  });
+  itIfSupports(
+    "datetime_with_precision",
+    "passing precision to time does not set limit",
+    async () => {
+      await ctx.createTable("foos", { force: true }, (t) => {
+        t.time("start", { precision: 3 });
+        t.time("finish", { precision: 6 });
+      });
+      const Foo = makeFoo();
+      await Foo.loadSchema();
+      expect((Foo.columnsHash() as any)["start"].limit).toBeNull();
+      expect((Foo.columnsHash() as any)["finish"].limit).toBeNull();
+    },
+  );
 
-  it("invalid time precision raises error", async () => {
+  itIfSupports("datetime_with_precision", "invalid time precision raises error", async () => {
     await expect(
       ctx.createTable("foos", { force: true }, (t) => {
         t.time("start", { precision: 7 });
@@ -117,12 +126,12 @@ describe("TimePrecisionTest", () => {
     ).rejects.toThrow(ArgumentError);
   });
 
-  it("formatting time according to precision", () => {
+  itIfSupports("datetime_with_precision", "formatting time according to precision", () => {
     // BLOCKED: type — PlainTime WHERE-clause quoting needed + time.to_s Rails-format comparison
     // ROOT-CAUSE: ~20 LOC in connection-adapters/abstract/quoting.ts PlainTime quoting
   });
 
-  it("schema dump includes time precision", async () => {
+  itIfSupports("datetime_with_precision", "schema dump includes time precision", async () => {
     await ctx.createTable("foos", { force: true }, (t) => {
       t.time("start", { precision: 4 });
       t.time("finish", { precision: 6 });
@@ -132,7 +141,11 @@ describe("TimePrecisionTest", () => {
     expect(output).toMatch(/t\.time\("finish",\s*\{[^}]*precision:\s*6/);
   });
 
-  it("time precision with zero should be dumped", () => {
-    // BLOCKED: adapter-pg — postgres-only test (current_adapter?(:PostgreSQLAdapter))
-  });
+  itIfSupports.skipIf(adapterType !== "postgres")(
+    "datetime_with_precision",
+    "time precision with zero should be dumped",
+    () => {
+      // BLOCKED: adapter-pg — postgres-only test (current_adapter?(:PostgreSQLAdapter))
+    },
+  );
 });

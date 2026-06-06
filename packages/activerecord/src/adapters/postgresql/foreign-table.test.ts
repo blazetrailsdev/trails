@@ -11,6 +11,7 @@ import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { Base } from "../../index.js";
+import { itIfSupports } from "../../test-helpers/supports.js";
 
 const url = new URL(PG_TEST_URL);
 const fdwHost = url.hostname || "localhost";
@@ -75,26 +76,26 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("ForeignTableTest", () => {
-    it("table exists", async () => {
+    itIfSupports("foreign_tables", "table exists", async () => {
       expect(await adapter.tableExists("foreign_professors")).toBe(false);
     });
 
-    it("foreign tables are valid data sources", async () => {
+    itIfSupports("foreign_tables", "foreign tables are valid data sources", async () => {
       expect(await adapter.dataSourceExists("foreign_professors")).toBe(true);
     });
 
-    it("foreign tables", async () => {
+    itIfSupports("foreign_tables", "foreign tables", async () => {
       expect(await adapter.foreignTables()).toEqual(["foreign_professors"]);
     });
 
-    it("foreign table exists", async () => {
+    itIfSupports("foreign_tables", "foreign table exists", async () => {
       expect(await adapter.foreignTableExists("foreign_professors")).toBe(true);
       expect(await adapter.foreignTableExists("nonexistingtable")).toBe(false);
       expect(await adapter.foreignTableExists("'")).toBe(false);
       expect(await adapter.foreignTableExists(null as unknown as string)).toBe(false);
     });
 
-    it("attribute names", async () => {
+    itIfSupports("foreign_tables", "attribute names", async () => {
       class ForeignProfessor extends Base {
         static tableName = "foreign_professors";
       }
@@ -112,7 +113,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // change outside this PR's test-only scope.
     });
 
-    it("attributes", async () => {
+    itIfSupports("foreign_tables", "attributes", async () => {
       class Professor extends Base {
         static tableName = "professors";
       }
@@ -128,7 +129,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(found.readAttribute("id")).toBe(created.readAttribute("id"));
     });
 
-    it("insert record", async () => {
+    itIfSupports("foreign_tables", "insert record", async () => {
       class ForeignProfessorWithPk extends Base {
         static tableName = "foreign_professors";
         static primaryKey = "id";
@@ -139,7 +140,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(last?.readAttribute("name")).toBe("Leonardo");
     });
 
-    it("update record", async () => {
+    itIfSupports("foreign_tables", "update record", async () => {
       class Professor extends Base {
         static tableName = "professors";
       }
@@ -157,7 +158,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(prof.readAttribute("name")).toBe("Albert");
     });
 
-    it("delete record", async () => {
+    itIfSupports("foreign_tables", "delete record", async () => {
       class Professor extends Base {
         static tableName = "professors";
       }

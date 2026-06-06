@@ -5,6 +5,8 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
+import { adapterType } from "../test-adapter.js";
+import { itIfSupports } from "../test-helpers/supports.js";
 
 import { defineSchema } from "../test-helpers/define-schema.js";
 import type { Schema } from "../test-helpers/define-schema.js";
@@ -564,7 +566,7 @@ describe("UniquenessValidationTest", () => {
     expect(p.saved_count).toBe(1);
   });
 
-  it("validate uniqueness uuid", async () => {
+  it.skipIf(adapterType !== "postgres")("validate uniqueness uuid", async () => {
     class Post extends Base {
       static {
         this.attribute("uuid", "string");
@@ -681,7 +683,7 @@ describe("UniquenessValidationWithIndexTest", () => {
     expect(await p3.save()).toBe(true);
   });
 
-  it("partial index", async () => {
+  itIfSupports("partial_index", "partial index", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -772,7 +774,7 @@ describe("UniquenessValidationWithIndexTest", () => {
     expect(await p2.save()).toBe(true);
   });
 
-  it("expression index", async () => {
+  it.skipIf(adapterType !== "postgres")("expression index", async () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
