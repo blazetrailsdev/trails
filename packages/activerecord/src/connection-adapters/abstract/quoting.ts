@@ -416,7 +416,7 @@ export function columnNameWithOrderMatcher(): RegExp {
   return /^((?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*$/i;
 }
 
-function isSqlLiteral(value: unknown): value is { value: string } {
+export function isSqlLiteral(value: unknown): value is { value: string } {
   return (
     value !== null &&
     typeof value === "object" &&
