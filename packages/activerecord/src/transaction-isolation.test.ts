@@ -42,7 +42,7 @@ describe("TransactionIsolationTest", () => {
     await defineSchema({ tags: TEST_SCHEMA.tags });
   });
 
-  itIfSupports(
+  itIfSupports.skipIf(adapterType === "sqlite")(
     "transaction_isolation",
     "setting isolation when joining a transaction raises an error",
     async () => {
@@ -59,7 +59,7 @@ describe("TransactionIsolationTest", () => {
     },
   );
 
-  itIfSupports(
+  itIfSupports.skipIf(adapterType === "sqlite")(
     "transaction_isolation",
     "setting isolation when starting a nested transaction raises error",
     async () => {

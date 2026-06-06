@@ -426,7 +426,7 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
 
   // SQLite INTEGER PRIMARY KEY (ROWID alias) only works with INTEGER type;
   // BIGINT PKs require explicit values on SQLite. Skip on SQLite.
-  it("primary key with bigint", async () => {
+  it.skipIf(adapterType === "sqlite")("primary key with bigint", async () => {
     // Rails: id: :bigint → BIGSERIAL on PG; BIGINT AUTO_INCREMENT on MySQL.
     const type = adapterType === "postgres" ? "bigserial" : "bigint";
     await (Base.connection as any).createTable("auto_increments", {

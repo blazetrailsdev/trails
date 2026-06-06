@@ -108,12 +108,15 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   virtual_columns: ALL,
   // `supports_foreign_tables?`: PostgreSQL only. (postgresql_adapter.rb:255; abstract default false)
   foreign_tables: ["postgres"] as readonly Backend[],
-  // `supports_optimizer_hints?`: PostgreSQL + MySQL. (postgresql_adapter.rb:295,
-  // abstract_mysql_adapter.rb:148; abstract default false)
-  optimizer_hints: ["postgres", "mysql"] as readonly Backend[],
-  // `supports_transaction_isolation?`: PostgreSQL + MySQL. (postgresql_adapter.rb:412,
-  // abstract_mysql_adapter.rb:157; abstract default false)
-  transaction_isolation: ["postgres", "mysql"] as readonly Backend[],
+  // `supports_optimizer_hints?`: MySQL only in CI. PostgreSQL checks
+  // extension_available?("pg_hint_plan") at runtime (postgresql_adapter.rb:295) — CI
+  // does not have pg_hint_plan installed, so PG effectively returns false.
+  // (abstract_mysql_adapter.rb:148; abstract default false)
+  optimizer_hints: ["mysql"] as readonly Backend[],
+  // `supports_transaction_isolation?`: PostgreSQL + MySQL + SQLite (sqlite3_adapter.rb:147).
+  // The Rails test (transaction_isolation_test.rb:20) adds a separate
+  // !current_adapter?(:SQLite3Adapter) guard — express via itIfSupports.skipIf(adapterType === "sqlite").
+  transaction_isolation: ALL,
 };
 
 /** Does the active backend support Rails' `supports_<feature>?` capability? */

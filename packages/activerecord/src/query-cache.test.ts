@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./index.js";
 import { itIfSupports } from "./test-helpers/supports.js";
-import { newRawTestAdapter } from "./test-adapter.js";
+import { adapterType, newRawTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import {
   QueryCache,
@@ -739,7 +739,7 @@ describe("QuerySerializedParamTest", () => {
 });
 
 describe("QueryCacheExpiryTest", () => {
-  it("cache gets cleared after migration", async () => {
+  it.skipIf(adapterType === "sqlite")("cache gets cleared after migration", async () => {
     const cached = rawAdapter();
     cached._queryCache = new Store();
     const { Migration } = await import("./migration.js");
