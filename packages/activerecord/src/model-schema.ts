@@ -7,6 +7,7 @@ import {
   AttributeSetCoder,
   MissingAttributeError,
   typeRegistry,
+  defineDirtyAttributeMethods,
   type Type,
 } from "@blazetrails/activemodel";
 import {
@@ -833,6 +834,10 @@ function applyColumnsHash(
         configurable: true,
       });
     }
+    // Per-attribute dirty methods (nameChanged, nameWas, nameChange, …).
+    // Mirrors the call in activemodel's `attribute()` for user-declared attrs.
+    // Guards inside defineDirtyAttributeMethods skip already-defined methods.
+    defineDirtyAttributeMethods(proto, name);
   }
 
   type CacheBag = {
