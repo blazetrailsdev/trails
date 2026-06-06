@@ -1369,12 +1369,6 @@ export class Model {
 
   /** @internal */
   _readAttribute(name: string): unknown {
-    const attr = this._attributes.getAttribute(name);
-    if (!attr.isInitialized()) {
-      throw new MissingAttributeError(
-        `missing attribute '${name}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
-      );
-    }
     if (!this._attributes.has(name)) {
       return null;
     }
