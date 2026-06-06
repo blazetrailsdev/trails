@@ -3501,9 +3501,15 @@ function _castEnumDirtyOpts(
   }
   const enumDef = _EnumModule.getEnumDefinitions(ctor).get(name);
   if (enumDef) {
-    // EnumType.cast normalises labels, integers, and blank → null (matching
-    // Rails' `value.presence`). No fallback: we know this IS an enum attr.
-    const cast = (v: unknown): unknown => enumDef.type.cast(v);
+    // Mirror EnumType#cast's `value.presence` fallback: known label/integer →
+    // normalised form; nil/blank string → null; nonblank unrecognised → preserve.
+    // (Our EnumType.cast returns null for ALL unrecognised values, not just blank,
+    // so we can't delegate the fallback to it directly.)
+    const cast = (v: unknown): unknown => {
+      if (v === null || v === undefined) return null;
+      if (typeof v === "string" && /^\s*$/.test(v)) return null;
+      return enumDef.type.cast(v) ?? v;
+    };
     const result: { from?: unknown; to?: unknown } = {};
     if ("from" in opts) result.from = cast(opts.from);
     if ("to" in opts) result.to = cast(opts.to);
