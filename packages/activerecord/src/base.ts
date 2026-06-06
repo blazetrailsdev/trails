@@ -2638,23 +2638,49 @@ export class Base extends Model {
   private _skipTouch = false;
   private _instanceRecordTimestamps: boolean | null = null;
 
-  // Mirrors: ActiveRecord::AttributeMethods::Dirty#changed? — super (ActiveModel) already
-  // covers explicit assignments; AR adds in-place mutation detection for mutable types
-  // (e.g. Serialized) so that topic.content["key"] = val makes changed? return true.
+  // Rails routes changed?, has_changes_to_save?, changes_to_save,
+  // changed_attribute_names_to_save, and attributes_in_database all through the same
+  // mutations_from_database tracker (AttributeMutationTracker), which checks both
+  // explicit assignments AND in-place mutations on mutable types (e.g. Serialized).
+  // Mirrors: ActiveRecord::AttributeMethods::Dirty (activerecord/lib/.../dirty.rb:138-192).
+
   override get changed(): boolean {
-    if (this._dirty.changed) return true;
-    let found = false;
-    this._attributes.forEach((attr) => {
-      if (!found && attr.type.isMutable() && attr.changedInPlace()) found = true;
-    });
-    return found;
+    return this._dirty.changed || this._hasInPlaceMutableChanges();
   }
 
-  // Mirrors: ActiveRecord::AttributeMethods::Dirty#has_changes_to_save? — delegates to
-  // mutations_from_database.any_changes? which is always AttributeMutationTracker (no
-  // partial_updates gate in Rails; that flag only selects which columns to write).
   override get hasChangesToSave(): boolean {
-    if (this._dirty.changed) return true;
+    return this._dirty.changed || this._hasInPlaceMutableChanges();
+  }
+
+  override get changesToSave(): Record<string, [unknown, unknown]> {
+    const result = { ...this._dirty.changes };
+    this._attributes.forEach((attr, name) => {
+      if (!Object.hasOwn(result, name) && attr.type.isMutable() && attr.changedInPlace()) {
+        result[name] = [this._dirty.attributeWas(name), attr.value];
+      }
+    });
+    return result;
+  }
+
+  override get changedAttributeNamesToSave(): string[] {
+    const names = this._dirty.changedAttributes;
+    this._attributes.forEach((attr, name) => {
+      if (!names.includes(name) && attr.type.isMutable() && attr.changedInPlace()) {
+        names.push(name);
+      }
+    });
+    return names;
+  }
+
+  override get attributesInDatabase(): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const name of this.changedAttributeNamesToSave) {
+      result[name] = this.attributeInDatabase(name);
+    }
+    return result;
+  }
+
+  private _hasInPlaceMutableChanges(): boolean {
     let found = false;
     this._attributes.forEach((attr) => {
       if (!found && attr.type.isMutable() && attr.changedInPlace()) found = true;
