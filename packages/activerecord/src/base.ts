@@ -2702,7 +2702,10 @@ export class Base extends Model {
     const result = { ...this._dirty.changes };
     this._attributes.forEach((attr, name) => {
       if (!Object.hasOwn(result, name) && attr.type.isMutable() && attr.changedInPlace()) {
-        result[name] = [this._dirty.attributeWas(name), attr.value];
+        // Re-cast from raw DB string (mirrors FromDatabase#original_value →
+        // type_cast(value_before_type_cast)) so in-place mutations don't corrupt
+        // the "from" side by sharing the same object reference.
+        result[name] = [attr.type.cast(attr.valueBeforeTypeCast), attr.value];
       }
     });
     return result;
@@ -2731,7 +2734,7 @@ export class Base extends Model {
     // JSON.stringify is key-order-dependent so it can't be used here — use deep
     // structural equality on the cast (decoded) objects instead.
     if ("from" in options) {
-      if (!_jsonEqual(this._dirty.attributeWas(resolved), attr.type.cast(options.from)))
+      if (!_jsonEqual(attr.type.cast(attr.valueBeforeTypeCast), attr.type.cast(options.from)))
         return false;
     }
     if ("to" in options) {
@@ -2877,7 +2880,7 @@ export class Base extends Model {
     const changedAttrs = { ...this.changes };
     this._attributes.forEach((attr, name) => {
       if (!Object.hasOwn(changedAttrs, name) && attr.type.isMutable() && attr.changedInPlace()) {
-        changedAttrs[name] = [attr.originalValue, attr.value];
+        changedAttrs[name] = [attr.type.cast(attr.valueBeforeTypeCast), attr.value];
       }
     });
 
