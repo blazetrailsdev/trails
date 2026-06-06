@@ -2685,8 +2685,18 @@ export class Base extends Model {
     const attr = this._attributes.getAttribute(resolved);
     if (!attr.type.isMutable() || !attr.changedInPlace()) return false;
     if (!options) return true;
-    if ("from" in options && this._dirty.attributeWas(resolved) !== options.from) return false;
-    if ("to" in options && attr.value !== options.to) return false;
+    // Mirror AttributeMutationTracker#changed?: cast option values with the attribute's
+    // type (type_cast) then compare serialized forms so { a: "a" } == { a: "a" }
+    // works structurally (Rails uses Ruby == on cast values; we serialize to string).
+    if ("from" in options) {
+      const castFrom = attr.type.cast(options.from);
+      if (attr.type.serialize(this._dirty.attributeWas(resolved)) !== attr.type.serialize(castFrom))
+        return false;
+    }
+    if ("to" in options) {
+      const castTo = attr.type.cast(options.to);
+      if (attr.type.serialize(attr.value) !== attr.type.serialize(castTo)) return false;
+    }
     return true;
   }
 
