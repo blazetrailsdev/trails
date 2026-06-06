@@ -122,11 +122,12 @@ describe("InnerJoinAssociationTest", () => {
     const joinSources = postTable
       .join(commentTable)
       .on(postTable.get("id").eq(commentTable.get("post_id"))).joinSources;
-    expect(() =>
-      Post.includes("comments")
-        .joins(...joinSources)
-        .toSql(),
-    ).not.toThrow();
+    // Mirrors Rails: eager_load(:agents).joins(arel_join) — assert the joined
+    // table appears in the generated SQL, not just that compilation succeeds.
+    const sql = Post.includes("comments")
+      .joins(...joinSources)
+      .toSql();
+    expect(sql).toContain("comments");
   });
 
   it("construct finder sql ignores empty joins hash", () => {
@@ -386,9 +387,12 @@ describe("InnerJoinAssociationTest", () => {
 
   it("eager load with string joins", () => {
     const { Post } = makeModels();
-    expect(() =>
-      Post.includes("comments").joins("INNER JOIN comments ON comments.post_id = posts.id").toSql(),
-    ).not.toThrow();
+    // Mirrors Rails: eager_load(:agents).joins(string_join) — assert the joined
+    // table appears in the generated SQL, not just that compilation succeeds.
+    const sql = Post.includes("comments")
+      .joins("INNER JOIN comments ON comments.post_id = posts.id")
+      .toSql();
+    expect(sql).toContain("comments");
   });
 
   it("joins a has_and_belongs_to_many association", async () => {

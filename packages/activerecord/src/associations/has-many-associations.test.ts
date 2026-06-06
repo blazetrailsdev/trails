@@ -8241,6 +8241,11 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
+    Associations.hasMany.call(Author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      inverseOf: "author",
+    });
     Associations.belongsTo.call(Post, "author", {
       className: "Author",
       foreignKey: "author_id",
@@ -8249,9 +8254,9 @@ describe("HasManyAssociationsTest", () => {
     registerModel(Author);
     registerModel(Post);
     const author = await Author.create({ name: "Alice", posts_count: 0 });
-    await Post.create({ author_id: author.id, title: "A" });
-    const reloaded = await Author.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(1);
+    // Mirrors Rails: car.wheels.create! then check car.wheels_count in-memory (no reload).
+    await (author as any).posts.create({ title: "A" });
+    expect((author as any).readAttribute("posts_count")).toBe(1);
   });
 
   it("pushing association updates counter cache", async () => {
@@ -8267,6 +8272,11 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
+    Associations.hasMany.call(Author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      inverseOf: "author",
+    });
     Associations.belongsTo.call(Post, "author", {
       className: "Author",
       foreignKey: "author_id",
@@ -8275,9 +8285,11 @@ describe("HasManyAssociationsTest", () => {
     registerModel(Author);
     registerModel(Post);
     const author = await Author.create({ name: "Alice", posts_count: 0 });
-    await Post.create({ author_id: author.id, title: "A" });
+    // Mirrors Rails: car.wheels << Wheel.new then check car.reload.wheels_count.
+    const post = new Post({ title: "A" });
+    await (author as any).posts.push(post);
     const reloaded = await Author.find(author.id!);
-    expect((reloaded as any).posts_count).toBeGreaterThanOrEqual(1);
+    expect((reloaded as any).posts_count).toBe(1);
   });
 
   it("calling empty with counter cache", async () => {
@@ -8293,13 +8305,20 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
+    Associations.hasMany.call(Author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      inverseOf: "author",
+    });
+    Associations.belongsTo.call(Post, "author", {
+      className: "Author",
+      foreignKey: "author_id",
+      counterCache: "posts_count",
+    });
     registerModel(Author);
     registerModel(Post);
     const author = await Author.create({ name: "Alice", posts_count: 0 });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(0);
+    // Mirrors Rails: topic.replies.empty? when counter cache shows 0 posts.
+    expect(await (author as any).posts.isEmpty()).toBe(true);
   });
 });
