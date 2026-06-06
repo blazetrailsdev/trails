@@ -3494,11 +3494,13 @@ function _castEnumDirtyOpts(
 ): { from?: unknown; to?: unknown } {
   const mapping = ctor._enums?.get(name);
   if (mapping) {
-    // Mirrors EnumType#cast: known label → storage integer; blank (Ruby
-    // value.presence) → null; everything else passes through unchanged.
+    // Mirrors EnumType#cast: has_key (label → storage value), then has_value
+    // (recognised storage value → pass through), then value.presence fallback.
+    const storageValues = Object.values(mapping) as unknown[];
     const cast = (v: unknown): unknown => {
       if (typeof v === "string" && Object.prototype.hasOwnProperty.call(mapping, v))
         return mapping[v];
+      if (storageValues.includes(v)) return v;
       if (_isBlankValue(v)) return null;
       return v;
     };
