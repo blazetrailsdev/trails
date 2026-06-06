@@ -213,7 +213,14 @@ export function aliasAttribute(this: AttributeMethodHost, newName: string, oldNa
 
   // Define the direct alias property (bare name → original)
   ensureOwnGeneratedMethods(this);
-  const getter: TaggedFn = function (this: ReadWriteHost) {
+  const getter: TaggedFn = function (
+    this: ReadWriteHost & {
+      _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
+    },
+  ) {
+    if (!this._attributes.getAttribute(oldName).isInitialized()) {
+      throw new MissingAttributeError(`missing attribute '${oldName}'`);
+    }
     return this.readAttribute(oldName);
   };
   getter.__generatedAttributeMethod = true;
