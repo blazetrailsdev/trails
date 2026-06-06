@@ -1617,11 +1617,44 @@ describe("AssociationsJoinModelTest", () => {
     expect(names).toEqual(["Bob", "Carol"]);
   });
 
-  it.skip("add to self referential has many through", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires << on self-referential through
+  it("add to self referential has many through", async () => {
+    class SrPerson extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SrFriendship extends Base {
+      static {
+        this.attribute("person_id", "integer");
+        this.attribute("friend_id", "integer");
+      }
+    }
+    registerModel(SrPerson);
+    registerModel(SrFriendship);
+    Associations.hasMany.call(SrPerson, "sr_friendships", {
+      className: "SrFriendship",
+      foreignKey: "person_id",
+    });
+    Associations.belongsTo.call(SrFriendship, "sr_friend", {
+      className: "SrPerson",
+      foreignKey: "friend_id",
+    });
+    Associations.hasMany.call(SrPerson, "sr_friends", {
+      through: "sr_friendships",
+      className: "SrPerson",
+      source: "sr_friend",
+    });
+    const david = await SrPerson.create({ name: "David" });
+    const bob = await SrPerson.create({ name: "Bob" });
+    const proxy = association(david, "sr_friends");
+    await proxy.push(bob);
+    const friends = await loadHasMany(david, "sr_friends", {
+      through: "sr_friendships",
+      className: "SrPerson",
+      source: "sr_friend",
+    });
+    expect(friends.length).toBe(1);
+    expect((friends[0] as any).name).toBe("Bob");
   });
 
   it("has many through uses conditions specified on the has many association", async () => {
