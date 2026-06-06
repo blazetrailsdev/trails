@@ -12,6 +12,7 @@ import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js"
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
 import { useFixtures } from "./test-helpers/use-fixtures.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
@@ -37,6 +38,22 @@ async function dropView(name: string): Promise<void> {
   }
 }
 
+// Force-recreate `books`/`authors` to the canonical shape before each suite's
+// view is created. Vitest resets the schema-signature cache to canonical per
+// file, so `useFixtures`' own `defineSchema` sees a cache-hit and skips the
+// repair — leaving whatever reduced `books` shape (no `cover`/`status`) a sibling
+// handler-suite file co-scheduled earlier in the same fork left in the shared
+// worker DB. The `CREATE VIEW … SELECT cover, status FROM books` below then fails
+// with "Unknown column" on MySQL. `dropExisting` drops + recreates
+// unconditionally. Register this AFTER the fixtures hook so it runs last and wins,
+// and BEFORE the view-creating `beforeAll` so the columns the view references exist.
+async function rebuildBooksTables(): Promise<void> {
+  await defineSchema(
+    { authors: canonicalSchema.authors, books: canonicalSchema.books },
+    { dropExisting: true },
+  );
+}
+
 // ---------------------------------------------------------------------------
 // ViewWithPrimaryKeyTest
 // ---------------------------------------------------------------------------
@@ -47,6 +64,8 @@ describe("ViewWithPrimaryKeyTest", () => {
     static override _tableName = "ebooks'";
     static override _primaryKey = "id";
   }
+
+  beforeAll(rebuildBooksTables);
 
   beforeAll(async () => {
     await dropView("ebooks'");
@@ -126,6 +145,8 @@ describe("ViewWithoutPrimaryKeyTest", () => {
     static override _tableName = "paperbacks";
   }
 
+  beforeAll(rebuildBooksTables);
+
   beforeAll(async () => {
     await dropView("paperbacks");
     await createView("paperbacks", `SELECT name, status FROM books WHERE format = 'paperback'`);
@@ -197,6 +218,8 @@ describe("UpdateableViewTest", () => {
     static override _tableName = "printed_books";
     static override _primaryKey = "id";
   }
+
+  beforeAll(rebuildBooksTables);
 
   beforeAll(async () => {
     if (adapterType === "sqlite") return;
