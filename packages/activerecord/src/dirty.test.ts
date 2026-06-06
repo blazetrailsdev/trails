@@ -914,13 +914,16 @@ describe("DirtyTest", () => {
     // attribute coercion parity, separate PR.
   });
 
-  it.skip("attribute_changed? properly type casts enum values", () => {
-    // BLOCKED (two gaps): (1) the canonical Parrot virtual-attr issue above
-    // (needs `LiveParrot.create`); (2) enum dirty `from:`/`to:` don't type-cast —
-    // Rails matches `breed_changed?(from: "african")`, `from: :african`, and
-    // `from: 0` against the same change, but trails compares the stored integer
-    // only, so the label forms fail. SCOPE: enum-aware dirty option casting,
-    // separate PR.
+  it("attribute_changed? properly type casts enum values", async () => {
+    // breed: 0 = "african". writeAttribute bypasses the _enum setter, and the
+    // integer column casts "african" → null, so pass the integer directly.
+    const parrot = await LiveParrot.createBang({ name: "Scipio", breed: 0 });
+
+    (parrot as any).breed = "australian";
+
+    expect(parrot.attributeChanged("breed", { from: "african", to: "australian" })).toBe(true);
+    expect(parrot.attributeChanged("breed", { from: "african", to: "australian" })).toBe(true);
+    expect(parrot.attributeChanged("breed", { from: 0, to: 1 })).toBe(true);
   });
 });
 
