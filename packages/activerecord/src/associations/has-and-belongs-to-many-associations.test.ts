@@ -828,8 +828,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     });
     expect(projects.length).toBe(1);
     expect((projects[0] as any).id).toBe(proj.id);
-    // Unselected attribute stays at its uninitialized null sentinel.
-    expect((projects[0] as any).name).toBeNull();
+    // Unselected attribute raises MissingAttributeError.
+    expect(() => (projects[0] as any).name).toThrow("missing attribute 'name'");
   });
 
   it("habtm respects select query method", async () => {
