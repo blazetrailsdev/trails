@@ -144,10 +144,10 @@ describe("LeftOuterJoinAssociationTest", () => {
   it("left outer joins with string join", () => {
     const { Post } = makeModels();
     // Mirrors Rails: Author.left_outer_joins(:posts).joins("LEFT OUTER JOIN comments …")
-    // The raw SQL join is passed to joins(), not leftOuterJoins().
+    // A raw SQL left outer join string is passed to joins() after the association join.
     const sql = Post.all()
       .leftOuterJoins("authors", "posts.author_id = authors.id")
-      .joins("INNER JOIN comments ON comments.post_id = posts.id")
+      .joins("LEFT OUTER JOIN comments ON comments.post_id = posts.id")
       .toSql();
     expect(sql).toContain("LEFT OUTER JOIN");
     expect(sql).toContain("comments");

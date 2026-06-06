@@ -8254,9 +8254,12 @@ describe("HasManyAssociationsTest", () => {
     registerModel(Author);
     registerModel(Post);
     const author = await Author.create({ name: "Alice", posts_count: 0 });
-    // Mirrors Rails: car.wheels.create! then check car.wheels_count in-memory (no reload).
+    // Mirrors Rails: car.wheels.create! then check in-memory counter, association
+    // size, and reloaded counter (has_many_associations_test.rb:1368-1374).
     await (author as any).posts.create({ title: "A" });
     expect((author as any).readAttribute("posts_count")).toBe(1);
+    expect(await (author as any).posts.size()).toBe(1);
+    expect(((await Author.find(author.id!)) as any).readAttribute("posts_count")).toBe(1);
   });
 
   it("pushing association updates counter cache", async () => {
@@ -8318,7 +8321,9 @@ describe("HasManyAssociationsTest", () => {
     registerModel(Author);
     registerModel(Post);
     const author = await Author.create({ name: "Alice", posts_count: 0 });
-    // Mirrors Rails: topic.replies.empty? when counter cache shows 0 posts.
-    expect(await (author as any).posts.isEmpty()).toBe(true);
+    // Mirrors Rails: topic.replies.empty? returns false without queries when the
+    // counter cache shows rows exist (has_many_associations_test.rb:1473-1477).
+    await (author as any).posts.create({ title: "A" });
+    expect(await (author as any).posts.isEmpty()).toBe(false);
   });
 });

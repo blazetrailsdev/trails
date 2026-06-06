@@ -115,19 +115,20 @@ describe("InnerJoinAssociationTest", () => {
     expect(sql).toContain("INNER JOIN authors");
   });
 
-  it("eager load with arel joins", () => {
-    const { Post } = makeModels();
+  it("eager load with arel joins", async () => {
+    const { Post, Comment } = makeModels();
+    const post = await Post.create({ title: "T" });
+    await Comment.create({ body: "C", post_id: post.id });
     const postTable = new Table("posts");
     const commentTable = new Table("comments");
     const joinSources = postTable
       .join(commentTable)
       .on(postTable.get("id").eq(commentTable.get("post_id"))).joinSources;
-    // Mirrors Rails: eager_load(:agents).joins(arel_join) — assert the joined
-    // table appears in the generated SQL, not just that compilation succeeds.
-    const sql = Post.includes("comments")
+    // Mirrors Rails: Person.eager_load(:agents).joins(arel_join).count == 3
+    const count = await Post.eagerLoad("comments")
       .joins(...joinSources)
-      .toSql();
-    expect(sql).toContain("comments");
+      .count();
+    expect(count).toBeGreaterThanOrEqual(1);
   });
 
   it("construct finder sql ignores empty joins hash", () => {
@@ -385,14 +386,15 @@ describe("InnerJoinAssociationTest", () => {
     expect(sql).toContain("comments");
   });
 
-  it("eager load with string joins", () => {
-    const { Post } = makeModels();
-    // Mirrors Rails: eager_load(:agents).joins(string_join) — assert the joined
-    // table appears in the generated SQL, not just that compilation succeeds.
-    const sql = Post.includes("comments")
+  it("eager load with string joins", async () => {
+    const { Post, Comment } = makeModels();
+    const post = await Post.create({ title: "T" });
+    await Comment.create({ body: "C", post_id: post.id });
+    // Mirrors Rails: Person.eager_load(:agents).joins(string_join).count == 3
+    const count = await Post.eagerLoad("comments")
       .joins("INNER JOIN comments ON comments.post_id = posts.id")
-      .toSql();
-    expect(sql).toContain("comments");
+      .count();
+    expect(count).toBeGreaterThanOrEqual(1);
   });
 
   it("joins a has_and_belongs_to_many association", async () => {
