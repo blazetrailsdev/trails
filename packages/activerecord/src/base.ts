@@ -606,21 +606,26 @@ function _jsonEqual(a: unknown, b: unknown): boolean {
       ba = b as unknown[];
     return aa.length === ba.length && aa.every((v, i) => _jsonEqual(v, ba[i]));
   }
-  // Typed instances (Temporal, Date, etc.) store state in internal slots — Object.keys
-  // returns [] for them, making the plain-object key-count check trivially pass and
-  // causing different-valued instances to compare as equal.  Guard: check proto first.
-  // - Different prototypes → always false (a Date and a PlainDate can't be equal).
-  // - Same non-plain prototype → compare via String(), which Temporal and other
-  //   well-behaved value types override with a canonical representation (e.g. ISO
-  //   strings), mirroring Ruby Date#== / ActiveModel type-cast equality.
-  // - Plain Object/null proto → fall through to structural key comparison.
+  // Typed instances (Temporal, Date, PointValue, etc.) need proto-aware dispatch:
+  // - Different prototypes → false (a PlainDate and a Date are never equal).
+  // - Same non-plain proto + toString override on that proto → String() comparison
+  //   (Temporal types return ISO strings; mirrors Ruby Date#== canonical equality).
+  // - Same non-plain proto, no toString override → fall through to structural key
+  //   comparison; types like PointValue expose state as enumerable own properties
+  //   (x, y) so Object.keys works correctly for them.
+  // - a is plain but b is typed → false.
+  // - Both plain → fall through to structural key comparison.
   const protoA = Object.getPrototypeOf(a);
   const protoB = Object.getPrototypeOf(b);
   if (protoA !== Object.prototype && protoA !== null) {
     if (protoA !== protoB) return false;
-    return String(a) === String(b);
+    if (Object.prototype.hasOwnProperty.call(protoA, "toString")) {
+      return String(a) === String(b);
+    }
+    // No toString override: fall through to structural key comparison below.
+  } else if (protoB !== Object.prototype && protoB !== null) {
+    return false;
   }
-  if (protoB !== Object.prototype && protoB !== null) return false;
   const oa = a as Record<string, unknown>,
     ob = b as Record<string, unknown>;
   const ka = Object.keys(oa),
