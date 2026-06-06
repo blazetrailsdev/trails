@@ -3509,13 +3509,15 @@ function _castEnumDirtyOpts(
   }
   const enumDef = _EnumModule.getEnumDefinitions(ctor).get(name);
   if (enumDef) {
-    // Mirror EnumType#cast's `value.presence` fallback: known label/integer →
-    // normalised form; blank → null; nonblank unrecognised → preserve.
-    // (Our EnumType.cast returns null for ALL unrecognised values, not just blank,
-    // so we can't delegate the fallback to it directly.)
+    // Mirror EnumType#cast order: mapping lookup first (has_key/has_value),
+    // then value.presence as the fallback for unrecognised values.
+    // EnumType.cast returns null for ALL unrecognised values (not just blank),
+    // so we apply isBlank only after cast returns null to distinguish blank
+    // (→ null) from nonblank unrecognised (→ preserve as-is).
     const cast = (v: unknown): unknown => {
-      if (_isBlankValue(v)) return null;
-      return enumDef.type.cast(v) ?? v;
+      const casted = enumDef.type.cast(v);
+      if (casted != null) return casted;
+      return _isBlankValue(v) ? null : v;
     };
     const result: { from?: unknown; to?: unknown } = {};
     if ("from" in opts) result.from = cast(opts.from);
