@@ -533,6 +533,8 @@ describe("StrictLoadingTest", () => {
       slcpm_developers: { name: "string", ship_id: "integer" },
       slcpm_ships: { name: "string" },
       slcpm_parts: { name: "string", ship_id: "integer" },
+      slcpd_authors: { name: "string" },
+      slcpd_books: { title: "string", author_id: "integer" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -1312,6 +1314,36 @@ describe("StrictLoadingTest", () => {
     await expect((parts[0] as any).association("slcpmShip").loadTarget()).rejects.toThrow(
       StrictLoadingViolationError,
     );
+  });
+  it("proxy strict_loading chain wins over cascade in diverged path", async () => {
+    class SlcpdAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlcpdBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+      }
+    }
+    registerModel("SlcpdAuthor", SlcpdAuthor);
+    registerModel("SlcpdBook", SlcpdBook);
+    Associations.hasMany.call(SlcpdAuthor, "slcpdBooks", {
+      className: "SlcpdBook",
+      foreignKey: "author_id",
+    });
+    const author = await SlcpdAuthor.create({ name: "Test" });
+    await SlcpdBook.create({ title: "B", author_id: author.id });
+    // author is NOT strict loading — cascade would call strictLoadingBang(false)
+    // on children. Calling strictLoadingBang(true) directly on the proxy sets
+    // _cpMutated=true (diverged path) AND _isStrictLoading=true. The relation's
+    // strict_loading must win because Rails applies strict_loading_value AFTER
+    // AssociationRelation's per-record set_strict_loading block.
+    const proxy = association(author, "slcpdBooks");
+    proxy.strictLoadingBang(true);
+    const books = (await proxy.toArray()) as Base[];
+    expect(books.every((b) => b.isStrictLoading())).toBe(true);
   });
   it("default mode can be changed globally", async () => {
     class GmAuthor extends Base {

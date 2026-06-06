@@ -507,6 +507,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       this._checkStrictLoading();
       const results = await super.toArray();
       this._cascadeStrictLoading(results);
+      // Relation's strict_loading wins over cascade — applied last to
+      // match Rails: AssociationRelation#exec_queries runs set_strict_loading
+      // per record inside the block, then Relation#exec_queries applies
+      // strict_loading_value to all records afterward.
+      if (this.isStrictLoading) {
+        for (const r of results) (r as any)._strictLoading = true;
+      }
       const unsaved = this._target.filter((r) => r.isNewRecord());
       return unsaved.length > 0 ? [...results, ...unsaved] : results;
     }
@@ -540,6 +547,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       this._checkStrictLoading();
       results = await super.toArray();
       this._cascadeStrictLoading(results);
+      // Same ordering fix as toArray() — relation strict_loading wins.
+      if (this.isStrictLoading) {
+        for (const r of results) (r as any)._strictLoading = true;
+      }
     } else {
       results = (await loadHasMany(this._record, this._assocName, this._assocDef.options)) as T[];
       this._cascadeStrictLoading(results);
