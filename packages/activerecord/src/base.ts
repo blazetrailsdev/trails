@@ -1460,7 +1460,11 @@ export class Base extends Model {
   // Handles both the `_enum` macro (integer-stored, mapping in `_enums`) and
   // `defineEnum` (string-stored, normalised via EnumType).
   override attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
-    if (options) options = _castEnumDirtyOpts(this.constructor as typeof Base, name, options);
+    if (options) {
+      const ctor = this.constructor as typeof Base;
+      const canonical = (ctor as any)._attributeAliases?.[name] ?? name;
+      options = _castEnumDirtyOpts(ctor, canonical, options);
+    }
     return super.attributeChanged(name, options);
   }
 
@@ -1468,7 +1472,11 @@ export class Base extends Model {
     name: string,
     options?: { from?: unknown; to?: unknown },
   ): boolean {
-    if (options) options = _castEnumDirtyOpts(this.constructor as typeof Base, name, options);
+    if (options) {
+      const ctor = this.constructor as typeof Base;
+      const canonical = (ctor as any)._attributeAliases?.[name] ?? name;
+      options = _castEnumDirtyOpts(ctor, canonical, options);
+    }
     return super.savedChangeToAttribute(name, options);
   }
 
