@@ -2650,13 +2650,11 @@ export class Base extends Model {
     return found;
   }
 
-  // Mirrors: ActiveRecord::AttributeMethods::Dirty#has_changes_to_save? — gated on
-  // partialUpdates (Rails' partial_writes=false => NullMutationTracker => no in-place
-  // detection for save decisions, but all columns are written anyway).
+  // Mirrors: ActiveRecord::AttributeMethods::Dirty#has_changes_to_save? — delegates to
+  // mutations_from_database.any_changes? which is always AttributeMutationTracker (no
+  // partial_updates gate in Rails; that flag only selects which columns to write).
   override get hasChangesToSave(): boolean {
     if (this._dirty.changed) return true;
-    const ctor = this.constructor as typeof Base;
-    if (!ctor.partialUpdates) return false;
     let found = false;
     this._attributes.forEach((attr) => {
       if (!found && attr.type.isMutable() && attr.changedInPlace()) found = true;
