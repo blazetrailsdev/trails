@@ -423,14 +423,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const ruStmt = await this.driver.prepare("PRAGMA read_uncommitted");
       const row = (await ruStmt.get()) as { read_uncommitted: number } | undefined;
       this._previousReadUncommitted = row?.read_uncommitted ?? 0;
-      await this.driver.exec("PRAGMA read_uncommitted=ON");
+      await this._logTransaction("PRAGMA read_uncommitted=ON");
     }
   }
 
   // Mirrors: SQLite3::DatabaseStatements#reset_isolation_level
   async resetIsolationLevel(): Promise<void> {
     if (this._previousReadUncommitted !== null) {
-      await this.driver.exec(`PRAGMA read_uncommitted=${this._previousReadUncommitted}`);
+      await this._logTransaction(`PRAGMA read_uncommitted=${this._previousReadUncommitted}`);
       this._previousReadUncommitted = null;
     }
   }

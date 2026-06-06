@@ -1485,7 +1485,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async beginDbTransaction(): Promise<void> {
     this._client = await this._acquireFreshClient();
     try {
-      await this._client.query("BEGIN");
+      await this._logTransaction("BEGIN", async () => {
+        await this._client!.query("BEGIN");
+      });
       this._inTransaction = true;
     } catch (error) {
       this._client = null;
@@ -1519,7 +1521,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
     if (!this._client) throw new Error("No active transaction");
     try {
-      await this._client.query("COMMIT");
+      await this._logTransaction("COMMIT", async () => {
+        await this._client!.query("COMMIT");
+      });
     } catch (e) {
       // Connection-level error (08P01, broken socket, etc.) leaves the
       // single pg.Client unusable. Tear down so the next caller gets a
@@ -1559,7 +1563,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
     if (!this._client) throw new Error("No active transaction");
     try {
-      await this._client.query("ROLLBACK");
+      await this._logTransaction("ROLLBACK", async () => {
+        await this._client!.query("ROLLBACK");
+      });
     } catch (e) {
       // Connection-level error — closing the socket implicitly aborts
       // the server-side TX. Swallow and reconnect so the next caller

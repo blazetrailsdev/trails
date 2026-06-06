@@ -814,7 +814,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   async beginDbTransaction(): Promise<void> {
     await this._ensureClient();
-    await this._client!.query("BEGIN");
+    await this._logTransaction("BEGIN", async () => {
+      await this._client!.query("BEGIN");
+    });
     this._inTransaction = true;
   }
 
@@ -831,7 +833,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
     if (!this._inTransaction || !this._client) throw new Error("No active transaction");
     try {
-      await this._client.query("COMMIT");
+      await this._logTransaction("COMMIT", async () => {
+        await this._client!.query("COMMIT");
+      });
     } finally {
       this._inTransaction = false;
     }
@@ -854,7 +858,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   async rollbackDbTransaction(): Promise<void> {
     if (!this._inTransaction || !this._client) throw new Error("No active transaction");
     try {
-      await this._client.query("ROLLBACK");
+      await this._logTransaction("ROLLBACK", async () => {
+        await this._client!.query("ROLLBACK");
+      });
     } finally {
       this._inTransaction = false;
     }
