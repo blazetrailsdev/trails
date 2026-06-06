@@ -1519,7 +1519,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
     if (!this._client) throw new Error("No active transaction");
     try {
-      await this.internalExecute("COMMIT", "TRANSACTION", [], false, false, false, false);
+      await this.internalExecute("COMMIT", "TRANSACTION", [], false, false, false, true);
     } catch (e) {
       // Connection-level error (08P01, broken socket, etc.) leaves the
       // single pg.Client unusable. Tear down so the next caller gets a
@@ -1559,7 +1559,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
     if (!this._client) throw new Error("No active transaction");
     try {
-      await this.internalExecute("ROLLBACK", "TRANSACTION", [], false, false, false, false);
+      await this.internalExecute("ROLLBACK", "TRANSACTION", [], false, false, false, true);
     } catch (e) {
       // Connection-level error — closing the socket implicitly aborts
       // the server-side TX. Swallow and reconnect so the next caller

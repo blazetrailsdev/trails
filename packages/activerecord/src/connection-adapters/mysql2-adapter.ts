@@ -831,7 +831,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
     if (!this._inTransaction || !this._client) throw new Error("No active transaction");
     try {
-      await this.internalExecute("COMMIT", "TRANSACTION", [], false, false, false, false);
+      await this.internalExecute("COMMIT", "TRANSACTION", [], false, false, false, true);
     } finally {
       this._inTransaction = false;
     }
@@ -854,7 +854,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   async rollbackDbTransaction(): Promise<void> {
     if (!this._inTransaction || !this._client) throw new Error("No active transaction");
     try {
-      await this.internalExecute("ROLLBACK", "TRANSACTION", [], false, false, false, false);
+      await this.internalExecute("ROLLBACK", "TRANSACTION", [], false, false, false, true);
     } finally {
       this._inTransaction = false;
     }
