@@ -117,17 +117,18 @@ describe("InnerJoinAssociationTest", () => {
 
   it("eager load with arel joins", async () => {
     const { Post, Comment } = makeModels();
-    const postWithComment = await Post.create({ title: "with-comment" });
-    await Post.create({ title: "without-comment" });
-    await Comment.create({ body: "C", post_id: postWithComment.id });
+    const post = await Post.create({ title: "with-two-comments" });
+    await Comment.create({ body: "C1", post_id: post.id });
+    await Comment.create({ body: "C2", post_id: post.id });
     const postTable = new Table("posts");
     const commentTable = new Table("comments");
     const joinSources = postTable
       .join(commentTable)
       .on(postTable.get("id").eq(commentTable.get("post_id"))).joinSources;
     // Mirrors Rails: Person.eager_load(:agents).joins(arel_join).count == 3
-    // eagerLoad alone would include both posts (LEFT OUTER); the explicit INNER
-    // JOIN node filters to only the post that has a comment, proving both joins act.
+    // Without eagerLoad the INNER JOIN fans out to 2 rows (one per comment).
+    // eagerLoad routes count through apply_join_dependency which adds DISTINCT
+    // on the PK, collapsing the fan-out back to 1.
     const count = await Post.eagerLoad("comments")
       .joins(...joinSources)
       .count();
@@ -391,12 +392,13 @@ describe("InnerJoinAssociationTest", () => {
 
   it("eager load with string joins", async () => {
     const { Post, Comment } = makeModels();
-    const postWithComment = await Post.create({ title: "with-comment" });
-    await Post.create({ title: "without-comment" });
-    await Comment.create({ body: "C", post_id: postWithComment.id });
+    const post = await Post.create({ title: "with-two-comments" });
+    await Comment.create({ body: "C1", post_id: post.id });
+    await Comment.create({ body: "C2", post_id: post.id });
     // Mirrors Rails: Person.eager_load(:agents).joins(string_join).count == 3
-    // eagerLoad alone would include both posts (LEFT OUTER); the explicit INNER
-    // JOIN string filters to only the post with a comment, proving both joins act.
+    // Without eagerLoad the INNER JOIN fans out to 2 rows (one per comment).
+    // eagerLoad routes count through apply_join_dependency which adds DISTINCT
+    // on the PK, collapsing the fan-out back to 1.
     const count = await Post.eagerLoad("comments")
       .joins("INNER JOIN comments ON comments.post_id = posts.id")
       .count();

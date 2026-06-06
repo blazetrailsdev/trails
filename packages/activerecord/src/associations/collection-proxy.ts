@@ -1278,10 +1278,31 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // count() which routes through AssociationScope as a SQL COUNT for the
     // common shapes (loadHasMany fallback still loads for the rest).
     if (this._isThrough) return (await this.count()) === 0;
-    // Mirrors Rails: CollectionProxy#empty? → any? → count_records, which reads
-    // the counter cache when active (no DB query). Falls back to a SQL COUNT
-    // when no counter cache is present.
-    return (await this._countRecords()) === 0;
+    // Mirrors Rails collection_association.rb#empty?:
+    //   if loaded? || @association_ids || reflection.has_active_cached_counter?
+    //     size.zero?  → count_records (reads counter cache; marks loaded when 0)
+    //   else
+    //     target.empty? && !scope.exists?  (no side effects, never marks loaded)
+    // Using _countRecords unconditionally was a regression: when count=0 it calls
+    // markLoaded(), so a later isEmpty() reads a stale empty cache instead of
+    // querying the DB again after records were created.
+    const ctor = this._record.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => unknown;
+    };
+    const refl = ctor._reflectOnAssociation?.(this._assocName) as
+      | { hasActiveCachedCounter?: () => boolean }
+      | undefined;
+    let activeCachedCounter = false;
+    try {
+      activeCachedCounter = refl?.hasActiveCachedCounter?.() ?? false;
+    } catch {
+      // hasActiveCachedCounter can throw when referenced models are not yet
+      // registered (e.g. inverseWhichUpdatesCounterCache calls c.klass).
+    }
+    if (this._cachedAssociationIds() !== null || activeCachedCounter) {
+      return (await this._countRecords()) === 0;
+    }
+    return !(await this.exists());
   }
 
   /**
