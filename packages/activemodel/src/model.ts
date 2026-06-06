@@ -1352,12 +1352,6 @@ export class Model {
     // (attribute_aliases[name] || name); `_read_attribute` skips it.
     const resolved = resolveAliasName(this.constructor as typeof Model, name);
     if (!this._attributes.has(resolved)) {
-      // Matches Rails AR: fetch_value → NullAttribute#value → nil.
-      // MissingAttributeError is only raised by the generated per-attribute
-      // methods (name, email, …) when a record is partially loaded via a
-      // SELECT subset — a feature trails does not implement. Rails AM
-      // _read_attribute routes through __send__ to hit those methods;
-      // trails _readAttribute skips that dispatch and reads the store directly.
       return null;
     }
     this._accessedFields.add(resolved);

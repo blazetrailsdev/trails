@@ -2332,8 +2332,8 @@ describe("RelationTest", () => {
 
     const result = await User.all().select("name").toArray();
     expect(result[0].name).toBe("Alice");
-    // email should not be in the selected columns
-    expect(result[0].email).toBeNull();
+    // unselected column raises MissingAttributeError
+    expect(() => result[0].email).toThrow("missing attribute 'email'");
   });
 
   it("pluck with multiple columns returns arrays", async () => {

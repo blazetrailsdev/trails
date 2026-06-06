@@ -16,7 +16,7 @@ import {
   pushPendingDefault,
   resetDefaultAttributes,
 } from "./attribute-registration.js";
-import { type InstanceHost } from "./attribute-methods.js";
+import { MissingAttributeError, type InstanceHost } from "./attribute-methods.js";
 
 export interface AttributeDefinition {
   name: string;
@@ -148,7 +148,15 @@ export function attribute(
   // the framework method per-instance.
   if (!(name in this.prototype)) {
     Object.defineProperty(this.prototype, name, {
-      get(this: { readAttribute(n: string): unknown }) {
+      get(this: {
+        readAttribute(n: string): unknown;
+        _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
+      }) {
+        if (!this._attributes.getAttribute(name).isInitialized()) {
+          throw new MissingAttributeError(
+            `missing attribute '${name}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+          );
+        }
         return this.readAttribute(name);
       },
       set(this: { writeAttribute(n: string, v: unknown): void }, value: unknown) {

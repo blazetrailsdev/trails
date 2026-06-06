@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::AttributeMethods
  */
 import { isBlank } from "@blazetrails/activesupport";
-import { resolveAliasName } from "@blazetrails/activemodel";
+import { MissingAttributeError, resolveAliasName } from "@blazetrails/activemodel";
 import { formatForInspect as _formatForInspect } from "./attribute-inspection.js";
 import { attributeForInspect as _attrForInspect } from "./core.js";
 import { writeAttribute as _writeAttribute } from "./readonly-attributes.js";
@@ -240,7 +240,16 @@ export function aliasAttributeMethodDefinition(
   // Define a direct getter/setter for the alias name.
   if (this.prototype && !(newName in this.prototype)) {
     Object.defineProperty(this.prototype, newName, {
-      get(this: AttributeAccessorHost) {
+      get(
+        this: AttributeAccessorHost & {
+          _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
+        },
+      ) {
+        if (!this._attributes.getAttribute(oldName).isInitialized()) {
+          throw new MissingAttributeError(
+            `missing attribute '${oldName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+          );
+        }
         return this.readAttribute(oldName);
       },
       set(this: AttributeAccessorHost, value: unknown) {

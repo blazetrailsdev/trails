@@ -11,6 +11,7 @@
 import {
   Attribute,
   AttributeSet,
+  MissingAttributeError,
   type Type,
   applyPendingAttributeModifications,
   resetDefaultAttributes as amResetDefaultAttributes,
@@ -109,7 +110,15 @@ export function defineAttribute(
       }
     } else if (!Object.prototype.hasOwnProperty.call(this.prototype, name)) {
       Object.defineProperty(this.prototype, name, {
-        get(this: { readAttribute(n: string): unknown }) {
+        get(this: {
+          readAttribute(n: string): unknown;
+          _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
+        }) {
+          if (!this._attributes.getAttribute(name).isInitialized()) {
+            throw new MissingAttributeError(
+              `missing attribute '${name}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+            );
+          }
           return this.readAttribute(name);
         },
         set(this: { writeAttribute(n: string, v: unknown): void }, value: unknown) {
