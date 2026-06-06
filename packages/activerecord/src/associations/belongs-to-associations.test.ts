@@ -3,7 +3,14 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { SubclassNotFound, Base, registerModel, enableSti, registerSubclass } from "../index.js";
+import {
+  SubclassNotFound,
+  Base,
+  ReadOnlyRecord,
+  registerModel,
+  enableSti,
+  registerSubclass,
+} from "../index.js";
 import {
   Associations,
   loadBelongsTo,
@@ -3696,6 +3703,8 @@ describe("BelongsToAssociationsTest", () => {
       bt_accounts: { company_id: "integer", credit_limit: "integer" },
       pk_firms: { name: "string", firm_name: "string" },
       pk_clients: { firm_name: "string" },
+      ro_companies: { name: "string" },
+      ro_accounts: { company_id: "integer" },
     });
   });
   it("belongs to", async () => {
@@ -3756,10 +3765,36 @@ describe("BelongsToAssociationsTest", () => {
     expect(loaded!.name).toBe("Apple");
   });
 
-  it.skip("cant save readonly association", () => {
-    // BLOCKED: associations — belongs-to feature gap
-    // ROOT-CAUSE: associations/belongs-to-associations.ts or preloader.ts missing belongs-to semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in belongs-to-associations.test.ts
-    // Requires readonly association
+  it("cant save readonly association", async () => {
+    class RoCompany extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class RoAccount extends Base {
+      static {
+        this.attribute("company_id", "integer");
+      }
+    }
+    // Rails: belongs_to :readonly_firm, -> { readonly }, class_name: "Firm"
+    // The readonly scope marks loaded records as readonly via the relation's readonly flag.
+    const roScope = (rel: any) => rel.readonly();
+    Associations.belongsTo.call(RoAccount, "roCompany", {
+      className: "RoCompany",
+      foreignKey: "company_id",
+      scope: roScope,
+    });
+    registerModel("RoCompany", RoCompany);
+    registerModel("RoAccount", RoAccount);
+
+    const company = await RoCompany.create({ name: "Rails" });
+    const account = await RoAccount.create({ company_id: company.id });
+    const loaded = await loadBelongsTo(account, "roCompany", {
+      className: "RoCompany",
+      foreignKey: "company_id",
+      scope: roScope,
+    });
+    expect(loaded!.isReadonly()).toBe(true);
+    await expect((loaded as any).save()).rejects.toThrow(ReadOnlyRecord);
   });
 });

@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
+import { Table } from "@blazetrails/arel";
 
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -114,11 +115,24 @@ describe("InnerJoinAssociationTest", () => {
     expect(sql).toContain("INNER JOIN authors");
   });
 
-  it.skip("eager load with arel joins", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/inner-join-association.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inner-join-association.test.ts
-    /* needs eager loading with arel nodes */
+  it("eager load with arel joins", async () => {
+    const { Post, Comment } = makeModels();
+    const post = await Post.create({ title: "with-two-comments" });
+    await Comment.create({ body: "C1", post_id: post.id });
+    await Comment.create({ body: "C2", post_id: post.id });
+    const postTable = new Table("posts");
+    const commentTable = new Table("comments");
+    const joinSources = postTable
+      .join(commentTable)
+      .on(postTable.get("id").eq(commentTable.get("post_id"))).joinSources;
+    // Mirrors Rails: Person.eager_load(:agents).joins(arel_join).count == 3
+    // Without eagerLoad the INNER JOIN fans out to 2 rows (one per comment).
+    // eagerLoad routes count through apply_join_dependency which adds DISTINCT
+    // on the PK, collapsing the fan-out back to 1.
+    const count = await Post.eagerLoad("comments")
+      .joins(...joinSources)
+      .count();
+    expect(count).toBe(1);
   });
 
   it("construct finder sql ignores empty joins hash", () => {
@@ -376,10 +390,19 @@ describe("InnerJoinAssociationTest", () => {
     expect(sql).toContain("comments");
   });
 
-  it.skip("eager load with string joins", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/inner-join-association.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inner-join-association.test.ts
+  it("eager load with string joins", async () => {
+    const { Post, Comment } = makeModels();
+    const post = await Post.create({ title: "with-two-comments" });
+    await Comment.create({ body: "C1", post_id: post.id });
+    await Comment.create({ body: "C2", post_id: post.id });
+    // Mirrors Rails: Person.eager_load(:agents).joins(string_join).count == 3
+    // Without eagerLoad the INNER JOIN fans out to 2 rows (one per comment).
+    // eagerLoad routes count through apply_join_dependency which adds DISTINCT
+    // on the PK, collapsing the fan-out back to 1.
+    const count = await Post.eagerLoad("comments")
+      .joins("INNER JOIN comments ON comments.post_id = posts.id")
+      .count();
+    expect(count).toBe(1);
   });
 
   it("joins a has_and_belongs_to_many association", async () => {

@@ -2,7 +2,7 @@ import { underscore, pluralize, camelize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
-import { resolveModel, resolveAssocClass, modelRegistry } from "../../associations.js";
+import { resolveModel, modelRegistry } from "../../associations.js";
 import {
   flushPendingCounterCacheColumns,
   registerCounterCachedAssociation,
@@ -90,7 +90,10 @@ export class BelongsTo extends SingularAssociation {
     pendingCounterCacheColumns.set(targetClassName, pending);
     if (modelRegistry.has(targetClassName)) {
       // Target already registered — flush right now (eager path).
-      const targetClass = resolveAssocClass(model, name, targetClassName);
+      // Use modelRegistry.get directly (not resolveAssocClass) to avoid
+      // prematurely caching the reflection's klass via a stale registry
+      // entry when the target class is re-defined (e.g. between tests).
+      const targetClass = modelRegistry.get(targetClassName) as any;
       if (targetClass) flushPendingCounterCacheColumns(targetClass);
     }
 

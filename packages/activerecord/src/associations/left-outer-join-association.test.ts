@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
+import { Table } from "@blazetrails/arel";
 
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
@@ -133,24 +134,39 @@ describe("LeftOuterJoinAssociationTest", () => {
     expect(sql).not.toContain("JOIN");
   });
 
-  it.skip("left outer joins forbids to use string as argument", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/left-outer-join-association.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in left-outer-join-association.test.ts
-    /* Rails raises on string arg; our impl accepts strings */
+  it("left outer joins forbids to use string as argument", () => {
+    const { Post } = makeModels();
+    expect(() =>
+      Post.leftOuterJoins("inner join l_comments on l_comments.post_id = posts.id"),
+    ).toThrow();
   });
 
   it("left outer joins with string join", () => {
     const { Post } = makeModels();
-    const sql = Post.all().leftOuterJoins("authors", "posts.author_id = authors.id").toSql();
+    // Mirrors Rails: Author.left_outer_joins(:posts).joins("LEFT OUTER JOIN comments …")
+    // A raw SQL left outer join string is passed to joins() after the association join.
+    const sql = Post.all()
+      .leftOuterJoins("authors", "posts.author_id = authors.id")
+      .joins("LEFT OUTER JOIN comments ON comments.post_id = posts.id")
+      .toSql();
     expect(sql).toContain("LEFT OUTER JOIN");
+    expect(sql).toContain("comments");
   });
 
-  it.skip("left outer joins with arel join", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/left-outer-join-association.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in left-outer-join-association.test.ts
-    /* needs arel node support */
+  it("left outer joins with arel join", () => {
+    const { Post } = makeModels();
+    const postTable = new Table("posts");
+    const commentTable = new Table("l_comments");
+    // Rails: Author.left_outer_joins(:posts).joins(arel_join)
+    // Arel nodes are passed to joins(), not leftOuterJoins().
+    const arelJoin = postTable
+      .outerJoin(commentTable)
+      .on(postTable.get("id").eq(commentTable.get("post_id"))).joinSources[0];
+    const sql = Post.leftOuterJoins("authors", "posts.author_id = authors.id")
+      .joins(arelJoin)
+      .toSql();
+    expect(sql).toContain("LEFT OUTER JOIN");
+    expect(sql).toContain("l_comments");
   });
 
   it("join conditions added to join clause", () => {
@@ -226,8 +242,9 @@ describe("LeftOuterJoinAssociationTest", () => {
   });
 
   it.skip("merging left joins should be left joins", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/left-outer-join-association.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in left-outer-join-association.test.ts
+    // Rails: Author.left_joins(:posts).merge(Post.no_comments) and asserts the
+    // cross-model merged result still returns the left-join rows. Blocked by the
+    // cross-model path in mergeOuterJoins (merger.ts:88-93 stub vs
+    // activerecord/lib/active_record/relation/merger.rb:136-151).
   });
 });

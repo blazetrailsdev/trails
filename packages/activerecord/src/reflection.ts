@@ -292,11 +292,16 @@ export class AbstractReflection {
     const inv = this.inverseOf();
     const candidates: any[] = inv ? [inv] : reflectOnAllAssociations(this.klass, "belongsTo");
     return (
-      candidates.find(
-        (c: any) =>
-          c.counterCacheColumn?.() === col &&
-          (c.isPolymorphic?.() || c.klass === (this as any).activeRecord),
-      ) ?? null
+      candidates.find((c: any) => {
+        try {
+          return (
+            c.counterCacheColumn?.() === col &&
+            (c.isPolymorphic?.() || c.klass === (this as any).activeRecord)
+          );
+        } catch {
+          return false;
+        }
+      }) ?? null
     );
   }
 
