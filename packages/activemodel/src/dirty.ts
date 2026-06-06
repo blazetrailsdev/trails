@@ -295,10 +295,18 @@ export class DirtyTracker {
    * the in-place mutation). Rails snapshots this via `clone_value` so the
    * stored "was" stays stable even as the live object mutates.
    *
+   * Returns the forced value, mirroring Rails' `force_change` (the assignment
+   * `forced_changes[attr] = fetch_value(attr)` returns the stored value), so
+   * `attribute_will_change!` stays truthy (dirty_test.rb:317
+   * `assert pirate.catchphrase_will_change!`).
+   *
    * Mirrors: ActiveModel::AttributeMutationTracker#force_change
    */
-  forceChange(name: string, currentValue: unknown): void {
-    if (this._changedAttributes.has(name)) return;
+  forceChange(name: string, currentValue: unknown): unknown {
+    // Already force-marked: Rails' AttributeMutationTracker#force_change re-reads
+    // and returns the current value (attribute_mutation_tracker.rb:63), so a
+    // repeat call stays truthy. We keep the original "was" snapshot intact.
+    if (this._changedAttributes.has(name)) return currentValue;
     // Clone so the stored "was" side isn't mutated along with the live object.
     // Mirrors Rails' clone_value: shallow-clone when possible, else keep as-is.
     let cloned: unknown;
@@ -312,6 +320,7 @@ export class DirtyTracker {
     }
     this._changedAttributes.set(name, [cloned, cloned]);
     this._forcedNames.add(name);
+    return cloned;
   }
 
   /**
@@ -465,8 +474,8 @@ export class DirtyTracker {
  *
  * @internal Rails-private helper.
  */
-export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: string): void {
-  this._dirty.forceChange(attrName, this._attributes.fetchValue(attrName));
+export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: string): unknown {
+  return this._dirty.forceChange(attrName, this._attributes.fetchValue(attrName));
 }
 
 /**

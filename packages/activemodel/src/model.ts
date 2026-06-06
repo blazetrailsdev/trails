@@ -1819,11 +1819,15 @@ export class Model {
    * Used for in-place mutations where the object reference stays the same
    * but the content has changed, or to mark a virtual attribute dirty.
    *
+   * Returns the forced value, mirroring Rails where `attribute_will_change!`
+   * returns `mutations_from_database.force_change(...)` (dirty.rb:409-410) — a
+   * truthy value relied on by `assert pirate.catchphrase_will_change!`.
+   *
    * Mirrors: ActiveModel::Dirty#attribute_will_change!
    */
-  attributeWillChange(name: string): void {
+  attributeWillChange(name: string): unknown {
     const resolved = resolveAliasName(this.constructor as typeof Model, name);
-    this._dirty.forceChange(resolved, this._attributes.fetchValue(resolved));
+    return this._dirty.forceChange(resolved, this._attributes.fetchValue(resolved));
   }
 
   /**
