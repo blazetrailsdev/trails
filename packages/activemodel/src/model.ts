@@ -46,7 +46,6 @@ import type { ConditionalOptions, ConditionFn, ValidatableRecord } from "./valid
 import { evaluateCondition } from "./validator.js";
 import {
   AttributeMethodPattern,
-  MissingAttributeError,
   attributeMethodPrefix,
   attributeMethodSuffix,
   attributeMethodAffix,
@@ -1352,14 +1351,6 @@ export class Model {
     // Rails resolves alias_attribute names in `read_attribute`
     // (attribute_aliases[name] || name); `_read_attribute` skips it.
     const resolved = resolveAliasName(this.constructor as typeof Model, name);
-    const attr = this._attributes.getAttribute(resolved);
-    if (!attr.isInitialized()) {
-      // Attribute in the set but excluded by a partial SELECT → MissingAttributeError.
-      // (Truly unknown attributes use the Null default which IS initialized.)
-      throw new MissingAttributeError(
-        `missing attribute '${resolved}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
-      );
-    }
     if (!this._attributes.has(resolved)) {
       return null;
     }

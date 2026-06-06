@@ -5,6 +5,7 @@ import {
   Attribute,
   AttributeSetBuilder,
   AttributeSetCoder,
+  MissingAttributeError,
   typeRegistry,
   type Type,
 } from "@blazetrails/activemodel";
@@ -804,7 +805,13 @@ function applyColumnsHash(
     const inheritedFromParent = parentProto != null && name in (parentProto as object);
     if (!Object.prototype.hasOwnProperty.call(proto, name) && !inheritedFromParent) {
       Object.defineProperty(proto, name, {
-        get(this: { readAttribute(n: string): unknown }) {
+        get(this: {
+          readAttribute(n: string): unknown;
+          _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
+        }) {
+          if (!this._attributes.getAttribute(name).isInitialized()) {
+            throw new MissingAttributeError(`missing attribute '${name}'`);
+          }
           return this.readAttribute(name);
         },
         set(this: { writeAttribute(n: string, v: unknown): void }, value: unknown) {
