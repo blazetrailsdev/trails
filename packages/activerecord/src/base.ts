@@ -606,16 +606,21 @@ function _jsonEqual(a: unknown, b: unknown): boolean {
       ba = b as unknown[];
     return aa.length === ba.length && aa.every((v, i) => _jsonEqual(v, ba[i]));
   }
-  // Only structurally compare plain objects (Object/null prototype). Typed instances
-  // (Temporal, custom classes) carry no enumerable keys, so Object.keys returns []
-  // for any two instances, making the key-length check trivially true and causing
-  // different-valued typed objects to compare as equal. There is no universal
-  // value-equality protocol in JS, so non-identical typed instances return false
-  // (conservative false-negative rather than a wrong false-positive).
+  // Typed instances (Temporal, Date, etc.) store state in internal slots — Object.keys
+  // returns [] for them, making the plain-object key-count check trivially pass and
+  // causing different-valued instances to compare as equal.  Guard: check proto first.
+  // - Different prototypes → always false (a Date and a PlainDate can't be equal).
+  // - Same non-plain prototype → compare via String(), which Temporal and other
+  //   well-behaved value types override with a canonical representation (e.g. ISO
+  //   strings), mirroring Ruby Date#== / ActiveModel type-cast equality.
+  // - Plain Object/null proto → fall through to structural key comparison.
   const protoA = Object.getPrototypeOf(a);
-  if (protoA !== Object.prototype && protoA !== null) return false;
-  if (Object.getPrototypeOf(b) !== Object.prototype && Object.getPrototypeOf(b) !== null)
-    return false;
+  const protoB = Object.getPrototypeOf(b);
+  if (protoA !== Object.prototype && protoA !== null) {
+    if (protoA !== protoB) return false;
+    return String(a) === String(b);
+  }
+  if (protoB !== Object.prototype && protoB !== null) return false;
   const oa = a as Record<string, unknown>,
     ob = b as Record<string, unknown>;
   const ka = Object.keys(oa),
