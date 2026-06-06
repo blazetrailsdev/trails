@@ -33,6 +33,7 @@ import {
   typeRegistry,
   pushPendingDecorator,
   type TransactionalCallbackConditions,
+  resolveAliasName,
 } from "@blazetrails/activemodel";
 import "./type.js"; // Register AR type overrides into AM's type registry
 import {
@@ -2638,11 +2639,15 @@ export class Base extends Model {
   private _skipTouch = false;
   private _instanceRecordTimestamps: boolean | null = null;
 
-  // Rails routes changed?, has_changes_to_save?, changes_to_save,
-  // changed_attribute_names_to_save, and attributes_in_database all through the same
-  // mutations_from_database tracker (AttributeMutationTracker), which checks both
-  // explicit assignments AND in-place mutations on mutable types (e.g. Serialized).
-  // Mirrors: ActiveRecord::AttributeMethods::Dirty (activerecord/lib/.../dirty.rb:138-192).
+  // Rails routes changed?/changed/attribute_changed?/changes/changed_attributes and the
+  // _to_save / _in_database AR variants all through the same mutations_from_database
+  // tracker (AttributeMutationTracker), which checks both explicit assignments AND
+  // in-place mutations on mutable types (e.g. Serialized).  Overriding the AM-level
+  // primitives (changed, changedAttributes, changes, attributeChanged) is sufficient
+  // because the AR-layer getters in model.ts (changesToSave, changedAttributeNamesToSave,
+  // attributesInDatabase) already delegate to this.changes / this.changedAttributes.
+  // Mirrors: ActiveModel::Dirty (activemodel/.../dirty.rb:286-354) +
+  //          ActiveRecord::AttributeMethods::Dirty (activerecord/.../dirty.rb:138-301).
 
   override get changed(): boolean {
     return this._dirty.changed || this._hasInPlaceMutableChanges();
@@ -2652,7 +2657,7 @@ export class Base extends Model {
     return this._dirty.changed || this._hasInPlaceMutableChanges();
   }
 
-  override get changesToSave(): Record<string, [unknown, unknown]> {
+  override get changes(): Record<string, [unknown, unknown]> {
     const result = { ...this._dirty.changes };
     this._attributes.forEach((attr, name) => {
       if (!Object.hasOwn(result, name) && attr.type.isMutable() && attr.changedInPlace()) {
@@ -2662,7 +2667,7 @@ export class Base extends Model {
     return result;
   }
 
-  override get changedAttributeNamesToSave(): string[] {
+  override get changedAttributes(): string[] {
     const names = this._dirty.changedAttributes;
     this._attributes.forEach((attr, name) => {
       if (!names.includes(name) && attr.type.isMutable() && attr.changedInPlace()) {
@@ -2672,12 +2677,17 @@ export class Base extends Model {
     return names;
   }
 
-  override get attributesInDatabase(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const name of this.changedAttributeNamesToSave) {
-      result[name] = this.attributeInDatabase(name);
-    }
-    return result;
+  override attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
+    if (super.attributeChanged(name, options)) return true;
+    const resolved = resolveAliasName(this.constructor as typeof Model, name);
+    if (this._dirty.attributeChanged(resolved)) return false;
+    if (!this._attributes.has(resolved)) return false;
+    const attr = this._attributes.getAttribute(resolved);
+    if (!attr.type.isMutable() || !attr.changedInPlace()) return false;
+    if (!options) return true;
+    if ("from" in options && this._dirty.attributeWas(resolved) !== options.from) return false;
+    if ("to" in options && attr.value !== options.to) return false;
+    return true;
   }
 
   private _hasInPlaceMutableChanges(): boolean {
