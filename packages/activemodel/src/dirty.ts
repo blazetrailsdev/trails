@@ -92,6 +92,8 @@ export class DirtyTracker {
   private _previousChanges: Map<string, [unknown, unknown]> = new Map();
   /** Names explicitly force-dirtied via attribute_will_change!. @internal */
   private _forcedNames: Set<string> = new Set();
+  /** Live AttributeSet reference — set on first snapshot, used to detect changedInPlace(). */
+  private _attrs: AttributeSet | null = null;
 
   initAttributes(
     attributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
@@ -118,16 +120,22 @@ export class DirtyTracker {
   }
 
   get changed(): boolean {
-    return this._changedAttributes.size > 0;
+    if (this._changedAttributes.size > 0) return true;
+    return this._hasInPlaceMutableChange();
   }
 
   attributeChanged(name: string): boolean {
-    return this._changedAttributes.has(name);
+    if (this._changedAttributes.has(name)) return true;
+    return this._isInPlaceMutableChange(name);
   }
 
   attributeWas(name: string): unknown {
     const change = this._changedAttributes.get(name);
-    return change ? change[0] : resolveValue(this._originalAttributes.get(name));
+    if (change) return change[0];
+    if (this._isInPlaceMutableChange(name)) {
+      return this._attrs!.getAttribute(name).originalValue;
+    }
+    return resolveValue(this._originalAttributes.get(name));
   }
 
   clearChangesInformation(): void {
@@ -142,7 +150,13 @@ export class DirtyTracker {
   }
 
   get changedAttributes(): string[] {
-    return Array.from(this._changedAttributes.keys());
+    const names = Array.from(this._changedAttributes.keys());
+    this._attrs?.forEach((attr, name) => {
+      if (!this._changedAttributes.has(name) && attr.type.isMutable() && attr.changedInPlace()) {
+        names.push(name);
+      }
+    });
+    return names;
   }
 
   get changes(): Record<string, [unknown, unknown]> {
@@ -150,6 +164,11 @@ export class DirtyTracker {
     for (const [k, v] of this._changedAttributes) {
       result[k] = v;
     }
+    this._attrs?.forEach((attr, name) => {
+      if (!Object.hasOwn(result, name) && attr.type.isMutable() && attr.changedInPlace()) {
+        result[name] = [attr.originalValue, attr.value];
+      }
+    });
     return result;
   }
 
@@ -255,7 +274,28 @@ export class DirtyTracker {
 
   /** @internal */
   attributeChange(name: string): [unknown, unknown] | null {
-    return this._changedAttributes.get(name) ?? null;
+    const explicit = this._changedAttributes.get(name);
+    if (explicit) return explicit;
+    if (this._isInPlaceMutableChange(name)) {
+      const attr = this._attrs!.getAttribute(name);
+      return [attr.originalValue, attr.value];
+    }
+    return null;
+  }
+
+  private _isInPlaceMutableChange(name: string): boolean {
+    if (!this._attrs?.has(name)) return false;
+    const attr = this._attrs.getAttribute(name);
+    return attr.type.isMutable() && attr.changedInPlace();
+  }
+
+  private _hasInPlaceMutableChange(): boolean {
+    if (!this._attrs) return false;
+    let found = false;
+    this._attrs.forEach((attr) => {
+      if (!found && attr.type.isMutable() && attr.changedInPlace()) found = true;
+    });
+    return found;
   }
 
   /** @internal Delete a single change entry and its forced-dirty marker together. */
@@ -276,6 +316,7 @@ export class DirtyTracker {
    * without forcing lazy evaluation on unread FromDatabase attributes.
    */
   snapshot(attributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> }): void {
+    if (attributes instanceof AttributeSet) this._attrs = attributes;
     if (attributes instanceof Map) {
       this._originalAttributes = new Map(attributes);
       this._originalHas = new Set(attributes.keys());

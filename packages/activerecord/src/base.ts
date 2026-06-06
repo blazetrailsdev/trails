@@ -33,7 +33,6 @@ import {
   typeRegistry,
   pushPendingDecorator,
   type TransactionalCallbackConditions,
-  resolveAliasName,
 } from "@blazetrails/activemodel";
 import "./type.js"; // Register AR type overrides into AM's type registry
 import {
@@ -593,47 +592,6 @@ function _dispatchAssociationAttrs(
       value,
     );
   }
-}
-
-// Deep structural equality for JSON-compatible values — mirrors Ruby Hash#== / Array#==
-// used by AttributeMutationTracker#changed? when comparing type-cast option values.
-function _jsonEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
-  if (Array.isArray(a)) {
-    const aa = a as unknown[],
-      ba = b as unknown[];
-    return aa.length === ba.length && aa.every((v, i) => _jsonEqual(v, ba[i]));
-  }
-  // Typed instances (Temporal, Date, PointValue, etc.) need proto-aware dispatch:
-  // - Different prototypes → false (a PlainDate and a Date are never equal).
-  // - Same non-plain proto + toString override on that proto → String() comparison
-  //   (Temporal types return ISO strings; mirrors Ruby Date#== canonical equality).
-  // - Same non-plain proto, no toString override → fall through to structural key
-  //   comparison; types like PointValue expose state as enumerable own properties
-  //   (x, y) so Object.keys works correctly for them.
-  // - a is plain but b is typed → false.
-  // - Both plain → fall through to structural key comparison.
-  const protoA = Object.getPrototypeOf(a);
-  const protoB = Object.getPrototypeOf(b);
-  if (protoA !== Object.prototype && protoA !== null) {
-    if (protoA !== protoB) return false;
-    if (Object.prototype.hasOwnProperty.call(protoA, "toString")) {
-      return String(a) === String(b);
-    }
-    // No toString override: fall through to structural key comparison below.
-  } else if (protoB !== Object.prototype && protoB !== null) {
-    return false;
-  }
-  const oa = a as Record<string, unknown>,
-    ob = b as Record<string, unknown>;
-  const ka = Object.keys(oa),
-    kb = Object.keys(ob);
-  return (
-    ka.length === kb.length &&
-    ka.every((k) => Object.prototype.hasOwnProperty.call(ob, k) && _jsonEqual(oa[k], ob[k]))
-  );
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -2680,77 +2638,6 @@ export class Base extends Model {
   private _skipTouch = false;
   private _instanceRecordTimestamps: boolean | null = null;
 
-  // Rails routes changed?/changed/attribute_changed?/changes/changed_attributes and the
-  // _to_save / _in_database AR variants all through the same mutations_from_database
-  // tracker (AttributeMutationTracker), which checks both explicit assignments AND
-  // in-place mutations on mutable types (e.g. Serialized).  Overriding the AM-level
-  // primitives (changed, changedAttributes, changes, attributeChanged) is sufficient
-  // because the AR-layer getters in model.ts (changesToSave, changedAttributeNamesToSave,
-  // attributesInDatabase) already delegate to this.changes / this.changedAttributes.
-  // Mirrors: ActiveModel::Dirty (activemodel/.../dirty.rb:286-354) +
-  //          ActiveRecord::AttributeMethods::Dirty (activerecord/.../dirty.rb:138-301).
-
-  override get changed(): boolean {
-    return this._dirty.changed || this._hasInPlaceMutableChanges();
-  }
-
-  override get hasChangesToSave(): boolean {
-    return this._dirty.changed || this._hasInPlaceMutableChanges();
-  }
-
-  override get changes(): Record<string, [unknown, unknown]> {
-    const result = { ...this._dirty.changes };
-    this._attributes.forEach((attr, name) => {
-      if (!Object.hasOwn(result, name) && attr.type.isMutable() && attr.changedInPlace()) {
-        // Re-cast from raw DB string (mirrors FromDatabase#original_value →
-        // type_cast(value_before_type_cast)) so in-place mutations don't corrupt
-        // the "from" side by sharing the same object reference.
-        result[name] = [attr.type.cast(attr.valueBeforeTypeCast), attr.value];
-      }
-    });
-    return result;
-  }
-
-  override get changedAttributes(): string[] {
-    const names = this._dirty.changedAttributes;
-    this._attributes.forEach((attr, name) => {
-      if (!names.includes(name) && attr.type.isMutable() && attr.changedInPlace()) {
-        names.push(name);
-      }
-    });
-    return names;
-  }
-
-  override attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
-    if (super.attributeChanged(name, options)) return true;
-    const resolved = resolveAliasName(this.constructor as typeof Model, name);
-    if (this._dirty.attributeChanged(resolved)) return false;
-    if (!this._attributes.has(resolved)) return false;
-    const attr = this._attributes.getAttribute(resolved);
-    if (!attr.type.isMutable() || !attr.changedInPlace()) return false;
-    if (!options) return true;
-    // Mirror AttributeMutationTracker#changed?: cast the option values with the attribute's
-    // type (type_cast) then compare with == (Ruby structural equality for Hash/Array).
-    // JSON.stringify is key-order-dependent so it can't be used here — use deep
-    // structural equality on the cast (decoded) objects instead.
-    if ("from" in options) {
-      if (!_jsonEqual(attr.type.cast(attr.valueBeforeTypeCast), attr.type.cast(options.from)))
-        return false;
-    }
-    if ("to" in options) {
-      if (!_jsonEqual(attr.value, attr.type.cast(options.to))) return false;
-    }
-    return true;
-  }
-
-  private _hasInPlaceMutableChanges(): boolean {
-    let found = false;
-    this._attributes.forEach((attr) => {
-      if (!found && attr.type.isMutable() && attr.changedInPlace()) found = true;
-    });
-    return found;
-  }
-
   // Mirrors: ActiveRecord class_attribute :record_timestamps instance-level override
   get recordTimestamps(): boolean {
     return this._instanceRecordTimestamps ?? (this.constructor as typeof Base).recordTimestamps;
@@ -2878,11 +2765,6 @@ export class Base extends Model {
     }
 
     const changedAttrs = { ...this.changes };
-    this._attributes.forEach((attr, name) => {
-      if (!Object.hasOwn(changedAttrs, name) && attr.type.isMutable() && attr.changedInPlace()) {
-        changedAttrs[name] = [attr.type.cast(attr.valueBeforeTypeCast), attr.value];
-      }
-    });
 
     if (Object.keys(changedAttrs).length === 0) return;
 
