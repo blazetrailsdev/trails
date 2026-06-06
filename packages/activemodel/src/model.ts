@@ -1815,6 +1815,22 @@ export class Model {
   }
 
   /**
+   * Force-mark an attribute as changed without changing its value.
+   * Used for in-place mutations where the object reference stays the same
+   * but the content has changed, or to mark a virtual attribute dirty.
+   *
+   * Returns the forced value, mirroring Rails where `attribute_will_change!`
+   * returns `mutations_from_database.force_change(...)` (dirty.rb:409-410) — a
+   * truthy value relied on by `assert pirate.catchphrase_will_change!`.
+   *
+   * Mirrors: ActiveModel::Dirty#attribute_will_change!
+   */
+  attributeWillChange(name: string): unknown {
+    const resolved = resolveAliasName(this.constructor as typeof Model, name);
+    return this._dirty.forceChange(resolved, this._attributes.fetchValue(resolved));
+  }
+
+  /**
    * Restore a single attribute to its pre-change value.
    *
    * Mirrors: ActiveModel::Dirty#restore_attribute!

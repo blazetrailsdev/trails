@@ -517,6 +517,7 @@ export function defineDirtyAttributeMethods(prototype: object, attrName: string)
     [`${attrName}Changed`, "attributeChanged"],
     [`${attrName}Change`, "attributeChange"],
     [`${attrName}Was`, "attributeWas"],
+    [`${attrName}WillChange`, "attributeWillChange"],
     [`${attrName}InDatabase`, "attributeInDatabase"],
     [`${attrName}BeforeLastSave`, "attributeBeforeLastSave"],
     [`${attrName}PreviouslyChanged`, "attributePreviouslyChanged"],
