@@ -404,6 +404,17 @@ function claim(id: string, assignee: string): void {
   flip(id, `claim: ${id}`, `lost claim race on ${id} — pick another story`, 3, (file) => {
     const fm = readFileSync(file, "utf8");
     if (!/^claim: null\s*$/m.test(fm)) {
+      // Already claimed. If it's our own claim that already landed on main
+      // (attempt 0's push succeeded server-side but the client reported a
+      // transient error, so commitAndPush reset and retried — and the rebase
+      // pulled our claim back), treat it as an idempotent success rather than
+      // a conflict. Only a claim held by someone else is a real "already
+      // claimed".
+      const held = fm.match(/^assignee:\s*"?([^"\n]*)"?\s*$/m)?.[1] ?? null;
+      if (held === assignee) {
+        console.log(`claimed ${id} as ${assignee}`);
+        process.exit(0);
+      }
       console.error(`error: ${id} is already claimed`);
       process.exit(2);
     }
