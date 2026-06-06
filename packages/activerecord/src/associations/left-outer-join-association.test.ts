@@ -151,10 +151,14 @@ describe("LeftOuterJoinAssociationTest", () => {
     const { Post } = makeModels();
     const postTable = new Table("posts");
     const commentTable = new Table("l_comments");
-    const joinSources = postTable
+    // Rails: Author.left_outer_joins(:posts).joins(arel_join)
+    // Arel nodes are passed to joins(), not leftOuterJoins().
+    const arelJoin = postTable
       .outerJoin(commentTable)
-      .on(postTable.get("id").eq(commentTable.get("post_id"))).joinSources;
-    const sql = Post.leftOuterJoins(joinSources).toSql();
+      .on(postTable.get("id").eq(commentTable.get("post_id"))).joinSources[0];
+    const sql = Post.leftOuterJoins("authors", "posts.author_id = authors.id")
+      .joins(arelJoin)
+      .toSql();
     expect(sql).toContain("LEFT OUTER JOIN");
   });
 

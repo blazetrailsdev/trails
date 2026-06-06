@@ -1447,10 +1447,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#left_joins
    */
-  leftJoins(nodes: Nodes.Join[]): Relation<T>;
   leftJoins(table: string, on: string): Relation<T>;
   leftJoins(table: AssociationSpec | AssociationSpec[]): Relation<T>;
-  leftJoins(table: AssociationSpec | AssociationSpec[] | Nodes.Join[], on?: string): Relation<T> {
+  leftJoins(table: AssociationSpec | AssociationSpec[], on?: string): Relation<T> {
     const rel = this._clone();
     if (on !== undefined) {
       // Explicit SQL form: LEFT OUTER JOIN table ON condition — only valid for strings.
@@ -1459,11 +1458,6 @@ export class Relation<T extends Base> {
       if (typeof on !== "string" || !on.trim())
         throw argumentError("leftJoins(table, on) requires a non-empty string ON condition");
       rel._joinClauses.push({ type: "left", table, on });
-    } else if (Array.isArray(table) && table.length > 0 && table[0] instanceof Nodes.Join) {
-      // Arel join node array: add directly to _joinValues (nodes carry their own join type).
-      for (const node of table as Nodes.Join[]) {
-        if (!rel._joinValues.includes(node)) rel._joinValues.push(node);
-      }
     } else {
       // Association name/spec form — mirrors Rails left_outer_joins! storing in
       // left_outer_joins_values for deferred resolution via JoinDependency.
@@ -1474,9 +1468,7 @@ export class Relation<T extends Base> {
           "only associations and hashes are supported as arguments to leftOuterJoins",
         );
       }
-      const specs = Array.isArray(table)
-        ? (table as AssociationSpec[])
-        : [table as AssociationSpec];
+      const specs = Array.isArray(table) ? table : [table as AssociationSpec];
       for (const spec of specs) {
         if (!rel._leftOuterJoinsValues.includes(spec)) rel._leftOuterJoinsValues.push(spec);
       }
@@ -1490,20 +1482,16 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#left_outer_joins
    */
   leftOuterJoins(): Relation<T>;
-  leftOuterJoins(nodes: Nodes.Join[]): Relation<T>;
   leftOuterJoins(table: string, on: string): Relation<T>;
   leftOuterJoins(table: AssociationSpec | AssociationSpec[]): Relation<T>;
-  leftOuterJoins(
-    table?: AssociationSpec | AssociationSpec[] | Nodes.Join[],
-    on?: string,
-  ): Relation<T> {
+  leftOuterJoins(table?: AssociationSpec | AssociationSpec[], on?: string): Relation<T> {
     if (table === undefined) return this._clone();
     if (on !== undefined) {
       if (typeof table !== "string")
         throw argumentError("leftOuterJoins(table, on) requires a string table name");
       return this.leftJoins(table, on);
     }
-    return this.leftJoins(table as any);
+    return this.leftJoins(table);
   }
 
   /**

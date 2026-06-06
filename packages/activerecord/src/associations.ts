@@ -146,9 +146,6 @@ export interface AssociationOptions {
    * Mirrors Rails' `has_many :foo, strict_loading: true` — checked via
    * `reflection.strict_loading?` during query execution. */
   strictLoading?: boolean;
-  /** When true, the loaded target record is marked readonly — saving it raises
-   * ReadOnlyRecord. Mirrors Rails' `belongs_to :owner, readonly: true`. */
-  readonly?: boolean;
   /** When true (or `:nested_attributes_order`), propagated validation errors
    * include the child record's position in the collection. Mirrors Rails'
    * `index_errors` option on collection associations. */
@@ -986,7 +983,6 @@ export async function loadBelongsTo(
   }
 
   syncToAssociationInstance(record, assocName, result);
-  if (result && options.readonly) (result as any)._readonly = true;
   return result;
 }
 

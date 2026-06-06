@@ -3776,10 +3776,13 @@ describe("BelongsToAssociationsTest", () => {
         this.attribute("company_id", "integer");
       }
     }
+    // Rails: belongs_to :readonly_firm, -> { readonly }, class_name: "Firm"
+    // The readonly scope marks loaded records as readonly via the relation's readonly flag.
+    const roScope = (rel: any) => rel.readonly();
     Associations.belongsTo.call(RoAccount, "roCompany", {
       className: "RoCompany",
       foreignKey: "company_id",
-      readonly: true,
+      scope: roScope,
     });
     registerModel("RoCompany", RoCompany);
     registerModel("RoAccount", RoAccount);
@@ -3789,7 +3792,7 @@ describe("BelongsToAssociationsTest", () => {
     const loaded = await loadBelongsTo(account, "roCompany", {
       className: "RoCompany",
       foreignKey: "company_id",
-      readonly: true,
+      scope: roScope,
     });
     expect(loaded!.isReadonly()).toBe(true);
     await expect((loaded as any).save()).rejects.toThrow(ReadOnlyRecord);

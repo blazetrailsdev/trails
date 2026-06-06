@@ -83,6 +83,10 @@ describe("RequiredAssociationsTest", () => {
       const record = new Child();
       expect(await record.save()).toBe(false);
       expect(record.errors.fullMessages).toEqual(["Parent must exist"]);
+
+      const parent = await Parent.create({});
+      record.writeAttribute("parent_id", parent.id);
+      expect(await record.save()).toBe(true);
     } finally {
       if (prev === undefined) {
         delete (Base as any).belongsToRequiredByDefault;
