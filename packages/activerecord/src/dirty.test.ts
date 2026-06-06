@@ -500,12 +500,29 @@ describe("DirtyTest", () => {
   });
 
   it("partial update", async () => {
-    const pirate = (await Pirate.createBang({ catchphrase: "foo" })) as Rec;
-    const savedUpdatedOn = (pirate as any).updated_on;
+    const pirate = new Pirate() as Rec;
+    pirate.catchphrase = "foo";
 
-    // Rails asserts exact query counts (6/0/3) that include BEGIN/COMMIT.
-    // trails does not emit BEGIN/COMMIT as sql.active_record events and always
-    // skips no-op UPDATEs. Re-expressed: match UPDATE presence/absence instead.
+    await withPartialWrites(Pirate, false, async () => {
+      // Rails: assert_queries_count(6) { 2.times { pirate.save! } }
+      // trails: BEGIN/COMMIT/SAVEPOINT are not sql.active_record events; the
+      // second save has no dirty attrs so trails skips the UPDATE unconditionally.
+      // Assert exactly 1 INSERT is emitted across both calls.
+      await assertQueriesMatch(/INSERT/i, 1, false, async () => {
+        await pirate.saveBang();
+        await pirate.saveBang();
+      });
+      // Rails: Pirate.where(id: pirate.id).update_all(updated_on: old_updated_on)
+      await Pirate.where({ id: pirate.id }).updateAll({
+        updated_on: Temporal.Instant.from("2020-01-01T00:00:00Z"),
+      });
+    });
+
+    // Reload so the in-memory snapshot reflects the DB reset; this is the
+    // known baseline that no-op saves must not advance.
+    await (pirate as unknown as Pirate).reload();
+    const oldUpdatedOn = pirate.updated_on;
+
     await withPartialWrites(Pirate, true, async () => {
       // No-op saves with partialUpdates=true issue no queries.
       await assertNoQueries(false, async () => {
@@ -513,30 +530,47 @@ describe("DirtyTest", () => {
         await pirate.saveBang();
       });
       expect(((await (pirate as unknown as Pirate).reload()) as Rec).updated_on).toEqual(
-        savedUpdatedOn,
+        oldUpdatedOn,
       );
 
       // A real attribute change triggers exactly one UPDATE and bumps updated_on.
-      (pirate as any).catchphrase = "bar";
+      pirate.catchphrase = "bar";
       await assertQueriesMatch(/UPDATE/i, 1, false, async () => {
         await pirate.saveBang();
       });
       expect(((await (pirate as unknown as Pirate).reload()) as Rec).updated_on).not.toEqual(
-        savedUpdatedOn,
+        oldUpdatedOn,
       );
     });
   });
 
   it("partial update with optimistic locking", async () => {
-    const person = (await Person.createBang({ first_name: "foo" })) as Rec;
+    const person = new Person() as Rec;
+    (person as any).first_name = "foo";
+
+    await withPartialWrites(Person, false, async () => {
+      // Rails: assert_queries_count(6) { 2.times { person.save! } }
+      // trails: same divergence as "partial update" — 1 INSERT only.
+      await assertQueriesMatch(/INSERT/i, 1, false, async () => {
+        await person.saveBang();
+        await person.saveBang();
+      });
+      // Rails: Person.where(id: person.id).update_all(first_name: "baz")
+      await Person.where({ id: person.id }).updateAll({ first_name: "baz" });
+    });
+
+    // Rails: old_lock_version = person.lock_version + 1
+    // In Rails the force-UPDATE in the partial_writes=false block increments
+    // lock_version (0→1), so person.lock_version == 1 and old_lock_version == 2.
+    // trails skips that UPDATE so lock_version stays at its post-INSERT value;
+    // record it directly instead of adding 1.
     const savedLockVersion = (person as any).lock_version;
 
-    // Same re-expression as "partial update": match UPDATE presence/absence.
     await withPartialWrites(Person, true, async () => {
       // No-op saves do not issue queries and do not increment lock_version.
       await assertNoQueries(false, async () => {
-        await (person as unknown as Person).saveBang();
-        await (person as unknown as Person).saveBang();
+        await person.saveBang();
+        await person.saveBang();
       });
       expect(((await (person as unknown as Person).reload()) as Rec).lock_version).toEqual(
         savedLockVersion,
@@ -545,7 +579,7 @@ describe("DirtyTest", () => {
       // A real attribute change triggers exactly one UPDATE and increments lock_version.
       (person as any).first_name = "bar";
       await assertQueriesMatch(/UPDATE/i, 1, false, async () => {
-        await (person as unknown as Person).saveBang();
+        await person.saveBang();
       });
       expect(((await (person as unknown as Person).reload()) as Rec).lock_version).not.toEqual(
         savedLockVersion,
