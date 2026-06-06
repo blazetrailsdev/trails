@@ -1453,6 +1453,15 @@ export class Base extends Model {
   /** @internal */
   declare static detectNegativeEnumConditionsBang: typeof _EnumModule.detectNegativeEnumConditionsBang;
 
+  // Cast `from:`/`to:` options through the enum mapping before comparison.
+  // Rails normalises these via EnumType on the attribute; we mirror it here.
+  // Handles both the `_enum` macro (stored in `_enums`) and `defineEnum`
+  // (stored in the enum registry via EnumType).
+  override attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
+    if (options) options = _castEnumDirtyOpts(this.constructor as typeof Base, name, options);
+    return super.attributeChanged(name, options);
+  }
+
   // -- Explain --
 
   /** @internal */
@@ -3454,6 +3463,34 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   clone(): this;
   becomes<K extends typeof Base>(klass: K): InstanceType<K>;
   becomesBang<K extends typeof Base>(klass: K): InstanceType<K>;
+}
+
+// Normalise a single `from:` or `to:` option value through the enum mapping so
+// that label / symbol / integer forms all compare equal to the stored value.
+// Covers the `_enum` macro (ctor._enums) and `defineEnum` (EnumType registry).
+function _castEnumDirtyOpts(
+  ctor: typeof Base,
+  name: string,
+  opts: { from?: unknown; to?: unknown },
+): { from?: unknown; to?: unknown } {
+  const mapping = ctor._enums?.get(name);
+  if (mapping) {
+    const cast = (v: unknown): unknown =>
+      typeof v === "string" && Object.prototype.hasOwnProperty.call(mapping, v) ? mapping[v] : v;
+    const result: { from?: unknown; to?: unknown } = {};
+    if ("from" in opts) result.from = cast(opts.from);
+    if ("to" in opts) result.to = cast(opts.to);
+    return result;
+  }
+  const enumDef = _EnumModule.getEnumDefinitions(ctor).get(name);
+  if (enumDef) {
+    const cast = (v: unknown): unknown => enumDef.type.cast(v) ?? v;
+    const result: { from?: unknown; to?: unknown } = {};
+    if ("from" in opts) result.from = cast(opts.from);
+    if ("to" in opts) result.to = cast(opts.to);
+    return result;
+  }
+  return opts;
 }
 
 // ---------------------------------------------------------------------------
