@@ -403,6 +403,10 @@ export function removeConnection(this: typeof Base): void {
     })
   ) {
     (this as any)._connectionSpecificationName = undefined;
+    // Reset connection_class so connectionSpecificationName delegates to the
+    // parent class (matching Rails: setting connection_specification_name = nil
+    // triggers the superclass walk in the accessor, undoing establish_connection).
+    (this as any).connectionClass = false;
   }
   this.connectionHandler.removeConnectionPool(name, {
     role: coreCurrentRole.call(this as any),
