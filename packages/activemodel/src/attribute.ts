@@ -346,7 +346,7 @@ export class Uninitialized extends Attribute {
   }
 
   get value(): unknown {
-    return undefined;
+    throw new MissingAttributeError(`missing attribute '${this.name}'`);
   }
 
   override get originalValue(): unknown {

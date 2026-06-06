@@ -867,11 +867,11 @@ describe("DirtyTest", () => {
     expect(person.changed).toBe(true);
   });
 
-  it.skip("attributes not selected are still missing after save", () => {
-    // BLOCKED: attribute-methods — accessing an unselected attribute
-    // (`Person.select(:id).first.first_name`) does not raise
-    // `MissingAttributeError` in trails (returns undefined). SCOPE: missing-
-    // attribute guard on partial selects, separate PR.
+  it("attributes not selected are still missing after save", async () => {
+    const person = (await Person.select("id").first()) as Rec;
+    expect(() => person.first_name).toThrow("missing attribute 'first_name'");
+    await person.save();
+    expect(() => person.first_name).toThrow("missing attribute 'first_name'");
   });
 
   it("saved_change_to_attribute? returns whether a change occurred in the last save", async () => {

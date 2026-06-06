@@ -46,6 +46,7 @@ import type { ConditionalOptions, ConditionFn, ValidatableRecord } from "./valid
 import { evaluateCondition } from "./validator.js";
 import {
   AttributeMethodPattern,
+  MissingAttributeError,
   attributeMethodPrefix,
   attributeMethodSuffix,
   attributeMethodAffix,
@@ -1351,13 +1352,15 @@ export class Model {
     // Rails resolves alias_attribute names in `read_attribute`
     // (attribute_aliases[name] || name); `_read_attribute` skips it.
     const resolved = resolveAliasName(this.constructor as typeof Model, name);
+    const attr = this._attributes.getAttribute(resolved);
+    if (!attr.isInitialized()) {
+      // Attribute in the set but excluded by a partial SELECT → MissingAttributeError.
+      // (Truly unknown attributes use the Null default which IS initialized.)
+      throw new MissingAttributeError(
+        `missing attribute '${resolved}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+      );
+    }
     if (!this._attributes.has(resolved)) {
-      // Matches Rails AR: fetch_value → NullAttribute#value → nil.
-      // MissingAttributeError is only raised by the generated per-attribute
-      // methods (name, email, …) when a record is partially loaded via a
-      // SELECT subset — a feature trails does not implement. Rails AM
-      // _read_attribute routes through __send__ to hit those methods;
-      // trails _readAttribute skips that dispatch and reads the store directly.
       return null;
     }
     this._accessedFields.add(resolved);
@@ -1366,6 +1369,12 @@ export class Model {
 
   /** @internal */
   _readAttribute(name: string): unknown {
+    const attr = this._attributes.getAttribute(name);
+    if (!attr.isInitialized()) {
+      throw new MissingAttributeError(
+        `missing attribute '${name}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+      );
+    }
     if (!this._attributes.has(name)) {
       return null;
     }
