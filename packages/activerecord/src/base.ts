@@ -1454,12 +1454,22 @@ export class Base extends Model {
   declare static detectNegativeEnumConditionsBang: typeof _EnumModule.detectNegativeEnumConditionsBang;
 
   // Cast `from:`/`to:` options through the enum mapping before comparison.
-  // Rails normalises these via EnumType on the attribute; we mirror it here.
-  // Handles both the `_enum` macro (stored in `_enums`) and `defineEnum`
-  // (stored in the enum registry via EnumType).
+  // Rails normalises these via AttributeMutationTracker#type_cast (which calls
+  // type.cast on the attribute's EnumType); we mirror it here for both live
+  // changes (attributeChanged) and persisted changes (savedChangeToAttribute).
+  // Handles both the `_enum` macro (integer-stored, mapping in `_enums`) and
+  // `defineEnum` (string-stored, normalised via EnumType).
   override attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
     if (options) options = _castEnumDirtyOpts(this.constructor as typeof Base, name, options);
     return super.attributeChanged(name, options);
+  }
+
+  override savedChangeToAttribute(
+    name: string,
+    options?: { from?: unknown; to?: unknown },
+  ): boolean {
+    if (options) options = _castEnumDirtyOpts(this.constructor as typeof Base, name, options);
+    return super.savedChangeToAttribute(name, options);
   }
 
   // -- Explain --
