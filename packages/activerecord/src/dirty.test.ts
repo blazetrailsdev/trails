@@ -38,7 +38,11 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { NumericData } from "./test-helpers/models/numeric-data.js";
 import { adapterType } from "./test-adapter.js";
-import { assertNoQueriesMatch, assertQueriesMatch } from "./testing/query-assertions.js";
+import {
+  assertNoQueries,
+  assertNoQueriesMatch,
+  assertQueriesMatch,
+} from "./testing/query-assertions.js";
 
 // trails generates column accessors (`pirate.catchphrase`) at runtime, so they
 // aren't visible to TS on the model classes. This alias keeps the inherited
@@ -495,18 +499,58 @@ describe("DirtyTest", () => {
     // no faithful JS equivalent.
   });
 
-  it.skip("partial update", () => {
-    // BLOCKED: query-count parity — Rails asserts exact counts
-    // (`assert_queries_count(6)` for 2×save! with partial writes off, etc.).
-    // trails skips no-op UPDATEs unconditionally and emits different
-    // transaction/statement notifications, so the counts (6/0/3) don't
-    // translate. The behavioral core (no-op saves issue no query; updated_on
-    // bumps only on a real change) is what these assert. SCOPE: query-count
-    // parity, separate PR.
+  it("partial update", async () => {
+    const pirate = (await Pirate.createBang({ catchphrase: "foo" })) as Rec;
+    const savedUpdatedOn = (pirate as any).updated_on;
+
+    // Rails asserts exact query counts (6/0/3) that include BEGIN/COMMIT.
+    // trails does not emit BEGIN/COMMIT as sql.active_record events and always
+    // skips no-op UPDATEs. Re-expressed: match UPDATE presence/absence instead.
+    await withPartialWrites(Pirate, true, async () => {
+      // No-op saves with partialUpdates=true issue no queries.
+      await assertNoQueries(false, async () => {
+        await pirate.saveBang();
+        await pirate.saveBang();
+      });
+      expect(((await (pirate as unknown as Pirate).reload()) as Rec).updated_on).toEqual(
+        savedUpdatedOn,
+      );
+
+      // A real attribute change triggers exactly one UPDATE and bumps updated_on.
+      (pirate as any).catchphrase = "bar";
+      await assertQueriesMatch(/UPDATE/i, 1, false, async () => {
+        await pirate.saveBang();
+      });
+      expect(((await (pirate as unknown as Pirate).reload()) as Rec).updated_on).not.toEqual(
+        savedUpdatedOn,
+      );
+    });
   });
 
-  it.skip("partial update with optimistic locking", () => {
-    // BLOCKED: query-count parity — see "partial update".
+  it("partial update with optimistic locking", async () => {
+    const person = (await Person.createBang({ first_name: "foo" })) as Rec;
+    const savedLockVersion = (person as any).lock_version;
+
+    // Same re-expression as "partial update": match UPDATE presence/absence.
+    await withPartialWrites(Person, true, async () => {
+      // No-op saves do not issue queries and do not increment lock_version.
+      await assertNoQueries(false, async () => {
+        await (person as unknown as Person).saveBang();
+        await (person as unknown as Person).saveBang();
+      });
+      expect(((await (person as unknown as Person).reload()) as Rec).lock_version).toEqual(
+        savedLockVersion,
+      );
+
+      // A real attribute change triggers exactly one UPDATE and increments lock_version.
+      (person as any).first_name = "bar";
+      await assertQueriesMatch(/UPDATE/i, 1, false, async () => {
+        await (person as unknown as Person).saveBang();
+      });
+      expect(((await (person as unknown as Person).reload()) as Rec).lock_version).not.toEqual(
+        savedLockVersion,
+      );
+    });
   });
 
   it("changed attributes should be preserved if save failure", async () => {
