@@ -324,7 +324,7 @@ export class Relation<T extends Base> {
   private _preloadAssociations: AssociationSpec[] = [];
   private _eagerLoadAssociations: AssociationSpec[] = [];
   private _isReadonly = false;
-  private _isStrictLoading = false;
+  private _isStrictLoading: boolean | undefined = undefined;
   private _annotations: string[] = [];
   private _optimizerHints: string[] = [];
   private _referencesValues: string[] = [];
@@ -1201,7 +1201,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#strict_loading?
    */
   get isStrictLoading(): boolean {
-    return this._isStrictLoading;
+    return this._isStrictLoading ?? false;
   }
 
   /**
@@ -2304,9 +2304,9 @@ export class Relation<T extends Base> {
         (record as any)._readonly = true;
       }
     }
-    if (this._isStrictLoading) {
+    if (this._isStrictLoading !== undefined) {
       for (const record of this._records) {
-        (record as any)._strictLoading = true;
+        (record as any)._strictLoading = this._isStrictLoading;
       }
     }
 

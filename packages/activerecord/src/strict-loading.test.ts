@@ -535,6 +535,8 @@ describe("StrictLoadingTest", () => {
       slcpm_parts: { name: "string", ship_id: "integer" },
       slcpd_authors: { name: "string" },
       slcpd_books: { title: "string", author_id: "integer" },
+      slcpf_devs: { name: "string" },
+      slcpf_logs: { message: "string", slcpf_dev_id: "integer" },
     });
   });
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -1344,6 +1346,37 @@ describe("StrictLoadingTest", () => {
     proxy.strictLoadingBang(true);
     const books = (await proxy.toArray()) as Base[];
     expect(books.every((b) => b.isStrictLoading())).toBe(true);
+  });
+  it("proxy strict_loading(false) wins over n_plus_one_only cascade in diverged path", async () => {
+    class SlcpfDev extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SlcpfLog extends Base {
+      static {
+        this.attribute("message", "string");
+        this.attribute("slcpf_dev_id", "integer");
+      }
+    }
+    registerModel("SlcpfDev", SlcpfDev);
+    registerModel("SlcpfLog", SlcpfLog);
+    Associations.hasMany.call(SlcpfDev, "slcpfLogs", {
+      className: "SlcpfLog",
+      foreignKey: "slcpf_dev_id",
+    });
+    const dev = await SlcpfDev.create({ name: "Dev" });
+    await SlcpfLog.create({ message: "entry", slcpf_dev_id: dev.id });
+    dev.strictLoadingBang(true, { mode: "n_plus_one_only" });
+
+    // n_plus_one_only cascade would normally enable strict on has_many children.
+    // An explicit strictLoadingBang(false) on the proxy sets _isStrictLoading=false
+    // (diverged path). Rails applies strict_loading_value even when false
+    // (Relation#exec_queries: `unless strict_loading_value.nil?`), so false wins.
+    const proxy = association(dev, "slcpfLogs");
+    proxy.strictLoadingBang(false);
+    const logs = (await proxy.toArray()) as Base[];
+    expect(logs.every((l) => !l.isStrictLoading())).toBe(true);
   });
   it("default mode can be changed globally", async () => {
     class GmAuthor extends Base {
