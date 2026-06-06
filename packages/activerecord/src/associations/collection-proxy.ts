@@ -186,6 +186,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return !!this._assocDef.options.through;
   }
 
+  /**
+   * Self-referential alias so AssociationRelation#toArray can be called
+   * with `this` = CollectionProxy via `.call(this)`. AR#toArray reads
+   * `this._association.owner` and `this._association.reflection`; both are
+   * already exposed as getters on CollectionProxy, so returning `this`
+   * satisfies the contract without extra indirection.
+   */
+  private get _association(): this {
+    return this;
+  }
+
   // ──────────────────────────────────────────────────────────────────
   // Array-likeness — sync ops over the loaded target.
   //
@@ -502,9 +513,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private async _execLoad(): Promise<T[]> {
     const queryExecutor = this._cpMutated
       ? (): Promise<Base[]> =>
-          (Relation.prototype as unknown as { toArray(): Promise<Base[]> }).toArray.call(
-            this,
-          ) as Promise<Base[]>
+          // Route through AssociationRelation#toArray (not plain Relation#toArray) so
+          // inverse wiring (set_inverse_instance_from_queries) and set_strict_loading are
+          // applied — mirrors Rails' CollectionProxy → AssociationRelation#exec_queries path.
+          // `_association` returns `this` so AR#toArray can read owner/reflection off the CP.
+          (
+            _AssociationRelationCtor!.prototype as unknown as { toArray(): Promise<Base[]> }
+          ).toArray.call(this) as Promise<Base[]>
       : undefined;
     const results = (await loadHasMany(
       this._record,
