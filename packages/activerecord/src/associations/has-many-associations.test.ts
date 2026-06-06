@@ -8320,10 +8320,14 @@ describe("HasManyAssociationsTest", () => {
     });
     registerModel(Author);
     registerModel(Post);
-    const author = await Author.create({ name: "Alice", posts_count: 0 });
-    // Mirrors Rails: topic.replies.empty? returns false without queries when the
-    // counter cache shows rows exist (has_many_associations_test.rb:1473-1477).
-    await (author as any).posts.create({ title: "A" });
-    expect(await (author as any).posts.isEmpty()).toBe(false);
+    // Seed a post so the DB counter is 1, then reload a fresh owner so the
+    // proxy is unloaded. Mirrors Rails: assert_no_queries { post.comments.empty? }
+    // when the counter cache shows rows exist (has_many_associations_test.rb:1473-1477).
+    const seedAuthor = await Author.create({ name: "Alice", posts_count: 0 });
+    await (seedAuthor as any).posts.create({ title: "A" });
+    const author = await Author.find(seedAuthor.id!);
+    await assertNoQueries(false, async () => {
+      expect(await (author as any).posts.isEmpty()).toBe(false);
+    });
   });
 });

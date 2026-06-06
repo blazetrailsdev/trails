@@ -248,7 +248,10 @@ function getCounterCacheColumns(modelClass: typeof Base): Set<string> {
   const next: Set<string> = owns && inherited ? inherited : new Set(inherited ?? []);
   for (const key of matchingKeys) {
     for (const col of pendingCounterCacheColumns.get(key)!) next.add(col);
-    pendingCounterCacheColumns.delete(key);
+    // Intentionally keep the pending entry so that if the target class is
+    // re-defined and re-registered (e.g. between tests), the next
+    // registerModel call also flushes the column into the new class.
+    // The Set-based dedup makes repeated flushes idempotent.
   }
   (modelClass as any)._counterCacheColumns = next;
   return next;

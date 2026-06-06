@@ -1278,7 +1278,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // count() which routes through AssociationScope as a SQL COUNT for the
     // common shapes (loadHasMany fallback still loads for the rest).
     if (this._isThrough) return (await this.count()) === 0;
-    return !(await this.exists());
+    // Mirrors Rails: CollectionProxy#empty? → any? → count_records, which reads
+    // the counter cache when active (no DB query). Falls back to a SQL COUNT
+    // when no counter cache is present.
+    return (await this._countRecords()) === 0;
   }
 
   /**
