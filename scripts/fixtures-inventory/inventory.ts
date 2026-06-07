@@ -135,7 +135,7 @@ const RAW_DDL = /CREATE\s+TABLE|executeSql|execute\(\s*["'`]\s*CREATE/i;
 
 function classify(raw: string, canonical: Set<string>): Omit<Row, "file" | "loc"> {
   const content = stripComments(raw);
-  const hasUseFixtures = /useFixtures\s*\(/.test(content);
+  const hasUseFixtures = /useFixtures\s*\(|useHandlerFixtures\s*\(/.test(content);
   const hasDbOps = detectDbOps(content);
 
   const inlineClasses = [

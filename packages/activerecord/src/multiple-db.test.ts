@@ -4,6 +4,7 @@ import { Base } from "./base.js";
 import { StatementInvalid } from "./errors.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { setupSecondPool } from "./test-helpers/setup-second-pool.js";
+import { useFixtures } from "./test-helpers/use-fixtures.js";
 import { isSqliteRun } from "./test-helpers/sqlite-template.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Course } from "./test-helpers/models/course.js";
@@ -21,6 +22,27 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
   beforeAll(async () => {
     await setupSecondPool();
   });
+
+  // Rails: `fixtures :colleges, :courses, :entrants`.
+  // Colleges + courses live in arunit2; entrants in the primary pool.
+  // Seed in insertion order (colleges → courses → entrants) so FK refs resolve.
+  // Entrant course_id is supplied explicitly because `entrantFixtureData` uses
+  // ref("courses", …) which can't cross adapter registries (arunit2 ↔ primary).
+  const { colleges } = useFixtures(["colleges"], () => College.connection);
+  const { courses } = useFixtures(["courses"], () => Course.connection);
+  const { entrants } = useFixtures(
+    {
+      entrants: [
+        Entrant,
+        {
+          first: { id: 1, course_id: 1, name: "Ruby Developer" },
+          second: { id: 2, course_id: 1, name: "Ruby Guru" },
+          third: { id: 3, course_id: 2, name: "Java Lover" },
+        },
+      ],
+    },
+    () => Entrant.connection,
+  );
 
   it("connected", () => {
     expect(Entrant.leaseConnection()).toBeTruthy();
@@ -44,16 +66,16 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
     }
   });
 
-  it("find", async () => {
-    const c1 = await Course.find(1);
+  it("find", () => {
+    const c1 = courses("ruby");
     expect(c1.name).toBe("Ruby Development");
-    const c2 = await Course.find(2);
+    const c2 = courses("java");
     expect(c2.name).toBe("Java Development");
-    const e1 = await Entrant.find(1);
+    const e1 = entrants("first");
     expect(e1.name).toBe("Ruby Developer");
-    const e2 = await Entrant.find(2);
+    const e2 = entrants("second");
     expect(e2.name).toBe("Ruby Guru");
-    const e3 = await Entrant.find(3);
+    const e3 = entrants("third");
     expect(e3.name).toBe("Java Lover");
   });
 
@@ -61,14 +83,14 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
     (course as unknown as { entrants: { count(): Promise<number> } }).entrants;
 
   it("associations", async () => {
-    const c1 = await Course.find(1);
+    const c1 = courses("ruby");
     expect(await entrantsOf(c1).count()).toBe(2);
-    const e1 = await Entrant.find(1);
+    const e1 = entrants("first");
     const e1Course = (await e1.association("course").loadTarget()) as InstanceType<typeof Course>;
     expect(e1Course.id).toBe(c1.id);
-    const c2 = await Course.find(2);
+    const c2 = courses("java");
     expect(await entrantsOf(c2).count()).toBe(1);
-    const e3 = await Entrant.find(3);
+    const e3 = entrants("third");
     const e3Course = (await e3.association("course").loadTarget()) as InstanceType<typeof Course>;
     expect(e3Course.id).toBe(c2.id);
   });
@@ -84,8 +106,8 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
   });
 
   it("transactions across databases", async () => {
-    const c1 = await Course.find(1);
-    const e1 = await Entrant.find(1);
+    const c1 = courses("ruby");
+    const e1 = entrants("first");
 
     try {
       await Course.transaction(async () => {
@@ -127,7 +149,7 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
   });
 
   it("associations should work when model has no connection", async () => {
-    const college = (await College.first()) as unknown as {
+    const college = colleges("FIU") as unknown as {
       courses: { first(): Promise<unknown> };
     };
     await expect(college.courses.first()).resolves.not.toThrow();
