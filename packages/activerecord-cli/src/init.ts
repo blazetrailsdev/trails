@@ -44,6 +44,11 @@ export async function connect(): Promise<void> {
 }
 `;
 
+// node-sqlite is a Node.js built-in (22.5+) — no npm install needed, but the
+// driver must be registered explicitly before establishConnection() is called.
+export const DB_GLUE_NODE_SQLITE =
+  `import "@blazetrails/activerecord/sqlite/node-sqlite";\n` + DB_GLUE;
+
 const DB_SEEDS = `/**
  * Idempotent seed data — the analog of Rails' \`db/seeds.rb\`, run by
  * \`ar db:seed\`. Import models from "../app/models/index.js" and create here.
@@ -238,6 +243,10 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
     skipPackageJson = false,
     skipTsconfig = false,
   } = opts;
+  const effectiveOverrides: Record<string, string> =
+    driver === "node-sqlite" && !Object.prototype.hasOwnProperty.call(overrides, "db.ts")
+      ? { ...overrides, "db.ts": DB_GLUE_NODE_SQLITE }
+      : overrides;
   const created: string[] = [];
   const skipped: string[] = [];
   let packageJsonUpdated: InitResult["packageJsonUpdated"];
@@ -268,7 +277,7 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
   }
 
   // tsconfig.json: merge into existing if present, else scaffold fresh.
-  if (!skipTsconfig && !Object.prototype.hasOwnProperty.call(overrides, "tsconfig.json")) {
+  if (!skipTsconfig && !Object.prototype.hasOwnProperty.call(effectiveOverrides, "tsconfig.json")) {
     const tsconfigPath = join(root, "tsconfig.json");
     let tsconfigExists = false;
     try {
@@ -296,8 +305,8 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
   }
 
   for (const [rel, defaultBody] of SCAFFOLD) {
-    const body = Object.prototype.hasOwnProperty.call(overrides, rel)
-      ? overrides[rel]
+    const body = Object.prototype.hasOwnProperty.call(effectiveOverrides, rel)
+      ? effectiveOverrides[rel]
       : defaultBody;
     const target = join(root, rel);
     await mkdir(dirname(target), { recursive: true });
