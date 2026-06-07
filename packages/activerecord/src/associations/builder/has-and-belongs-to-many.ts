@@ -227,7 +227,10 @@ export class HasAndBelongsToMany {
       // handles this association.
     } else {
       ownWrappedNames.add(name);
-      model.prototype.destroyAssociations = async function (this: any): Promise<void> {
+      model.prototype.destroyAssociations = async function (this: {
+        association(n: string): { handleDependency(): Promise<void>; reset?(): void };
+        _collectionProxies?: { delete(n: string): void };
+      }): Promise<void> {
         await this.association(middleName).handleDependency();
         this.association(name).reset?.();
         // Rails' `association(:name).reset` only clears the Association

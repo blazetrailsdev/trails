@@ -45,15 +45,16 @@ export class HasOneAssociation extends SingularAssociation {
           // Rails: owner.errors.add(:base, ...); throw(:abort). The owner is
           // NOT destroyed and no exception is raised — `destroy` returns false.
           // We signal :abort to the before_destroy chain by returning false.
-          const ownerAny = this.owner as any;
-          if (typeof ownerAny.errors?.add === "function") {
-            const record = (this.owner.constructor as any)
-              .humanAttributeName(this.reflection.name)
-              .toLowerCase();
-            ownerAny.errors.add("base", "invalid", {
-              message: `Cannot delete record because a dependent ${record} exists`,
-            });
-          }
+          const owner = this.owner as Base & {
+            errors: { add(a: string, t: string, opts?: Record<string, unknown>): void };
+          };
+          const ctor = owner.constructor as typeof Base & {
+            humanAttributeName(attr: string): string;
+          };
+          const record = ctor.humanAttributeName(this.reflection.name).toLowerCase();
+          owner.errors.add("base", "invalid", {
+            message: `Cannot delete record because a dependent ${record} exists`,
+          });
           return false;
         }
         break;

@@ -172,6 +172,9 @@ interface ReflectionLike {
   scope?: ((...args: any[]) => any) | null;
   klass: typeof Base;
   activeRecordPrimaryKey?: string | string[];
+  isThroughReflection?: () => boolean;
+  isNested?: () => boolean;
+  sourceReflection?: { belongsTo?: () => boolean; isPolymorphic?: () => boolean } | null;
 }
 
 /**
@@ -531,7 +534,7 @@ export function isAssociationCached(record: Base, assocName: string): boolean {
  * Shared by loadHasMany and loadHasOne so the gating rules can't drift.
  */
 export function _canRouteThroughViaAssociationScope(
-  reflection: unknown,
+  reflection: ReflectionLike | null | undefined,
   options: AssociationOptions,
 ): boolean {
   if (!reflection) return false;
@@ -542,11 +545,7 @@ export function _canRouteThroughViaAssociationScope(
   // would falsely match. Gate explicitly on isThroughReflection so HABTM's
   // anonymous-join-model machinery (with its own load path) keeps using
   // the existing 2-step loaders.
-  const refl = reflection as {
-    isThroughReflection?: () => boolean;
-    isNested?: () => boolean;
-  };
-  if (typeof refl.isThroughReflection !== "function" || !refl.isThroughReflection()) {
+  if (typeof reflection.isThroughReflection !== "function" || !reflection.isThroughReflection()) {
     return false;
   }
   // Through-a-through (nested) cases — either the throughReflection
@@ -554,10 +553,8 @@ export function _canRouteThroughViaAssociationScope(
   // exposes both via ThroughReflection#isNested (reflection.ts:1187);
   // PR 3c sticks with chain-length-2, so any nested shape falls back
   // to the 2-step loader.
-  if (typeof refl.isNested === "function" && refl.isNested()) return false;
-  const src = (reflection as { sourceReflection?: unknown }).sourceReflection as
-    | { belongsTo?: () => boolean; isPolymorphic?: () => boolean }
-    | undefined;
+  if (typeof reflection.isNested === "function" && reflection.isNested()) return false;
+  const src = reflection.sourceReflection;
   if (!src) return false;
   // Polymorphic has_many / has_one source (rare): the chain walker
   // would need inversion machinery not present in PR 3c. Polymorphic
@@ -597,18 +594,14 @@ export function _canRouteThroughViaAssociationScope(
  * reverseChain walk iterate that list uniformly.
  */
 function _canRouteThroughViaDisableJoinsAssociationScope(
-  reflection: unknown,
+  reflection: ReflectionLike | null | undefined,
   options: AssociationOptions,
 ): boolean {
   if (!reflection) return false;
   if (!options.disableJoins) return false;
-  const refl = reflection as {
-    isThroughReflection?: () => boolean;
-  };
-  if (typeof refl.isThroughReflection !== "function" || !refl.isThroughReflection()) return false;
-  const src = (reflection as { sourceReflection?: unknown }).sourceReflection as
-    | { isPolymorphic?: () => boolean }
-    | undefined;
+  if (typeof reflection.isThroughReflection !== "function" || !reflection.isThroughReflection())
+    return false;
+  const src = reflection.sourceReflection;
   if (!src) return false;
   // `sourceType` must pair with a polymorphic source. Rails' own
   // reflection validation rejects `has_many :through` with a
@@ -1718,13 +1711,13 @@ function createHabtmJoinModel(
 
   for (const assocDef of joinAssocs) {
     const ref = Reflection.create(
-      assocDef.type as any,
+      assocDef.type,
       assocDef.name,
       null,
       assocDef.options as Record<string, unknown>,
       JoinModel,
     );
-    Reflection.addReflection(JoinModel, assocDef.name, ref as any);
+    Reflection.addReflection(JoinModel, assocDef.name, ref);
   }
 
   return JoinModel;

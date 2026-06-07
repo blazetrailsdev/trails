@@ -33,6 +33,12 @@ interface CallbackHostRecord {
   validationContext?: string | string[] | null;
 }
 
+/** @internal Host shape for the callbacks-wrapping `runValidationsBang` override. */
+export interface RunValidationsBangHost {
+  _runValidationCallbacks?: (block: () => boolean) => boolean;
+  runValidations?: () => boolean;
+}
+
 /**
  * Mirrors: callbacks.rb:113-115
  *   def run_validations!
@@ -48,10 +54,7 @@ interface CallbackHostRecord {
  *
  * @internal Rails-private helper.
  */
-export function runValidationsBang(this: {
-  _runValidationCallbacks?: (block: () => boolean) => boolean;
-  runValidations?: () => boolean;
-}): boolean {
+export function runValidationsBang(this: RunValidationsBangHost): boolean {
   const block = (): boolean => {
     if (typeof this.runValidations === "function") return this.runValidations();
     return true;

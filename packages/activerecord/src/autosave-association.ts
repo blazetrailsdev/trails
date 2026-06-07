@@ -833,17 +833,9 @@ async function autosaveHabtm(record: Base, assoc: AssociationDefinition): Promis
 }
 
 function propagateErrors(parent: Base, child: Base, assocName: string): void {
-  const childErrors = (child as any).errors;
-  if (!childErrors) return;
-  const parentErrors = (parent as any).errors;
-  if (!parentErrors) return;
-
-  parentErrors.add("base", "invalid", { message: `${assocName} is invalid` });
-  const errorMessages = (
-    Array.isArray(childErrors.fullMessages) ? childErrors.fullMessages : []
-  ) as string[];
-  for (const msg of errorMessages) {
-    parentErrors.add("base", "invalid", { message: msg });
+  parent.errors.add("base", "invalid", { message: `${assocName} is invalid` });
+  for (const msg of child.errors.fullMessages) {
+    parent.errors.add("base", "invalid", { message: msg });
   }
 }
 
