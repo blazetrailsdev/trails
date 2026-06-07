@@ -18,6 +18,8 @@ describe("buildTestDatabaseConfig", () => {
   });
 
   it("defaults to sqlite when no URL env vars are set", async () => {
+    vi.stubEnv("PG_TEST_URL", "");
+    vi.stubEnv("MYSQL_TEST_URL", "");
     const { adapter, envConfig } = await buildTestDatabaseConfig();
     expect(adapter).toBe("sqlite");
     expect(envConfig.adapter).toMatch(/sqlite/i);
