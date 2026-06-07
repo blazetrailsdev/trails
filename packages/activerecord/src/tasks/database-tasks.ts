@@ -465,6 +465,12 @@ export class DatabaseTasks {
     if (!filename || filename.trim() === "") {
       throw new Error("Schema file not specified");
     }
+    // Rails: unless File.exist?(filename) → Kernel.abort (database_tasks.rb:482-487)
+    if (!getFs().existsSync(filename)) {
+      throw new Error(
+        `${filename} doesn't exist yet. Run \`db:migrate\` to create it, then try again.`,
+      );
+    }
   }
 
   /**
@@ -836,7 +842,9 @@ export class DatabaseTasks {
     format: SchemaFormat = DatabaseTasks.schemaFormat,
     file?: string,
   ): Promise<void> {
-    const filename = file ?? this.schemaDumpPath(config, format) ?? "";
+    // Rails: file ||= schema_dump_path(db_config, format); return unless file
+    const filename = file ?? this.schemaDumpPath(config, format);
+    if (!filename) return;
     this.checkSchemaFile(filename);
 
     if (format === "sql") {
