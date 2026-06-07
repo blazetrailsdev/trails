@@ -462,10 +462,9 @@ export class DatabaseTasks {
   }
 
   static checkSchemaFile(filename: string): void {
-    if (!filename || filename.trim() === "") {
-      throw new Error("Schema file not specified");
-    }
-    // Rails: unless File.exist?(filename) → Kernel.abort (database_tasks.rb:482-487)
+    // Rails: unless File.exist?(filename) → Kernel.abort (database_tasks.rb:482-487).
+    // No blank-string special case — Rails only does File.exist?, so "" flows through
+    // the same path (existsSync("") === false) and aborts with the filename in the message.
     if (!getFs().existsSync(filename)) {
       throw new Error(
         `${filename} doesn't exist yet. Run \`db:migrate\` to create it, then try again.`,
@@ -843,8 +842,10 @@ export class DatabaseTasks {
     file?: string,
   ): Promise<void> {
     // Rails: file ||= schema_dump_path(db_config, format); return unless file
+    // Ruby `unless file` is nil/false only — "" is truthy there, so blank strings
+    // reach check_schema_file. Use == null (nullish) to match that.
     const filename = file ?? this.schemaDumpPath(config, format);
-    if (!filename) return;
+    if (filename == null) return;
     this.checkSchemaFile(filename);
 
     if (format === "sql") {

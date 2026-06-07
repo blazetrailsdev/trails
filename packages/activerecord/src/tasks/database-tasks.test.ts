@@ -1323,9 +1323,10 @@ describe("DatabaseTasksReconstructFromSchemaTest", () => {
   });
 
   it("raises before establishing pool when file path is blank", async () => {
-    // Rails: check_schema_file(file) if file — validates before the pool opens.
+    // Rails: check_schema_file only does File.exist? — no blank-string branch.
+    // existsSync("") === false, so it throws the "doesn't exist yet" message.
     await expect(DatabaseTasks.reconstructFromSchema(config, "ts", "")).rejects.toThrow(
-      "Schema file not specified",
+      /doesn't exist yet/,
     );
     expect(withTemporaryPoolSpy).not.toHaveBeenCalled();
   });
@@ -1493,11 +1494,11 @@ describe("DatabaseTaskCheckTargetVersionTest", () => {
 describe("DatabaseTasksCheckSchemaFileTest", () => {
   it("check schema file", () => {
     // Rails: assert_called_with(Kernel, :abort, [/awesome-file.sql/]) — aborts when file missing.
+    // No blank-string branch: Rails only does File.exist?, so "" flows through the same path.
     expect(() => DatabaseTasks.checkSchemaFile("nonexistent-awesome-file.sql")).toThrow(
       /nonexistent-awesome-file\.sql/,
     );
-    // Blank path is also rejected before the existence check.
-    expect(() => DatabaseTasks.checkSchemaFile("")).toThrow("Schema file not specified");
+    expect(() => DatabaseTasks.checkSchemaFile("")).toThrow(/doesn't exist yet/);
   });
 });
 
