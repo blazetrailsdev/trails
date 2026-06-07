@@ -37,6 +37,8 @@ export type ColumnSpec =
       references?: string;
       null?: boolean;
       default?: unknown;
+      /** SQL expression emitted verbatim as `DEFAULT <expr>` (e.g. `"CURRENT_TIMESTAMP"`). */
+      defaultFunction?: string;
       primary?: boolean;
       /**
        * PostgreSQL array column (`INTEGER[]`, `TEXT[]`, etc.). PG-only;
@@ -628,7 +630,12 @@ async function _defineSchemaImpl(
           if (spec.precision !== undefined) options["precision"] = spec.precision;
           if (spec.scale !== undefined) options["scale"] = spec.scale;
           if (spec.null !== undefined) options["null"] = spec.null;
-          if (spec.default !== undefined) options["default"] = spec.default;
+          if (spec.defaultFunction !== undefined) {
+            const fn = spec.defaultFunction;
+            options["default"] = () => fn;
+          } else if (spec.default !== undefined) {
+            options["default"] = spec.default;
+          }
           if (spec.array !== undefined) options["array"] = spec.array;
           if (spec.primary && pk === undefined) {
             options["primaryKey"] = true;

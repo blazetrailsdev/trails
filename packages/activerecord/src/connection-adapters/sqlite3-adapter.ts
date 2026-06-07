@@ -1483,10 +1483,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         precision,
         scale: null,
       });
-      const defaultValue = sqliteExtractValueFromDefault(r.dflt_value);
+      const rawDflt = r.dflt_value as string | null;
+      const defaultValue = sqliteExtractValueFromDefault(rawDflt);
+      // A non-null dflt_value that extractValueFromDefault can't parse as a
+      // literal (quoted string, number, hex) is a SQL function expression.
+      const defaultFunction =
+        rawDflt !== null && !/^null$/i.test(rawDflt) && defaultValue === null ? rawDflt : null;
       return new Sqlite3Column(r.name, defaultValue, meta, r.notnull === 0, {
         primaryKey: r.pk > 0,
         collation: collationMap.get(r.name) ?? null,
+        defaultFunction,
       });
     });
   }
