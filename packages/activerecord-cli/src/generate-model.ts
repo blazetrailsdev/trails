@@ -1,7 +1,12 @@
 import { mkdir, writeFile, access, unlink } from "fs/promises";
 import { join } from "path";
 import { camelize, pluralize } from "@blazetrails/activesupport";
-import { renderMigration, normalizeSnakeName, normalizeRefName } from "./generate-migration.js";
+import {
+  renderMigration,
+  normalizeSnakeName,
+  normalizeRefName,
+  validateMigrationName,
+} from "./generate-migration.js";
 import type { FieldSpec, GenerateMigrationOptions } from "./generate-migration.js";
 
 export type { FieldSpec };
@@ -65,6 +70,7 @@ export async function generateModel(
 ): Promise<GenerateModelResult> {
   // Normalize namespace separators (Admin::User → admin_user) before building paths.
   const snakeName = normalizeSnakeName(name);
+  validateMigrationName(snakeName);
   const className = camelize(snakeName);
   const modelPath = join(root, "app", "models", `${snakeName}.ts`);
   const migrationPath = join(root, "db", "migrate", `${ts}_create_${pluralize(snakeName)}.ts`);
