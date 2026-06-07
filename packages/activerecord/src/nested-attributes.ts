@@ -385,7 +385,7 @@ function generateAssociationWriter(
   const attrName = `${associationName}Attributes`;
   // Register so persistence.create/createBang can re-dispatch after construction
   // (the Base constructor routes attrs through writeAttribute, bypassing setters).
-  if (!(modelClass as any)._nestedAttributeSetterKeys) {
+  if (!Object.prototype.hasOwnProperty.call(modelClass, "_nestedAttributeSetterKeys")) {
     (modelClass as any)._nestedAttributeSetterKeys = new Set<string>();
   }
   (modelClass as any)._nestedAttributeSetterKeys.add(attrName);

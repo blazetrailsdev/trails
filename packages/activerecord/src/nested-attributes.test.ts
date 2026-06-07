@@ -2420,10 +2420,10 @@ describe("validate presence of parent works with inverse of", () => {
 
     const beforeH = Number(await NVPHuman.count());
     const beforeI = Number(await NVPInterest.count());
-    const human = new NVPHuman({ name: "John" });
-    assignNestedAttributes(human, "nvpInterests", [{ topic: "Cars" }, { topic: "Sports" }]);
-    const saved = await human.save();
-    expect(saved).toBe(true);
+    await NVPHuman.createBang({
+      name: "John",
+      nvpInterestsAttributes: [{ topic: "Cars" }, { topic: "Sports" }],
+    });
     expect(Number(await NVPHuman.count()) - beforeH).toBe(1);
     expect(Number(await NVPInterest.count()) - beforeI).toBe(2);
   });
