@@ -16,35 +16,80 @@ import {
   extractClass,
   extractFileLocalHelpers,
   extractFromProgram,
+  harvestObjectLiteralMethods,
   packageFingerprint,
 } from "./extract-ts-api.js";
 import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
-function extractFromSource(source: string, className = "Foo"): ClassInfo {
-  const filename = "virtual.ts";
-  const sourceFile = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true);
+const VIRTUAL = "virtual.ts";
+
+/** Compile an in-memory source file with no lib/resolution; return its AST + checker. */
+function compile(source: string): { sourceFile: ts.SourceFile; checker: ts.TypeChecker } {
+  const sourceFile = ts.createSourceFile(VIRTUAL, source, ts.ScriptTarget.Latest, true);
   const host: ts.CompilerHost = {
-    getSourceFile: (name) => (name === filename ? sourceFile : undefined),
+    getSourceFile: (name) => (name === VIRTUAL ? sourceFile : undefined),
     getDefaultLibFileName: () => "lib.d.ts",
     writeFile: () => undefined,
     getCurrentDirectory: () => "/",
     getCanonicalFileName: (n) => n,
     useCaseSensitiveFileNames: () => true,
     getNewLine: () => "\n",
-    fileExists: (name) => name === filename,
-    readFile: (name) => (name === filename ? source : undefined),
+    fileExists: (name) => name === VIRTUAL,
+    readFile: (name) => (name === VIRTUAL ? source : undefined),
   };
-  const program = ts.createProgram([filename], { noLib: true, noResolve: true }, host);
-  const checker = program.getTypeChecker();
+  const program = ts.createProgram([VIRTUAL], { noLib: true, noResolve: true }, host);
+  return { sourceFile: program.getSourceFile(VIRTUAL)!, checker: program.getTypeChecker() };
+}
+
+function extractFromSource(source: string, className = "Foo"): ClassInfo {
+  const { sourceFile, checker } = compile(source);
   let found: ClassInfo | null = null;
-  ts.forEachChild(program.getSourceFile(filename)!, (node) => {
+  ts.forEachChild(sourceFile, (node) => {
     if (ts.isClassDeclaration(node) && node.name?.text === className) {
-      found = extractClass(node, checker, filename);
+      found = extractClass(node, checker, VIRTUAL);
     }
   });
   if (!found) throw new Error(`class ${className} not found`);
   return found;
 }
+
+function objectLiteralMethods(source: string): MethodInfo[] {
+  const { sourceFile, checker } = compile(source);
+  let out: MethodInfo[] = [];
+  ts.forEachChild(sourceFile, (node) => {
+    if (!ts.isVariableStatement(node)) return;
+    for (const decl of node.declarationList.declarations) {
+      if (decl.initializer && ts.isObjectLiteralExpression(decl.initializer)) {
+        out = harvestObjectLiteralMethods(decl.initializer, checker, VIRTUAL);
+      }
+    }
+  });
+  return out;
+}
+
+describe("harvestObjectLiteralMethods", () => {
+  it("captures params for inline method and function-property forms", () => {
+    const methods = objectLiteralMethods(
+      `export const Reg = {
+        registerTemplateHandler(...extensionsAndHandler: unknown[]): void {},
+        build: (a: number, b = 1) => {},
+        noop,
+      };`,
+    );
+    const byName = Object.fromEntries(methods.map((m) => [m.name, m.params]));
+    // Rest param must survive — the bug recorded these as 0-arg, which let
+    // Ruby's `register_template_handler(*extensions, handler)` falsely match.
+    expect(byName["registerTemplateHandler"]).toEqual([
+      { name: "extensionsAndHandler", kind: "rest", type: "unknown[]" },
+    ]);
+    expect(byName["build"]).toEqual([
+      { name: "a", kind: "required", type: "number" },
+      { name: "b", kind: "optional", default: "..." },
+    ]);
+    // Shorthand reference: name captured, params unknown (signature lives elsewhere).
+    expect(byName["noop"]).toEqual([]);
+  });
+});
 
 describe("resolveRelModule", () => {
   it("resolves a sibling .js import", () => {

@@ -22,7 +22,7 @@ import { ROOT_DIR, OUTPUT_DIR, PACKAGES, PACKAGE_DIR_OVERRIDES, packageSrcDir } 
 // (SHA-1 over sorted (relPath, mtimeMs, size) triples) plus a
 // SCHEMA_VERSION constant we can bump when the extractor's output
 // shape changes. Set `API_COMPARE_FORCE=1` to skip the cache entirely.
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 const CACHE_DIR = path.join(OUTPUT_DIR, "ts-api-cache");
 
 interface CacheEntry {
@@ -1092,14 +1092,20 @@ export function harvestObjectLiteralMethods(
   const out: MethodInfo[] = [];
   for (const prop of obj.properties) {
     let mname: string | null = null;
+    // Params are recoverable for inline method/function forms; left empty for
+    // identifier references (`qux,` / `foo: NS.bar`) whose signature lives
+    // elsewhere — the arity check tolerates that via its global candidate pool.
+    let params: ParamInfo[] = [];
     if (ts.isMethodDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
       mname = prop.name.text;
+      params = extractParameters(prop.parameters);
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       mname = prop.name.text;
     } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
       const init = prop.initializer;
       if (ts.isFunctionExpression(init) || ts.isArrowFunction(init)) {
         mname = prop.name.text;
+        params = extractParameters(init.parameters);
       } else {
         // `foo: bar` / `foo: NS.bar` — count if the RHS resolves to a
         // callable. Catches `readAttributeForValidation:
@@ -1110,7 +1116,7 @@ export function harvestObjectLiteralMethods(
     }
     if (!mname) continue;
     const line = prop.getSourceFile().getLineAndCharacterOfPosition(prop.getStart()).line + 1;
-    out.push({ name: mname, visibility: "public", params: [], line, file });
+    out.push({ name: mname, visibility: "public", params, line, file });
   }
   return out;
 }
@@ -1449,6 +1455,9 @@ function extractParameters(params: ts.NodeArray<ts.ParameterDeclaration>): Param
     const result: ParamInfo = { name, kind };
     if (p.initializer) {
       result.default = "...";
+    }
+    if (p.type) {
+      result.type = p.type.getText();
     }
     return result;
   });
