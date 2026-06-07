@@ -64,7 +64,7 @@ def extract_params(params_node)
 
   # params node structure:
   # [:params, required, optional, rest, post_required, keywords, keyword_rest, block]
-  _, required, optional, rest, _post_required, keywords, keyword_rest, block = params_node
+  _, required, optional, rest, post_required, keywords, keyword_rest, block = params_node
 
   # Required params
   (required || []).each do |p|
@@ -85,6 +85,13 @@ def extract_params(params_node)
     name = ident_name(rest)
     name = "*" if name.nil?
     result << { name: name, kind: "rest" }
+  end
+
+  # Post-splat required params: `def m(*args, value)` — `value` is required.
+  # Emitted after the rest param to preserve source order.
+  (post_required || []).each do |p|
+    name = ident_name(p)
+    result << { name: name, kind: "required" } if name
   end
 
   # Keyword params
