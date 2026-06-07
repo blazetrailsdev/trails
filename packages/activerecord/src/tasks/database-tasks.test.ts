@@ -1278,6 +1278,90 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
   });
 });
 
+describe("DatabaseTasksReconstructFromSchemaTest", () => {
+  // Mirrors Rails: database_tasks.rb:413-425
+  // with_temporary_pool(db_config, clobber: true) wrapping the full branch.
+  const config = new HashConfig("test", "primary", { adapter: "sqlite3", database: "test.db" });
+  let withTemporaryPoolSpy: MockInstance;
+  let schemaUpToDateSpy: MockInstance;
+  let truncateTablesSpy: MockInstance;
+  let purgeSpy: MockInstance;
+  let loadSchemaSpy: MockInstance;
+  let createSpy: MockInstance;
+
+  beforeEach(() => {
+    // Bypass real pool establishment — call the callback immediately.
+    withTemporaryPoolSpy = vi
+      .spyOn(DatabaseTasks, "withTemporaryPool")
+      .mockImplementation((_config: any, fn: any) => fn(null));
+    truncateTablesSpy = vi.spyOn(DatabaseTasks, "truncateTables").mockResolvedValue(undefined);
+    purgeSpy = vi.spyOn(DatabaseTasks, "purge").mockResolvedValue(undefined);
+    loadSchemaSpy = vi.spyOn(DatabaseTasks, "loadSchema").mockResolvedValue(undefined);
+    createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("truncates tables when schema is up to date", async () => {
+    // Warm-DB fast path: schema_up_to_date? → truncate_tables
+    schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(true);
+    await DatabaseTasks.reconstructFromSchema(config, "ts", "db/schema.ts");
+    expect(withTemporaryPoolSpy).toHaveBeenCalledWith(config, expect.any(Function));
+    expect(schemaUpToDateSpy).toHaveBeenCalledWith(config, "ts", "db/schema.ts");
+    expect(truncateTablesSpy).toHaveBeenCalledWith(config);
+    expect(purgeSpy).not.toHaveBeenCalled();
+    expect(loadSchemaSpy).not.toHaveBeenCalled();
+  });
+
+  it("skips truncate when SKIP_TEST_DATABASE_TRUNCATE is set", async () => {
+    // Rails: truncate_tables(db_config) unless ENV["SKIP_TEST_DATABASE_TRUNCATE"]
+    schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(true);
+    const prev = process.env.SKIP_TEST_DATABASE_TRUNCATE;
+    process.env.SKIP_TEST_DATABASE_TRUNCATE = "1";
+    try {
+      await DatabaseTasks.reconstructFromSchema(config, "ts", "db/schema.ts");
+      expect(truncateTablesSpy).not.toHaveBeenCalled();
+      expect(purgeSpy).not.toHaveBeenCalled();
+      expect(loadSchemaSpy).not.toHaveBeenCalled();
+    } finally {
+      if (prev === undefined) delete process.env.SKIP_TEST_DATABASE_TRUNCATE;
+      else process.env.SKIP_TEST_DATABASE_TRUNCATE = prev;
+    }
+  });
+
+  it("purges and loads schema when schema is not up to date", async () => {
+    // Cold path: !schema_up_to_date? → purge + load_schema
+    schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(false);
+    await DatabaseTasks.reconstructFromSchema(config, "ts", "db/schema.ts");
+    expect(withTemporaryPoolSpy).toHaveBeenCalledWith(config, expect.any(Function));
+    expect(purgeSpy).toHaveBeenCalledWith(config);
+    expect(loadSchemaSpy).toHaveBeenCalledWith(config, "ts", "db/schema.ts");
+    expect(truncateTablesSpy).not.toHaveBeenCalled();
+  });
+
+  it("creates database and loads schema on NoDatabaseError", async () => {
+    // rescue NoDatabaseError → create + load_schema
+    schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(false);
+    purgeSpy.mockRejectedValue(new NoDatabaseError());
+    await DatabaseTasks.reconstructFromSchema(config, "ts", "db/schema.ts");
+    expect(createSpy).toHaveBeenCalledWith(config);
+    expect(loadSchemaSpy).toHaveBeenCalledWith(config, "ts", "db/schema.ts");
+    expect(truncateTablesSpy).not.toHaveBeenCalled();
+  });
+
+  it("re-raises non-database errors", async () => {
+    schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(false);
+    const boom = new Error("connection refused");
+    purgeSpy.mockRejectedValue(boom);
+    await expect(DatabaseTasks.reconstructFromSchema(config, "ts", "db/schema.ts")).rejects.toThrow(
+      boom,
+    );
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+});
+
 describe("DatabaseTasksCharsetTest", () => {
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();

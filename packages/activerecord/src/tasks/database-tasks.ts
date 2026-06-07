@@ -1284,24 +1284,25 @@ export class DatabaseTasks {
     file?: string,
   ): Promise<void> {
     const { NoDatabaseError } = await import("../errors.js");
-    try {
-      // Rails fast path: when the loaded schema already matches the dump's
-      // SHA1 (`schema_up_to_date?`), skip the expensive purge+reload and just
-      // truncate — unless SKIP_TEST_DATABASE_TRUNCATE is set, mirroring
-      // `truncate_tables(db_config) unless ENV["SKIP_TEST_DATABASE_TRUNCATE"]`.
-      if (await this.schemaUpToDate(config, format, file)) {
-        if (getEnv("SKIP_TEST_DATABASE_TRUNCATE") === undefined) {
-          await this.truncateTables(config);
+    // Mirrors Rails' `with_temporary_pool(db_config, clobber: true)` wrapper:
+    // establishes a fresh connection so schemaUpToDate can query ar_internal_metadata,
+    // then restores the prior connection when done.
+    await this.withTemporaryPool(config, async () => {
+      try {
+        if (await this.schemaUpToDate(config, format, file)) {
+          if (getEnv("SKIP_TEST_DATABASE_TRUNCATE") === undefined) {
+            await this.truncateTables(config);
+          }
+        } else {
+          await this.purge(config);
+          await this.loadSchema(config, format, file);
         }
-      } else {
-        await this.purge(config);
+      } catch (error) {
+        if (!(error instanceof NoDatabaseError)) throw error;
+        await this.create(config);
         await this.loadSchema(config, format, file);
       }
-    } catch (error) {
-      if (!(error instanceof NoDatabaseError)) throw error;
-      await this.create(config);
-      await this.loadSchema(config, format, file);
-    }
+    });
   }
 }
 
