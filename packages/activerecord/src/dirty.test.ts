@@ -21,6 +21,7 @@
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
+import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
@@ -814,12 +815,23 @@ describe("DirtyTest", () => {
     // correct for subclass".
   });
 
-  it.skip("attribute_changed? doesn't compute in-place changes for unrelated attributes", () => {
-    // BLOCKED: attribute types — Rails registers a custom Type whose
-    // `changed_in_place?` raises, asserting it's never called for unrelated
-    // attributes. trails' attribute-type registration on an anonymous class
-    // doesn't expose an equivalent hook to instrument. SCOPE: custom-type
-    // registration parity, separate PR.
+  it("attribute_changed? doesn't compute in-place changes for unrelated attributes", async () => {
+    const TestType = class extends ValueType {
+      override isChangedInPlace(_rawOldValue: unknown, _newValue: unknown): boolean {
+        throw new Error("isChangedInPlace should not be called for unrelated attributes");
+      }
+    };
+    const klass = class extends Base {
+      static {
+        this.tableName = "people";
+        this.attribute("foo", new TestType());
+      }
+    };
+    await klass.loadSchema();
+
+    const model = new klass() as Rec;
+    (model as any).first_name = "Jim";
+    expect(model.attributeChanged("first_name")).toBe(true);
   });
 
   it("attribute_will_change! doesn't try to save non-persistable attributes", async () => {
