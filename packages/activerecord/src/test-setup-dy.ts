@@ -18,7 +18,7 @@
  */
 import { buildTestDatabaseConfig } from "./test-helpers/test-database-config.js";
 import { generateSchemaFile } from "./test-helpers/schema-file-generator.js";
-import { setCanonicalSchemaPreload } from "./test-helpers/define-schema.js";
+import { seedSchemaSignatures, setCanonicalSchemaPreload } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
@@ -28,7 +28,7 @@ import { DatabaseTasks } from "./tasks/database-tasks.js";
 import "./relation.js";
 
 const { adapter, envConfig } = await buildTestDatabaseConfig();
-const schemaFilePath = await generateSchemaFile(TEST_SCHEMA);
+const schemaFilePath = await generateSchemaFile(TEST_SCHEMA, adapter);
 
 await Base.establishConnection(envConfig.configuration as Record<string, unknown>);
 
@@ -53,6 +53,12 @@ if (missingTables.length > 0) {
   );
 }
 
+// Seed the signature cache so handler-path files' defineSchema(TEST_SCHEMA)
+// calls remain cache-hit no-ops. DatabaseTasks.loadSchema goes through
+// MigrationContext (not defineSchema), so _appliedSchemaSignatures is empty
+// after the load — seedSchemaSignatures bridges the gap before
+// setCanonicalSchemaPreload snapshots the cache.
+seedSchemaSignatures(Base.connection, TEST_SCHEMA);
 setCanonicalSchemaPreload(Base.connection);
 
 // Remove the connection pool from the handler so old-path workers don't

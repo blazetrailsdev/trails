@@ -27,6 +27,8 @@ export interface TestDatabaseConfig {
   envConfig: HashConfig | UrlConfig;
 }
 
+let _taskRegistered = false;
+
 function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfig } {
   const pgUrl = getEnv("PG_TEST_URL");
   if (pgUrl) {
@@ -46,29 +48,33 @@ function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfi
 /**
  * Build the test `DatabaseConfigurations`, assign it to
  * `DatabaseTasks.databaseConfiguration`, and register the adapter task
- * handler. Safe to call multiple times — subsequent calls are idempotent
- * if the env vars haven't changed.
+ * handler. Safe to call multiple times — task-handler registration is
+ * guarded by a module-level flag so `_registeredTasks` doesn't grow on
+ * repeated calls from `setupHandlerSuite`.
  */
 export async function buildTestDatabaseConfig(): Promise<TestDatabaseConfig> {
   const { adapter, envConfig } = resolve();
   const configs = new DatabaseConfigurations([envConfig]);
   DatabaseTasks.databaseConfiguration = configs;
 
-  switch (adapter) {
-    case "sqlite": {
-      const { SQLiteDatabaseTasks } = await import("../tasks/sqlite-database-tasks.js");
-      SQLiteDatabaseTasks.register();
-      break;
-    }
-    case "postgres": {
-      const { PostgreSQLDatabaseTasks } = await import("../tasks/postgresql-database-tasks.js");
-      PostgreSQLDatabaseTasks.register();
-      break;
-    }
-    case "mysql": {
-      const { MySQLDatabaseTasks } = await import("../tasks/mysql-database-tasks.js");
-      MySQLDatabaseTasks.register();
-      break;
+  if (!_taskRegistered) {
+    _taskRegistered = true;
+    switch (adapter) {
+      case "sqlite": {
+        const { SQLiteDatabaseTasks } = await import("../tasks/sqlite-database-tasks.js");
+        SQLiteDatabaseTasks.register();
+        break;
+      }
+      case "postgres": {
+        const { PostgreSQLDatabaseTasks } = await import("../tasks/postgresql-database-tasks.js");
+        PostgreSQLDatabaseTasks.register();
+        break;
+      }
+      case "mysql": {
+        const { MySQLDatabaseTasks } = await import("../tasks/mysql-database-tasks.js");
+        MySQLDatabaseTasks.register();
+        break;
+      }
     }
   }
 

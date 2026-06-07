@@ -15,8 +15,19 @@ import type { Schema, ColumnSpec, TableSchema } from "./define-schema.js";
 
 const SCHEMA_TO_AR: Record<string, string> = { big_integer: "bigint" };
 
-function toArType(primitive: string): string {
-  return SCHEMA_TO_AR[primitive] ?? primitive;
+// Mirrors define-schema.ts COLUMN_TYPE_MAP_MYSQL: date/time/json map to
+// "string" (VARCHAR 255) on MySQL so the column type matches what defineSchema
+// produced before this path was introduced.
+const SCHEMA_TO_AR_MYSQL: Record<string, string> = {
+  ...SCHEMA_TO_AR,
+  date: "string",
+  time: "string",
+  json: "string",
+};
+
+function toArType(primitive: string, adapterName?: string): string {
+  const map = adapterName === "mysql" ? SCHEMA_TO_AR_MYSQL : SCHEMA_TO_AR;
+  return map[primitive] ?? primitive;
 }
 
 function isWrapped(
@@ -38,11 +49,18 @@ function primaryKeyOf(t: TableSchema): string[] | false | undefined {
   return isWrapped(t) ? (t as { primaryKey: string[] | false }).primaryKey : undefined;
 }
 
-function colOpts(spec: ColumnSpec, colName: string, cpkCols: Set<string> | null): string {
+function colOpts(
+  spec: ColumnSpec,
+  colName: string,
+  cpkCols: Set<string> | null,
+  primitive: string,
+  adapterName?: string,
+): string {
   const parts: string[] = [];
+  const hasPrecision = typeof spec === "object" && spec.precision !== undefined;
   if (typeof spec === "object") {
     if (spec.limit !== undefined) parts.push(`limit: ${JSON.stringify(spec.limit)}`);
-    if (spec.precision !== undefined) parts.push(`precision: ${JSON.stringify(spec.precision)}`);
+    if (hasPrecision) parts.push(`precision: ${JSON.stringify(spec.precision)}`);
     if (spec.scale !== undefined) parts.push(`scale: ${JSON.stringify(spec.scale)}`);
     if (spec.null !== undefined) parts.push(`null: ${JSON.stringify(spec.null)}`);
     if (spec.defaultFunction !== undefined) {
@@ -56,6 +74,12 @@ function colOpts(spec: ColumnSpec, colName: string, cpkCols: Set<string> | null)
   if (cpkCols?.has(colName) && !parts.some((p) => p.startsWith("null:"))) {
     parts.push(`null: false`);
   }
+  // Mirrors define-schema.ts: MySQL DATETIME without precision defaults to
+  // DATETIME(0), which rejects fractional seconds. Inject precision:6 unless
+  // the spec sets precision explicitly (even precision:null opts out).
+  if (adapterName === "mysql" && primitive === "datetime" && !hasPrecision) {
+    parts.push(`precision: 6`);
+  }
   return parts.length === 0 ? "{}" : `{ ${parts.join(", ")} }`;
 }
 
@@ -68,7 +92,7 @@ function schemaChecksum(code: string): string {
   return h.toString(36);
 }
 
-function generateCode(schema: Schema): string {
+function generateCode(schema: Schema, adapterName?: string): string {
   const lines: string[] = [
     `import type { MigrationContext } from "@blazetrails/activerecord";`,
     ``,
@@ -95,7 +119,7 @@ function generateCode(schema: Schema): string {
       for (const [colName, colSpec] of colEntries) {
         const primitive = typeof colSpec === "string" ? colSpec : colSpec.type;
         lines.push(
-          `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(toArType(primitive))}, ${colOpts(colSpec, colName, cpkCols)});`,
+          `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(toArType(primitive, adapterName))}, ${colOpts(colSpec, colName, cpkCols, primitive, adapterName)});`,
         );
       }
       lines.push(`  });`);
@@ -110,11 +134,14 @@ function generateCode(schema: Schema): string {
  * Generate a TypeScript schema file from `schema` and write it to a
  * temp path keyed off `VITEST_POOL_ID`. Returns the absolute file path so
  * callers can pass it to `DatabaseTasks.loadSchema`.
+ *
+ * Pass `adapterName` to apply adapter-specific column mappings (e.g. MySQL
+ * date/time/json → string, datetime precision:6 default).
  */
-export async function generateSchemaFile(schema: Schema): Promise<string> {
+export async function generateSchemaFile(schema: Schema, adapterName?: string): Promise<string> {
   const [os, fs, path] = await Promise.all([getOsAsync(), getFsAsync(), getPathAsync()]);
   const poolId = getEnv("VITEST_POOL_ID") ?? "0";
-  const code = generateCode(schema);
+  const code = generateCode(schema, adapterName);
   const filePath = path.join(os.tmpdir(), `trails-schema-${poolId}-${schemaChecksum(code)}.ts`);
   if (fs.writeFile) {
     await fs.writeFile(filePath, code);
