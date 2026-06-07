@@ -6,6 +6,12 @@ export interface ParamInfo {
   name: string;
   kind: "required" | "optional" | "rest" | "keyword" | "keyword_rest" | "block";
   default?: string;
+  /**
+   * TS-side declared type text (e.g. `"Base"`), when available — lets a
+   * consumer recognize a leading receiver/host param on standalone mixin
+   * functions (the arity check, in a follow-up). Absent on the Ruby side.
+   */
+  type?: string;
 }
 
 export interface MethodInfo {
