@@ -174,10 +174,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("can marshal has one association with nil target", () => {
-    // BLOCKED: associations — has-one feature gap
-    // ROOT-CAUSE: associations/has-one-associations.ts or preloader.ts missing has-one semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-associations.test.ts
-    // Requires Marshal (Ruby-specific)
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
 
   it("proxy assignment", async () => {
