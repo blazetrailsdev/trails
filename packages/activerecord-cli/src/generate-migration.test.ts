@@ -7,6 +7,7 @@ import {
   renderMigration,
   generateMigration,
   migrationTimestamp,
+  IllegalMigrationNameError,
 } from "./generate-migration.js";
 
 describe("ArGenerateMigrationTest", () => {
@@ -107,5 +108,15 @@ describe("ArGenerateMigrationTest", () => {
     });
     expect(result.written).toBe(false);
     await expect(readFile(result.path, "utf8")).rejects.toThrow();
+  });
+
+  it("test_migration_with_invalid_file_name", async () => {
+    // colon survives normalizeSnakeName (hyphens do not — they become underscores)
+    await expect(
+      generateMigration(dir, "add_something:datetime", [], "20240101120003"),
+    ).rejects.toThrow(IllegalMigrationNameError);
+    await expect(generateMigration(dir, "my migration", [], "20240101120003")).rejects.toThrow(
+      IllegalMigrationNameError,
+    );
   });
 });

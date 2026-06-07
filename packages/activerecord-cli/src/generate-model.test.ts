@@ -3,6 +3,7 @@ import { mkdtemp, readFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { generateModel } from "./generate-model.js";
+import { IllegalMigrationNameError } from "./generate-migration.js";
 
 describe("ArGenerateModelTest", () => {
   let dir: string;
@@ -93,5 +94,17 @@ describe("ArGenerateModelTest", () => {
     const result = await generateModel(dir, "Widget", [], "20240101120007", { dryRun: true });
     expect(result.written).toBe(false);
     await expect(readFile(result.modelPath, "utf8")).rejects.toThrow();
+  });
+
+  it("rejects illegal model names before writing any file", async () => {
+    // colon survives normalizeSnakeName (hyphens do not — they become underscores)
+    await expect(generateModel(dir, "user:admin", [], "20240101120008")).rejects.toThrow(
+      IllegalMigrationNameError,
+    );
+    await expect(generateModel(dir, "my model", [], "20240101120008")).rejects.toThrow(
+      IllegalMigrationNameError,
+    );
+    // Nothing should have been written
+    await expect(readFile(join(dir, "app", "models", "user_admin.ts"), "utf8")).rejects.toThrow();
   });
 });
