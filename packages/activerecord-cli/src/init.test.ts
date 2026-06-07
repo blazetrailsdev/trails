@@ -131,6 +131,25 @@ describe("ArInitTest", () => {
     const pkg = JSON.parse(raw) as { dependencies: Record<string, string> };
     expect(pkg.dependencies["@blazetrails/activerecord"]).toBe("*");
   });
+
+  it("injects node-sqlite registration import into db.ts when driver is node-sqlite", async () => {
+    const { created } = await init(root, { driver: "node-sqlite" });
+    expect(created).toContain("db.ts");
+    const dbTs = await readFile(join(root, "db.ts"), "utf8");
+    expect(dbTs).toContain('import "@blazetrails/activerecord/sqlite/node-sqlite"');
+  });
+
+  it("leaves db.ts without node-sqlite import for default (better-sqlite3) driver", async () => {
+    await init(root);
+    const dbTs = await readFile(join(root, "db.ts"), "utf8");
+    expect(dbTs).not.toContain("node-sqlite");
+  });
+
+  it("respects a caller-supplied db.ts override even when driver is node-sqlite", async () => {
+    const custom = "// custom\n";
+    await init(root, { driver: "node-sqlite", overrides: { "db.ts": custom } });
+    expect(await readFile(join(root, "db.ts"), "utf8")).toBe(custom);
+  });
 });
 
 describe("detectPackageManager", () => {
