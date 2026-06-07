@@ -54,7 +54,7 @@ describe("handler-resolved adapter (Phase D-0)", () => {
     clearAppliedSchemaSignatures(adapter);
   });
 
-  it("isConnectedQ() is true after bootstrapTestHandler()", () => {
+  it("isConnectedQ() is true after setupHandlerSuite()", () => {
     expect(Base.isConnectedQ()).toBe(true);
   });
 
