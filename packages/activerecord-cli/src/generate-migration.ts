@@ -54,7 +54,7 @@ export function normalizeSnakeName(name: string): string {
 export class IllegalMigrationNameError extends Error {
   constructor(name: string) {
     super(
-      `Illegal migration name ${JSON.stringify(name)}. Migration name must match /^[_a-z0-9]+$/.`,
+      `Illegal name for migration file: ${name}\n\t(only lower case letters, numbers, and '_' allowed).`,
     );
     this.name = "IllegalMigrationNameError";
   }
