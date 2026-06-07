@@ -211,7 +211,13 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   for (const [name, def] of this._attributeDefinitions) {
     if (ignored.has(name)) continue;
     if ((def as any).virtual) continue;
-    result[name] = { name, type: def.type?.name ?? null, default: def.defaultValue ?? null };
+    const fn = (def as any).defaultFunction ?? null;
+    result[name] = {
+      name,
+      type: def.type?.name ?? null,
+      default: def.defaultValue ?? null,
+      ...(fn != null ? { defaultFunction: fn } : {}),
+    };
   }
   return result;
 }
@@ -683,11 +689,13 @@ export function loadSchema(this: SchemaHost): void {
     for (const [name, def] of workHost._attributeDefinitions) {
       if (ignored.has(name)) continue;
       if ((def as any).virtual) continue;
+      const fn = (def as any).defaultFunction ?? null;
       hash[name] = {
         name,
         type: def.type?.name ?? null,
         default: def.defaultValue ?? null,
         limit: (def as any).limit ?? null,
+        ...(fn != null ? { defaultFunction: fn } : {}),
       };
     }
     workHost._columnsHash = hash;
@@ -782,6 +790,8 @@ function applyColumnsHash(
 
     const defaultValue = (column as { default?: unknown }).default ?? null;
     const colLimit = (column as { limit?: number | null }).limit ?? null;
+    const colDefaultFunction =
+      (column as { defaultFunction?: string | null }).defaultFunction ?? null;
 
     host._attributeDefinitions.set(name, {
       name,
@@ -790,6 +800,7 @@ function applyColumnsHash(
       userProvided: false,
       source: "schema",
       ...(colLimit != null ? { limit: colLimit } : {}),
+      ...(colDefaultFunction != null ? { defaultFunction: colDefaultFunction } : {}),
     });
 
     if (name === "id") {

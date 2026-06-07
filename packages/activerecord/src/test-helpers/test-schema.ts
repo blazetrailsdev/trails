@@ -12,7 +12,6 @@
 // don't depend on them):
 //   - secondary indexes / expression indexes
 //   - foreign-key constraints (add_foreign_key)
-//   - SQL function defaults (e.g. CURRENT_TIMESTAMP via -> {})
 //   - identifier-length stress columns (t.string "a" * max_identifier_length)
 //   - polymorphic helper (modeled directly as `<name>_id` + `<name>_type`)
 
@@ -81,9 +80,7 @@ export const TEST_SCHEMA: Schema = {
     name: "string",
     wheels_count: { type: "integer", default: 0, null: false },
     wheels_owned_at: "datetime",
-    // Rails uses CURRENT_TIMESTAMP as the default; defineSchema does not
-    // yet support SQL function defaults — column kept, default dropped.
-    manufactured_at: "datetime",
+    manufactured_at: { type: "datetime", precision: null, defaultFunction: "CURRENT_TIMESTAMP" },
   },
 
   articles: {},
