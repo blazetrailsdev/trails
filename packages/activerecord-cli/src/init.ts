@@ -26,6 +26,27 @@ export default config;
 // generator on a freshly-`init`ed project (or `--check` in CI) reports no drift.
 const MODELS_INDEX = renderManifest([]);
 
+// node-sqlite is a Node.js built-in (22.5+) — no npm install needed, but the
+// driver must be registered explicitly before establishConnection() is called.
+export const DB_GLUE_NODE_SQLITE = `import "@blazetrails/activerecord/sqlite/node-sqlite";
+import { Base } from "@blazetrails/activerecord";
+import { models } from "./app/models/index.js";
+
+let connected = false;
+
+/**
+ * Establish the connection and reflect each model's columns (idempotent).
+ * \`establishConnection()\` reads \`config/database.ts\` for the current
+ * \`TRAILS_ENV\`. Run after migrating, before any read/write.
+ */
+export async function connect(): Promise<void> {
+  if (connected) return;
+  await Base.establishConnection();
+  await Promise.all(models.map((m) => m.loadSchema()));
+  connected = true;
+}
+`;
+
 const DB_GLUE = `import { Base } from "@blazetrails/activerecord";
 import { models } from "./app/models/index.js";
 
@@ -238,6 +259,10 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
     skipPackageJson = false,
     skipTsconfig = false,
   } = opts;
+  const effectiveOverrides: Record<string, string> =
+    driver === "node-sqlite" && !Object.prototype.hasOwnProperty.call(overrides, "db.ts")
+      ? { ...overrides, "db.ts": DB_GLUE_NODE_SQLITE }
+      : overrides;
   const created: string[] = [];
   const skipped: string[] = [];
   let packageJsonUpdated: InitResult["packageJsonUpdated"];
@@ -268,7 +293,7 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
   }
 
   // tsconfig.json: merge into existing if present, else scaffold fresh.
-  if (!skipTsconfig && !Object.prototype.hasOwnProperty.call(overrides, "tsconfig.json")) {
+  if (!skipTsconfig && !Object.prototype.hasOwnProperty.call(effectiveOverrides, "tsconfig.json")) {
     const tsconfigPath = join(root, "tsconfig.json");
     let tsconfigExists = false;
     try {
@@ -296,8 +321,8 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
   }
 
   for (const [rel, defaultBody] of SCAFFOLD) {
-    const body = Object.prototype.hasOwnProperty.call(overrides, rel)
-      ? overrides[rel]
+    const body = Object.prototype.hasOwnProperty.call(effectiveOverrides, rel)
+      ? effectiveOverrides[rel]
       : defaultBody;
     const target = join(root, rel);
     await mkdir(dirname(target), { recursive: true });

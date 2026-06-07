@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "fs/promises";
 import { dirname, join } from "path";
-import { init } from "./init.js";
+import { init, DB_GLUE_NODE_SQLITE } from "./init.js";
 
 export type Driver = "better-sqlite3" | "node-sqlite" | "pg" | "mysql2";
 
@@ -59,27 +59,6 @@ const config = {
 export default config;
 `;
 }
-
-// node-sqlite is a Node.js built-in (22.5+) — no npm install needed, but the
-// driver must be registered explicitly before establishConnection() is called.
-const DB_GLUE_NODE_SQLITE = `import "@blazetrails/activerecord/sqlite/node-sqlite";
-import { Base } from "@blazetrails/activerecord";
-import { models } from "./app/models/index.js";
-
-let connected = false;
-
-/**
- * Establish the connection and reflect each model's columns (idempotent).
- * \`establishConnection()\` reads \`config/database.ts\` for the current
- * \`TRAILS_ENV\`. Run after migrating, before any read/write.
- */
-export async function connect(): Promise<void> {
-  if (connected) return;
-  await Base.establishConnection();
-  await Promise.all(models.map((m) => m.loadSchema()));
-  connected = true;
-}
-`;
 
 function packageJson(appName: string, driver: Driver): string {
   return (
