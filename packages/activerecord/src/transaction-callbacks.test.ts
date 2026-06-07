@@ -2,8 +2,15 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, transaction, beforeCommit, currentTransaction, Rollback } from "./index.js";
+import { describe, it, expect, beforeAll, vi } from "vitest";
+import {
+  Base,
+  transaction,
+  beforeCommit,
+  currentTransaction,
+  Rollback,
+  registerModel,
+} from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -12,7 +19,7 @@ setupHandlerSuite();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
   await defineSchema({
-    topics: { title: "string" },
+    topics: { title: "string", parent_id: "integer" },
     orders: { total: "integer", amount: "integer" },
     payments: { amount: "integer" },
     invoices: { total: "integer" },
@@ -176,10 +183,39 @@ describe("TransactionCallbacksTest", () => {
     expect(called).toEqual(["after_commit"]);
   });
 
-  it.skip("only call after commit on create after transaction commits for new record if create succeeds creating through association", () => {
-    // DEFERRED: needs has_many `.create` on an association whose target model
-    // declares `validates(content, presence)` so the create fails validation
-    // and the after_create_commit callback never fires (empty history).
+  it("only call after commit on create after transaction commits for new record if create succeeds creating through association", async () => {
+    // Mirrors Rails: TopicWithCallbacks.create! + topic.replies.create (no content)
+    // → validates_presence_of :content fails → afterCreateCommit never fires.
+    const commitHistory: string[] = [];
+    class ReplyForAssoc extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("title", "string");
+        this.attribute("parent_id", "integer");
+        this.validates("title", { presence: true });
+        this.afterCreateCommit(function () {
+          commitHistory.push("commit_on_create");
+        });
+      }
+    }
+    class TopicForAssoc extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("title", "string");
+        this.attribute("parent_id", "integer");
+        this.hasMany("assocReplies", {
+          className: "ReplyForAssoc",
+          foreignKey: "parent_id",
+        });
+      }
+    }
+    registerModel(ReplyForAssoc);
+    registerModel(TopicForAssoc);
+
+    const topic = (await TopicForAssoc.create({ title: "Parent" })) as any;
+    // Create with no title → validation fails → afterCreateCommit does NOT fire
+    await (topic.assocReplies as any).create({});
+    expect(commitHistory).toEqual([]);
   });
   it("no after commit on destroy after transaction commits for destroyed new record", async () => {
     class Topic extends Base {
@@ -313,10 +349,39 @@ describe("TransactionCallbacksTest", () => {
     expect(called).toEqual(["after_rollback"]);
   });
 
-  it.skip("call after rollback when commit fails", () => {
-    // DEFERRED: requires monkeypatching the current transaction's `commit` to
-    // raise (Rails redefines `tx.commit`), exercising the rollback-on-failed-commit
-    // path. No test-layer hook exposes the live transaction object for this.
+  it("call after rollback when commit fails", async () => {
+    const afterHistory: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    Topic.afterCommit(function () {
+      afterHistory.push("after_commit");
+    });
+    Topic.afterRollback(function () {
+      afterHistory.push("after_rollback");
+    });
+
+    // The test suite wraps each test in a SAVEPOINT, so `Topic.transaction()`
+    // creates a nested SavepointTransaction whose commit calls releaseSavepoint.
+    // Throwing there exercises the rollback-on-failed-commit path.
+    const adapter = Topic.connection as any;
+    const spy = vi.spyOn(adapter, "releaseSavepoint").mockImplementationOnce(async () => {
+      throw new Error("commit failed");
+    });
+
+    try {
+      await expect(
+        Topic.transaction(async () => {
+          await Topic.create({ title: "test" });
+        }),
+      ).rejects.toThrow("commit failed");
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(afterHistory).toEqual(["after_rollback"]);
   });
   it("only call after rollback on records rolled back to a savepoint", async () => {
     class Topic extends Base {
@@ -873,10 +938,28 @@ describe("TransactionCallbacksTest", () => {
       // cannot pass without changing global callback-ordering semantics.
     });
 
-    it.skip("before commit update in same transaction", () => {
-      // DEFERRED: needs a before_commit callback that issues an `update` writing
-      // to the DB inside the still-open committing transaction, with the new
-      // value surviving to `reload`.
+    it("before commit update in same transaction", async () => {
+      class TopicBC extends Base {
+        declare updateTitle: boolean;
+        static {
+          this._tableName = "topics";
+          this.attribute("title", "string");
+        }
+      }
+      beforeCommit(TopicBC, async function (record: any) {
+        if (record.updateTitle) {
+          await record.update({ title: "before commit title" });
+        }
+      });
+
+      const topic = new TopicBC() as any;
+      topic.title = "original";
+      topic.updateTitle = true;
+      await topic.save();
+
+      expect(topic.title).toBe("before commit title");
+      await topic.reload();
+      expect(topic.title).toBe("before commit title");
     });
   }); // CallbacksOnMultipleActionsTest
 
