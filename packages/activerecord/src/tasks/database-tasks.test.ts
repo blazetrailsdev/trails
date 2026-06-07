@@ -1304,11 +1304,14 @@ describe("DatabaseTasksReconstructFromSchemaTest", () => {
     vi.restoreAllMocks();
   });
 
-  it("resolves file via schemaDumpPath when file is not provided", async () => {
-    // Rails: file ||= schema_dump_path(db_config, format)
-    vi.spyOn(DatabaseTasks, "schemaDumpPath").mockReturnValue("db/resolved-schema.ts");
+  it("resolves file via schemaDumpPath(config, format) when file is not provided", async () => {
+    // Rails: file ||= schema_dump_path(db_config, format) — format must be threaded through.
+    const schemaDumpPathSpy = vi
+      .spyOn(DatabaseTasks, "schemaDumpPath")
+      .mockReturnValue("db/resolved-schema.ts");
     schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(true);
     await DatabaseTasks.reconstructFromSchema(config, "ts");
+    expect(schemaDumpPathSpy).toHaveBeenCalledWith(config, "ts");
     expect(schemaUpToDateSpy).toHaveBeenCalledWith(config, "ts", "db/resolved-schema.ts");
     expect(truncateTablesSpy).toHaveBeenCalledWith(config);
   });

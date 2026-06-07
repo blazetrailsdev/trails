@@ -449,12 +449,12 @@ export class DatabaseTasks {
     }
   }
 
-  static dumpSchemaFilename(config?: DatabaseConfig): string {
+  static dumpSchemaFilename(config?: DatabaseConfig, format?: SchemaFormat): string {
     const envSchema = getEnv("SCHEMA")?.trim();
     if (envSchema) return envSchema;
-    const format = this.schemaFormat;
-    const ext = format === "sql" ? "sql" : format;
-    const base = format === "sql" ? "structure" : "schema";
+    const fmt = format ?? this.schemaFormat;
+    const ext = fmt === "sql" ? "sql" : fmt;
+    const base = fmt === "sql" ? "structure" : "schema";
     if (config && config.name !== "primary") {
       return `${this.dbDir}/${config.name}_${base}.${ext}`;
     }
@@ -748,7 +748,7 @@ export class DatabaseTasks {
    *
    * Returns `null` when the config disables schema dumping (`schemaDump: false`).
    */
-  static schemaDumpPath(config?: DatabaseConfig): string | null {
+  static schemaDumpPath(config?: DatabaseConfig, format?: SchemaFormat): string | null {
     const envSchema = getEnv("SCHEMA")?.trim();
     if (envSchema) return envSchema;
 
@@ -763,7 +763,7 @@ export class DatabaseTasks {
       rawCfg != null && Object.hasOwn(rawCfg, "schemaDump") && rawCfg["schemaDump"] !== undefined;
 
     if (!hasExplicitSchemaDump) {
-      return this.dumpSchemaFilename(config);
+      return this.dumpSchemaFilename(config, format);
     }
 
     // Explicit key: call schemaDump() for the value.
@@ -771,10 +771,10 @@ export class DatabaseTasks {
     // returns null for unknown formats, which would incorrectly gate the dump.
     const cfgWithDump = config as unknown as { schemaDump?: (format?: string) => string | null };
     if (typeof cfgWithDump?.schemaDump !== "function") {
-      return this.dumpSchemaFilename(config);
+      return this.dumpSchemaFilename(config, format);
     }
-    const format = this.schemaFormat === "js" ? "ts" : this.schemaFormat;
-    const filename = cfgWithDump.schemaDump(format);
+    const fmt = (format ?? this.schemaFormat) === "js" ? "ts" : (format ?? this.schemaFormat);
+    const filename = cfgWithDump.schemaDump(fmt);
     if (filename == null) return null;
 
     // Mirrors: `File.dirname(filename) == db_dir ? filename : File.join(db_dir, filename)`.
@@ -1284,7 +1284,7 @@ export class DatabaseTasks {
     file?: string,
   ): Promise<void> {
     // Rails: file ||= schema_dump_path(db_config, format)
-    const resolvedFile = file ?? this.schemaDumpPath(config) ?? undefined;
+    const resolvedFile = file ?? this.schemaDumpPath(config, format) ?? undefined;
     // Rails: check_schema_file(file) if file
     if (resolvedFile !== undefined) this.checkSchemaFile(resolvedFile);
 
