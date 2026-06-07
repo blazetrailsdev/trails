@@ -3,10 +3,12 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { Base, defineEnum } from "./index.js";
+import { Base, defineEnum, registerModel } from "./index.js";
 import { InsertAll } from "./insert-all.js";
 import { UnknownAttributeError } from "./errors.js";
 import { adapterType } from "./test-adapter.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { enableSti } from "./inheritance.js";
 
 // Rails' insert_all_test.rb skips uniqueBy-dependent tests via
 // `skip unless supports_insert_conflict_target?`. MySQL's ON DUPLICATE KEY
@@ -53,6 +55,25 @@ describe("InsertAllTest", () => {
         columns: { shop_id: "integer", id: "integer", name: "string" },
         primaryKey: ["shop_id", "id"],
       },
+      ships: {
+        name: "string",
+        created_at: { type: "datetime", null: true },
+        created_on: { type: "datetime", null: true },
+        updated_at: { type: "datetime", null: true },
+        updated_on: { type: "datetime", null: true },
+      },
+      categories: {
+        name: { type: "string", null: true },
+        type: { type: "string", null: true },
+      },
+      developers: {
+        name: "string",
+        salary: "integer",
+        legacy_created_at: { type: "datetime", null: true },
+        legacy_created_on: { type: "datetime", null: true },
+        legacy_updated_at: { type: "datetime", null: true },
+        legacy_updated_on: { type: "datetime", null: true },
+      },
     });
   });
 
@@ -66,6 +87,77 @@ describe("InsertAllTest", () => {
       }
     }
     return Book;
+  }
+
+  function makeShip() {
+    class Ship extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("created_at", "datetime");
+        this.attribute("created_on", "datetime");
+        this.attribute("updated_at", "datetime");
+        this.attribute("updated_on", "datetime");
+      }
+    }
+    return Ship;
+  }
+
+  function makeCategoryHierarchy() {
+    class Category extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        enableSti(this);
+      }
+    }
+    class SpecialCategory extends Category {}
+    registerModel("SpecialCategory", SpecialCategory);
+    return { Category, SpecialCategory };
+  }
+
+  function makeDeveloper() {
+    class Developer extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("salary", "integer");
+        this.attribute("legacy_created_at", "datetime");
+        this.attribute("legacy_created_on", "datetime");
+        this.attribute("legacy_updated_at", "datetime");
+        this.attribute("legacy_updated_on", "datetime");
+        this.aliasAttribute("created_at", "legacy_created_at");
+        this.aliasAttribute("created_on", "legacy_created_on");
+        this.aliasAttribute("updated_at", "legacy_updated_at");
+        this.aliasAttribute("updated_on", "legacy_updated_on");
+      }
+    }
+    return Developer;
+  }
+
+  async function withRecordTimestamps(
+    model: typeof Base,
+    value: boolean,
+    fn: () => Promise<void>,
+  ): Promise<void> {
+    const original = model.recordTimestamps;
+    model.recordTimestamps = value;
+    try {
+      await fn();
+    } finally {
+      model.recordTimestamps = original;
+    }
+  }
+
+  function getYear(val: unknown): number {
+    if (val == null) return 0;
+    if (val instanceof Temporal.Instant) {
+      return val.toZonedDateTimeISO("UTC").year;
+    }
+    if (typeof val === "string") return parseInt(val.slice(0, 4), 10);
+    if (val instanceof Date) return val.getUTCFullYear();
+    return 0;
   }
 
   it("insert logs message including model name", async () => {
@@ -581,10 +673,22 @@ describe("InsertAllTest", () => {
   it.skip("insert all and upsert all with aliased attributes", () => {
     // BLOCKED: relation — insert_all.rb: aliasAttribute in insertAll / upsertAll
   });
-  it.skip("insert all and upsert all with sti", () => {
-    // BLOCKED: fixture — Rails Category / SpecialCategory STI hierarchy is not declared in the trails test-models registry; no STI routing gap (audit-STI: insertAll/upsertAll set the `type` column via existing STI dispatch)
-    // ROOT-CAUSE: test fixtures — `categories` table + `Category` / `SpecialCategory` STI models with the `type` discriminator are missing from this test file's model setup
-    // SCOPE: ~15–25 LOC fixture-models setup in insert-all.test.ts; affects this single STI insert/upsert test
+  it("insert all and upsert all with sti", async () => {
+    const { Category, SpecialCategory } = makeCategoryHierarchy();
+    const before = (await Category.count()) as number;
+    await SpecialCategory.insertAll([{ name: "First" }, { name: "Second", type: null }]);
+    expect(await Category.count()).toBe(before + 2);
+    const [first, second] = (await Category.order("id").last(2)) as any[];
+    expect(first.type).toBe("SpecialCategory");
+    expect(second.type).toBeNull();
+    await SpecialCategory.upsertAll([
+      { id: 103, name: "Third" },
+      { id: 104, name: "Fourth", type: null },
+    ]);
+    const third = (await Category.find(103)) as any;
+    expect(third.type).toBe("SpecialCategory");
+    const fourth = (await Category.find(104)) as any;
+    expect(fourth.type).toBeNull();
   });
   it.skip("upsert and db warnings", () => {
     // BLOCKED: relation — insert_all.rb: DB warnings emitted on upsert
@@ -603,70 +707,198 @@ describe("InsertAllTest", () => {
     // ROOT-CAUSE: schema-cache.indexes() returns IndexDefinition without partial-index where clause, expression-index sql, or inverted column-order match; findUniqueIndexFor falls back to first match and Builder.conflictTarget emits raw columns only.
     // SCOPE: ~60–80 LOC across schema-cache index extraction (pg/mysql/sqlite index introspection) and findUniqueIndexFor matching; affects ~7 index/partial-index tests
   });
-  it.skip("upsert all respects updated at precision when touched implicitly", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("upsert all respects updated at precision when touched implicitly", async () => {
+    const Ship = makeShip();
+    const oldTime = "2021-01-01 00:00:00.000";
+    await Ship.insertAll([{ id: 101, name: "Boaty", updated_at: oldTime, updated_on: oldTime }], {
+      recordTimestamps: false,
+    });
+    let hasSubsecond = false;
+    for (let i = 0; i < 10 && !hasSubsecond; i++) {
+      await Ship.upsertAll([{ id: 101, name: `Edition ${i}` }]);
+      const ship = (await Ship.find(101)) as any;
+      const ua = ship.updated_at as Temporal.Instant | null;
+      if (ua) hasSubsecond = ua.epochMilliseconds % 1000 !== 0;
+    }
+    expect(hasSubsecond).toBe(true);
   });
-  it.skip("upsert all uses given updated at over implicit updated at", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("upsert all uses given updated at over implicit updated at", async () => {
+    const Ship = makeShip();
+    const oneYearAgo = Temporal.Now.instant().subtract({ hours: 365 * 24 });
+    await Ship.insertAll([{ id: 101, name: "Boaty", updated_at: "2021-01-01 00:00:00.000" }], {
+      recordTimestamps: false,
+    });
+    await Ship.upsertAll([{ id: 101, name: "New Boaty", updated_at: oneYearAgo }]);
+    const ship = (await Ship.find(101)) as any;
+    expect(getYear(ship.updated_at)).toBe(oneYearAgo.toZonedDateTimeISO("UTC").year);
   });
-  it.skip("upsert all uses given updated on over implicit updated on", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("upsert all uses given updated on over implicit updated on", async () => {
+    const Ship = makeShip();
+    const oneYearAgo = Temporal.Now.instant().subtract({ hours: 365 * 24 });
+    await Ship.insertAll([{ id: 101, name: "Boaty", updated_on: "2021-01-01 00:00:00.000" }], {
+      recordTimestamps: false,
+    });
+    await Ship.upsertAll([{ id: 101, name: "New Boaty", updated_on: oneYearAgo }]);
+    const ship = (await Ship.find(101)) as any;
+    expect(getYear(ship.updated_on)).toBe(oneYearAgo.toZonedDateTimeISO("UTC").year);
   });
-  it.skip("upsert all implicitly sets timestamps on create when model record timestamps is true", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("upsert all implicitly sets timestamps on create when model record timestamps is true", async () => {
+    const Ship = makeShip();
+    const currentYear = new Date().getUTCFullYear();
+    await withRecordTimestamps(Ship, true, async () => {
+      await Ship.upsertAll([{ id: 101, name: "RSS Boaty McBoatface" }]);
+      const ship = (await Ship.find(101)) as any;
+      expect(getYear(ship.created_at)).toBe(currentYear);
+      expect(getYear(ship.created_on)).toBe(currentYear);
+      expect(getYear(ship.updated_at)).toBe(currentYear);
+      expect(getYear(ship.updated_on)).toBe(currentYear);
+    });
   });
-  it.skip("upsert all does not implicitly set timestamps on create when model record timestamps is true but overridden", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("upsert all does not implicitly set timestamps on create when model record timestamps is true but overridden", async () => {
+    const Ship = makeShip();
+    await withRecordTimestamps(Ship, true, async () => {
+      await Ship.upsertAll([{ id: 101, name: "RSS Boaty McBoatface" }], {
+        recordTimestamps: false,
+      });
+      const ship = (await Ship.find(101)) as any;
+      expect(ship.created_at).toBeNull();
+      expect(ship.created_on).toBeNull();
+      expect(ship.updated_at).toBeNull();
+      expect(ship.updated_on).toBeNull();
+    });
   });
-  it.skip("upsert all does not implicitly set timestamps on create when model record timestamps is false", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("upsert all does not implicitly set timestamps on create when model record timestamps is false", async () => {
+    const Ship = makeShip();
+    await withRecordTimestamps(Ship, false, async () => {
+      await Ship.upsertAll([{ id: 101, name: "RSS Boaty McBoatface" }]);
+      const ship = (await Ship.find(101)) as any;
+      expect(ship.created_at).toBeNull();
+      expect(ship.created_on).toBeNull();
+      expect(ship.updated_at).toBeNull();
+      expect(ship.updated_on).toBeNull();
+    });
   });
-  it.skip("upsert all implicitly sets timestamps on create when model record timestamps is false but overridden", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("upsert all implicitly sets timestamps on create when model record timestamps is false but overridden", async () => {
+    const Ship = makeShip();
+    const currentYear = new Date().getUTCFullYear();
+    await withRecordTimestamps(Ship, false, async () => {
+      await Ship.upsertAll([{ id: 101, name: "RSS Boaty McBoatface" }], {
+        recordTimestamps: true,
+      });
+      const ship = (await Ship.find(101)) as any;
+      expect(getYear(ship.created_at)).toBe(currentYear);
+      expect(getYear(ship.created_on)).toBe(currentYear);
+      expect(getYear(ship.updated_at)).toBe(currentYear);
+      expect(getYear(ship.updated_on)).toBe(currentYear);
+    });
   });
-  it.skip("upsert all respects created at precision when touched implicitly", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("upsert all respects created at precision when touched implicitly", async () => {
+    const Ship = makeShip();
+    let hasSubsecond = false;
+    for (let i = 0; i < 10 && !hasSubsecond; i++) {
+      await Ship.upsertAll([{ id: 200 + i, name: "Fresh Ship" }]);
+      const ship = (await Ship.find(200 + i)) as any;
+      const ca = ship.created_at as Temporal.Instant | null;
+      if (ca) hasSubsecond = ca.epochMilliseconds % 1000 !== 0;
+    }
+    expect(hasSubsecond).toBe(true);
   });
-  it.skip("upsert all implicitly sets timestamps on update when model record timestamps is true", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("upsert all implicitly sets timestamps on update when model record timestamps is true", async () => {
+    const Ship = makeShip();
+    const currentYear = new Date().getUTCFullYear();
+    await withRecordTimestamps(Ship, true, async () => {
+      const oldTime = Temporal.Instant.from("2016-04-17T00:00:00Z");
+      await Ship.insertAll(
+        [
+          {
+            id: 101,
+            name: "RSS Boaty McBoatface",
+            created_at: oldTime,
+            created_on: oldTime,
+            updated_at: oldTime,
+            updated_on: oldTime,
+          },
+        ],
+        { recordTimestamps: false },
+      );
+      await Ship.upsertAll([{ id: 101, name: "RSS Sir David Attenborough" }]);
+      const ship = (await Ship.find(101)) as any;
+      expect(getYear(ship.created_at)).toBe(2016);
+      expect(getYear(ship.created_on)).toBe(2016);
+      expect(getYear(ship.updated_at)).toBe(currentYear);
+      expect(getYear(ship.updated_on)).toBe(currentYear);
+    });
   });
-  it.skip("upsert all does not implicitly set timestamps on update when model record timestamps is true but overridden", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("upsert all does not implicitly set timestamps on update when model record timestamps is true but overridden", async () => {
+    const Ship = makeShip();
+    await withRecordTimestamps(Ship, true, async () => {
+      const oldTime = Temporal.Instant.from("2016-04-17T00:00:00Z");
+      await Ship.insertAll(
+        [
+          {
+            id: 101,
+            name: "RSS Boaty McBoatface",
+            created_at: oldTime,
+            created_on: oldTime,
+            updated_at: oldTime,
+            updated_on: oldTime,
+          },
+        ],
+        { recordTimestamps: false },
+      );
+      await Ship.upsertAll([{ id: 101, name: "RSS Sir David Attenborough" }], {
+        recordTimestamps: false,
+      });
+      const ship = (await Ship.find(101)) as any;
+      expect(getYear(ship.created_at)).toBe(2016);
+      expect(getYear(ship.created_on)).toBe(2016);
+      expect(getYear(ship.updated_at)).toBe(2016);
+      expect(getYear(ship.updated_on)).toBe(2016);
+    });
   });
-  it.skip("upsert all does not implicitly set timestamps on update when model record timestamps is false", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("upsert all does not implicitly set timestamps on update when model record timestamps is false", async () => {
+    const Ship = makeShip();
+    await withRecordTimestamps(Ship, false, async () => {
+      await Ship.insertAll([{ id: 101, name: "RSS Boaty McBoatface" }]);
+      await Ship.upsertAll([{ id: 101, name: "RSS Sir David Attenborough" }]);
+      const ship = (await Ship.find(101)) as any;
+      expect(ship.created_at).toBeNull();
+      expect(ship.created_on).toBeNull();
+      expect(ship.updated_at).toBeNull();
+      expect(ship.updated_on).toBeNull();
+    });
   });
-  it.skip("upsert all implicitly sets timestamps on update when model record timestamps is false but overridden", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("upsert all implicitly sets timestamps on update when model record timestamps is false but overridden", async () => {
+    const Ship = makeShip();
+    const currentYear = new Date().getUTCFullYear();
+    await withRecordTimestamps(Ship, false, async () => {
+      await Ship.insertAll([{ id: 101, name: "RSS Boaty McBoatface" }]);
+      await Ship.upsertAll([{ id: 101, name: "RSS Sir David Attenborough" }], {
+        recordTimestamps: true,
+      });
+      const ship = (await Ship.find(101)) as any;
+      expect(ship.created_at).toBeNull();
+      expect(ship.created_on).toBeNull();
+      expect(getYear(ship.updated_at)).toBe(currentYear);
+      expect(getYear(ship.updated_on)).toBe(currentYear);
+    });
   });
-  it.skip("upsert all implicitly sets timestamps even when columns are aliased", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
+  it("upsert all implicitly sets timestamps even when columns are aliased", async () => {
+    const Developer = makeDeveloper();
+    const currentYear = new Date().getUTCFullYear();
+    await Developer.upsertAll([{ id: 101, name: "Alice", salary: 70000 }]);
+    const alice = (await Developer.find(101)) as any;
+    expect(alice.created_at).not.toBeNull();
+    expect(alice.created_on).not.toBeNull();
+    expect(alice.updated_at).not.toBeNull();
+    expect(alice.updated_on).not.toBeNull();
+    await alice.update({ created_at: null, created_on: null, updated_at: null, updated_on: null });
+    await Developer.upsertAll([{ id: alice.id, name: alice.name, salary: alice.salary * 2 }]);
+    await alice.reload();
+    expect(alice.created_at).toBeNull();
+    expect(alice.created_on).toBeNull();
+    expect(getYear(alice.updated_at)).toBe(currentYear);
+    expect(getYear(alice.updated_on)).toBe(currentYear);
   });
   it.skip("upsert all works with partitioned indexes", () => {
     // BLOCKED: adapter-pg — insert_all.rb: partitioned index support
@@ -822,18 +1054,29 @@ describe("InsertAllTest", () => {
     // RETURNING clause support depends on the adapter
   });
 
-  it.skip("upsert all does not touch updated at when values do not change", async () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
-    // requires timestamps tracking
+  it("upsert all does not touch updated at when values do not change", async () => {
+    const Ship = makeShip();
+    const oldTime = Temporal.Instant.from("2021-01-01T00:00:00Z");
+    await Ship.insertAll([{ id: 301, name: "Boaty", updated_at: oldTime, updated_on: oldTime }], {
+      recordTimestamps: false,
+    });
+    await Ship.upsertAll([{ id: 301, name: "Boaty" }]);
+    const ship = (await Ship.find(301)) as any;
+    expect(getYear(ship.updated_at)).toBe(2021);
+    expect(getYear(ship.updated_on)).toBe(2021);
   });
 
-  it.skip("upsert all touches updated at and updated on when values change", async () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
-    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
-    // requires timestamps tracking
+  it("upsert all touches updated at and updated on when values change", async () => {
+    const Ship = makeShip();
+    const currentYear = new Date().getUTCFullYear();
+    const oldTime = Temporal.Instant.from("2021-01-01T00:00:00Z");
+    await Ship.insertAll([{ id: 302, name: "Boaty", updated_at: oldTime, updated_on: oldTime }], {
+      recordTimestamps: false,
+    });
+    await Ship.upsertAll([{ id: 302, name: "New Boaty" }]);
+    const ship = (await Ship.find(302)) as any;
+    expect(getYear(ship.updated_at)).toBe(currentYear);
+    expect(getYear(ship.updated_on)).toBe(currentYear);
   });
 
   it("insert all should handle empty arrays", async () => {
