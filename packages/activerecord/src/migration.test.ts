@@ -2710,10 +2710,9 @@ describe("MigrationTest", () => {
         const body = fs.readFileSync(copied[0]!.filename!, "utf8");
         // Expected layout: directive + blank line + provenance + rest
         expect(body).toMatch(/^\/\/ @ts-nocheck\n\n\/\/ This migration comes from/);
-        // Blank line belongs before the provenance comment (Rails parity).
-        const blankIdx = body.indexOf("\n\n");
-        const provenanceIdx = body.indexOf("// This migration comes from");
-        expect(blankIdx).toBeLessThan(provenanceIdx);
+        // Second copy must find the file as a duplicate and return nothing.
+        const copied2 = await Migration.copy(dst, { bukkits: src });
+        expect(copied2).toHaveLength(0);
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }
