@@ -70,8 +70,8 @@ export class MySQLDatabaseTasks {
     this.urlParts = parseDbUrl(this.configurationHash.url as string | undefined);
   }
 
-  async create(): Promise<void> {
-    const opts = this.creationOptions();
+  async create(charsetOverride?: { charset?: string; collation?: string }): Promise<void> {
+    const opts = this.creationOptions(charsetOverride);
     const charset = opts.charset ? ` CHARACTER SET \`${this.escapeIdent(opts.charset)}\`` : "";
     const collation = opts.collation ? ` COLLATE \`${this.escapeIdent(opts.collation)}\`` : "";
     const dbName = this.requireDatabaseName();
@@ -104,8 +104,13 @@ export class MySQLDatabaseTasks {
   }
 
   async purge(): Promise<void> {
+    // Query the existing DB's charset/collation before dropping so recreating
+    // preserves them. MySQL 8's default (utf8mb4_0900_ai_ci) differs from CI
+    // provisioned DBs, so without preservation, purge would silently change
+    // collation and break case-sensitivity tests.
+    const saved = await this.savedCharset();
     await this.drop();
-    await this.create();
+    await this.create(saved);
   }
 
   charset(): string {
@@ -146,29 +151,7 @@ export class MySQLDatabaseTasks {
   async truncateAll(): Promise<void> {
     const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
     const dbName = this.requireDatabaseName();
-    // Build the adapter config the same way withAdmin does: prefer a
-    // unix socket when the config provides one, coerce port safely so
-    // invalid/NaN values don't leak into mysql2.
-    const socket = this.resolvedField("socket");
-    const adapterConfig: {
-      host?: string;
-      port?: number;
-      database: string;
-      user?: string;
-      password?: string;
-      socketPath?: string;
-    } = {
-      database: dbName,
-      user: this.resolvedField("username"),
-      password: this.resolvedField("password"),
-    };
-    if (socket) {
-      adapterConfig.socketPath = socket;
-    } else {
-      adapterConfig.host = this.resolvedField("host") ?? "localhost";
-      adapterConfig.port = coercePort(this.resolvedField("port"), 3306);
-    }
-    const adapter = new Mysql2Adapter(adapterConfig);
+    const adapter = new Mysql2Adapter({ ...this.buildAdapterConfig(), database: dbName });
     try {
       const rows = (await adapter.execute(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = ? " +
@@ -216,15 +199,71 @@ export class MySQLDatabaseTasks {
     DatabaseTasks.registerTask(/mysql/, handler);
   }
 
-  private creationOptions(): { charset?: string; collation?: string } {
+  private creationOptions(override?: { charset?: string; collation?: string }): {
+    charset?: string;
+    collation?: string;
+  } {
     const options: { charset?: string; collation?: string } = {};
-    if (this.configurationHash.encoding !== undefined) {
+    if (override?.charset !== undefined) {
+      options.charset = override.charset;
+    } else if (this.configurationHash.encoding !== undefined) {
       options.charset = String(this.configurationHash.encoding);
     }
-    if (this.configurationHash.collation !== undefined) {
+    if (override?.collation !== undefined) {
+      options.collation = override.collation;
+    } else if (this.configurationHash.collation !== undefined) {
       options.collation = String(this.configurationHash.collation);
     }
     return options;
+  }
+
+  private async savedCharset(): Promise<{ charset?: string; collation?: string }> {
+    const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
+    const dbName = this.requireDatabaseName();
+    // Connect without selecting a database: information_schema.SCHEMATA is
+    // server-global, and connecting to the target DB would fail with error 1049
+    // if it doesn't exist yet (e.g. purge() called before create() on a clean env).
+    const adapter = new Mysql2Adapter(this.buildAdapterConfig());
+    try {
+      const rows = (await adapter.execute(
+        "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME " +
+          "FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
+        [dbName],
+      )) as Array<{ DEFAULT_CHARACTER_SET_NAME?: string; DEFAULT_COLLATION_NAME?: string }>;
+      const row = rows[0];
+      if (!row) return {};
+      return { charset: row.DEFAULT_CHARACTER_SET_NAME, collation: row.DEFAULT_COLLATION_NAME };
+    } finally {
+      const close = (adapter as unknown as { close?: () => Promise<void> }).close;
+      if (typeof close === "function") await close.call(adapter);
+    }
+  }
+
+  private buildAdapterConfig(): {
+    host?: string;
+    port?: number;
+    user?: string;
+    password?: string;
+    socketPath?: string;
+  } {
+    const socket = this.resolvedField("socket");
+    const config: {
+      host?: string;
+      port?: number;
+      user?: string;
+      password?: string;
+      socketPath?: string;
+    } = {
+      user: this.resolvedField("username"),
+      password: this.resolvedField("password"),
+    };
+    if (socket) {
+      config.socketPath = socket;
+    } else {
+      config.host = this.resolvedField("host") ?? "localhost";
+      config.port = coercePort(this.resolvedField("port"), 3306);
+    }
+    return config;
   }
 
   private resolvedField(name: keyof UrlParts): string | undefined {

@@ -15,10 +15,14 @@
  *   - sqlite :memory: → loadSchema (fresh DB, no existing tables)
  *   - sqlite file → reconstructFromSchema (per-worker isolated file; purge is
  *     safe — no other worker shares this file path)
- *   - PG/MySQL → loadSchema (shared DB; reconstructFromSchema would purge the
- *     whole database, which fails while other workers hold sessions (PG error
- *     55006) and resets DB collation on MySQL 8, breaking case-sensitivity.
- *     The schema file uses force:"cascade" for per-table drop+recreate.)
+ *   - PG/MySQL slot >1 (AR_PG_EXCLUSIVE_DB / AR_MYSQL_EXCLUSIVE_DB set by
+ *     test-setup-worker-db.ts) → reconstructFromSchema; the worker owns its
+ *     own suffixed DB (rails_js_test_N), so purge+load is safe.
+ *   - PG/MySQL slot 1 → loadSchema (base URL unchanged; the advisory-lock
+ *     bootstrap pg.Client / GET_LOCK connection lives in the same DB as the
+ *     worker pool, so DROP DATABASE fails with PG error 55006 and releasing
+ *     GET_LOCK would allow slot races on MySQL. The schema file uses
+ *     force:"cascade" for per-table drop+recreate instead.)
  */
 import { buildTestDatabaseConfig } from "./test-helpers/test-database-config.js";
 import { generateSchemaFile } from "./test-helpers/schema-file-generator.js";
@@ -36,7 +40,9 @@ const schemaFilePath = await generateSchemaFile(TEST_SCHEMA, adapter);
 
 await Base.establishConnection(envConfig.configuration as Record<string, unknown>);
 
-if (adapter === "sqlite" && envConfig.database !== ":memory:") {
+const pgExclusive = adapter === "postgres" && !!process.env.AR_PG_EXCLUSIVE_DB;
+const mysqlExclusive = adapter === "mysql" && !!process.env.AR_MYSQL_EXCLUSIVE_DB;
+if ((adapter === "sqlite" && envConfig.database !== ":memory:") || pgExclusive || mysqlExclusive) {
   await DatabaseTasks.reconstructFromSchema(envConfig, "ts", schemaFilePath);
 } else {
   await DatabaseTasks.loadSchema(envConfig, "ts", schemaFilePath);
