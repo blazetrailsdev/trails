@@ -860,7 +860,7 @@ export class Base extends Model {
    */
   static attribute(
     name: string,
-    typeName: string,
+    typeName: string | Type,
     options?: {
       default?: unknown;
       virtual?: boolean;

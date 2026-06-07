@@ -86,7 +86,7 @@ export function attribute(
     _cachedDefaultAttributes?: AttributeSet | null;
   },
   name: string,
-  typeName: string,
+  typeName: string | Type,
   options?: {
     default?: unknown;
     virtual?: boolean;
@@ -100,7 +100,7 @@ export function attribute(
     limit?: number | null;
   },
 ): void {
-  const type = typeRegistry.lookup(typeName);
+  const type = typeName instanceof Type ? typeName : typeRegistry.lookup(typeName);
   const userProvided = options?.userProvidedDefault !== false;
   if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
     this._attributeDefinitions = new Map(this._attributeDefinitions);

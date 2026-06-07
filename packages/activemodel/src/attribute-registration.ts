@@ -16,7 +16,7 @@ import { AttributeSet } from "./attribute-set.js";
 export interface AttributeRegistrationClassMethods {
   attribute(
     name: string,
-    typeName: string,
+    typeName: string | Type,
     options?: { default?: unknown; virtual?: boolean; userProvidedDefault?: boolean },
   ): void;
   _defaultAttributes(): AttributeSet;
