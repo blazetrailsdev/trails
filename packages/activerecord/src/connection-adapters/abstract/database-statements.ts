@@ -83,7 +83,11 @@ export interface DatabaseStatementsHost {
     opts?: { allowRetry?: boolean },
   ): Promise<Result>;
   /** @internal */
-  internalExecute?(sql: string, name?: string, binds?: unknown[]): Promise<unknown>;
+  internalExecute?(
+    sql: string,
+    name?: string,
+    opts?: { materializeTransactions?: boolean },
+  ): Promise<unknown>;
   /** @internal */
   rawExecute?(sql: string, name?: string, binds?: unknown[]): Promise<unknown>;
   /** @internal */
@@ -482,14 +486,10 @@ export async function execDelete(
   binds: unknown[] = [],
 ): Promise<number> {
   const host = this as DatabaseStatementsHost;
-  if (host?.internalExecute) {
-    const result = await host.internalExecute(sql, name ?? "SQL", binds);
-    return host.affectedRows ? host.affectedRows(result) : (result as number);
-  }
   if (binds.length > 0) {
-    throw new Error("execDelete requires internalExecute on the adapter when binds are provided");
+    throw new Error("execDelete requires execQuery on the adapter when binds are provided");
   }
-  const doExecute = host?.execute ?? execute;
+  const doExecute = host?.execute?.bind(host) ?? execute;
   return doExecute(sql) as Promise<number>;
 }
 
@@ -505,14 +505,10 @@ export async function execUpdate(
   binds: unknown[] = [],
 ): Promise<number> {
   const host = this as DatabaseStatementsHost;
-  if (host?.internalExecute) {
-    const result = await host.internalExecute(sql, name ?? "SQL", binds);
-    return host.affectedRows ? host.affectedRows(result) : (result as number);
-  }
   if (binds.length > 0) {
-    throw new Error("execUpdate requires internalExecute on the adapter when binds are provided");
+    throw new Error("execUpdate requires execQuery on the adapter when binds are provided");
   }
-  const doExecute = host?.execute ?? execute;
+  const doExecute = host?.execute?.bind(host) ?? execute;
   return doExecute(sql) as Promise<number>;
 }
 
@@ -1297,7 +1293,7 @@ export async function internalExecQuery(
     const tm = (this as any)._transactionManager as TransactionManager | undefined;
     if (tm) await tm.materializeTransactions();
     if (this?.internalExecute) {
-      const rawResult = await this.internalExecute(sql, sqlName, binds);
+      const rawResult = await this.internalExecute(sql, sqlName);
       return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
     }
     if (binds && binds.length > 0) {
@@ -1306,7 +1302,7 @@ export async function internalExecQuery(
       );
     }
     // Fallback: delegate through this.execute only when there are no binds
-    const doExecute = this?.execute ?? execute;
+    const doExecute = this?.execute?.bind(this) ?? execute;
     const result = await doExecute(sql);
     return normalizeResult(result);
   });
@@ -1613,6 +1609,8 @@ export const DatabaseStatements = {
 /** @internal */
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#raw_execute
+ *
+ * @internal
  */
 export async function rawExecute(
   this: DatabaseStatementsHost,

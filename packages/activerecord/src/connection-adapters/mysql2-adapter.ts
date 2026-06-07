@@ -814,7 +814,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   async beginDbTransaction(): Promise<void> {
     await this._ensureClient();
-    await this._client!.query("BEGIN");
+    await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
     this._inTransaction = true;
   }
 
@@ -831,7 +831,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
     if (!this._inTransaction || !this._client) throw new Error("No active transaction");
     try {
-      await this._client.query("COMMIT");
+      await this.internalExecute("COMMIT", "TRANSACTION");
     } finally {
       this._inTransaction = false;
     }
@@ -854,34 +854,73 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   async rollbackDbTransaction(): Promise<void> {
     if (!this._inTransaction || !this._client) throw new Error("No active transaction");
     try {
-      await this._client.query("ROLLBACK");
+      await this.internalExecute("ROLLBACK", "TRANSACTION");
     } finally {
       this._inTransaction = false;
     }
+  }
+
+  // Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_execute
+  // Overrides the abstract mixin default so TRANSACTION SQL (materializeTransactions=false)
+  // skips materializeTransactions() — calling it would trigger re-entrant SAVEPOINT emission.
+  override async internalExecute(
+    sql: string,
+    name: string = "SQL",
+    { materializeTransactions = true }: { materializeTransactions?: boolean } = {},
+  ): Promise<unknown> {
+    sql = this.preprocessQuery(sql);
+    if (materializeTransactions) {
+      this._syncDatabaseTimezone();
+      await this.materializeTransactions();
+    }
+    const driverSql = this.mysqlQuote(sql);
+    const payload: Record<string, unknown> = {
+      sql: driverSql,
+      name,
+      binds: [],
+      type_casted_binds: [],
+      connection: this,
+      row_count: 0,
+    };
+    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      try {
+        const conn = await this.getConn();
+        await conn.query(driverSql);
+        return 0;
+      } catch (e: any) {
+        const translated = await this._translateAndEnrich(e, driverSql, []);
+        payload.exception = translated;
+        payload.exception_object = translated;
+        throw translated;
+      }
+    });
   }
 
   /**
    * Create a savepoint (nested transaction).
    */
   async createSavepoint(name: string): Promise<void> {
-    const conn = await this.getConn();
-    await conn.query(`SAVEPOINT \`${name}\``);
+    await this.internalExecute(`SAVEPOINT \`${name}\``, "TRANSACTION", {
+      materializeTransactions: false,
+    });
   }
 
   /**
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    const conn = await this.getConn();
-    await conn.query(`RELEASE SAVEPOINT \`${name}\``);
+    await this.internalExecute(`RELEASE SAVEPOINT \`${name}\``, "TRANSACTION", {
+      materializeTransactions: false,
+    });
   }
 
   /**
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    const conn = await this.getConn();
-    await conn.query(`ROLLBACK TO SAVEPOINT \`${name}\``);
+    await this.internalExecute(`ROLLBACK TO SAVEPOINT \`${name}\``, "TRANSACTION", {
+      materializeTransactions: false,
+    });
   }
 
   /**

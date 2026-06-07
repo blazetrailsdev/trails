@@ -281,10 +281,12 @@ export async function _updateRecord(this: any): Promise<boolean> {
     // when the model has record_timestamps enabled and has changes to save.
     // Mirror record_update_timestamps: use _skipTouch (Rails' @_touch_record flag)
     // and the shared currentTimeFromProperTimezone() helper (Temporal.Instant).
+    // With partial_writes=false Rails always issues an UPDATE; treat it as having changes.
     const hasChanges =
-      "hasChangesToSave" in this
+      !ctor.partialUpdates ||
+      ("hasChangesToSave" in this
         ? !!(this.hasChangesToSave as boolean)
-        : Object.keys(this.changes ?? {}).length > 0;
+        : Object.keys(this.changes ?? {}).length > 0);
     const instanceRecordTs = this.recordTimestamps ?? ctor.recordTimestamps;
     const wroteTimestamps = !this._skipTouch && instanceRecordTs !== false && hasChanges;
     if (wroteTimestamps) {

@@ -409,11 +409,7 @@ export interface AbstractAdapter {
   internalExecute(
     sql: string,
     name?: string,
-    binds?: unknown[],
-    prepare?: boolean,
-    async?: boolean,
-    allowRetry?: boolean,
-    materializeTransactions?: boolean,
+    opts?: { materializeTransactions?: boolean },
   ): Promise<unknown>;
   /** @internal */
   executeBatch(statements: string[], name?: string | null): Promise<void>;

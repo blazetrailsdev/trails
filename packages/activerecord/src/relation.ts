@@ -3156,6 +3156,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#update_all
    */
   async updateAll(updates: Record<string, unknown>): Promise<number> {
+    // Mirrors Rails: blank check precedes none? check (relation.rb:588-591).
+    if (Object.keys(updates).length === 0)
+      throw new ArgumentError("Empty list of attributes to change");
     if (this._isNone) return 0;
 
     const table = this._modelClass.arelTable;
@@ -3173,6 +3176,14 @@ export class Relation<T extends Base> {
         return [table.get(key), val];
       },
     );
+    // Mirrors Rails relation.rb#update_all: bump locking_column when omitted.
+    // Uses _incrementAttribute (COALESCE(col, 0) + 1) for NULL-safe increment.
+    if (this._modelClass.lockingEnabled) {
+      const lockingCol = this._modelClass.lockingColumn;
+      if (!Object.prototype.hasOwnProperty.call(updates, lockingCol)) {
+        updateValues.push([table.get(lockingCol), this._incrementAttribute(lockingCol)]);
+      }
+    }
     const um = new UpdateManager().table(table).set(updateValues);
     for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
       um.where(node);

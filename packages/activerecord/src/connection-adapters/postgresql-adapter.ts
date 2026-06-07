@@ -67,6 +67,7 @@ import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   transactionIsolationLevels,
   typeCastedBinds,
+  preprocessQuery,
   temporalToBindString,
   extractTableRefFromInsertSql,
 } from "./abstract/database-statements.js";
@@ -1485,7 +1486,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async beginDbTransaction(): Promise<void> {
     this._client = await this._acquireFreshClient();
     try {
-      await this._client.query("BEGIN");
+      await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
       this._inTransaction = true;
     } catch (error) {
       this._client = null;
@@ -1519,7 +1520,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
     if (!this._client) throw new Error("No active transaction");
     try {
-      await this._client.query("COMMIT");
+      await this.internalExecute("COMMIT", "TRANSACTION");
     } catch (e) {
       // Connection-level error (08P01, broken socket, etc.) leaves the
       // single pg.Client unusable. Tear down so the next caller gets a
@@ -1559,7 +1560,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
     if (!this._client) throw new Error("No active transaction");
     try {
-      await this._client.query("ROLLBACK");
+      await this.internalExecute("ROLLBACK", "TRANSACTION");
     } catch (e) {
       // Connection-level error — closing the socket implicitly aborts
       // the server-side TX. Swallow and reconnect so the next caller
@@ -1675,7 +1676,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (!level) throw new Error(`Unknown isolation level: ${isolation}`);
     this._client = await this._acquireFreshClient();
     try {
-      await this._client.query(`BEGIN ISOLATION LEVEL ${level}`);
+      await this.internalExecute(`BEGIN ISOLATION LEVEL ${level}`, "TRANSACTION", {
+        materializeTransactions: false,
+      });
       this._inTransaction = true;
     } catch (error) {
       this._client = null;
@@ -1715,12 +1718,46 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.execute(`SET CONSTRAINTS ${list} ${deferred.toUpperCase()}`);
   }
 
+  // Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_execute
+  // Overrides the abstract mixin default so TRANSACTION SQL (materializeTransactions=false)
+  // skips materializeTransactions() — calling it would trigger re-entrant SAVEPOINT emission.
+  override async internalExecute(
+    sql: string,
+    name: string = "SQL",
+    { materializeTransactions = true }: { materializeTransactions?: boolean } = {},
+  ): Promise<unknown> {
+    sql = preprocessQuery.call(this as any, sql);
+    if (materializeTransactions) await this.materializeTransactions();
+    const payload: Record<string, unknown> = {
+      sql,
+      name,
+      binds: [],
+      type_casted_binds: [],
+      connection: this,
+      row_count: 0,
+    };
+    return Notifications.instrumentAsync("sql.active_record", payload, () =>
+      this.withClient(async (client) => {
+        try {
+          const result = await this._runQuery(client, sql, [], { rowMode: "array" });
+          const count = result.rowCount ?? result.rows.length;
+          payload.row_count = count;
+          return result;
+        } catch (e: any) {
+          payload.exception = e;
+          payload.exception_object = e;
+          throw e;
+        }
+      }),
+    );
+  }
+
   /**
    * Create a savepoint (nested transaction).
    */
   async createSavepoint(name: string): Promise<void> {
-    await this.withClient(async (client) => {
-      await client.query(`SAVEPOINT "${name}"`);
+    await this.internalExecute(`SAVEPOINT "${name}"`, "TRANSACTION", {
+      materializeTransactions: false,
     });
   }
 
@@ -1728,8 +1765,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    await this.withClient(async (client) => {
-      await client.query(`RELEASE SAVEPOINT "${name}"`);
+    await this.internalExecute(`RELEASE SAVEPOINT "${name}"`, "TRANSACTION", {
+      materializeTransactions: false,
     });
   }
 
@@ -1737,8 +1774,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    await this.withClient(async (client) => {
-      await client.query(`ROLLBACK TO SAVEPOINT "${name}"`);
+    await this.internalExecute(`ROLLBACK TO SAVEPOINT "${name}"`, "TRANSACTION", {
+      materializeTransactions: false,
     });
   }
 
