@@ -449,12 +449,12 @@ export class DatabaseTasks {
     }
   }
 
-  static dumpSchemaFilename(config?: DatabaseConfig): string {
-    const envSchema = getEnv("SCHEMA")?.trim();
-    if (envSchema) return envSchema;
-    const format = this.schemaFormat;
-    const ext = format === "sql" ? "sql" : format;
-    const base = format === "sql" ? "structure" : "schema";
+  static dumpSchemaFilename(config?: DatabaseConfig, format?: SchemaFormat): string {
+    const envSchema = getEnv("SCHEMA");
+    if (envSchema !== undefined) return envSchema;
+    const fmt = format ?? this.schemaFormat;
+    const ext = fmt === "sql" ? "sql" : fmt;
+    const base = fmt === "sql" ? "structure" : "schema";
     if (config && config.name !== "primary") {
       return `${this.dbDir}/${config.name}_${base}.${ext}`;
     }
@@ -462,8 +462,13 @@ export class DatabaseTasks {
   }
 
   static checkSchemaFile(filename: string): void {
-    if (!filename || filename.trim() === "") {
-      throw new Error("Schema file not specified");
+    // Rails: unless File.exist?(filename) → Kernel.abort (database_tasks.rb:482-487).
+    // No blank-string special case — Rails only does File.exist?, so "" flows through
+    // the same path (existsSync("") === false) and aborts with the filename in the message.
+    if (!getFs().existsSync(filename)) {
+      throw new Error(
+        `${filename} doesn't exist yet. Run \`db:migrate\` to create it, then try again.`,
+      );
     }
   }
 
@@ -748,9 +753,9 @@ export class DatabaseTasks {
    *
    * Returns `null` when the config disables schema dumping (`schemaDump: false`).
    */
-  static schemaDumpPath(config?: DatabaseConfig): string | null {
-    const envSchema = getEnv("SCHEMA")?.trim();
-    if (envSchema) return envSchema;
+  static schemaDumpPath(config?: DatabaseConfig, format?: SchemaFormat): string | null {
+    const envSchema = getEnv("SCHEMA");
+    if (envSchema !== undefined) return envSchema;
 
     // Only consult config.schemaDump() when the key is explicitly present.
     // When absent, dumpSchemaFilename() is the authoritative path — it handles
@@ -763,7 +768,7 @@ export class DatabaseTasks {
       rawCfg != null && Object.hasOwn(rawCfg, "schemaDump") && rawCfg["schemaDump"] !== undefined;
 
     if (!hasExplicitSchemaDump) {
-      return this.dumpSchemaFilename(config);
+      return this.dumpSchemaFilename(config, format);
     }
 
     // Explicit key: call schemaDump() for the value.
@@ -771,10 +776,10 @@ export class DatabaseTasks {
     // returns null for unknown formats, which would incorrectly gate the dump.
     const cfgWithDump = config as unknown as { schemaDump?: (format?: string) => string | null };
     if (typeof cfgWithDump?.schemaDump !== "function") {
-      return this.dumpSchemaFilename(config);
+      return this.dumpSchemaFilename(config, format);
     }
-    const format = this.schemaFormat === "js" ? "ts" : this.schemaFormat;
-    const filename = cfgWithDump.schemaDump(format);
+    const fmt = (format ?? this.schemaFormat) === "js" ? "ts" : (format ?? this.schemaFormat);
+    const filename = cfgWithDump.schemaDump(fmt);
     if (filename == null) return null;
 
     // Mirrors: `File.dirname(filename) == db_dir ? filename : File.join(db_dir, filename)`.
@@ -836,7 +841,11 @@ export class DatabaseTasks {
     format: SchemaFormat = DatabaseTasks.schemaFormat,
     file?: string,
   ): Promise<void> {
-    const filename = file ?? this.schemaDumpPath(config) ?? "";
+    // Rails: file ||= schema_dump_path(db_config, format); return unless file
+    // Ruby `unless file` is nil/false only — "" is truthy there, so blank strings
+    // reach check_schema_file. Use == null (nullish) to match that.
+    const filename = file ?? this.schemaDumpPath(config, format);
+    if (filename == null) return;
     this.checkSchemaFile(filename);
 
     if (format === "sql") {
@@ -1283,25 +1292,31 @@ export class DatabaseTasks {
     format: SchemaFormat = DatabaseTasks.schemaFormat,
     file?: string,
   ): Promise<void> {
+    // Rails: file ||= schema_dump_path(db_config, format)
+    const resolvedFile = file ?? this.schemaDumpPath(config, format) ?? undefined;
+    // Rails: check_schema_file(file) if file
+    if (resolvedFile !== undefined) this.checkSchemaFile(resolvedFile);
+
     const { NoDatabaseError } = await import("../errors.js");
-    try {
-      // Rails fast path: when the loaded schema already matches the dump's
-      // SHA1 (`schema_up_to_date?`), skip the expensive purge+reload and just
-      // truncate — unless SKIP_TEST_DATABASE_TRUNCATE is set, mirroring
-      // `truncate_tables(db_config) unless ENV["SKIP_TEST_DATABASE_TRUNCATE"]`.
-      if (await this.schemaUpToDate(config, format, file)) {
-        if (getEnv("SKIP_TEST_DATABASE_TRUNCATE") === undefined) {
-          await this.truncateTables(config);
+    // Mirrors Rails' `with_temporary_pool(db_config, clobber: true)` wrapper:
+    // establishes a fresh connection so schemaUpToDate can query ar_internal_metadata,
+    // then restores the prior connection when done.
+    await this.withTemporaryPool(config, async () => {
+      try {
+        if (await this.schemaUpToDate(config, format, resolvedFile)) {
+          if (getEnv("SKIP_TEST_DATABASE_TRUNCATE") === undefined) {
+            await this.truncateTables(config);
+          }
+        } else {
+          await this.purge(config);
+          await this.loadSchema(config, format, resolvedFile);
         }
-      } else {
-        await this.purge(config);
-        await this.loadSchema(config, format, file);
+      } catch (error) {
+        if (!(error instanceof NoDatabaseError)) throw error;
+        await this.create(config);
+        await this.loadSchema(config, format, resolvedFile);
       }
-    } catch (error) {
-      if (!(error instanceof NoDatabaseError)) throw error;
-      await this.create(config);
-      await this.loadSchema(config, format, file);
-    }
+    });
   }
 }
 
