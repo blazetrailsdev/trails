@@ -51,6 +51,21 @@ export function normalizeSnakeName(name: string): string {
   return underscore(name).replace(/[/\\]/g, "_");
 }
 
+export class IllegalMigrationNameError extends Error {
+  constructor(name: string) {
+    super(
+      `Illegal migration name ${JSON.stringify(name)}. Migration name must match /^[_a-z0-9]+$/.`,
+    );
+    this.name = "IllegalMigrationNameError";
+  }
+}
+
+export function validateMigrationName(snakeName: string): void {
+  if (!/^[_a-z0-9]+$/.test(snakeName)) {
+    throw new IllegalMigrationNameError(snakeName);
+  }
+}
+
 /** Strip a trailing `_id` suffix so `author_id:references` generates `author_id`, not `author_id_id`. */
 export function normalizeRefName(name: string): string {
   return name.endsWith("_id") ? name.slice(0, -3) : name;
@@ -143,6 +158,7 @@ export async function generateMigration(
   options: GenerateMigrationOptions = {},
 ): Promise<GenerateMigrationResult> {
   const snakeName = normalizeSnakeName(name);
+  validateMigrationName(snakeName);
   const migrateDir = join(root, "db", "migrate");
   const path = join(migrateDir, `${ts}_${snakeName}.ts`);
   // Check existence upfront so dry-run reflects what a real run would do.
