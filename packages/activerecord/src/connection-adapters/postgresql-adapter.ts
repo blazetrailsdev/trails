@@ -1752,10 +1752,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return Notifications.instrumentAsync("sql.active_record", payload, () =>
       this.withClient(async (client) => {
         try {
-          const result = await client.query(pgSql, pgBinds.length > 0 ? pgBinds : undefined);
-          const count = result.rowCount ?? 0;
+          const result = await this._runQuery(client, pgSql, pgBinds, { rowMode: "array" });
+          const count = result.rowCount ?? result.rows.length;
           payload.row_count = count;
-          return count;
+          return result;
         } catch (e: any) {
           payload.exception = e;
           payload.exception_object = e;
