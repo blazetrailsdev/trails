@@ -37,12 +37,11 @@ export async function arRunner(cwd: string, args: string[]): Promise<number> {
   }
 
   const env = DatabaseConfigurations.currentEnv();
-  const configs = DatabaseTasks.configsFor(env);
-  if (configs.length === 0) {
+  const dbConfig = DatabaseTasks.databaseConfiguration?.findDbConfig(env);
+  if (!dbConfig) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
   }
-  const dbConfig = configs.find((c) => c.name === "primary") ?? configs[0]!;
   try {
     await Base.establishConnection(dbConfig.configurationHash as { [key: string]: unknown });
   } catch (err) {
