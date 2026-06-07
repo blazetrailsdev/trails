@@ -309,9 +309,36 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "disconnect and clear reloadable connections are able to preempt other waiting threads",
       "clear reloadable connections creates new connections for waiting threads if necessary",
       "public connections access threadsafe",
+      "reap inactive",
+      "full pool blocking shares load interlock",
+      "checkout fairness",
+      "checkout fairness by group",
+      "pin connection synchronize the connection",
+      "pin connection nesting lock",
+      "pin connection nesting lock inverse",
     ],
     reason:
       "GVL / Ruby Thread semantics — concurrent connection tests cannot translate to single-threaded Node.js.",
+  },
+  {
+    testFile: "connection_pool_test.rb",
+    tests: ["new connection no query"],
+    reason: "Rails skips this test when in_memory_db? is true; TS always uses :memory: SQLite.",
+  },
+  {
+    testFile: "disconnected_test.rb",
+    tests: ["reconnects to execute statements when disconnected"],
+    reason:
+      "Rails wraps this entire test in `unless in_memory_db?`; TS always uses :memory: SQLite.",
+  },
+  {
+    testFile: "connection_management_test.rb",
+    tests: [
+      "connections are cleared even if inside a non-joinable transaction",
+      "cancel asynchronous queries if an exception is raised",
+    ],
+    reason:
+      "GVL / Ruby Thread semantics — first test pins across threads; second uses FutureResult (thread-based async queries).",
   },
   // --- Permanently not-portable: GVL / Ruby Thread + fork in mixed files ---
   // (load_async / FutureResult itself is already fully excluded above via the
