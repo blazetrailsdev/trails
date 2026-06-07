@@ -191,7 +191,7 @@ export class InsertAll {
       const merged = { ...this._scopeAttributes, ...row };
       if (timestamps) {
         for (const [col, val] of Object.entries(timestamps)) {
-          if (merged[col] == null) merged[col] = val;
+          if (!(col in merged)) merged[col] = val;
         }
       }
       return keysList.map((key) => fn(key, merged[key]));
