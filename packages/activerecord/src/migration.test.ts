@@ -2662,18 +2662,56 @@ describe("MigrationTest", () => {
       expect(new CM2().version).toBe("20230201120000");
     });
 
-    it.skip("copying migrations with timestamps to destination with timestamps in future", () => {
-      // BLOCKED: migration — migration runner gap in migration
-      // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-      // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-      /* filesystem-dependent */
+    it("copying migrations with timestamps to destination with timestamps in future", async () => {
+      const fs = await import("node:fs");
+      const path = await import("node:path");
+      const os = await import("node:os");
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-mig-future-"));
+      const src = path.join(root, "src");
+      const dst = path.join(root, "dst");
+      fs.mkdirSync(src, { recursive: true });
+      fs.mkdirSync(dst, { recursive: true });
+      // Destination already has a migration stamped far in the future.
+      const futureVersion = "99991231235959";
+      fs.writeFileSync(path.join(dst, `${futureVersion}_future_table.ts`), "// future\n");
+      fs.writeFileSync(path.join(src, "1_create_horses.ts"), "// source\n");
+      try {
+        const copied = await Migration.copy(dst, { bukkits: src });
+        expect(copied).toHaveLength(1);
+        // Copied version must be renumbered past the future destination version.
+        expect(BigInt(copied[0]!.version) > BigInt(futureVersion)).toBe(true);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
     });
 
-    it.skip("copying migrations preserving magic comments", () => {
-      // BLOCKED: migration — migration runner gap in migration
-      // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-      // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-      /* filesystem-dependent */
+    it("copying migrations preserving magic comments", async () => {
+      const fs = await import("node:fs");
+      const path = await import("node:path");
+      const os = await import("node:os");
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-mig-magic-"));
+      const src = path.join(root, "src");
+      const dst = path.join(root, "dst");
+      fs.mkdirSync(src, { recursive: true });
+      fs.mkdirSync(dst, { recursive: true });
+      // Source migration opens with a magic-comment directive.
+      fs.writeFileSync(
+        path.join(src, "1_create_horses.ts"),
+        "// @ts-nocheck\nexport class CreateHorses {}\n",
+      );
+      try {
+        const copied = await Migration.copy(dst, { bukkits: src });
+        expect(copied).toHaveLength(1);
+        const body = fs.readFileSync(copied[0]!.filename!, "utf8");
+        // Magic comment must come before the provenance line.
+        expect(body).toMatch(/^\/\/ @ts-nocheck\n/);
+        expect(body).toContain("// This migration comes from bukkits");
+        expect(body.indexOf("// @ts-nocheck")).toBeLessThan(
+          body.indexOf("// This migration comes from"),
+        );
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
     });
 
     it("skipping migrations", () => {
@@ -2685,25 +2723,68 @@ describe("MigrationTest", () => {
       expect(new CM1().name).toBe("CM1");
     });
 
-    it.skip("skip is not called if migrations are from the same plugin", () => {
-      // BLOCKED: migration — migration runner gap in migration
-      // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-      // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-      /* plugin system not implemented */
+    it("skip is not called if migrations are from the same plugin", async () => {
+      const fs = await import("node:fs");
+      const path = await import("node:path");
+      const os = await import("node:os");
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-mig-same-plugin-"));
+      const src = path.join(root, "src");
+      const dst = path.join(root, "dst");
+      fs.mkdirSync(src, { recursive: true });
+      fs.mkdirSync(dst, { recursive: true });
+      fs.writeFileSync(path.join(src, "1_create_articles.ts"), "// source\n");
+      // Destination already has the same migration under the same scope.
+      fs.writeFileSync(path.join(dst, "20100101000000_create_articles.bukkits.ts"), "// dst\n");
+      try {
+        const onSkip = vi.fn();
+        const copied = await Migration.copy(dst, { bukkits: src }, { onSkip });
+        expect(copied).toHaveLength(0);
+        // onSkip must NOT fire when the duplicate is from the same plugin.
+        expect(onSkip).not.toHaveBeenCalled();
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
     });
 
-    it.skip("copying migrations to non existing directory", () => {
-      // BLOCKED: migration — migration runner gap in migration
-      // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-      // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-      /* filesystem-dependent */
+    it("copying migrations to non existing directory", async () => {
+      const fs = await import("node:fs");
+      const path = await import("node:path");
+      const os = await import("node:os");
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-mig-nonexist-"));
+      const src = path.join(root, "src");
+      const dst = path.join(root, "does-not-exist");
+      fs.mkdirSync(src, { recursive: true });
+      fs.writeFileSync(path.join(src, "1_create_horses.ts"), "// source\n");
+      try {
+        expect(fs.existsSync(dst)).toBe(false);
+        const copied = await Migration.copy(dst, { bukkits: src });
+        expect(copied).toHaveLength(1);
+        expect(fs.existsSync(dst)).toBe(true);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
     });
 
-    it.skip("copying migrations to empty directory", () => {
-      // BLOCKED: migration — migration runner gap in migration
-      // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-      // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-      /* filesystem-dependent */
+    it("copying migrations to empty directory", async () => {
+      const fs = await import("node:fs");
+      const path = await import("node:path");
+      const os = await import("node:os");
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-mig-empty-dst-"));
+      const src = path.join(root, "src");
+      const dst = path.join(root, "dst");
+      fs.mkdirSync(src, { recursive: true });
+      fs.mkdirSync(dst, { recursive: true });
+      fs.writeFileSync(path.join(src, "1_create_horses.ts"), "// source\n");
+      fs.writeFileSync(path.join(src, "2_create_riders.ts"), "// source2\n");
+      try {
+        const copied = await Migration.copy(dst, { bukkits: src });
+        expect(copied).toHaveLength(2);
+        for (const m of copied) {
+          expect(m.scope).toBe("bukkits");
+        }
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
     });
 
     it("check pending with stdlib logger", async () => {

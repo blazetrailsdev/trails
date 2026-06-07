@@ -1518,7 +1518,12 @@ export abstract class Migration {
         };
         last = copy;
 
-        fs.writeFileSync(newPath, `${inserted}${body}`);
+        // Preserve magic-comment directives (// @ts-check, #!/usr/bin/env) before
+        // the provenance line, mirroring Rails' encoding-comment handling.
+        const magicMatch = /^((?:(?:\/\/ @[^\n]*|#!\/[^\n]*)\n)+)/.exec(body);
+        const magic = magicMatch ? magicMatch[1]! : "";
+        const rest = magic.length > 0 ? body.slice(magic.length) : body;
+        fs.writeFileSync(newPath, `${magic}${inserted}${rest}`);
         copied.push(copy);
         options.onCopy?.(scope, copy, oldPath);
         destinationMigrations.push(copy);
