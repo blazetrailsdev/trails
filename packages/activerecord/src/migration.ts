@@ -1518,9 +1518,10 @@ export abstract class Migration {
         };
         last = copy;
 
-        // Preserve magic-comment directives (// @ts-check, #!/usr/bin/env) before
-        // the provenance line, mirroring Rails' encoding-comment handling.
-        const magicMatch = /^((?:(?:\/\/ @[^\n]*|#!\/[^\n]*)\n)+\n?)/.exec(body);
+        // Preserve TS compiler magic directives (// @ts-check, // @ts-nocheck)
+        // before the provenance line, mirroring Rails' frozen_string_literal /
+        // encoding handling (migration.rb:1082).
+        const magicMatch = /^((?:\/\/ @ts-(?:no)?check[^\n]*\n)+\n?)/.exec(body);
         const magic = magicMatch ? magicMatch[1]! : "";
         const rest = magic.length > 0 ? body.slice(magic.length) : body;
         fs.writeFileSync(newPath, `${magic}${inserted}${rest}`);

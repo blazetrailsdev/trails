@@ -2680,6 +2680,10 @@ describe("MigrationTest", () => {
         expect(copied).toHaveLength(1);
         // Copied version must be renumbered past the future destination version.
         expect(BigInt(copied[0]!.version) > BigInt(futureVersion)).toBe(true);
+        expect(fs.existsSync(copied[0]!.filename!)).toBe(true);
+        // Second copy must detect the renumbered migration as a duplicate.
+        const copied2 = await Migration.copy(dst, { bukkits: src });
+        expect(copied2).toHaveLength(0);
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }
@@ -2761,6 +2765,7 @@ describe("MigrationTest", () => {
         const copied = await Migration.copy(dst, { bukkits: src });
         expect(copied).toHaveLength(1);
         expect(fs.existsSync(dst)).toBe(true);
+        expect(fs.existsSync(copied[0]!.filename!)).toBe(true);
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }
@@ -2782,6 +2787,7 @@ describe("MigrationTest", () => {
         expect(copied).toHaveLength(2);
         for (const m of copied) {
           expect(m.scope).toBe("bukkits");
+          expect(fs.existsSync(m.filename!)).toBe(true);
         }
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
