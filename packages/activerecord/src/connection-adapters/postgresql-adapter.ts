@@ -67,6 +67,7 @@ import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   transactionIsolationLevels,
   typeCastedBinds,
+  preprocessQuery,
   temporalToBindString,
   extractTableRefFromInsertSql,
 } from "./abstract/database-statements.js";
@@ -1735,12 +1736,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     _allowRetry = false,
     materializeTransactions = true,
   ): Promise<unknown> {
+    sql = preprocessQuery.call(this as any, sql);
     if (materializeTransactions) await this.materializeTransactions();
+    const tcBinds = typeCastedBinds(binds);
     const payload: Record<string, unknown> = {
       sql,
       name,
-      binds: [],
-      type_casted_binds: [],
+      binds,
+      type_casted_binds: tcBinds,
       connection: this,
       row_count: 0,
     };
