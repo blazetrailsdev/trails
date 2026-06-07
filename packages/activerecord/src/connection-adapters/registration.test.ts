@@ -18,8 +18,9 @@ describe("RegistrationTest", () => {
   });
 
   it("#register allows for symbol key", async () => {
-    // TS has no Ruby Symbol type; adapter names are always strings.
-    // This mirrors the Rails symbol-key register variant using a distinct key.
+    // TS has no Ruby Symbol type; register(:fake) → register("fake") interop cannot be
+    // reproduced. This effectively duplicates test 1; the sole value is the distinct key
+    // proving the registry isn't keyed on object identity.
     const name = "fake_reg_b";
     const err = await ConnectionAdapters.resolve(name).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(AdapterNotFound);
@@ -32,8 +33,9 @@ describe("RegistrationTest", () => {
   });
 
   it("#resolve allows for symbol key", async () => {
-    // TS has no Ruby Symbol type; adapter names are always strings.
-    // This mirrors the Rails symbol-key resolve variant using a distinct key.
+    // TS has no Ruby Symbol type; register("fake") + resolve(:fake) interop cannot be
+    // reproduced. This effectively duplicates test 1; the sole value is the distinct key
+    // proving the registry isn't keyed on object identity.
     const name = "fake_reg_c";
     const err = await ConnectionAdapters.resolve(name).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(AdapterNotFound);
