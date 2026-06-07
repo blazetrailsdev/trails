@@ -101,6 +101,18 @@ describe("PostgreSQLAdapter#execQuery", () => {
     expect(result).toBeInstanceOf(Result);
     expect(result.columnTypes.guid).toBeInstanceOf(Uuid);
   });
+
+  it("does not materialize a pending lazy transaction", async () => {
+    adapter = makeAdapter(async () => ({ rows: [], fields: [] }));
+    const materializeSpy = vi
+      .spyOn(
+        adapter as unknown as { materializeTransactions: () => Promise<void> },
+        "materializeTransactions",
+      )
+      .mockResolvedValue(undefined);
+    await adapter.execQuery("SELECT 1");
+    expect(materializeSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe("PostgreSQLAdapter#lookupCastTypeFromColumn", () => {
