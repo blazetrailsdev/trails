@@ -1278,6 +1278,125 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
   });
 });
 
+describe("DatabaseTasksReconstructFromSchemaTest", () => {
+  // Mirrors Rails: database_tasks.rb:413-425
+  // with_temporary_pool(db_config, clobber: true) wrapping the full branch.
+  const config = new HashConfig("test", "primary", { adapter: "sqlite3", database: "test.db" });
+  let tmpDir: string;
+  let schemaFile: string;
+  let withTemporaryPoolSpy: MockInstance;
+  let schemaUpToDateSpy: MockInstance;
+  let truncateTablesSpy: MockInstance;
+  let purgeSpy: MockInstance;
+  let loadSchemaSpy: MockInstance;
+  let createSpy: MockInstance;
+
+  beforeEach(() => {
+    // checkSchemaFile now checks existence — use a real temp file.
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-rfs-"));
+    schemaFile = path.join(tmpDir, "schema.ts");
+    fs.writeFileSync(schemaFile, "");
+
+    // Bypass real pool establishment — call the callback immediately.
+    withTemporaryPoolSpy = vi
+      .spyOn(DatabaseTasks, "withTemporaryPool")
+      .mockImplementation((_config: any, fn: any) => fn(null));
+    truncateTablesSpy = vi.spyOn(DatabaseTasks, "truncateTables").mockResolvedValue(undefined);
+    purgeSpy = vi.spyOn(DatabaseTasks, "purge").mockResolvedValue(undefined);
+    loadSchemaSpy = vi.spyOn(DatabaseTasks, "loadSchema").mockResolvedValue(undefined);
+    createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("resolves file via schemaDumpPath(config, format) when file is not provided", async () => {
+    // Rails: file ||= schema_dump_path(db_config, format) — format must be threaded through.
+    const schemaDumpPathSpy = vi.spyOn(DatabaseTasks, "schemaDumpPath").mockReturnValue(schemaFile);
+    schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(true);
+    await DatabaseTasks.reconstructFromSchema(config, "ts");
+    expect(schemaDumpPathSpy).toHaveBeenCalledWith(config, "ts");
+    expect(schemaUpToDateSpy).toHaveBeenCalledWith(config, "ts", schemaFile);
+    expect(truncateTablesSpy).toHaveBeenCalledWith(config);
+  });
+
+  it("raises before establishing pool when file path is blank", async () => {
+    // Rails: check_schema_file only does File.exist? — no blank-string branch.
+    // existsSync("") === false, so it throws the "doesn't exist yet" message.
+    await expect(DatabaseTasks.reconstructFromSchema(config, "ts", "")).rejects.toThrow(
+      /doesn't exist yet/,
+    );
+    expect(withTemporaryPoolSpy).not.toHaveBeenCalled();
+  });
+
+  it("raises before establishing pool when file does not exist", async () => {
+    // Rails: check_schema_file calls File.exist? and aborts on missing file.
+    await expect(
+      DatabaseTasks.reconstructFromSchema(config, "ts", path.join(tmpDir, "missing.ts")),
+    ).rejects.toThrow(/missing\.ts/);
+    expect(withTemporaryPoolSpy).not.toHaveBeenCalled();
+  });
+
+  it("truncates tables when schema is up to date", async () => {
+    // Warm-DB fast path: schema_up_to_date? → truncate_tables
+    schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(true);
+    await DatabaseTasks.reconstructFromSchema(config, "ts", schemaFile);
+    expect(withTemporaryPoolSpy).toHaveBeenCalledWith(config, expect.any(Function));
+    expect(schemaUpToDateSpy).toHaveBeenCalledWith(config, "ts", schemaFile);
+    expect(truncateTablesSpy).toHaveBeenCalledWith(config);
+    expect(purgeSpy).not.toHaveBeenCalled();
+    expect(loadSchemaSpy).not.toHaveBeenCalled();
+  });
+
+  it("skips truncate when SKIP_TEST_DATABASE_TRUNCATE is set", async () => {
+    // Rails: truncate_tables(db_config) unless ENV["SKIP_TEST_DATABASE_TRUNCATE"]
+    schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(true);
+    const prev = process.env.SKIP_TEST_DATABASE_TRUNCATE;
+    process.env.SKIP_TEST_DATABASE_TRUNCATE = "1";
+    try {
+      await DatabaseTasks.reconstructFromSchema(config, "ts", schemaFile);
+      expect(truncateTablesSpy).not.toHaveBeenCalled();
+      expect(purgeSpy).not.toHaveBeenCalled();
+      expect(loadSchemaSpy).not.toHaveBeenCalled();
+    } finally {
+      if (prev === undefined) delete process.env.SKIP_TEST_DATABASE_TRUNCATE;
+      else process.env.SKIP_TEST_DATABASE_TRUNCATE = prev;
+    }
+  });
+
+  it("purges and loads schema when schema is not up to date", async () => {
+    // Cold path: !schema_up_to_date? → purge + load_schema
+    schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(false);
+    await DatabaseTasks.reconstructFromSchema(config, "ts", schemaFile);
+    expect(withTemporaryPoolSpy).toHaveBeenCalledWith(config, expect.any(Function));
+    expect(purgeSpy).toHaveBeenCalledWith(config);
+    expect(loadSchemaSpy).toHaveBeenCalledWith(config, "ts", schemaFile);
+    expect(truncateTablesSpy).not.toHaveBeenCalled();
+  });
+
+  it("creates database and loads schema on NoDatabaseError", async () => {
+    // rescue NoDatabaseError → create + load_schema
+    schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(false);
+    purgeSpy.mockRejectedValue(new NoDatabaseError());
+    await DatabaseTasks.reconstructFromSchema(config, "ts", schemaFile);
+    expect(createSpy).toHaveBeenCalledWith(config);
+    expect(loadSchemaSpy).toHaveBeenCalledWith(config, "ts", schemaFile);
+    expect(truncateTablesSpy).not.toHaveBeenCalled();
+  });
+
+  it("re-raises non-database errors", async () => {
+    schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(false);
+    const boom = new Error("connection refused");
+    purgeSpy.mockRejectedValue(boom);
+    await expect(DatabaseTasks.reconstructFromSchema(config, "ts", schemaFile)).rejects.toThrow(
+      boom,
+    );
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+});
+
 describe("DatabaseTasksCharsetTest", () => {
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
@@ -1374,8 +1493,12 @@ describe("DatabaseTaskCheckTargetVersionTest", () => {
 
 describe("DatabaseTasksCheckSchemaFileTest", () => {
   it("check schema file", () => {
-    expect(() => DatabaseTasks.checkSchemaFile("")).toThrow();
-    expect(() => DatabaseTasks.checkSchemaFile("db/schema.ts")).not.toThrow();
+    // Rails: assert_called_with(Kernel, :abort, [/awesome-file.sql/]) — aborts when file missing.
+    // No blank-string branch: Rails only does File.exist?, so "" flows through the same path.
+    expect(() => DatabaseTasks.checkSchemaFile("nonexistent-awesome-file.sql")).toThrow(
+      /nonexistent-awesome-file\.sql/,
+    );
+    expect(() => DatabaseTasks.checkSchemaFile("")).toThrow(/doesn't exist yet/);
   });
 });
 
@@ -1400,6 +1523,13 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
   it("check dump filename with schema env", () => {
     process.env.SCHEMA = "custom.rb";
     expect(DatabaseTasks.dumpSchemaFilename()).toBe("custom.rb");
+  });
+
+  it("check dump filename preserves raw SCHEMA value including whitespace", () => {
+    // Rails: `return ENV["SCHEMA"] if ENV["SCHEMA"]` — returns raw value when set.
+    // Empty string is truthy in Ruby, so SCHEMA="" returns ""; SCHEMA="  f  " returns "  f  ".
+    process.env.SCHEMA = "  custom.rb  ";
+    expect(DatabaseTasks.dumpSchemaFilename()).toBe("  custom.rb  ");
   });
 
   it("check dump filename defaults for non primary databases", () => {
