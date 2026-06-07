@@ -401,7 +401,7 @@ function orderBang(
   this: QueryMethodsHost,
   ...args: Array<
     | string
-    | Record<string, "asc" | "desc">
+    | Record<string, "asc" | "desc" | "ASC" | "DESC">
     | Nodes.Node
     | string[]
     | [Nodes.Node, ...unknown[]]
@@ -486,7 +486,7 @@ function reorderBang(
   this: QueryMethodsHost,
   ...args: Array<
     | string
-    | Record<string, "asc" | "desc">
+    | Record<string, "asc" | "desc" | "ASC" | "DESC">
     | Nodes.Node
     | string[]
     | [Nodes.Node, ...unknown[]]
