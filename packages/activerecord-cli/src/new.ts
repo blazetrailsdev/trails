@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "fs/promises";
 import { dirname, join } from "path";
-import { init, DB_GLUE_NODE_SQLITE } from "./init.js";
+import { init } from "./init.js";
 
 export type Driver = "better-sqlite3" | "node-sqlite" | "pg" | "mysql2";
 
@@ -131,8 +131,6 @@ export async function arNew(
   const overrides: Record<string, string> = {
     "config/database.ts": databaseConfig(appName, driver),
   };
-  // node-sqlite must be explicitly registered before establishConnection().
-  if (driver === "node-sqlite") overrides["db.ts"] = DB_GLUE_NODE_SQLITE;
 
   const initResult = await init(appDir, {
     force,

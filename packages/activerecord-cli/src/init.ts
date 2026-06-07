@@ -26,27 +26,6 @@ export default config;
 // generator on a freshly-`init`ed project (or `--check` in CI) reports no drift.
 const MODELS_INDEX = renderManifest([]);
 
-// node-sqlite is a Node.js built-in (22.5+) — no npm install needed, but the
-// driver must be registered explicitly before establishConnection() is called.
-export const DB_GLUE_NODE_SQLITE = `import "@blazetrails/activerecord/sqlite/node-sqlite";
-import { Base } from "@blazetrails/activerecord";
-import { models } from "./app/models/index.js";
-
-let connected = false;
-
-/**
- * Establish the connection and reflect each model's columns (idempotent).
- * \`establishConnection()\` reads \`config/database.ts\` for the current
- * \`TRAILS_ENV\`. Run after migrating, before any read/write.
- */
-export async function connect(): Promise<void> {
-  if (connected) return;
-  await Base.establishConnection();
-  await Promise.all(models.map((m) => m.loadSchema()));
-  connected = true;
-}
-`;
-
 const DB_GLUE = `import { Base } from "@blazetrails/activerecord";
 import { models } from "./app/models/index.js";
 
@@ -64,6 +43,11 @@ export async function connect(): Promise<void> {
   connected = true;
 }
 `;
+
+// node-sqlite is a Node.js built-in (22.5+) — no npm install needed, but the
+// driver must be registered explicitly before establishConnection() is called.
+export const DB_GLUE_NODE_SQLITE =
+  `import "@blazetrails/activerecord/sqlite/node-sqlite";\n` + DB_GLUE;
 
 const DB_SEEDS = `/**
  * Idempotent seed data — the analog of Rails' \`db/seeds.rb\`, run by
