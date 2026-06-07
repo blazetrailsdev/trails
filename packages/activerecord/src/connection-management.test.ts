@@ -73,10 +73,10 @@ describe("ConnectionManagementTest", () => {
   });
 
   it.skip("connections are cleared even if inside a non-joinable transaction", () => {
-    // BLOCKED: connection-pool — pin_connection!/unpin_connection! not yet ported (Phase 6 blocker).
-    // Rails pins the connection on the main thread, then asserts a separate
-    // thread's lease is cleared on body close. Unblocks when pinConnectionBang/
-    // unpinConnectionBang land — see project_phase6_pin_connection_blocker.
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — Thread
+    // Rails pins the connection on the MAIN thread then checks a SEPARATE thread's
+    // lease is cleared on body close. Node.js has no threads; the multi-thread
+    // lifecycle cannot be reproduced.
   });
 
   it("active connections are not cleared on body close during transaction", async () => {
@@ -112,9 +112,9 @@ describe("ConnectionManagementTest", () => {
   });
 
   it.skip("cancel asynchronous queries if an exception is raised", () => {
-    // BLOCKED: load-async — asynchronous queries (select_all async:) / FutureResult not yet
-    // ported. Rails asserts an in-flight async query is canceled when the app
-    // raises. Unblocks with async-query support in the abstract adapter.
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — FutureResult
+    // Rails uses `select_all async: true` / FutureResult (thread-based async queries).
+    // Node.js has no equivalent; async queries run on the JS event loop, not threads.
   });
 
   it("doesn't clear active connections when running in a test case", () => {
