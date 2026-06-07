@@ -866,7 +866,7 @@ export class Relation<T extends Base> {
       | Map<Nodes.Node | string, "asc" | "desc" | "ASC" | "DESC">
     >
   ): Relation<T> {
-    return this._clone().orderBang(...(args as any));
+    return this._clone().orderBang(...args);
   }
 
   /**
@@ -993,7 +993,7 @@ export class Relation<T extends Base> {
       | Map<Nodes.Node | string, "asc" | "desc" | "ASC" | "DESC">
     >
   ): Relation<T> {
-    return this._clone().reorderBang(...(args as any));
+    return this._clone().reorderBang(...args);
   }
 
   /**
