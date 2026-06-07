@@ -1738,19 +1738,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   ): Promise<unknown> {
     sql = preprocessQuery.call(this as any, sql);
     if (materializeTransactions) await this.materializeTransactions();
-    const tcBinds = typeCastedBinds(binds);
+    // Mirrors PG exec_query/execute_mutation bind path: type-cast → _bindForPg → rewriteBinds.
+    const pgBinds = binds.length > 0 ? typeCastedBinds(binds).map((v) => this._bindForPg(v)) : [];
+    const pgSql = binds.length > 0 ? this.rewriteBinds(sql, pgBinds) : sql;
     const payload: Record<string, unknown> = {
-      sql,
+      sql: pgSql,
       name,
-      binds,
-      type_casted_binds: tcBinds,
+      binds: pgBinds,
+      type_casted_binds: pgBinds,
       connection: this,
       row_count: 0,
     };
     return Notifications.instrumentAsync("sql.active_record", payload, () =>
       this.withClient(async (client) => {
         try {
-          const result = await client.query(sql, binds.length > 0 ? (binds as any[]) : undefined);
+          const result = await client.query(pgSql, pgBinds.length > 0 ? pgBinds : undefined);
           const count = result.rowCount ?? 0;
           payload.row_count = count;
           return count;
