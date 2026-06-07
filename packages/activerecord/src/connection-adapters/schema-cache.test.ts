@@ -117,12 +117,10 @@ describe("SchemaCacheTest", () => {
     expect(cols!["id"]).toBeInstanceOf(Column);
   });
   it.skip("yaml loads 5 1 dump", () => {
-    // SKIPPED:rails-specific — exercises a fixture written by Rails 5.1's
-    // YAML serializer (test/assets/schema_dump_5_1.yml). Trails uses JSON
-    // throughout the schema cache, so the on-disk shape can't round-trip.
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
   });
   it.skip("yaml loads 5 1 dump without indexes still queries for indexes", () => {
-    // SKIPPED:rails-specific — see "yaml loads 5 1 dump".
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
   });
 
   it("primary key for existent table", async () => {
