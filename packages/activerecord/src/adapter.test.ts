@@ -416,15 +416,53 @@ describe("AdapterConnectionTest", () => {
     expect(blockCalled).toBe(true);
     expect(a.active).toBe(true);
   });
-  it.skip("querying after a failed non-retryable query restores and succeeds", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts: non-retryable execute raises ConnectionFailed; next idempotent query reconnects
-    // SCOPE: ~20 LOC; affects ~5 tests
+  // eslint-disable-next-line blazetrails/test-fixture-parity -- tests abstract loop directly; no AR model / DB needed
+  it("querying after a failed non-retryable query restores and succeeds", async () => {
+    const adapter = new LifecycleTestAdapter();
+    adapter.simulateConnect();
+    adapter.remoteDisconnect();
+
+    // Non-retryable query (allowRetry: false) fails; marks connection unverified.
+    await expect(
+      adapter.withRawConnection({ allowRetry: false, materializeTransactions: false }, async () => {
+        throw new ConnectionFailed("remote disconnect");
+      }),
+    ).rejects.toBeInstanceOf(ConnectionFailed);
+
+    // Verifying the connection causes a reconnect and the query succeeds.
+    let reconnected = false;
+    await adapter.withRawConnection(
+      { allowRetry: false, materializeTransactions: false },
+      async () => {
+        reconnected = adapter.active;
+      },
+    );
+    expect(reconnected).toBe(true);
+    expect(adapter.active).toBe(true);
   });
-  it.skip("idempotent SELECT queries are retried and result in a reconnect", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts: idempotent SELECT auto-retry on ConnectionFailed not implemented
-    // SCOPE: ~25 LOC; affects ~5 tests
+  it("idempotent SELECT queries are retried and result in a reconnect", async () => {
+    const adapter = new LifecycleTestAdapter();
+    adapter.simulateConnect();
+    adapter.remoteDisconnect();
+
+    // allowRetry: true — ConnectionFailed triggers a reconnect and re-run.
+    await adapter.withRawConnection(
+      { allowRetry: true, materializeTransactions: false },
+      async () => {
+        if (!adapter.active) throw new ConnectionFailed("remote disconnect");
+      },
+    );
+    expect(adapter.active).toBe(true);
+
+    adapter.remoteDisconnect();
+
+    await adapter.withRawConnection(
+      { allowRetry: true, materializeTransactions: false },
+      async () => {
+        if (!adapter.active) throw new ConnectionFailed("remote disconnect");
+      },
+    );
+    expect(adapter.active).toBe(true);
   });
   it("#find and #find_by queries with known attributes are retried and result in a reconnect", async () => {
     const adapter = new QueryTestAdapter();
