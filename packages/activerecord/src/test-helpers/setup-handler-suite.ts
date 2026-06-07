@@ -1,5 +1,5 @@
 import { beforeAll, afterAll } from "vitest";
-import { bootstrapTestHandler } from "./bootstrap-test-handler.js";
+import { establishFromTestConfig } from "./test-database-config.js";
 import { pushSkipGlobalReset, popSkipGlobalReset } from "./skip-global-reset.js";
 
 /**
@@ -14,7 +14,7 @@ import { pushSkipGlobalReset, popSkipGlobalReset } from "./skip-global-reset.js"
  */
 export function setupHandlerSuite(): void {
   beforeAll(async () => {
-    await bootstrapTestHandler();
+    await establishFromTestConfig();
     pushSkipGlobalReset();
   });
   afterAll(() => {

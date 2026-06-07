@@ -6,9 +6,11 @@
  * `reconstructFromSchema` can use the real Rails-mirrored path.
  *
  * Phase 1 of RFC 0002 — new file, no consumer changes.
+ * Phase 2 of RFC 0002 — adds `establishFromTestConfig` for setupHandlerSuite.
  */
 
 import { getEnv } from "@blazetrails/activesupport";
+import { Base } from "../base.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
@@ -44,8 +46,9 @@ function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfi
 /**
  * Build the test `DatabaseConfigurations`, assign it to
  * `DatabaseTasks.databaseConfiguration`, and register the adapter task
- * handler. Safe to call multiple times — subsequent calls are idempotent
- * if the env vars haven't changed.
+ * handler. Called once from `test-setup-dy.ts` during worker startup;
+ * the registration runs on every call so callers that clear
+ * `_registeredTasks` (e.g. `database-tasks.test.ts`) can re-register.
  */
 export async function buildTestDatabaseConfig(): Promise<TestDatabaseConfig> {
   const { adapter, envConfig } = resolve();
@@ -71,4 +74,31 @@ export async function buildTestDatabaseConfig(): Promise<TestDatabaseConfig> {
   }
 
   return { configs, adapter, envConfig };
+}
+
+/**
+ * Re-establish `Base`'s connection handler from the env-var config if not
+ * already connected. Called by `setupHandlerSuite` so handler-path test files
+ * get a live pool without knowing which adapter the worker is using.
+ * Idempotent — a no-op when already connected.
+ *
+ * Intentionally does NOT call `buildTestDatabaseConfig` — that would set
+ * `DatabaseTasks.databaseConfiguration`, contaminating tests in
+ * `database-tasks.test.ts` that rely on it being null. This function only
+ * re-establishes `Base`'s connection; `DatabaseTasks` state is left as-is.
+ */
+export async function establishFromTestConfig(): Promise<void> {
+  if (Base.isConnectedQ()) return;
+  const pgUrl = getEnv("PG_TEST_URL");
+  if (pgUrl) {
+    await Base.establishConnection(pgUrl);
+    return;
+  }
+  const mysqlUrl = getEnv("MYSQL_TEST_URL");
+  if (mysqlUrl) {
+    await Base.establishConnection(mysqlUrl);
+    return;
+  }
+  const database = getEnv("AR_TEST_WORKER_DB") ?? ":memory:";
+  await Base.establishConnection({ adapter: "sqlite3", database, pool: 1 });
 }
