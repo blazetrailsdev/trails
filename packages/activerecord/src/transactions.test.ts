@@ -961,9 +961,18 @@ describe("TransactionTest", () => {
     const reloaded = (await Topic.find(first.id)) as any;
     expect(reloaded.approved).toBe(false);
   });
-  it.skip("update should rollback on failure!", () => {
-    // BLOCKED: connection-pool — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
+  it("update should rollback on failure!", async () => {
+    const { RecordInvalid } = await import("./index.js");
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    Post.validates("title", { presence: true });
+    const post = (await Post.create({ title: "original" })) as any;
+    await expect(post.updateBang({ title: "" })).rejects.toThrow(RecordInvalid);
+    const reloaded = (await Post.find(post.id)) as any;
+    expect(reloaded.title).toBe("original");
   });
   it("manually rolling back a transaction", async () => {
     class Topic extends Base {
@@ -1499,7 +1508,8 @@ describe("TransactionTest", () => {
     // Pool connection eviction — pool internals not accessible.
   });
   it.skip("connection removed from pool when thread killed in begin after successfully beginning a transaction", () => {
-    // Requires Ruby Thread.kill semantics — not available in JS.
+    // PERMANENT-SKIP: Ruby Thread semantics — Thread.kill aborts a thread
+    // mid-transaction; JS is single-threaded with no equivalent kill primitive.
   });
   it.skip("rollback dirty changes then retry save on new record with autosave association", () => {
     // Autosave associations not yet ported.
@@ -1508,7 +1518,9 @@ describe("TransactionTest", () => {
     // Calls private Ruby method send(:add_to_transaction) — not exposed.
   });
   it.skip("deprecation on ruby timeout outside inner transaction", () => {
-    // Requires Ruby catch/throw non-local exit — not available in JS.
+    // PERMANENT-SKIP: Ruby catch/throw semantics — `catch(:abort)` /
+    // `throw(:abort)` is non-exceptional control flow in Ruby; JS has no
+    // equivalent, and Timeout is Ruby-stdlib with no Node.js counterpart.
   });
   it("transaction state is cleared when record is persisted", async () => {
     class Post extends Base {
@@ -1534,7 +1546,8 @@ describe("TransactionTest", () => {
     // fixture SAVEPOINT wrapper.
   });
   it.skip("rollback when thread killed", () => {
-    // Requires Ruby Thread.kill semantics — not available in JS.
+    // PERMANENT-SKIP: Ruby Thread semantics — Thread.kill aborts a thread
+    // mid-transaction; JS is single-threaded with no equivalent kill primitive.
   });
   it("assign custom primary key after rollback", async () => {
     const { Movie } = makeSQLiteMovie();
@@ -1981,10 +1994,12 @@ describe("TransactionUUIDTest", () => {
 // ==========================================================================
 describe("ConcurrentTransactionTest", () => {
   it.skip("transaction per thread", () => {
-    // Requires Ruby Thread semantics — JS is single-threaded.
+    // PERMANENT-SKIP: Ruby Thread semantics — spawns two threads asserting
+    // per-thread transaction isolation; JS is single-threaded.
   });
   it.skip("transaction isolation  read committed", () => {
-    // Requires Ruby Thread semantics — JS is single-threaded.
+    // PERMANENT-SKIP: Ruby Thread semantics — uses Thread.new to assert
+    // READ COMMITTED isolation across concurrent threads; JS is single-threaded.
   });
 });
 
@@ -1993,7 +2008,8 @@ describe("ConcurrentTransactionTest", () => {
 // ==========================================================================
 describe("TransactionTest", () => {
   it.skip("after current transaction commit multidb nested transactions", () => {
-    // Requires multi-database setup (ARUnit2Model) — not available.
+    // PERMANENT-SKIP: requires ARUnit2Model secondary DB connection
+    // (multi-database setup) — not available in single-database test env.
   });
 });
 
