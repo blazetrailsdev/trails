@@ -419,7 +419,12 @@ export interface AbstractAdapter {
   // --- Members previously only on DatabaseAdapter interface ---
   // Declaring them here makes AbstractAdapter a structural superset of
   // DatabaseAdapter, prerequisite for collapsing the two types.
-  execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]>;
+  execute(
+    sql: string,
+    binds?: unknown[],
+    name?: string,
+    opts?: { allowRetry?: boolean },
+  ): Promise<Record<string, unknown>[]>;
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
   beginTransaction(): Promise<void>;
   commit(): Promise<void>;
@@ -495,7 +500,6 @@ export class AbstractAdapter implements Quoting {
   // exec paths (PR 25b) and reconnect-with-restore (Wave 6 follow-up);
   // the default-false here matches Rails' fresh-adapter state.
   protected _rawConnectionDirty = false;
-  private _lockQueue: Promise<unknown> = Promise.resolve();
   protected _config: Record<string, unknown> = {};
   _transactionManager: TransactionManager = new TransactionManager(this as any);
 
@@ -1854,10 +1858,18 @@ export class AbstractAdapter implements Quoting {
       }
     };
 
-    const prev = this._lockQueue;
-    const next = prev.then(run, run);
-    this._lockQueue = next.catch(() => undefined);
-    return next as Promise<T>;
+    // withRawConnection and the transaction manager share ONE reentrant lock,
+    // mirroring Rails where a single @lock.synchronize wraps both
+    // with_raw_connection (abstract_adapter.rb:984) and every TransactionManager
+    // critical section (abstract/transaction.rb). Using two separate locks
+    // deadlocks (ABBA): a bare write takes the raw lock then materialize_
+    // transactions wants the tx lock, while a transaction block holds the tx
+    // lock then its inner write wants the raw lock. Routing through
+    // synchronize() — which is reentrant per async chain — collapses them into
+    // one lock, so materialize_transactions and a write nested inside a
+    // transaction both re-enter directly (Rails' Monitor reentrancy,
+    // abstract_adapter.rb:972-981).
+    return this._transactionManager.synchronize(run);
   }
 
   /**

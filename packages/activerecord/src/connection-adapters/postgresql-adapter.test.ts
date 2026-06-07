@@ -69,6 +69,33 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.close();
   });
 
+  // Regression: withRawConnection and the transaction manager must share one
+  // reentrant lock (Rails' single @lock). With separate locks a transaction
+  // (holds the tx lock, then its write wants the raw lock) racing a bare write
+  // (holds the raw lock, then materializeTransactions wants the tx lock)
+  // deadlocks (ABBA) — the hang that routing writes through withRawConnection
+  // surfaced. See abstract-adapter.ts withRawConnection.
+  it("concurrent transaction and bare write do not deadlock", async () => {
+    await adapter.exec('DROP TABLE IF EXISTS "abba" CASCADE');
+    await adapter.exec('CREATE TABLE "abba" ("id" SERIAL PRIMARY KEY, "n" INT)');
+    const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+    // Transaction holds the lock, then (after a gap) writes — needs the raw lock.
+    const inTx = adapter.transaction(async () => {
+      await delay(150);
+      await adapter.executeMutation(`INSERT INTO "abba" ("n") VALUES (1)`);
+    });
+    // Bare write races into the gap: grabs the raw lock, then materialize wants
+    // the tx lock. Separate locks → ABBA deadlock; one shared lock → serializes.
+    const bare = (async () => {
+      await delay(50);
+      await adapter.executeMutation(`INSERT INTO "abba" ("n") VALUES (2)`);
+    })();
+    await Promise.all([inTx, bare]);
+    const rows = await adapter.execute(`SELECT COUNT(*)::int AS c FROM "abba"`);
+    expect(rows[0]["c"]).toBe(2);
+    await adapter.exec('DROP TABLE IF EXISTS "abba" CASCADE');
+  });
+
   // -- Basic adapter operations --
   describe("raw SQL execution", () => {
     it("creates tables and inserts data", async () => {

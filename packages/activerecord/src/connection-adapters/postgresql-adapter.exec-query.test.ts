@@ -230,3 +230,60 @@ describe("PostgreSQLAdapter#execQuery prepare override", () => {
     }
   });
 });
+
+describe("PostgreSQLAdapter#executeMutation", () => {
+  let adapter: PostgreSQLAdapter;
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    if (adapter) await adapter.close().catch(() => undefined);
+  });
+
+  it("savepoint nesting does not re-enter withRawConnection (_lockQueue)", async () => {
+    // executeMutation runs its RETURNING-retry savepoints via client.query()
+    // on the yielded conn — it does NOT call this.createSavepoint(), which
+    // would re-acquire withRawConnection. Verify the savepoint statements hit
+    // the yielded connection directly and that the outer lock is released
+    // cleanly (a second withRawConnection call queued immediately after must
+    // succeed without hanging).
+    const queries: string[] = [];
+    const fakeClient = {
+      query: async (arg: unknown) => {
+        queries.push(typeof arg === "string" ? arg : (arg as { text: string }).text);
+        return { rows: [{ id: 42 }], rowCount: 1, fields: [] };
+      },
+      release: () => {},
+    };
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+    vi.spyOn(adapter as unknown as { getClient: () => unknown }, "getClient").mockResolvedValue(
+      fakeClient,
+    );
+    // Mark verified so withRawConnection's verify/reconnect preamble is
+    // skipped — reconnect() would otherwise reset _inTransaction (the mock
+    // leaves _rawConnection null, which a live in-transaction adapter never
+    // does). Inside a transaction the bare-INSERT RETURNING-append path wraps
+    // the attempt in a SAVEPOINT so a RETURNING failure can roll back without
+    // poisoning the outer transaction (postgresql-adapter.ts:1405).
+    adapter.verifiedBang();
+    (adapter as unknown as { _inTransaction: boolean })._inTransaction = true;
+
+    const result = await adapter.executeMutation(
+      "INSERT INTO posts (title) VALUES ('test')",
+      [],
+      "SQL",
+    );
+    expect(typeof result).toBe("number");
+    // The savepoint dance ran on the yielded connection (not a nested
+    // withRawConnection): SAVEPOINT … then RELEASE SAVEPOINT bracket the insert.
+    expect(queries.some((q) => q.startsWith("SAVEPOINT "))).toBe(true);
+    expect(queries.some((q) => q.startsWith("RELEASE SAVEPOINT "))).toBe(true);
+
+    // A second withRawConnection call must complete immediately — if the first
+    // call deadlocked on _lockQueue the second would never resolve.
+    let secondCallRan = false;
+    await adapter.withRawConnection({ materializeTransactions: false }, async () => {
+      secondCallRan = true;
+    });
+    expect(secondCallRan).toBe(true);
+  });
+});

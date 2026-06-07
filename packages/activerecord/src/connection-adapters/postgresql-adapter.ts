@@ -1277,6 +1277,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         throw translated;
       }
     });
+    // Mirrors Rails' raw_execute → verified!: a successful round-trip proves the
+    // connection is live, so skip the verify ping on the next withRawConnection.
+    this.verifiedBang();
     this._flushWarnings(rewritten);
     return castResult.call(this, pgResult);
   }
@@ -1333,9 +1336,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     sql: string,
     binds: unknown[] = [],
     name: string = "SQL",
+    { allowRetry = false }: { allowRetry?: boolean } = {},
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
-    await this.materializeTransactions();
     binds = binds.map((v) => this._bindForPg(v));
     const rewritten = this.rewriteBinds(sql, binds);
     // payload.sql is the rewritten SQL (`$1` not `?`) so ExplainSubscriber
@@ -1354,8 +1357,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // payload.exception — mirrors Rails' handle_warnings inside perform_query (line 166).
     return await Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
-        return await this.withClient(async (client) => {
+        return await this.withRawConnection({ allowRetry }, async (conn) => {
+          const client = conn as unknown as pg.Client;
           const result = await this._runQuery(client, rewritten, binds);
+          // Mirrors Rails' raw_execute → verified! (database_statements.rb):
+          // a successful round-trip proves the connection is live, so mark it
+          // verified to skip the verify ping on the next withRawConnection.
+          this.verifiedBang();
           payload.row_count = result.rows.length;
           this._flushWarnings(rewritten);
           return result.rows;
@@ -1378,7 +1386,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     sql = this.preprocessQuery(sql);
-    await this.materializeTransactions();
     binds = binds.map((v) => this._bindForPg(v));
     const pgSql = this.rewriteBinds(sql, binds);
     this._noticeReceiverSqlWarnings = [];
@@ -1397,8 +1404,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const m = await Notifications.instrumentAsync("sql.active_record", payload, async () => {
       let rc: number;
       try {
-        rc = await this.withClient(async (client) => {
-          this.dirtyCurrentTransaction();
+        rc = await this.withRawConnection(async (conn) => {
+          const client = conn as unknown as pg.Client;
           const upper = sql.trimStart().toUpperCase();
 
           // For INSERT without RETURNING, append RETURNING id automatically
@@ -1470,6 +1477,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         payload.exception_object = translated;
         throw translated;
       }
+      // Mirrors Rails' raw_execute → verified!: the block completed a live
+      // round-trip, so mark verified to skip the next withRawConnection's ping.
+      this.verifiedBang();
       // Flush inside the instrumented callback so a raised SQLWarning is visible
       // to instrumentation subscribers — mirrors handle_warnings inside perform_query.
       this._flushWarnings(payload.sql as string);
@@ -2008,9 +2018,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         sql = `${sql} RETURNING ${cols}`;
       }
       sql = this.preprocessQuery(sql);
-      await this.materializeTransactions();
-      return this.withClient(async (client) => {
-        this.dirtyCurrentTransaction();
+      return this.withRawConnection(async (conn) => {
+        const client = conn as unknown as pg.Client;
         return this._instrumentedQueryOnClient(client, sql, name ?? "SQL", binds);
       });
     }
@@ -2030,11 +2039,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
     }
     sql = this.preprocessQuery(sql);
-    await this.materializeTransactions();
     // currval() is session-scoped: INSERT and SELECT currval(...) must
-    // run on the same connection. withClient() pins both to one client.
-    return this.withClient(async (client) => {
-      this.dirtyCurrentTransaction();
+    // run on the same connection. withRawConnection pins both to one client.
+    return this.withRawConnection(async (conn) => {
+      const client = conn as unknown as pg.Client;
       const insertResult = await this._instrumentedQueryOnClient(client, sql, name ?? "SQL", binds);
       if (!sequenceName) return insertResult;
       const currvalSql = `SELECT currval(${this.quote(sequenceName)})`;

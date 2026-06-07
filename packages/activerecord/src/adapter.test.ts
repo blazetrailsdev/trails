@@ -59,6 +59,26 @@ class QueryTestAdapter extends LifecycleTestAdapter {
   }
 }
 
+// Adapter whose execute() wires the allowRetry option through to
+// withRawConnection exactly as the real adapters do — so the test exercises
+// the public execute() API end-to-end (not withRawConnection directly).
+class ExecuteRetryAdapter extends LifecycleTestAdapter {
+  attempts = 0;
+
+  override async execute(
+    _sql: string,
+    _binds?: unknown[],
+    _name?: string,
+    opts?: { allowRetry?: boolean },
+  ): Promise<Record<string, unknown>[]> {
+    return this.withRawConnection({ allowRetry: opts?.allowRetry ?? false }, async () => {
+      this.attempts++;
+      if (this.attempts === 1) throw new ConnectionFailed("remote disconnect");
+      return [];
+    });
+  }
+}
+
 // Minimal Post model for retryable-classification tests.
 class PostForRetryTest extends Base {
   static {
@@ -615,10 +635,36 @@ describe("AdapterConnectionTest", () => {
       });
     }).rejects.toBeInstanceOf(ConnectionFailed);
   });
-  it.skip("#execute is retryable", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#execute: allowRetry: true must reconnect on remote kill
-    // SCOPE: ~20 LOC; affects ~5 tests
+
+  it("withRawConnection is reentrant", async () => {
+    // Rails' with_raw_connection runs under a reentrant Monitor and is
+    // documented to re-enter (abstract_adapter.rb:972-981): materialize_
+    // transactions re-enters, and the yielded block can too (e.g. a write
+    // path's exec_restart_db_transaction → execute). A nested call on the same
+    // chain must run directly, not queue behind the held lock and deadlock.
+    const a = new AbstractAdapter();
+    let innerRan = false;
+    const result = await a.withRawConnection(async () => {
+      await a.withRawConnection(async () => {
+        innerRan = true;
+      });
+      return "outer";
+    });
+    expect(innerRan).toBe(true);
+    expect(result).toBe("outer");
+  });
+
+  it("#execute is retryable", async () => {
+    const adapter = new ExecuteRetryAdapter();
+    adapter.simulateConnect();
+    adapter.remoteDisconnect();
+
+    // Calling execute() with allowRetry: true must reconnect and re-run the
+    // query transparently (mirrors Rails adapter_test.rb:835 — kill the server
+    // connection, then execute("SELECT 1", allow_retry: true) succeeds).
+    await adapter.execute("SELECT 1", [], "SQL", { allowRetry: true });
+    expect(adapter.attempts).toBe(2);
+    expect(adapter.active).toBe(true);
   });
   it.skip("disconnect and recover on #configure_connection failure", () => {
     // BLOCKED: connection-pool

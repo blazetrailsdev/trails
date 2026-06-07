@@ -56,7 +56,12 @@ export interface DatabaseAdapter {
   /**
    * Execute a SQL query and return rows.
    */
-  execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]>;
+  execute(
+    sql: string,
+    binds?: unknown[],
+    name?: string,
+    opts?: { allowRetry?: boolean },
+  ): Promise<Record<string, unknown>[]>;
 
   /**
    * Execute a SQL statement that modifies data (INSERT/UPDATE/DELETE).
