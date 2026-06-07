@@ -6,9 +6,11 @@
  * `reconstructFromSchema` can use the real Rails-mirrored path.
  *
  * Phase 1 of RFC 0002 — new file, no consumer changes.
+ * Phase 2 of RFC 0002 — adds `establishFromTestConfig` for setupHandlerSuite.
  */
 
 import { getEnv } from "@blazetrails/activesupport";
+import { Base } from "../base.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
@@ -71,4 +73,16 @@ export async function buildTestDatabaseConfig(): Promise<TestDatabaseConfig> {
   }
 
   return { configs, adapter, envConfig };
+}
+
+/**
+ * Re-establish `Base`'s connection handler from the env-var config if not
+ * already connected. Called by `setupHandlerSuite` so handler-path test files
+ * get a live pool without knowing which adapter the worker is using.
+ * Idempotent — a no-op when already connected.
+ */
+export async function establishFromTestConfig(): Promise<void> {
+  if (Base.isConnectedQ()) return;
+  const { envConfig } = await buildTestDatabaseConfig();
+  await Base.establishConnection(envConfig.configuration as Record<string, unknown>);
 }
