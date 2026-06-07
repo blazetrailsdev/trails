@@ -86,6 +86,7 @@ function stripHostParam(params: ParamInfo[]): ParamInfo[] {
 export interface Arity {
   min: number;
   max: number; // Infinity when a rest/splat param is present
+  /** True when optional kwargs (`key: default`) or `**opts` are present — adds 1 max-slot slack. */
   hasKeywords: boolean;
   hasBlock: boolean;
 }
@@ -101,8 +102,14 @@ export interface ArityMatch {
   tsRange: ArityRange;
 }
 
-/** Accepted positional-arg range (TS side drops a leading `this:`). Keyword/block
- *  params don't count positionally; their presence is reported for the slack. */
+/** Accepted positional-arg range (TS side drops a leading `this:`).
+ *
+ * Required keywords (`key:`) count toward min — Ruby arity treats them as
+ * required arguments and the TS port supplies them via a required options
+ * object. Optional keywords (`key: default`) and `**opts` only set
+ * `hasKeywords`, which adds one max-slot of slack so a trailing TS options
+ * object counts. Block params are excluded from the count but set `hasBlock`
+ * for the same slack treatment. */
 export function positionalArity(params: ParamInfo[], side: "ruby" | "ts"): Arity {
   const list = side === "ts" ? stripThis(params) : params;
 
@@ -123,6 +130,14 @@ export function positionalArity(params: ParamInfo[], side: "ruby" | "ts"): Arity
         hasRest = true;
         break;
       case "keyword":
+        // Required keyword (`key:`, no default) counts as a real required arg.
+        // Optional keyword (`key: default`) only adds slack via hasKeywords.
+        if (p.default === undefined) {
+          required++;
+        } else {
+          hasKeywords = true;
+        }
+        break;
       case "keyword_rest":
         hasKeywords = true;
         break;
@@ -140,7 +155,7 @@ export function positionalArity(params: ParamInfo[], side: "ruby" | "ts"): Arity
   };
 }
 
-/** Do the ranges overlap, granting Ruby one extra max slot per trailing kwargs/block convention? */
+/** Do the ranges overlap, granting Ruby one extra max slot per optional-kwargs/block convention? */
 function rangesOverlap(r: Arity, t: Arity): boolean {
   const slack = (r.hasKeywords ? 1 : 0) + (r.hasBlock ? 1 : 0);
   const rubyMax = r.max === Infinity ? Infinity : r.max + slack;

@@ -11,7 +11,8 @@ import type { ParamInfo } from "./types.js";
 const req = (name: string, type?: string): ParamInfo => ({ name, kind: "required", type });
 const opt = (name: string): ParamInfo => ({ name, kind: "optional", default: "…" });
 const rest = (name: string): ParamInfo => ({ name, kind: "rest" });
-const kw = (name: string): ParamInfo => ({ name, kind: "keyword" });
+const kw = (name: string): ParamInfo => ({ name, kind: "keyword" }); // required keyword (no default)
+const kwopt = (name: string): ParamInfo => ({ name, kind: "keyword", default: "…" }); // optional keyword
 const kwrest = (name: string): ParamInfo => ({ name, kind: "keyword_rest" });
 const blk = (name: string): ParamInfo => ({ name, kind: "block" });
 
@@ -35,8 +36,14 @@ describe("positionalArity", () => {
     });
   });
 
-  it("reports keywords without counting them positionally", () => {
-    expect(positionalArity([req("a"), kw("b"), kwrest("o")], "ruby")).toMatchObject({
+  it("counts a required keyword (`key:`) toward min", () => {
+    // Ruby `def m(a, key:)` has arity 2; the TS port must supply an options object.
+    expect(positionalArity([req("a"), kw("key")], "ruby")).toMatchObject({ min: 2, max: 2 });
+  });
+
+  it("treats optional kwargs and keyword_rest as slack only (hasKeywords)", () => {
+    // def m(a, opt: default, **o)  → min: 1, max: 1, hasKeywords: true
+    expect(positionalArity([req("a"), kwopt("b"), kwrest("o")], "ruby")).toMatchObject({
       min: 1,
       max: 1,
       hasKeywords: true,
@@ -74,6 +81,25 @@ describe("arityMatches", () => {
   it("treats ruby kwargs as satisfied by a trailing TS options object", () => {
     // def foo(a, **o)  ≈  foo(a, o = {})  → ruby [1,1]+slack=[1,2] vs ts [1,2]
     expect(arityMatches([req("a"), kwrest("o")], [req("a"), opt("o")]).ok).toBe(true);
+  });
+
+  it("flags a required keyword against a TS zero-arg port — regression", () => {
+    // def m(key:)  — Ruby arity 1; a TS zero-arg port is NOT a match.
+    // Previously collapsed into hasKeywords and added max-slack only, letting
+    // ruby [0,0+1]=[0,1] overlap with ts [0,0]. Now ruby min is 1 so [1,1]
+    // does not overlap with [0,0].
+    const m = arityMatches([kw("key")], []);
+    expect(m.ok).toBe(false);
+    expect(m.rubyRange).toEqual({ min: 1, max: 1 });
+    expect(m.tsRange).toEqual({ min: 0, max: 0 });
+  });
+
+  it("matches a required keyword against a TS options-object port", () => {
+    // def m(key:)  ≈  m(options: { key: string })  → ruby [1,1] vs ts [1,1]
+    expect(arityMatches([kw("key")], [req("opts")]).ok).toBe(true);
+    // mixed: def m(a, req_key:, opt_key: default)  → ruby min:2 max:2+slack=3
+    // TS: m(a, opts)  → [2,2] — overlaps
+    expect(arityMatches([req("a"), kw("rk"), kwopt("ok")], [req("a"), req("opts")]).ok).toBe(true);
   });
 
   it("flags a genuinely missing positional arg", () => {
