@@ -1327,6 +1327,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     sql: string,
     binds: unknown[] = [],
     name: string = "SQL",
+    { allowRetry = false }: { allowRetry?: boolean } = {},
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
     binds = binds.map((v) => this._bindForPg(v));
@@ -1347,7 +1348,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // payload.exception — mirrors Rails' handle_warnings inside perform_query (line 166).
     return await Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
-        return await this.withRawConnection(async (conn) => {
+        return await this.withRawConnection({ allowRetry }, async (conn) => {
           const client = conn as unknown as pg.Client;
           const result = await this._runQuery(client, rewritten, binds);
           payload.row_count = result.rows.length;
