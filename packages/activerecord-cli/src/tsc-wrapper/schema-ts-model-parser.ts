@@ -10,7 +10,7 @@
  */
 
 import ts from "typescript";
-import { singularize } from "@blazetrails/activesupport";
+import { singularize, getCrypto } from "@blazetrails/activesupport";
 import {
   ForeignKeyDefinition,
   type IntrospectedTable,
@@ -122,12 +122,17 @@ function parseAddForeignKey(call: ts.CallExpression): ForeignKeyDefinition | und
   // fires on a hand-written schema.ts.
   const column = (opts && strLiteral(objPropValue(opts, "column"))) ?? `${singularize(toTable)}_id`;
   const primaryKey = (opts && strLiteral(objPropValue(opts, "primaryKey"))) ?? "id";
-  // For a composite FK `column` is the comma-joined string (e.g. "a_id,b_id"),
-  // so the synthesized name can contain a comma. Harmless: it surfaces only in
-  // generateModels' composite-FK `// TODO composite FK ...` comment
-  // (model-codegen.ts:241) and never round-trips through the dumper.
+  // Synthesize a name following Rails' foreignKeyName algorithm so the result
+  // matches fk_rails_[0-9a-f]{10} and isExportNameOnSchemaDump returns false,
+  // letting SchemaDumper suppress name: on a subsequent dump (round-trip).
+  const synthesizeName = (table: string, col: string): string => {
+    const cols = col.split(",");
+    const identifier = `${table}_${cols.join("_and_")}_fk`;
+    const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
+    return `fk_rails_${hex}`;
+  };
   const name =
-    (opts && strLiteral(objPropValue(opts, "name"))) ?? `fk_rails_${fromTable}_${column}`;
+    (opts && strLiteral(objPropValue(opts, "name"))) ?? synthesizeName(fromTable, column);
   const onDelete = opts
     ? (strLiteral(objPropValue(opts, "onDelete")) as ReferentialAction | undefined)
     : undefined;

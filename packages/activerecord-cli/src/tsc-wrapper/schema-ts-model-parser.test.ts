@@ -102,8 +102,8 @@ describe("parseSchemaForModels", () => {
     `;
     const fk = tableNamed(source, "reviews").foreignKeys[0]!;
     expect(fk.column).toBe("book_id");
-    // Synthesized name does not match Rails' fk_rails_<10hex> shape (codegen-only).
-    expect(fk.name).toBe("fk_rails_reviews_book_id");
+    // Synthesized name mirrors Rails' fk_rails_<10hex> so it round-trips through SchemaDumper.
+    expect(fk.name).toBe("fk_rails_924a0b30ca");
   });
 
   it("reads onDelete, primaryKey, and validate options off a foreign key", () => {
