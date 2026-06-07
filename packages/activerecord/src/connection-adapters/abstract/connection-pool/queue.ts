@@ -186,7 +186,6 @@ export function withABiasFor<T>(this: BiasableQueueHost, context: unknown, fn: (
 }
 
 export const BiasableQueue = {
-  BiasedConditionVariable,
   withABiasFor,
 };
 

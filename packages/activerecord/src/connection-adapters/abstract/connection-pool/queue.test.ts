@@ -215,10 +215,6 @@ describe("ConnectionPool::BiasedConditionVariable", () => {
 });
 
 describe("ConnectionPool::BiasableQueue", () => {
-  it("exposes BiasedConditionVariable", () => {
-    expect(BiasableQueue.BiasedConditionVariable).toBe(BiasedConditionVariable);
-  });
-
   it("withABiasFor restores cond and transfers orphaned waiters", async () => {
     const q = new ConnectionLeasingQueue();
 
