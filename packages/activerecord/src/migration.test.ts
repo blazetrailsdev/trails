@@ -2694,21 +2694,22 @@ describe("MigrationTest", () => {
       const dst = path.join(root, "dst");
       fs.mkdirSync(src, { recursive: true });
       fs.mkdirSync(dst, { recursive: true });
-      // Source migration opens with a magic-comment directive.
+      // Source migration opens with a magic-comment directive followed by a
+      // blank line — mirrors Rails' "# frozen_string_literal: true\n\n" pattern.
       fs.writeFileSync(
         path.join(src, "1_create_horses.ts"),
-        "// @ts-nocheck\nexport class CreateHorses {}\n",
+        "// @ts-nocheck\n\nexport class CreateHorses {}\n",
       );
       try {
         const copied = await Migration.copy(dst, { bukkits: src });
         expect(copied).toHaveLength(1);
         const body = fs.readFileSync(copied[0]!.filename!, "utf8");
-        // Magic comment must come before the provenance line.
-        expect(body).toMatch(/^\/\/ @ts-nocheck\n/);
-        expect(body).toContain("// This migration comes from bukkits");
-        expect(body.indexOf("// @ts-nocheck")).toBeLessThan(
-          body.indexOf("// This migration comes from"),
-        );
+        // Expected layout: directive + blank line + provenance + rest
+        expect(body).toMatch(/^\/\/ @ts-nocheck\n\n\/\/ This migration comes from/);
+        // Blank line belongs before the provenance comment (Rails parity).
+        const blankIdx = body.indexOf("\n\n");
+        const provenanceIdx = body.indexOf("// This migration comes from");
+        expect(blankIdx).toBeLessThan(provenanceIdx);
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }
