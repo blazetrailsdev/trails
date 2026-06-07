@@ -1304,6 +1304,23 @@ describe("DatabaseTasksReconstructFromSchemaTest", () => {
     vi.restoreAllMocks();
   });
 
+  it("resolves file via schemaDumpPath when file is not provided", async () => {
+    // Rails: file ||= schema_dump_path(db_config, format)
+    vi.spyOn(DatabaseTasks, "schemaDumpPath").mockReturnValue("db/resolved-schema.ts");
+    schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(true);
+    await DatabaseTasks.reconstructFromSchema(config, "ts");
+    expect(schemaUpToDateSpy).toHaveBeenCalledWith(config, "ts", "db/resolved-schema.ts");
+    expect(truncateTablesSpy).toHaveBeenCalledWith(config);
+  });
+
+  it("raises before establishing pool when file path is blank", async () => {
+    // Rails: check_schema_file(file) if file — validates before the pool opens.
+    await expect(DatabaseTasks.reconstructFromSchema(config, "ts", "")).rejects.toThrow(
+      "Schema file not specified",
+    );
+    expect(withTemporaryPoolSpy).not.toHaveBeenCalled();
+  });
+
   it("truncates tables when schema is up to date", async () => {
     // Warm-DB fast path: schema_up_to_date? → truncate_tables
     schemaUpToDateSpy = vi.spyOn(DatabaseTasks, "schemaUpToDate").mockResolvedValue(true);

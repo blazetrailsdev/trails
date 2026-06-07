@@ -1283,24 +1283,29 @@ export class DatabaseTasks {
     format: SchemaFormat = DatabaseTasks.schemaFormat,
     file?: string,
   ): Promise<void> {
+    // Rails: file ||= schema_dump_path(db_config, format)
+    const resolvedFile = file ?? this.schemaDumpPath(config) ?? undefined;
+    // Rails: check_schema_file(file) if file
+    if (resolvedFile !== undefined) this.checkSchemaFile(resolvedFile);
+
     const { NoDatabaseError } = await import("../errors.js");
     // Mirrors Rails' `with_temporary_pool(db_config, clobber: true)` wrapper:
     // establishes a fresh connection so schemaUpToDate can query ar_internal_metadata,
     // then restores the prior connection when done.
     await this.withTemporaryPool(config, async () => {
       try {
-        if (await this.schemaUpToDate(config, format, file)) {
+        if (await this.schemaUpToDate(config, format, resolvedFile)) {
           if (getEnv("SKIP_TEST_DATABASE_TRUNCATE") === undefined) {
             await this.truncateTables(config);
           }
         } else {
           await this.purge(config);
-          await this.loadSchema(config, format, file);
+          await this.loadSchema(config, format, resolvedFile);
         }
       } catch (error) {
         if (!(error instanceof NoDatabaseError)) throw error;
         await this.create(config);
-        await this.loadSchema(config, format, file);
+        await this.loadSchema(config, format, resolvedFile);
       }
     });
   }
