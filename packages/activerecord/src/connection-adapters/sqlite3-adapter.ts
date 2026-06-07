@@ -1253,7 +1253,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         sql += raw.value;
       } else {
         const assignments: string[] = [];
-        const touch = insert.touchModelTimestampsUnless((col) => `${col} IS excluded.${col}`);
+        const touch = insert.touchModelTimestampsUnless(
+          (col) => `${col} IS excluded.${col}`,
+          "STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')",
+        );
         if (touch) assignments.push(touch);
         for (const col of insert.updatableColumns()) assignments.push(`${col}=excluded.${col}`);
         sql += assignments.join(",");

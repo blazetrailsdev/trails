@@ -3392,11 +3392,12 @@ export class Relation<T extends Base> {
    */
   async insertAll(
     records: Record<string, unknown>[],
-    options?: { uniqueBy?: string | string[] },
+    options?: { uniqueBy?: string | string[]; recordTimestamps?: boolean },
   ): Promise<number> {
     return InsertAll.execute(this, records, {
       uniqueBy: options?.uniqueBy,
       onDuplicate: options?.uniqueBy ? "skip" : undefined,
+      recordTimestamps: options?.recordTimestamps,
     });
   }
 
@@ -3411,12 +3412,14 @@ export class Relation<T extends Base> {
       uniqueBy?: string | string[];
       updateOnly?: string | string[];
       onDuplicate?: "skip" | "update" | Nodes.SqlLiteral;
+      recordTimestamps?: boolean;
     },
   ): Promise<number> {
     return InsertAll.execute(this, records, {
       uniqueBy: options?.uniqueBy,
       updateOnly: options?.updateOnly,
       onDuplicate: options?.onDuplicate ?? "update",
+      recordTimestamps: options?.recordTimestamps,
     });
   }
 

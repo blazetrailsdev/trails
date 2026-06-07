@@ -12,8 +12,8 @@ import type { AdapterName } from "./adapter.js";
 type ModelClass = typeof Base;
 type AdapterDialect = AdapterName;
 
-const TIMESTAMP_COLUMNS = ["created_at", "updated_at"] as const;
-const UPDATE_TIMESTAMP_COLUMNS = ["updated_at"] as const;
+const TIMESTAMP_COLUMNS = ["created_at", "created_on", "updated_at", "updated_on"] as const;
+const UPDATE_TIMESTAMP_COLUMNS = ["updated_at", "updated_on"] as const;
 // Mirrors timestamp.ts CREATED_ATTRS/UPDATED_ATTRS: both _at and _on are magic
 // timestamp columns, so verifyAttributes must allow either pair even when only
 // the other is in the model's declared attribute set.
@@ -157,11 +157,6 @@ export class InsertAll {
     }
     if (this._updatableColumns) return;
     const exclude = new Set([...this.readonlyColumns(), ...this.uniqueByColumns()]);
-    if (this.recordTimestamps() && !this.updateOnly && !this.updateSql) {
-      for (const col of TIMESTAMP_COLUMNS) {
-        exclude.add(col);
-      }
-    }
     this._updatableColumns = [...this.keys].filter((k) => !exclude.has(k));
     // Mirrors Rails' elsif branch: only coerce "update"→"skip" on the auto-generated
     // update path. Custom SQL (updateSql) and explicit updateOnly are handled earlier
@@ -211,10 +206,8 @@ export class InsertAll {
     if (this._keysIncludingTimestamps) return this._keysIncludingTimestamps;
     if (this.recordTimestamps()) {
       const result = new Set(this.keys);
-      for (const col of TIMESTAMP_COLUMNS) {
-        if (this.model._attributeDefinitions.has(col)) {
-          result.add(col);
-        }
+      for (const col of this._physicalTimestampCols(TIMESTAMP_COLUMNS)) {
+        result.add(col);
       }
       this._keysIncludingTimestamps = result;
     } else {
@@ -318,7 +311,7 @@ export class InsertAll {
     if (!inheritanceCol) return;
     const type = stiName(this.model);
     for (const insert of this.inserts) {
-      if (insert[inheritanceCol] == null) {
+      if (!(inheritanceCol in insert)) {
         insert[inheritanceCol] = type;
       }
     }
@@ -440,14 +433,36 @@ export class InsertAll {
     );
   }
 
+  /**
+   * Returns physical column names for the given logical timestamp columns,
+   * resolving alias_attribute mappings (e.g. created_at → legacy_created_at).
+   * @internal
+   */
+  private _physicalTimestampCols(logicalCols: readonly string[]): string[] {
+    const aliases = (this.model as any)._attributeAliases as Record<string, string> | undefined;
+    const result: string[] = [];
+    for (const col of logicalCols) {
+      if (this.model._attributeDefinitions.has(col)) {
+        result.push(col);
+      } else {
+        const physical = aliases?.[col];
+        if (physical && this.model._attributeDefinitions.has(physical)) result.push(physical);
+      }
+    }
+    return result;
+  }
+
+  /** Physical column names for all update timestamp columns (resolves aliases). @internal */
+  updateTimestampColumnsInModel(): string[] {
+    return this._physicalTimestampCols(UPDATE_TIMESTAMP_COLUMNS);
+  }
+
   /** @internal */
   private timestampsForCreate(): Record<string, unknown> {
     const now = Temporal.Now.instant();
     const result: Record<string, unknown> = {};
-    for (const col of TIMESTAMP_COLUMNS) {
-      if (this.model._attributeDefinitions.has(col)) {
-        result[col] = now;
-      }
+    for (const col of this._physicalTimestampCols(TIMESTAMP_COLUMNS)) {
+      result[col] = now;
     }
     return result;
   }
@@ -468,7 +483,7 @@ export interface InsertBuilder {
   conflictTarget(): string;
   returning(): string | undefined;
   updatableColumns(): string[];
-  touchModelTimestampsUnless(block: (col: string) => string): string;
+  touchModelTimestampsUnless(block: (col: string) => string, nowValue?: string): string;
   rawUpdateSql(): Nodes.SqlLiteral | undefined;
   skipDuplicates(): boolean;
   updateDuplicates(): boolean;
@@ -578,7 +593,10 @@ export class Builder implements InsertBuilder {
     return this._insertAll.updatableColumns().map((c) => `"${c}"`);
   }
 
-  touchModelTimestampsUnless(block: (col: string) => string): string {
+  touchModelTimestampsUnless(
+    block: (col: string) => string,
+    nowValue = "CURRENT_TIMESTAMP",
+  ): string {
     if (!this._insertAll.updateDuplicates() || !this._insertAll.recordTimestamps()) {
       return "";
     }
@@ -588,11 +606,11 @@ export class Builder implements InsertBuilder {
     const parts: string[] = [];
     const tableName = this.quotedTableName();
     const conditions = quotedUpdatable.map(block).join(" AND ");
-    for (const col of UPDATE_TIMESTAMP_COLUMNS) {
-      if (this.model._attributeDefinitions.has(col) && !updatable.includes(col)) {
+    for (const col of this._insertAll.updateTimestampColumnsInModel()) {
+      if (!updatable.includes(col)) {
         const qcol = `"${col}"`;
         parts.push(
-          `${qcol}=(CASE WHEN (${conditions}) THEN ${tableName}.${qcol} ELSE CURRENT_TIMESTAMP END)`,
+          `${qcol}=(CASE WHEN (${conditions}) THEN ${tableName}.${qcol} ELSE ${nowValue} END)`,
         );
       }
     }
