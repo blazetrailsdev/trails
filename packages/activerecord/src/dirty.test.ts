@@ -998,11 +998,21 @@ describe("DirtyTest", () => {
     expect(person.changed).toBe(false);
   });
 
-  it.skip("partial insert off with unchanged default function attribute", () => {
-    // BLOCKED: schema — Rails' `aircraft.manufactured_at` defaults to
-    // CURRENT_TIMESTAMP; the canonical schema drops SQL-function defaults
-    // (defineSchema doesn't emit them), so an unset `manufactured_at` isn't
-    // auto-populated to assert against. SCOPE: SQL-function column defaults.
+  it("partial insert off with unchanged default function attribute", async () => {
+    await withPartialWrites(Aircraft, false, async () => {
+      const aircraft = new Aircraft({ name: "Boeing" }) as Rec;
+      expect(aircraft.name).toBe("Boeing");
+
+      await (aircraft as unknown as Aircraft).saveBang();
+      await (aircraft as unknown as Aircraft).reload();
+
+      expect(aircraft.name).toBe("Boeing");
+      const mfgAt = aircraft.manufactured_at;
+      expect(mfgAt).not.toBeNull();
+      const nowMs = Temporal.Now.instant().epochMilliseconds;
+      const mfgAtMs = (mfgAt as Temporal.Instant).epochMilliseconds;
+      expect(Math.abs(nowMs - mfgAtMs)).toBeLessThan(5000);
+    });
   });
 
   it("partial insert off with changed default function attribute", async () => {

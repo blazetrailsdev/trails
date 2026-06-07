@@ -30,13 +30,20 @@ export type ColumnSpec =
   | {
       type: AnyPrimitiveColumnSpec;
       limit?: number;
-      /** Decimal/numeric total digits (mirrors Rails' `precision:`). */
-      precision?: number;
+      /**
+       * Decimal/numeric total digits (mirrors Rails' `precision:`).
+       * Pass `null` to suppress the MySQL auto-precision-6 upgrade and emit a
+       * bare `DATETIME` column — required when pairing with a `DEFAULT
+       * CURRENT_TIMESTAMP` function default (mirrors Rails `precision: nil`).
+       */
+      precision?: number | null;
       /** Decimal/numeric fractional digits (mirrors Rails' `scale:`). */
       scale?: number;
       references?: string;
       null?: boolean;
       default?: unknown;
+      /** SQL expression emitted verbatim as `DEFAULT <expr>` (e.g. `"CURRENT_TIMESTAMP"`). */
+      defaultFunction?: string;
       primary?: boolean;
       /**
        * PostgreSQL array column (`INTEGER[]`, `TEXT[]`, etc.). PG-only;
@@ -628,7 +635,12 @@ async function _defineSchemaImpl(
           if (spec.precision !== undefined) options["precision"] = spec.precision;
           if (spec.scale !== undefined) options["scale"] = spec.scale;
           if (spec.null !== undefined) options["null"] = spec.null;
-          if (spec.default !== undefined) options["default"] = spec.default;
+          if (spec.defaultFunction !== undefined) {
+            const fn = spec.defaultFunction;
+            options["default"] = () => fn;
+          } else if (spec.default !== undefined) {
+            options["default"] = spec.default;
+          }
           if (spec.array !== undefined) options["array"] = spec.array;
           if (spec.primary && pk === undefined) {
             options["primaryKey"] = true;
@@ -643,10 +655,14 @@ async function _defineSchemaImpl(
         }
         // MySQL DATETIME without precision = DATETIME(0), which rejects fractional
         // seconds. Default to DATETIME(6) so test schemas accept microseconds.
+        // Only fires when precision is omitted entirely (undefined); an explicit
+        // `precision: null` opts out of the upgrade and emits bare DATETIME —
+        // required when the column carries a DEFAULT CURRENT_TIMESTAMP function
+        // (mirrors Rails `precision: nil, default: -> { "CURRENT_TIMESTAMP" }`).
         if (
           adapter.adapterName === "mysql" &&
           primitive === "datetime" &&
-          options["precision"] == null
+          options["precision"] === undefined
         ) {
           options["precision"] = 6;
         }
