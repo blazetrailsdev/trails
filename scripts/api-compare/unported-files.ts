@@ -747,6 +747,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
     testFile: "transactions_test.rb",
     tests: [
       "transaction per thread",
+      "transaction isolation  read committed",
       "rollback when thread killed",
       "connection removed from pool when thread killed in begin after successfully beginning a transaction",
     ],
@@ -754,6 +755,26 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Thread.new + Thread#kill to assert per-thread transaction isolation and " +
       "connection-pool cleanup on thread death. Ruby Thread.kill and the " +
       "shared-memory Thread model have no Node.js equivalent.",
+  },
+  {
+    testFile: "transactions_test.rb",
+    tests: [
+      "throw from transaction commits",
+      "deprecation on ruby timeout outside inner transaction",
+    ],
+    reason:
+      "Ruby throw/catch is non-exceptional control flow that commits the " +
+      "transaction (unlike JS throw, which always causes rollback). " +
+      "There is no JS equivalent for throw/catch semantics.",
+  },
+  {
+    testFile: "transactions_test.rb",
+    tests: ["after current transaction commit multidb nested transactions"],
+    reason:
+      "Requires the ARUnit2Model secondary database connection (multi-database " +
+      "setup). The test asserts afterAllTransactionsCommit fires only after the " +
+      "outermost cross-database transaction commits — not available in the " +
+      "single-database test environment.",
   },
   {
     testFile: "database_selector_test.rb",

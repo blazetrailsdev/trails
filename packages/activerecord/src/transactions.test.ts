@@ -961,9 +961,18 @@ describe("TransactionTest", () => {
     const reloaded = (await Topic.find(first.id)) as any;
     expect(reloaded.approved).toBe(false);
   });
-  it.skip("update should rollback on failure!", () => {
-    // BLOCKED: connection-pool — this test bypassed the connection handler via direct adapter assignment.
-    // Needs reimplementation against the pool (no bypass). Tracked in docs/activerecord/activerecord-index.md (retired pool-epic note).
+  it("update should rollback on failure!", async () => {
+    const { RecordInvalid } = await import("./index.js");
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    Post.validates("title", { presence: true });
+    const post = (await Post.create({ title: "original" })) as any;
+    await expect(post.updateBang({ title: "" })).rejects.toThrow(RecordInvalid);
+    const reloaded = (await Post.find(post.id)) as any;
+    expect(reloaded.title).toBe("original");
   });
   it("manually rolling back a transaction", async () => {
     class Topic extends Base {
