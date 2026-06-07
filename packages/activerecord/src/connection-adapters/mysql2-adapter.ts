@@ -814,7 +814,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   async beginDbTransaction(): Promise<void> {
     await this._ensureClient();
-    await this.internalExecute("BEGIN", "TRANSACTION", [], false, false, false, false);
+    await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
     this._inTransaction = true;
   }
 
@@ -831,7 +831,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
     if (!this._inTransaction || !this._client) throw new Error("No active transaction");
     try {
-      await this.internalExecute("COMMIT", "TRANSACTION", [], false, false, false, true);
+      await this.internalExecute("COMMIT", "TRANSACTION");
     } finally {
       this._inTransaction = false;
     }
@@ -854,7 +854,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   async rollbackDbTransaction(): Promise<void> {
     if (!this._inTransaction || !this._client) throw new Error("No active transaction");
     try {
-      await this.internalExecute("ROLLBACK", "TRANSACTION", [], false, false, false, true);
+      await this.internalExecute("ROLLBACK", "TRANSACTION");
     } finally {
       this._inTransaction = false;
     }
@@ -866,11 +866,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   override async internalExecute(
     sql: string,
     name: string = "SQL",
-    binds: unknown[] = [],
-    _prepare = false,
-    _async = false,
-    _allowRetry = false,
-    materializeTransactions = true,
+    { materializeTransactions = true }: { materializeTransactions?: boolean } = {},
   ): Promise<unknown> {
     sql = this.preprocessQuery(sql);
     if (materializeTransactions) {
@@ -878,28 +874,21 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       await this.materializeTransactions();
     }
     const driverSql = this.mysqlQuote(sql);
-    const driverBinds = this.mysqlBinds(binds);
     const payload: Record<string, unknown> = {
       sql: driverSql,
       name,
-      binds: driverBinds,
-      type_casted_binds: typeCastedBinds(driverBinds),
+      binds: [],
+      type_casted_binds: [],
       connection: this,
       row_count: 0,
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         const conn = await this.getConn();
-        if (binds.length > 0) {
-          const [result] = await conn.execute(driverSql, driverBinds as any[]);
-          const affected = (result as any).affectedRows ?? 0;
-          payload.row_count = affected;
-          return affected;
-        }
         await conn.query(driverSql);
         return 0;
       } catch (e: any) {
-        const translated = await this._translateAndEnrich(e, driverSql, driverBinds);
+        const translated = await this._translateAndEnrich(e, driverSql, []);
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
@@ -911,45 +900,27 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Create a savepoint (nested transaction).
    */
   async createSavepoint(name: string): Promise<void> {
-    await this.internalExecute(
-      `SAVEPOINT \`${name}\``,
-      "TRANSACTION",
-      [],
-      false,
-      false,
-      false,
-      false,
-    );
+    await this.internalExecute(`SAVEPOINT \`${name}\``, "TRANSACTION", {
+      materializeTransactions: false,
+    });
   }
 
   /**
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    await this.internalExecute(
-      `RELEASE SAVEPOINT \`${name}\``,
-      "TRANSACTION",
-      [],
-      false,
-      false,
-      false,
-      false,
-    );
+    await this.internalExecute(`RELEASE SAVEPOINT \`${name}\``, "TRANSACTION", {
+      materializeTransactions: false,
+    });
   }
 
   /**
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    await this.internalExecute(
-      `ROLLBACK TO SAVEPOINT \`${name}\``,
-      "TRANSACTION",
-      [],
-      false,
-      false,
-      false,
-      false,
-    );
+    await this.internalExecute(`ROLLBACK TO SAVEPOINT \`${name}\``, "TRANSACTION", {
+      materializeTransactions: false,
+    });
   }
 
   /**

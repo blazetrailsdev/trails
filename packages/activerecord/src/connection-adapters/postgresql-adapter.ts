@@ -1486,7 +1486,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async beginDbTransaction(): Promise<void> {
     this._client = await this._acquireFreshClient();
     try {
-      await this.internalExecute("BEGIN", "TRANSACTION", [], false, false, false, false);
+      await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
       this._inTransaction = true;
     } catch (error) {
       this._client = null;
@@ -1520,7 +1520,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
     if (!this._client) throw new Error("No active transaction");
     try {
-      await this.internalExecute("COMMIT", "TRANSACTION", [], false, false, false, true);
+      await this.internalExecute("COMMIT", "TRANSACTION");
     } catch (e) {
       // Connection-level error (08P01, broken socket, etc.) leaves the
       // single pg.Client unusable. Tear down so the next caller gets a
@@ -1560,7 +1560,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
     if (!this._client) throw new Error("No active transaction");
     try {
-      await this.internalExecute("ROLLBACK", "TRANSACTION", [], false, false, false, true);
+      await this.internalExecute("ROLLBACK", "TRANSACTION");
     } catch (e) {
       // Connection-level error — closing the socket implicitly aborts
       // the server-side TX. Swallow and reconnect so the next caller
@@ -1676,15 +1676,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (!level) throw new Error(`Unknown isolation level: ${isolation}`);
     this._client = await this._acquireFreshClient();
     try {
-      await this.internalExecute(
-        `BEGIN ISOLATION LEVEL ${level}`,
-        "TRANSACTION",
-        [],
-        false,
-        false,
-        false,
-        false,
-      );
+      await this.internalExecute(`BEGIN ISOLATION LEVEL ${level}`, "TRANSACTION", {
+        materializeTransactions: false,
+      });
       this._inTransaction = true;
     } catch (error) {
       this._client = null;
@@ -1730,29 +1724,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   override async internalExecute(
     sql: string,
     name: string = "SQL",
-    binds: unknown[] = [],
-    _prepare = false,
-    _async = false,
-    _allowRetry = false,
-    materializeTransactions = true,
+    { materializeTransactions = true }: { materializeTransactions?: boolean } = {},
   ): Promise<unknown> {
     sql = preprocessQuery.call(this as any, sql);
     if (materializeTransactions) await this.materializeTransactions();
-    // Mirrors PG exec_query/execute_mutation bind path: type-cast → _bindForPg → rewriteBinds.
-    const pgBinds = binds.length > 0 ? typeCastedBinds(binds).map((v) => this._bindForPg(v)) : [];
-    const pgSql = binds.length > 0 ? this.rewriteBinds(sql, pgBinds) : sql;
     const payload: Record<string, unknown> = {
-      sql: pgSql,
+      sql,
       name,
-      binds: pgBinds,
-      type_casted_binds: pgBinds,
+      binds: [],
+      type_casted_binds: [],
       connection: this,
       row_count: 0,
     };
     return Notifications.instrumentAsync("sql.active_record", payload, () =>
       this.withClient(async (client) => {
         try {
-          const result = await this._runQuery(client, pgSql, pgBinds, { rowMode: "array" });
+          const result = await this._runQuery(client, sql, [], { rowMode: "array" });
           const count = result.rowCount ?? result.rows.length;
           payload.row_count = count;
           return result;
@@ -1769,45 +1756,27 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Create a savepoint (nested transaction).
    */
   async createSavepoint(name: string): Promise<void> {
-    await this.internalExecute(
-      `SAVEPOINT "${name}"`,
-      "TRANSACTION",
-      [],
-      false,
-      false,
-      false,
-      false,
-    );
+    await this.internalExecute(`SAVEPOINT "${name}"`, "TRANSACTION", {
+      materializeTransactions: false,
+    });
   }
 
   /**
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    await this.internalExecute(
-      `RELEASE SAVEPOINT "${name}"`,
-      "TRANSACTION",
-      [],
-      false,
-      false,
-      false,
-      false,
-    );
+    await this.internalExecute(`RELEASE SAVEPOINT "${name}"`, "TRANSACTION", {
+      materializeTransactions: false,
+    });
   }
 
   /**
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    await this.internalExecute(
-      `ROLLBACK TO SAVEPOINT "${name}"`,
-      "TRANSACTION",
-      [],
-      false,
-      false,
-      false,
-      false,
-    );
+    await this.internalExecute(`ROLLBACK TO SAVEPOINT "${name}"`, "TRANSACTION", {
+      materializeTransactions: false,
+    });
   }
 
   /**

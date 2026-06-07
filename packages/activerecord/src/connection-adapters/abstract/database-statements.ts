@@ -1296,13 +1296,9 @@ export async function internalExecQuery(
     // Materialize lazy transactions before executing SQL
     const tm = (this as any)._transactionManager as TransactionManager | undefined;
     if (tm) await tm.materializeTransactions();
-    if (this?.internalExecute) {
-      const rawResult = await this.internalExecute(sql, sqlName, binds);
-      return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
-    }
     if (binds && binds.length > 0) {
       throw new Error(
-        "internalExecQuery requires internalExecute on the adapter when binds are provided",
+        "internalExecQuery requires execQuery on the adapter when binds are provided",
       );
     }
     // Fallback: delegate through this.execute only when there are no binds
@@ -1613,6 +1609,8 @@ export const DatabaseStatements = {
 /** @internal */
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#raw_execute
+ *
+ * @internal
  */
 export async function rawExecute(
   this: DatabaseStatementsHost,

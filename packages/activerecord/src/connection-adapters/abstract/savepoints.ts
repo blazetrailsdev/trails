@@ -46,11 +46,7 @@ export interface SavepointHost {
   internalExecute(
     sql: string,
     name: string,
-    binds?: unknown[],
-    prepare?: boolean,
-    async?: boolean,
-    allowRetry?: boolean,
-    materializeTransactions?: boolean,
+    opts?: { materializeTransactions?: boolean },
   ): Promise<unknown>;
   currentSavepointName?(): string;
 }
@@ -62,15 +58,9 @@ export interface SavepointHost {
  */
 export async function createSavepoint(this: SavepointHost, name?: string): Promise<void> {
   const spName = name ?? this.currentSavepointName?.() ?? currentSavepointName();
-  await this.internalExecute(
-    createSavepointSql(spName),
-    "TRANSACTION",
-    [],
-    false,
-    false,
-    false,
-    false,
-  );
+  await this.internalExecute(createSavepointSql(spName), "TRANSACTION", {
+    materializeTransactions: false,
+  });
 }
 
 /**
@@ -80,15 +70,9 @@ export async function createSavepoint(this: SavepointHost, name?: string): Promi
  */
 export async function execRollbackToSavepoint(this: SavepointHost, name?: string): Promise<void> {
   const spName = name ?? this.currentSavepointName?.() ?? currentSavepointName();
-  await this.internalExecute(
-    execRollbackToSavepointSql(spName),
-    "TRANSACTION",
-    [],
-    false,
-    false,
-    false,
-    false,
-  );
+  await this.internalExecute(execRollbackToSavepointSql(spName), "TRANSACTION", {
+    materializeTransactions: false,
+  });
 }
 
 /**
@@ -98,15 +82,9 @@ export async function execRollbackToSavepoint(this: SavepointHost, name?: string
  */
 export async function releaseSavepoint(this: SavepointHost, name?: string): Promise<void> {
   const spName = name ?? this.currentSavepointName?.() ?? currentSavepointName();
-  await this.internalExecute(
-    releaseSavepointSql(spName),
-    "TRANSACTION",
-    [],
-    false,
-    false,
-    false,
-    false,
-  );
+  await this.internalExecute(releaseSavepointSql(spName), "TRANSACTION", {
+    materializeTransactions: false,
+  });
 }
 
 /**
