@@ -1371,7 +1371,12 @@ export { deleteStatement as remove };
 // ---------------------------------------------------------------------------
 
 interface DatabaseStatementsDefaultsHost {
-  execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]>;
+  execute(
+    sql: string,
+    binds?: unknown[],
+    name?: string,
+    opts?: { allowRetry?: boolean },
+  ): Promise<Record<string, unknown>[]>;
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
   selectAll(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
   selectRows(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
