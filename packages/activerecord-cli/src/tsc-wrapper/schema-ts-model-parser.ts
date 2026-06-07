@@ -122,9 +122,10 @@ function parseAddForeignKey(call: ts.CallExpression): ForeignKeyDefinition | und
   // fires on a hand-written schema.ts.
   const column = (opts && strLiteral(objPropValue(opts, "column"))) ?? `${singularize(toTable)}_id`;
   const primaryKey = (opts && strLiteral(objPropValue(opts, "primaryKey"))) ?? "id";
-  // Synthesize a name following Rails' foreignKeyName algorithm so the result
-  // matches fk_rails_[0-9a-f]{10} and isExportNameOnSchemaDump returns false,
-  // letting SchemaDumper suppress name: on a subsequent dump (round-trip).
+  // Synthesize a name following Rails' foreign_key_name algorithm (mirrored by
+  // schema-statements.ts:foreignKeyName) so the result matches fk_rails_[0-9a-f]{10}
+  // and isExportNameOnSchemaDump returns false, letting SchemaDumper suppress
+  // name: on a subsequent dump (round-trip).
   const synthesizeName = (table: string, col: string): string => {
     const cols = col.split(",").map((c) => c.trim());
     const identifier = `${table}_${cols.join("_and_")}_fk`;
