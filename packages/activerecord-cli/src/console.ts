@@ -26,15 +26,17 @@ export async function arConsole(
     return 1;
   }
 
-  const configs = DatabaseTasks.configsFor(DatabaseConfigurations.currentEnv());
-  if (configs.length > 0) {
-    const dbConfig = configs.find((c) => c.name === "primary") ?? configs[0]!;
-    try {
-      await Base.establishConnection(dbConfig.configurationHash as { [key: string]: unknown });
-    } catch (err) {
-      console.error(`ar: failed to establish connection — ${String(err)}`);
-      return 1;
-    }
+  const env = DatabaseConfigurations.currentEnv();
+  const dbConfig = DatabaseTasks.databaseConfiguration?.findDbConfig(env);
+  if (!dbConfig) {
+    console.error(`ar: no database configuration found for environment "${env}"`);
+    return 1;
+  }
+  try {
+    await Base.establishConnection(dbConfig.configurationHash as { [key: string]: unknown });
+  } catch (err) {
+    console.error(`ar: failed to establish connection — ${String(err)}`);
+    return 1;
   }
 
   const models = await tryLoadModels(cwd).catch((err: unknown) => {
