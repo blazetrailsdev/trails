@@ -80,7 +80,7 @@ export const TEST_SCHEMA: Schema = {
     name: "string",
     wheels_count: { type: "integer", default: 0, null: false },
     wheels_owned_at: "datetime",
-    manufactured_at: { type: "datetime", defaultFunction: "CURRENT_TIMESTAMP" },
+    manufactured_at: { type: "datetime", precision: null, defaultFunction: "CURRENT_TIMESTAMP" },
   },
 
   articles: {},
