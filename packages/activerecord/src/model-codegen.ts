@@ -238,7 +238,7 @@ export function generateModels(
       // Composite FK: emit TODO comment, no association.
       if (fk.column.includes(",")) {
         fromCls.leadingComments.push(
-          `// TODO composite FK: ${fk.column} -> ${fk.toTable}.${fk.primaryKey}`,
+          `// TODO composite FK ${fk.name}: ${fk.column} -> ${fk.toTable}.${fk.primaryKey}`,
         );
         continue;
       }
