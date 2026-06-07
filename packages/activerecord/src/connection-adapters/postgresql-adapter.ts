@@ -1271,6 +1271,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         throw translated;
       }
     });
+    // Mirrors Rails' raw_execute → verified!: a successful round-trip proves the
+    // connection is live, so skip the verify ping on the next withRawConnection.
+    this.verifiedBang();
     this._flushWarnings(rewritten);
     return castResult.call(this, pgResult);
   }
@@ -1351,6 +1354,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const client = conn as unknown as pg.Client;
           const result = await this._runQuery(client, rewritten, binds);
+          // Mirrors Rails' raw_execute → verified! (database_statements.rb):
+          // a successful round-trip proves the connection is live, so mark it
+          // verified to skip the verify ping on the next withRawConnection.
+          this.verifiedBang();
           payload.row_count = result.rows.length;
           this._flushWarnings(rewritten);
           return result.rows;
@@ -1464,6 +1471,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         payload.exception_object = translated;
         throw translated;
       }
+      // Mirrors Rails' raw_execute → verified!: the block completed a live
+      // round-trip, so mark verified to skip the next withRawConnection's ping.
+      this.verifiedBang();
       // Flush inside the instrumented callback so a raised SQLWarning is visible
       // to instrumentation subscribers — mirrors handle_warnings inside perform_query.
       this._flushWarnings(payload.sql as string);
