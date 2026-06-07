@@ -149,7 +149,7 @@ export interface WithTransactionalFixturesOptions {
   /**
    * Optional async hook that runs at the very start of the `beforeAll`
    * registered by this helper — before `pushSkipGlobalReset()`. Used by
-   * {@link useTransactionalTests} to co-locate `bootstrapTestHandler` and
+   * {@link useTransactionalTests} to co-locate `establishFromTestConfig` and
    * `pushSkipGlobalReset` in a single `beforeAll` (matches the idiom in
    * `setupHandlerSuite`).
    *

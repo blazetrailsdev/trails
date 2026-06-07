@@ -1,5 +1,5 @@
 import { Base } from "../base.js";
-import { bootstrapTestHandler } from "./bootstrap-test-handler.js";
+import { establishFromTestConfig } from "./test-database-config.js";
 import {
   withTransactionalFixtures,
   type WithTransactionalFixturesOptions,
@@ -54,13 +54,13 @@ import {
  *   it("fires after_commit callback", async () => { ... }); // no outer txn
  */
 export function useTransactionalTests(options?: WithTransactionalFixturesOptions): void {
-  // bootstrapTestHandler and pushSkipGlobalReset run in the same beforeAll
+  // establishFromTestConfig and pushSkipGlobalReset run in the same beforeAll
   // hook so a bootstrap failure does not leave pushSkipGlobalReset orphaned
-  // (matches the idiom in setupHandlerSuite). bootstrapTestHandler is
-  // idempotent (guarded by !Base.isConnectedQ()), so calling it from both
+  // (matches the idiom in setupHandlerSuite). establishFromTestConfig is
+  // idempotent (guarded by Base.isConnectedQ()), so calling it from both
   // setupHandlerSuite and useTransactionalTests in the same file is safe.
   withTransactionalFixtures(() => Base.connection, {
     ...options,
-    _beforeAll: bootstrapTestHandler,
+    _beforeAll: establishFromTestConfig,
   });
 }

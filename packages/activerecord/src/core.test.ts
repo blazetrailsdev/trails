@@ -510,7 +510,7 @@ describe("Base features (Rails-guided) - core", () => {
   });
 
   it.skip("adapter throws when not configured", () => {
-    // D-Y-INCOMPATIBLE: bootstrapTestHandler() installs Base.connectionHandler at
+    // D-Y-INCOMPATIBLE: setupHandlerSuite() installs Base.connectionHandler at
     // worker startup so subclasses now inherit a pool and never throw.
     class NoAdapter extends Base {
       static {
@@ -872,7 +872,7 @@ describe("Base (extended)", () => {
 
   describe("adapter", () => {
     it.skip("throws when no adapter is set", () => {
-      // D-Y-INCOMPATIBLE: bootstrapTestHandler() installs Base.connectionHandler at
+      // D-Y-INCOMPATIBLE: setupHandlerSuite() installs Base.connectionHandler at
       // worker startup so subclasses now inherit a pool and never throw.
       class Orphan extends Base {}
       expect(() => Orphan.connection).toThrow("No connection pool for");

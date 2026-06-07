@@ -1,12 +1,12 @@
 /**
  * Builds the test-environment `DatabaseConfigurations` from the standard
  * env-var signals (`PG_TEST_URL` / `MYSQL_TEST_URL` / sqlite fallback) and
- * wires it into `DatabaseTasks`. This moves the env-sniff that lives in
- * `bootstrapTestHandler` to the `DatabaseTasks` layer so `loadSchema` and
- * `reconstructFromSchema` can use the real Rails-mirrored path.
+ * wires it into `DatabaseTasks`, routing schema load through the real
+ * Rails-mirrored path (`loadSchema` / `reconstructFromSchema`).
  *
  * Phase 1 of RFC 0002 — new file, no consumer changes.
  * Phase 2 of RFC 0002 — adds `establishFromTestConfig` for setupHandlerSuite.
+ * Phase 4 of RFC 0002 — sole env-sniff source after bootstrap-test-handler deleted.
  */
 
 import { getEnv } from "@blazetrails/activesupport";
