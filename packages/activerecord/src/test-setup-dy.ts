@@ -1,53 +1,80 @@
 /**
- * D-Y vitest setupFile for the activerecord project: loads the canonical
- * fixture schema once per worker via a temporary handler connection, then
- * tears the handler down so old-path test files (those that never call
- * setupHandlerSuite) are not affected by a globally-installed handler pool.
+ * D-Y vitest setupFile for the activerecord project: establishes Base from
+ * the Phase-1 test config, loads the canonical fixture schema once per worker
+ * via `DatabaseTasks`, then tears the handler down so old-path test files
+ * (those that never call `setupHandlerSuite`) are not affected by a
+ * globally-installed handler pool.
  *
  * Handler-path test files re-establish the connection in their own beforeAll
- * via setupHandlerSuite() → bootstrapTestHandler().
+ * via setupHandlerSuite() → establishFromTestConfig().
  *
  * Must run AFTER test-setup-ar.ts so better-sqlite3 is registered and
- * bootstrapTestHandler can open the pool.
+ * Base.establishConnection can open the pool.
+ *
+ * Driver gate (RFC 0002 §Design):
+ *   - sqlite :memory: → loadSchema (fresh DB, no existing tables)
+ *   - sqlite file → reconstructFromSchema (per-worker isolated file; purge is
+ *     safe — no other worker shares this file path)
+ *   - PG/MySQL → loadSchema (shared DB; reconstructFromSchema would purge the
+ *     whole database, which fails while other workers hold sessions (PG error
+ *     55006) and resets DB collation on MySQL 8, breaking case-sensitivity.
+ *     The schema file uses force:"cascade" for per-table drop+recreate.)
  */
-import { bootstrapTestHandler } from "./test-helpers/bootstrap-test-handler.js";
-import {
-  defineSchema,
-  seedSchemaSignatures,
-  setCanonicalSchemaPreload,
-} from "./test-helpers/define-schema.js";
+import { buildTestDatabaseConfig } from "./test-helpers/test-database-config.js";
+import { generateSchemaFile } from "./test-helpers/schema-file-generator.js";
+import { seedSchemaSignatures, setCanonicalSchemaPreload } from "./test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Base } from "./base.js";
+import { DatabaseTasks } from "./tasks/database-tasks.js";
 // Registers _RelationCtor so Model.first()/.all()/.where() etc. work in
 // test files that import base.js directly rather than index.js (which
 // re-exports relation.js as a side effect).
 import "./relation.js";
 
-await bootstrapTestHandler();
-// Phase 0 sqlite template-clone: the worker DB is a file copy of a pre-built
-// template, so the canonical tables already exist. Seed their signatures so
-// the defineSchema() below short-circuits to a cache-hit (no per-file DDL).
-// defineSchema's dataSourceExists guard still recreates any table a prior
-// file's reset dropped from the shared worker file, preserving correctness.
-if (process.env.AR_TEST_WORKER_DB && Base.connection.adapterName === "sqlite") {
-  seedSchemaSignatures(Base.connection, TEST_SCHEMA);
+const { adapter, envConfig } = await buildTestDatabaseConfig();
+const schemaFilePath = await generateSchemaFile(TEST_SCHEMA, adapter);
+
+await Base.establishConnection(envConfig.configuration as Record<string, unknown>);
+
+if (adapter === "sqlite" && envConfig.database !== ":memory:") {
+  await DatabaseTasks.reconstructFromSchema(envConfig, "ts", schemaFilePath);
+} else {
+  await DatabaseTasks.loadSchema(envConfig, "ts", schemaFilePath);
 }
-if (process.env.AR_TEST_PG_TEMPLATE && Base.connection.adapterName === "postgres") {
-  seedSchemaSignatures(Base.connection, TEST_SCHEMA);
+
+// Permanent worker-startup assertion: key canonical tables must exist after
+// DatabaseTasks loads the schema. Failure here means the load path is broken,
+// not just the signature cache. Cast because tableExists is on the concrete
+// adapter class, not the DatabaseAdapter interface.
+const _conn = Base.connection as unknown as { tableExists(n: string): Promise<boolean> };
+const missingTables: string[] = [];
+for (const t of ["accounts", "topics", "posts"]) {
+  if (!(await _conn.tableExists(t))) missingTables.push(t);
 }
-if (process.env.AR_TEST_MYSQL_TEMPLATE && Base.connection.adapterName === "mysql") {
-  seedSchemaSignatures(Base.connection, TEST_SCHEMA);
+if (missingTables.length > 0) {
+  throw new Error(
+    `[test-setup-dy] DatabaseTasks schema load incomplete — missing tables: ${missingTables.join(", ")}`,
+  );
 }
-await defineSchema(TEST_SCHEMA);
+
+// Seed the signature cache so handler-path files' defineSchema(TEST_SCHEMA)
+// calls remain cache-hit no-ops. DatabaseTasks.loadSchema goes through
+// MigrationContext (not defineSchema), so _appliedSchemaSignatures is empty
+// after the load — seedSchemaSignatures bridges the gap before
+// setCanonicalSchemaPreload snapshots the cache.
+seedSchemaSignatures(Base.connection, TEST_SCHEMA);
 setCanonicalSchemaPreload(Base.connection);
 
 // Remove the connection pool from the handler so old-path workers don't
 // inherit an active pool.  isConnectedQ() returns false after this, so
 // handler-path files reinstall it cleanly via setupHandlerSuite() →
-// bootstrapTestHandler().
+// establishFromTestConfig().
 Base.removeConnection();
 // Also clear the cached checkout: Base.adapter caches a pool-leased
 // connection in Base._adapter; subclasses without their own _adapter
 // resolve through the prototype chain and would inherit the MySQL/PG
 // adapter from this preload on MariaDB/PG CI workers.
 Base._adapter = null;
+// Clear DatabaseTasks global state so database-tasks.test.ts sees the null
+// invariant it expects (it tests checkProtectedEnvironmentsBang with no config).
+DatabaseTasks.databaseConfiguration = null;
