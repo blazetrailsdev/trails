@@ -111,11 +111,10 @@ describe("ArGenerateMigrationTest", () => {
   });
 
   it("test_migration_with_invalid_file_name", async () => {
-    // colon survives normalizeSnakeName; mirrors Rails' add_something:datetime example
+    // colon survives normalizeSnakeName (hyphens do not — they become underscores)
     await expect(
       generateMigration(dir, "add_something:datetime", [], "20240101120003"),
     ).rejects.toThrow(IllegalMigrationNameError);
-    // space survives normalizeSnakeName
     await expect(generateMigration(dir, "my migration", [], "20240101120003")).rejects.toThrow(
       IllegalMigrationNameError,
     );
