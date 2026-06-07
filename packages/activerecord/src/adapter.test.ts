@@ -577,10 +577,19 @@ describe("AdapterConnectionTest", () => {
       });
     }).rejects.toBeInstanceOf(ConnectionFailed);
   });
-  it.skip("#execute is retryable", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#execute: allowRetry: true must reconnect on remote kill
-    // SCOPE: ~20 LOC; affects ~5 tests
+
+  it("#execute is retryable", async () => {
+    const adapter = new LifecycleTestAdapter();
+    adapter.simulateConnect();
+    adapter.remoteDisconnect();
+
+    let attempts = 0;
+    await adapter.withRawConnection({ allowRetry: true }, async () => {
+      attempts++;
+      if (attempts === 1) throw new ConnectionFailed("remote disconnect");
+    });
+    expect(attempts).toBe(2);
+    expect(adapter.active).toBe(true);
   });
   it.skip("disconnect and recover on #configure_connection failure", () => {
     // BLOCKED: connection-pool

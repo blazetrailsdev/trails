@@ -218,3 +218,43 @@ describe("PostgreSQLAdapter#execQuery prepare override", () => {
     }
   });
 });
+
+describe("PostgreSQLAdapter#executeMutation", () => {
+  let adapter: PostgreSQLAdapter;
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    if (adapter) await adapter.close().catch(() => undefined);
+  });
+
+  it("savepoint nesting does not re-enter withRawConnection (_lockQueue)", async () => {
+    // executeMutation runs its RETURNING-retry savepoints via client.query()
+    // on the yielded conn — it does NOT call this.createSavepoint(), which
+    // would re-acquire withRawConnection and deadlock _lockQueue. Verify that
+    // the outer lock is released cleanly (a second withRawConnection call
+    // queued immediately after must succeed without hanging).
+    const fakeClient = {
+      query: async () => ({ rows: [{ id: 42 }], rowCount: 1, fields: [] }),
+      release: () => {},
+    };
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+    vi.spyOn(adapter as unknown as { getClient: () => unknown }, "getClient").mockResolvedValue(
+      fakeClient,
+    );
+
+    const result = await adapter.executeMutation(
+      "INSERT INTO posts (title) VALUES ('test')",
+      [],
+      "SQL",
+    );
+    expect(typeof result).toBe("number");
+
+    // A second withRawConnection call must complete immediately — if the first
+    // call deadlocked on _lockQueue the second would never resolve.
+    let secondCallRan = false;
+    await adapter.withRawConnection({ materializeTransactions: false }, async () => {
+      secondCallRan = true;
+    });
+    expect(secondCallRan).toBe(true);
+  });
+});
