@@ -737,14 +737,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result> {
     sql = this.preprocessQuery(sql);
     // Note: we do NOT call materializeTransactions() here. If a lazy tx
-    // is pending but un-materialized, a SELECT against an ad-hoc pool
-    // client sees pre-tx state — which is correct read-before-write
-    // semantics. If the tx HAS begun, `_client` is set and withClient()
-    // uses it.
+    // is pending but un-materialized, a SELECT sees pre-tx state — which
+    // is correct read-before-write semantics.
 
     // Release the query client BEFORE any loadAdditionalTypes call —
     // that path re-enters execute() and acquires its own pooled client,
@@ -773,18 +771,26 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       payload,
       async () => {
         try {
-          const r = await this.withClient(async (client) =>
-            // rowMode: "array" returns rows as positional arrays, preserving
-            // duplicate column names and matching the field-index order.
-            // Delegates to `_runQuery` so prepared-statement caching and
-            // in-txn / out-of-txn cached-plan handling stay in one place.
-            this._runQuery<ArrayQueryResult>(client, rewritten, bindArray, {
-              rowMode: "array",
-              prepareOverride: options?.prepare,
-              onPrepared: (stmtName) => {
-                payload.statement_name = stmtName;
-              },
-            }),
+          const r = await this.withRawConnection(
+            { materializeTransactions: false, allowRetry: options?.allowRetry ?? false },
+            async (conn) => {
+              const client = conn as unknown as pg.Client;
+              try {
+                // rowMode: "array" returns rows as positional arrays, preserving
+                // duplicate column names and matching the field-index order.
+                // Delegates to `_runQuery` so prepared-statement caching and
+                // in-txn / out-of-txn cached-plan handling stay in one place.
+                return await this._runQuery<ArrayQueryResult>(client, rewritten, bindArray, {
+                  rowMode: "array",
+                  prepareOverride: options?.prepare,
+                  onPrepared: (stmtName) => {
+                    payload.statement_name = stmtName;
+                  },
+                });
+              } catch (e: any) {
+                throw this._translateException(e, rewritten, bindArray);
+              }
+            },
           );
           payload.row_count = r.rows?.length ?? 0;
           return r;
@@ -1795,7 +1801,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    return this.withClient(async (client) => {
+    return this.withRawConnection({}, async (conn) => {
+      const client = conn as unknown as pg.Client;
       const clause = this._explainStatementClause(options);
       // Rewrite `?` → `$1` the same way execute/execQuery do, so a
       // collected query with driver-neutral placeholders (`?`) can be
