@@ -203,6 +203,15 @@ export const SKIP_GROUPS: SkipGroup[] = [
 export const SKIP = new Set<string>(SKIP_GROUPS.flatMap((g) => g.names));
 
 /**
+ * Ruby method names whose arity is *intentionally* allowed to diverge from the
+ * TS port; the advisory arity check (arity.ts) suppresses these. For documented
+ * deliberate differences only, NOT to silence real gaps. Seeded empty.
+ */
+export const ARITY_OVERRIDE_GROUPS: SkipGroup[] = [];
+
+export const ARITY_OVERRIDES = new Set<string>(ARITY_OVERRIDE_GROUPS.flatMap((g) => g.names));
+
+/**
  * Camel-prefixes that are *already* predicates, so the bare camel form is the
  * canonical candidate and the `is*` form is only a disambiguating fallback
  * (e.g. `hasOne` + `isHasOne`). `rubyMethodToTs` matches on these and the

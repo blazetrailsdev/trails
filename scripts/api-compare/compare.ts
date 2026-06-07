@@ -13,12 +13,17 @@
  * Usage:
  *   npx tsx scripts/api-compare/compare.ts \
  *     [--package activerecord] [--missing] [--files] [--incomplete] \
- *     [--inheritance] [--public-only | --privates-only]
+ *     [--inheritance] [--arity] [--public-only | --privates-only]
  *
  * The default reports the full surface (public + private). `--public-only`
  * drops Rails-private/internal methods on both sides for a contract-only
  * view; `--privates-only` is the inverse. The JSON artifact is always
  * written to output/api-comparison*.json regardless of flags.
+ *
+ * The advisory arity check compares the positional-arg ranges of name-matched
+ * methods (it never affects the parity %). A one-line summary always prints and
+ * output/arity-mismatches.json is always written; `--arity` adds the
+ * per-method breakdown.
  *
  * Each host class's expected method set is expanded with the instance
  * methods of every module it `include`s (and class methods of modules it
@@ -31,7 +36,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "./types.js";
+import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo, ParamInfo } from "./types.js";
 import {
   DIR_TO_PACKAGES,
   OUTPUT_DIR,
@@ -41,7 +46,8 @@ import {
   packageSrcDir,
 } from "./config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
-import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
+import { ARITY_OVERRIDES, rubyFileToTs, rubyMethodToTs } from "./conventions.js";
+import { arityMatches, renderSig, shouldSkipArity, type ArityRange } from "./arity.js";
 import { isSourceUnported } from "./unported-files.js";
 
 const DETAIL_PACKAGES = new Set([
@@ -105,6 +111,27 @@ interface PackageResult {
   excludedFiles: string[];
   files: FileResult[];
   inheritance: InheritanceResult;
+  arity: ArityResult;
+}
+
+// Advisory signature comparison: for a name-matched (ruby, ts) pair whose
+// positional-arg ranges don't overlap. Never affects the parity %.
+interface ArityMismatch {
+  rubyFile: string;
+  tsFile: string;
+  rubyName: string;
+  tsName: string;
+  rubySig: string;
+  tsSig: string;
+  rubyRange: ArityRange;
+  tsRange: ArityRange;
+}
+
+interface ArityResult {
+  /** Pairs whose arity was actually compared (skips excluded). */
+  compared: number;
+  mismatched: number;
+  mismatches: ArityMismatch[];
 }
 
 interface InheritanceMismatch {
@@ -597,6 +624,8 @@ function main() {
   const showFiles = args.includes("--files");
   const showIncomplete = args.includes("--incomplete");
   const showInheritance = args.includes("--inheritance");
+  // Arity is always computed (summary + artifact); --arity adds the breakdown.
+  const showArity = args.includes("--arity");
   // Comparison bucket:
   //   default        → public + private combined (full surface)
   //   --public-only  → public API only (historical default; matches
@@ -650,12 +679,26 @@ function main() {
     const tsShouldInclude = (m: MethodInfo) => tsShouldIncludeInIndex(m, mode);
     const tsMethodsByFile = new Map<string, Set<string>>();
 
+    // Param side-map for the advisory arity check (tsMethodsByFile carries
+    // only names). Every signature seen for a name — across own methods, setter
+    // accessors, and same-named functions elsewhere; a pair matches when it
+    // overlaps ANY, so overload ambiguity never yields a false positive.
+    const tsAllParamsByName = new Map<string, ParamInfo[][]>();
+    const recordTsParams = (m: MethodInfo) => {
+      const all = tsAllParamsByName.get(m.name) || [];
+      all.push(m.params);
+      tsAllParamsByName.set(m.name, all);
+    };
+
     if (tsPkg) {
       const addMethods = (cls: ClassInfo) => {
         const file = cls.file || "";
         const methods = tsMethodsByFile.get(file) || new Set();
         for (const m of [...cls.instanceMethods, ...cls.classMethods]) {
-          if (tsShouldInclude(m)) methods.add(m.name);
+          if (tsShouldInclude(m)) {
+            methods.add(m.name);
+            recordTsParams(m);
+          }
         }
         tsMethodsByFile.set(file, methods);
       };
@@ -668,7 +711,10 @@ function main() {
         for (const [file, fns] of Object.entries(tsPkg.fileFunctions)) {
           const methods = tsMethodsByFile.get(file) || new Set();
           for (const fn of fns) {
-            if (tsShouldInclude(fn)) methods.add(fn.name);
+            if (tsShouldInclude(fn)) {
+              methods.add(fn.name);
+              recordTsParams(fn);
+            }
           }
           tsMethodsByFile.set(file, methods);
         }
@@ -922,6 +968,8 @@ function main() {
     let totalFiles = 0;
     let filesExist = 0;
     let totalMisplaced = 0;
+    let arityCompared = 0;
+    const arityMismatches: ArityMismatch[] = [];
     const fileResults: FileResult[] = [];
 
     for (const [rubyFile, items] of [...byFile.entries()].sort(([a], [b]) => a.localeCompare(b))) {
@@ -954,14 +1002,49 @@ function main() {
       // the same method (e.g., 8 subclasses in binary.rb each override
       // `invert`). Count once.
       const seen = new Map<string, { rubyName: string; rubyModule: string }>();
+      // First-sighting Ruby params per name (mirrors `seen`'s dedup) for arity.
+      const rubyParamsByName = new Map<string, ParamInfo[]>();
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
         for (const rm of rubyMethods) {
           if (!methodMatchesMode(rm)) continue;
           dedupeRubyMethodInto(seen, rm, item.fqn);
+          if (!rubyParamsByName.has(rm.name)) rubyParamsByName.set(rm.name, rm.params);
         }
       }
+
+      // Advisory arity check for one name-matched pair: flag when the Ruby and
+      // TS positional-arg ranges don't overlap (see arity.ts).
+      const checkArity = (rubyName: string, tsName: string, tsFile: string) => {
+        if (ARITY_OVERRIDES.has(rubyName)) return;
+        // Ruby writers (`foo=`) map to a TS setter/assignable property; the name
+        // match already confirms it exists and arity isn't meaningful here.
+        if (rubyName.endsWith("=")) return;
+        const rubyParams = rubyParamsByName.get(rubyName);
+        if (!rubyParams) return;
+        // Match against ANY recorded signature for the name (overlap is lenient).
+        const candidates = tsAllParamsByName.get(tsName) || [];
+        if (candidates.length === 0) return;
+        if (candidates.every((c) => shouldSkipArity(rubyParams, c))) return;
+        arityCompared++;
+        let best: { c: ParamInfo[]; rubyRange: ArityRange; tsRange: ArityRange } | null = null;
+        for (const c of candidates) {
+          const m = arityMatches(rubyParams, c);
+          if (m.ok) return;
+          if (!best) best = { c, rubyRange: m.rubyRange, tsRange: m.tsRange };
+        }
+        arityMismatches.push({
+          rubyFile,
+          tsFile,
+          rubyName,
+          tsName,
+          rubySig: renderSig(rubyParams, "ruby"),
+          tsSig: renderSig(best!.c, "ts"),
+          rubyRange: best!.rubyRange,
+          tsRange: best!.tsRange,
+        });
+      };
 
       // Misplaced-file detection: tally per-sibling-file how many of
       // this Ruby file's expected TS candidates land there, then pick
@@ -994,6 +1077,7 @@ function main() {
         const directMatch = tsCandidates.find((c) => tsMethods.has(c));
         if (directMatch) {
           fileMatched++;
+          checkArity(rubyName, directMatch, expectedTs);
           continue;
         }
 
@@ -1013,6 +1097,7 @@ function main() {
 
         if (foundViaInclude) {
           fileMatched++;
+          checkArity(rubyName, matchedCandidate!, foundViaInclude);
           moves.push({
             tsName: matchedCandidate!,
             rubyName,
@@ -1029,6 +1114,7 @@ function main() {
           const misplacedMatch = tsCandidates.find((c) => actualMethods.has(c));
           if (misplacedMatch) {
             fileMatched++;
+            checkArity(rubyName, misplacedMatch, misplacedActualFile!);
             moves.push({
               tsName: misplacedMatch,
               rubyName,
@@ -1201,6 +1287,11 @@ function main() {
       excludedFiles: [...excludedFiles].sort(),
       files: fileResults,
       inheritance,
+      arity: {
+        compared: arityCompared,
+        mismatched: arityMismatches.length,
+        mismatches: arityMismatches,
+      },
     });
   }
 
@@ -1218,7 +1309,35 @@ function main() {
     JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2),
   );
 
-  printReport(results, showMissing, showFiles, filterPkg, showIncomplete, showInheritance, mode);
+  // Advisory arity artifact — always written; flat across packages.
+  const arityPath = path.join(OUTPUT_DIR, "arity-mismatches.json");
+  const arityFlat = results.flatMap((r) =>
+    r.arity.mismatches.map((m) => ({ package: r.package, ...m })),
+  );
+  fs.writeFileSync(
+    arityPath,
+    JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        compared: results.reduce((n, r) => n + r.arity.compared, 0),
+        mismatched: arityFlat.length,
+        mismatches: arityFlat,
+      },
+      null,
+      2,
+    ),
+  );
+
+  printReport(
+    results,
+    showMissing,
+    showFiles,
+    filterPkg,
+    showIncomplete,
+    showInheritance,
+    showArity,
+    mode,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1232,6 +1351,7 @@ function printReport(
   filterPkg: string | null,
   showIncomplete = false,
   showInheritance = false,
+  showArity = false,
   mode: CompareMode = "public",
 ) {
   if (mode === "private") {
@@ -1248,6 +1368,8 @@ function printReport(
   let grandFilesExist = 0;
   let grandInhChecked = 0;
   let grandInhMatched = 0;
+  let grandArityCompared = 0;
+  let grandArityMismatched = 0;
 
   for (const pkg of results) {
     grandTotal += pkg.totalMethods;
@@ -1256,6 +1378,8 @@ function printReport(
     grandFilesExist += pkg.filesExist;
     grandInhChecked += pkg.inheritance.checked;
     grandInhMatched += pkg.inheritance.matched;
+    grandArityCompared += pkg.arity.compared;
+    grandArityMismatched += pkg.arity.mismatched;
 
     console.log(`\n${"=".repeat(100)}`);
     const excludedNote =
@@ -1265,10 +1389,21 @@ function printReport(
     const inhNote =
       inh.checked > 0 ? `  |  inheritance: ${inh.matched}/${inh.checked} (${inhPct}%)` : "";
     const misplacedNote = pkg.misplacedFiles > 0 ? `  |  ${pkg.misplacedFiles} misplaced` : "";
+    const ar = pkg.arity;
+    const arOk = ar.compared - ar.mismatched;
+    const arPct = ar.compared > 0 ? Math.round((arOk / ar.compared) * 1000) / 10 : 0;
+    const arityNote = ar.compared > 0 ? `  |  arity: ${arOk}/${ar.compared} (${arPct}%)` : "";
     console.log(
-      `  ${pkg.package}  —  ${pkg.matched}/${pkg.totalMethods} methods (${pkg.percent}%)  |  files: ${pkg.filesExist}/${pkg.totalFiles}${misplacedNote}${inhNote}${excludedNote}`,
+      `  ${pkg.package}  —  ${pkg.matched}/${pkg.totalMethods} methods (${pkg.percent}%)  |  files: ${pkg.filesExist}/${pkg.totalFiles}${misplacedNote}${inhNote}${arityNote}${excludedNote}`,
     );
     console.log(`${"=".repeat(100)}`);
+
+    if (showArity && ar.mismatches.length > 0) {
+      console.log(`\n  Arity mismatches (advisory — does not affect parity):`);
+      for (const m of ar.mismatches) {
+        console.log(`    ${m.tsFile}:${m.tsName}  ruby${m.rubySig}  ts${m.tsSig}`);
+      }
+    }
 
     if (showInheritance && inh.mismatches.length > 0) {
       console.log(`\n  Inheritance mismatches:`);
@@ -1348,9 +1483,19 @@ function printReport(
     grandInhChecked > 0
       ? `  |  inheritance: ${grandInhMatched}/${grandInhChecked} (${inhPct}%)`
       : "";
+  const grandArOk = grandArityCompared - grandArityMismatched;
+  const arPct =
+    grandArityCompared > 0 ? Math.round((grandArOk / grandArityCompared) * 1000) / 10 : 0;
+  const aritySummary =
+    grandArityCompared > 0 ? `  |  arity: ${grandArOk}/${grandArityCompared} (${arPct}%)` : "";
   console.log(
-    `  Overall: ${grandMatched}/${grandTotal} methods (${grandPct}%)  |  files: ${grandFilesExist}/${grandFiles}${inhSummary}`,
+    `  Overall: ${grandMatched}/${grandTotal} methods (${grandPct}%)  |  files: ${grandFilesExist}/${grandFiles}${inhSummary}${aritySummary}`,
   );
+  if (grandArityMismatched > 0 && !showArity) {
+    console.log(
+      `  (${grandArityMismatched} arity mismatches — rerun with --arity for the breakdown, or see output/arity-mismatches.json)`,
+    );
+  }
   console.log(`${"=".repeat(100)}\n`);
 }
 
