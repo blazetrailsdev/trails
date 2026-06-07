@@ -1,26 +1,12 @@
 // Postgres E2E suite — mirrors sqlite-happy-path.test.ts. Set PG_TEST_URL to run.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, readdir, rm, writeFile } from "fs/promises";
-import { tmpdir } from "os";
+import { readdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { run } from "../cli.js";
-import { DatabaseTasks } from "@blazetrails/activerecord";
+import { MIGRATION_BODY, mkE2eTmpDir, teardownE2eFixture } from "./helpers.js";
 
 const PG_URL = process.env.PG_TEST_URL;
-
-const MIGRATION_BODY = `\
-export default {
-  async up() {
-    await this.connection.createTable("users", (t) => {
-      t.string("name");
-    });
-  },
-  async down() {
-    await this.connection.dropTable("users");
-  },
-};
-`;
 
 function pgUrlWithDb(url: string, dbName: string): string {
   const parsed = new URL(url);
@@ -42,7 +28,7 @@ describe.skipIf(!PG_URL)("postgres-happy-path E2E", { timeout: 30_000 }, () => {
   let origTrailsEnv: string | undefined;
 
   beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), "ar-cli-e2e-pg-"));
+    tmpDir = await mkE2eTmpDir("ar-cli-e2e-pg-");
     dbUrl = pgUrlWithDb(PG_URL!, `ar_cli_e2e_${process.hrtime.bigint()}`);
     origTrailsEnv = process.env.TRAILS_ENV;
     process.env.TRAILS_ENV = "development";
@@ -62,11 +48,7 @@ describe.skipIf(!PG_URL)("postgres-happy-path E2E", { timeout: 30_000 }, () => {
     } else {
       process.env.TRAILS_ENV = origTrailsEnv;
     }
-    DatabaseTasks.databaseConfiguration = null;
-    (DatabaseTasks as unknown as { _root: string | null })._root = null;
-    DatabaseTasks.registerMigrations([]);
-    DatabaseTasks.seedLoader = null;
-    await rm(tmpDir, { recursive: true, force: true });
+    await teardownE2eFixture(tmpDir);
     // Per-hook timeout: the suite-level option above covers tests, not hooks,
     // and db:drop here does the same cold connect + DROP DATABASE. See the
     // describe block for the full rationale.

@@ -1,33 +1,17 @@
 // First E2E suite for activerecord-cli. Pattern: in-process run() + tmp sqlite file. Extend with pg/mysql variants in follow-up PRs.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "fs/promises";
-import { tmpdir } from "os";
+import { readdir, readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { run } from "../cli.js";
-import { DatabaseTasks } from "@blazetrails/activerecord";
-
-// Plain MigrationLike object — no import needed, so this resolves correctly
-// from any path. connection is set by DefaultStrategy.exec() before up() fires.
-const MIGRATION_BODY = `\
-export default {
-  async up() {
-    await this.connection.createTable("users", (t) => {
-      t.string("name");
-    });
-  },
-  async down() {
-    await this.connection.dropTable("users");
-  },
-};
-`;
+import { MIGRATION_BODY, mkE2eTmpDir, teardownE2eFixture } from "./helpers.js";
 
 describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
   let tmpDir: string;
   let origTrailsEnv: string | undefined;
 
   beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), "ar-cli-e2e-"));
+    tmpDir = await mkE2eTmpDir("ar-cli-e2e-");
     origTrailsEnv = process.env.TRAILS_ENV;
     // Use development env so the scaffolded file-based SQLite config is chosen.
     // NODE_ENV=test (set by vitest) would otherwise resolve the :memory: test config.
@@ -41,12 +25,7 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
     } else {
       process.env.TRAILS_ENV = origTrailsEnv;
     }
-    // Reset DatabaseTasks singleton state so tests don't leak into each other.
-    DatabaseTasks.databaseConfiguration = null;
-    (DatabaseTasks as unknown as { _root: string | null })._root = null;
-    DatabaseTasks.registerMigrations([]);
-    DatabaseTasks.seedLoader = null;
-    await rm(tmpDir, { recursive: true, force: true });
+    await teardownE2eFixture(tmpDir);
   });
 
   it("init → db:create → generate:migration → db:migrate → db:version → db:migrate:status → db:schema:dump", async () => {
