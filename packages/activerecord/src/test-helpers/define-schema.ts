@@ -657,6 +657,19 @@ async function _defineSchemaImpl(
         ) {
           options["precision"] = 6;
         }
+        // MySQL DATETIME(N) rejects `DEFAULT CURRENT_TIMESTAMP` — the precision
+        // must match: `DEFAULT CURRENT_TIMESTAMP(N)`. Qualify the function name
+        // when the column has a non-zero precision.
+        if (adapter.adapterName === "mysql") {
+          const prec = options["precision"] as number | undefined;
+          const dflt = options["default"];
+          if (typeof dflt === "function" && prec != null && prec > 0) {
+            const raw = (dflt as () => string)();
+            if (/^CURRENT_TIMESTAMP$/i.test(raw)) {
+              options["default"] = () => `CURRENT_TIMESTAMP(${prec})`;
+            }
+          }
+        }
         t.column(colName, arType, options);
       }
     });
