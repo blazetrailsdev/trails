@@ -1506,6 +1506,13 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
     expect(DatabaseTasks.dumpSchemaFilename()).toBe("custom.rb");
   });
 
+  it("check dump filename preserves raw SCHEMA value including whitespace", () => {
+    // Rails: `return ENV["SCHEMA"] if ENV["SCHEMA"]` — returns raw value when set.
+    // Empty string is truthy in Ruby, so SCHEMA="" returns ""; SCHEMA="  f  " returns "  f  ".
+    process.env.SCHEMA = "  custom.rb  ";
+    expect(DatabaseTasks.dumpSchemaFilename()).toBe("  custom.rb  ");
+  });
+
   it("check dump filename defaults for non primary databases", () => {
     const config = new HashConfig("test", "animals", { adapter: "sqlite3" });
     expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/animals_schema.ts");

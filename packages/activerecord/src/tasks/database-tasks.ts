@@ -450,8 +450,8 @@ export class DatabaseTasks {
   }
 
   static dumpSchemaFilename(config?: DatabaseConfig, format?: SchemaFormat): string {
-    const envSchema = getEnv("SCHEMA")?.trim();
-    if (envSchema) return envSchema;
+    const envSchema = getEnv("SCHEMA");
+    if (envSchema !== undefined) return envSchema;
     const fmt = format ?? this.schemaFormat;
     const ext = fmt === "sql" ? "sql" : fmt;
     const base = fmt === "sql" ? "structure" : "schema";
@@ -749,8 +749,8 @@ export class DatabaseTasks {
    * Returns `null` when the config disables schema dumping (`schemaDump: false`).
    */
   static schemaDumpPath(config?: DatabaseConfig, format?: SchemaFormat): string | null {
-    const envSchema = getEnv("SCHEMA")?.trim();
-    if (envSchema) return envSchema;
+    const envSchema = getEnv("SCHEMA");
+    if (envSchema !== undefined) return envSchema;
 
     // Only consult config.schemaDump() when the key is explicitly present.
     // When absent, dumpSchemaFilename() is the authoritative path — it handles
@@ -836,7 +836,7 @@ export class DatabaseTasks {
     format: SchemaFormat = DatabaseTasks.schemaFormat,
     file?: string,
   ): Promise<void> {
-    const filename = file ?? this.schemaDumpPath(config) ?? "";
+    const filename = file ?? this.schemaDumpPath(config, format) ?? "";
     this.checkSchemaFile(filename);
 
     if (format === "sql") {
