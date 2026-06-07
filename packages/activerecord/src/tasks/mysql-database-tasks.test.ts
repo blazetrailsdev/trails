@@ -40,6 +40,67 @@ describe("MySQLDatabaseTasks", () => {
     expect(DatabaseTasks.resolveTask("mysql2")).toBeDefined();
   });
 
+  it("test_purge_preserves_existing_database_charset_and_collation", async () => {
+    const executeCalls: Array<{ sql: string; binds?: unknown[] }> = [];
+    const closeMock = vi.fn(async () => {});
+    let constructorOpts: unknown;
+
+    class FakeMysql2Adapter {
+      constructor(opts: unknown) {
+        constructorOpts = opts;
+      }
+      async execute(sql: string, binds?: unknown[]) {
+        executeCalls.push({ sql, binds });
+        return [{ DEFAULT_CHARACTER_SET_NAME: "utf8mb4", DEFAULT_COLLATION_NAME: "utf8mb4_bin" }];
+      }
+      close = closeMock;
+    }
+
+    vi.resetModules();
+    vi.doMock("../connection-adapters/mysql2-adapter.js", () => ({
+      Mysql2Adapter: FakeMysql2Adapter,
+    }));
+
+    let dropCallCount = 0;
+    let createCallArg: unknown;
+
+    try {
+      const mod =
+        (await import("./mysql-database-tasks.js")) as typeof import("./mysql-database-tasks.js");
+      const tasks = new mod.MySQLDatabaseTasks(
+        new HashConfig("development", "primary", {
+          adapter: "mysql2",
+          database: "trails_test",
+        }),
+      );
+      vi.spyOn(tasks, "drop").mockImplementation(async () => {
+        dropCallCount++;
+      });
+      vi.spyOn(tasks, "create").mockImplementation(async (override) => {
+        createCallArg = override;
+      });
+      await tasks.purge();
+    } finally {
+      vi.doUnmock("../connection-adapters/mysql2-adapter.js");
+      vi.resetModules();
+    }
+
+    // savedCharset must connect without a database (information_schema.SCHEMATA
+    // is server-global; connecting to the target DB would fail with error 1049
+    // if it doesn't exist yet).
+    expect((constructorOpts as Record<string, unknown>).database).toBeUndefined();
+
+    // savedCharset must have queried information_schema.SCHEMATA with the DB name
+    expect(executeCalls).toHaveLength(1);
+    expect(executeCalls[0].sql).toMatch(/FROM information_schema\.SCHEMATA/i);
+    expect(executeCalls[0].binds).toEqual(["trails_test"]);
+
+    // purge must drop then recreate with the saved charset/collation
+    expect(dropCallCount).toBe(1);
+    expect(createCallArg).toEqual({ charset: "utf8mb4", collation: "utf8mb4_bin" });
+    expect(closeMock).toHaveBeenCalledTimes(1);
+  });
+
   it("test_truncate_all_queries_information_schema_and_truncates_each_user_table", async () => {
     const executeCalls: Array<{ sql: string; binds?: unknown[] }> = [];
     const mutationCalls: string[] = [];
