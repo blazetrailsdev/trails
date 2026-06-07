@@ -1485,10 +1485,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       });
       const rawDflt = r.dflt_value as string | null;
       const defaultValue = sqliteExtractValueFromDefault(rawDflt);
-      // A non-null dflt_value that extractValueFromDefault can't parse as a
-      // literal (quoted string, number, hex) is a SQL function expression.
+      // Mirrors Rails' SQLite3Adapter#extract_default_function /
+      // #has_default_function?: only treat the dflt_value as a SQL function
+      // expression when the literal parse returned nil AND the raw string
+      // matches a known function pattern (call, CURRENT_* keywords, concat).
       const defaultFunction =
-        rawDflt !== null && !/^null$/i.test(rawDflt) && defaultValue === null ? rawDflt : null;
+        rawDflt !== null &&
+        !defaultValue &&
+        /\w+\(.*\)|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP|\|\|/.test(rawDflt)
+          ? rawDflt
+          : null;
       return new Sqlite3Column(r.name, defaultValue, meta, r.notnull === 0, {
         primaryKey: r.pk > 0,
         collation: collationMap.get(r.name) ?? null,
