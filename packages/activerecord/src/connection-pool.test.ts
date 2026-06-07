@@ -262,10 +262,8 @@ it("withConnection waits using pool default timeout without explicit checkoutTim
 });
 
 it.skip("new connection no query", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
-  /* needs query tracking */
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — in_memory_db
+  // Rails skips this test when `in_memory_db?` is true; TS always uses :memory: SQLite.
 });
 
 it("active connection in use", () => {
@@ -300,10 +298,9 @@ it("full pool blocks", async () => {
 });
 
 it.skip("full pool blocking shares load interlock", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
-  /* needs thread interlock */
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — skip_fiber_testing / Thread
+  // Rails uses skip_fiber_testing + Concurrent::CountDownLatch thread interlock.
+  // Node.js is single-threaded; blocking cross-thread coordination cannot be reproduced.
 });
 
 it("removing releases latch", async () => {
@@ -515,17 +512,15 @@ it("checkout order is lifo", () => {
 });
 
 it.skip("checkout fairness", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
-  /* needs thread fairness */
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — skip_fiber_testing / Thread
+  // Rails uses skip_fiber_testing + multiple threads to verify FIFO checkout order.
+  // Node.js is single-threaded; cross-thread scheduling fairness cannot be reproduced.
 });
 
 it.skip("checkout fairness by group", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
-  /* needs thread fairness */
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — skip_fiber_testing / Thread
+  // Rails uses skip_fiber_testing + multiple threads grouped by role/shard.
+  // Node.js is single-threaded; cross-thread scheduling fairness cannot be reproduced.
 });
 
 it("automatic reconnect restores after disconnect", () => {
@@ -771,10 +766,9 @@ it("pin connection connected?", async () => {
 });
 
 it.skip("pin connection synchronize the connection", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
-  /* needs thread synchronization */
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — Thread / NullLock
+  // Rails tests NullLock thread-safety object across concurrent threads.
+  // Node.js has no threads; cross-thread lock synchronization cannot be reproduced.
 });
 
 it("pin connection opens a transaction", async () => {
@@ -940,17 +934,15 @@ it("context pin takes priority over fixture pin in unpin", async () => {
 });
 
 it.skip("pin connection nesting lock", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
-  /* needs thread locking */
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — Thread / NullLock
+  // Rails tests NullLock nested-lock semantics across threads.
+  // Node.js has no threads; nested cross-thread locking cannot be reproduced.
 });
 
 it.skip("pin connection nesting lock inverse", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
-  /* needs thread locking */
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — Thread / NullLock
+  // Rails tests NullLock nested-lock inversion semantics across threads.
+  // Node.js has no threads; nested cross-thread locking cannot be reproduced.
 });
 
 it("inspect does not show secrets", () => {
