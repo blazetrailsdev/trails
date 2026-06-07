@@ -394,7 +394,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   // Mirrors: SQLite3::DatabaseStatements#begin_deferred_transaction
   async beginDeferredTransaction(isolation?: string | null): Promise<void> {
     if (isolation) return this._internalBeginTransaction("DEFERRED", isolation);
-    await this.driver.exec("BEGIN DEFERRED TRANSACTION");
+    await this.internalExecute("BEGIN DEFERRED TRANSACTION", "TRANSACTION", {
+      materializeTransactions: false,
+    });
     this._inTransaction = true;
   }
 
@@ -417,27 +419,68 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         );
       }
     }
-    await this.driver.exec(`BEGIN ${mode} TRANSACTION`);
+    await this.internalExecute(`BEGIN ${mode} TRANSACTION`, "TRANSACTION", {
+      materializeTransactions: false,
+    });
     this._inTransaction = true;
     if (isolation) {
       const ruStmt = await this.driver.prepare("PRAGMA read_uncommitted");
       const row = (await ruStmt.get()) as { read_uncommitted: number } | undefined;
       this._previousReadUncommitted = row?.read_uncommitted ?? 0;
-      await this.driver.exec("PRAGMA read_uncommitted=ON");
+      await this.internalExecute("PRAGMA read_uncommitted=ON", "TRANSACTION", {
+        materializeTransactions: false,
+      });
     }
   }
 
   // Mirrors: SQLite3::DatabaseStatements#reset_isolation_level
   async resetIsolationLevel(): Promise<void> {
     if (this._previousReadUncommitted !== null) {
-      await this.driver.exec(`PRAGMA read_uncommitted=${this._previousReadUncommitted}`);
+      await this.internalExecute(
+        `PRAGMA read_uncommitted=${this._previousReadUncommitted}`,
+        "TRANSACTION",
+        { materializeTransactions: false },
+      );
       this._previousReadUncommitted = null;
     }
   }
 
+  // Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_execute
+  // Overrides the abstract mixin default so TRANSACTION SQL (materializeTransactions=false)
+  // skips materializeTransactions() — calling it would trigger re-entrant SAVEPOINT emission.
+  override async internalExecute(
+    sql: string,
+    name: string = "SQL",
+    { materializeTransactions = true }: { materializeTransactions?: boolean } = {},
+  ): Promise<unknown> {
+    sql = this.preprocessQuery(sql);
+    if (materializeTransactions) await this.materializeTransactions();
+    const payload: Record<string, unknown> = {
+      sql,
+      name,
+      binds: [],
+      type_casted_binds: [],
+      connection: this,
+      row_count: 0,
+    };
+    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      try {
+        await this.driver.exec(sql);
+        return 0;
+      } catch (e: any) {
+        const translated = this._translateException(e, sql, []);
+        payload.exception = translated;
+        payload.exception_object = translated;
+        throw translated;
+      }
+    });
+  }
+
   async beginDbTransaction(): Promise<void> {
     if (!this._inTransaction) {
-      await this.driver.exec("BEGIN IMMEDIATE TRANSACTION");
+      await this.internalExecute("BEGIN IMMEDIATE TRANSACTION", "TRANSACTION", {
+        materializeTransactions: false,
+      });
       this._inTransaction = true;
     }
   }
@@ -451,7 +494,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Commit the current transaction.
    */
   async commitDbTransaction(): Promise<void> {
-    await this.driver.exec("COMMIT TRANSACTION");
+    await this.internalExecute("COMMIT TRANSACTION", "TRANSACTION", {
+      materializeTransactions: false,
+    });
     this._inTransaction = false;
   }
 
@@ -464,7 +509,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async rollbackDbTransaction(): Promise<void> {
     try {
-      await this.driver.exec("ROLLBACK TRANSACTION");
+      await this.internalExecute("ROLLBACK TRANSACTION", "TRANSACTION", {
+        materializeTransactions: false,
+      });
     } catch (e) {
       // Mirrors Rails: rescue ConnectionNotEstablished, ConnectionFailed.
       // A closed/dropped connection is an implicit rollback; re-throw anything else.
@@ -485,21 +532,27 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Create a savepoint (nested transaction).
    */
   async createSavepoint(name: string): Promise<void> {
-    await this.driver.exec(`SAVEPOINT "${name}"`);
+    await this.internalExecute(`SAVEPOINT "${name}"`, "TRANSACTION", {
+      materializeTransactions: false,
+    });
   }
 
   /**
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    await this.driver.exec(`RELEASE SAVEPOINT "${name}"`);
+    await this.internalExecute(`RELEASE SAVEPOINT "${name}"`, "TRANSACTION", {
+      materializeTransactions: false,
+    });
   }
 
   /**
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    await this.driver.exec(`ROLLBACK TO SAVEPOINT "${name}"`);
+    await this.internalExecute(`ROLLBACK TO SAVEPOINT "${name}"`, "TRANSACTION", {
+      materializeTransactions: false,
+    });
   }
 
   /**

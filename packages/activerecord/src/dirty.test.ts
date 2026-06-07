@@ -38,7 +38,12 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { NumericData } from "./test-helpers/models/numeric-data.js";
 import { adapterType } from "./test-adapter.js";
-import { assertNoQueriesMatch, assertQueriesMatch } from "./testing/query-assertions.js";
+import {
+  assertNoQueries,
+  assertNoQueriesMatch,
+  assertQueriesCount,
+  assertQueriesMatch,
+} from "./testing/query-assertions.js";
 
 // trails generates column accessors (`pirate.catchphrase`) at runtime, so they
 // aren't visible to TS on the model classes. This alias keeps the inherited
@@ -498,18 +503,92 @@ describe("DirtyTest", () => {
     // no faithful JS equivalent.
   });
 
-  it.skip("partial update", () => {
-    // BLOCKED: query-count parity — Rails asserts exact counts
-    // (`assert_queries_count(6)` for 2×save! with partial writes off, etc.).
-    // trails skips no-op UPDATEs unconditionally and emits different
-    // transaction/statement notifications, so the counts (6/0/3) don't
-    // translate. The behavioral core (no-op saves issue no query; updated_on
-    // bumps only on a real change) is what these assert. SCOPE: query-count
-    // parity, separate PR.
+  it("partial update", async () => {
+    const pirate = new Pirate() as Rec;
+    pirate.catchphrase = "foo";
+
+    await withPartialWrites(Pirate, false, async () => {
+      // Mirrors: assert_queries_count(6) { 2.times { pirate.save! } }
+      // SAVEPOINT+INSERT+RELEASE for save1 + SAVEPOINT+UPDATE+RELEASE for save2 = 6.
+      await assertQueriesCount(6, false, async () => {
+        await pirate.saveBang();
+        await pirate.saveBang();
+      });
+      // Rails: Pirate.where(id: pirate.id).update_all(updated_on: old_updated_on)
+      await Pirate.where({ id: pirate.id }).updateAll({
+        updated_on: Temporal.Instant.from("2020-01-01T00:00:00Z"),
+      });
+    });
+
+    // Reload so the in-memory snapshot reflects the DB reset; this is the
+    // known baseline that no-op saves must not advance.
+    await (pirate as unknown as Pirate).reload();
+    const oldUpdatedOn = pirate.updated_on;
+
+    await withPartialWrites(Pirate, true, async () => {
+      // No-op saves with partialUpdates=true: lazy SAVEPOINT never materializes → 0 events.
+      // Mirrors: assert_no_queries { 2.times { pirate.save! } }
+      await assertNoQueries(false, async () => {
+        await pirate.saveBang();
+        await pirate.saveBang();
+      });
+      expect(((await (pirate as unknown as Pirate).reload()) as Rec).updated_on).toEqual(
+        oldUpdatedOn,
+      );
+
+      // A real attribute change: SAVEPOINT+UPDATE+RELEASE = 3.
+      // Mirrors: assert_queries_count(3) { pirate.catchphrase = "bar"; pirate.save! }
+      await assertQueriesCount(3, false, async () => {
+        pirate.catchphrase = "bar";
+        await pirate.saveBang();
+      });
+      expect(((await (pirate as unknown as Pirate).reload()) as Rec).updated_on).not.toEqual(
+        oldUpdatedOn,
+      );
+    });
   });
 
-  it.skip("partial update with optimistic locking", () => {
-    // BLOCKED: query-count parity — see "partial update".
+  it("partial update with optimistic locking", async () => {
+    const person = new Person() as Rec;
+    (person as any).first_name = "foo";
+
+    await withPartialWrites(Person, false, async () => {
+      // Mirrors: assert_queries_count(6) { 2.times { person.save! } }
+      // SAVEPOINT+INSERT+RELEASE for save1 + SAVEPOINT+UPDATE+RELEASE for save2 = 6.
+      // The force-UPDATE in save2 increments lock_version (0→1).
+      await assertQueriesCount(6, false, async () => {
+        await person.saveBang();
+        await person.saveBang();
+      });
+      // Rails: Person.where(id: person.id).update_all(first_name: "baz")
+      await Person.where({ id: person.id }).updateAll({ first_name: "baz" });
+    });
+
+    // Mirrors: old_lock_version = person.lock_version + 1
+    // updateAll bumped the DB lock_version by 1; in-memory is still 1, so DB = 2.
+    const savedLockVersion = (person as any).lock_version + 1;
+
+    await withPartialWrites(Person, true, async () => {
+      // No-op saves: lazy SAVEPOINT never materializes → 0 events, lock_version unchanged.
+      // Mirrors: assert_no_queries { 2.times { person.save! } }
+      await assertNoQueries(false, async () => {
+        await person.saveBang();
+        await person.saveBang();
+      });
+      expect(((await (person as unknown as Person).reload()) as Rec).lock_version).toEqual(
+        savedLockVersion,
+      );
+
+      // A real attribute change: SAVEPOINT+UPDATE+RELEASE = 3, lock_version incremented.
+      // Mirrors: assert_queries_count(3) { person.first_name = "bar"; person.save! }
+      await assertQueriesCount(3, false, async () => {
+        (person as any).first_name = "bar";
+        await person.saveBang();
+      });
+      expect(((await (person as unknown as Person).reload()) as Rec).lock_version).not.toEqual(
+        savedLockVersion,
+      );
+    });
   });
 
   it("changed attributes should be preserved if save failure", async () => {
