@@ -28,6 +28,13 @@ describe("positionalArity", () => {
     expect(positionalArity([rest("args")], "ruby")).toMatchObject({ min: 0, max: Infinity });
   });
 
+  it("counts a required param after a splat — def m(*args, value)", () => {
+    expect(positionalArity([rest("args"), req("value")], "ruby")).toMatchObject({
+      min: 1,
+      max: Infinity,
+    });
+  });
+
   it("reports keywords without counting them positionally", () => {
     expect(positionalArity([req("a"), kw("b"), kwrest("o")], "ruby")).toMatchObject({
       min: 1,
