@@ -12,9 +12,13 @@
  * Base.establishConnection can open the pool.
  *
  * Driver gate (RFC 0002 §Design):
- *   - sqlite :memory: → DatabaseTasks.loadSchema (fresh DB, no purge needed)
- *   - sqlite file / PG / MySQL → DatabaseTasks.reconstructFromSchema (handles
- *     schema-up-to-date check, purge, and load for persistent per-worker DBs)
+ *   - sqlite :memory: → loadSchema (fresh DB, no existing tables)
+ *   - sqlite file → reconstructFromSchema (per-worker isolated file; purge is
+ *     safe — no other worker shares this file path)
+ *   - PG/MySQL → loadSchema (shared DB; reconstructFromSchema would purge the
+ *     whole database, which fails while other workers hold sessions (PG error
+ *     55006) and resets DB collation on MySQL 8, breaking case-sensitivity.
+ *     The schema file uses force:"cascade" for per-table drop+recreate.)
  */
 import { buildTestDatabaseConfig } from "./test-helpers/test-database-config.js";
 import { generateSchemaFile } from "./test-helpers/schema-file-generator.js";
@@ -32,10 +36,10 @@ const schemaFilePath = await generateSchemaFile(TEST_SCHEMA, adapter);
 
 await Base.establishConnection(envConfig.configuration as Record<string, unknown>);
 
-if (adapter === "sqlite" && envConfig.database === ":memory:") {
-  await DatabaseTasks.loadSchema(envConfig, "ts", schemaFilePath);
-} else {
+if (adapter === "sqlite" && envConfig.database !== ":memory:") {
   await DatabaseTasks.reconstructFromSchema(envConfig, "ts", schemaFilePath);
+} else {
+  await DatabaseTasks.loadSchema(envConfig, "ts", schemaFilePath);
 }
 
 // Permanent worker-startup assertion: key canonical tables must exist after

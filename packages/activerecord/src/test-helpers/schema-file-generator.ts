@@ -99,17 +99,21 @@ function generateCode(schema: Schema, adapterName?: string): string {
     `export default async function defineSchema(ctx: MigrationContext): Promise<void> {`,
   ];
 
+  // PG/MySQL: loadSchema runs on a shared database that other workers may already
+  // have connected to, so we can't DROP DATABASE. Use force:"cascade" per-table
+  // drop+recreate instead — safe for concurrent workers on a shared DB.
+  const needsForce = adapterName === "postgres" || adapterName === "mysql";
+
   for (const [tableName, tableSpec] of Object.entries(schema)) {
     const cols = columnsOf(tableSpec);
     const pk = primaryKeyOf(tableSpec);
     const cpkCols = Array.isArray(pk) ? new Set(pk) : null;
 
-    const tOpts =
-      pk === false
-        ? `{ id: false }`
-        : Array.isArray(pk)
-          ? `{ primaryKey: ${JSON.stringify(pk)} }`
-          : `{}`;
+    const tOptsEntries: string[] = [];
+    if (pk === false) tOptsEntries.push(`id: false`);
+    else if (Array.isArray(pk)) tOptsEntries.push(`primaryKey: ${JSON.stringify(pk)}`);
+    if (needsForce) tOptsEntries.push(`force: "cascade"`);
+    const tOpts = tOptsEntries.length === 0 ? `{}` : `{ ${tOptsEntries.join(", ")} }`;
 
     const colEntries = Object.entries(cols);
     if (colEntries.length === 0) {

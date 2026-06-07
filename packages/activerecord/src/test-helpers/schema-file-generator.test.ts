@@ -70,6 +70,10 @@ describe("generateSchemaFile", () => {
     expect(content).toContain('"book_id", "integer", { null: false }');
     expect(content).toContain('"edition_num", "integer", { null: false }');
   });
+
+  it("does not emit force:cascade for non-mysql/pg adapters", () => {
+    expect(content).not.toContain('force: "cascade"');
+  });
 });
 
 const MYSQL_SCHEMA: Schema = {
@@ -128,5 +132,9 @@ describe("generateSchemaFile (MySQL adapter)", () => {
 
   it("leaves non-date/json types unchanged", () => {
     expect(content).toContain('"description", "string"');
+  });
+
+  it("emits force:cascade on createTable for per-table drop+recreate on shared DB", () => {
+    expect(content).toContain('force: "cascade"');
   });
 });
