@@ -737,7 +737,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result> {
     sql = this.preprocessQuery(sql);
     // Note: we do NOT call materializeTransactions() here. If a lazy tx
@@ -772,7 +772,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       async () => {
         try {
           const r = await this.withRawConnection(
-            { materializeTransactions: false },
+            { materializeTransactions: false, allowRetry: options?.allowRetry ?? false },
             async (conn) => {
               const client = conn as unknown as pg.Client;
               try {
@@ -1801,7 +1801,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    return this.withRawConnection({ materializeTransactions: false }, async (conn) => {
+    return this.withRawConnection({}, async (conn) => {
       const client = conn as unknown as pg.Client;
       const clause = this._explainStatementClause(options);
       // Rewrite `?` → `$1` the same way execute/execQuery do, so a
