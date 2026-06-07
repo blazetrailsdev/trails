@@ -102,8 +102,24 @@ describe("parseSchemaForModels", () => {
     `;
     const fk = tableNamed(source, "reviews").foreignKeys[0]!;
     expect(fk.column).toBe("book_id");
-    // Synthesized name does not match Rails' fk_rails_<10hex> shape (codegen-only).
-    expect(fk.name).toBe("fk_rails_reviews_book_id");
+    // Synthesized name mirrors Rails' fk_rails_<10hex> so it round-trips through SchemaDumper.
+    expect(fk.name).toBe("fk_rails_924a0b30ca");
+  });
+
+  it("synthesizes a hash-format name for composite FK columns (joins with _and_)", () => {
+    const source = `
+      export default async function defineSchema(ctx) {
+        await ctx.createTable("memberships", { force: "cascade" }, (t) => {
+          t.bigint("tenant_id");
+          t.bigint("account_id");
+        });
+        await ctx.addForeignKey("memberships", "accounts", { column: "tenant_id,account_id" });
+      }
+    `;
+    const fk = tableNamed(source, "memberships").foreignKeys[0]!;
+    expect(fk.column).toBe("tenant_id,account_id");
+    // sha256("memberships_tenant_id_and_account_id_fk").slice(0,10)
+    expect(fk.name).toBe("fk_rails_4bc705af9c");
   });
 
   it("reads onDelete, primaryKey, and validate options off a foreign key", () => {
