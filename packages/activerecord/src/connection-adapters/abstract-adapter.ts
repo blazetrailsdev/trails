@@ -22,7 +22,6 @@ import {
   NotImplementedError,
 } from "../errors.js";
 import { Notifications } from "@blazetrails/activesupport";
-import { getAsyncContext, type AsyncContext } from "@blazetrails/activesupport";
 import { disablePreparedStatements } from "../ar-config.js";
 import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
@@ -501,16 +500,6 @@ export class AbstractAdapter implements Quoting {
   // exec paths (PR 25b) and reconnect-with-restore (Wave 6 follow-up);
   // the default-false here matches Rails' fresh-adapter state.
   protected _rawConnectionDirty = false;
-  private _lockQueue: Promise<unknown> = Promise.resolve();
-  // Reentrancy bookkeeping for withRawConnection. Rails' with_raw_connection
-  // runs under a reentrant Monitor (@lock.synchronize) and is documented to
-  // re-enter (abstract_adapter.rb:972-981): materialize_transactions re-enters,
-  // and the yielded block can too. The promise-chain lock isn't reentrant on
-  // its own, so we track the holding async chain via an owner token (mirroring
-  // TransactionManager#synchronize) and run nested calls directly.
-  private _rawLockOwner: AsyncContext<symbol> | null = null;
-  private _rawLockOwnerAdapter: ReturnType<typeof getAsyncContext> | null = null;
-  private _currentRawLockOwner: symbol | null = null;
   protected _config: Record<string, unknown> = {};
   _transactionManager: TransactionManager = new TransactionManager(this as any);
 
@@ -1869,47 +1858,18 @@ export class AbstractAdapter implements Quoting {
       }
     };
 
-    // Reentrant fast-path: if this async chain already holds the lock, run
-    // directly on the held connection instead of queuing behind ourselves
-    // (which would self-deadlock). Mirrors Rails' reentrant Monitor — both
-    // materialize_transactions and the yielded block legitimately re-enter
-    // (abstract_adapter.rb:972-981). On re-entry the connect/materialize/verify
-    // preamble in run() is a no-op (already done by the outer holder).
-    const storage = this._rawLockStorage();
-    if (this._currentRawLockOwner && storage.getStore() === this._currentRawLockOwner) {
-      return await run();
-    }
-
-    const owner = Symbol("adapter.rawlock");
-    const acquire = async (): Promise<T> => {
-      this._currentRawLockOwner = owner;
-      try {
-        return await storage.run(owner, run);
-      } finally {
-        this._currentRawLockOwner = null;
-      }
-    };
-    const prev = this._lockQueue;
-    const next = prev.then(acquire, acquire);
-    this._lockQueue = next.catch(() => undefined);
-    return next as Promise<T>;
-  }
-
-  /**
-   * @internal
-   * Async-chain-aware owner storage for withRawConnection's reentrant lock.
-   * Mirrors TransactionManager#synchronize's `_lockStorage`: a fresh token is
-   * minted per acquisition and stored both in the AsyncContext and in
-   * `_currentRawLockOwner`; re-entry requires both to match so a detached task
-   * that inherits the context but outlives the holder re-acquires correctly.
-   */
-  private _rawLockStorage(): AsyncContext<symbol> {
-    const asyncContext = getAsyncContext();
-    if (!this._rawLockOwner || this._rawLockOwnerAdapter !== asyncContext) {
-      this._rawLockOwner = asyncContext.create<symbol>();
-      this._rawLockOwnerAdapter = asyncContext;
-    }
-    return this._rawLockOwner;
+    // withRawConnection and the transaction manager share ONE reentrant lock,
+    // mirroring Rails where a single @lock.synchronize wraps both
+    // with_raw_connection (abstract_adapter.rb:984) and every TransactionManager
+    // critical section (abstract/transaction.rb). Using two separate locks
+    // deadlocks (ABBA): a bare write takes the raw lock then materialize_
+    // transactions wants the tx lock, while a transaction block holds the tx
+    // lock then its inner write wants the raw lock. Routing through
+    // synchronize() — which is reentrant per async chain — collapses them into
+    // one lock, so materialize_transactions and a write nested inside a
+    // transaction both re-enter directly (Rails' Monitor reentrancy,
+    // abstract_adapter.rb:972-981).
+    return this._transactionManager.synchronize(run);
   }
 
   /**
