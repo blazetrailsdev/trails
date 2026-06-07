@@ -211,16 +211,10 @@ describe("AssociationsExtensionsTest", () => {
   });
 
   it.skip("marshalling extensions", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/extension.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in extension.test.ts
-    /* marshalling not implemented */
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
   it.skip("marshalling named extensions", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/extension.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in extension.test.ts
-    /* marshalling not implemented */
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
   it("extension name", () => {
     // Mirrors Rails `extend!(model)` helper, which calls
