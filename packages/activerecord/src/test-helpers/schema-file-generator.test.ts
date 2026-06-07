@@ -76,6 +76,30 @@ describe("generateSchemaFile", () => {
   });
 });
 
+describe("generateSchemaFile (postgres adapter)", () => {
+  let content: string;
+  let filePath: string;
+
+  beforeAll(async () => {
+    filePath = await generateSchemaFile({ users: { name: "string" } }, "postgres");
+    const fs = await getFsAsync();
+    content = fs.readFileSync(filePath, "utf-8");
+  });
+
+  afterAll(async () => {
+    const fs = await getFsAsync();
+    try {
+      fs.unlinkSync(filePath);
+    } catch {
+      /* already gone */
+    }
+  });
+
+  it("emits force:cascade on createTable for per-table drop+recreate on shared DB", () => {
+    expect(content).toContain('force: "cascade"');
+  });
+});
+
 const MYSQL_SCHEMA: Schema = {
   events: {
     occurred_on: "date",
