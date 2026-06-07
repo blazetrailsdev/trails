@@ -56,6 +56,7 @@ import { buildThroughInverseFor } from "./has-many-through-association.js";
 import { countRecords } from "./has-many-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
 import { foreignKeyPresentFor } from "./foreign-association.js";
+import type { AssociationReflection } from "../reflection.js";
 
 // Declaration merging with `class CollectionProxy extends Relation`
 // propagates Relation's method types into this interface. `load()`
@@ -982,7 +983,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   private async _djarForCount(): Promise<{ djar: unknown } | null> {
     const ctor = this._record.constructor as typeof Base;
-    const reflection = (ctor as any)._reflectOnAssociation?.(this._assocName);
+    const reflection = ctor._reflectOnAssociation?.(this._assocName);
     if (!reflection) return null;
     if (ownerHasUnresolvedThroughKey(this._record, reflection)) return null;
     const { DisableJoinsAssociationScope } = await import("./disable-joins-association-scope.js");
@@ -1246,12 +1247,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   private _foreignKeyPresent(): boolean {
     const ctor = this._record.constructor as typeof Base;
-    const reflection = (ctor as any)._reflectOnAssociation?.(this._assocName);
+    const reflection = ctor._reflectOnAssociation?.(this._assocName);
     if (!reflection) return false;
     if (this._assocDef.options.through) {
       return throughForeignKeyPresent({ owner: this._record, reflection });
     }
-    return foreignKeyPresentFor(reflection, this._record);
+    return foreignKeyPresentFor(reflection as AssociationReflection, this._record);
   }
 
   /**

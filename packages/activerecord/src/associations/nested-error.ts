@@ -3,12 +3,12 @@ import { indexNestedAttributeErrors } from "../ar-config.js";
 
 interface AssociationLike {
   owner: object | null;
-  reflection: { name: string };
+  reflection: { name: string; options?: Record<string, unknown> };
   isCollection?(): boolean;
   target?: unknown[];
   nestedAttributesTarget?: unknown[];
   // Rails index_errors: true = association order, :nested_attributes_order = write order
-  options?: { indexErrors?: boolean | "nestedAttributesOrder" };
+  options?: Record<string, unknown>;
 }
 
 interface InnerErrorLike {
@@ -51,9 +51,7 @@ export class NestedError extends ActiveModelNestedError {
     // Falls back to global flag when not set per-association — mirrors Rails:
     //   association.options.fetch(:index_errors, ActiveRecord.index_nested_attribute_errors)
     // Options may be on association.options or association.reflection.options.
-    const opts =
-      (association.options as Record<string, unknown> | undefined) ??
-      ((association.reflection as any)?.options as Record<string, unknown> | undefined);
+    const opts = association.options ?? association.reflection.options;
     const indexErrors =
       opts && "indexErrors" in opts ? opts["indexErrors"] : indexNestedAttributeErrors;
     if (isCollection && indexErrors) {
@@ -79,9 +77,7 @@ function association(err: NestedError): NestedError["association"] {
 
 /** @internal */
 function indexErrorsSetting(err: NestedError): boolean | "nestedAttributesOrder" {
-  const opts =
-    ((err.association as any).options as Record<string, unknown> | undefined) ??
-    ((err.association as any).reflection?.options as Record<string, unknown> | undefined);
+  const opts = err.association.options ?? err.association.reflection.options;
   if (opts && "indexErrors" in opts) {
     return opts["indexErrors"] as boolean | "nestedAttributesOrder";
   }
@@ -101,7 +97,7 @@ function orderedRecords(err: NestedError): unknown[] | null {
   const setting = indexErrorsSetting(err);
   const assoc = err.association;
   if (setting === true) return Array.isArray(assoc.target) ? assoc.target : null;
-  if (setting === "nestedAttributesOrder") return (assoc as any).nestedAttributesTarget ?? null;
+  if (setting === "nestedAttributesOrder") return assoc.nestedAttributesTarget ?? null;
   return null;
 }
 

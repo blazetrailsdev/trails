@@ -1867,6 +1867,20 @@ function reflectionClassFor(
  * Mirrors: ActiveRecord::Reflection.create
  */
 export function create(
+  macro: Exclude<MacroType, "composedOf">,
+  name: string,
+  scope: ((...args: any[]) => any) | null,
+  options: Record<string, unknown>,
+  activeRecord: typeof Base,
+): AssociationReflection | ThroughReflection;
+export function create(
+  macro: "composedOf",
+  name: string,
+  scope: ((...args: any[]) => any) | null,
+  options: Record<string, unknown>,
+  activeRecord: typeof Base,
+): AggregateReflection;
+export function create(
   macro: MacroType,
   name: string,
   scope: ((...args: any[]) => any) | null,
