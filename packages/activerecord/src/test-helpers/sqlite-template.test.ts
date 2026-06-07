@@ -19,16 +19,23 @@ describe.skipIf(!isSqliteRun())("sqlite template-clone (Phase 0 probe)", () => {
     );
   });
 
-  it("this worker has a per-worker clone distinct from the template", async () => {
+  it("this worker has a per-worker clone keyed by its pool slot", async () => {
     const workerDb = process.env[WORKER_DB_ENV];
     expect(workerDb, "AR_TEST_WORKER_DB must be set by test-setup-worker-db").toBeTruthy();
 
     const fs = await getFsAsync();
     expect(await fs.exists(workerDb!), `worker clone must exist at ${workerDb}`).toBe(true);
 
-    // Clone is a separate file — no cross-worker state sharing.
-    const templatePath = process.env[TEMPLATE_PATH_ENV];
-    expect(workerDb).not.toBe(templatePath);
+    // The clone path embeds the vitest worker's pool slot ID
+    // (`ar-test-worker-<token>-<slot>.sqlite`), mirroring how Rails keys each
+    // parallel test DB by fork index (test_databases.rb). Two workers with
+    // different VITEST_POOL_IDs resolve to different paths, making cross-worker
+    // DB sharing structurally impossible.
+    const slot = process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? "1";
+    expect(workerDb).toContain(`-${slot}.sqlite`);
+
+    // Also distinct from the shared template — workers write to their own clone.
+    expect(workerDb).not.toBe(process.env[TEMPLATE_PATH_ENV]);
   });
 
   it("per-run token appears in both template and worker clone paths", () => {
