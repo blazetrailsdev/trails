@@ -581,7 +581,7 @@ jobs:
         env:
           ARCONN: postgresql
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
-          AR_DB_FORKS: 4
+          AR_DB_FORKS: 8
       - run: pnpm vitest run packages/activerecord-cli
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
@@ -636,7 +636,7 @@ jobs:
         env:
           ARCONN: mysql2
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
-          AR_DB_FORKS: 4
+          AR_DB_FORKS: 8
       # No MYSQL_TEST_URL: no mysql-happy-path E2E exists yet. This run
       # covers the SQLite E2E until a mysql suite lands and can be wired up.
       - run: pnpm vitest run packages/activerecord-cli
