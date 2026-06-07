@@ -41,7 +41,8 @@ describe("generateSchemaFile", () => {
   it("writes file to os.tmpdir keyed by VITEST_POOL_ID", async () => {
     const [os, path] = await Promise.all([getOsAsync(), getPathAsync()]);
     const poolId = getEnv("VITEST_POOL_ID") ?? "0";
-    expect(filePath).toBe(path.join(os.tmpdir(), `trails-schema-${poolId}.ts`));
+    expect(filePath).toContain(path.join(os.tmpdir(), `trails-schema-${poolId}-`));
+    expect(filePath).toMatch(/\.ts$/);
     const fs = await getFsAsync();
     expect(await fs.exists(filePath)).toBe(true);
   });

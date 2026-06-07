@@ -59,6 +59,15 @@ function colOpts(spec: ColumnSpec, colName: string, cpkCols: Set<string> | null)
   return parts.length === 0 ? "{}" : `{ ${parts.join(", ")} }`;
 }
 
+// DJB2 hash — makes each unique schema state produce a unique file path so
+// `import(href)` (ESM-cached by URL) never returns a stale module when the
+// schema changes between calls, mirroring Rails' `load(file)` re-execution.
+function schemaChecksum(code: string): string {
+  let h = 5381;
+  for (let i = 0; i < code.length; i++) h = ((h << 5) + h + code.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
 function generateCode(schema: Schema): string {
   const lines: string[] = [
     `import type { MigrationContext } from "@blazetrails/activerecord";`,
@@ -105,8 +114,8 @@ function generateCode(schema: Schema): string {
 export async function generateSchemaFile(schema: Schema): Promise<string> {
   const [os, fs, path] = await Promise.all([getOsAsync(), getFsAsync(), getPathAsync()]);
   const poolId = getEnv("VITEST_POOL_ID") ?? "0";
-  const filePath = path.join(os.tmpdir(), `trails-schema-${poolId}.ts`);
   const code = generateCode(schema);
+  const filePath = path.join(os.tmpdir(), `trails-schema-${poolId}-${schemaChecksum(code)}.ts`);
   if (fs.writeFile) {
     await fs.writeFile(filePath, code);
   } else {
