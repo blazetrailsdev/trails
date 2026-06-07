@@ -71,3 +71,6 @@ Base.removeConnection();
 // resolve through the prototype chain and would inherit the MySQL/PG
 // adapter from this preload on MariaDB/PG CI workers.
 Base._adapter = null;
+// Clear DatabaseTasks global state so database-tasks.test.ts sees the null
+// invariant it expects (it tests checkProtectedEnvironmentsBang with no config).
+DatabaseTasks.databaseConfiguration = null;

@@ -27,8 +27,6 @@ export interface TestDatabaseConfig {
   envConfig: HashConfig | UrlConfig;
 }
 
-let _taskRegistered = false;
-
 function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfig } {
   const pgUrl = getEnv("PG_TEST_URL");
   if (pgUrl) {
@@ -48,33 +46,30 @@ function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfi
 /**
  * Build the test `DatabaseConfigurations`, assign it to
  * `DatabaseTasks.databaseConfiguration`, and register the adapter task
- * handler. Safe to call multiple times — task-handler registration is
- * guarded by a module-level flag so `_registeredTasks` doesn't grow on
- * repeated calls from `setupHandlerSuite`.
+ * handler. Called once from `test-setup-dy.ts` during worker startup;
+ * the registration runs on every call so callers that clear
+ * `_registeredTasks` (e.g. `database-tasks.test.ts`) can re-register.
  */
 export async function buildTestDatabaseConfig(): Promise<TestDatabaseConfig> {
   const { adapter, envConfig } = resolve();
   const configs = new DatabaseConfigurations([envConfig]);
   DatabaseTasks.databaseConfiguration = configs;
 
-  if (!_taskRegistered) {
-    _taskRegistered = true;
-    switch (adapter) {
-      case "sqlite": {
-        const { SQLiteDatabaseTasks } = await import("../tasks/sqlite-database-tasks.js");
-        SQLiteDatabaseTasks.register();
-        break;
-      }
-      case "postgres": {
-        const { PostgreSQLDatabaseTasks } = await import("../tasks/postgresql-database-tasks.js");
-        PostgreSQLDatabaseTasks.register();
-        break;
-      }
-      case "mysql": {
-        const { MySQLDatabaseTasks } = await import("../tasks/mysql-database-tasks.js");
-        MySQLDatabaseTasks.register();
-        break;
-      }
+  switch (adapter) {
+    case "sqlite": {
+      const { SQLiteDatabaseTasks } = await import("../tasks/sqlite-database-tasks.js");
+      SQLiteDatabaseTasks.register();
+      break;
+    }
+    case "postgres": {
+      const { PostgreSQLDatabaseTasks } = await import("../tasks/postgresql-database-tasks.js");
+      PostgreSQLDatabaseTasks.register();
+      break;
+    }
+    case "mysql": {
+      const { MySQLDatabaseTasks } = await import("../tasks/mysql-database-tasks.js");
+      MySQLDatabaseTasks.register();
+      break;
     }
   }
 
@@ -86,9 +81,24 @@ export async function buildTestDatabaseConfig(): Promise<TestDatabaseConfig> {
  * already connected. Called by `setupHandlerSuite` so handler-path test files
  * get a live pool without knowing which adapter the worker is using.
  * Idempotent — a no-op when already connected.
+ *
+ * Intentionally does NOT call `buildTestDatabaseConfig` — that would set
+ * `DatabaseTasks.databaseConfiguration`, contaminating tests in
+ * `database-tasks.test.ts` that rely on it being null. This function only
+ * re-establishes `Base`'s connection; `DatabaseTasks` state is left as-is.
  */
 export async function establishFromTestConfig(): Promise<void> {
   if (Base.isConnectedQ()) return;
-  const { envConfig } = await buildTestDatabaseConfig();
-  await Base.establishConnection(envConfig.configuration as Record<string, unknown>);
+  const pgUrl = getEnv("PG_TEST_URL");
+  if (pgUrl) {
+    await Base.establishConnection(pgUrl);
+    return;
+  }
+  const mysqlUrl = getEnv("MYSQL_TEST_URL");
+  if (mysqlUrl) {
+    await Base.establishConnection(mysqlUrl);
+    return;
+  }
+  const database = getEnv("AR_TEST_WORKER_DB") ?? ":memory:";
+  await Base.establishConnection({ adapter: "sqlite3", database, pool: 1 });
 }
