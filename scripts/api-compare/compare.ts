@@ -549,6 +549,41 @@ export function selectMisplacedFile(
  * @blazetrails/* dependency so the inheritance walker can cross package
  * boundaries (e.g. AR Base extends AM Model).
  */
+/**
+ * api-compare keys of a package's `@blazetrails/*` deps (incl. peer deps), from
+ * its package.json. Inheritance/mixin walks cross these boundaries (AR `Base
+ * extends` AM `Model`), so the entity index and the arity candidate pool both
+ * key on this set. Returns [] if package.json can't be read.
+ */
+export function blazetrailsDepKeys(pkg: string): string[] {
+  const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
+  const pkgJsonPath = path.join(ROOT_DIR, "packages", dirName, "package.json");
+  if (!fs.existsSync(pkgJsonPath)) return [];
+  try {
+    const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8")) as Record<
+      string,
+      Record<string, string>
+    >;
+    const allDeps = {
+      ...((pkgJson["dependencies"] as Record<string, string>) ?? {}),
+      ...((pkgJson["peerDependencies"] as Record<string, string>) ?? {}),
+    };
+    const keys: string[] = [];
+    for (const dep of Object.keys(allDeps)) {
+      if (!dep.startsWith("@blazetrails/")) continue;
+      const depDir = dep.replace("@blazetrails/", "");
+      // A single npm package may map to multiple api-compare keys
+      // (e.g. actionpack → actiondispatch + actioncontroller).
+      for (const depKey of DIR_TO_PACKAGES[depDir] ?? [depDir]) {
+        if (depKey !== pkg) keys.push(depKey);
+      }
+    }
+    return keys;
+  } catch {
+    return []; // Non-fatal: fall back to same-package only.
+  }
+}
+
 export function buildEntitiesByName(pkg: string, ts: ApiManifest): Map<string, ClassInfo[]> {
   const map = new Map<string, ClassInfo[]>();
 
@@ -569,34 +604,7 @@ export function buildEntitiesByName(pkg: string, ts: ApiManifest): Map<string, C
   // Always include the current package first so same-package candidates beat
   // cross-package ones in the proximity tie-breaker.
   addPkg(pkg);
-
-  // Read @blazetrails/* deps from package.json to discover sibling packages.
-  const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
-  const pkgJsonPath = path.join(ROOT_DIR, "packages", dirName, "package.json");
-  if (fs.existsSync(pkgJsonPath)) {
-    try {
-      const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8")) as Record<
-        string,
-        Record<string, string>
-      >;
-      const allDeps = {
-        ...((pkgJson["dependencies"] as Record<string, string>) ?? {}),
-        ...((pkgJson["peerDependencies"] as Record<string, string>) ?? {}),
-      };
-      for (const dep of Object.keys(allDeps)) {
-        if (!dep.startsWith("@blazetrails/")) continue;
-        const depDir = dep.replace("@blazetrails/", "");
-        // A single npm package may map to multiple api-compare keys
-        // (e.g. actionpack → actiondispatch + actioncontroller).
-        const depKeys = DIR_TO_PACKAGES[depDir] ?? [depDir];
-        for (const depKey of depKeys) {
-          if (depKey !== pkg) addPkg(depKey);
-        }
-      }
-    } catch {
-      // Non-fatal: if we can't read deps, fall back to same-package only.
-    }
-  }
+  for (const depKey of blazetrailsDepKeys(pkg)) addPkg(depKey);
 
   return map;
 }
@@ -680,7 +688,8 @@ function main() {
     const tsMethodsByFile = new Map<string, Set<string>>();
 
     // Param side-map for the advisory arity check (tsMethodsByFile carries only
-    // names): every signature seen for a TS name, package-GLOBAL by design. The
+    // names): every signature seen for a TS name, GLOBAL across this package and
+    // its deps (populated below) by design. The
     // mixin convention (CLAUDE.md `static x = x`) puts a method's real signature
     // in its source file while the aggregator class Ruby maps to holds only a
     // 0-arg re-export binding (`_writeAttribute: ReadonlyAttributes._write…`);
@@ -721,6 +730,23 @@ function main() {
           }
           tsMethodsByFile.set(file, methods);
         }
+      }
+    }
+
+    // Also pool signatures from dep packages: the inherited-method walk below
+    // adds dep-parent method NAMES to tsMethodsByFile (so a Ruby method can
+    // match an inherited dep method), and without the signature here its arity
+    // would be silently skipped. Matching is unchanged; only the pool grows.
+    for (const depKey of blazetrailsDepKeys(pkg)) {
+      const depPkg = ts.packages[depKey];
+      if (!depPkg) continue;
+      for (const ent of [...Object.values(depPkg.classes), ...Object.values(depPkg.modules)]) {
+        for (const m of [...ent.instanceMethods, ...ent.classMethods]) {
+          if (tsShouldInclude(m)) recordTsParams(m);
+        }
+      }
+      for (const fns of Object.values(depPkg.fileFunctions ?? {})) {
+        for (const fn of fns) if (tsShouldInclude(fn)) recordTsParams(fn);
       }
     }
 
