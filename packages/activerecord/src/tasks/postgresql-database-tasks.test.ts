@@ -38,6 +38,19 @@ describe("PostgreSQLDatabaseTasks", () => {
     expect(DatabaseTasks.resolveTask("postgresql")).toBeDefined();
   });
 
+  it("test_purge_drops_then_recreates_with_already_connected_flag", async () => {
+    const calls: Array<string> = [];
+    const tasks = new PostgreSQLDatabaseTasks(config());
+    vi.spyOn(tasks, "drop").mockImplementation(async () => {
+      calls.push("drop");
+    });
+    vi.spyOn(tasks, "create").mockImplementation(async (alreadyConnected?: boolean) => {
+      calls.push(alreadyConnected ? "create(true)" : "create");
+    });
+    await tasks.purge();
+    expect(calls).toEqual(["drop", "create(true)"]);
+  });
+
   it("test_truncate_all_queries_pg_tables_and_issues_cascade_truncate", async () => {
     const executeCalls: Array<{ sql: string; binds?: unknown[] }> = [];
     const mutationCalls: string[] = [];

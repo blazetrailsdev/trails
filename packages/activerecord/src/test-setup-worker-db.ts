@@ -136,10 +136,16 @@ async function acquireAdvisorySlotMysql(baseUrl: string): Promise<string> {
 }
 
 if (process.env.PG_TEST_URL) {
-  process.env.PG_TEST_URL = await acquireAdvisorySlotPg(process.env.PG_TEST_URL);
+  const base = process.env.PG_TEST_URL;
+  process.env.PG_TEST_URL = await acquireAdvisorySlotPg(base);
+  // When the URL was suffixed, this worker owns an exclusive per-worker DB;
+  // test-setup-dy.ts uses reconstructFromSchema (purge+load) instead of loadSchema.
+  if (process.env.PG_TEST_URL !== base) process.env.AR_PG_EXCLUSIVE_DB = "1";
 }
 if (process.env.MYSQL_TEST_URL) {
-  process.env.MYSQL_TEST_URL = await acquireAdvisorySlotMysql(process.env.MYSQL_TEST_URL);
+  const base = process.env.MYSQL_TEST_URL;
+  process.env.MYSQL_TEST_URL = await acquireAdvisorySlotMysql(base);
+  if (process.env.MYSQL_TEST_URL !== base) process.env.AR_MYSQL_EXCLUSIVE_DB = "1";
 }
 
 // Phase 0 sqlite template-clone: when globalSetup built a canonical template,
