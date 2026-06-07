@@ -71,3 +71,62 @@ describe("generateSchemaFile", () => {
     expect(content).toContain('"edition_num", "integer", { null: false }');
   });
 });
+
+const MYSQL_SCHEMA: Schema = {
+  events: {
+    occurred_on: "date",
+    started_at: "datetime",
+    window_open: { type: "datetime", precision: 3 },
+    legacy_ts: { type: "datetime", precision: null, defaultFunction: "CURRENT_TIMESTAMP" },
+    scheduled_time: "time",
+    metadata: "json",
+    description: "string",
+  },
+};
+
+describe("generateSchemaFile (MySQL adapter)", () => {
+  let content: string;
+  let filePath: string;
+
+  beforeAll(async () => {
+    filePath = await generateSchemaFile(MYSQL_SCHEMA, "mysql");
+    const fs = await getFsAsync();
+    content = fs.readFileSync(filePath, "utf-8");
+  });
+
+  afterAll(async () => {
+    const fs = await getFsAsync();
+    try {
+      fs.unlinkSync(filePath);
+    } catch {
+      /* already gone */
+    }
+  });
+
+  it("remaps date, time, json columns to string (VARCHAR)", () => {
+    expect(content).toContain('"occurred_on", "string"');
+    expect(content).toContain('"scheduled_time", "string"');
+    expect(content).toContain('"metadata", "string"');
+    expect(content).not.toContain('"date"');
+    expect(content).not.toContain('"time"');
+    expect(content).not.toContain('"json"');
+  });
+
+  it("injects precision:6 for bare datetime columns", () => {
+    expect(content).toContain('"started_at", "datetime", { precision: 6 }');
+  });
+
+  it("does not override explicit precision on datetime", () => {
+    expect(content).toContain('"window_open", "datetime", { precision: 3 }');
+    expect(content).not.toContain('"window_open", "datetime", { precision: 6 }');
+  });
+
+  it("does not inject precision:6 when precision is null (opts out)", () => {
+    expect(content).toContain('"legacy_ts", "datetime", { precision: null');
+    expect(content).not.toContain('"legacy_ts", "datetime", { precision: 6 }');
+  });
+
+  it("leaves non-date/json types unchanged", () => {
+    expect(content).toContain('"description", "string"');
+  });
+});
