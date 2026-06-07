@@ -108,7 +108,7 @@ export class MySQLDatabaseTasks {
     // preserves them. MySQL 8's default (utf8mb4_0900_ai_ci) differs from CI
     // provisioned DBs, so without preservation, purge would silently change
     // collation and break case-sensitivity tests.
-    const saved = await this._savedCharset();
+    const saved = await this.savedCharset();
     await this.drop();
     await this.create(saved);
   }
@@ -151,29 +151,7 @@ export class MySQLDatabaseTasks {
   async truncateAll(): Promise<void> {
     const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
     const dbName = this.requireDatabaseName();
-    // Build the adapter config the same way withAdmin does: prefer a
-    // unix socket when the config provides one, coerce port safely so
-    // invalid/NaN values don't leak into mysql2.
-    const socket = this.resolvedField("socket");
-    const adapterConfig: {
-      host?: string;
-      port?: number;
-      database: string;
-      user?: string;
-      password?: string;
-      socketPath?: string;
-    } = {
-      database: dbName,
-      user: this.resolvedField("username"),
-      password: this.resolvedField("password"),
-    };
-    if (socket) {
-      adapterConfig.socketPath = socket;
-    } else {
-      adapterConfig.host = this.resolvedField("host") ?? "localhost";
-      adapterConfig.port = coercePort(this.resolvedField("port"), 3306);
-    }
-    const adapter = new Mysql2Adapter(adapterConfig);
+    const adapter = new Mysql2Adapter({ ...this.buildAdapterConfig(), database: dbName });
     try {
       const rows = (await adapter.execute(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = ? " +
@@ -239,29 +217,13 @@ export class MySQLDatabaseTasks {
     return options;
   }
 
-  private async _savedCharset(): Promise<{ charset?: string; collation?: string }> {
+  private async savedCharset(): Promise<{ charset?: string; collation?: string }> {
     const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
     const dbName = this.requireDatabaseName();
-    const socket = this.resolvedField("socket");
-    const adapterConfig: {
-      host?: string;
-      port?: number;
-      database: string;
-      user?: string;
-      password?: string;
-      socketPath?: string;
-    } = {
-      database: dbName,
-      user: this.resolvedField("username"),
-      password: this.resolvedField("password"),
-    };
-    if (socket) {
-      adapterConfig.socketPath = socket;
-    } else {
-      adapterConfig.host = this.resolvedField("host") ?? "localhost";
-      adapterConfig.port = coercePort(this.resolvedField("port"), 3306);
-    }
-    const adapter = new Mysql2Adapter(adapterConfig);
+    // Connect without selecting a database: information_schema.SCHEMATA is
+    // server-global, and connecting to the target DB would fail with error 1049
+    // if it doesn't exist yet (e.g. purge() called before create() on a clean env).
+    const adapter = new Mysql2Adapter(this.buildAdapterConfig());
     try {
       const rows = (await adapter.execute(
         "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME " +
@@ -275,6 +237,33 @@ export class MySQLDatabaseTasks {
       const close = (adapter as unknown as { close?: () => Promise<void> }).close;
       if (typeof close === "function") await close.call(adapter);
     }
+  }
+
+  private buildAdapterConfig(): {
+    host?: string;
+    port?: number;
+    user?: string;
+    password?: string;
+    socketPath?: string;
+  } {
+    const socket = this.resolvedField("socket");
+    const config: {
+      host?: string;
+      port?: number;
+      user?: string;
+      password?: string;
+      socketPath?: string;
+    } = {
+      user: this.resolvedField("username"),
+      password: this.resolvedField("password"),
+    };
+    if (socket) {
+      config.socketPath = socket;
+    } else {
+      config.host = this.resolvedField("host") ?? "localhost";
+      config.port = coercePort(this.resolvedField("port"), 3306);
+    }
+    return config;
   }
 
   private resolvedField(name: keyof UrlParts): string | undefined {

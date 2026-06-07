@@ -43,10 +43,11 @@ describe("MySQLDatabaseTasks", () => {
   it("test_purge_preserves_existing_database_charset_and_collation", async () => {
     const executeCalls: Array<{ sql: string; binds?: unknown[] }> = [];
     const closeMock = vi.fn(async () => {});
+    let constructorOpts: unknown;
 
     class FakeMysql2Adapter {
-      constructor(_opts: unknown) {
-        void _opts;
+      constructor(opts: unknown) {
+        constructorOpts = opts;
       }
       async execute(sql: string, binds?: unknown[]) {
         executeCalls.push({ sql, binds });
@@ -84,7 +85,12 @@ describe("MySQLDatabaseTasks", () => {
       vi.resetModules();
     }
 
-    // _savedCharset must have queried information_schema.SCHEMATA with the DB name
+    // savedCharset must connect without a database (information_schema.SCHEMATA
+    // is server-global; connecting to the target DB would fail with error 1049
+    // if it doesn't exist yet).
+    expect((constructorOpts as Record<string, unknown>).database).toBeUndefined();
+
+    // savedCharset must have queried information_schema.SCHEMATA with the DB name
     expect(executeCalls).toHaveLength(1);
     expect(executeCalls[0].sql).toMatch(/FROM information_schema\.SCHEMATA/i);
     expect(executeCalls[0].binds).toEqual(["trails_test"]);
