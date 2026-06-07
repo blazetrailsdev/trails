@@ -994,7 +994,7 @@ describe("DirtyTest", () => {
 
   it("partial insert off with changed default function attribute", async () => {
     await withPartialWrites(Aircraft, false, async () => {
-      const manufacturingDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+      const manufacturingDate = new Date("2025-01-01T00:00:00Z");
       const aircraft = new Aircraft({ name: "Boeing2", manufactured_at: manufacturingDate }) as Rec;
 
       expect(aircraft.name).toBe("Boeing2");
