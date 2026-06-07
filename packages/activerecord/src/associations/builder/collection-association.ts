@@ -100,7 +100,7 @@ export class CollectionAssociation extends Association {
   // calls (`blog.posts.where(...).order(...)`) flow through the
   // `wrapCollectionProxy` Proxy delegation; `await blog.posts` hydrates
   // and yields a plain array.
-  static override defineReaders(mixin: any, name: string): void {
+  static override defineReaders(mixin: object, name: string): void {
     if (!mixin || typeof mixin !== "object") return;
 
     // Override the main `<name>` getter to return the AssociationProxy
@@ -130,7 +130,7 @@ export class CollectionAssociation extends Association {
     }
   }
 
-  static override defineWriters(mixin: any, name: string): void {
+  static override defineWriters(mixin: object, name: string): void {
     super.defineWriters(mixin, name);
     if (!mixin || typeof mixin !== "object") return;
     const idsName = `${singularize(name)}Ids`;

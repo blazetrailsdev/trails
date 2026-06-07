@@ -219,7 +219,7 @@ export class Association {
     this.defineWriters(mixin, name);
   }
 
-  static defineReaders(mixin: any, name: string): void {
+  static defineReaders(mixin: object, name: string): void {
     if (!mixin || typeof mixin !== "object") return;
     const existing = Object.getOwnPropertyDescriptor(mixin, name);
     if (existing && !existing.configurable) return;
@@ -232,7 +232,7 @@ export class Association {
     });
   }
 
-  static defineWriters(mixin: any, name: string): void {
+  static defineWriters(mixin: object, name: string): void {
     if (!mixin || typeof mixin !== "object") return;
     const existing = Object.getOwnPropertyDescriptor(mixin, name);
     if (existing && !existing.configurable) return;
