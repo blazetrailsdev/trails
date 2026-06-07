@@ -2,21 +2,17 @@
 //
 // The matcher (compare.ts) pairs Ruby↔TS methods by *name* only, so a port can
 // have the right name but the wrong signature. These helpers compare the
-// *positional* arg ranges. A match means the ranges overlap (not exact
-// equality). Two conventions get one extra slot of Ruby-max tolerance because
-// the port spells them out positionally: kwargs → options object, `&block` →
-// callback. And a leading host/receiver param (`this:`-typed or explicit
-// `record: Base`) is stripped from the TS side only to *gain* a match — we try
-// with and without and accept if EITHER overlaps, so stripping never
-// manufactures a mismatch when both sides share a real leading arg.
+// *positional* arg ranges: a match means the ranges OVERLAP (not exact). Two
+// conventions get one extra slot of Ruby-max tolerance since the port spells
+// them out positionally — kwargs → options object, `&block` → callback — and a
+// leading host/receiver param (`this:`-typed or `record: Base`) is stripped
+// from the TS side only to *gain* a match (we try with and without and accept
+// if EITHER overlaps), so stripping never manufactures a mismatch.
 
 import type { ParamInfo } from "./types.js";
 
-/**
- * TS host/receiver types — when the port passes the host instance as an
- * explicit leading param we recognize and strip it. Curated; leaf-name match
- * (`Base`) also covers generic/aliased forms (`Base<T>`, `ns.Relation`).
- */
+/** TS host/receiver types — a leading param of one of these is the explicit host
+ *  instance and is stripped. Leaf match also covers `Base<T>` / `ns.Relation`. */
 const HOST_PARAM_TYPES = new Set([
   "Base",
   "Model",
@@ -45,12 +41,9 @@ const HOST_PARAM_TYPES = new Set([
   "ConnectionPool",
 ]);
 
-/**
- * Leading-param NAMES that conventionally denote the host receiver (often typed
- * `any`). Kept tight so genuine first-args (`modelClass`, `key`, `name`) stay
- * flagged; since stripping only ever *gains* a match, an over-broad entry can
- * at worst hide a real mismatch.
- */
+/** Leading-param NAMES that conventionally denote the host receiver (often typed
+ *  `any`). Kept tight so genuine first-args (`modelClass`, `key`) stay flagged;
+ *  since stripping only *gains* a match, an over-broad entry can at worst hide one. */
 const RECEIVER_PARAM_NAMES = new Set([
   "record",
   "klass",
@@ -71,22 +64,17 @@ const RECEIVER_PARAM_NAMES = new Set([
 
 function leafTypeName(type: string | undefined): string | null {
   if (!type) return null;
-  // Strip generics and array suffixes, then take the leaf of any qualifier:
-  // `ns.Base<T>[]` → `Base`.
+  // Strip generics/arrays, take the leaf of any qualifier: `ns.Base<T>[]` → `Base`.
   const base = type.replace(/<[^>]*>/g, "").replace(/\[\]/g, "");
-  const leaf = base.split(/::|\./).pop()?.trim();
-  return leaf || null;
+  return base.split(/::|\./).pop()?.trim() || null;
 }
 
-/** Drop a leading `this:`-typed mixin receiver param (param literally named `this`). */
+/** Drop a leading `this:`-typed mixin receiver param (literally named `this`). */
 function stripThis(params: ParamInfo[]): ParamInfo[] {
   return params.length > 0 && params[0].name === "this" ? params.slice(1) : params;
 }
 
-/**
- * Drop a leading explicit-receiver param — identified by a known host type or a
- * conventional receiver name (the trails mixin-as-standalone-function form).
- */
+/** Drop a leading explicit-receiver param — known host type or conventional name. */
 function stripHostParam(params: ParamInfo[]): ParamInfo[] {
   if (params.length === 0) return params;
   const first = params[0];
@@ -113,11 +101,8 @@ export interface ArityMatch {
   tsRange: ArityRange;
 }
 
-/**
- * Accepted positional-arg range for a param list (TS side drops a leading
- * `this:`). Keyword/block params don't count positionally; their presence is
- * reported so the caller can apply the trailing-param tolerance.
- */
+/** Accepted positional-arg range (TS side drops a leading `this:`). Keyword/block
+ *  params don't count positionally; their presence is reported for the slack. */
 export function positionalArity(params: ParamInfo[], side: "ruby" | "ts"): Arity {
   const list = side === "ts" ? stripThis(params) : params;
 
@@ -169,12 +154,9 @@ export function shouldSkipArity(ruby: ParamInfo[], ts: ParamInfo[]): boolean {
   return r.min === 0 && r.max === 0 && t.min === 0 && t.max === 0;
 }
 
-/**
- * Compare positional arity. Matches when the ranges overlap either as-declared
- * or with a leading host/receiver param stripped from the TS side (stripping
- * only ever helps). The reported `tsRange` is as-declared (minus `this:`) so a
- * flagged mismatch shows the real TS signature.
- */
+/** Matches when the ranges overlap either as-declared or with the TS leading
+ *  receiver stripped (stripping only helps). `tsRange` is as-declared (minus
+ *  `this:`) so a flagged mismatch shows the real TS signature. */
 export function arityMatches(ruby: ParamInfo[], ts: ParamInfo[]): ArityMatch {
   const r = positionalArity(ruby, "ruby");
   const tAsDeclared = positionalArity(ts, "ts");
@@ -186,6 +168,32 @@ export function arityMatches(ruby: ParamInfo[], ts: ParamInfo[]): ArityMatch {
     ok,
     rubyRange: { min: r.min, max: r.max },
     tsRange: { min: tAsDeclared.min, max: tAsDeclared.max },
+  };
+}
+
+export type ArityVerdict =
+  | { matched: true }
+  | { matched: false; tsParams: ParamInfo[]; rubyRange: ArityRange; tsRange: ArityRange };
+
+/**
+ * Verdict for a Ruby method against EVERY TS signature recorded for its name
+ * (see compare.ts `tsParamsByName`). Matches if ANY candidate overlaps — that's
+ * what lets the real implementation win over a 0-arg re-export binding exposed
+ * under the same name; otherwise reports the first candidate's ranges.
+ */
+export function matchArityAgainst(ruby: ParamInfo[], candidates: ParamInfo[][]): ArityVerdict {
+  let first: { m: ArityMatch; params: ParamInfo[] } | null = null;
+  for (const c of candidates) {
+    const m = arityMatches(ruby, c);
+    if (m.ok) return { matched: true };
+    first ??= { m, params: c };
+  }
+  if (!first) return { matched: true }; // no candidates — nothing to flag
+  return {
+    matched: false,
+    tsParams: first.params,
+    rubyRange: first.m.rubyRange,
+    tsRange: first.m.tsRange,
   };
 }
 

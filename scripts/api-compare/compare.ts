@@ -47,7 +47,7 @@ import {
 } from "./config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { ARITY_OVERRIDES, rubyFileToTs, rubyMethodToTs } from "./conventions.js";
-import { arityMatches, renderSig, shouldSkipArity, type ArityRange } from "./arity.js";
+import { matchArityAgainst, renderSig, shouldSkipArity, type ArityRange } from "./arity.js";
 import { isSourceUnported } from "./unported-files.js";
 
 const DETAIL_PACKAGES = new Set([
@@ -679,15 +679,18 @@ function main() {
     const tsShouldInclude = (m: MethodInfo) => tsShouldIncludeInIndex(m, mode);
     const tsMethodsByFile = new Map<string, Set<string>>();
 
-    // Param side-map for the advisory arity check (tsMethodsByFile carries
-    // only names). Every signature seen for a name — across own methods, setter
-    // accessors, and same-named functions elsewhere; a pair matches when it
-    // overlaps ANY, so overload ambiguity never yields a false positive.
-    const tsAllParamsByName = new Map<string, ParamInfo[][]>();
+    // Param side-map for the advisory arity check (tsMethodsByFile carries only
+    // names): every signature seen for a TS name, package-GLOBAL by design. The
+    // mixin convention (CLAUDE.md `static x = x`) puts a method's real signature
+    // in its source file while the aggregator class Ruby maps to holds only a
+    // 0-arg re-export binding (`_writeAttribute: ReadonlyAttributes._write…`);
+    // pooling all signatures and matching ANY (see matchArityAgainst) finds the
+    // true arity and keeps those bindings/overloads from false-positiving.
+    const tsParamsByName = new Map<string, ParamInfo[][]>();
     const recordTsParams = (m: MethodInfo) => {
-      const all = tsAllParamsByName.get(m.name) || [];
-      all.push(m.params);
-      tsAllParamsByName.set(m.name, all);
+      const sigs = tsParamsByName.get(m.name) ?? [];
+      sigs.push(m.params);
+      tsParamsByName.set(m.name, sigs);
     };
 
     if (tsPkg) {
@@ -1023,26 +1026,23 @@ function main() {
         if (rubyName.endsWith("=")) return;
         const rubyParams = rubyParamsByName.get(rubyName);
         if (!rubyParams) return;
-        // Match against ANY recorded signature for the name (overlap is lenient).
-        const candidates = tsAllParamsByName.get(tsName) || [];
+        // Every signature recorded for this TS name; a pair matches when it
+        // overlaps ANY (see tsParamsByName above for why this is global).
+        const candidates = tsParamsByName.get(tsName) ?? [];
         if (candidates.length === 0) return;
         if (candidates.every((c) => shouldSkipArity(rubyParams, c))) return;
         arityCompared++;
-        let best: { c: ParamInfo[]; rubyRange: ArityRange; tsRange: ArityRange } | null = null;
-        for (const c of candidates) {
-          const m = arityMatches(rubyParams, c);
-          if (m.ok) return;
-          if (!best) best = { c, rubyRange: m.rubyRange, tsRange: m.tsRange };
-        }
+        const verdict = matchArityAgainst(rubyParams, candidates);
+        if (verdict.matched) return;
         arityMismatches.push({
           rubyFile,
           tsFile,
           rubyName,
           tsName,
           rubySig: renderSig(rubyParams, "ruby"),
-          tsSig: renderSig(best!.c, "ts"),
-          rubyRange: best!.rubyRange,
-          tsRange: best!.tsRange,
+          tsSig: renderSig(verdict.tsParams, "ts"),
+          rubyRange: verdict.rubyRange,
+          tsRange: verdict.tsRange,
         });
       };
 
@@ -1297,20 +1297,17 @@ function main() {
 
   // Write JSON. Separate file per mode so artifacts don't clobber each
   // other when multiple runs land back-to-back in CI.
-  const jsonFilename =
-    mode === "private"
-      ? "api-comparison-privates-only.json"
-      : mode === "public"
-        ? "api-comparison-public-only.json"
-        : "api-comparison.json";
-  const jsonPath = path.join(OUTPUT_DIR, jsonFilename);
+  const modeSuffix =
+    mode === "private" ? "-privates-only" : mode === "public" ? "-public-only" : "";
+  const jsonPath = path.join(OUTPUT_DIR, `api-comparison${modeSuffix}.json`);
   fs.writeFileSync(
     jsonPath,
     JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2),
   );
 
-  // Advisory arity artifact — always written; flat across packages.
-  const arityPath = path.join(OUTPUT_DIR, "arity-mismatches.json");
+  // Advisory arity artifact — always written; flat across packages. Per-mode
+  // filename so a public/privates run doesn't clobber the full-surface one.
+  const arityPath = path.join(OUTPUT_DIR, `arity-mismatches${modeSuffix}.json`);
   const arityFlat = results.flatMap((r) =>
     r.arity.mismatches.map((m) => ({ package: r.package, ...m })),
   );

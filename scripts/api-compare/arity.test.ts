@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { positionalArity, arityMatches, shouldSkipArity, renderSig } from "./arity.js";
+import {
+  positionalArity,
+  arityMatches,
+  matchArityAgainst,
+  shouldSkipArity,
+  renderSig,
+} from "./arity.js";
 import type { ParamInfo } from "./types.js";
 
 const req = (name: string, type?: string): ParamInfo => ({ name, kind: "required", type });
@@ -98,6 +104,21 @@ describe("arityMatches", () => {
   it("treats a ruby block as satisfied by an explicit TS callback param", () => {
     // def each(&block)  ≈  each(fn)
     expect(arityMatches([blk("block")], [req("fn")]).ok).toBe(true);
+  });
+});
+
+describe("matchArityAgainst", () => {
+  it("matches when ANY candidate overlaps — real impl wins over a 0-arg binding", () => {
+    // base.ts exposes `_writeAttribute: ReadonlyAttributes._writeAttribute` as a
+    // 0-arg property; the real 2-arg signature lives in the mixin source.
+    const real: ParamInfo[] = [req("name"), req("value")];
+    expect(matchArityAgainst(real, [[], real])).toEqual({ matched: true });
+    expect(matchArityAgainst([req("a")], [])).toEqual({ matched: true });
+  });
+
+  it("reports a mismatch (first candidate's ranges) when none overlap", () => {
+    const v = matchArityAgainst([req("a"), req("b")], [[req("a")]]);
+    expect(v).toMatchObject({ matched: false, rubyRange: { min: 2 }, tsRange: { min: 1 } });
   });
 });
 
