@@ -76,7 +76,9 @@ export async function create(
   // Reflect the schema before constructing — the constructor casts attrs
   // against attribute definitions that lazy reflection populates.
   await this.ensureSchemaLoaded();
-  const record = new this((this as any)._mergeCurrentScopeAttrs(attrs));
+  const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attrs);
+  const record = new this(mergedAttrs);
+  _reapplyNestedAttrSetters(this, record, mergedAttrs);
   if (block) block(record);
   await record.save();
   return record;
@@ -99,7 +101,9 @@ export async function createBang(
     return records;
   }
   await this.ensureSchemaLoaded();
-  const record = new this((this as any)._mergeCurrentScopeAttrs(attrs));
+  const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attrs);
+  const record = new this(mergedAttrs);
+  _reapplyNestedAttrSetters(this, record, mergedAttrs);
   if (block) block(record);
   await record.saveBang();
   return record;
@@ -756,6 +760,29 @@ function findPrototypeSetter(instance: object, key: string): ((v: unknown) => vo
     proto = Object.getPrototypeOf(proto);
   }
   return undefined;
+}
+
+/**
+ * Re-dispatch any `*Attributes=` nested attribute setter keys that the Base
+ * constructor wrote as plain attribute values (via `writeAttribute`) rather
+ * than through the prototype setter. Called by `create`/`createBang` after
+ * construction so that `Model.create({commentsAttributes: [...]})` correctly
+ * queues nested attributes for processing on save — mirrors Rails'
+ * `new Model(attributes)` → `assign_attributes` → `public_send(setter)` path.
+ */
+function _reapplyNestedAttrSetters(
+  ctor: PersistenceHost,
+  record: any,
+  attrs: Record<string, unknown>,
+): void {
+  const nestedKeys: Set<string> | undefined = (ctor as any)._nestedAttributeSetterKeys;
+  if (!nestedKeys?.size) return;
+  for (const k of nestedKeys) {
+    if (Object.prototype.hasOwnProperty.call(attrs, k)) {
+      const setter = findPrototypeSetter(record, k);
+      if (setter) setter.call(record, attrs[k]);
+    }
+  }
 }
 
 /**

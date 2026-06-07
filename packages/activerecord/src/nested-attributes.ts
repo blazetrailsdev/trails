@@ -244,11 +244,20 @@ async function processNestedAttributes(record: Base): Promise<void> {
           await conn.executeMutation(conn.toSql(um));
         }
       } else {
-        // For hasMany/hasOne, set FK on the child record
-        await (targetModel as any).create({
-          ...childAttrs,
-          [foreignKey]: record.id,
-        });
+        // For hasMany/hasOne, set FK on the child record.
+        // When inverseOf is declared, cache the parent on the new child before
+        // saving so presence validators that check the association object pass
+        // without a DB round-trip — mirrors Rails' inverse_of auto-population.
+        const inverseOf: string | undefined = assocDef.options.inverseOf;
+        if (inverseOf) {
+          await (targetModel as any).ensureSchemaLoaded();
+          const child = new (targetModel as any)({ ...childAttrs, [foreignKey]: record.id });
+          if (!(child as any)._cachedAssociations) (child as any)._cachedAssociations = new Map();
+          (child as any)._cachedAssociations.set(inverseOf, record);
+          await child.save();
+        } else {
+          await (targetModel as any).create({ ...childAttrs, [foreignKey]: record.id });
+        }
       }
     }
   }
@@ -374,6 +383,12 @@ function generateAssociationWriter(
   type: "collection" | "one_to_one",
 ): void {
   const attrName = `${associationName}Attributes`;
+  // Register so persistence.create/createBang can re-dispatch after construction
+  // (the Base constructor routes attrs through writeAttribute, bypassing setters).
+  if (!(modelClass as any)._nestedAttributeSetterKeys) {
+    (modelClass as any)._nestedAttributeSetterKeys = new Set<string>();
+  }
+  (modelClass as any)._nestedAttributeSetterKeys.add(attrName);
   if (type === "collection") {
     Object.defineProperty(modelClass.prototype, attrName, {
       set(this: Base, value: any) {
