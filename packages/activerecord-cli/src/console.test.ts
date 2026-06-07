@@ -17,7 +17,7 @@ function makeReplStub() {
   return server;
 }
 
-const DB_CONFIG = `export default { development: { adapter: "sqlite3", database: ":memory:" } };\n`;
+const DB_CONFIG = `export default { development: { adapter: "sqlite3", database: ":memory:" }, test: { adapter: "sqlite3", database: ":memory:" } };\n`;
 async function scaffoldProject(dir: string) {
   await mkdir(join(dir, "config"), { recursive: true });
   await writeFile(join(dir, "config", "database.ts"), DB_CONFIG, "utf8");
@@ -65,5 +65,20 @@ describe("ArConsoleTest", () => {
     const code = await arConsole(dir, []);
     expect(code).toBe(1);
     expect(err.join("\n")).toContain("config/database.ts");
+  });
+
+  it("returns 1 when no database configuration found for environment", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-console-emptyenv-"));
+    await mkdir(join(dir, "config"), { recursive: true });
+    await writeFile(
+      join(dir, "config", "database.ts"),
+      `export default { development: { adapter: "sqlite3", database: ":memory:" } };\n`,
+      "utf8",
+    );
+    const code = await arConsole(dir, ["--env", "production"], { startRepl: () => makeReplStub() });
+    expect(code).toBe(1);
+    expect(err.join("\n")).toContain(
+      'no database configuration found for environment "production"',
+    );
   });
 });
