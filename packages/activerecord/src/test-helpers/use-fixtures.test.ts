@@ -606,8 +606,8 @@ describe("useFixtures resolves STI subclasses on standalone load", () => {
       `SELECT breed FROM ${Base.adapter.quoteTableName("parrots")} WHERE name = 'Curious George'`,
     )) as { breed: number }[];
     expect(row!.breed).toBe(1);
-    expect(parrots("george").readAttribute("breed")).toBe(1);
-    expect(parrots("louis").readAttribute("breed")).toBe(0);
+    expect(parrots("george").readAttribute("breed")).toBe("australian");
+    expect(parrots("louis").readAttribute("breed")).toBe("african");
   });
 
   it("hydrates a Cucumber-typed row as a Cucumber instance", () => {

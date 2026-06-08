@@ -1049,8 +1049,14 @@ export class Base extends Model {
     // real DB columns from the schema cache — the sync fallback in loadSchema
     // would otherwise synthesize a columnsHash containing only the virtual
     // attrs and mark the model schema-loaded, hiding every real column.
+    //
+    // Only bail early when a schema-sourced (non-user-declared) attribute
+    // exists — that proves real DB reflection already ran. User-declared
+    // attributes (source:"user", e.g. from `enum()`) don't prove this and
+    // must not prevent reflection from running for the first time.
     for (const def of this._attributeDefinitions.values()) {
-      if (!(def as { virtual?: boolean }).virtual) return Promise.resolve();
+      const d = def as { virtual?: boolean; source?: string };
+      if (!d.virtual && d.source === "schema") return Promise.resolve();
     }
     return this.loadSchema();
   }
