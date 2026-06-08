@@ -853,4 +853,21 @@ describe("newStory cluster validation", () => {
     expect(msg).toMatch(/scaffold/);
     expect(msg).toMatch(/conversion/);
   });
+
+  it("validates clusters declared as a YAML flow sequence", () => {
+    // Codex review: regex parsing misses `clusters: [scaffold, conversion]`.
+    // The fix uses the `yaml` package to parse all valid YAML forms.
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    mkdirSync(join(dir, "rfcs", "0005-gaps", "stories"), { recursive: true });
+    writeFileSync(
+      join(dir, "rfcs", "0005-gaps", "README.md"),
+      `---\nrfc: "0005-gaps"\ntitle: "test"\nstatus: active\nclusters: [scaffold, conversion]\n---\n`,
+    );
+    expect(() => newStory("0005-gaps", "my-story", { cluster: "tooling" }, dir)).toThrow(/exit 1/);
+    const msg = (console.error as ReturnType<typeof vi.spyOn>).mock.calls[0]?.[0] as string;
+    expect(msg).toMatch(/scaffold/);
+    expect(msg).toMatch(/conversion/);
+  });
 });

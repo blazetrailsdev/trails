@@ -21,6 +21,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse as parseYaml } from "yaml";
 
 // $TASKS_DIR is the canonical override; $RFCS_DIR is honored as a
 // transition fallback after the rfcs → tasks repo rename.
@@ -612,9 +613,11 @@ function refine(id: string, pr: number | null, dir: string): void {
 
 // ──────────────────── new story ────────────────────
 
-// Returns the cluster names declared in an RFC's README.md frontmatter. Returns
-// [] when the README is missing, unparseable, or has no clusters field — the
-// caller passes through, and validate.mjs will catch any structural error later.
+// Returns the cluster names declared in an RFC's README.md frontmatter, parsed
+// with the same yaml.load semantics as tasks/scripts/lib.mjs (block sequences,
+// flow sequences, quoted values, comments all handled). Returns [] when the
+// README is missing, unparseable, or has no clusters field — the caller passes
+// through, and validate.mjs will catch any structural error later.
 function readRfcClusters(tasksDir: string, rfcSlug: string): string[] {
   const readmePath = join(tasksDir, "rfcs", rfcSlug, "README.md");
   let text: string;
@@ -623,18 +626,16 @@ function readRfcClusters(tasksDir: string, rfcSlug: string): string[] {
   } catch {
     return [];
   }
-  const fm = text.match(/^---\n([\s\S]*?)\n---/)?.[1];
-  if (!fm) return [];
-  const lines = fm.split("\n");
-  const start = lines.findIndex((l) => /^clusters:/.test(l));
-  if (start === -1) return [];
-  const clusters: string[] = [];
-  for (let i = start + 1; i < lines.length; i++) {
-    const m = lines[i].match(/^[ \t]+-[ \t]+(.+)$/);
-    if (!m) break;
-    clusters.push(m[1].trim());
+  const fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
+  if (!fmMatch) return [];
+  try {
+    const fm = parseYaml(fmMatch[1]) as { clusters?: unknown } | null;
+    const clusters = fm?.clusters;
+    if (!Array.isArray(clusters)) return [];
+    return clusters.filter((c): c is string => typeof c === "string");
+  } catch {
+    return [];
   }
-  return clusters;
 }
 
 // Pure content generator — exported so tests can verify the exact file format
