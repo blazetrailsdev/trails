@@ -231,6 +231,7 @@ export interface IdHashOptions {
   scale?: number;
   unsigned?: boolean;
   comment?: string;
+  autoIncrement?: boolean;
 }
 
 export interface ColumnOptions {
