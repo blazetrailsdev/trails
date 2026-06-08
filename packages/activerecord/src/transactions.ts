@@ -71,7 +71,7 @@ export function afterAllTransactionsCommit(fn: () => void | Promise<void>): void
  */
 export async function transaction<T>(
   modelClass: typeof Base,
-  fn: (tx: Transaction) => Promise<T>,
+  fn: (tx: PublicTransaction) => Promise<T>,
   options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
 ): Promise<T | undefined> {
   const adapter = modelClass.connection;
@@ -90,7 +90,7 @@ export async function transaction<T>(
       }
       return IsolatedExecutionState.scope(CURRENT_TRANSACTION_KEY, internalTx, () => {
         const publicTx = userTx instanceof PublicTransaction ? userTx : internalTx.userTransaction;
-        return fn(publicTx as unknown as Transaction);
+        return fn(publicTx);
       });
     },
     {

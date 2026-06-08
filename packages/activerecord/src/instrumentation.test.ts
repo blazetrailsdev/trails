@@ -357,16 +357,19 @@ describe("TransactionInSqlActiveRecordPayloadTest", () => {
         this.attribute("name", "string");
       }
     }
+    let asserted = false;
     let capturedTransaction: unknown = "unset";
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.name === "Book Count") {
         capturedTransaction = event.payload.transaction;
+        asserted = true;
       }
     });
     await Book.transaction(async (tx) => {
       await Book.count();
       expect(capturedTransaction).toBe(tx);
     });
+    expect(asserted).toBe(true);
   });
 });
 
@@ -405,15 +408,18 @@ describe("TransactionInSqlActiveRecordPayloadNonTransactionalTest", () => {
         this.attribute("name", "string");
       }
     }
+    let asserted = false;
     let capturedTransaction: unknown = "unset";
     Notifications.subscribe("sql.active_record", (event: any) => {
       if (event.payload?.name === "Book Count") {
         capturedTransaction = event.payload.transaction;
+        asserted = true;
       }
     });
     await Book.transaction(async (tx) => {
       await Book.count();
       expect(capturedTransaction).toBe(tx);
     });
+    expect(asserted).toBe(true);
   });
 });
