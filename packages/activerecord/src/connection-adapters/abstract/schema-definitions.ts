@@ -1236,9 +1236,6 @@ export class TableDefinition {
         if (clause) parts.push(clause.trimStart());
       }
 
-      if (this._adapterName === "mysql" && col.options.comment?.trim())
-        parts.push(`COMMENT '${col.options.comment.replace(/'/g, "''")}'`);
-
       return parts.join(" ");
     });
 

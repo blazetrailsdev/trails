@@ -1918,7 +1918,10 @@ export class MigrationContext {
     if (options?.ifNotExists && this.tableExists(name)) {
       return;
     }
-    const td = new TableDefinition(name, {
+    // Build via the adapter's own TableDefinition so MySQL/PG generate DDL through their
+    // SchemaCreation visitors (comments/charset handled polymorphically, mirroring Rails);
+    // SQLite falls back to the generic one. Mirrors how SchemaStatements#createTable dispatches.
+    const td = this.connection.createTableDefinition!(name, {
       id: options?.as != null ? false : options?.id,
       primaryKey: options?.primaryKey,
       default: options?.default,
@@ -1927,8 +1930,6 @@ export class MigrationContext {
       charset: options?.charset,
       collation: options?.collation,
       as: options?.as,
-      adapterName: this._adapterName,
-      adapter: this.connection,
     });
     if (fn) fn(td);
     await this.connection.executeMutation(this.connection.toSql(td));
