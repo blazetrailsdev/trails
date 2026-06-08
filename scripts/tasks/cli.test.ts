@@ -560,7 +560,7 @@ describe("buildStoryContent", () => {
       date: "2026-06-08",
     });
     expect(content).toContain(`title: "My custom title"`);
-    expect(content).toContain(`cluster: type-system`);
+    expect(content).toContain(`cluster: "type-system"`);
     expect(content).toContain(`deps: ["story-a", "story-b"]`);
     expect(content).toContain(`est-loc: 120`);
     expect(content).toContain(`priority: 5`);
@@ -569,6 +569,16 @@ describe("buildStoryContent", () => {
   it("uses story slug as title when no title given", () => {
     const content = buildStoryContent("0001-r", "add-foo-support", { date: "2026-06-08" });
     expect(content).toContain(`title: "add-foo-support"`);
+  });
+
+  it("escapes double-quotes in title and cluster", () => {
+    const content = buildStoryContent("0005-gaps", "x", {
+      title: 'foo "bar" baz',
+      cluster: 'a "b"',
+      date: "2026-06-08",
+    });
+    expect(content).toContain(`title: "foo \\"bar\\" baz"`);
+    expect(content).toContain(`cluster: "a \\"b\\""`);
   });
 });
 
@@ -581,29 +591,23 @@ describe("checkPrNotOpen (done merge-state guard)", () => {
   }
 
   it("succeeds silently when PR is merged", () => {
-    execFileSyncMock.mockReturnValueOnce(
-      JSON.stringify({ state: "MERGED", mergedAt: "2026-06-01T00:00:00Z" }) as never,
-    );
+    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ state: "MERGED" }) as never);
     expect(() => checkPrNotOpen(123)).not.toThrow();
     expect(execFileSyncMock).toHaveBeenCalledWith(
       "gh",
-      ["pr", "view", "123", "--json", "state,mergedAt"],
+      ["pr", "view", "123", "--json", "state"],
       expect.objectContaining({ encoding: "utf8" }),
     );
   });
 
   it("succeeds silently when PR is closed (spike / moot-audit)", () => {
-    execFileSyncMock.mockReturnValueOnce(
-      JSON.stringify({ state: "CLOSED", mergedAt: null }) as never,
-    );
+    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ state: "CLOSED" }) as never);
     expect(() => checkPrNotOpen(42)).not.toThrow();
   });
 
   it("exits 1 when PR is open (work unfinished)", () => {
     setupExit();
-    execFileSyncMock.mockReturnValueOnce(
-      JSON.stringify({ state: "OPEN", mergedAt: null }) as never,
-    );
+    execFileSyncMock.mockReturnValueOnce(JSON.stringify({ state: "OPEN" }) as never);
     expect(() => checkPrNotOpen(42)).toThrow(/exit 1/);
     expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/still open/i));
   });

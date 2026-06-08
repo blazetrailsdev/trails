@@ -38,14 +38,14 @@ package list, and the `declare` / associations / enums / schema reference, see
   500 LOC is the hard one — review-cycle data shows PRs ≥400 LOC need 4–6
   rounds minimum and ≥700 LOC need 13+, so 500 sits just above the 400-LOC
   inflection and well below the 700-LOC danger zone. **Do NOT fan out into
-  sibling PRs yourself.** Keep each PR scoped to the single story you claimed.
-  If the work is larger than one PR, or you discover additional work that
-  belongs in a separate PR, do NOT open it yourself — add a new story to the
-  epic with `pnpm tasks new <rfc-slug> <story-slug>` so it gets scheduled and
-  owned separately. This keeps the one-agent-per-PR ownership model intact
-  (a single agent fanning out N PRs and then dying orphans all of them —
-  this happened). The only exception is a single mechanical rename — note it
-  in the PR body.
+  sibling PRs yourself.** Keep each PR scoped to the single story you claimed;
+  ship the portion that fits and register the rest as new stories. If the work
+  is larger than one PR, or you discover additional work that belongs in a
+  separate PR, do NOT open it yourself — add a new story to the epic with
+  `pnpm tasks new <rfc-slug> <story-slug>` so it gets scheduled and owned
+  separately. This keeps the one-agent-per-PR ownership model intact (a single
+  agent fanning out N PRs and then dying orphans all of them — this happened).
+  The only exception is a single mechanical rename — note it in the PR body.
 - **Do NOT stack PRs.** Each PR branches from `main` and stands alone.
   We don't have spare CI runners or review bandwidth — stacked branches
   (`<base>b` off `<base>`, `<base>c` off `<base>b`, etc.) re-run CI on

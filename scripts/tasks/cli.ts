@@ -598,15 +598,17 @@ export function buildStoryContent(
     date: string;
   },
 ): string {
+  // Escape for a YAML double-quoted scalar: backslash first, then double-quote.
+  const qs = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   const title = opts.title ?? storySlug;
   const deps = opts.deps ?? [];
-  const depsYaml = deps.length === 0 ? "[]" : `[${deps.map((d) => `"${d}"`).join(", ")}]`;
+  const depsYaml = deps.length === 0 ? "[]" : `[${deps.map((d) => qs(d)).join(", ")}]`;
   return `---
-title: "${title}"
+title: ${qs(title)}
 status: draft
 updated: ${opts.date}
 rfc: "${rfcSlug}"
-cluster: ${opts.cluster ?? "null"}
+cluster: ${opts.cluster != null ? qs(opts.cluster) : "null"}
 deps: ${depsYaml}
 deps-rfc: []
 est-loc: ${opts.estLoc != null ? opts.estLoc : "null"}
@@ -651,13 +653,12 @@ function newStory(
     console.error(`error: story "${storySlug}" already exists at ${storyFile}`);
     process.exit(1);
   }
-  const content = buildStoryContent(rfcSlug, storySlug, { ...opts, date: today() });
   commitAndPush({
     message: `new: ${storySlug}`,
     fileToStage: storyFile,
     mutator: () => {
       mkdirSync(storiesDir, { recursive: true });
-      writeFileSync(storyFile, content);
+      writeFileSync(storyFile, buildStoryContent(rfcSlug, storySlug, { ...opts, date: today() }));
     },
     raceMessage: `failed to create ${storySlug} after retry — pull manually and retry`,
     raceExitCode: 4,
@@ -674,7 +675,7 @@ function newStory(
 export function checkPrNotOpen(pr: number): void {
   let raw: string;
   try {
-    raw = execFileSync("gh", ["pr", "view", String(pr), "--json", "state,mergedAt"], {
+    raw = execFileSync("gh", ["pr", "view", String(pr), "--json", "state"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -907,7 +908,9 @@ function main(): void {
       if (!id) usage();
       // --pr is optional here: present ⇒ also flip the story to done.
       // --dir is the agent's tasks worktree; defaults to the canonical checkout.
-      refine(id, numberFlag(flags, "pr"), stringFlag(flags, "dir") ?? TASKS_DIR);
+      const refinePr = numberFlag(flags, "pr");
+      if (refinePr !== null && !flags.force) checkPrNotOpen(refinePr);
+      refine(id, refinePr, stringFlag(flags, "dir") ?? TASKS_DIR);
       break;
     }
     case "priority": {
@@ -941,7 +944,7 @@ function usage(): never {
   in-progress <id> --pr <N>
   done <id> --pr <N> [--force]
   block <id> --reason "<text>"
-  refine <id> [--pr <N>] [--dir <tasks worktree>]
+  refine <id> [--pr <N>] [--dir <tasks worktree>] [--force]
   priority <id> <N> | priority <id> --clear    (lower N = higher priority)
   new <rfc-slug> <story-slug> [--title "text"] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>]
 
