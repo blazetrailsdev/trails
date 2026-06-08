@@ -1727,7 +1727,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     ...constraints: string[]
   ): Promise<void> {
     if (deferred !== "deferred" && deferred !== "immediate") {
-      throw new Error(`deferred must be "deferred" or "immediate"`);
+      throw new ArgumentError(`deferred must be "deferred" or "immediate"`);
     }
     const list =
       constraints.length === 0 ? "ALL" : constraints.map((c) => this.quoteTableName(c)).join(", ");
