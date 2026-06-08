@@ -607,7 +607,7 @@ export function buildStoryContent(
 title: ${qs(title)}
 status: draft
 updated: ${opts.date}
-rfc: "${rfcSlug}"
+rfc: ${qs(rfcSlug)}
 cluster: ${opts.cluster != null ? qs(opts.cluster) : "null"}
 deps: ${depsYaml}
 deps-rfc: []
@@ -630,7 +630,7 @@ TODO: describe what situation this story addresses.
 `;
 }
 
-function newStory(
+export function newStory(
   rfcSlug: string,
   storySlug: string,
   opts: {
@@ -640,9 +640,15 @@ function newStory(
     deps?: string[];
     priority?: number | null;
   },
+  tasksDir = TASKS_DIR,
 ): void {
-  inGitTasks();
-  const rfcDir = join(TASKS_DIR, "rfcs", rfcSlug);
+  if (!existsSync(join(tasksDir, ".git"))) {
+    console.error(
+      `error: ${tasksDir} is not a git repo. Clone blazetrailsdev/tasks there, or set $TASKS_DIR to an existing checkout.`,
+    );
+    process.exit(1);
+  }
+  const rfcDir = join(tasksDir, "rfcs", rfcSlug);
   if (!existsSync(rfcDir)) {
     console.error(`error: RFC "${rfcSlug}" not found (expected ${rfcDir})`);
     process.exit(1);
@@ -654,7 +660,7 @@ function newStory(
     process.exit(1);
   }
   commitAndPush({
-    message: `new: ${storySlug}`,
+    message: `new: ${rfcSlug}/${storySlug}`,
     fileToStage: storyFile,
     mutator: () => {
       mkdirSync(storiesDir, { recursive: true });
@@ -662,6 +668,7 @@ function newStory(
     },
     raceMessage: `failed to create ${storySlug} after retry — pull manually and retry`,
     raceExitCode: 4,
+    cwd: tasksDir,
   });
   console.log(`created ${rfcSlug}/stories/${storySlug}.md`);
 }

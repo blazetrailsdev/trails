@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -27,6 +27,7 @@ import {
   editFrontmatter,
   Index,
   listFiltered,
+  newStory,
   nextBundle,
   numberFlag,
   parseFlags,
@@ -621,5 +622,33 @@ describe("checkPrNotOpen (done merge-state guard)", () => {
     });
     expect(() => checkPrNotOpen(42)).toThrow(/exit 1/);
     expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/could not query PR #42/));
+  });
+});
+
+describe("newStory validation paths", () => {
+  function setupExit() {
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  }
+
+  it("exits 1 when the RFC directory does not exist", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    // No rfcs/missing-rfc subdir — expect the RFC-not-found guard to fire.
+    expect(() => newStory("missing-rfc", "my-story", {}, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/not found/));
+  });
+
+  it("exits 1 when the story file already exists", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    mkdirSync(join(dir, "rfcs", "0005-gaps", "stories"), { recursive: true });
+    writeFileSync(join(dir, "rfcs", "0005-gaps", "stories", "existing.md"), "---\ntitle: x\n---\n");
+    expect(() => newStory("0005-gaps", "existing", {}, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/already exists/));
   });
 });

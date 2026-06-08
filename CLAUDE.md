@@ -33,7 +33,9 @@ package list, and the `declare` / associations / enums / schema reference, see
 - **PR size ceiling: 500 LOC** (additions + deletions, excluding lockfiles,
   snapshots, and generated parity fixtures; docs-only changes — `.md` files,
   READMEs, RFC/story prose — are exempt). Check before opening with
-  `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**'`.
+  `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**' ':!**/*.md'`
+  (`.md` files are excluded because docs-only changes are exempt; subtract them
+  manually if your PR mixes code and docs).
   Tests and fixtures count. The historical 20-method rule is a soft guide;
   500 LOC is the hard one — review-cycle data shows PRs ≥400 LOC need 4–6
   rounds minimum and ≥700 LOC need 13+, so 500 sits just above the 400-LOC
