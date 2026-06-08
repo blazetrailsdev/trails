@@ -88,13 +88,13 @@ const RECEIVER_PARAM_NAMES = new Set([
   "pool",
   "batch",
   "reflection",
-  // Explicit-receiver spellings observed across the port.
-  "host",
+  // Explicit-receiver spellings observed across the port (each backed by ≥1
+  // real mismatch the strip resolves), plus `self` (the definitional receiver).
   "self",
+  "host",
   "model",
   "modelClass",
   "recordOrClass",
-  "subject",
   "target",
   "adapter",
   "node",
@@ -102,7 +102,6 @@ const RECEIVER_PARAM_NAMES = new Set([
   "branch",
   "association",
   "date",
-  "time",
   "input",
   "connections",
   "targets",
@@ -117,16 +116,7 @@ const RECEIVER_PARAM_NAMES = new Set([
  *  explicit trailing callback has nothing to match against. Dropping it only ever
  *  *gains* a match (same guarantee as receiver stripping). Genuine trailing value
  *  args (`options`, `value`) are intentionally absent. */
-const TRAILING_CALLBACK_NAMES = new Set([
-  "fn",
-  "cb",
-  "callback",
-  "block",
-  "blk",
-  "compute",
-  "yielder",
-  "next",
-]);
+const TRAILING_CALLBACK_NAMES = new Set(["fn", "cb", "callback", "block", "blk", "compute"]);
 
 function leafTypeName(type: string | undefined): string | null {
   if (!type) return null;
