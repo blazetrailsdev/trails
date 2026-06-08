@@ -17,7 +17,7 @@
 // schema migration cost. If we hit dep-graph queries the JSON+JS shape
 // can't handle, switch in a follow-up.
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -582,6 +582,159 @@ function refine(id: string, pr: number | null, dir: string): void {
   console.log(JSON.stringify({ id, outcome, pushed: true, pr }));
 }
 
+// ──────────────────── new story ────────────────────
+
+// Pure content generator — exported so tests can verify the exact file format
+// without needing a real git repo or TASKS_DIR.
+export function buildStoryContent(
+  rfcSlug: string,
+  storySlug: string,
+  opts: {
+    title?: string;
+    cluster?: string | null;
+    estLoc?: number | null;
+    deps?: string[];
+    priority?: number | null;
+    date: string;
+  },
+): string {
+  // Escape for a YAML double-quoted scalar: backslash first, then double-quote.
+  const qs = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  const title = opts.title ?? storySlug;
+  const deps = opts.deps ?? [];
+  const depsYaml = deps.length === 0 ? "[]" : `[${deps.map((d) => qs(d)).join(", ")}]`;
+  return `---
+title: ${qs(title)}
+status: draft
+updated: ${opts.date}
+rfc: ${qs(rfcSlug)}
+cluster: ${opts.cluster != null ? opts.cluster : "null"}
+deps: ${depsYaml}
+deps-rfc: []
+est-loc: ${opts.estLoc != null ? opts.estLoc : "null"}
+priority: ${opts.priority != null ? opts.priority : "null"}
+pr: null
+claim: null
+assignee: null
+blocked-by: null
+---
+
+## Context
+
+TODO: describe what situation this story addresses.
+
+## Acceptance criteria
+
+- [ ] TODO
+
+`;
+}
+
+export function newStory(
+  rfcSlug: string,
+  storySlug: string,
+  opts: {
+    title?: string;
+    cluster?: string;
+    estLoc?: number | null;
+    deps?: string[];
+    priority?: number | null;
+  },
+  tasksDir = TASKS_DIR,
+): void {
+  const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+  if (!SLUG_RE.test(rfcSlug)) {
+    console.error(
+      `error: rfcSlug "${rfcSlug}" must be a lowercase slug (letters, digits, hyphens)`,
+    );
+    process.exit(1);
+  }
+  if (!SLUG_RE.test(storySlug)) {
+    console.error(
+      `error: storySlug "${storySlug}" must be a lowercase slug (letters, digits, hyphens)`,
+    );
+    process.exit(1);
+  }
+  if (opts.cluster != null && !SLUG_RE.test(opts.cluster)) {
+    console.error(
+      `error: cluster "${opts.cluster}" must be a lowercase slug (letters, digits, hyphens)`,
+    );
+    process.exit(1);
+  }
+  if (!existsSync(join(tasksDir, ".git"))) {
+    console.error(
+      `error: ${tasksDir} is not a git repo. Clone blazetrailsdev/tasks there, or set $TASKS_DIR to an existing checkout.`,
+    );
+    process.exit(1);
+  }
+  const rfcDir = join(tasksDir, "rfcs", rfcSlug);
+  if (!existsSync(rfcDir)) {
+    console.error(`error: RFC "${rfcSlug}" not found (expected ${rfcDir})`);
+    process.exit(1);
+  }
+  const storiesDir = join(rfcDir, "stories");
+  const storyFile = join(storiesDir, `${storySlug}.md`);
+  if (existsSync(storyFile)) {
+    console.error(`error: story "${storySlug}" already exists at ${storyFile}`);
+    process.exit(1);
+  }
+  commitAndPush({
+    message: `new: ${rfcSlug}/${storySlug}`,
+    fileToStage: storyFile,
+    mutator: () => {
+      // Re-check after pull: another agent may have pushed the same story since
+      // the pre-pull existsSync above, and writeFileSync would silently overwrite it.
+      if (existsSync(storyFile)) {
+        console.error(`error: story "${storySlug}" already exists (created by concurrent agent)`);
+        process.exit(4);
+      }
+      mkdirSync(storiesDir, { recursive: true });
+      writeFileSync(storyFile, buildStoryContent(rfcSlug, storySlug, { ...opts, date: today() }));
+    },
+    raceMessage: `failed to create ${storySlug} after retry — pull manually and retry`,
+    raceExitCode: 4,
+    cwd: tasksDir,
+  });
+  console.log(`created ${rfcSlug}/stories/${storySlug}.md`);
+}
+
+// ──────────────────── done merge-state guard ────────────────────
+
+// Guards `done` against marking an OPEN PR as done. Exported for unit tests.
+// MERGED and CLOSED are both allowed (CLOSED covers spikes and moot-audit PRs
+// that are intentionally not merged). Only OPEN is rejected: the work is
+// unfinished. Exits 1 on OPEN or if gh is unavailable.
+export function checkPrNotOpen(pr: number): void {
+  let raw: string;
+  try {
+    raw = execFileSync("gh", ["pr", "view", String(pr), "--json", "state"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (e) {
+    const msg = ((e as { stderr?: string }).stderr ?? String(e)).trim();
+    console.error(`error: could not query PR #${pr} state via gh: ${msg}`);
+    process.exit(1);
+  }
+  let data: { state?: string } = {};
+  try {
+    data = JSON.parse(raw) as typeof data;
+  } catch {
+    console.error(`error: unexpected output from gh pr view #${pr}`);
+    process.exit(1);
+  }
+  if (!data.state) {
+    console.error(`error: could not read PR #${pr} state from gh output`);
+    process.exit(1);
+  }
+  if (data.state === "OPEN") {
+    console.error(
+      `error: PR #${pr} is still open — merge or close it first, or use --force to bypass`,
+    );
+    process.exit(1);
+  }
+}
+
 // ──────────────────── presentation ────────────────────
 
 function fmt(rows: StoryEntry[]): void {
@@ -640,7 +793,7 @@ export function stringFlag(
 // Known boolean flags. Everything else with a non-`--` following token
 // is treated as `--key value`. Boolean flags never consume the next
 // token, removing the `--json <id>` ambiguity.
-const BOOLEAN_FLAGS = new Set(["json", "clear"]);
+const BOOLEAN_FLAGS = new Set(["json", "clear", "force"]);
 
 export function parseFlags(
   args: string[],
@@ -678,7 +831,20 @@ function main(): void {
   const { flags, rest: pos } = parseFlags(rest);
   // `flags[k] === true` means the user wrote `--k` with no following
   // value. For value-flags that's a usage error, not a boolean.
-  const valueFlags = ["rfc", "cluster", "status", "max-loc", "pr", "assignee", "reason", "dir"];
+  const valueFlags = [
+    "rfc",
+    "cluster",
+    "status",
+    "max-loc",
+    "pr",
+    "assignee",
+    "reason",
+    "dir",
+    "title",
+    "est-loc",
+    "deps",
+    "priority",
+  ];
   for (const k of valueFlags) if (flags[k] === true) usage();
 
   switch (cmd) {
@@ -739,7 +905,31 @@ function main(): void {
       const id = pos[0];
       const pr = numberFlag(flags, "pr");
       if (!id || pr === null) usage();
+      if (!flags.force) checkPrNotOpen(pr);
       done(id, pr);
+      break;
+    }
+    case "new": {
+      const rfcSlug = pos[0];
+      const storySlug = pos[1];
+      if (!rfcSlug || !storySlug) usage();
+      const estLocRaw = stringFlag(flags, "est-loc");
+      if (estLocRaw !== undefined && (!/^\d+$/.test(estLocRaw) || Number(estLocRaw) <= 0)) usage();
+      const priorityRaw = stringFlag(flags, "priority");
+      if (priorityRaw !== undefined && !/^\d+$/.test(priorityRaw)) usage();
+      const depsRaw = stringFlag(flags, "deps");
+      newStory(rfcSlug, storySlug, {
+        title: stringFlag(flags, "title"),
+        cluster: stringFlag(flags, "cluster"),
+        estLoc: estLocRaw !== undefined ? Number(estLocRaw) : null,
+        deps: depsRaw
+          ? depsRaw
+              .split(",")
+              .map((d) => d.trim())
+              .filter(Boolean)
+          : [],
+        priority: priorityRaw !== undefined ? Number(priorityRaw) : null,
+      });
       break;
     }
     case "block": {
@@ -754,7 +944,9 @@ function main(): void {
       if (!id) usage();
       // --pr is optional here: present ⇒ also flip the story to done.
       // --dir is the agent's tasks worktree; defaults to the canonical checkout.
-      refine(id, numberFlag(flags, "pr"), stringFlag(flags, "dir") ?? TASKS_DIR);
+      const refinePr = numberFlag(flags, "pr");
+      if (refinePr !== null && !flags.force) checkPrNotOpen(refinePr);
+      refine(id, refinePr, stringFlag(flags, "dir") ?? TASKS_DIR);
       break;
     }
     case "priority": {
@@ -786,10 +978,11 @@ function usage(): never {
 
   claim <id> [--assignee <name>]
   in-progress <id> --pr <N>
-  done <id> --pr <N>
+  done <id> --pr <N> [--force]
   block <id> --reason "<text>"
-  refine <id> [--pr <N>] [--dir <tasks worktree>]
+  refine <id> [--pr <N>] [--dir <tasks worktree>] [--force]
   priority <id> <N> | priority <id> --clear    (lower N = higher priority)
+  new <rfc-slug> <story-slug> [--title "text"] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>]
 
 Set $TASKS_DIR to override the default ~/github/blazetrailsdev/tasks.
 ($RFCS_DIR is honored as a transition fallback after the rfcs → tasks rename.)`);
