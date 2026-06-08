@@ -1097,7 +1097,11 @@ export class TableDefinition {
             break;
           }
           case "string":
-            parts.push(`VARCHAR(${col.options.limit ?? 255})`);
+            parts.push(
+              this._adapterName === "postgres" && col.options.limit == null
+                ? "character varying"
+                : `VARCHAR(${col.options.limit ?? 255})`,
+            );
             break;
           case "text":
             parts.push("TEXT");
