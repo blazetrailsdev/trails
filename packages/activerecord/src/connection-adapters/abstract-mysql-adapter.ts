@@ -586,7 +586,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     );
     const row = rows[0] ?? {};
     const val = (row["table_comment"] ?? row["TABLE_COMMENT"]) as string | null | undefined;
-    return val || null;
+    // Mirrors Rails' `.presence` — a blank/whitespace-only comment reads as nil.
+    return val && val.trim().length > 0 ? val : null;
   }
 
   async changeTableComment(

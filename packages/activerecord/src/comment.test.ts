@@ -70,13 +70,12 @@ describe("CommentTest", () => {
     expect(col.comment).toBe("I am running out of imagination");
   });
 
-  it.skip("add index with comment later", () => {
-    // indexes() does not return a comment field; deferred
-  });
+  // Index comments (MySQL INDEX_COMMENT introspection, PG obj_description + COMMENT ON INDEX,
+  // and dump emission) are a separable sub-feature shipping in a follow-up PR. These two
+  // Rails-mirrored names (comment_test.rb:74, :89) are kept so the test:compare match holds.
+  it.skip("add index with comment later", () => {});
 
-  it.skip("blank indexes created in block", () => {
-    // indexes() does not return a comment field; deferred
-  });
+  it.skip("blank indexes created in block", () => {});
 
   itIfSupports("comments", "add comment to column", async () => {
     await ctx.changeColumn("commenteds", "content", "string", {
