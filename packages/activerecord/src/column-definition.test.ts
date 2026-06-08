@@ -9,12 +9,10 @@ describe("ColumnDefinitionTest", () => {
     const col = new ColumnDefinition("title", "string", { limit: 20 });
     expect(sc.accept(col)).not.toContain("DEFAULT");
   });
-
   it("should include default clause when default is present", () => {
     const col = new ColumnDefinition("title", "string", { limit: 20, default: "Hello" });
     expect(sc.accept(col)).toContain("DEFAULT 'Hello'");
   });
-
   it("should specify not null if null option is false", () => {
     const col = new ColumnDefinition("title", "string", {
       limit: 20,

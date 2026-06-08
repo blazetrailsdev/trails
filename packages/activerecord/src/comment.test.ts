@@ -43,8 +43,7 @@ describe("CommentTest", () => {
   });
 
   itIfSupports("comments", "default primary key comment", async () => {
-    const cols = await (adapter as any).columns("commenteds");
-    const id = cols.find((c: any) => c.name === "id");
+    const id = (await (adapter as any).columns("commenteds")).find((c: any) => c.name === "id");
     expect(id?.comment).toBeNull();
   });
 
