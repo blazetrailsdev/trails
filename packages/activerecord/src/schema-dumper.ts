@@ -55,6 +55,7 @@ export interface ColumnInfo {
   isEnum?: boolean;
   /** True for PostgreSQL serial/bigserial columns — emitted as the `t.serial`/`t.bigserial` shorthand. */
   isSerial?: boolean;
+  comment?: string | null;
 }
 
 export interface IndexInfo {
@@ -435,7 +436,7 @@ class AdapterSchemaSource implements SchemaSource {
       array: (col as any).array === true ? true : undefined,
       isEnum: col.type === "enum" ? true : undefined,
       isSerial: (col as any).isSerial === true ? true : undefined,
-      comment: (col as any).comment ?? undefined,
+      comment: col.comment ?? undefined,
     }));
   }
 
