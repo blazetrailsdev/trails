@@ -259,11 +259,22 @@ describe("InstrumentationTest", () => {
     expect(capturedRowCount).toBe(10);
   });
 
-  it.skip("payload row count on raw sql", () => {
-    // BLOCKED: relation — ActiveSupport::Notifications instrumentation gap
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#instrumentQuery not fully publishing AR notification events
-    // SCOPE: ~30 LOC fix in abstract-adapter.ts; affects ~5 tests in instrumentation.test.ts
-    /* needs raw SQL connection */
+  it("payload row count on raw sql", async () => {
+    class Book extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    for (let i = 0; i < 3; i++) await Book.create({ name: "raw-sql-book" });
+    let capturedRowCount: number | undefined;
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if ((event.payload?.sql as string)?.includes("SELECT") && !event.payload?.cached) {
+        capturedRowCount = event.payload.row_count as number;
+      }
+    });
+    await Base.connection.execute("SELECT * FROM books");
+    expect(typeof capturedRowCount).toBe("number");
+    expect(capturedRowCount).toBeGreaterThanOrEqual(3);
   });
 
   it.skip("payload row count on cache", () => {
@@ -341,11 +352,22 @@ describe("TransactionInSqlActiveRecordPayloadTest", () => {
     expect(capturedTransaction ?? null).toBeNull();
   });
 
-  it.skip("payload with an open transaction", () => {
-    // BLOCKED: relation — ActiveSupport::Notifications instrumentation gap
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#instrumentQuery not fully publishing AR notification events
-    // SCOPE: ~30 LOC fix in abstract-adapter.ts; affects ~5 tests in instrumentation.test.ts
-    /* needs transaction object in payload */
+  it("payload with an open transaction", async () => {
+    class Book extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    let capturedTransaction: unknown = "unset";
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (event.payload?.name === "Book Count") {
+        capturedTransaction = event.payload.transaction;
+      }
+    });
+    await Book.transaction(async (tx) => {
+      await Book.count();
+      expect(capturedTransaction).toBe(tx);
+    });
   });
 });
 
@@ -378,10 +400,21 @@ describe("TransactionInSqlActiveRecordPayloadNonTransactionalTest", () => {
     expect(capturedTransaction ?? null).toBeNull();
   });
 
-  it.skip("payload with an open transaction", () => {
-    // BLOCKED: relation — ActiveSupport::Notifications instrumentation gap
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#instrumentQuery not fully publishing AR notification events
-    // SCOPE: ~30 LOC fix in abstract-adapter.ts; affects ~5 tests in instrumentation.test.ts
-    // Requires transaction object exposed in sql.active_record payload.
+  it("payload with an open transaction", async () => {
+    class Book extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    let capturedTransaction: unknown = "unset";
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (event.payload?.name === "Book Count") {
+        capturedTransaction = event.payload.transaction;
+      }
+    });
+    await Book.transaction(async (tx) => {
+      await Book.count();
+      expect(capturedTransaction).toBe(tx);
+    });
   });
 });
