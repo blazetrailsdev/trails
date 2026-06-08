@@ -1129,8 +1129,8 @@ describe("DirtyTest", () => {
   });
 
   it("attribute_changed? properly type casts enum values", async () => {
-    // breed: 0 = "african". writeAttribute bypasses the _enum setter, and the
-    // integer column casts "african" → null, so pass the integer directly.
+    // breed: 0 = "african". EnumType.cast(0) maps the integer to the label, so
+    // passing the integer directly is equivalent to passing the label string.
     const parrot = await LiveParrot.createBang({ name: "Scipio", breed: 0 });
 
     (parrot as any).breed = "australian";

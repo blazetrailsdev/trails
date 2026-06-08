@@ -495,27 +495,37 @@ export function _enum(
         : "";
 
   const attrName = attribute;
-  const reverseMap: Record<number, string> = {};
-  for (const [n, value] of Object.entries(mapping)) {
-    reverseMap[value as number] = n;
+
+  // Read subtype from _attributeDefinitions directly — never call typeForAttribute()
+  // here, because typeForAttribute() triggers loadSchema(), which sets _schemaLoaded
+  // prematurely and blocks the real DB schema reflection from running later.
+  // Mirrors Rails' decorate_attributes block receiving the subtype lazily; we
+  // resolve it now from user-declared defs (e.g. `attribute("status", "string")`)
+  // and fall back to "integer" otherwise.
+  let subtype: string;
+  try {
+    const existingDef = (this as any)._attributeDefinitions?.get(name);
+    const t: string = existingDef?.type?.type?.() ?? "value";
+    subtype = t === "value" || /integer/i.test(t) || t === "smallint" ? "integer" : t;
+  } catch {
+    subtype = "integer";
   }
 
-  // Define getter that returns the symbol name. Use hasOwnProperty checks so
-  // inherited prototype keys like "toString" don't masquerade as enum values.
-  const hasOwn = Object.prototype.hasOwnProperty;
+  // Register EnumType so typeForAttribute() returns it for predicate-builder
+  // serialization — e.g. where({status: "draft"}) serializes "draft" → 0.
+  // Mirrors: ActiveRecord::Enum#_enum calling klass.attribute(name, enum_type).
+  const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype);
+  this.attribute(name, enumType);
+
+  // Define getter after this.attribute() so EnumType is in _attributeDefinitions
+  // and the pending-type queue before the enum-specific getter overwrites whatever
+  // attribute() may have installed.
   Object.defineProperty(this.prototype, attribute, {
     get(this: Base) {
-      const raw = this._attributes.get(attrName);
-      if (typeof raw === "number" && hasOwn.call(reverseMap, raw)) return reverseMap[raw];
-      if (typeof raw === "string" && hasOwn.call(mapping, raw)) return raw;
-      return raw;
+      return this._attributes.get(attrName);
     },
     set(this: Base, value: unknown) {
-      if (typeof value === "string" && hasOwn.call(mapping, value)) {
-        this.writeAttribute(attrName, mapping[value as string]);
-      } else {
-        this.writeAttribute(attrName, value);
-      }
+      this.writeAttribute(attrName, value);
     },
     configurable: true,
   });
@@ -524,12 +534,13 @@ export function _enum(
     const methodBase = `${prefix}${n}${suffix}`;
 
     // Predicate: user.active? → user.isActive()
+    // Compare against the label (n) — EnumType.cast stores labels in _attributes.
     Object.defineProperty(
       this.prototype,
       `is${methodBase.charAt(0).toUpperCase()}${methodBase.slice(1)}`,
       {
         value: function (this: Base) {
-          return this._attributes.get(attrName) === value;
+          return this._attributes.get(attrName) === n;
         },
         writable: true,
         configurable: true,
