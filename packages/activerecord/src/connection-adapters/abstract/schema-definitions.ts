@@ -1183,6 +1183,8 @@ export class TableDefinition {
           assertSafeMysqlIdentifier(col.options.collation, "collation");
           parts.push(`COLLATE ${col.options.collation}`);
         }
+      } else if (this._adapterName === "postgres" && col.options.collation) {
+        parts.push(`COLLATE ${this._adapter.quoteIdentifier(col.options.collation)}`);
       }
 
       if (col.options.array && col.type !== "primary_key") {
