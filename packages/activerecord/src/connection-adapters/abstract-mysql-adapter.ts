@@ -584,7 +584,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       `SELECT table_comment FROM information_schema.tables` +
         ` WHERE table_schema = ${scope.schema} AND table_name = ${scope.name}`,
     );
-    const val = rows[0]?.["table_comment"] as string | null | undefined;
+    const row = rows[0] ?? {};
+    const val = (row["table_comment"] ?? row["TABLE_COMMENT"]) as string | null | undefined;
     return val || null;
   }
 
@@ -592,8 +593,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     tableName: string,
     commentOrChanges: string | Record<string, string | null>,
   ): Promise<void> {
-    void tableName;
-    void commentOrChanges;
+    const raw = this.schemaStatements().extractNewCommentValue(commentOrChanges);
+    const c = (raw == null ? "" : String(raw)).replace(/'/g, "''");
+    await this._execMutation(`ALTER TABLE ${this.quoteTableName(tableName)} COMMENT='${c}'`);
   }
 
   async renameTable(tableName: string, newName: string): Promise<void> {

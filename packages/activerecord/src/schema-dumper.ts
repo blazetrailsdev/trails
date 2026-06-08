@@ -55,6 +55,9 @@ export interface ColumnInfo {
   isEnum?: boolean;
   /** True for PostgreSQL serial/bigserial columns — emitted as the `t.serial`/`t.bigserial` shorthand. */
   isSerial?: boolean;
+  comment?: string | null;
+  /** MySQL `AUTO_INCREMENT` flag — consulted by the dialect `isDefaultPrimaryKey`. */
+  autoIncrement?: boolean;
 }
 
 export interface IndexInfo {
@@ -435,6 +438,8 @@ class AdapterSchemaSource implements SchemaSource {
       array: (col as any).array === true ? true : undefined,
       isEnum: col.type === "enum" ? true : undefined,
       isSerial: (col as any).isSerial === true ? true : undefined,
+      comment: col.comment ?? undefined,
+      autoIncrement: (col as any).autoIncrement === true ? true : undefined,
     }));
   }
 
@@ -977,8 +982,8 @@ export class SchemaDumper {
     if (typeof adapterTableOpts.collation === "string")
       tableOpts.collation = adapterTableOpts.collation;
     if (typeof adapterTableOpts.options === "string") tableOpts.options = adapterTableOpts.options;
-    if (typeof adapterTableOpts.comment === "string" && adapterTableOpts.comment.length > 0)
-      tableOpts.comment = adapterTableOpts.comment;
+    if (typeof adapterTableOpts.comment === "string" && adapterTableOpts.comment.trim().length > 0)
+      tableOpts.comment = adapterTableOpts.comment.trim();
     tableOpts.force = "cascade";
     const optStr = `{ ${this.formatOptions(tableOpts)} }`;
 

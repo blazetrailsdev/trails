@@ -136,7 +136,11 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isDefaultPrimaryKey(column: MysqlColumn): boolean {
-    return super.isDefaultPrimaryKey(column) && !!column.autoIncrement && !column.unsigned;
+    // Live bigint reflects as type:"integer" + sqlType:"bigint(20)" (the dsl cast type carries
+    // the limit), so detect bigint off sqlType too — mirrors Rails' Column#bigint?. The super
+    // arm keeps mock sources that pass type:"bigint" working.
+    const isBigint = super.isDefaultPrimaryKey(column) || /^bigint\b/i.test(column.sqlType ?? "");
+    return isBigint && !!column.autoIncrement && !column.unsigned;
   }
 
   /** @internal */
@@ -149,15 +153,21 @@ export class SchemaDumper extends AbstractSchemaDumper {
     const sqlType = (column.sqlType ?? "").toLowerCase();
     if (/^timestamp\b/.test(sqlType)) return "timestamp";
     if (/^(?:enum|set)\b/.test(sqlType)) return column.sqlType ?? sqlType;
+    if (/^bigint\b/.test(sqlType)) return "bigint";
     return super.schemaType(column);
   }
 
   /** @internal */
   protected override schemaLimit(column: MysqlColumn): string | undefined {
     if (/^(?:tiny|medium|long)?(?:text|blob)\b/i.test(column.sqlType ?? "")) return undefined;
-    // Mirrors Rails schema_limit: suppress limit when it equals the native default.
-    // Native default for float is 24 (abstract_mysql_adapter.rb native_database_types).
+    // bigint reflects with limit 8 but Rails suppresses it (column.bigint?); detect off sqlType
+    // since the cast map reports type:"integer".
+    if (/^bigint\b/i.test(column.sqlType ?? "")) return undefined;
+    // Mirrors Rails schema_limit: suppress limit when it equals the native default
+    // (string varchar(255), float 24, emulated boolean tinyint(1)).
+    if (column.type === "string" && column.limit === 255) return undefined;
     if (column.type === "float" && column.limit === 24) return undefined;
+    if (column.type === "boolean") return undefined;
     return super.schemaLimit(column);
   }
 
@@ -181,7 +191,17 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (/^time(?:stamp)?\b/.test(sqlType) && column.precision === 0) return undefined;
     if (column.type === "datetime")
       return column.precision === 0 ? "null" : super.schemaPrecision(column);
-    return super.schemaPrecision(column);
+    // Precision is only meaningful for decimal and date/time in dumps; the cast map fills
+    // numeric_precision for integers/booleans where Rails leaves column.precision nil.
+    if (column.type === "decimal" || /^time\b/.test(sqlType)) return super.schemaPrecision(column);
+    return undefined;
+  }
+
+  /** @internal */
+  protected override schemaScale(column: MysqlColumn): string | undefined {
+    // Scale only applies to decimal; suppress the numeric_scale the cast map fills for integers.
+    if (column.type !== "decimal") return undefined;
+    return super.schemaScale(column);
   }
 
   /** @internal */

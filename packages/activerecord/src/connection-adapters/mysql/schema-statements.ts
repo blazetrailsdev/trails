@@ -187,6 +187,7 @@ export function newColumnFromField(
     autoIncrement: /auto_increment/i.test(field["Extra"] ?? ""),
     virtual: /(virtual|stored|persistent)\s+generated/i.test(field["Extra"] ?? ""),
     onUpdate: onUpdateForColumn,
+    comment: (field["Comment"] as string | undefined)?.trim() || null,
   });
 }
 

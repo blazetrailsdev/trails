@@ -1932,7 +1932,7 @@ export class MigrationContext {
     });
     if (fn) fn(td);
     await this.connection.executeMutation(this.connection.toSql(td));
-    if (options?.comment != null && options.comment.length > 0) {
+    if (options?.comment != null && options.comment.trim().length > 0) {
       const adapterWithComments = this.connection as {
         supportsComments?: () => boolean;
         supportsCommentsInCreate?: () => boolean;
@@ -1952,6 +1952,13 @@ export class MigrationContext {
     const tdCols = options?.as != null ? [] : td.columns;
     for (const col of tdCols) {
       cols.add(col.name);
+    }
+    if (this.connection.supportsComments?.() && !this.connection.supportsCommentsInCreate?.()) {
+      for (const col of tdCols) {
+        const cc = (col.options as { comment?: unknown }).comment;
+        if (typeof cc === "string" && cc.trim().length > 0)
+          await this.changeColumnComment(name, col.name, cc);
+      }
     }
 
     // Store column metadata
@@ -2083,7 +2090,9 @@ export class MigrationContext {
     const an = this._adapterName;
     switch (type.toLowerCase()) {
       case "string":
-        return `VARCHAR(255)`;
+        // PG: unlimited `character varying` (matches Rails) so changeColumn-to-string
+        // doesn't introspect a spurious limit:255 into dumps.
+        return an === "postgres" ? "character varying" : `VARCHAR(255)`;
       case "text":
         return "TEXT";
       case "integer":
@@ -2145,6 +2154,8 @@ export class MigrationContext {
     await this.connection.executeMutation(
       `ALTER TABLE "${table}" ADD COLUMN "${column}" ${this._mapType(type, _options)}`,
     );
+    if (_options && "comment" in _options && (this.connection as any).supportsComments?.())
+      await this.changeColumnComment(table, column, (_options as any).comment ?? null);
     if (!this._columns.has(table)) this._columns.set(table, new Set());
     this._columns.get(table)!.add(column);
     if (!this._columnMeta.has(table)) this._columnMeta.set(table, new Map());
@@ -2220,6 +2231,8 @@ export class MigrationContext {
         `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${this._mapType(type, _options)}`,
       );
     }
+    if (_options && "comment" in _options && (this.connection as any).supportsComments?.())
+      await this.changeColumnComment(table, column, (_options as any).comment ?? null);
     const meta = this._columnMeta.get(table);
     if (meta && meta.has(column)) {
       const entry = meta.get(column)!;
@@ -2238,6 +2251,14 @@ export class MigrationContext {
         scale: _options?.scale !== undefined ? _options.scale : entry.scale,
       });
     }
+  }
+
+  async changeTableComment(name: string, comment: string | null): Promise<void> {
+    await (this.connection as any).changeTableComment(name, comment);
+  }
+
+  async changeColumnComment(table: string, col: string, comment: string | null): Promise<void> {
+    await (this.connection as any).changeColumnComment(table, col, comment);
   }
 
   async addIndex(
