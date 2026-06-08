@@ -4,7 +4,13 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { IntegerOutOf64BitRange } from "../../connection-adapters/postgresql/quoting.js";
+import {
+  IntegerOutOf64BitRange,
+  quotingConfig,
+} from "../../connection-adapters/postgresql/quoting.js";
+import { Range as OidRange, RangeType } from "../../connection-adapters/postgresql/oid/range.js";
+import { Bit } from "../../connection-adapters/postgresql/oid/bit.js";
+import { IntegerType } from "@blazetrails/activemodel";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -66,18 +72,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(adapter.quoteTableName("foo.bar")).toBe('"foo"."bar"');
     });
 
-    it.skip("quote unicode string", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in quoting
-      // ROOT-CAUSE: connection-adapters/postgresql/quoting.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/quoting.ts; affects ~10–47 tests in quoting.test.ts
-      // unicode string quoting verified via standard string quoting; no special PG behavior
-    });
-    it.skip("quote binary", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in quoting
-      // ROOT-CAUSE: connection-adapters/postgresql/quoting.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/quoting.ts; affects ~10–47 tests in quoting.test.ts
-      // binary quoting tested via write/read bytea round-trips; requires bytea column setup
-    });
     it("quote date", async () => {
       const rows = await adapter.execute("SELECT DATE '2023-01-15' AS val");
       const val = rows[0].val as Temporal.PlainDate;
@@ -100,10 +94,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(val.toZonedDateTimeISO("UTC").year).toBe(2023);
     });
 
-    it.skip("quote range", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in quoting
-      // ROOT-CAUSE: connection-adapters/postgresql/quoting.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/quoting.ts; affects ~10–47 tests in quoting.test.ts
+    it("quote range", () => {
+      // Mirrors Rails test_quote_range: injection strings are neutralized by
+      // RangeType#serialize casting bounds through IntegerType before quoting.
+      const type = new RangeType(new IntegerType(), "int8range");
+      const range = new OidRange("1,2]'; SELECT * FROM users; --", "0; DROP TABLE users; --");
+      const serialized = type.serialize(range);
+      expect(adapter.quote(serialized)).toBe("'[1,0]'");
     });
 
     it("quote array", async () => {
@@ -120,17 +117,25 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(adapter.quote(4.2)).toBe("4.2");
     });
 
-    it.skip("quote rational", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in quoting
-      // ROOT-CAUSE: connection-adapters/postgresql/quoting.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/quoting.ts; affects ~10–47 tests in quoting.test.ts
-      // Ruby-only: Rational(3,4). No JS equivalent; numeric literals work without a Rational type.
+    it.skip("quote rational", () => {
+      // PERMANENT: Ruby-only — Rational(3,4) has no JavaScript equivalent.
     });
-    it.skip("quote bit string", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in quoting
-      // ROOT-CAUSE: connection-adapters/postgresql/quoting.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/quoting.ts; affects ~10–47 tests in quoting.test.ts
-      // Requires OID::Bit type serialization; covered by bit_string tests.
+
+    it.skip("quote binary", async () => {
+      // BLOCKED: requires bytea column + quotedBinary round-trip; see bytea.test.ts for DB-backed coverage
+    });
+
+    it("quote bit string", () => {
+      // binary path
+      expect(adapter.quote(new Bit().serialize("01")!)).toBe("B'01'");
+      // hex path
+      expect(adapter.quote(new Bit().serialize("FF")!)).toBe("X'FF'");
+      // neither binary nor hex → null
+      const type = new Bit();
+      const value = "'); SELECT * FROM users; /*\n01\n*/--";
+      const serialized = type.serialize(value);
+      const result: unknown = adapter.quote(serialized!);
+      expect(result).toBeNull();
     });
 
     it("quote table name with spaces", async () => {
@@ -152,11 +157,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(adapter.quote(BigInt("-9223372036854775808"))).toBe("-9223372036854775808");
     });
 
-    it.skip("do not raise when raise int wider than 64bit is false", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in quoting
-      // ROOT-CAUSE: connection-adapters/postgresql/quoting.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/quoting.ts; affects ~10–47 tests in quoting.test.ts
-      // Requires ActiveRecord.raise_int_wider_than_64bit class-level flag; not yet implemented.
+    it("do not raise when raise int wider than 64bit is false", () => {
+      const saved = quotingConfig.raiseIntWiderThan64Bit;
+      quotingConfig.raiseIntWiderThan64Bit = false;
+      try {
+        expect(adapter.quote(BigInt("9223372036854775808"))).toBe("9223372036854775808");
+      } finally {
+        quotingConfig.raiseIntWiderThan64Bit = saved;
+      }
     });
   });
 });

@@ -36,6 +36,11 @@ export class IntegerOutOf64BitRange extends Error {
 const PG_INT64_MIN = BigInt("-9223372036854775808");
 const PG_INT64_MAX = BigInt("9223372036854775807");
 
+// Mirrors: ActiveRecord.raise_int_wider_than_64bit (active_record.rb:446).
+export const quotingConfig = {
+  raiseIntWiderThan64Bit: true,
+};
+
 export interface Quoting {
   quotedTrue(): string;
   unquotedTrue(): boolean;
@@ -134,7 +139,9 @@ export function quote(value: unknown): string {
     return `xml ${quoteString(value.toString())}`;
   }
   if (value instanceof BitData) {
-    return `B'${value.toString()}'`;
+    if (value.isBinary()) return `B'${value.toString()}'`;
+    if (value.isHex()) return `X'${value.toString()}'`;
+    return null as unknown as string;
   }
   if (typeof value === "number" && !Number.isFinite(value)) {
     return quoteString(String(value));
@@ -153,7 +160,7 @@ export function quote(value: unknown): string {
   // integer number values — JS integers beyond MAX_SAFE_INTEGER lose
   // precision silently, so they must be rejected the same way bigints are.
   if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
-    checkIntegerRange(value);
+    if (quotingConfig.raiseIntWiderThan64Bit) checkIntegerRange(value);
     return String(value);
   }
   if (value instanceof Uint8Array) return quotedBinary(value);
@@ -239,7 +246,7 @@ export function typeCast(value: unknown): unknown {
     return encodeMultirange(value);
   }
   if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
-    checkIntegerRange(value);
+    if (quotingConfig.raiseIntWiderThan64Bit) checkIntegerRange(value);
   }
   return abstractTypeCast(value);
 }
