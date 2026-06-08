@@ -83,7 +83,15 @@ export class Serialized extends ValueType {
   deserialize(value: unknown): unknown {
     if (this.isDefaultValue(value)) return value;
     const deserialized = this.subtype.deserialize?.(value) ?? value;
-    return this.coder.load(deserialized);
+    // Rails: binary subtypes (bytea) return a binary-encoded Ruby String; JS
+    // returns a Uint8Array. BinaryType.serialize pipes coder.dump() output
+    // through TextEncoder (UTF-8), so the bridge must invert with UTF-8 to
+    // recover the string coder.load() expects.
+    const forCoder =
+      this.subtype.isBinary() && deserialized instanceof Uint8Array
+        ? Buffer.from(deserialized).toString("utf8")
+        : deserialized;
+    return this.coder.load(forCoder);
   }
 
   cast(value: unknown): unknown {
@@ -93,7 +101,18 @@ export class Serialized extends ValueType {
     // assigning e.g. a class-coder instance loads back through the coder.
     // Mirrors ActiveModel::Type::Helpers::Mutable#cast for the structured case
     // while still accepting pre-serialized string assignments.
-    if (value === null || value === undefined || typeof value === "string") {
+    //
+    // Binary subtypes (bytea) are the exception: a raw user string is a value
+    // to encode, not a wire-format payload. Routing it straight to the
+    // subtype's deserialize would send it through unescape_bytea, which maps
+    // each character to a single byte (latin1) and mangles non-ASCII input.
+    // Encoding it first (serialize → TextEncoder UTF-8) keeps the bytes the
+    // UTF-8 bridge in `deserialize` expects, matching Rails' Mutable#cast.
+    const preEncoded =
+      value === null ||
+      value === undefined ||
+      (typeof value === "string" && !this.subtype.isBinary());
+    if (preEncoded) {
       return this.deserialize(value);
     }
     return this.deserialize(this.serialize(value));

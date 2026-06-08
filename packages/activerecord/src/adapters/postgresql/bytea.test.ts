@@ -179,12 +179,27 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((reloaded as any).payload).toBeNull();
     });
 
-    it.skip("serialize", () => {
-      // BLOCKED: binary-subtype coder bridge
+    it("serialize", async () => {
+      // Rails: class Serializer; def load(str); str; end; def dump(str); str; end; end
+      const coder = { load: (s: unknown) => s, dump: (s: unknown) => s };
       // Rails: klass = Class.new(ByteaDataType) { serialize :serialized, coder: Serializer.new }
-      // On read, Bytea#deserialize yields a Uint8Array, but coder.load() needs a string.
-      // Type::Serialized#deserialize must bridge binary Buffer→string for binary subtypes.
-      // SCOPE: ~15 LOC binary bridge in type/serialized.ts.
+      class ByteaSerialized extends ByteaDataType {}
+      ByteaSerialized.serialize("serialized", { coder });
+      ByteaSerialized.resetColumnInformation();
+      await ByteaSerialized.loadSchema();
+      // Rails: obj = klass.new; obj.serialized = "hello world"; obj.save!
+      const obj = new ByteaSerialized() as any;
+      obj.serialized = "hello world";
+      await obj.saveBang();
+      // Rails: obj.reload; assert_equal "hello world", obj.serialized
+      await obj.reload();
+      expect(obj.serialized).toBe("hello world");
+      // Non-ASCII: TextEncoder encodes as UTF-8 multi-byte; the bridge must
+      // decode as UTF-8 (not latin1) to recover the original string.
+      obj.serialized = "héllo";
+      await obj.saveBang();
+      await obj.reload();
+      expect(obj.serialized).toBe("héllo");
     });
 
     it("schema dumping", async () => {
