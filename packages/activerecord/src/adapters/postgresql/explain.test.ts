@@ -117,9 +117,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       const result = await adapter.explain("SELECT 1", [], [{ format: "json" }]);
       // The prior stringifier rendered pg-auto-parsed plans as "[object Object]".
       expect(result).not.toContain("[object Object]");
-      // Rails wraps output in the "QUERY PLAN" header/separator format even for JSON.
+      // Rails wraps JSON output in the "QUERY PLAN" header block; JSON.parse(result) would fail.
       expect(result).toContain("QUERY PLAN");
-      expect(result).toContain('"Plan"');
+      // Extract the JSON array from within the pp() block (pp() adds one leading space per line),
+      // strip that indent, then parse to confirm the full JSON pipeline is intact.
+      const jsonMatch = result.match(/\[[\s\S]*\]/);
+      expect(jsonMatch).not.toBeNull();
+      const parsed = JSON.parse(jsonMatch![0].replace(/^ /gm, "")) as unknown[];
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed[0] as Record<string, unknown>).toHaveProperty("Plan");
     });
 
     it("explain options with eager loading", async () => {
