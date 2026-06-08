@@ -30,6 +30,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     await connection.execute(
       `CREATE TABLE postgresql_domains (id SERIAL PRIMARY KEY, price custom_money)`,
     );
+    // Rails' create_table auto-calls reload_type_map; raw execute() does not.
+    // Without a full reload, registerDomainType can't find the base numeric OID.
+    await connection.reloadTypeMap();
     PostgresqlDomain.resetColumnInformation();
     await PostgresqlDomain.loadSchema();
   });
