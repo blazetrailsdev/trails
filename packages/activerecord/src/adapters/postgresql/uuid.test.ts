@@ -239,12 +239,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(output).toContain("uuid_data_type");
       expect(output).toMatch(/"guid".*"uuid"/);
     });
-    it.skip("uuid migration", async () => {
-      // BLOCKED: migration framework — ActiveRecord::Migration class wrapper not implemented.
-      // The adapter's createTable() is implemented and verified by "uuid primary key" above.
-      // Not uuid-specific; separate multi-PR effort.
-    });
-
     it("uuid gen random uuid", async () => {
       const rows = await adapter.execute(`SELECT gen_random_uuid() AS uuid`);
       expect(isValidUuid(rows[0].uuid as string)).toBe(true);
