@@ -640,6 +640,20 @@ describe("newStory validation paths", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
   }
 
+  it("exits 1 when rfcSlug contains path traversal characters", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    expect(() => newStory("../../outside", "my-story", {}, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/rfcSlug.*lowercase slug/));
+  });
+
+  it("exits 1 when storySlug contains path traversal characters", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    expect(() => newStory("0005-gaps", "../../outside", {}, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/storySlug.*lowercase slug/));
+  });
+
   it("exits 1 when tasksDir is not a git repo", () => {
     setupExit();
     const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));

@@ -642,6 +642,19 @@ export function newStory(
   },
   tasksDir = TASKS_DIR,
 ): void {
+  const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+  if (!SLUG_RE.test(rfcSlug)) {
+    console.error(
+      `error: rfcSlug "${rfcSlug}" must be a lowercase slug (letters, digits, hyphens)`,
+    );
+    process.exit(1);
+  }
+  if (!SLUG_RE.test(storySlug)) {
+    console.error(
+      `error: storySlug "${storySlug}" must be a lowercase slug (letters, digits, hyphens)`,
+    );
+    process.exit(1);
+  }
   if (!existsSync(join(tasksDir, ".git"))) {
     console.error(
       `error: ${tasksDir} is not a git repo. Clone blazetrailsdev/tasks there, or set $TASKS_DIR to an existing checkout.`,
