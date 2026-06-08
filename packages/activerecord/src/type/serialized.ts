@@ -83,13 +83,13 @@ export class Serialized extends ValueType {
   deserialize(value: unknown): unknown {
     if (this.isDefaultValue(value)) return value;
     const deserialized = this.subtype.deserialize?.(value) ?? value;
-    // Rails: binary subtypes (bytea) return a binary-encoded Ruby String (all
-    // 256 byte values preserved). JS returns a Uint8Array. Bridge via latin1
-    // (bytes 0x00–0xFF → code points 0x0000–0x00FF, lossless) so coder.load()
-    // receives a string matching what coder.dump() originally produced.
+    // Rails: binary subtypes (bytea) return a binary-encoded Ruby String; JS
+    // returns a Uint8Array. BinaryType.serialize pipes coder.dump() output
+    // through TextEncoder (UTF-8), so the bridge must invert with UTF-8 to
+    // recover the string coder.load() expects.
     const forCoder =
       this.subtype.isBinary() && deserialized instanceof Uint8Array
-        ? Buffer.from(deserialized).toString("latin1")
+        ? Buffer.from(deserialized).toString("utf8")
         : deserialized;
     return this.coder.load(forCoder);
   }
