@@ -537,26 +537,30 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         conn = await this.getConn();
         const prepare = options?.prepare ?? this._shouldPrepare(binds ?? []);
         if (prepare) this._trackPrepared(conn, driverSql);
-        const [rawResult] = prepare
+        const [rawResult, rawFields] = prepare
           ? await conn.execute(driverSql, driverBinds as any[])
           : await conn.query(driverSql, driverBinds);
-        // CALL statements set _resultIndex > 0 in mysql2, which wraps every
-        // result set in a nested array: [[rows|header, ...], ...]. Unwrap to
-        // the first result set and discard the rest — mirrors Rails'
-        // raw_connection.abandon_results! + cast_result's fields.empty? guard.
-        // First nested element may be rows (SELECT) or a ResultSetHeader
-        // (DML-only CALL); the existing !Array.isArray(result) branch below
-        // handles the DML case once it is unwrapped here.
+        // CALL sets _resultIndex > 0 in mysql2, wrapping rows AND fields in
+        // parallel nested arrays. Mirror Rails' abandon_results! + cast_result:
+        // take the first result set and use rawFields[0] (field-descriptor array,
+        // or undefined for DML) — the same as Rails' fields.empty? check at
+        // database_statements.rb:116. For a plain non-CALL query rawFields is a
+        // flat FieldPacket[], so rawFields[0] is a FieldPacket object (not an
+        // array) and neither branch fires.
         let result: mysql.RowDataPacket[] | mysql.ResultSetHeader = rawResult as
           | mysql.RowDataPacket[]
           | mysql.ResultSetHeader;
-        if (Array.isArray(rawResult) && rawResult.length > 0) {
-          const first = rawResult[0];
-          if (Array.isArray(first)) {
-            result = first as mysql.RowDataPacket[];
-          } else if (first != null && typeof first === "object" && "affectedRows" in first) {
-            result = first as mysql.ResultSetHeader;
-          }
+        if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
+          // Multi-result CALL w/ SELECT: rawFields[0] is a FieldPacket[].
+          result = (rawResult as unknown[])[0] as mysql.RowDataPacket[];
+        } else if (
+          Array.isArray(rawFields) &&
+          rawFields[0] === undefined &&
+          Array.isArray(rawResult)
+        ) {
+          // Multi-result CALL w/ DML-only: rawFields[0] is undefined.
+          // Unwrap so !Array.isArray(result) below returns empty Result.
+          result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
         }
         // DML results in a ResultSetHeader (no rows array); SELECT results
         // in an array of row objects. Return empty Result for DML to avoid
@@ -740,20 +744,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // `statement_limit`.
         const prepare = this._shouldPrepare(binds);
         if (prepare) this._trackPrepared(conn, driverSql);
-        const [rows] = prepare
+        const [rows, rowFields] = prepare
           ? await conn.execute(driverSql, driverBinds as any[])
           : await conn.query(driverSql, driverBinds);
-        // Unwrap nested result sets from stored procedure CALL (see execQuery).
-        let r: Record<string, unknown>[] = Array.isArray(rows)
-          ? (rows as Record<string, unknown>[])
-          : [];
-        if (Array.isArray(rows) && rows.length > 0) {
-          const first = rows[0];
-          if (Array.isArray(first)) {
-            r = first as Record<string, unknown>[];
-          } else if (first != null && typeof first === "object" && "affectedRows" in first) {
-            r = [];
-          }
+        // Unwrap nested result sets from CALL (see execQuery for the full
+        // comment). Use rowFields[0] as the fields.empty? discriminator.
+        let r: Record<string, unknown>[];
+        if (Array.isArray(rowFields) && Array.isArray(rowFields[0])) {
+          r = (rows as unknown[])[0] as Record<string, unknown>[];
+        } else if (Array.isArray(rowFields) && rowFields[0] === undefined && Array.isArray(rows)) {
+          r = [];
+        } else {
+          r = Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
         }
         payload.row_count = r.length;
         await this._handleWarningsOn(conn, driverSql);
