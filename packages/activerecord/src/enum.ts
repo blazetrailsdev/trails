@@ -495,10 +495,6 @@ export function _enum(
         : "";
 
   const attrName = attribute;
-  const reverseMap: Record<number | string, string> = {};
-  for (const [n, value] of Object.entries(mapping)) {
-    reverseMap[value as number | string] = n;
-  }
 
   // Read subtype from _attributeDefinitions directly — never call typeForAttribute()
   // here, because typeForAttribute() triggers loadSchema(), which sets _schemaLoaded
@@ -517,15 +513,13 @@ export function _enum(
 
   // Register EnumType so typeForAttribute() returns it for predicate-builder
   // serialization — e.g. where({status: "draft"}) serializes "draft" → 0.
-  // Must be registered before defining the prototype getter so attribute()
-  // sees the accessor already in place and skips installing its own.
   // Mirrors: ActiveRecord::Enum#_enum calling klass.attribute(name, enum_type).
   const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype);
   this.attribute(name, enumType);
 
-  // Define getter that returns the cast label from _attributes.
-  // Defined after this.attribute() to preserve prototype-accessor ordering;
-  // configurable:true lets schema reflection overwrite if needed.
+  // Define getter after this.attribute() so EnumType is in _attributeDefinitions
+  // and the pending-type queue before the enum-specific getter overwrites whatever
+  // attribute() may have installed.
   Object.defineProperty(this.prototype, attribute, {
     get(this: Base) {
       return this._attributes.get(attrName);
