@@ -1919,9 +1919,10 @@ export class MigrationContext {
       return;
     }
     // Build via the adapter's own TableDefinition so MySQL/PG generate DDL through their
-    // SchemaCreation visitors (comments/charset handled polymorphically, mirroring Rails);
-    // SQLite falls back to the generic one. Mirrors how SchemaStatements#createTable dispatches.
-    const td = this.connection.createTableDefinition!(name, {
+    // SchemaCreation visitors (comments/charset handled polymorphically, mirroring Rails).
+    // Connections without the hook — SQLite resolves the base SchemaStatements mixin, but
+    // lightweight test-double adapters may omit it — fall back to the generic TableDefinition.
+    const tdOptions = {
       id: options?.as != null ? false : options?.id,
       primaryKey: options?.primaryKey,
       default: options?.default,
@@ -1930,7 +1931,16 @@ export class MigrationContext {
       charset: options?.charset,
       collation: options?.collation,
       as: options?.as,
-    });
+    };
+    const createTd = this.connection.createTableDefinition;
+    const td =
+      typeof createTd === "function"
+        ? createTd.call(this.connection, name, tdOptions)
+        : new TableDefinition(name, {
+            ...tdOptions,
+            adapterName: this._adapterName,
+            adapter: this.connection,
+          });
     if (fn) fn(td);
     await this.connection.executeMutation(this.connection.toSql(td));
     if (options?.comment != null && options.comment.trim().length > 0) {
