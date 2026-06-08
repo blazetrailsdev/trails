@@ -56,6 +56,8 @@ export interface ColumnInfo {
   /** True for PostgreSQL serial/bigserial columns — emitted as the `t.serial`/`t.bigserial` shorthand. */
   isSerial?: boolean;
   comment?: string | null;
+  /** MySQL `AUTO_INCREMENT` flag — consulted by the dialect `isDefaultPrimaryKey`. */
+  autoIncrement?: boolean;
 }
 
 export interface IndexInfo {
@@ -437,6 +439,7 @@ class AdapterSchemaSource implements SchemaSource {
       isEnum: col.type === "enum" ? true : undefined,
       isSerial: (col as any).isSerial === true ? true : undefined,
       comment: col.comment ?? undefined,
+      autoIncrement: (col as any).autoIncrement === true ? true : undefined,
     }));
   }
 

@@ -136,7 +136,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isDefaultPrimaryKey(column: MysqlColumn): boolean {
-    return super.isDefaultPrimaryKey(column) && !!column.autoIncrement && !column.unsigned;
+    // Live bigint reflects as type:"integer" + sqlType:"bigint(20)"; detect off sqlType too
+    // (mirrors Column#bigint?). The super arm keeps mock sources passing type:"bigint".
+    const isBigint = super.isDefaultPrimaryKey(column) || /^bigint\b/i.test(column.sqlType ?? "");
+    return isBigint && !!column.autoIncrement && !column.unsigned;
   }
 
   /** @internal */

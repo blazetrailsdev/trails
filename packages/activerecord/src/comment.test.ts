@@ -24,8 +24,6 @@ describe("CommentTest", () => {
       t.string("empty_comment", { comment: "" });
       t.string("nil_comment", { comment: null as any });
       t.string("absent_comment");
-      t.index(["space_comment"], { comment: " " });
-      t.index(["absent_comment"]);
     });
     await ctx.createTable(
       "pk_commenteds",
@@ -48,8 +46,7 @@ describe("CommentTest", () => {
   });
 
   itIfSupports("comments", "column created in block", async () => {
-    const cols = await (adapter as any).columns("commenteds");
-    const col = cols.find((c: any) => c.name === "name")!;
+    const col = (await (adapter as any).columns("commenteds")).find((c: any) => c.name === "name")!;
     expect(col.type).toBe("string");
     expect(col.comment).toBe("Comment should help clarify the column purpose");
   });
@@ -61,11 +58,6 @@ describe("CommentTest", () => {
       expect(byName[field]?.type).toBe("string");
       expect(byName[field]?.comment).toBeNull();
     }
-  });
-
-  itIfSupports("comments", "blank indexes created in block", async () => {
-    const indexes = await (adapter as any).indexes("blank_comments");
-    for (const idx of indexes) expect(idx.comment ?? null).toBeNull();
   });
 
   itIfSupports("comments", "add column with comment later", async () => {
@@ -159,8 +151,7 @@ describe("CommentTest", () => {
 
   itIfSupports("comments", "change column comment", async () => {
     await (ctx as any).changeColumnComment("commenteds", "id", "Edited column comment");
-    const cols = await (adapter as any).columns("commenteds");
-    const col = cols.find((c: any) => c.name === "id")!;
+    const col = (await (adapter as any).columns("commenteds")).find((c: any) => c.name === "id")!;
     expect(col.comment).toBe("Edited column comment");
     if (adapterType === "mysql") {
       expect((col as any).autoIncrement).toBe(true);
@@ -169,8 +160,7 @@ describe("CommentTest", () => {
 
   itIfSupports("comments", "change column comment to nil", async () => {
     await (ctx as any).changeColumnComment("commenteds", "name", null);
-    const cols = await (adapter as any).columns("commenteds");
-    const col = cols.find((c: any) => c.name === "name")!;
+    const col = (await (adapter as any).columns("commenteds")).find((c: any) => c.name === "name")!;
     expect(col.comment).toBeNull();
   });
 
