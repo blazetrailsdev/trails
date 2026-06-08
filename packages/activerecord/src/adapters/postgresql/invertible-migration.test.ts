@@ -20,21 +20,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlInvertibleMigrationTest", () => {
-    it.skip("up", async () => {
-      // BLOCKED: migration — Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
-    });
-    it.skip("down", async () => {
-      // BLOCKED: migration — Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
-    });
-    it.skip("change", async () => {
-      // BLOCKED: migration — Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
-    });
-    it.skip("revert", async () => {
-      // BLOCKED: migration — Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
-    });
-    it.skip("revert whole migration", async () => {
-      // BLOCKED: migration — Migrator infrastructure (schema_migration, Migrator.new) not yet wired for PG
-    });
     it("migrate and revert", async () => {
       class CreateHorses extends Migration {
         async change() {
