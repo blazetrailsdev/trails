@@ -3193,7 +3193,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
               a.atttypid AS oid,
               a.atttypmod AS fmod,
               a.attidentity AS identity,
-              a.attgenerated AS attgenerated
+              a.attgenerated AS attgenerated,
+              col.collname AS collation
        FROM pg_attribute a
        JOIN pg_class t ON t.oid = a.attrelid
        JOIN pg_namespace n ON n.oid = t.relnamespace
@@ -3202,6 +3203,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
          ON i.indrelid = a.attrelid
         AND i.indisprimary
         AND a.attnum = ANY(i.indkey)
+       LEFT JOIN pg_type pt ON a.atttypid = pt.oid
+       LEFT JOIN pg_collation col ON a.attcollation = col.oid AND a.attcollation <> pt.typcollation
        WHERE ${tableCondition}
          AND a.attnum > 0
          AND NOT a.attisdropped
@@ -3267,6 +3270,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           array: sqlType.endsWith("[]"),
           identity,
           generated: attgenerated,
+          collation: (r.collation as string | null) ?? undefined,
         },
       );
     });
@@ -3302,8 +3306,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
     }
 
+    const collateSql = options.collation
+      ? ` COLLATE ${this.quoteIdentifier(options.collation as string)}`
+      : "";
     await this.exec(
-      `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} TYPE ${pgType}${usingClause}`,
+      `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} TYPE ${pgType}${collateSql}${usingClause}`,
     );
 
     if (options.default !== undefined) {
