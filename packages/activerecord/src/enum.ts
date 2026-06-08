@@ -495,13 +495,24 @@ export function _enum(
         : "";
 
   const attrName = attribute;
-  const reverseMap: Record<number, string> = {};
+  const reverseMap: Record<number | string, string> = {};
   for (const [n, value] of Object.entries(mapping)) {
-    reverseMap[value as number] = n;
+    reverseMap[value as number | string] = n;
+  }
+
+  // Determine storage subtype so EnumType serializes labels to the right DB type.
+  let subtype: string;
+  try {
+    const t = this.typeForAttribute(name).type();
+    subtype = t === "value" || /integer/i.test(t) || t === "smallint" ? "integer" : t;
+  } catch {
+    subtype = "integer";
   }
 
   // Define getter that returns the symbol name. Use hasOwnProperty checks so
   // inherited prototype keys like "toString" don't masquerade as enum values.
+  // Must be defined before this.attribute() so attribute() sees the accessor and
+  // skips installing its own.
   const hasOwn = Object.prototype.hasOwnProperty;
   Object.defineProperty(this.prototype, attribute, {
     get(this: Base) {
@@ -520,16 +531,23 @@ export function _enum(
     configurable: true,
   });
 
+  // Register EnumType so typeForAttribute() returns it for predicate-builder
+  // serialization — e.g. where({status: "draft"}) serializes "draft" → 0.
+  // Mirrors: ActiveRecord::Enum#_enum calling klass.attribute(name, enum_type).
+  const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype);
+  this.attribute(name, enumType);
+
   for (const [n, value] of Object.entries(mapping)) {
     const methodBase = `${prefix}${n}${suffix}`;
 
     // Predicate: user.active? → user.isActive()
+    // Compare against the label (n) — EnumType.cast stores labels in _attributes.
     Object.defineProperty(
       this.prototype,
       `is${methodBase.charAt(0).toUpperCase()}${methodBase.slice(1)}`,
       {
         value: function (this: Base) {
-          return this._attributes.get(attrName) === value;
+          return this._attributes.get(attrName) === n;
         },
         writable: true,
         configurable: true,
