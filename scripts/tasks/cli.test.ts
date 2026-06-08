@@ -623,6 +623,15 @@ describe("checkPrNotOpen (done merge-state guard)", () => {
     expect(() => checkPrNotOpen(42)).toThrow(/exit 1/);
     expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/could not query PR #42/));
   });
+
+  it("exits 1 when gh returns JSON without a state field (API regression)", () => {
+    setupExit();
+    execFileSyncMock.mockReturnValueOnce(JSON.stringify({}) as never);
+    expect(() => checkPrNotOpen(42)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringMatching(/could not read PR #42 state/),
+    );
+  });
 });
 
 describe("newStory validation paths", () => {
@@ -632,6 +641,14 @@ describe("newStory validation paths", () => {
     }) as never);
     vi.spyOn(console, "error").mockImplementation(() => {});
   }
+
+  it("exits 1 when tasksDir is not a git repo", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    // No .git dir — expect the git-repo guard to fire.
+    expect(() => newStory("0005-gaps", "my-story", {}, dir)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/not a git repo/));
+  });
 
   it("exits 1 when the RFC directory does not exist", () => {
     setupExit();

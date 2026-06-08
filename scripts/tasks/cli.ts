@@ -663,6 +663,12 @@ export function newStory(
     message: `new: ${rfcSlug}/${storySlug}`,
     fileToStage: storyFile,
     mutator: () => {
+      // Re-check after pull: another agent may have pushed the same story since
+      // the pre-pull existsSync above, and writeFileSync would silently overwrite it.
+      if (existsSync(storyFile)) {
+        console.error(`error: story "${storySlug}" already exists (created by concurrent agent)`);
+        process.exit(4);
+      }
       mkdirSync(storiesDir, { recursive: true });
       writeFileSync(storyFile, buildStoryContent(rfcSlug, storySlug, { ...opts, date: today() }));
     },
@@ -696,6 +702,10 @@ export function checkPrNotOpen(pr: number): void {
     data = JSON.parse(raw) as typeof data;
   } catch {
     console.error(`error: unexpected output from gh pr view #${pr}`);
+    process.exit(1);
+  }
+  if (!data.state) {
+    console.error(`error: could not read PR #${pr} state from gh output`);
     process.exit(1);
   }
   if (data.state === "OPEN") {
