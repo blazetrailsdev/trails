@@ -74,13 +74,19 @@ export function acceptsNestedAttributesFor(
   // assignNestedAttributesForOneToOneAssociation.
 
   // Store config on the class
-  if (!(modelClass as any)._nestedAttributeConfigs) {
+  if (!Object.prototype.hasOwnProperty.call(modelClass, "_nestedAttributeConfigs")) {
     (modelClass as any)._nestedAttributeConfigs = [];
   }
-  (modelClass as any)._nestedAttributeConfigs.push({
-    associationName,
-    options,
-  } as NestedAttributeConfig);
+  // Upsert: replace existing entry for this association (mirrors Rails'
+  // nested_attributes_options[name] = options hash-assignment).
+  const configs: NestedAttributeConfig[] = (modelClass as any)._nestedAttributeConfigs;
+  const existingIdx = configs.findIndex((c) => c.associationName === associationName);
+  const entry: NestedAttributeConfig = { associationName, options };
+  if (existingIdx >= 0) {
+    configs[existingIdx] = entry;
+  } else {
+    configs.push(entry);
+  }
 
   const type =
     assocExists.type === "hasMany" || assocExists.type === "hasAndBelongsToMany"
@@ -244,11 +250,22 @@ async function processNestedAttributes(record: Base): Promise<void> {
           await conn.executeMutation(conn.toSql(um));
         }
       } else {
-        // For hasMany/hasOne, set FK on the child record
-        await (targetModel as any).create({
-          ...childAttrs,
-          [foreignKey]: record.id,
-        });
+        // For hasMany/hasOne, set FK on the child record.
+        // When inverseOf is declared, cache the parent on the new child before
+        // saving so presence validators that check the association object pass
+        // without a DB round-trip — mirrors Rails' inverse_of auto-population.
+        const inverseOf: string | undefined = assocDef.options.inverseOf;
+        if (inverseOf) {
+          await (targetModel as any).create(
+            { ...childAttrs, [foreignKey]: record.id },
+            (child: any) => {
+              child._cachedAssociations = child._cachedAssociations ?? new Map();
+              child._cachedAssociations.set(inverseOf, record);
+            },
+          );
+        } else {
+          await (targetModel as any).create({ ...childAttrs, [foreignKey]: record.id });
+        }
       }
     }
   }
@@ -374,6 +391,12 @@ function generateAssociationWriter(
   type: "collection" | "one_to_one",
 ): void {
   const attrName = `${associationName}Attributes`;
+  // Register so persistence.create/createBang can re-dispatch after construction
+  // (the Base constructor routes attrs through writeAttribute, bypassing setters).
+  if (!Object.prototype.hasOwnProperty.call(modelClass, "_nestedAttributeSetterKeys")) {
+    (modelClass as any)._nestedAttributeSetterKeys = new Set<string>();
+  }
+  (modelClass as any)._nestedAttributeSetterKeys.add(attrName);
   if (type === "collection") {
     Object.defineProperty(modelClass.prototype, attrName, {
       set(this: Base, value: any) {
