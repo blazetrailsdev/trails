@@ -1,69 +1,114 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/numbers_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { Base } from "../../index.js";
+
+// Rails: class PostgresqlNumber < ActiveRecord::Base
+class PostgresqlNumber extends Base {
+  static {
+    this.tableName = "postgresql_numbers";
+  }
+}
 
 describeIfPg("PostgreSQLAdapter", () => {
-  let adapter: PostgreSQLAdapter;
+  setupHandlerSuite();
+
+  let connection: PostgreSQLAdapter;
+
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    connection = Base.connection as PostgreSQLAdapter;
+    await connection.execute(
+      `CREATE TABLE postgresql_numbers (id SERIAL PRIMARY KEY, single REAL, double DOUBLE PRECISION)`,
+    );
+    PostgresqlNumber.resetColumnInformation();
+    await PostgresqlNumber.loadSchema();
   });
+
   afterEach(async () => {
-    await adapter.close();
+    await connection.execute("DROP TABLE IF EXISTS postgresql_numbers");
+    PostgresqlNumber.resetColumnInformation();
   });
 
   describe("PostgreSQLNumberTest", () => {
-    it.skip("numeric column", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
+    it("data type", async () => {
+      // Rails: assert_equal :float, PostgresqlNumber.columns_hash["single"].type
+      expect(PostgresqlNumber.columnsHash()["single"].type).toBe("float");
+      // Rails: assert_equal :float, PostgresqlNumber.columns_hash["double"].type
+      expect(PostgresqlNumber.columnsHash()["double"].type).toBe("float");
     });
-    it.skip("numeric default", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
+
+    it("values", async () => {
+      // Rails: @connection.execute "INSERT INTO postgresql_numbers ..."
+      await connection.execute(
+        `INSERT INTO postgresql_numbers (id, single, double) VALUES (1, 123.456, 123456.789)`,
+      );
+      await connection.execute(
+        `INSERT INTO postgresql_numbers (id, single, double) VALUES (2, '-Infinity', 'Infinity')`,
+      );
+      await connection.execute(
+        `INSERT INTO postgresql_numbers (id, single, double) VALUES (3, 123.456, 'NaN')`,
+      );
+
+      // Rails: first, second, third = PostgresqlNumber.find(1, 2, 3)
+      const [first, second, third] = (await PostgresqlNumber.find([1, 2, 3])) as any[];
+
+      // Rails: assert_equal 123.456, first.single
+      expect(first.single).toBeCloseTo(123.456, 2);
+      // Rails: assert_equal 123456.789, first.double
+      expect(first.double).toBeCloseTo(123456.789, 2);
+      // Rails: assert_equal(-::Float::INFINITY, second.single)
+      expect(second.single).toBe(-Infinity);
+      // Rails: assert_equal ::Float::INFINITY, second.double
+      expect(second.double).toBe(Infinity);
+      // Rails: assert_predicate third.double, :nan?
+      expect(Number.isNaN(third.double)).toBe(true);
     });
-    it.skip("numeric type cast", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
+
+    it("update", async () => {
+      // Rails: record = PostgresqlNumber.create! single: "123.456", double: "123456.789"
+      const record = (await PostgresqlNumber.createBang({
+        single: "123.456",
+        double: "123456.789",
+      })) as any;
+      // Rails: record.single = new_single; record.double = new_double; record.save!
+      record.single = 789.012;
+      record.double = 789012.345;
+      await record.saveBang();
+      // Rails: record.reload; assert_equal new_single, record.single
+      await record.reload();
+      expect(record.single).toBeCloseTo(789.012, 2);
+      expect(record.double).toBeCloseTo(789012.345, 2);
     });
-    it.skip("numeric nan", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
+
+    it("reassigning infinity does not mark record as changed", async () => {
+      // Rails: record = PostgresqlNumber.create!(single: Float::INFINITY, double: -Float::INFINITY)
+      const record = (await PostgresqlNumber.createBang({
+        single: Infinity,
+        double: -Infinity,
+      })) as any;
+      await record.reload();
+      // Rails: record.single = Float::INFINITY; record.double = -Float::INFINITY
+      record.single = Infinity;
+      record.double = -Infinity;
+      // Rails: assert_not_predicate record, :changed?
+      expect(record.changed).toBe(false);
     });
-    it.skip("numeric infinity", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
-    });
-    it.skip("data type", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
-    });
-    it.skip("values", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
-    });
-    it.skip("reassigning infinity does not mark record as changed", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
-    });
-    it.skip("reassigning nan does not mark record as changed", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
-    });
-    it.skip("update", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
-      /* TODO: needs imports from original file */
+
+    it("reassigning nan does not mark record as changed", async () => {
+      // Rails: record = PostgresqlNumber.create!(single: Float::NAN, double: Float::NAN)
+      const record = (await PostgresqlNumber.createBang({
+        single: NaN,
+        double: NaN,
+      })) as any;
+      await record.reload();
+      // Rails: record.single = Float::NAN; record.double = Float::NAN
+      record.single = NaN;
+      record.double = NaN;
+      // Rails: assert_not_predicate record, :changed?
+      expect(record.changed).toBe(false);
     });
   });
 });
