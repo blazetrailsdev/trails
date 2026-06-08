@@ -1405,12 +1405,9 @@ describe("TestNestedAttributesInGeneral", () => {
       static {
         this._tableName = "n_human4s";
         this.attribute("name", "string");
+        this.hasMany("ncwInterests", { className: "NCWInterest", foreignKey: "nhuman4_id" });
       }
     }
-    Associations.hasMany.call(NCWHuman, "ncwInterests", {
-      className: "NCWInterest",
-      foreignKey: "nhuman4_id",
-    });
     acceptsNestedAttributesFor(NCWHuman, "ncwInterests");
     registerModel(NCWInterest);
     registerModel(NCWHuman);
@@ -2396,24 +2393,24 @@ describe("validate presence of parent works with inverse of", () => {
         this.attribute("topic", "string");
         this.attribute("nhuman4_id", "integer");
         this.validates("nvpHuman", { presence: true });
+        this.belongsTo("nvpHuman", {
+          className: "NVPHuman",
+          foreignKey: "nhuman4_id",
+          inverseOf: "nvpInterests",
+        });
       }
     }
     class NVPHuman extends Base {
       static {
         this._tableName = "n_human4s";
         this.attribute("name", "string");
+        this.hasMany("nvpInterests", {
+          className: "NVPInterest",
+          foreignKey: "nhuman4_id",
+          inverseOf: "nvpHuman",
+        });
       }
     }
-    Associations.hasMany.call(NVPHuman, "nvpInterests", {
-      className: "NVPInterest",
-      foreignKey: "nhuman4_id",
-      inverseOf: "nvpHuman",
-    });
-    Associations.belongsTo.call(NVPInterest, "nvpHuman", {
-      className: "NVPHuman",
-      foreignKey: "nhuman4_id",
-      inverseOf: "nvpInterests",
-    });
     acceptsNestedAttributesFor(NVPHuman, "nvpInterests");
     registerModel(NVPInterest);
     registerModel(NVPHuman);
