@@ -608,7 +608,7 @@ title: ${qs(title)}
 status: draft
 updated: ${opts.date}
 rfc: ${qs(rfcSlug)}
-cluster: ${opts.cluster != null ? qs(opts.cluster) : "null"}
+cluster: ${opts.cluster != null ? opts.cluster : "null"}
 deps: ${depsYaml}
 deps-rfc: []
 est-loc: ${opts.estLoc != null ? opts.estLoc : "null"}

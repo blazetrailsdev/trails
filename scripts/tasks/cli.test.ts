@@ -561,7 +561,7 @@ describe("buildStoryContent", () => {
       date: "2026-06-08",
     });
     expect(content).toContain(`title: "My custom title"`);
-    expect(content).toContain(`cluster: "type-system"`);
+    expect(content).toContain(`cluster: type-system`);
     expect(content).toContain(`deps: ["story-a", "story-b"]`);
     expect(content).toContain(`est-loc: 120`);
     expect(content).toContain(`priority: 5`);
@@ -572,14 +572,12 @@ describe("buildStoryContent", () => {
     expect(content).toContain(`title: "add-foo-support"`);
   });
 
-  it("escapes double-quotes in title and cluster", () => {
+  it("escapes double-quotes in title", () => {
     const content = buildStoryContent("0005-gaps", "x", {
       title: 'foo "bar" baz',
-      cluster: 'a "b"',
       date: "2026-06-08",
     });
     expect(content).toContain(`title: "foo \\"bar\\" baz"`);
-    expect(content).toContain(`cluster: "a \\"b\\""`);
   });
 });
 
