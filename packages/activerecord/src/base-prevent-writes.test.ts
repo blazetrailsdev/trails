@@ -1,44 +1,91 @@
-import { describe, it } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
+
+import { Base } from "./index.js";
+import { ReadOnlyError } from "./errors.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 describe("BasePreventWritesTest", () => {
-  it.skip("creating a record raises if preventing writes", () => {
-    // BLOCKED: relation — preventingWrites guard not wired into all query paths
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#executeMutation missing preventingWrites check for some query types
-    // SCOPE: ~20 LOC in relation.ts; affects ~5–8 tests in base-prevent-writes.test.ts
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  class Bird extends Base {
+    static {
+      this.attribute("name", "string");
+    }
+  }
+
+  beforeAll(async () => {
+    await defineSchema({ birds: TEST_SCHEMA.birds }, { dropExisting: true });
   });
-  it.skip("updating a record raises if preventing writes", () => {
-    // BLOCKED: relation — preventingWrites guard not wired into all query paths
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#executeMutation missing preventingWrites check for some query types
-    // SCOPE: ~20 LOC in relation.ts; affects ~5–8 tests in base-prevent-writes.test.ts
+
+  it("creating a record raises if preventing writes", async () => {
+    const error = await Base.whilePreventingWrites(async () => {
+      await Bird.create({ name: "Bluejay" });
+    }).catch((e) => e);
+    expect(error).toBeInstanceOf(ReadOnlyError);
+    expect((error as ReadOnlyError).message).toMatch(
+      /^Write query attempted while in readonly mode: INSERT /,
+    );
   });
-  it.skip("deleting a record raises if preventing writes", () => {
-    // BLOCKED: relation — preventingWrites guard not wired into all query paths
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#executeMutation missing preventingWrites check for some query types
-    // SCOPE: ~20 LOC in relation.ts; affects ~5–8 tests in base-prevent-writes.test.ts
+
+  it("updating a record raises if preventing writes", async () => {
+    const bird = await Bird.create({ name: "Bluejay" });
+    const error = await Base.whilePreventingWrites(async () => {
+      await bird.update({ name: "Robin" });
+    }).catch((e) => e);
+    expect(error).toBeInstanceOf(ReadOnlyError);
+    expect((error as ReadOnlyError).message).toMatch(
+      /^Write query attempted while in readonly mode: UPDATE /,
+    );
   });
-  it.skip("selecting a record does not raise if preventing writes", () => {
-    // BLOCKED: relation — preventingWrites guard not wired into all query paths
-    // ROOT-CAUSE: abstract-adapter.ts#execute (read path) does not check preventingWrites — only mutation path does
-    // SCOPE: ~20 LOC in abstract-adapter.ts; affects ~5–8 tests in base-prevent-writes.test.ts
+
+  it("deleting a record raises if preventing writes", async () => {
+    const bird = await Bird.create({ name: "Bluejay" });
+    const error = await Base.whilePreventingWrites(async () => {
+      await bird.destroy();
+    }).catch((e) => e);
+    expect(error).toBeInstanceOf(ReadOnlyError);
+    expect((error as ReadOnlyError).message).toMatch(
+      /^Write query attempted while in readonly mode: DELETE /,
+    );
   });
-  it.skip("an explain query does not raise if preventing writes", () => {
-    // BLOCKED: relation — preventingWrites guard not wired into all query paths
-    // ROOT-CAUSE: abstract-adapter.ts#execute (read/explain path) does not check preventingWrites — only mutation path does
-    // SCOPE: ~20 LOC in abstract-adapter.ts; affects ~5–8 tests in base-prevent-writes.test.ts
+
+  it("selecting a record does not raise if preventing writes", async () => {
+    const bird = await Bird.create({ name: "Bluejay" });
+    let found: Bird | null = null;
+    await Base.whilePreventingWrites(async () => {
+      found = await Bird.where({ name: "Bluejay" }).last();
+    });
+    expect(found).not.toBeNull();
+    expect((found as unknown as Bird).id).toBe(bird.id);
   });
-  it.skip("an empty transaction does not raise if preventing writes", () => {
-    // BLOCKED: relation — preventingWrites guard not wired into all query paths
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#executeMutation missing preventingWrites check for some query types
-    // SCOPE: ~20 LOC in relation.ts; affects ~5–8 tests in base-prevent-writes.test.ts
+
+  it("an explain query does not raise if preventing writes", async () => {
+    await Bird.create({ name: "Bluejay" });
+    await Base.whilePreventingWrites(async () => {
+      const result = await Bird.where({ name: "Bluejay" }).explain();
+      expect(typeof result).toBe("string");
+    });
   });
+
+  it("an empty transaction does not raise if preventing writes", async () => {
+    await Base.whilePreventingWrites(async () => {
+      await Bird.transaction(async () => {});
+    });
+  });
+
   it.skip("preventing writes applies to all connections in block", () => {
-    // BLOCKED: relation — preventingWrites guard not wired into all query paths
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#executeMutation missing preventingWrites check for some query types
-    // SCOPE: ~20 LOC in relation.ts; affects ~5–8 tests in base-prevent-writes.test.ts
+    // Requires two separate connection pools — cannot verify with single-pool SQLite.
   });
-  it.skip("current_preventing_writes", () => {
-    // BLOCKED: relation — preventingWrites guard not wired into all query paths
-    // ROOT-CAUSE: relation.ts or abstract-adapter.ts#executeMutation missing preventingWrites check for some query types
-    // SCOPE: ~20 LOC in relation.ts; affects ~5–8 tests in base-prevent-writes.test.ts
+
+  it("current_preventing_writes", () => {
+    expect(Base.currentPreventingWrites()).toBe(false);
+    Base.whilePreventingWrites(() => {
+      expect(Base.currentPreventingWrites()).toBe(true);
+    });
+    expect(Base.currentPreventingWrites()).toBe(false);
   });
 });

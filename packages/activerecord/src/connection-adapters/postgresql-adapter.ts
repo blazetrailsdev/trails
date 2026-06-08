@@ -758,6 +758,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const bindArray = typeCastedBinds(binds).map((v) => this._bindForPg(v));
     const rewritten = this.rewriteBinds(sql, bindArray);
     this._noticeReceiverSqlWarnings = [];
+    const txPublicQuery = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql: rewritten,
       name: name ?? "SQL",
@@ -765,6 +766,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       type_casted_binds: bindArray,
       connection: this,
       row_count: 0,
+      transaction: txPublicQuery.isOpen() ? txPublicQuery : null,
     };
     const pgResult: ArrayQueryResult = await Notifications.instrumentAsync(
       "sql.active_record",
@@ -1344,6 +1346,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // payload.sql is the rewritten SQL (`$1` not `?`) so ExplainSubscriber
     // stores something that can be re-EXPLAIN'd on the same adapter
     // without re-running rewriteBinds.
+    const txPublic = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql: rewritten,
       name,
@@ -1351,6 +1354,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       type_casted_binds: typeCastedBinds(binds),
       connection: this,
       row_count: 0,
+      transaction: txPublic.isOpen() ? txPublic : null,
     };
     this._noticeReceiverSqlWarnings = [];
     // Flush inside the instrumented callback so a warning raise is captured by
@@ -1393,6 +1397,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // something that can be re-EXPLAIN'd without re-running rewriteBinds
     // (and without re-appending RETURNING for bare INSERTs, which isn't
     // part of the logical query).
+    const txPublic = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql: pgSql,
       name,
@@ -1400,6 +1405,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       type_casted_binds: typeCastedBinds(binds),
       connection: this,
       row_count: 0,
+      transaction: txPublic.isOpen() ? txPublic : null,
     };
     const m = await Notifications.instrumentAsync("sql.active_record", payload, async () => {
       let rc: number;

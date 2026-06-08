@@ -4,6 +4,7 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { ReadOnlyError } from "../../errors.js";
 
 let adapter: SQLite3Adapter;
 
@@ -22,7 +23,7 @@ describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
     await adapter.withPreventedWrites(async () => {
       await expect(
         adapter.executeMutation(`INSERT INTO "pw" ("name") VALUES ('x')`),
-      ).rejects.toThrow(/preventing writes/);
+      ).rejects.toThrow(ReadOnlyError);
     });
   });
 
@@ -31,7 +32,7 @@ describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
     await adapter.executeMutation(`INSERT INTO "pw2" ("name") VALUES ('x')`);
     await adapter.withPreventedWrites(async () => {
       await expect(adapter.executeMutation(`UPDATE "pw2" SET "name" = 'y'`)).rejects.toThrow(
-        /preventing writes/,
+        ReadOnlyError,
       );
     });
   });
@@ -40,9 +41,7 @@ describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
     adapter.exec(`CREATE TABLE "pw3" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await adapter.executeMutation(`INSERT INTO "pw3" ("name") VALUES ('x')`);
     await adapter.withPreventedWrites(async () => {
-      await expect(adapter.executeMutation(`DELETE FROM "pw3"`)).rejects.toThrow(
-        /preventing writes/,
-      );
+      await expect(adapter.executeMutation(`DELETE FROM "pw3"`)).rejects.toThrow(ReadOnlyError);
     });
   });
 
@@ -51,7 +50,7 @@ describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
     await adapter.withPreventedWrites(async () => {
       await expect(
         adapter.executeMutation(`REPLACE INTO "pw4" ("id", "name") VALUES (1, 'x')`),
-      ).rejects.toThrow(/preventing writes/);
+      ).rejects.toThrow(ReadOnlyError);
     });
   });
 
