@@ -1,5 +1,5 @@
 import mysql from "mysql2/promise";
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, presence } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { DatabaseAdapter } from "../adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
@@ -1261,7 +1261,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         nullable,
         {
           collation: (r.collation ?? r.COLLATION ?? null) as string | null,
-          comment: ((r.comment ?? r.COMMENT ?? "") as string).trim() || null,
+          comment: presence((r.comment ?? r.COMMENT) as string | null | undefined) ?? null,
           defaultFunction: defFn,
           primaryKey: colKey === "PRI",
           autoIncrement: extra === "auto_increment",

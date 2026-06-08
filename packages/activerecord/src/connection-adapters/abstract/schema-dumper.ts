@@ -223,7 +223,7 @@ export class SchemaDumper extends BaseSchemaDumper {
     if (typeof adapterTableOpts.options === "string")
       tableOpts["options"] = JSON.stringify(adapterTableOpts.options);
     if (typeof adapterTableOpts.comment === "string" && adapterTableOpts.comment.trim().length > 0)
-      tableOpts["comment"] = JSON.stringify(adapterTableOpts.comment.trim());
+      tableOpts["comment"] = JSON.stringify(adapterTableOpts.comment);
     tableOpts["force"] = '"cascade"';
 
     lines.push(

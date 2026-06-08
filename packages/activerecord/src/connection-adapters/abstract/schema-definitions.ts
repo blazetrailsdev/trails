@@ -1243,7 +1243,9 @@ export class TableDefinition {
       // use MySQL::SchemaCreation#add_column_options!; the DDL-generator-convergence RFC
       // will route this through the visitor and remove the branch.
       if (this._adapterName === "mysql" && col.options.comment?.trim())
-        parts.push(`COMMENT '${col.options.comment.replace(/'/g, "''")}'`);
+        // Escape backslashes and quotes like a MySQL string literal (matches
+        // `_mysqlInlineIndexSql` in this file and Rails' quoted_comment).
+        parts.push(`COMMENT '${col.options.comment.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`);
 
       return parts.join(" ");
     });

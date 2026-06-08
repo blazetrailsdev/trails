@@ -595,8 +595,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     commentOrChanges: string | Record<string, string | null>,
   ): Promise<void> {
     const raw = this.schemaStatements().extractNewCommentValue(commentOrChanges);
-    const c = (raw == null ? "" : String(raw)).replace(/'/g, "''");
-    await this._execMutation(`ALTER TABLE ${this.quoteTableName(tableName)} COMMENT='${c}'`);
+    // Mirrors Rails: `comment = "" if comment.nil?` then `COMMENT #{quote(comment)}`.
+    const c = raw == null ? "" : String(raw);
+    await this._execMutation(
+      `ALTER TABLE ${this.quoteTableName(tableName)} COMMENT ${this.quote(c)}`,
+    );
   }
 
   async renameTable(tableName: string, newName: string): Promise<void> {

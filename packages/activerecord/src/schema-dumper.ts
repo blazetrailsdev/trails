@@ -983,7 +983,7 @@ export class SchemaDumper {
       tableOpts.collation = adapterTableOpts.collation;
     if (typeof adapterTableOpts.options === "string") tableOpts.options = adapterTableOpts.options;
     if (typeof adapterTableOpts.comment === "string" && adapterTableOpts.comment.trim().length > 0)
-      tableOpts.comment = adapterTableOpts.comment.trim();
+      tableOpts.comment = adapterTableOpts.comment;
     tableOpts.force = "cascade";
     const optStr = `{ ${this.formatOptions(tableOpts)} }`;
 
