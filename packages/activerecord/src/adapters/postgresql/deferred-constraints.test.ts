@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { InvalidForeignKey } from "../../errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -135,7 +136,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           name: "dc_s_fk2",
           deferrable: "immediate",
         });
-        // Defer only fk2; fk1 is not deferrable so it stays immediate.
+        // Defer only fk2; fk1 (deferrable, not listed) stays at INITIALLY IMMEDIATE.
         await adapter.beginTransaction();
         try {
           await adapter.setConstraints("deferred", "dc_s_fk2");
@@ -155,7 +156,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("set constraints requires valid value", async () => {
       await expect(adapter.setConstraints("invalid" as unknown as "deferred")).rejects.toThrow(
-        /deferred must be/,
+        ArgumentError,
       );
     });
   });
