@@ -30,7 +30,7 @@ export class ExplainPrettyPrinter {
     // Rails: header = result.columns.first ("QUERY PLAN"), then separator + rows + separator.
     const header = "QUERY PLAN";
     const allWidths = lines.flatMap((l) => l.split("\n").map((s) => s.length));
-    const width = Math.max(header.length, ...allWidths) + 1;
+    const width = Math.max(header.length, ...allWidths) + 2;
     const sep = "-".repeat(width);
     return [header, sep, ...lines, sep].join("\n");
   }
