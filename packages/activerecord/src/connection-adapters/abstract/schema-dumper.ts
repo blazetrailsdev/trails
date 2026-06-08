@@ -48,7 +48,7 @@ export class SchemaDumper extends BaseSchemaDumper {
       // "null" (not Ruby "nil") — emitted verbatim by formatColspecRaw as `default: null`.
       spec["default"] ??= "null";
     }
-    if (!("comment" in spec)) return spec;
+    if (Object.keys(spec).every((k) => k === "id" || k === "default")) return spec;
     const { id: idType, ...idOpts } = spec as { id?: unknown } & Record<string, unknown>;
     return { id: { ...(idType != null ? { type: idType } : {}), ...idOpts } };
   }

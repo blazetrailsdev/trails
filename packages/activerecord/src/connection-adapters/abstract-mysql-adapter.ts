@@ -593,7 +593,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     tableName: string,
     commentOrChanges: string | Record<string, string | null>,
   ): Promise<void> {
-    const c = (typeof commentOrChanges === "string" ? commentOrChanges : "").replace(/'/g, "''");
+    const raw = this.schemaStatements().extractNewCommentValue(commentOrChanges);
+    const c = (raw == null ? "" : String(raw)).replace(/'/g, "''");
     await this._execMutation(`ALTER TABLE ${this.quoteTableName(tableName)} COMMENT='${c}'`);
   }
 

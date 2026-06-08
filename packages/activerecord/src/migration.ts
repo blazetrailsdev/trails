@@ -1953,7 +1953,7 @@ export class MigrationContext {
     for (const col of tdCols) {
       cols.add(col.name);
     }
-    if (this.connection.supportsComments?.()) {
+    if (this.connection.supportsComments?.() && !this.connection.supportsCommentsInCreate?.()) {
       for (const col of tdCols) {
         const cc = (col.options as { comment?: unknown }).comment;
         if (typeof cc === "string" && cc.trim().length > 0)
