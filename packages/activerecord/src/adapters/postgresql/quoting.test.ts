@@ -8,8 +8,9 @@ import {
   IntegerOutOf64BitRange,
   quotingConfig,
 } from "../../connection-adapters/postgresql/quoting.js";
-import { Range as OidRange } from "../../connection-adapters/postgresql/oid/range.js";
+import { Range as OidRange, RangeType } from "../../connection-adapters/postgresql/oid/range.js";
 import { Bit } from "../../connection-adapters/postgresql/oid/bit.js";
+import { IntegerType } from "@blazetrails/activemodel";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -94,8 +95,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("quote range", () => {
-      const range = new OidRange(1, 0, false);
-      expect(adapter.quote(range)).toBe("'[1,0]'");
+      // Mirrors Rails test_quote_range: injection strings are neutralized by
+      // RangeType#serialize casting bounds through IntegerType before quoting.
+      const type = new RangeType(new IntegerType(), "int8range");
+      const range = new OidRange("1,2]'; SELECT * FROM users; --", "0; DROP TABLE users; --");
+      const serialized = type.serialize(range);
+      expect(adapter.quote(serialized)).toBe("'[1,0]'");
     });
 
     it("quote array", async () => {
@@ -153,11 +158,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("do not raise when raise int wider than 64bit is false", () => {
+      const saved = quotingConfig.raiseIntWiderThan64Bit;
       quotingConfig.raiseIntWiderThan64Bit = false;
       try {
         expect(adapter.quote(BigInt("9223372036854775808"))).toBe("9223372036854775808");
       } finally {
-        quotingConfig.raiseIntWiderThan64Bit = true;
+        quotingConfig.raiseIntWiderThan64Bit = saved;
       }
     });
   });

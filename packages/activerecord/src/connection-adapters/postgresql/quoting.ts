@@ -246,7 +246,7 @@ export function typeCast(value: unknown): unknown {
     return encodeMultirange(value);
   }
   if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
-    checkIntegerRange(value);
+    if (quotingConfig.raiseIntWiderThan64Bit) checkIntegerRange(value);
   }
   return abstractTypeCast(value);
 }
