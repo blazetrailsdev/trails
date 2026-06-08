@@ -89,13 +89,16 @@ export function parsePostgresDate(
   if (trimmed === "infinity") return DateInfinity;
   if (trimmed === "-infinity") return DateNegativeInfinity;
   const { iso, bc } = extractBcSuffix(trimmed);
-  const plain = Temporal.PlainDate.from(iso);
-  if (!bc) return plain;
-  return Temporal.PlainDate.from({
-    year: bcYearToIso(plain.year),
-    month: plain.month,
-    day: plain.day,
-  });
+  if (!bc) return Temporal.PlainDate.from(iso);
+  // Parse components directly — do not construct an intermediate PlainDate from
+  // the CE year string. "0005-02-29 BC" is Feb 29, ISO year -4 (a leap year),
+  // but year 5 CE is not; Temporal.PlainDate.from("0005-02-29") would throw.
+  const m = /^(\d+)-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) throw new RangeError(`Cannot parse BC date: ${JSON.stringify(text)}`);
+  return Temporal.PlainDate.from(
+    { year: bcYearToIso(parseInt(m[1], 10)), month: parseInt(m[2], 10), day: parseInt(m[3], 10) },
+    { overflow: "reject" },
+  );
 }
 
 /**
