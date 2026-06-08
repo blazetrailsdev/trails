@@ -36,19 +36,29 @@ export class SchemaDumper extends BaseSchemaDumper {
 
   /** @internal */
   protected columnSpecForPrimaryKey(column: Column): Record<string, unknown> {
-    const spec: Record<string, unknown> = {};
-    if (!this.isDefaultPrimaryKey(column)) {
-      // Pre-format the id value as a TS-DSL string literal for formatColspecRaw.
-      spec["id"] = JSON.stringify(this.schemaType(column));
-    }
     const colOpts = this.prepareColumnOptions(column);
     delete colOpts["null"];
-    Object.assign(spec, colOpts);
     if (this.isExplicitPrimaryKeyDefault(column)) {
       // "null" (not Ruby "nil") — emitted verbatim by formatColspecRaw as `default: null`.
-      spec["default"] ??= "null";
+      colOpts["default"] ??= "null";
     }
-    return spec;
+
+    const idHash: Record<string, unknown> = {};
+    if (!this.isDefaultPrimaryKey(column)) {
+      // Pre-format the type as a TS-DSL string literal for formatColspecRaw.
+      idHash["type"] = JSON.stringify(this.schemaType(column));
+    }
+    Object.assign(idHash, colOpts);
+
+    if (Object.keys(idHash).length === 0) return {};
+    // Only a type override with no extra options: emit the simple string form
+    // `id: "type"` so the output is compact and matches Rails' common case.
+    if (Object.keys(idHash).length === 1 && "type" in idHash) {
+      return { id: idHash["type"] };
+    }
+    // Hash form: `id: { type: "...", comment: "...", ... }` — used when there
+    // are extra PK column options (comment, default, etc.) beyond just the type.
+    return { id: idHash };
   }
 
   /** @internal */
@@ -201,7 +211,7 @@ export class SchemaDumper extends BaseSchemaDumper {
     } else if (!hasId) {
       tableOpts["id"] = "false";
     } else if (pkColumn) {
-      if (!this.isDefaultPrimaryKey(pkColumn)) {
+      if (!this.isDefaultPrimaryKey(pkColumn) || (pkColumn as any).comment) {
         Object.assign(tableOpts, this.columnSpecForPrimaryKey(pkColumn));
       }
     }

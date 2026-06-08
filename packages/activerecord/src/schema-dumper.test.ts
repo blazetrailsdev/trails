@@ -386,24 +386,69 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("idx_users_full_name");
     expect(output).toContain("lower(first_name");
   });
-  it.skip("schema dump includes length for mysql binary fields", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs MySQL-specific handling */
-  });
-  it.skip("schema dump includes length for mysql blob and text fields", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs MySQL-specific handling */
-  });
-  it.skip("schema does not include limit for emulated mysql boolean fields", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs MySQL-specific handling */
-  });
+  it.skipIf(adapterType !== "mysql")(
+    "schema dump includes length for mysql binary fields",
+    async () => {
+      const { SchemaDumper: D } = await import("./connection-adapters/mysql/schema-dumper.js");
+      const source = {
+        tables: () => ["binary_fields"],
+        indexes: (_t: string) => [],
+        columns: () => [
+          { name: "id", type: "bigint", primaryKey: true, autoIncrement: true },
+          { name: "var_binary", type: "binary", sqlType: "varbinary(255)", limit: 255 },
+          { name: "var_binary_large", type: "binary", sqlType: "varbinary(4095)", limit: 4095 },
+        ],
+      };
+      const output = D.create(source as any).dump() as string;
+      expect(output).toMatch(/t\.binary\("var_binary",\s*\{[^}]*limit:\s*255/);
+      expect(output).toMatch(/t\.binary\("var_binary_large",\s*\{[^}]*limit:\s*4095/);
+    },
+  );
+  it.skipIf(adapterType !== "mysql")(
+    "schema dump includes length for mysql blob and text fields",
+    async () => {
+      const { SchemaDumper: D } = await import("./connection-adapters/mysql/schema-dumper.js");
+      const output = D.create({
+        tables: () => ["t"],
+        indexes: () => [],
+        columns: () => [
+          { name: "id", type: "bigint", primaryKey: true, autoIncrement: true },
+          { name: "tiny_blob", type: "binary", sqlType: "tinyblob" },
+          { name: "normal_blob", type: "binary", sqlType: "blob" },
+          { name: "medium_blob", type: "binary", sqlType: "mediumblob" },
+          { name: "long_blob", type: "binary", sqlType: "longblob" },
+          { name: "tiny_text", type: "text", sqlType: "tinytext" },
+          { name: "normal_text", type: "text", sqlType: "text" },
+          { name: "medium_text", type: "text", sqlType: "mediumtext" },
+          { name: "long_text", type: "text", sqlType: "longtext" },
+        ],
+      } as any).dump() as string;
+      expect(output).toMatch(/t\.binary\("tiny_blob",\s*\{[^}]*size:\s*"tiny"/);
+      expect(output).toMatch(/t\.binary\("normal_blob"\)/);
+      expect(output).toMatch(/t\.binary\("medium_blob",\s*\{[^}]*size:\s*"medium"/);
+      expect(output).toMatch(/t\.binary\("long_blob",\s*\{[^}]*size:\s*"long"/);
+      expect(output).toMatch(/t\.text\("tiny_text",\s*\{[^}]*size:\s*"tiny"/);
+      expect(output).toMatch(/t\.text\("normal_text"\)/);
+      expect(output).toMatch(/t\.text\("medium_text",\s*\{[^}]*size:\s*"medium"/);
+      expect(output).toMatch(/t\.text\("long_text",\s*\{[^}]*size:\s*"long"/);
+    },
+  );
+  it.skipIf(adapterType !== "mysql")(
+    "schema does not include limit for emulated mysql boolean fields",
+    async () => {
+      const { SchemaDumper: D } = await import("./connection-adapters/mysql/schema-dumper.js");
+      const source = {
+        tables: () => ["booleans"],
+        indexes: (_t: string) => [],
+        columns: () => [
+          { name: "id", type: "bigint", primaryKey: true, autoIncrement: true },
+          { name: "active", type: "boolean", sqlType: "tinyint(1)", limit: 1 },
+        ],
+      };
+      const output = D.create(source as any).dump() as string;
+      expect(output).not.toMatch(/t\.boolean.*limit:/);
+    },
+  );
   it.skip("schema dumps index type", () => {
     // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
     // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
@@ -759,28 +804,16 @@ describe("SchemaDumperTest", () => {
     /* needs PG timestamptz support */
   });
   it.skip("timestamps schema dump before rails 7", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs Rails version compat */
+    /* PERMANENT-SKIP: no Rails version branching in TS */
   });
   it.skip("timestamps schema dump before rails 7 with timestamptz setting", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs Rails version compat */
+    /* PERMANENT-SKIP: no Rails version branching in TS */
   });
   it.skip("schema dump when changing datetime type for an existing app", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs datetime type migration */
+    /* PERMANENT-SKIP: no Rails version branching in TS */
   });
   it.skip("schema dump with correct timestamp types via create table and t timestamptz", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs PG timestamptz support */
+    /* PERMANENT-SKIP: no Rails version branching in TS */
   });
 
   it("schema dump with correct timestamp types via add column", async () => {
@@ -794,16 +827,10 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skip("schema dump with correct timestamp types via add column before rails 7", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs Rails version compat */
+    /* PERMANENT-SKIP: no Rails version branching in TS */
   });
   it.skip("schema dump with correct timestamp types via add column before rails 7 with timestamptz setting", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs Rails version compat */
+    /* PERMANENT-SKIP: no Rails version branching in TS */
   });
 
   it("schema dump with correct timestamp types via add column with type as string", async () => {

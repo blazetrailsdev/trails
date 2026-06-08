@@ -158,6 +158,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     // Mirrors Rails schema_limit: suppress limit when it equals the native default.
     // Native default for float is 24 (abstract_mysql_adapter.rb native_database_types).
     if (column.type === "float" && column.limit === 24) return undefined;
+    if (column.type === "boolean") return undefined;
     return super.schemaLimit(column);
   }
 

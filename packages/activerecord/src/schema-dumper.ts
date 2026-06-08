@@ -435,6 +435,7 @@ class AdapterSchemaSource implements SchemaSource {
       array: (col as any).array === true ? true : undefined,
       isEnum: col.type === "enum" ? true : undefined,
       isSerial: (col as any).isSerial === true ? true : undefined,
+      comment: (col as any).comment ?? undefined,
     }));
   }
 
