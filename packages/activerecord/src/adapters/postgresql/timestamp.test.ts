@@ -98,17 +98,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(output).toMatch(/t\.datetime\s*\("created_at"/);
     });
 
-    // Needs migration framework
-    it.skip("timestamp migration", async () => {
-      // BLOCKED: adapter-pg — migration framework not implemented
-      // ROOT-CAUSE: Rails' ActiveRecord::Migration.new.add_column uses the migration
-      // framework's create_table / add_column DSL. The TS adapter exposes addColumn()
-      // directly, but the test checks that the migration framework routes through
-      // the adapter's datetime_type setting. The passing "adds column as timestamp"
-      // test below covers the addColumn() path directly; this test is redundant.
-      // SCOPE: Migration framework wiring; not a timestamp-specific gap.
-    });
-
     it("datetime column", async () => {
       const cols = await adapter.columns("postgresql_timestamps");
       const col = cols.find((c) => c.name === "created_at");
