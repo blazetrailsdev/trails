@@ -20,6 +20,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   beforeEach(async () => {
     connection = Base.connection as PostgreSQLAdapter;
+    await connection.execute("DROP TABLE IF EXISTS postgresql_numbers");
     await connection.execute(
       `CREATE TABLE postgresql_numbers (id SERIAL PRIMARY KEY, single REAL, double DOUBLE PRECISION)`,
     );
@@ -56,9 +57,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const [first, second, third] = (await PostgresqlNumber.find([1, 2, 3])) as any[];
 
       // Rails: assert_equal 123.456, first.single
-      expect(first.single).toBeCloseTo(123.456, 2);
+      expect(first.single).toBe(123.456);
       // Rails: assert_equal 123456.789, first.double
-      expect(first.double).toBeCloseTo(123456.789, 2);
+      expect(first.double).toBe(123456.789);
       // Rails: assert_equal(-::Float::INFINITY, second.single)
       expect(second.single).toBe(-Infinity);
       // Rails: assert_equal ::Float::INFINITY, second.double
@@ -79,8 +80,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await record.saveBang();
       // Rails: record.reload; assert_equal new_single, record.single
       await record.reload();
-      expect(record.single).toBeCloseTo(789.012, 2);
-      expect(record.double).toBeCloseTo(789012.345, 2);
+      expect(record.single).toBe(789.012);
+      expect(record.double).toBe(789012.345);
     });
 
     it("reassigning infinity does not mark record as changed", async () => {
