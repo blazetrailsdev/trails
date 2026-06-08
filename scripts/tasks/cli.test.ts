@@ -329,6 +329,9 @@ describe("commitAndPush (git mutation flow)", () => {
       const sub = (args ?? []).find((a) => !a.startsWith("-") && a !== "git") ?? "";
       // Use the first non-flag token after `-C <dir>` to label the call.
       const label = args && args.length >= 3 ? args[2] : sub;
+      // The branch guard probes the current branch; the canonical checkout is on
+      // main. Answer without recording so the seen[] flow assertions are unaffected.
+      if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
       return "" as never;
     });
@@ -364,6 +367,7 @@ describe("commitAndPush (git mutation flow)", () => {
     let push = 0;
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
       if (label === "push" && push++ === 0) {
         throw pushError("! [rejected]        main -> main (non-fast-forward)");
@@ -402,6 +406,7 @@ describe("commitAndPush (git mutation flow)", () => {
     const { seen, exit } = setup();
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
       if (label === "push") throw pushError("! [rejected] non-fast-forward");
       return "" as never;
@@ -426,6 +431,7 @@ describe("commitAndPush (git mutation flow)", () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
       if (label === "push") {
         throw pushError("fatal: Authentication failed for 'https://...'");
@@ -454,6 +460,7 @@ describe("commitAndPush (git mutation flow)", () => {
     setup();
     const fullArgs: string[][] = [];
     execFileSyncMock.mockImplementation((_file, args) => {
+      if (args && args[2] === "symbolic-ref") return "main" as never;
       fullArgs.push(args ?? []);
       return "" as never;
     });
@@ -482,6 +489,7 @@ describe("commitAndPush (git mutation flow)", () => {
     const restored: string[] = [];
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
       if (label === "checkout") {
         const path = args[args.length - 1];
         if (path === "index.json") throw new Error("pathspec 'index.json' did not match");
@@ -504,6 +512,69 @@ describe("commitAndPush (git mutation flow)", () => {
     // ...and the mutation proceeded normally.
     expect(mutatorCalls).toBe(1);
     expect(seen).toEqual(["pull", "add", "commit", "push"]);
+  });
+
+  // The canonical checkout pushes a bare `main` ref, which pushes the LOCAL
+  // `main` branch — not HEAD. If the checkout is parked on another branch, that
+  // push is rejected non-fast-forward forever and looks like a lost race. Guard
+  // it: bail with exit 1 before pulling/committing, never touching the tree.
+  it("refuses a bare-branch push when the checkout is on the wrong branch", () => {
+    const { seen, exit } = setup();
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "rfc-some-feature" as never;
+      seen.push(label);
+      return "" as never;
+    });
+    let mutatorCalls = 0;
+    expect(() =>
+      commitAndPush({
+        message: "claim: x",
+        fileToStage: "/some/file.md",
+        mutator: () => mutatorCalls++,
+        raceMessage: "lost claim race",
+        raceExitCode: 3,
+      }),
+    ).toThrow(/exit 1/);
+    expect(exit).toHaveBeenCalledWith(1);
+    // The guard fires before the mutation loop: it never restores generated
+    // files, pulls, runs the mutator, commits, or pushes — the tree is untouched.
+    expect(seen).toEqual([]);
+    expect(mutatorCalls).toBe(0);
+    // And it exits 1 (a real config error), NOT the raceExitCode (a lost race) —
+    // the whole point is to stop masquerading a stuck checkout as a lost claim.
+    expect(exit).not.toHaveBeenCalledWith(3);
+    const msg = errSpy.mock.calls.at(-1)?.[0] as string;
+    expect(msg).toMatch(/is on branch "rfc-some-feature", not "main"/);
+    // The actionable recovery command is part of the contract — lock it so a
+    // refactor can't silently drop the one line an operator needs to copy.
+    expect(msg).toMatch(/checkout main && .*pull --ff-only origin main/);
+  });
+
+  it("reports a detached HEAD (symbolic-ref exits non-zero) and still exits 1", () => {
+    const { seen, exit } = setup();
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      // `git symbolic-ref --quiet HEAD` exits non-zero on a detached HEAD; the
+      // git() helper surfaces that as a throw, which the guard must swallow.
+      if (label === "symbolic-ref") throw new Error("fatal: ref HEAD is not a symbolic ref");
+      seen.push(label);
+      return "" as never;
+    });
+    expect(() =>
+      commitAndPush({
+        message: "claim: x",
+        fileToStage: "/some/file.md",
+        mutator: () => {},
+        raceMessage: "lost claim race",
+        raceExitCode: 3,
+      }),
+    ).toThrow(/exit 1/);
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(seen).toEqual([]);
+    expect(errSpy.mock.calls.at(-1)?.[0]).toMatch(/is on branch "\(detached HEAD\)", not "main"/);
   });
 
   // refine commits in an agent worktree (on a feature branch) and must push
