@@ -27,6 +27,25 @@ export class ExplainPrettyPrinter {
       return String(queryPlan);
     });
 
-    return lines.join("\n");
+    const header = "QUERY PLAN";
+    // Width: max of header and all plan sub-line lengths + 2 (one space each side). Mirrors Rails.
+    // Multi-line JSON values are split so each sub-line is measured independently.
+    const allWidths = lines.flatMap((l) => l.split("\n").map((s) => s.length));
+    const width = Math.max(header.length, ...allWidths) + 2;
+    const sep = "-".repeat(width);
+
+    // Rails: header.center(width).rstrip
+    const leftPad = Math.floor((width - header.length) / 2);
+    const centeredHeader = " ".repeat(leftPad) + header;
+
+    // Rails: lines.map { |line| " #{line}" } — one leading space per plan line.
+    // Multi-line JSON values: indent each sub-line individually.
+    const indentedLines = lines.flatMap((l) => l.split("\n").map((s) => ` ${s}`));
+
+    // Rails: "(N rows)" footer (not a second separator), then a trailing newline.
+    const nrows = result.length;
+    const footer = `(${nrows} ${nrows === 1 ? "row" : "rows"})`;
+
+    return [centeredHeader, sep, ...indentedLines, footer].join("\n") + "\n";
   }
 }
