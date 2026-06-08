@@ -4836,7 +4836,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   /** @internal */
   createTableDefinition(name: string, options: Record<string, unknown> = {}): PgTableDefinition {
     const { adapter: _adapterOpt, adapterName: _adapterNameOpt, ...rest } = options;
-    return new PgTableDefinition(name, { ...rest, adapter: this });
+    const unlogged =
+      (rest.unlogged as boolean | undefined) ?? PostgreSQLAdapter.createUnloggedTables;
+    return new PgTableDefinition(name, { ...rest, unlogged, adapter: this });
   }
 
   /** @internal */
