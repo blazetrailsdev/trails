@@ -612,6 +612,31 @@ function refine(id: string, pr: number | null, dir: string): void {
 
 // ──────────────────── new story ────────────────────
 
+// Returns the cluster names declared in an RFC's README.md frontmatter. Returns
+// [] when the README is missing, unparseable, or has no clusters field — the
+// caller passes through, and validate.mjs will catch any structural error later.
+function readRfcClusters(tasksDir: string, rfcSlug: string): string[] {
+  const readmePath = join(tasksDir, "rfcs", rfcSlug, "README.md");
+  let text: string;
+  try {
+    text = readFileSync(readmePath, "utf8");
+  } catch {
+    return [];
+  }
+  const fm = text.match(/^---\n([\s\S]*?)\n---/)?.[1];
+  if (!fm) return [];
+  const lines = fm.split("\n");
+  const start = lines.findIndex((l) => /^clusters:/.test(l));
+  if (start === -1) return [];
+  const clusters: string[] = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const m = lines[i].match(/^[ \t]+-[ \t]+(.+)$/);
+    if (!m) break;
+    clusters.push(m[1].trim());
+  }
+  return clusters;
+}
+
 // Pure content generator — exported so tests can verify the exact file format
 // without needing a real git repo or TASKS_DIR.
 export function buildStoryContent(
@@ -649,12 +674,7 @@ blocked-by: null
 
 ## Context
 
-TODO: describe what situation this story addresses.
-
 ## Acceptance criteria
-
-- [ ] TODO
-
 `;
 }
 
@@ -699,6 +719,16 @@ export function newStory(
   if (!existsSync(rfcDir)) {
     console.error(`error: RFC "${rfcSlug}" not found (expected ${rfcDir})`);
     process.exit(1);
+  }
+  if (opts.cluster != null) {
+    const validClusters = readRfcClusters(tasksDir, rfcSlug);
+    if (validClusters.length > 0 && !validClusters.includes(opts.cluster)) {
+      console.error(
+        `error: cluster "${opts.cluster}" is not declared in ${rfcSlug}/README.md\n` +
+          `  valid clusters: ${validClusters.join(", ")}`,
+      );
+      process.exit(1);
+    }
   }
   const storiesDir = join(rfcDir, "stories");
   const storyFile = join(storiesDir, `${storySlug}.md`);
