@@ -74,13 +74,19 @@ export function acceptsNestedAttributesFor(
   // assignNestedAttributesForOneToOneAssociation.
 
   // Store config on the class
-  if (!(modelClass as any)._nestedAttributeConfigs) {
+  if (!Object.prototype.hasOwnProperty.call(modelClass, "_nestedAttributeConfigs")) {
     (modelClass as any)._nestedAttributeConfigs = [];
   }
-  (modelClass as any)._nestedAttributeConfigs.push({
-    associationName,
-    options,
-  } as NestedAttributeConfig);
+  // Upsert: replace existing entry for this association (mirrors Rails'
+  // nested_attributes_options[name] = options hash-assignment).
+  const configs: NestedAttributeConfig[] = (modelClass as any)._nestedAttributeConfigs;
+  const existingIdx = configs.findIndex((c) => c.associationName === associationName);
+  const entry: NestedAttributeConfig = { associationName, options };
+  if (existingIdx >= 0) {
+    configs[existingIdx] = entry;
+  } else {
+    configs.push(entry);
+  }
 
   const type =
     assocExists.type === "hasMany" || assocExists.type === "hasAndBelongsToMany"
