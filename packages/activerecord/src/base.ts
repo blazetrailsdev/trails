@@ -1049,8 +1049,21 @@ export class Base extends Model {
     // real DB columns from the schema cache — the sync fallback in loadSchema
     // would otherwise synthesize a columnsHash containing only the virtual
     // attrs and mark the model schema-loaded, hiding every real column.
-    for (const def of this._attributeDefinitions.values()) {
-      if (!(def as { virtual?: boolean }).virtual) return Promise.resolve();
+    //
+    // Bail early when a concrete attr exists that proves the schema is known:
+    // either (a) a source:"schema" attr (DB reflection already ran), or (b) a
+    // source:"user" attr that is NOT an enum overlay (the model explicitly
+    // declared its own schema, no DB reflection needed).
+    //
+    // Enum-only attrs (registered by `_enum` via `this.attribute()`) must NOT
+    // block reflection — they're type overlays, not full schema declarations,
+    // and the model still needs the DB to discover its other columns.
+    const enumNames = (this as any)._enums as Map<string, unknown> | undefined;
+    for (const [name, def] of this._attributeDefinitions) {
+      const d = def as { virtual?: boolean; source?: string };
+      if (!d.virtual && (d.source === "schema" || !enumNames?.has(name))) {
+        return Promise.resolve();
+      }
     }
     return this.loadSchema();
   }
@@ -3490,13 +3503,14 @@ function _castEnumDirtyOpts(
 ): { from?: unknown; to?: unknown } {
   const mapping = ctor._enums?.get(name);
   if (mapping) {
-    // Mirrors EnumType#cast: has_key (label → storage value), then has_value
-    // (recognised storage value → pass through), then value.presence fallback.
-    const storageValues = Object.values(mapping) as unknown[];
+    // Since I-2, _enum stores label strings in _attributes (via EnumType.cast).
+    // Normalise both label inputs and integer storage-value inputs to the label
+    // string so the comparison matches the in-memory value.
+    const entries = Object.entries(mapping) as [string, number | string][];
     const cast = (v: unknown): unknown => {
-      if (typeof v === "string" && Object.prototype.hasOwnProperty.call(mapping, v))
-        return mapping[v];
-      if (storageValues.includes(v)) return v;
+      if (typeof v === "string" && Object.prototype.hasOwnProperty.call(mapping, v)) return v;
+      const found = entries.find(([, sv]) => sv === v);
+      if (found) return found[0];
       if (_isBlankValue(v)) return null;
       return v;
     };

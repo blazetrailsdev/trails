@@ -50,16 +50,7 @@ describeIfMysql("Mysql2Adapter", () => {
       );
     });
 
-    // BLOCKED: not a MySQL-adapter gap — needs general enum label mass-assignment.
-    // `create({ state: "middle" })` routes the label through `writeAttribute`, which
-    // bypasses the `enum` macro's property setter (the only place label→integer
-    // mapping happens) and casts "middle" through the integer type → null. Rails
-    // dispatches construction through `public_send("state=")`; trails cannot route
-    // its constructor through setters wholesale (the composite-PK `id=` setter, and
-    // others, diverge from writeAttribute). The faithful fix is a separate,
-    // non-MySQL change to make the enum macro type-backed so writeAttribute maps
-    // labels — tracked as a follow-up.
-    it.skip("enum with attribute", async () => {
+    it("enum with attribute", async () => {
       class EnumTest extends Base {
         static _tableName = "enum_tests";
         static {

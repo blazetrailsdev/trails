@@ -1291,7 +1291,7 @@ describe("EnumTest", () => {
     }
     const user = new User({ name: "Alice" });
     (user as any).status = "inactive";
-    expect(user.readAttribute("status")).toBe(1);
+    expect(user.readAttribute("status")).toBe("inactive");
     expect((user as any).isInactive()).toBe(true);
   });
 
@@ -1307,7 +1307,7 @@ describe("EnumTest", () => {
     const user = new User({ name: "Alice", status: 0 });
     (user as any).inactiveBang();
     expect((user as any).isInactive()).toBe(true);
-    expect(user.readAttribute("status")).toBe(1);
+    expect(user.readAttribute("status")).toBe("inactive");
   });
 
   it("exposes the mapping via static getter", () => {
@@ -1639,7 +1639,7 @@ describe("EnumTest", () => {
 
       const t = new Task({});
       (t as any).priority = "high";
-      expect(t.readAttribute("priority")).toBe(2);
+      expect(t.readAttribute("priority")).toBe("high");
     });
 
     it("generates predicate methods", () => {
@@ -1666,7 +1666,21 @@ describe("EnumTest", () => {
 
       const t = new Task({});
       (t as any).highBang();
-      expect(t.readAttribute("priority")).toBe(2);
+      expect(t.readAttribute("priority")).toBe("high");
+    });
+
+    it("where with enum label serializes to integer", () => {
+      class Task extends Base {
+        static {
+          this.attribute("priority", "integer");
+          this.enum("priority", { low: 0, medium: 1, high: 2 });
+        }
+      }
+
+      // where({priority: "high"}) must serialize "high" → 2, not produce IS NULL.
+      const sql = Task.where({ priority: "high" }).toSql();
+      expect(sql).toMatch(/priority.*=.*2/i);
+      expect(sql).not.toMatch(/IS NULL/i);
     });
 
     it("provides static mapping accessor", () => {
