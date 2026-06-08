@@ -24,7 +24,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     // Rails: @connection = ActiveRecord::Base.lease_connection
     connection = Base.connection as PostgreSQLAdapter;
     // Rails: @connection.transaction { execute "CREATE DOMAIN custom_money as numeric(8,2)" }
-    await connection.execute("CREATE DOMAIN IF NOT EXISTS custom_money AS numeric(8,2)");
+    await connection.execute("DROP DOMAIN IF EXISTS custom_money CASCADE");
+    await connection.execute("CREATE DOMAIN custom_money AS numeric(8,2)");
     // Rails: @connection.create_table("postgresql_domains") { |t| t.column :price, :custom_money }
     await connection.execute(
       `CREATE TABLE postgresql_domains (id SERIAL PRIMARY KEY, price custom_money)`,
