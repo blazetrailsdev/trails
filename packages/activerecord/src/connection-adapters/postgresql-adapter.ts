@@ -3056,7 +3056,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   async pkAndSequenceFor(
     tableName: string,
-  ): Promise<[string, { schema: string; name: string }] | null> {
+  ): Promise<[string, { schema: string; name: string } | null] | null> {
     const { schema, table } = this.parseSchemaQualifiedName(tableName);
 
     let tableCondition: string;
@@ -3090,19 +3090,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
     const pk = rows[0].pk as string;
     const tableSchema = rows[0].schema_name as string;
-    let seqSchema: string;
-    let seqName: string;
+    let seq: { schema: string; name: string } | null = null;
 
     if (rows[0].seq) {
       const fullSeq = rows[0].seq as string;
       const parts = splitQuotedIdentifier(fullSeq);
-      if (parts.length > 1) {
-        seqSchema = parts[0];
-        seqName = parts[1];
-      } else {
-        seqSchema = tableSchema;
-        seqName = parts[0];
-      }
+      seq =
+        parts.length > 1
+          ? { schema: parts[0], name: parts[1] }
+          : { schema: tableSchema, name: parts[0] };
     } else {
       const defaultExpr = rows[0].default_expr as string | null;
       if (defaultExpr) {
@@ -3110,28 +3106,24 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         if (match) {
           const seqRef = match[1];
           const parts = splitQuotedIdentifier(seqRef);
-          if (parts.length > 1) {
-            seqSchema = parts[0];
-            seqName = parts[1];
-          } else {
-            seqSchema = tableSchema;
-            seqName = parts[0];
-          }
-        } else {
-          return null;
+          seq =
+            parts.length > 1
+              ? { schema: parts[0], name: parts[1] }
+              : { schema: tableSchema, name: parts[0] };
         }
-      } else {
-        return null;
+        // else: UUID pk with non-nextval default (e.g. gen_random_uuid()) — seq stays null
       }
+      // else: UUID pk with no column default — seq stays null
     }
 
-    return [pk, { schema: seqSchema, name: seqName }];
+    return [pk, seq];
   }
 
   async resetPkSequence(tableName: string): Promise<void> {
     const result = await this.pkAndSequenceFor(tableName);
     if (!result) return;
     const [pk, seq] = result;
+    if (!seq) return;
     const qualifiedTable = this.quoteTableName(tableName);
     const qi = (s: string) => this.quoteIdentifier(s);
     const seqName = `${seq.schema}.${seq.name}`;
@@ -3156,6 +3148,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const result = await this.pkAndSequenceFor(tableName);
     if (!result) return;
     const [, seq] = result;
+    if (!seq) return;
     const seqName = `${seq.schema}.${seq.name}`;
     await this.schemaQuery(`SELECT setval($1::regclass, $2)`, [
       this.quoteTableName(seqName),
@@ -3829,18 +3822,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       const qualifiedOldIdx = oldSchema
         ? `${this.quoteIdentifier(oldSchema)}.${this.quoteIdentifier(oldIdx)}`
         : this.quoteIdentifier(oldIdx);
+      // Always rename the pkey index when a PK exists (mirrors Rails schema_statements.rb:443-445).
       await this.exec(
         `ALTER INDEX IF EXISTS ${qualifiedOldIdx} RENAME TO ${this.quoteIdentifier(newIdx)}`,
       );
-      const seqSuffix = `_${pk}_seq`;
-      const maxSeqPrefix = maxLen - seqSuffix.length;
-      const expectedOldSeq = `${unqualifiedOld.slice(0, maxSeqPrefix)}${seqSuffix}`;
-      if (seq.name === expectedOldSeq) {
-        const newSeqName = `${unqualifiedNew.slice(0, maxSeqPrefix)}${seqSuffix}`;
-        const qualifiedOldSeq = `${this.quoteIdentifier(seq.schema)}.${this.quoteIdentifier(seq.name)}`;
-        await this.exec(
-          `ALTER SEQUENCE IF EXISTS ${qualifiedOldSeq} RENAME TO ${this.quoteIdentifier(newSeqName)}`,
-        );
+      // Only rename the sequence when the PK has one (SERIAL/BIGSERIAL; not UUID).
+      if (seq) {
+        const seqSuffix = `_${pk}_seq`;
+        const maxSeqPrefix = maxLen - seqSuffix.length;
+        const expectedOldSeq = `${unqualifiedOld.slice(0, maxSeqPrefix)}${seqSuffix}`;
+        if (seq.name === expectedOldSeq) {
+          const newSeqName = `${unqualifiedNew.slice(0, maxSeqPrefix)}${seqSuffix}`;
+          const qualifiedOldSeq = `${this.quoteIdentifier(seq.schema)}.${this.quoteIdentifier(seq.name)}`;
+          await this.exec(
+            `ALTER SEQUENCE IF EXISTS ${qualifiedOldSeq} RENAME TO ${this.quoteIdentifier(newSeqName)}`,
+          );
+        }
       }
     }
   }
@@ -4604,6 +4601,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const result = await this.pkAndSequenceFor(tableName);
     if (!result) return;
     const [, seq] = result;
+    if (!seq) return;
     const seqName = `${seq.schema}.${seq.name}`;
     await this.schemaQuery(`SELECT setval($1::regclass, $2)`, [
       this.quoteTableName(seqName),
@@ -4621,7 +4619,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       if (!result) return;
       const [defaultPk, defaultSeq] = result;
       pk = pk ?? defaultPk;
-      sequence = sequence ?? `${defaultSeq.schema}.${defaultSeq.name}`;
+      sequence = sequence ?? (defaultSeq ? `${defaultSeq.schema}.${defaultSeq.name}` : null);
     }
     if (!pk || !sequence) return;
     const quotedSeq = this.quoteTableName(sequence);

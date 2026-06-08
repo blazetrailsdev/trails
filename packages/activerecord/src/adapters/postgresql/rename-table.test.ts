@@ -64,7 +64,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const result = await adapter.pkAndSequenceFor("after_rename");
       expect(result).not.toBeNull();
       const [pk, seq] = result!;
-      expect(seq.name).toBe(`after_rename_${pk}_seq`);
+      expect(seq!.name).toBe(`after_rename_${pk}_seq`);
     });
 
     it("renaming a table also renames the primary key index", async () => {
