@@ -665,10 +665,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
   });
 
   it.skip("should modify an existing record if there is a matching composite id", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* composite keys not implemented */
+    // BLOCKED: CPK — composite primary keys not supported in test adapter.
   });
 
   it("should destroy an existing record if there is a matching id and destroy is truthy", async () => {
@@ -922,10 +919,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
   });
 
   it.skip("should modify an existing record if there is a matching composite id", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* composite keys not implemented */
+    // BLOCKED: CPK — composite primary keys not supported in test adapter.
   });
 
   it("should destroy an existing record if there is a matching id and destroy is truthy", async () => {
@@ -1268,16 +1262,12 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it.skip("reuse already built new record", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* needs association building support */
+    // BLOCKED: Phase G — assignment must update the in-memory association target
+    // synchronously; trails defers nested attribute processing to save.
   });
   it.skip("do not allow assigning foreign key when reusing existing new record", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* needs association building support */
+    // BLOCKED: Phase G — assignment must update the in-memory association target
+    // synchronously; trails defers nested attribute processing to save.
   });
 
   it("reject if with a proc which returns true always for has many", async () => {
@@ -1327,10 +1317,8 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it.skip("first and array index zero methods return the same value when nested attributes are set to update existing record", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* needs collection first() */
+    // BLOCKED: Phase G — reading association.first() after assignment must reflect
+    // the pending attrs in memory; trails defers nested attribute processing to save.
   });
   it("allows class to override setter and call super", async () => {
     class OvShip extends Base {
@@ -1405,17 +1393,33 @@ describe("TestNestedAttributesInGeneral", () => {
     const birds = await SubBird.where({ sub_pirate_id: pirate.id }).toArray();
     expect(birds.length).toBe(1);
   });
-  it.skip("should not create duplicates with create with", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* needs createWith support */
+  it("should not create duplicates with create with", async () => {
+    class NCWInterest extends Base {
+      static {
+        this._tableName = "n_interest4s";
+        this.attribute("topic", "string");
+        this.attribute("nhuman4_id", "integer");
+      }
+    }
+    class NCWHuman extends Base {
+      static {
+        this._tableName = "n_human4s";
+        this.attribute("name", "string");
+        this.hasMany("ncwInterests", { className: "NCWInterest", foreignKey: "nhuman4_id" });
+      }
+    }
+    acceptsNestedAttributesFor(NCWHuman, "ncwInterests");
+    registerModel(NCWInterest);
+    registerModel(NCWHuman);
+
+    const before = Number(await NCWInterest.count());
+    await NCWHuman.createWith({
+      ncwInterestsAttributes: [{ topic: "Pirate king" }],
+    }).findOrCreateByBang({ name: "Monkey D. Luffy" });
+    expect(Number(await NCWInterest.count()) - before).toBe(1);
   });
   it.skip("updating models with cpk provided as strings", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* composite keys not implemented */
+    // BLOCKED: CPK — composite primary keys not supported in test adapter.
   });
 
   it("should build a new record if reject all blank does not return false", async () => {
@@ -1575,16 +1579,10 @@ describe("TestNestedAttributesInGeneral", () => {
 
 describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
   it.skip("should update existing records with non standard primary key", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* test adapter auto-assigns 'id' not custom PK */
+    // BLOCKED: non-standard PK — test adapter auto-assigns integer `id`; custom PK not supported.
   });
   it.skip("attr accessor of child should be value provided during update", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* test adapter auto-assigns 'id' not custom PK */
+    // BLOCKED: non-standard PK — test adapter auto-assigns integer `id`; custom PK not supported.
   });
 });
 
@@ -2063,28 +2061,22 @@ describe("should not load association when updating existing records", () => {
 
 describe("should not overwrite unsaved updates when loading association", () => {
   it.skip("should not overwrite unsaved updates when loading association", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* fixture-dependent */
+    // BLOCKED: Phase G — loading the association must merge pending attrs with
+    // DB rows; trails defers nested attribute processing to save.
   });
 });
 
 describe("should not remove scheduled destroys when loading association", () => {
   it.skip("should not remove scheduled destroys when loading association", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* fixture-dependent */
+    // BLOCKED: Phase G — loading the association must preserve in-memory destroy
+    // marks from pending attrs; trails defers nested attribute processing to save.
   });
 });
 
 describe("should preserve order when not overwriting unsaved updates", () => {
   it.skip("should preserve order when not overwriting unsaved updates", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* fixture-dependent */
+    // BLOCKED: Phase G — loaded association must preserve pending attr order;
+    // trails defers nested attribute processing to save.
   });
 });
 
@@ -2191,10 +2183,8 @@ describe("should raise an argument error if something else than a hash is passed
 
 describe("should refresh saved records when not overwriting unsaved updates", () => {
   it.skip("should refresh saved records when not overwriting unsaved updates", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* fixture-dependent */
+    // BLOCKED: Phase G — refreshing saved association records while merging
+    // pending attrs requires in-memory target update; trails defers to save.
   });
 });
 
@@ -2314,10 +2304,7 @@ describe("should take a hash and assign the attributes to the associated models"
 
 describe("should take a hash with composite id keys and assign the attributes to the associated models", () => {
   it.skip("should take a hash with composite id keys and assign the attributes to the associated models", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* fixture-dependent */
+    // BLOCKED: CPK — composite primary keys not supported in test adapter.
   });
 });
 
@@ -2394,11 +2381,49 @@ describe("should work with update as well", () => {
 });
 
 describe("validate presence of parent works with inverse of", () => {
-  it.skip("validate presence of parent works with inverse of", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* fixture-dependent */
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+  beforeAll(async () => {
+    await defineSchema(TEST_SCHEMA);
+  });
+  it("validate presence of parent works with inverse of", async () => {
+    class NVPInterest extends Base {
+      static {
+        this._tableName = "n_interest4s";
+        this.attribute("topic", "string");
+        this.attribute("nhuman4_id", "integer");
+        this.validates("nvpHuman", { presence: true });
+        this.belongsTo("nvpHuman", {
+          className: "NVPHuman",
+          foreignKey: "nhuman4_id",
+          inverseOf: "nvpInterests",
+        });
+      }
+    }
+    class NVPHuman extends Base {
+      static {
+        this._tableName = "n_human4s";
+        this.attribute("name", "string");
+        this.hasMany("nvpInterests", {
+          className: "NVPInterest",
+          foreignKey: "nhuman4_id",
+          inverseOf: "nvpHuman",
+        });
+      }
+    }
+    acceptsNestedAttributesFor(NVPHuman, "nvpInterests");
+    registerModel(NVPInterest);
+    registerModel(NVPHuman);
+
+    const beforeH = Number(await NVPHuman.count());
+    const beforeI = Number(await NVPInterest.count());
+    const human = await NVPHuman.createBang({
+      name: "John",
+      nvpInterestsAttributes: [{ topic: "Cars" }, { topic: "Sports" }],
+    });
+    expect(Number(await NVPHuman.count()) - beforeH).toBe(1);
+    expect(Number(await NVPInterest.count()) - beforeI).toBe(2);
+    expect(Number(await (human as any).nvpInterests.count())).toBe(2);
   });
 });
 
@@ -2937,16 +2962,13 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
   }
 
   it.skip("if association is not loaded and association record is saved and then in memory record attributes should be saved", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
+    // BLOCKED: Phase G — `partsAttributes=` must populate the in-memory association
+    // target synchronously; trails defers nested attribute processing to save.
   });
 
   it.skip("if association is not loaded and child doesn't change and I am saving a grandchild then in memory record should be used", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
-    /* requires lazy-loading tracking */
+    // BLOCKED: Phase G — `partsAttributes=` must populate the in-memory association
+    // target synchronously; trails defers nested attribute processing to save.
   });
 
   it("when grandchild changed in memory, saving parent should save grandchild", async () => {
@@ -3094,9 +3116,9 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
   });
 
   it.skip("circular references do not perform unnecessary queries", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
+    // BLOCKED: missing Treasure fixture model with polymorphic looter association;
+    // the Rails test uses ship.treasures.build(looter: part) which requires
+    // Ship has_many :treasures not present in makeModels().
   });
 
   it("nested singular associations are validated", async () => {
