@@ -260,6 +260,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     sql = this.preprocessQuery(sql);
     await this.materializeTransactions();
 
+    const txPublic = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql,
       name,
@@ -267,6 +268,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       type_casted_binds: typeCastedBinds(binds),
       connection: this,
       row_count: 0,
+      transaction: txPublic.isOpen() ? txPublic : null,
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
@@ -353,8 +355,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     sql = this.preprocessQuery(sql);
     await this.materializeTransactions();
     if (this._preventWrites) {
-      throw new ReadOnlyError("Write query attempted while preventing writes");
+      throw new ReadOnlyError("Write query attempted while in readonly mode: " + sql);
     }
+    const txPublic = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql,
       name,
@@ -362,6 +365,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       type_casted_binds: typeCastedBinds(binds),
       connection: this,
       row_count: 0,
+      transaction: txPublic.isOpen() ? txPublic : null,
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {

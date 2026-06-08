@@ -521,6 +521,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds ?? []);
+    const txPublicQuery = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql: driverSql,
       name: name ?? "SQL",
@@ -528,6 +529,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       type_casted_binds: typeCastedBinds(driverBinds),
       connection: this,
       row_count: 0,
+      transaction: txPublicQuery.isOpen() ? txPublicQuery : null,
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       let conn: mysql.Connection | undefined;
@@ -699,6 +701,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const driverBinds = this.mysqlBinds(binds);
     // payload records the exact values sent to mysql2 so LogSubscriber /
     // ExplainSubscriber / QueryCache all observe what actually ran.
+    const txPublicExec = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql: driverSql,
       name,
@@ -706,6 +709,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       type_casted_binds: typeCastedBinds(driverBinds),
       connection: this,
       row_count: 0,
+      transaction: txPublicExec.isOpen() ? txPublicExec : null,
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       let conn: mysql.Connection | undefined;
@@ -754,6 +758,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds);
+    const txPublicMut = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql: driverSql,
       name,
@@ -761,6 +766,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       type_casted_binds: typeCastedBinds(driverBinds),
       connection: this,
       row_count: 0,
+      transaction: txPublicMut.isOpen() ? txPublicMut : null,
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       let conn: mysql.Connection | undefined;
@@ -874,6 +880,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       await this.materializeTransactions();
     }
     const driverSql = this.mysqlQuote(sql);
+    const txPublicInt = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql: driverSql,
       name,
@@ -881,6 +888,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       type_casted_binds: [],
       connection: this,
       row_count: 0,
+      transaction: txPublicInt.isOpen() ? txPublicInt : null,
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
