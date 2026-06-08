@@ -1932,7 +1932,7 @@ export class MigrationContext {
     });
     if (fn) fn(td);
     await this.connection.executeMutation(this.connection.toSql(td));
-    if (options?.comment != null && options.comment.length > 0) {
+    if (options?.comment != null && options.comment.trim().length > 0) {
       const adapterWithComments = this.connection as {
         supportsComments?: () => boolean;
         supportsCommentsInCreate?: () => boolean;
@@ -2090,7 +2090,7 @@ export class MigrationContext {
     const an = this._adapterName;
     switch (type.toLowerCase()) {
       case "string":
-        return `VARCHAR(255)`;
+        return an === "postgres" ? "character varying" : `VARCHAR(255)`;
       case "text":
         return "TEXT";
       case "integer":

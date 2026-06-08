@@ -1261,7 +1261,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         nullable,
         {
           collation: (r.collation ?? r.COLLATION ?? null) as string | null,
-          comment: (r.comment ?? r.COMMENT ?? null) as string | null,
+          comment: ((r.comment ?? r.COMMENT ?? "") as string).trim() || null,
           defaultFunction: defFn,
           primaryKey: colKey === "PRI",
           autoIncrement: extra === "auto_increment",

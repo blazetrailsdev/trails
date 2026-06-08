@@ -36,29 +36,21 @@ export class SchemaDumper extends BaseSchemaDumper {
 
   /** @internal */
   protected columnSpecForPrimaryKey(column: Column): Record<string, unknown> {
+    const spec: Record<string, unknown> = {};
+    if (!this.isDefaultPrimaryKey(column)) {
+      // Pre-format the id value as a TS-DSL string literal for formatColspecRaw.
+      spec["id"] = JSON.stringify(this.schemaType(column));
+    }
     const colOpts = this.prepareColumnOptions(column);
     delete colOpts["null"];
+    Object.assign(spec, colOpts);
     if (this.isExplicitPrimaryKeyDefault(column)) {
       // "null" (not Ruby "nil") — emitted verbatim by formatColspecRaw as `default: null`.
-      colOpts["default"] ??= "null";
+      spec["default"] ??= "null";
     }
-
-    const idHash: Record<string, unknown> = {};
-    if (!this.isDefaultPrimaryKey(column)) {
-      // Pre-format the type as a TS-DSL string literal for formatColspecRaw.
-      idHash["type"] = JSON.stringify(this.schemaType(column));
-    }
-    Object.assign(idHash, colOpts);
-
-    if (Object.keys(idHash).length === 0) return {};
-    // Only a type override with no extra options: emit the simple string form
-    // `id: "type"` so the output is compact and matches Rails' common case.
-    if (Object.keys(idHash).length === 1 && "type" in idHash) {
-      return { id: idHash["type"] };
-    }
-    // Hash form: `id: { type: "...", comment: "...", ... }` — used when there
-    // are extra PK column options (comment, default, etc.) beyond just the type.
-    return { id: idHash };
+    if (!("comment" in spec)) return spec;
+    const { id: idType, ...idOpts } = spec as { id?: unknown } & Record<string, unknown>;
+    return { id: { ...(idType != null ? { type: idType } : {}), ...idOpts } };
   }
 
   /** @internal */
@@ -221,8 +213,8 @@ export class SchemaDumper extends BaseSchemaDumper {
       tableOpts["collation"] = JSON.stringify(adapterTableOpts.collation);
     if (typeof adapterTableOpts.options === "string")
       tableOpts["options"] = JSON.stringify(adapterTableOpts.options);
-    if (typeof adapterTableOpts.comment === "string" && adapterTableOpts.comment.length > 0)
-      tableOpts["comment"] = JSON.stringify(adapterTableOpts.comment);
+    if (typeof adapterTableOpts.comment === "string" && adapterTableOpts.comment.trim().length > 0)
+      tableOpts["comment"] = JSON.stringify(adapterTableOpts.comment.trim());
     tableOpts["force"] = '"cascade"';
 
     lines.push(
