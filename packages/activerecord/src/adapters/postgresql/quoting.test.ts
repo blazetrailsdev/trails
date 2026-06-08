@@ -116,7 +116,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       // PERMANENT: Ruby-only — Rational(3,4) has no JavaScript equivalent.
     });
 
+    it.skip("quote binary", async () => {
+      // BLOCKED: requires bytea column + quotedBinary round-trip; see bytea.test.ts for DB-backed coverage
+    });
+
     it("quote bit string", () => {
+      // binary path
+      expect(adapter.quote(new Bit().serialize("01")!)).toBe("B'01'");
+      // hex path
+      expect(adapter.quote(new Bit().serialize("FF")!)).toBe("X'FF'");
+      // neither binary nor hex → null
       const type = new Bit();
       const value = "'); SELECT * FROM users; /*\n01\n*/--";
       const serialized = type.serialize(value);
