@@ -42,6 +42,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     await connection.execute("DROP TABLE IF EXISTS postgresql_domains");
     await connection.execute("DROP DOMAIN IF EXISTS custom_money");
     PostgresqlDomain.resetColumnInformation();
+    // Rails: reset_connection flushes the type map; mirror composite.test.ts:63-64
+    await connection.reloadTypeMap();
   });
 
   describe("PostgresqlDomainTest", () => {
@@ -73,7 +75,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
       // Rails: assert_equal BigDecimal("34.15"), record.reload.price
       await record.reload();
-      expect(parseFloat(String(record.price))).toBeCloseTo(34.15, 2);
+      expect(record.price).toBe("34.15");
     });
   });
 });
