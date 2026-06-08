@@ -1050,13 +1050,20 @@ export class Base extends Model {
     // would otherwise synthesize a columnsHash containing only the virtual
     // attrs and mark the model schema-loaded, hiding every real column.
     //
-    // Only bail early when a schema-sourced (non-user-declared) attribute
-    // exists — that proves real DB reflection already ran. User-declared
-    // attributes (source:"user", e.g. from `enum()`) don't prove this and
-    // must not prevent reflection from running for the first time.
-    for (const def of this._attributeDefinitions.values()) {
+    // Bail early when a concrete attr exists that proves the schema is known:
+    // either (a) a source:"schema" attr (DB reflection already ran), or (b) a
+    // source:"user" attr that is NOT an enum overlay (the model explicitly
+    // declared its own schema, no DB reflection needed).
+    //
+    // Enum-only attrs (registered by `_enum` via `this.attribute()`) must NOT
+    // block reflection — they're type overlays, not full schema declarations,
+    // and the model still needs the DB to discover its other columns.
+    const enumNames = (this as any)._enums as Map<string, unknown> | undefined;
+    for (const [name, def] of this._attributeDefinitions) {
       const d = def as { virtual?: boolean; source?: string };
-      if (!d.virtual && d.source === "schema") return Promise.resolve();
+      if (!d.virtual && (d.source === "schema" || !enumNames?.has(name))) {
+        return Promise.resolve();
+      }
     }
     return this.loadSchema();
   }
