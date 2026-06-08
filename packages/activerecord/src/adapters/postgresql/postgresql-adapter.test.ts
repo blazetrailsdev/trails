@@ -400,12 +400,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       });
     });
-    it.skip("type map", async () => {
-      // BLOCKED: adapter-pg — typeMap is HashLookupTypeMap, not pg-driver PG::TypeMapByOid.
-    });
-    it.skip("type map for results", async () => {
-      // BLOCKED: adapter-pg — Same as "type map" — pg-driver type_map_for_results not exposed.
-    });
     it.skip("only reload type map once for every unrecognized type", async () => {
       // BLOCKED: adapter-pg — assert_queries_count needed; SQLCounter doesn't isolate pg_type queries.
     });
