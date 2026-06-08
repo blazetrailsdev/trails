@@ -225,7 +225,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const result = await adapter.pkAndSequenceFor("ex_custom_seqt");
       expect(result).not.toBeNull();
       expect(result![0]).toBe("id");
-      expect(result![1].name).toBe("ex_custom_seq");
+      expect(result![1]!.name).toBe("ex_custom_seq");
     });
 
     it("columns for distinct", async () => {
@@ -875,14 +875,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`CREATE TABLE "ex_serial_seq" ("id" SERIAL PRIMARY KEY)`);
       const result = await adapter.pkAndSequenceFor("ex_serial_seq");
       expect(result).not.toBeNull();
-      expect(result![1].name).toBe("ex_serial_seq_id_seq");
+      expect(result![1]!.name).toBe("ex_serial_seq_id_seq");
     });
 
     it("default sequence name", async () => {
       await adapter.exec(`CREATE TABLE "ex_def_seq" ("id" SERIAL PRIMARY KEY)`);
       const result = await adapter.pkAndSequenceFor("ex_def_seq");
       expect(result).not.toBeNull();
-      expect(result![1].name).toBe("ex_def_seq_id_seq");
+      expect(result![1]!.name).toBe("ex_def_seq_id_seq");
     });
 
     it("default sequence name bad table", async () => {
@@ -895,13 +895,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       const result = await adapter.pkAndSequenceFor("ex_ns_pk");
       expect(result).not.toBeNull();
       expect(result![0]).toBe("custom_id");
-      expect(result![1].name).toBe("ex_ns_pk_custom_id_seq");
+      expect(result![1]!.name).toBe("ex_ns_pk_custom_id_seq");
     });
 
     it("pk and sequence for returns nil if no seq", async () => {
       await adapter.exec(`CREATE TABLE "ex_no_seq" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
       const result = await adapter.pkAndSequenceFor("ex_no_seq");
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result![0]).toBe("id");
+      expect(result![1]).toBeNull();
     });
 
     it("pk and sequence for returns nil if no pk", async () => {
