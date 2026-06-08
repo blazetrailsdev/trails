@@ -14,31 +14,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLNumberTest", () => {
-    it.skip("numeric column", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
-    });
-    it.skip("numeric default", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
-    });
-    it.skip("numeric type cast", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
-    });
-    it.skip("numeric nan", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
-    });
-    it.skip("numeric infinity", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
-      // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/numbers.ts; affects ~10–47 tests in numbers.test.ts
-    });
     it.skip("data type", async () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in numbers
       // ROOT-CAUSE: connection-adapters/postgresql/numbers.ts missing or incomplete Rails parity
