@@ -22,6 +22,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   beforeEach(async () => {
     connection = Base.connection as PostgreSQLAdapter;
+    await connection.execute("DROP TABLE IF EXISTS xml_data_type");
     // Rails: @connection.create_table("xml_data_type") { |t| t.xml "payload" }
     await connection.execute(`CREATE TABLE xml_data_type (id SERIAL PRIMARY KEY, payload xml)`);
     XmlDataType.resetColumnInformation();
@@ -33,7 +34,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     XmlDataType.resetColumnInformation();
   });
 
-  describe("PostgresqlXMLTest", () => {
+  describe("PostgreSQLXMLTest", () => {
     it("xml column", async () => {
       // Rails: assert_equal :xml, @column.type
       const column = XmlDataType.columnsHash()["payload"];
