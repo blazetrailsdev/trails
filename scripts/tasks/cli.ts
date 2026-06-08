@@ -342,6 +342,34 @@ export function commitAndPush(opts: {
 }): void {
   const cwd = opts.cwd;
   const pushRefspec = opts.pushRefspec ?? "main";
+  // Guard the canonical-checkout invariant. A bare-branch refspec (the default
+  // "main") pushes the LOCAL branch of that name — NOT HEAD. If the checkout is
+  // parked on some other branch, `git pull --rebase origin main` rebases the
+  // wrong branch, the commit lands off `main`, and `git push origin main` shoves
+  // a stale local `main` ref at origin → rejected non-fast-forward on every
+  // attempt. That rejection is indistinguishable from a lost race in the loop
+  // below, so without this guard the mutation silently burns both attempts,
+  // exits with raceExitCode ("lost claim race — pick another story"), and
+  // `reset --hard` throws the edit away — the claim is lost, not lost to a
+  // rival. Fail loudly instead. (`refine` pushes `HEAD:main` from a worktree and
+  // is exempt: its refspec carries a colon, so the branch name is irrelevant.)
+  if (!pushRefspec.includes(":")) {
+    let head = "";
+    try {
+      head = git(["symbolic-ref", "--quiet", "--short", "HEAD"], { silent: true, cwd });
+    } catch {
+      /* detached HEAD — symbolic-ref exits non-zero; leave head = "" */
+    }
+    if (head !== pushRefspec) {
+      const where = cwd ?? TASKS_DIR;
+      console.error(
+        `error: ${where} is on branch "${head || "(detached HEAD)"}", not "${pushRefspec}". ` +
+          `The tasks CLI mutates "${pushRefspec}" directly; check it out there first:\n` +
+          `  git -C "${where}" checkout ${pushRefspec} && git -C "${where}" pull --ff-only origin ${pushRefspec}`,
+      );
+      process.exit(1);
+    }
+  }
   // Clear any loadIndex()-regenerated artifacts so the pull below sees a clean
   // tree. Only needed before the first attempt — the retry path resets hard to
   // origin/main, which already discards them.
