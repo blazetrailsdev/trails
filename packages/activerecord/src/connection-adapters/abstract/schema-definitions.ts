@@ -643,6 +643,7 @@ export class TableDefinition {
       charset?: string;
       collation?: string;
       default?: unknown;
+      autoIncrement?: boolean;
     } = {},
   ) {
     this.tableName = tableName;
@@ -703,6 +704,7 @@ export class TableDefinition {
         pkType = (typeof this._id === "string" ? this._id : "primary_key") as ColumnType;
         pkOpts = { primaryKey: true };
         if (tdOptions.default !== undefined) pkOpts.default = tdOptions.default;
+        if (tdOptions.autoIncrement !== undefined) pkOpts.autoIncrement = tdOptions.autoIncrement;
       }
       this.columns.push(this.newColumnDefinition(pkNameOverride ?? "id", pkType, pkOpts));
     }

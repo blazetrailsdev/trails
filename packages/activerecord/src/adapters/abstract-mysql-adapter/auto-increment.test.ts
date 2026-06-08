@@ -1,8 +1,10 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/auto_increment_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { SchemaDumper } from "../../schema-dumper.js";
+import type { SchemaSource } from "../../schema-dumper.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -14,25 +16,52 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("AutoIncrementTest", () => {
-    it.skip("auto increment without primary key", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in auto-increment
-      // ROOT-CAUSE: adapters/mysql2/auto-increment.ts or abstract-mysql-adapter/auto-increment.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/auto-increment.ts; affects ~10–26 tests in auto-increment.test.ts
+    afterEach(async () => {
+      await adapter.dropTable("auto_increments", { ifExists: true });
     });
-    it.skip("auto increment with composite primary key", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in auto-increment
-      // ROOT-CAUSE: adapters/mysql2/auto-increment.ts or abstract-mysql-adapter/auto-increment.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/auto-increment.ts; affects ~10–26 tests in auto-increment.test.ts
+
+    it("auto increment without primary key", async () => {
+      await adapter.createTable("auto_increments", { id: false, force: true }, (t: any) => {
+        t.integer("id", { null: false, autoIncrement: true });
+        t.index(["id"]);
+      });
+      const output = await SchemaDumper.dumpTableSchema(
+        adapter as unknown as SchemaSource,
+        "auto_increments",
+      );
+      expect(output).toMatch(/t\.integer\("id", \{ null: false, autoIncrement: true \}\)/);
     });
-    it.skip("auto increment false with custom primary key", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in auto-increment
-      // ROOT-CAUSE: adapters/mysql2/auto-increment.ts or abstract-mysql-adapter/auto-increment.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/auto-increment.ts; affects ~10–26 tests in auto-increment.test.ts
+
+    it("auto increment with composite primary key", async () => {
+      await adapter.createTable(
+        "auto_increments",
+        { primaryKey: ["id", "created_at"], force: true },
+        (t: any) => {
+          t.integer("id", { null: false, autoIncrement: true });
+          t.datetime("created_at", { null: false });
+        },
+      );
+      const output = await SchemaDumper.dumpTableSchema(
+        adapter as unknown as SchemaSource,
+        "auto_increments",
+      );
+      expect(output).toMatch(/t\.integer\("id", \{ null: false, autoIncrement: true \}\)/);
     });
-    it.skip("auto increment false with create table", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in auto-increment
-      // ROOT-CAUSE: adapters/mysql2/auto-increment.ts or abstract-mysql-adapter/auto-increment.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/auto-increment.ts; affects ~10–26 tests in auto-increment.test.ts
+
+    it("auto increment false with custom primary key", async () => {
+      await adapter.createTable("auto_increments", { id: false, force: "cascade" }, (t: any) => {
+        t.column("id", "primary_key", { autoIncrement: false });
+      });
+      const columns = await adapter.columns("auto_increments");
+      const col = (columns as any[]).find((c) => c.name === "id");
+      expect(col.autoIncrement).toBe(false);
+    });
+
+    it("auto increment false with create table", async () => {
+      await adapter.createTable("auto_increments", { autoIncrement: false, force: "cascade" });
+      const columns = await adapter.columns("auto_increments");
+      const col = (columns as any[]).find((c) => c.name === "id");
+      expect(col.autoIncrement).toBe(false);
     });
   });
 });
