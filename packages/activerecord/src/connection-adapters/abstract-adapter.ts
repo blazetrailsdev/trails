@@ -1114,7 +1114,7 @@ export class AbstractAdapter implements Quoting {
 
   checkIfWriteQuery(sql: string): void {
     if (this.isPreventingWrites() && this.isWriteQuery(sql)) {
-      throw new ReadOnlyError("Write query attempted while preventing writes");
+      throw new ReadOnlyError("Write query attempted while in readonly mode: " + sql);
     }
   }
 

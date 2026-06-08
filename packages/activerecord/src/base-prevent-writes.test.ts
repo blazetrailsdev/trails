@@ -22,41 +22,52 @@ describe("BasePreventWritesTest", () => {
   });
 
   it("creating a record raises if preventing writes", async () => {
-    await expect(
-      Base.whilePreventingWrites(async () => {
-        await Bird.create({ name: "Bluejay" });
-      }),
-    ).rejects.toThrow(ReadOnlyError);
+    const error = await Base.whilePreventingWrites(async () => {
+      await Bird.create({ name: "Bluejay" });
+    }).catch((e) => e);
+    expect(error).toBeInstanceOf(ReadOnlyError);
+    expect((error as ReadOnlyError).message).toMatch(
+      /^Write query attempted while in readonly mode: INSERT /,
+    );
   });
 
   it("updating a record raises if preventing writes", async () => {
-    const bird = await Bird.create({ name: "Robin" });
-    await expect(
-      Base.whilePreventingWrites(async () => {
-        await bird.update({ name: "Mockingbird" });
-      }),
-    ).rejects.toThrow(ReadOnlyError);
+    const bird = await Bird.create({ name: "Bluejay" });
+    const error = await Base.whilePreventingWrites(async () => {
+      await bird.update({ name: "Robin" });
+    }).catch((e) => e);
+    expect(error).toBeInstanceOf(ReadOnlyError);
+    expect((error as ReadOnlyError).message).toMatch(
+      /^Write query attempted while in readonly mode: UPDATE /,
+    );
   });
 
   it("deleting a record raises if preventing writes", async () => {
-    const bird = await Bird.create({ name: "Sparrow" });
-    await expect(
-      Base.whilePreventingWrites(async () => {
-        await bird.destroy();
-      }),
-    ).rejects.toThrow(ReadOnlyError);
+    const bird = await Bird.create({ name: "Bluejay" });
+    const error = await Base.whilePreventingWrites(async () => {
+      await bird.destroy();
+    }).catch((e) => e);
+    expect(error).toBeInstanceOf(ReadOnlyError);
+    expect((error as ReadOnlyError).message).toMatch(
+      /^Write query attempted while in readonly mode: DELETE /,
+    );
   });
 
   it("selecting a record does not raise if preventing writes", async () => {
-    await Bird.create({ name: "Eagle" });
+    const bird = await Bird.create({ name: "Bluejay" });
+    let found: Bird | null = null;
     await Base.whilePreventingWrites(async () => {
-      await Bird.first();
+      found = await Bird.where({ name: "Bluejay" }).last();
     });
+    expect(found).not.toBeNull();
+    expect((found as unknown as Bird).id).toBe(bird.id);
   });
 
   it("an explain query does not raise if preventing writes", async () => {
+    await Bird.create({ name: "Bluejay" });
     await Base.whilePreventingWrites(async () => {
-      await Bird.all().explain();
+      const result = await Bird.where({ name: "Bluejay" }).explain();
+      expect(typeof result).toBe("string");
     });
   });
 

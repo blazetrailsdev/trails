@@ -355,7 +355,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     sql = this.preprocessQuery(sql);
     await this.materializeTransactions();
     if (this._preventWrites) {
-      throw new ReadOnlyError("Write query attempted while preventing writes");
+      throw new ReadOnlyError("Write query attempted while in readonly mode: " + sql);
     }
     const txPublic = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {

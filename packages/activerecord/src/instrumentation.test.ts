@@ -265,16 +265,15 @@ describe("InstrumentationTest", () => {
         this.attribute("name", "string");
       }
     }
-    for (let i = 0; i < 3; i++) await Book.create({ name: "raw-sql-book" });
+    for (let i = 0; i < 10; i++) await Book.create({ name: "row count book 3" });
     let capturedRowCount: number | undefined;
     Notifications.subscribe("sql.active_record", (event: any) => {
-      if ((event.payload?.sql as string)?.includes("SELECT") && !event.payload?.cached) {
+      if ((event.payload?.sql as string)?.includes("SELECT")) {
         capturedRowCount = event.payload.row_count as number;
       }
     });
-    await Base.connection.execute("SELECT * FROM books");
-    expect(typeof capturedRowCount).toBe("number");
-    expect(capturedRowCount).toBeGreaterThanOrEqual(3);
+    await Base.connection.execute("SELECT * FROM books WHERE name='row count book 3'");
+    expect(capturedRowCount).toBe(10);
   });
 
   it.skip("payload row count on cache", () => {
