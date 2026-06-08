@@ -639,6 +639,16 @@ export abstract class Migration {
     }
     tableName = this._pt(tableName);
     await this.schema.addColumn(tableName, columnName, type, options);
+    if (
+      "comment" in options &&
+      this.connection.supportsComments?.() &&
+      !this.connection.supportsCommentsInCreate?.()
+    )
+      await (this.connection as any).changeColumnComment(
+        tableName,
+        columnName,
+        (options as any).comment ?? null,
+      );
   }
 
   async removeColumn(
@@ -709,6 +719,12 @@ export abstract class Migration {
     }
     tableName = this._pt(tableName);
     await this.schema.changeColumn(tableName, columnName, type, options);
+    if ("comment" in options && this.connection.supportsComments?.())
+      await (this.connection as any).changeColumnComment(
+        tableName,
+        columnName,
+        (options as any).comment ?? null,
+      );
   }
 
   async renameTable(oldName: string, newName: string): Promise<void> {
@@ -1953,6 +1969,15 @@ export class MigrationContext {
     for (const col of tdCols) {
       cols.add(col.name);
     }
+    // toSql() does not emit inline COMMENT per column even for MySQL, so we
+    // always call changeColumnComment for any column with a non-blank comment.
+    if (this.connection.supportsComments?.()) {
+      for (const col of tdCols) {
+        const cc = (col.options as { comment?: unknown }).comment;
+        if (typeof cc === "string" && cc.trim().length > 0)
+          await (this.connection as any).changeColumnComment(name, col.name, cc);
+      }
+    }
 
     // Store column metadata
     const meta = new Map<
@@ -2145,6 +2170,12 @@ export class MigrationContext {
     await this.connection.executeMutation(
       `ALTER TABLE "${table}" ADD COLUMN "${column}" ${this._mapType(type, _options)}`,
     );
+    if (_options && "comment" in _options && (this.connection as any).supportsComments?.())
+      await (this.connection as any).changeColumnComment(
+        table,
+        column,
+        (_options as any).comment ?? null,
+      );
     if (!this._columns.has(table)) this._columns.set(table, new Set());
     this._columns.get(table)!.add(column);
     if (!this._columnMeta.has(table)) this._columnMeta.set(table, new Map());
@@ -2220,6 +2251,12 @@ export class MigrationContext {
         `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${this._mapType(type, _options)}`,
       );
     }
+    if (_options && "comment" in _options && (this.connection as any).supportsComments?.())
+      await (this.connection as any).changeColumnComment(
+        table,
+        column,
+        (_options as any).comment ?? null,
+      );
     const meta = this._columnMeta.get(table);
     if (meta && meta.has(column)) {
       const entry = meta.get(column)!;
@@ -2238,6 +2275,18 @@ export class MigrationContext {
         scale: _options?.scale !== undefined ? _options.scale : entry.scale,
       });
     }
+  }
+
+  async changeTableComment(tableName: string, comment: string | null): Promise<void> {
+    await (this.connection as any).changeTableComment(tableName, comment);
+  }
+
+  async changeColumnComment(
+    tableName: string,
+    columnName: string,
+    comment: string | null,
+  ): Promise<void> {
+    await (this.connection as any).changeColumnComment(tableName, columnName, comment);
   }
 
   async addIndex(
