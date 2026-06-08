@@ -79,8 +79,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.setConstraints("deferred");
         await adapter.commit();
-      } catch {
+      } catch (e) {
         await adapter.rollback().catch(() => {});
+        throw e;
       }
     });
 
@@ -89,8 +90,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.setConstraints("immediate");
         await adapter.commit();
-      } catch {
+      } catch (e) {
         await adapter.rollback().catch(() => {});
+        throw e;
       }
     });
 
