@@ -132,11 +132,50 @@ describe("arityMatches", () => {
 
   it("does not strip a leading non-host param", () => {
     expect(arityMatches([], [req("name", "string")]).ok).toBe(false);
+    // genuine value first-args stay flagged against a ruby zero-arg method
+    expect(arityMatches([], [req("value", "string")]).ok).toBe(false);
+  });
+
+  it("strips a leading `*Host` mixin-interface receiver", () => {
+    // ruby aliases_by_attribute_name()  vs  (host: AttributeMethodHost)
+    expect(arityMatches([], [req("host", "AttributeMethodHost")]).ok).toBe(true);
+  });
+
+  it("strips a leading `*Class` receiver (modelClass)", () => {
+    // ruby sti_name()  vs  stiName(modelClass: typeof Base)
+    expect(arityMatches([], [req("modelClass", "typeof Base")]).ok).toBe(true);
+  });
+
+  it("strips a leading core-extension receiver by type (date: Date)", () => {
+    // ruby Date#on_weekday?  vs  onWeekday(date: Date)
+    expect(arityMatches([], [req("date", "Date")]).ok).toBe(true);
+  });
+
+  it("strips a leading `_`-prefixed placeholder receiver", () => {
+    // ruby present?()  vs  present(_value)
+    expect(arityMatches([], [req("_value")]).ok).toBe(true);
   });
 
   it("treats a ruby block as satisfied by an explicit TS callback param", () => {
     // def each(&block)  ≈  each(fn)
     expect(arityMatches([blk("block")], [req("fn")]).ok).toBe(true);
+  });
+
+  it("strips a trailing ported `&block` the ruby extractor missed (bare yield)", () => {
+    // ruby `def no_touching?; yield; end` records zero block params; the port
+    // spells the block as a trailing `fn` → strip it to gain the match.
+    expect(arityMatches([], [req("fn")]).ok).toBe(true);
+    // with a real leading arg: ruby say_with_time(message) vs (message, fn)
+    expect(arityMatches([req("message")], [req("message"), req("fn")]).ok).toBe(true);
+  });
+
+  it("strips BOTH a leading receiver and a trailing callback together", () => {
+    // ruby enable_query_cache()  vs  (pool, fn)
+    expect(arityMatches([], [req("pool", "ConnectionPool"), req("fn")]).ok).toBe(true);
+  });
+
+  it("does not strip a trailing non-callback param", () => {
+    expect(arityMatches([], [req("value")]).ok).toBe(false);
   });
 });
 
