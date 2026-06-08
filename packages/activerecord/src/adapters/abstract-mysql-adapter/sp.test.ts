@@ -1,33 +1,52 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/sp_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { describe, it, beforeAll, afterAll, expect } from "vitest";
+import { describeIfMysql, Mysql2Adapter } from "./test-helper.js";
+import { Base } from "../../base.js";
+import { Topic } from "../../test-helpers/models/topic.js";
+import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 
 describeIfMysql("Mysql2Adapter", () => {
-  let adapter: Mysql2Adapter;
-  beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.close();
-  });
-
   describe("StoredProcedureTest", () => {
-    it.skip("multi results", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in sp
-      // ROOT-CAUSE: adapters/mysql2/sp.ts or abstract-mysql-adapter/sp.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/sp.ts; affects ~10–26 tests in sp.test.ts
+    // Rails `fixtures :topics` — load canonical topics via the handler connection.
+    const { topics } = useHandlerFixtures(["topics"], { schema: canonicalSchema });
+
+    beforeAll(async () => {
+      await Base.connection.executeMutation("DROP PROCEDURE IF EXISTS ten");
+      await Base.connection.executeMutation(
+        `CREATE PROCEDURE ten() SQL SECURITY INVOKER BEGIN SELECT 10; END`,
+      );
+      await Base.connection.executeMutation("DROP PROCEDURE IF EXISTS topics");
+      await Base.connection.executeMutation(
+        `CREATE PROCEDURE topics(IN num INT) SQL SECURITY INVOKER` +
+          ` BEGIN SELECT * FROM topics LIMIT num; END`,
+      );
     });
-    it.skip("multi results from select one", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in sp
-      // ROOT-CAUSE: adapters/mysql2/sp.ts or abstract-mysql-adapter/sp.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/sp.ts; affects ~10–26 tests in sp.test.ts
+
+    afterAll(async () => {
+      await Base.connection.executeMutation("DROP PROCEDURE IF EXISTS ten");
+      await Base.connection.executeMutation("DROP PROCEDURE IF EXISTS topics");
     });
-    it.skip("multi results from find by sql", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in sp
-      // ROOT-CAUSE: adapters/mysql2/sp.ts or abstract-mysql-adapter/sp.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/sp.ts; affects ~10–26 tests in sp.test.ts
+
+    it("multi results", async () => {
+      const rows = await Base.connection.selectRows("CALL ten();");
+      expect(Number(rows[0]![0])).toBe(10);
+      expect((Base.connection as Mysql2Adapter).active).toBe(true);
+    });
+
+    it("multi results from select one", async () => {
+      const row = await Base.connection.selectOne("CALL topics(1);");
+      expect(row?.["author_name"]).toBe(topics("first").author_name);
+      expect((Base.connection as Mysql2Adapter).active).toBe(true);
+    });
+
+    it("multi results from find by sql", async () => {
+      const result = await Topic.findBySql("CALL topics(3);");
+      expect(result.length).toBe(3);
+      expect(result[0]!["author_name"]).toBe(topics("first").author_name);
+      expect((Base.connection as Mysql2Adapter).active).toBe(true);
     });
   });
 });
