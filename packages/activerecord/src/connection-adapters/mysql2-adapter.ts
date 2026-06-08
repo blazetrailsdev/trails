@@ -540,18 +540,27 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         const [rawResult] = prepare
           ? await conn.execute(driverSql, driverBinds as any[])
           : await conn.query(driverSql, driverBinds);
+        // Stored procedure CALL returns nested result sets when the procedure
+        // contains a SELECT: mysql2 sets _resultIndex > 0 and returns
+        // [[selectRows, OkPacket], [fields, ...]]. Unwrap to the first result
+        // set (the rows from SELECT inside the procedure). Mirrors Rails'
+        // raw_connection.abandon_results! which discards trailing result sets.
+        const result =
+          Array.isArray(rawResult) && Array.isArray(rawResult[0])
+            ? (rawResult[0] as mysql.RowDataPacket[])
+            : rawResult;
         // DML results in a ResultSetHeader (no rows array); SELECT results
         // in an array of row objects. Return empty Result for DML to avoid
         // throwing on INSERT/UPDATE/DELETE passed to execQuery.
-        if (!Array.isArray(rawResult)) {
+        if (!Array.isArray(result)) {
           this.dirtyCurrentTransaction();
-          payload.row_count = (rawResult as mysql.ResultSetHeader).affectedRows ?? 0;
+          payload.row_count = (result as mysql.ResultSetHeader).affectedRows ?? 0;
           await this._handleWarningsOn(conn, driverSql);
           return new Result([], []);
         }
-        payload.row_count = rawResult.length;
+        payload.row_count = result.length;
         await this._handleWarningsOn(conn, driverSql);
-        return Result.fromRowHashes(rawResult as Record<string, unknown>[]);
+        return Result.fromRowHashes(result as Record<string, unknown>[]);
       } catch (e: any) {
         if (e instanceof SQLWarning) {
           payload.exception = e;
@@ -725,7 +734,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         const [rows] = prepare
           ? await conn.execute(driverSql, driverBinds as any[])
           : await conn.query(driverSql, driverBinds);
-        const r = rows as Record<string, unknown>[];
+        // Unwrap nested result sets from stored procedure CALL (see execQuery).
+        const r = (Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows) as Record<
+          string,
+          unknown
+        >[];
         payload.row_count = Array.isArray(r) ? r.length : 0;
         await this._handleWarningsOn(conn, driverSql);
         return r;
