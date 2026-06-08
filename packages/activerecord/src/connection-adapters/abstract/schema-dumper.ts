@@ -201,8 +201,19 @@ export class SchemaDumper extends BaseSchemaDumper {
     } else if (!hasId) {
       tableOpts["id"] = "false";
     } else if (pkColumn) {
-      if (!this.isDefaultPrimaryKey(pkColumn)) {
-        Object.assign(tableOpts, this.columnSpecForPrimaryKey(pkColumn));
+      // Emit the id spec for a non-default PK, or a default-typed PK that carries a comment.
+      if (!this.isDefaultPrimaryKey(pkColumn) || pkColumn.comment) {
+        // columnSpecForPrimaryKey returns a FLAT spec (dialect overrides post-process it,
+        // e.g. MySQL deletes auto_increment); wrap into `id: { ... }` here at the call site,
+        // after those overrides, so the PK's own `comment:` doesn't collide with the
+        // table-level `comment:`. Mirrors Rails schema_dumper.rb:174-179.
+        const pkSpec = this.columnSpecForPrimaryKey(pkColumn);
+        if (Object.keys(pkSpec).every((k) => k === "id" || k === "default")) {
+          Object.assign(tableOpts, pkSpec);
+        } else {
+          const { id: idType, ...rest } = pkSpec as { id?: unknown } & Record<string, unknown>;
+          tableOpts["id"] = { ...(idType != null ? { type: idType } : {}), ...rest };
+        }
       }
     }
     if (typeof adapterTableOpts.charset === "string")
@@ -211,7 +222,7 @@ export class SchemaDumper extends BaseSchemaDumper {
       tableOpts["collation"] = JSON.stringify(adapterTableOpts.collation);
     if (typeof adapterTableOpts.options === "string")
       tableOpts["options"] = JSON.stringify(adapterTableOpts.options);
-    if (typeof adapterTableOpts.comment === "string" && adapterTableOpts.comment.length > 0)
+    if (typeof adapterTableOpts.comment === "string" && adapterTableOpts.comment.trim().length > 0)
       tableOpts["comment"] = JSON.stringify(adapterTableOpts.comment);
     tableOpts["force"] = '"cascade"';
 

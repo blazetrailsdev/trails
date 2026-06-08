@@ -1097,7 +1097,13 @@ export class TableDefinition {
             break;
           }
           case "string":
-            parts.push(`VARCHAR(${col.options.limit ?? 255})`);
+            // PG: `t.string` with no limit is unlimited `character varying` (matches Rails);
+            // a VARCHAR(255) here would introspect a spurious limit:255 into dumps.
+            parts.push(
+              this._adapterName === "postgres"
+                ? `character varying${col.options.limit != null ? `(${col.options.limit})` : ""}`
+                : `VARCHAR(${col.options.limit ?? 255})`,
+            );
             break;
           case "text":
             parts.push("TEXT");
@@ -1231,6 +1237,15 @@ export class TableDefinition {
         const clause = this._adapter.quoteDefaultExpression(col.options.default, col);
         if (clause) parts.push(clause.trimStart());
       }
+
+      // MySQL carries column comments inline in CREATE TABLE. This hand-rolled toSql()
+      // (used by MigrationContext.createTable) branches on adapter name where Rails would
+      // use MySQL::SchemaCreation#add_column_options!; the DDL-generator-convergence RFC
+      // will route this through the visitor and remove the branch.
+      if (this._adapterName === "mysql" && col.options.comment?.trim())
+        // Escape backslashes and quotes like a MySQL string literal (matches
+        // `_mysqlInlineIndexSql` in this file and Rails' quoted_comment).
+        parts.push(`COMMENT '${col.options.comment.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`);
 
       return parts.join(" ");
     });

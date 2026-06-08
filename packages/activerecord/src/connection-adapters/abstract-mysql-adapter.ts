@@ -584,16 +584,22 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       `SELECT table_comment FROM information_schema.tables` +
         ` WHERE table_schema = ${scope.schema} AND table_name = ${scope.name}`,
     );
-    const val = rows[0]?.["table_comment"] as string | null | undefined;
-    return val || null;
+    const row = rows[0] ?? {};
+    const val = (row["table_comment"] ?? row["TABLE_COMMENT"]) as string | null | undefined;
+    // Mirrors Rails' `.presence` — a blank/whitespace-only comment reads as nil.
+    return val && val.trim().length > 0 ? val : null;
   }
 
   async changeTableComment(
     tableName: string,
     commentOrChanges: string | Record<string, string | null>,
   ): Promise<void> {
-    void tableName;
-    void commentOrChanges;
+    const raw = this.schemaStatements().extractNewCommentValue(commentOrChanges);
+    // Mirrors Rails: `comment = "" if comment.nil?` then `COMMENT #{quote(comment)}`.
+    const c = raw == null ? "" : String(raw);
+    await this._execMutation(
+      `ALTER TABLE ${this.quoteTableName(tableName)} COMMENT ${this.quote(c)}`,
+    );
   }
 
   async renameTable(tableName: string, newName: string): Promise<void> {
