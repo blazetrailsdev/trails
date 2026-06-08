@@ -654,6 +654,15 @@ describe("newStory validation paths", () => {
     expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/storySlug.*lowercase slug/));
   });
 
+  it("exits 1 when cluster contains YAML-significant characters", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    expect(() => newStory("0005-gaps", "my-story", { cluster: "type: system" }, dir)).toThrow(
+      /exit 1/,
+    );
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/cluster.*lowercase slug/));
+  });
+
   it("exits 1 when tasksDir is not a git repo", () => {
     setupExit();
     const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));

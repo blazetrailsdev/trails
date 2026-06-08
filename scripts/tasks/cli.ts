@@ -655,6 +655,12 @@ export function newStory(
     );
     process.exit(1);
   }
+  if (opts.cluster != null && !SLUG_RE.test(opts.cluster)) {
+    console.error(
+      `error: cluster "${opts.cluster}" must be a lowercase slug (letters, digits, hyphens)`,
+    );
+    process.exit(1);
+  }
   if (!existsSync(join(tasksDir, ".git"))) {
     console.error(
       `error: ${tasksDir} is not a git repo. Clone blazetrailsdev/tasks there, or set $TASKS_DIR to an existing checkout.`,
