@@ -775,13 +775,18 @@ function _reapplyNestedAttrSetters(
   record: any,
   attrs: Record<string, unknown>,
 ): void {
-  const nestedKeys: Set<string> | undefined = (ctor as any)._nestedAttributeSetterKeys;
-  if (!nestedKeys?.size) return;
-  for (const k of nestedKeys) {
-    if (Object.prototype.hasOwnProperty.call(attrs, k)) {
-      const setter = findPrototypeSetter(record, k);
-      if (setter) setter.call(record, attrs[k]);
+  let cls: any = ctor;
+  while (cls && cls !== Object) {
+    const own = Object.getOwnPropertyDescriptor(cls, "_nestedAttributeSetterKeys");
+    if (own?.value instanceof Set) {
+      for (const k of own.value as Set<string>) {
+        if (Object.prototype.hasOwnProperty.call(attrs, k)) {
+          const setter = findPrototypeSetter(record, k);
+          if (setter) setter.call(record, attrs[k]);
+        }
+      }
     }
+    cls = Object.getPrototypeOf(cls);
   }
 }
 
