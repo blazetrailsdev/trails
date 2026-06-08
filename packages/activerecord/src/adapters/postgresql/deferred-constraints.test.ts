@@ -107,18 +107,17 @@ describeIfPg("PostgreSQLAdapter", () => {
         deferrable: "immediate",
       });
       try {
-        await expect(async () => {
-          await adapter.beginTransaction();
-          try {
-            await adapter.setConstraints("deferred");
-            await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
-            await adapter.setConstraints("immediate");
-            await adapter.commit();
-          } catch (e) {
-            await adapter.rollback().catch(() => {});
-            throw e;
-          }
-        }).rejects.toThrow(InvalidForeignKey);
+        await adapter.beginTransaction();
+        try {
+          await adapter.setConstraints("deferred");
+          // INSERT must succeed — FK is deferred (mirrors Rails assert_nothing_raised).
+          // If it throws the error propagates through finally and the test fails correctly.
+          await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
+          // set_constraints(:immediate) triggers the deferred FK check → raises.
+          await expect(adapter.setConstraints("immediate")).rejects.toThrow(InvalidForeignKey);
+        } finally {
+          await adapter.rollback().catch(() => {});
+        }
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS dc_ch`);
         await adapter.execute(`DROP TABLE IF EXISTS dc_par`);
@@ -137,18 +136,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
       try {
         const fkName = (await adapter.foreignKeys("dc_ch"))[0].name;
-        await expect(async () => {
-          await adapter.beginTransaction();
-          try {
-            await adapter.setConstraints("deferred", fkName);
-            await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
-            await adapter.setConstraints("immediate", fkName);
-            await adapter.commit();
-          } catch (e) {
-            await adapter.rollback().catch(() => {});
-            throw e;
-          }
-        }).rejects.toThrow(InvalidForeignKey);
+        await adapter.beginTransaction();
+        try {
+          await adapter.setConstraints("deferred", fkName);
+          // INSERT must succeed (mirrors Rails assert_nothing_raised).
+          await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
+          // set_constraints(:immediate, @fk) triggers FK check → raises.
+          await expect(adapter.setConstraints("immediate", fkName)).rejects.toThrow(
+            InvalidForeignKey,
+          );
+        } finally {
+          await adapter.rollback().catch(() => {});
+        }
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS dc_ch`);
         await adapter.execute(`DROP TABLE IF EXISTS dc_par`);
@@ -175,18 +174,18 @@ describeIfPg("PostgreSQLAdapter", () => {
         deferrable: "immediate",
       });
       try {
-        await expect(async () => {
-          await adapter.beginTransaction();
-          try {
-            await adapter.setConstraints("deferred", "dc_m_fk1", "dc_m_fk2");
-            await adapter.execute(`INSERT INTO dc_m_ch (p1_id, p2_id) VALUES (-1, -1)`);
-            await adapter.setConstraints("immediate", "dc_m_fk1", "dc_m_fk2");
-            await adapter.commit();
-          } catch (e) {
-            await adapter.rollback().catch(() => {});
-            throw e;
-          }
-        }).rejects.toThrow(InvalidForeignKey);
+        await adapter.beginTransaction();
+        try {
+          await adapter.setConstraints("deferred", "dc_m_fk1", "dc_m_fk2");
+          // INSERT must succeed (mirrors Rails assert_nothing_raised).
+          await adapter.execute(`INSERT INTO dc_m_ch (p1_id, p2_id) VALUES (-1, -1)`);
+          // set_constraints(:immediate, ...) triggers FK checks → raises.
+          await expect(adapter.setConstraints("immediate", "dc_m_fk1", "dc_m_fk2")).rejects.toThrow(
+            InvalidForeignKey,
+          );
+        } finally {
+          await adapter.rollback().catch(() => {});
+        }
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS dc_m_ch`);
         await adapter.execute(`DROP TABLE IF EXISTS dc_m_p1`);
@@ -216,18 +215,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
       try {
         // Defer only fk2; fk1 is not deferrable so it stays immediate.
-        // Inserting a row that violates fk1 should raise immediately.
-        await expect(async () => {
-          await adapter.beginTransaction();
-          try {
-            await adapter.setConstraints("deferred", "dc_s_fk2");
-            await adapter.execute(`INSERT INTO dc_s_ch (p1_id, p2_id) VALUES (-1, -1)`);
-            await adapter.commit();
-          } catch (e) {
-            await adapter.rollback().catch(() => {});
-            throw e;
-          }
-        }).rejects.toThrow(InvalidForeignKey);
+        await adapter.beginTransaction();
+        try {
+          await adapter.setConstraints("deferred", "dc_s_fk2");
+          // INSERT violates fk1 (not deferred) — raises immediately.
+          await expect(
+            adapter.execute(`INSERT INTO dc_s_ch (p1_id, p2_id) VALUES (-1, -1)`),
+          ).rejects.toThrow(InvalidForeignKey);
+        } finally {
+          await adapter.rollback().catch(() => {});
+        }
       } finally {
         await adapter.execute(`DROP TABLE IF EXISTS dc_s_ch`);
         await adapter.execute(`DROP TABLE IF EXISTS dc_s_p1`);
