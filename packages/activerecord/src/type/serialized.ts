@@ -101,7 +101,18 @@ export class Serialized extends ValueType {
     // assigning e.g. a class-coder instance loads back through the coder.
     // Mirrors ActiveModel::Type::Helpers::Mutable#cast for the structured case
     // while still accepting pre-serialized string assignments.
-    if (value === null || value === undefined || typeof value === "string") {
+    //
+    // Binary subtypes (bytea) are the exception: a raw user string is a value
+    // to encode, not a wire-format payload. Routing it straight to the
+    // subtype's deserialize would send it through unescape_bytea, which maps
+    // each character to a single byte (latin1) and mangles non-ASCII input.
+    // Encoding it first (serialize → TextEncoder UTF-8) keeps the bytes the
+    // UTF-8 bridge in `deserialize` expects, matching Rails' Mutable#cast.
+    const preEncoded =
+      value === null ||
+      value === undefined ||
+      (typeof value === "string" && !this.subtype.isBinary());
+    if (preEncoded) {
       return this.deserialize(value);
     }
     return this.deserialize(this.serialize(value));
