@@ -115,18 +115,53 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("explain executes with { format: 'json' } and returns JSON plan", async () => {
       const result = await adapter.explain("SELECT 1", [], [{ format: "json" }]);
-      // The prior stringifier rendered pg-auto-parsed plans as
-      // "[object Object]" — assert structure instead of just "[".
+      // The prior stringifier rendered pg-auto-parsed plans as "[object Object]".
       expect(result).not.toContain("[object Object]");
-      const parsed = JSON.parse(result);
+      // Rails wraps JSON output in the "QUERY PLAN" header block; JSON.parse(result) would fail.
+      expect(result).toContain("QUERY PLAN");
+      // Extract the JSON array from within the pp() block (pp() adds one leading space per line),
+      // strip that indent, then parse to confirm the full JSON pipeline is intact.
+      const jsonMatch = result.match(/\[[\s\S]*\]/);
+      expect(jsonMatch).not.toBeNull();
+      const parsed = JSON.parse(jsonMatch![0].replace(/^ /gm, "")) as unknown[];
       expect(Array.isArray(parsed)).toBe(true);
-      expect(parsed[0]).toHaveProperty("Plan");
+      expect(parsed[0] as Record<string, unknown>).toHaveProperty("Plan");
     });
 
-    it.skip("explain options with eager loading", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in explain
-      // ROOT-CAUSE: connection-adapters/postgresql/explain.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/explain.ts; affects ~10–47 tests in explain.test.ts
+    it("explain options with eager loading", async () => {
+      // Rails: Author.where(id: 1).includes(:posts).explain(:analyze).inspect
+      const { registerModel } = await import("../../index.js");
+      class OpAuthor extends Base {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      class OpPost extends Base {
+        static {
+          this.attribute("title", "string");
+          this.attribute("op_author_id", "integer");
+        }
+      }
+      OpAuthor.hasMany("opPosts", { className: "OpPost" });
+      registerModel(OpAuthor);
+      registerModel(OpPost);
+      await adapter.exec(`CREATE TABLE "op_authors" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      await adapter.exec(
+        `CREATE TABLE "op_posts" ("id" SERIAL PRIMARY KEY, "title" TEXT, "op_author_id" INTEGER)`,
+      );
+      const author = (await OpAuthor.create({ name: "A" })) as any;
+      await OpPost.create({ title: "B", op_author_id: author.id });
+
+      const plan = await OpAuthor.where({ id: author.id }).includes("opPosts").explain("analyze");
+      // Rails: assert_match %(QUERY PLAN), explain
+      expect(plan).toContain("QUERY PLAN");
+      // Rails: assert_match %r(EXPLAIN \(ANALYZE\) SELECT "authors".*), explain
+      expect(plan).toMatch(/EXPLAIN \(ANALYZE\)/);
+      // Rails: assert_match %r(EXPLAIN \(ANALYZE\) SELECT "posts".*), explain
+      const analyzeBlocks = plan.split("\n\n").filter((b) => /EXPLAIN \(ANALYZE\)/.test(b));
+      expect(analyzeBlocks.length).toBeGreaterThanOrEqual(2);
+      expect(plan).toContain("op_authors");
+      expect(plan).toContain("op_posts");
     });
   });
 });
