@@ -9,12 +9,13 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    // Matches Rails' postgresql_specific_schema.rb "defaults" table column types.
     await adapter.exec(`
       CREATE TABLE pg_case_insensitive_defaults (
-        char1 varchar,
-        char2 varchar,
-        char3 character(10),
-        multiline_default varchar
+        char1 char(1),
+        char2 varchar(50),
+        char3 text,
+        multiline_default text
       )
     `);
   });
