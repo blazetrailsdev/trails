@@ -28,10 +28,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(col.type).not.toBe("binary");
     });
 
-    it.skip("tsquery column", async () => {
-      // tsquery is not a registered OID type in Rails (no corresponding Rails test).
-    });
-
     it("full text search", async () => {
       await adapter.exec(`INSERT INTO tsvectors (text_vector) VALUES ('cat'::tsvector)`);
       const rows = await adapter.execute(
