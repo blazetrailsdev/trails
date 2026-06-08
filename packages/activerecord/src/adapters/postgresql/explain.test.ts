@@ -123,10 +123,40 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(parsed[0]).toHaveProperty("Plan");
     });
 
-    it.skip("explain options with eager loading", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in explain
-      // ROOT-CAUSE: connection-adapters/postgresql/explain.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/explain.ts; affects ~10–47 tests in explain.test.ts
+    it("explain options with eager loading", async () => {
+      // Rails: Author.where(id: 1).includes(:posts).explain(:analyze).inspect
+      const { registerModel } = await import("../../index.js");
+      class OpAuthor extends Base {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      class OpPost extends Base {
+        static {
+          this.attribute("title", "string");
+          this.attribute("op_author_id", "integer");
+        }
+      }
+      OpAuthor.hasMany("opPosts", { className: "OpPost" });
+      registerModel(OpAuthor);
+      registerModel(OpPost);
+      await adapter.exec(`CREATE TABLE "op_authors" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      await adapter.exec(
+        `CREATE TABLE "op_posts" ("id" SERIAL PRIMARY KEY, "title" TEXT, "op_author_id" INTEGER)`,
+      );
+      const author = (await OpAuthor.create({ name: "A" })) as any;
+      await OpPost.create({ title: "B", op_author_id: author.id });
+
+      const plan = await OpAuthor.where({ id: author.id }).includes("opPosts").explain("analyze");
+      // Rails: assert_match %(QUERY PLAN), explain
+      expect(plan).toContain("QUERY PLAN");
+      // Rails: assert_match %r(EXPLAIN \(ANALYZE\) SELECT "authors".*), explain
+      expect(plan).toMatch(/EXPLAIN \(ANALYZE\)/);
+      // Rails: assert_match %r(EXPLAIN \(ANALYZE\) SELECT "posts".*), explain
+      const analyzeBlocks = plan.split("\n\n").filter((b) => /EXPLAIN \(ANALYZE\)/.test(b));
+      expect(analyzeBlocks.length).toBeGreaterThanOrEqual(2);
+      expect(plan).toContain("op_authors");
+      expect(plan).toContain("op_posts");
     });
   });
 });
