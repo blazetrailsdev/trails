@@ -20,6 +20,8 @@ afterEach(() => {
 
 import {
   bestBundle,
+  buildStoryContent,
+  checkPrNotOpen,
   claimState,
   commitAndPush,
   editFrontmatter,
@@ -527,5 +529,93 @@ describe("commitAndPush (git mutation flow)", () => {
     }
     const push = fullArgs.find((a) => a[2] === "push");
     expect(push).toEqual(["-C", "/wt", "push", "--quiet", "origin", "HEAD:main"]);
+  });
+});
+
+describe("buildStoryContent", () => {
+  it("generates minimal story with defaults", () => {
+    const content = buildStoryContent("0005-gaps", "my-story", { date: "2026-06-08" });
+    expect(content).toContain(`title: "my-story"`);
+    expect(content).toContain(`status: draft`);
+    expect(content).toContain(`rfc: "0005-gaps"`);
+    expect(content).toContain(`cluster: null`);
+    expect(content).toContain(`deps: []`);
+    expect(content).toContain(`deps-rfc: []`);
+    expect(content).toContain(`est-loc: null`);
+    expect(content).toContain(`priority: null`);
+    expect(content).toContain(`updated: 2026-06-08`);
+    expect(content).toContain(`pr: null`);
+    expect(content).toContain(`claim: null`);
+    expect(content).toContain(`## Context`);
+    expect(content).toContain(`## Acceptance criteria`);
+  });
+
+  it("applies all flags", () => {
+    const content = buildStoryContent("0005-gaps", "my-story", {
+      title: "My custom title",
+      cluster: "type-system",
+      estLoc: 120,
+      deps: ["story-a", "story-b"],
+      priority: 5,
+      date: "2026-06-08",
+    });
+    expect(content).toContain(`title: "My custom title"`);
+    expect(content).toContain(`cluster: type-system`);
+    expect(content).toContain(`deps: ["story-a", "story-b"]`);
+    expect(content).toContain(`est-loc: 120`);
+    expect(content).toContain(`priority: 5`);
+  });
+
+  it("uses story slug as title when no title given", () => {
+    const content = buildStoryContent("0001-r", "add-foo-support", { date: "2026-06-08" });
+    expect(content).toContain(`title: "add-foo-support"`);
+  });
+});
+
+describe("checkPrNotOpen (done merge-state guard)", () => {
+  function setupExit() {
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  }
+
+  it("succeeds silently when PR is merged", () => {
+    execFileSyncMock.mockReturnValueOnce(
+      JSON.stringify({ state: "MERGED", mergedAt: "2026-06-01T00:00:00Z" }) as never,
+    );
+    expect(() => checkPrNotOpen(123)).not.toThrow();
+    expect(execFileSyncMock).toHaveBeenCalledWith(
+      "gh",
+      ["pr", "view", "123", "--json", "state,mergedAt"],
+      expect.objectContaining({ encoding: "utf8" }),
+    );
+  });
+
+  it("succeeds silently when PR is closed (spike / moot-audit)", () => {
+    execFileSyncMock.mockReturnValueOnce(
+      JSON.stringify({ state: "CLOSED", mergedAt: null }) as never,
+    );
+    expect(() => checkPrNotOpen(42)).not.toThrow();
+  });
+
+  it("exits 1 when PR is open (work unfinished)", () => {
+    setupExit();
+    execFileSyncMock.mockReturnValueOnce(
+      JSON.stringify({ state: "OPEN", mergedAt: null }) as never,
+    );
+    expect(() => checkPrNotOpen(42)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/still open/i));
+  });
+
+  it("exits 1 when gh fails (not authenticated / no network)", () => {
+    setupExit();
+    execFileSyncMock.mockImplementationOnce(() => {
+      throw Object.assign(new Error("Command failed"), {
+        stderr: "could not resolve to a Repository",
+      });
+    });
+    expect(() => checkPrNotOpen(42)).toThrow(/exit 1/);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/could not query PR #42/));
   });
 });

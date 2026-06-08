@@ -31,21 +31,21 @@ package list, and the `declare` / associations / enums / schema reference, see
 - Tests live next to source files as `*.test.ts`.
 - Prefer small, focused modules.
 - **PR size ceiling: 500 LOC** (additions + deletions, excluding lockfiles,
-  snapshots, and generated parity fixtures). Check before opening with
+  snapshots, and generated parity fixtures; docs-only changes — `.md` files,
+  READMEs, RFC/story prose — are exempt). Check before opening with
   `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**'`.
   Tests and fixtures count. The historical 20-method rule is a soft guide;
   500 LOC is the hard one — review-cycle data shows PRs ≥400 LOC need 4–6
   rounds minimum and ≥700 LOC need 13+, so 500 sits just above the 400-LOC
-  inflection and well below the 700-LOC danger zone. If a feature is larger, split via the
-  `<base>` / `<base>b` / `<base>c` pattern before opening — these are sibling
-  branches each off `main` with **non-overlapping files**, merged sequentially,
-  **not** stacked branches (see "Do NOT stack PRs" below). Splitting heuristic,
-  in order:
-  (1) impl + smoke test in `<base>`, full Rails-mirrored tests in `<base>b`;
-  (2) public surface first, privates follow; (3) one Rails source file per
-  PR when multiple are touched; (4) happy path vs edges only as a last
-  resort. The only exception is a single mechanical rename — note it in the
-  PR body.
+  inflection and well below the 700-LOC danger zone. **Do NOT fan out into
+  sibling PRs yourself.** Keep each PR scoped to the single story you claimed.
+  If the work is larger than one PR, or you discover additional work that
+  belongs in a separate PR, do NOT open it yourself — add a new story to the
+  epic with `pnpm tasks new <rfc-slug> <story-slug>` so it gets scheduled and
+  owned separately. This keeps the one-agent-per-PR ownership model intact
+  (a single agent fanning out N PRs and then dying orphans all of them —
+  this happened). The only exception is a single mechanical rename — note it
+  in the PR body.
 - **Do NOT stack PRs.** Each PR branches from `main` and stands alone.
   We don't have spare CI runners or review bandwidth — stacked branches
   (`<base>b` off `<base>`, `<base>c` off `<base>b`, etc.) re-run CI on
