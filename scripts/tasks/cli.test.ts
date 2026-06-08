@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -33,8 +33,10 @@ import {
   parseFlags,
   ready,
   removeFrontmatterKey,
+  STORY_STATUSES,
   stringFlag,
   StoryEntry,
+  TASKS_DIR,
 } from "./cli.ts";
 
 function story(over: Partial<StoryEntry>): StoryEntry {
@@ -759,5 +761,113 @@ describe("newStory validation paths", () => {
     writeFileSync(join(dir, "rfcs", "0005-gaps", "stories", "existing.md"), "---\ntitle: x\n---\n");
     expect(() => newStory("0005-gaps", "existing", {}, dir)).toThrow(/exit 1/);
     expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/already exists/));
+  });
+});
+
+// Paths to the linting tools in the tasks repo. The integration test below
+// is skipped when they are absent (e.g. in a fresh CI clone without the
+// sibling tasks checkout).
+const ML_BIN = join(TASKS_DIR, "node_modules", ".bin", "markdownlint-cli2");
+const PR_BIN = join(TASKS_DIR, "node_modules", ".bin", "prettier");
+
+// Integration test: closes the mocked-git gap. buildStoryContent output is
+// written to a real temp file and run through the tasks-repo's actual linting
+// tools — no git involved, no mock needed for the lint step.
+describe.skipIf(!existsSync(ML_BIN) || !existsSync(PR_BIN))(
+  "buildStoryContent — integration (markdownlint + prettier)",
+  () => {
+    it("output passes markdownlint-cli2, prettier --check, and frontmatter validation", async () => {
+      // Use vi.importActual to bypass the execFileSync mock and get the real spawnSync.
+      const { spawnSync } =
+        await vi.importActual<typeof import("node:child_process")>("node:child_process");
+      const content = buildStoryContent("0005-gaps", "my-story", {
+        title: "My Story",
+        cluster: "scaffold",
+        estLoc: 100,
+        date: "2026-06-08",
+      });
+      const dir = mkdtempSync(join(tmpdir(), "cli-integration-"));
+      const file = join(dir, "my-story.md");
+      writeFileSync(file, content);
+
+      // Run from TASKS_DIR so .markdownlint-cli2.jsonc and .prettierrc are picked up.
+      const ml = spawnSync(ML_BIN, [file], { cwd: TASKS_DIR, encoding: "utf8" });
+      expect(ml.status, `markdownlint-cli2 failed:\n${ml.stdout}${ml.stderr}`).toBe(0);
+
+      const pr = spawnSync(PR_BIN, ["--check", file], { cwd: TASKS_DIR, encoding: "utf8" });
+      expect(pr.status, `prettier --check failed:\n${pr.stdout}${pr.stderr}`).toBe(0);
+
+      // Frontmatter field validation — mirrors validate.mjs story-frontmatter checks.
+      const fm = content.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
+      for (const key of ["title", "status", "rfc", "cluster", "deps", "est-loc"]) {
+        expect(fm, `missing required frontmatter field: ${key}`).toMatch(
+          new RegExp(`^${key}:`, "m"),
+        );
+      }
+      const status = fm.match(/^status:\s*(\S+)/m)?.[1];
+      expect(STORY_STATUSES, `invalid status: ${status}`).toContain(status);
+      const estLoc = fm.match(/^est-loc:\s*(.+)$/m)?.[1]?.trim();
+      expect(estLoc === "null" || /^\d+$/.test(estLoc ?? ""), `invalid est-loc: ${estLoc}`).toBe(
+        true,
+      );
+    });
+  },
+);
+
+describe("newStory cluster validation", () => {
+  function setupExit() {
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  }
+
+  function makeRfcDir(dir: string, rfcSlug: string, clusters: string[]) {
+    mkdirSync(join(dir, ".git"));
+    mkdirSync(join(dir, "rfcs", rfcSlug, "stories"), { recursive: true });
+    const clustersYaml = clusters.map((c) => `  - ${c}`).join("\n");
+    writeFileSync(
+      join(dir, "rfcs", rfcSlug, "README.md"),
+      `---\nrfc: "${rfcSlug}"\ntitle: "test"\nstatus: active\nclusters:\n${clustersYaml}\n---\n`,
+    );
+  }
+
+  it("accepts a cluster declared in the RFC README and proceeds to commitAndPush", () => {
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      return "" as never;
+    });
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    makeRfcDir(dir, "0005-gaps", ["scaffold", "conversion"]);
+    expect(() => newStory("0005-gaps", "my-story", { cluster: "scaffold" }, dir)).not.toThrow();
+  });
+
+  it("exits 1 for an undeclared cluster and lists the valid clusters", () => {
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    makeRfcDir(dir, "0005-gaps", ["scaffold", "conversion"]);
+    expect(() => newStory("0005-gaps", "my-story", { cluster: "tooling" }, dir)).toThrow(/exit 1/);
+    const msg = (console.error as ReturnType<typeof vi.spyOn>).mock.calls[0]?.[0] as string;
+    expect(msg).toMatch(/tooling/);
+    expect(msg).toMatch(/scaffold/);
+    expect(msg).toMatch(/conversion/);
+  });
+
+  it("validates clusters declared as a YAML flow sequence", () => {
+    // Codex review: regex parsing misses `clusters: [scaffold, conversion]`.
+    // The fix uses the `yaml` package to parse all valid YAML forms.
+    setupExit();
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    mkdirSync(join(dir, ".git"));
+    mkdirSync(join(dir, "rfcs", "0005-gaps", "stories"), { recursive: true });
+    writeFileSync(
+      join(dir, "rfcs", "0005-gaps", "README.md"),
+      `---\nrfc: "0005-gaps"\ntitle: "test"\nstatus: active\nclusters: [scaffold, conversion]\n---\n`,
+    );
+    expect(() => newStory("0005-gaps", "my-story", { cluster: "tooling" }, dir)).toThrow(/exit 1/);
+    const msg = (console.error as ReturnType<typeof vi.spyOn>).mock.calls[0]?.[0] as string;
+    expect(msg).toMatch(/scaffold/);
+    expect(msg).toMatch(/conversion/);
   });
 });
