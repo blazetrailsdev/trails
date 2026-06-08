@@ -122,10 +122,12 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE TABLE dc_s_ch (id SERIAL PRIMARY KEY, p1_id INT NOT NULL, p2_id INT NOT NULL)`,
       );
       try {
-        // FK1 is NOT deferrable — always immediate regardless of SET CONSTRAINTS.
+        // FK1 is deferrable but not in the SET CONSTRAINTS list — stays at INITIALLY IMMEDIATE.
+        // Mirrors Rails: @fk (authors.author_address_id) is DEFERRABLE INITIALLY IMMEDIATE.
         await adapter.addForeignKey("dc_s_ch", "dc_s_p1", {
           column: "p1_id",
           name: "dc_s_fk1",
+          deferrable: "immediate",
         });
         // FK2 is deferrable — can be set to deferred.
         await adapter.addForeignKey("dc_s_ch", "dc_s_p2", {
@@ -137,7 +139,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.beginTransaction();
         try {
           await adapter.setConstraints("deferred", "dc_s_fk2");
-          // INSERT violates fk1 (not deferred) — raises immediately.
+          // fk1 is deferrable but not listed — stays INITIALLY IMMEDIATE → raises immediately.
           await expect(
             adapter.execute(`INSERT INTO dc_s_ch (p1_id, p2_id) VALUES (-1, -1)`),
           ).rejects.toThrow(InvalidForeignKey);
