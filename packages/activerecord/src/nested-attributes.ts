@@ -250,11 +250,13 @@ async function processNestedAttributes(record: Base): Promise<void> {
         // without a DB round-trip — mirrors Rails' inverse_of auto-population.
         const inverseOf: string | undefined = assocDef.options.inverseOf;
         if (inverseOf) {
-          await (targetModel as any).ensureSchemaLoaded();
-          const child = new (targetModel as any)({ ...childAttrs, [foreignKey]: record.id });
-          if (!(child as any)._cachedAssociations) (child as any)._cachedAssociations = new Map();
-          (child as any)._cachedAssociations.set(inverseOf, record);
-          await child.save();
+          await (targetModel as any).create(
+            { ...childAttrs, [foreignKey]: record.id },
+            (child: any) => {
+              child._cachedAssociations = child._cachedAssociations ?? new Map();
+              child._cachedAssociations.set(inverseOf, record);
+            },
+          );
         } else {
           await (targetModel as any).create({ ...childAttrs, [foreignKey]: record.id });
         }
