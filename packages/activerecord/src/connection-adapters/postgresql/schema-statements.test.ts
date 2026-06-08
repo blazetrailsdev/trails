@@ -158,7 +158,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const result = await adapter.pkAndSequenceFor(tableName);
       expect(result).not.toBeNull();
       const [, seq] = result!;
-      const seqName = `${seq.schema}.${seq.name}`;
+      const seqName = `${seq!.schema}.${seq!.name}`;
       await adapter.schemaQuery(`SELECT setval($1::regclass, 123)`, [seqName]);
       const before = await adapter.schemaQuery(`SELECT nextval($1::regclass) AS n`, [seqName]);
       expect(Number(before[0].n)).toBe(124);
@@ -172,7 +172,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const result = await adapter.pkAndSequenceFor(tableName);
       expect(result).not.toBeNull();
       const [, seq] = result!;
-      const seqName = `${seq.schema}.${seq.name}`;
+      const seqName = `${seq!.schema}.${seq!.name}`;
       await adapter.setPkSequenceBang(tableName, 123);
       const rows = await adapter.schemaQuery(`SELECT nextval($1::regclass) AS n`, [seqName]);
       expect(Number(rows[0].n)).toBe(124);

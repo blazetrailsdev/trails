@@ -4,6 +4,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
+async function numIndicesNamed(adapter: PostgreSQLAdapter, name: string): Promise<number> {
+  const rows = await adapter.execute(
+    `SELECT 1 FROM pg_index JOIN pg_class ON pg_index.indexrelid = pg_class.oid WHERE pg_class.relname = $1`,
+    [name],
+  );
+  return rows.length;
+}
+
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
@@ -50,26 +58,50 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows.map((r) => r.name)).toEqual(["alice", "bob"]);
     });
 
-    it.skip("renaming a table with uuid primary key and uuid_generate_v4() default also renames the primary key index", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in rename-table
-      // ROOT-CAUSE: connection-adapters/postgresql/rename-table.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/rename-table.ts; affects ~10–47 tests in rename-table.test.ts
-    });
-    it.skip("renaming a table with uuid primary key and gen_random_uuid() default also renames the primary key index", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in rename-table
-      // ROOT-CAUSE: connection-adapters/postgresql/rename-table.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/rename-table.ts; affects ~10–47 tests in rename-table.test.ts
+    it("renaming a table also renames the primary key sequence", async () => {
+      await adapter.exec("CREATE TABLE before_rename (id serial primary key, name text)");
+      await adapter.renameTable("before_rename", "after_rename");
+      const result = await adapter.pkAndSequenceFor("after_rename");
+      expect(result).not.toBeNull();
+      const [pk, seq] = result!;
+      expect(seq!.name).toBe(`after_rename_${pk}_seq`);
     });
 
-    it.skip("renaming a table also renames the primary key sequence", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in rename-table
-      // ROOT-CAUSE: connection-adapters/postgresql/rename-table.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/rename-table.ts; affects ~10–47 tests in rename-table.test.ts
+    it("renaming a table also renames the primary key index", async () => {
+      await adapter.exec("CREATE TABLE before_rename (id serial primary key, name text)");
+      expect(await numIndicesNamed(adapter, "before_rename_pkey")).toBe(1);
+      expect(await numIndicesNamed(adapter, "after_rename_pkey")).toBe(0);
+      await adapter.renameTable("before_rename", "after_rename");
+      expect(await numIndicesNamed(adapter, "before_rename_pkey")).toBe(0);
+      expect(await numIndicesNamed(adapter, "after_rename_pkey")).toBe(1);
     });
-    it.skip("renaming a table also renames the primary key index", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in rename-table
-      // ROOT-CAUSE: connection-adapters/postgresql/rename-table.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/rename-table.ts; affects ~10–47 tests in rename-table.test.ts
+
+    it("renaming a table with uuid primary key and uuid_generate_v4() default also renames the primary key index", async (ctx) => {
+      try {
+        await adapter.exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+      } catch {
+        ctx.skip();
+        return;
+      }
+      await adapter.exec(
+        `CREATE TABLE before_rename (id uuid DEFAULT uuid_generate_v4() PRIMARY KEY)`,
+      );
+      expect(await numIndicesNamed(adapter, "before_rename_pkey")).toBe(1);
+      expect(await numIndicesNamed(adapter, "after_rename_pkey")).toBe(0);
+      await adapter.renameTable("before_rename", "after_rename");
+      expect(await numIndicesNamed(adapter, "before_rename_pkey")).toBe(0);
+      expect(await numIndicesNamed(adapter, "after_rename_pkey")).toBe(1);
+    });
+
+    it("renaming a table with uuid primary key and gen_random_uuid() default also renames the primary key index", async () => {
+      await adapter.exec(
+        `CREATE TABLE before_rename (id uuid DEFAULT gen_random_uuid() PRIMARY KEY)`,
+      );
+      expect(await numIndicesNamed(adapter, "before_rename_pkey")).toBe(1);
+      expect(await numIndicesNamed(adapter, "after_rename_pkey")).toBe(0);
+      await adapter.renameTable("before_rename", "after_rename");
+      expect(await numIndicesNamed(adapter, "before_rename_pkey")).toBe(0);
+      expect(await numIndicesNamed(adapter, "after_rename_pkey")).toBe(1);
     });
   });
 });
