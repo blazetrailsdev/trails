@@ -2251,16 +2251,12 @@ export class MigrationContext {
     }
   }
 
-  async changeTableComment(tableName: string, comment: string | null): Promise<void> {
-    await (this.connection as any).changeTableComment(tableName, comment);
+  async changeTableComment(name: string, comment: string | null): Promise<void> {
+    await (this.connection as any).changeTableComment(name, comment);
   }
 
-  async changeColumnComment(
-    tableName: string,
-    columnName: string,
-    comment: string | null,
-  ): Promise<void> {
-    await (this.connection as any).changeColumnComment(tableName, columnName, comment);
+  async changeColumnComment(table: string, col: string, comment: string | null): Promise<void> {
+    await (this.connection as any).changeColumnComment(table, col, comment);
   }
 
   async addIndex(
