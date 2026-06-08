@@ -399,8 +399,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected addSqlCommentBang(sql: string, comment: string | undefined): string {
-    if (!comment) return sql;
+  protected addSqlCommentBang(sql: string, comment: string | null | undefined): string {
+    if (!comment?.trim()) return sql;
     return `${sql} COMMENT ${mysqlQuoteString(comment)}`;
   }
 }

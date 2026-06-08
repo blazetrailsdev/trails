@@ -3194,7 +3194,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
               a.atttypmod AS fmod,
               a.attidentity AS identity,
               a.attgenerated AS attgenerated,
-              col.collname AS collation
+              col.collname AS collation,
+              pgd.description AS col_comment
        FROM pg_attribute a
        JOIN pg_class t ON t.oid = a.attrelid
        JOIN pg_namespace n ON n.oid = t.relnamespace
@@ -3205,6 +3206,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         AND a.attnum = ANY(i.indkey)
        LEFT JOIN pg_type pt ON a.atttypid = pt.oid
        LEFT JOIN pg_collation col ON a.attcollation = col.oid AND a.attcollation <> pt.typcollation
+       LEFT JOIN pg_description pgd
+         ON pgd.objoid = a.attrelid
+        AND pgd.classoid = 'pg_class'::regclass
+        AND pgd.objsubid = a.attnum
        WHERE ${tableCondition}
          AND a.attnum > 0
          AND NOT a.attisdropped
@@ -3271,6 +3276,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           identity,
           generated: attgenerated,
           collation: (r.collation as string | null) ?? undefined,
+          comment: (r.col_comment as string | null) ?? null,
         },
       );
     });

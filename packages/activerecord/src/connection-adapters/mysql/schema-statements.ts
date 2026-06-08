@@ -5,6 +5,7 @@
  */
 
 import { ArgumentError } from "@blazetrails/activemodel";
+import { presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { TypeMetadata } from "./type-metadata.js";
@@ -187,6 +188,7 @@ export function newColumnFromField(
     autoIncrement: /auto_increment/i.test(field["Extra"] ?? ""),
     virtual: /(virtual|stored|persistent)\s+generated/i.test(field["Extra"] ?? ""),
     onUpdate: onUpdateForColumn,
+    comment: presence(field["Comment"] as string | undefined) ?? null,
   });
 }
 

@@ -31,6 +31,7 @@ export class Column extends BaseColumn {
     options: {
       collation?: string | null;
       defaultFunction?: string | null;
+      comment?: string | null;
       primaryKey?: boolean;
       serial?: boolean;
       array?: boolean;
@@ -48,6 +49,7 @@ export class Column extends BaseColumn {
     super(name, defaultValue, meta, null_, {
       collation: options.collation,
       defaultFunction: options.defaultFunction,
+      comment: options.comment,
       primaryKey: options.primaryKey,
     });
     this.serial = options.serial ?? false;
