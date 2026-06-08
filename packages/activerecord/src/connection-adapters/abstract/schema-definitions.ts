@@ -1098,8 +1098,8 @@ export class TableDefinition {
           }
           case "string":
             parts.push(
-              this._adapterName === "postgres" && col.options.limit == null
-                ? "character varying"
+              this._adapterName === "postgres"
+                ? `character varying${col.options.limit != null ? `(${col.options.limit})` : ""}`
                 : `VARCHAR(${col.options.limit ?? 255})`,
             );
             break;
@@ -1235,6 +1235,9 @@ export class TableDefinition {
         const clause = this._adapter.quoteDefaultExpression(col.options.default, col);
         if (clause) parts.push(clause.trimStart());
       }
+
+      if (this._adapterName === "mysql" && col.options.comment?.trim())
+        parts.push(`COMMENT '${col.options.comment.replace(/'/g, "''")}'`);
 
       return parts.join(" ");
     });

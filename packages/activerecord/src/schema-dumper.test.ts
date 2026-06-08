@@ -390,7 +390,7 @@ describe("SchemaDumperTest", () => {
     "schema dump includes length for mysql binary fields",
     async () => {
       const { SchemaDumper: D } = await import("./connection-adapters/mysql/schema-dumper.js");
-      const source = {
+      const output = (await D.create({
         tables: async () => ["binary_fields"],
         indexes: (_t: string) => [],
         columns: () => [
@@ -398,8 +398,7 @@ describe("SchemaDumperTest", () => {
           { name: "var_binary", type: "binary", sqlType: "varbinary(255)", limit: 255 },
           { name: "var_binary_large", type: "binary", sqlType: "varbinary(4095)", limit: 4095 },
         ],
-      };
-      const output = (await D.create(source as any).dump()) as string;
+      } as any).dump()) as string;
       expect(output).toMatch(/t\.binary\("var_binary",\s*\{[^}]*limit:\s*255/);
       expect(output).toMatch(/t\.binary\("var_binary_large",\s*\{[^}]*limit:\s*4095/);
     },
@@ -437,15 +436,14 @@ describe("SchemaDumperTest", () => {
     "schema does not include limit for emulated mysql boolean fields",
     async () => {
       const { SchemaDumper: D } = await import("./connection-adapters/mysql/schema-dumper.js");
-      const source = {
+      const output = (await D.create({
         tables: async () => ["booleans"],
         indexes: (_t: string) => [],
         columns: () => [
           { name: "id", type: "bigint", primaryKey: true, autoIncrement: true },
           { name: "active", type: "boolean", sqlType: "tinyint(1)", limit: 1 },
         ],
-      };
-      const output = (await D.create(source as any).dump()) as string;
+      } as any).dump()) as string;
       expect(output).not.toMatch(/t\.boolean.*limit:/);
     },
   );

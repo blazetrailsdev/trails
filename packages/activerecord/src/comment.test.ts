@@ -24,6 +24,8 @@ describe("CommentTest", () => {
       t.string("empty_comment", { comment: "" });
       t.string("nil_comment", { comment: null as any });
       t.string("absent_comment");
+      t.index(["space_comment"], { comment: " " });
+      t.index(["absent_comment"]);
     });
     await ctx.createTable(
       "pk_commenteds",
@@ -64,9 +66,7 @@ describe("CommentTest", () => {
 
   itIfSupports("comments", "blank indexes created in block", async () => {
     const indexes = await (adapter as any).indexes("blank_comments");
-    for (const idx of indexes) {
-      expect(idx.comment ?? null).toBeNull();
-    }
+    for (const idx of indexes) expect(idx.comment ?? null).toBeNull();
   });
 
   itIfSupports("comments", "add column with comment later", async () => {
