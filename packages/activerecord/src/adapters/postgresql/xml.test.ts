@@ -1,59 +1,78 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/xml_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { SchemaDumper } from "../../schema-dumper.js";
+import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
+import { Base } from "../../index.js";
+
+// Rails: class XmlDataType < ActiveRecord::Base
+//   self.table_name = "xml_data_type"
+class XmlDataType extends Base {
+  static {
+    this.tableName = "xml_data_type";
+  }
+}
 
 describeIfPg("PostgreSQLAdapter", () => {
-  let adapter: PostgreSQLAdapter;
+  setupHandlerSuite();
+
+  let connection: PostgreSQLAdapter;
+
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    connection = Base.connection as PostgreSQLAdapter;
+    await connection.execute("DROP TABLE IF EXISTS xml_data_type");
+    // Rails: @connection.create_table("xml_data_type") { |t| t.xml "payload" }
+    await connection.execute(`CREATE TABLE xml_data_type (id SERIAL PRIMARY KEY, payload xml)`);
+    XmlDataType.resetColumnInformation();
+    await XmlDataType.loadSchema();
   });
+
   afterEach(async () => {
-    await adapter.close();
+    await connection.execute("DROP TABLE IF EXISTS xml_data_type");
+    XmlDataType.resetColumnInformation();
   });
 
   describe("PostgreSQLXMLTest", () => {
-    it.skip("xml column", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
-      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
+    it("xml column", async () => {
+      // Rails: assert_equal :xml, @column.type
+      const column = XmlDataType.columnsHash()["payload"];
+      expect(column.type).toBe("xml");
     });
-    it.skip("xml default", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
-      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
+
+    it("null xml", async () => {
+      // Rails: @connection.execute "insert into xml_data_type (payload) VALUES(null)"
+      await connection.execute("INSERT INTO xml_data_type (payload) VALUES(null)");
+      // Rails: assert_nil XmlDataType.first.payload
+      const record = (await XmlDataType.first()) as any;
+      expect(record.payload).toBeNull();
     });
-    it.skip("xml type cast", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
-      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
+
+    it("round trip", async () => {
+      // Rails: data = XmlDataType.new(payload: "<foo>bar</foo>"); data.save!
+      const data = XmlDataType.new({ payload: "<foo>bar</foo>" }) as any;
+      expect(data.payload).toBe("<foo>bar</foo>");
+      await data.saveBang();
+      // Rails: assert_equal "<foo>bar</foo>", data.reload.payload
+      await data.reload();
+      expect(data.payload).toBe("<foo>bar</foo>");
     });
-    it.skip("xml write", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
-      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
+
+    it("update all", async () => {
+      // Rails: data = XmlDataType.create!
+      const data = (await XmlDataType.createBang({})) as any;
+      // Rails: XmlDataType.update_all(payload: "<bar>baz</bar>")
+      await XmlDataType.updateAll({ payload: "<bar>baz</bar>" });
+      // Rails: assert_equal "<bar>baz</bar>", data.reload.payload
+      await data.reload();
+      expect(data.payload).toBe("<bar>baz</bar>");
     });
-    it.skip("xml schema dump", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
-      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
-    });
-    it.skip("null xml", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
-      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
-    });
-    it.skip("round trip", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
-      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
-    });
-    it.skip("update all", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
-      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
-      /* TODO: needs imports from original file */
+
+    it("xml schema dump", async () => {
+      // Rails: assert_match %r{t\.xml "payload"}, output
+      const output = await SchemaDumper.dumpTableSchema(connection, "xml_data_type");
+      expect(output).toMatch(/t\.xml\("payload"\)/);
     });
   });
 });
