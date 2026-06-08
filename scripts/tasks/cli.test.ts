@@ -33,6 +33,7 @@ import {
   parseFlags,
   ready,
   removeFrontmatterKey,
+  STORY_STATUSES,
   stringFlag,
   StoryEntry,
   TASKS_DIR,
@@ -804,7 +805,6 @@ describe.skipIf(!existsSync(ML_BIN) || !existsSync(PR_BIN))(
         );
       }
       const status = fm.match(/^status:\s*(\S+)/m)?.[1];
-      const STORY_STATUSES = ["draft", "ready", "claimed", "in-progress", "done", "blocked"];
       expect(STORY_STATUSES, `invalid status: ${status}`).toContain(status);
       const estLoc = fm.match(/^est-loc:\s*(.+)$/m)?.[1]?.trim();
       expect(estLoc === "null" || /^\d+$/.test(estLoc ?? ""), `invalid est-loc: ${estLoc}`).toBe(
