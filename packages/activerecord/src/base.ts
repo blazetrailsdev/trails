@@ -3496,13 +3496,14 @@ function _castEnumDirtyOpts(
 ): { from?: unknown; to?: unknown } {
   const mapping = ctor._enums?.get(name);
   if (mapping) {
-    // Mirrors EnumType#cast: has_key (label → storage value), then has_value
-    // (recognised storage value → pass through), then value.presence fallback.
-    const storageValues = Object.values(mapping) as unknown[];
+    // Since I-2, _enum stores label strings in _attributes (via EnumType.cast).
+    // Normalise both label inputs and integer storage-value inputs to the label
+    // string so the comparison matches the in-memory value.
+    const entries = Object.entries(mapping) as [string, number | string][];
     const cast = (v: unknown): unknown => {
-      if (typeof v === "string" && Object.prototype.hasOwnProperty.call(mapping, v))
-        return mapping[v];
-      if (storageValues.includes(v)) return v;
+      if (typeof v === "string" && Object.prototype.hasOwnProperty.call(mapping, v)) return v;
+      const found = entries.find(([, sv]) => sv === v);
+      if (found) return found[0];
       if (_isBlankValue(v)) return null;
       return v;
     };
