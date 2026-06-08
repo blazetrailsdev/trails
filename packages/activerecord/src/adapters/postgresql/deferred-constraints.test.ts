@@ -1,8 +1,9 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/deferred_constraints_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { InvalidForeignKey } from "../../errors.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -14,55 +15,228 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlDeferredConstraintsTest", () => {
-    it.skip("deferrable initially deferred", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
-      // ROOT-CAUSE: connection-adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+    it("deferrable initially deferred", async () => {
+      await adapter.execute(`DROP TABLE IF EXISTS dc_defd_c`);
+      await adapter.execute(`DROP TABLE IF EXISTS dc_defd_p`);
+      await adapter.execute(`CREATE TABLE dc_defd_p (id SERIAL PRIMARY KEY)`);
+      await adapter.execute(`CREATE TABLE dc_defd_c (id SERIAL PRIMARY KEY, par_id INT NOT NULL)`);
+      try {
+        await adapter.addForeignKey("dc_defd_c", "dc_defd_p", {
+          column: "par_id",
+          name: "dc_fk_defd",
+          deferrable: "deferred",
+        });
+        const fks = await adapter.foreignKeys("dc_defd_c");
+        expect(fks.length).toBe(1);
+        expect(fks[0].deferrable).toBe("deferred");
+      } finally {
+        await adapter.execute(`DROP TABLE IF EXISTS dc_defd_c`);
+        await adapter.execute(`DROP TABLE IF EXISTS dc_defd_p`);
+      }
     });
-    it.skip("deferrable initially immediate", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
-      // ROOT-CAUSE: connection-adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+
+    it("deferrable initially immediate", async () => {
+      await adapter.execute(`DROP TABLE IF EXISTS dc_imm_c`);
+      await adapter.execute(`DROP TABLE IF EXISTS dc_imm_p`);
+      await adapter.execute(`CREATE TABLE dc_imm_p (id SERIAL PRIMARY KEY)`);
+      await adapter.execute(`CREATE TABLE dc_imm_c (id SERIAL PRIMARY KEY, par_id INT NOT NULL)`);
+      try {
+        await adapter.addForeignKey("dc_imm_c", "dc_imm_p", {
+          column: "par_id",
+          name: "dc_fk_imm",
+          deferrable: "immediate",
+        });
+        const fks = await adapter.foreignKeys("dc_imm_c");
+        expect(fks.length).toBe(1);
+        expect(fks[0].deferrable).toBe("immediate");
+      } finally {
+        await adapter.execute(`DROP TABLE IF EXISTS dc_imm_c`);
+        await adapter.execute(`DROP TABLE IF EXISTS dc_imm_p`);
+      }
     });
-    it.skip("not deferrable", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
-      // ROOT-CAUSE: connection-adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+
+    it("not deferrable", async () => {
+      await adapter.execute(`DROP TABLE IF EXISTS dc_nd_c`);
+      await adapter.execute(`DROP TABLE IF EXISTS dc_nd_p`);
+      await adapter.execute(`CREATE TABLE dc_nd_p (id SERIAL PRIMARY KEY)`);
+      await adapter.execute(`CREATE TABLE dc_nd_c (id SERIAL PRIMARY KEY, par_id INT NOT NULL)`);
+      try {
+        await adapter.addForeignKey("dc_nd_c", "dc_nd_p", {
+          column: "par_id",
+          name: "dc_fk_nd",
+        });
+        const fks = await adapter.foreignKeys("dc_nd_c");
+        expect(fks.length).toBe(1);
+        expect(fks[0].deferrable).toBeFalsy();
+      } finally {
+        await adapter.execute(`DROP TABLE IF EXISTS dc_nd_c`);
+        await adapter.execute(`DROP TABLE IF EXISTS dc_nd_p`);
+      }
     });
-    it.skip("set constraints all deferred", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
-      // ROOT-CAUSE: connection-adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+
+    it("set constraints all deferred", async () => {
+      await adapter.beginTransaction();
+      try {
+        await adapter.setConstraints("deferred");
+        await adapter.commit();
+      } catch {
+        await adapter.rollback().catch(() => {});
+      }
     });
-    it.skip("set constraints all immediate", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
-      // ROOT-CAUSE: connection-adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+
+    it("set constraints all immediate", async () => {
+      await adapter.beginTransaction();
+      try {
+        await adapter.setConstraints("immediate");
+        await adapter.commit();
+      } catch {
+        await adapter.rollback().catch(() => {});
+      }
     });
-    it.skip("defer constraints", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
-      // ROOT-CAUSE: connection-adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+
+    it("defer constraints", async () => {
+      await adapter.execute(`DROP TABLE IF EXISTS dc_par`);
+      await adapter.execute(`DROP TABLE IF EXISTS dc_ch`);
+      await adapter.execute(`CREATE TABLE dc_par (id SERIAL PRIMARY KEY)`);
+      await adapter.execute(`CREATE TABLE dc_ch (id SERIAL PRIMARY KEY, par_id INT NOT NULL)`);
+      await adapter.addForeignKey("dc_ch", "dc_par", {
+        column: "par_id",
+        name: "dc_ch_fk",
+        deferrable: "immediate",
+      });
+      try {
+        await expect(async () => {
+          await adapter.beginTransaction();
+          try {
+            await adapter.setConstraints("deferred");
+            await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
+            await adapter.setConstraints("immediate");
+            await adapter.commit();
+          } catch (e) {
+            await adapter.rollback().catch(() => {});
+            throw e;
+          }
+        }).rejects.toThrow(InvalidForeignKey);
+      } finally {
+        await adapter.execute(`DROP TABLE IF EXISTS dc_ch`);
+        await adapter.execute(`DROP TABLE IF EXISTS dc_par`);
+      }
     });
-    it.skip("defer constraints with specific fk", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
-      // ROOT-CAUSE: connection-adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+
+    it("defer constraints with specific fk", async () => {
+      await adapter.execute(`DROP TABLE IF EXISTS dc_par`);
+      await adapter.execute(`DROP TABLE IF EXISTS dc_ch`);
+      await adapter.execute(`CREATE TABLE dc_par (id SERIAL PRIMARY KEY)`);
+      await adapter.execute(`CREATE TABLE dc_ch (id SERIAL PRIMARY KEY, par_id INT NOT NULL)`);
+      await adapter.addForeignKey("dc_ch", "dc_par", {
+        column: "par_id",
+        name: "dc_ch_fk",
+        deferrable: "immediate",
+      });
+      try {
+        const fkName = (await adapter.foreignKeys("dc_ch"))[0].name;
+        await expect(async () => {
+          await adapter.beginTransaction();
+          try {
+            await adapter.setConstraints("deferred", fkName);
+            await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
+            await adapter.setConstraints("immediate", fkName);
+            await adapter.commit();
+          } catch (e) {
+            await adapter.rollback().catch(() => {});
+            throw e;
+          }
+        }).rejects.toThrow(InvalidForeignKey);
+      } finally {
+        await adapter.execute(`DROP TABLE IF EXISTS dc_ch`);
+        await adapter.execute(`DROP TABLE IF EXISTS dc_par`);
+      }
     });
-    it.skip("defer constraints with multiple fks", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
-      // ROOT-CAUSE: connection-adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+
+    it("defer constraints with multiple fks", async () => {
+      await adapter.execute(`DROP TABLE IF EXISTS dc_m_ch`);
+      await adapter.execute(`DROP TABLE IF EXISTS dc_m_p1`);
+      await adapter.execute(`DROP TABLE IF EXISTS dc_m_p2`);
+      await adapter.execute(`CREATE TABLE dc_m_p1 (id SERIAL PRIMARY KEY)`);
+      await adapter.execute(`CREATE TABLE dc_m_p2 (id SERIAL PRIMARY KEY)`);
+      await adapter.execute(
+        `CREATE TABLE dc_m_ch (id SERIAL PRIMARY KEY, p1_id INT NOT NULL, p2_id INT NOT NULL)`,
+      );
+      await adapter.addForeignKey("dc_m_ch", "dc_m_p1", {
+        column: "p1_id",
+        name: "dc_m_fk1",
+        deferrable: "immediate",
+      });
+      await adapter.addForeignKey("dc_m_ch", "dc_m_p2", {
+        column: "p2_id",
+        name: "dc_m_fk2",
+        deferrable: "immediate",
+      });
+      try {
+        await expect(async () => {
+          await adapter.beginTransaction();
+          try {
+            await adapter.setConstraints("deferred", "dc_m_fk1", "dc_m_fk2");
+            await adapter.execute(`INSERT INTO dc_m_ch (p1_id, p2_id) VALUES (-1, -1)`);
+            await adapter.setConstraints("immediate", "dc_m_fk1", "dc_m_fk2");
+            await adapter.commit();
+          } catch (e) {
+            await adapter.rollback().catch(() => {});
+            throw e;
+          }
+        }).rejects.toThrow(InvalidForeignKey);
+      } finally {
+        await adapter.execute(`DROP TABLE IF EXISTS dc_m_ch`);
+        await adapter.execute(`DROP TABLE IF EXISTS dc_m_p1`);
+        await adapter.execute(`DROP TABLE IF EXISTS dc_m_p2`);
+      }
     });
-    it.skip("defer constraints only defers single fk", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
-      // ROOT-CAUSE: connection-adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+
+    it("defer constraints only defers single fk", async () => {
+      await adapter.execute(`DROP TABLE IF EXISTS dc_s_ch`);
+      await adapter.execute(`DROP TABLE IF EXISTS dc_s_p1`);
+      await adapter.execute(`DROP TABLE IF EXISTS dc_s_p2`);
+      await adapter.execute(`CREATE TABLE dc_s_p1 (id SERIAL PRIMARY KEY)`);
+      await adapter.execute(`CREATE TABLE dc_s_p2 (id SERIAL PRIMARY KEY)`);
+      await adapter.execute(
+        `CREATE TABLE dc_s_ch (id SERIAL PRIMARY KEY, p1_id INT NOT NULL, p2_id INT NOT NULL)`,
+      );
+      // FK1 is NOT deferrable — always immediate regardless of SET CONSTRAINTS.
+      await adapter.addForeignKey("dc_s_ch", "dc_s_p1", {
+        column: "p1_id",
+        name: "dc_s_fk1",
+      });
+      // FK2 is deferrable — can be set to deferred.
+      await adapter.addForeignKey("dc_s_ch", "dc_s_p2", {
+        column: "p2_id",
+        name: "dc_s_fk2",
+        deferrable: "immediate",
+      });
+      try {
+        // Defer only fk2; fk1 is not deferrable so it stays immediate.
+        // Inserting a row that violates fk1 should raise immediately.
+        await expect(async () => {
+          await adapter.beginTransaction();
+          try {
+            await adapter.setConstraints("deferred", "dc_s_fk2");
+            await adapter.execute(`INSERT INTO dc_s_ch (p1_id, p2_id) VALUES (-1, -1)`);
+            await adapter.commit();
+          } catch (e) {
+            await adapter.rollback().catch(() => {});
+            throw e;
+          }
+        }).rejects.toThrow(InvalidForeignKey);
+      } finally {
+        await adapter.execute(`DROP TABLE IF EXISTS dc_s_ch`);
+        await adapter.execute(`DROP TABLE IF EXISTS dc_s_p1`);
+        await adapter.execute(`DROP TABLE IF EXISTS dc_s_p2`);
+      }
     });
-    it.skip("set constraints requires valid value", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
-      // ROOT-CAUSE: connection-adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+
+    it("set constraints requires valid value", async () => {
+      await expect(adapter.setConstraints("invalid" as unknown as "deferred")).rejects.toThrow(
+        /deferred must be/,
+      );
     });
   });
 });
