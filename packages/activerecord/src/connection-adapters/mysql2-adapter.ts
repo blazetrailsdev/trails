@@ -540,15 +540,24 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         const [rawResult] = prepare
           ? await conn.execute(driverSql, driverBinds as any[])
           : await conn.query(driverSql, driverBinds);
-        // Stored procedure CALL returns nested result sets when the procedure
-        // contains a SELECT: mysql2 sets _resultIndex > 0 and returns
-        // [[selectRows, OkPacket], [fields, ...]]. Unwrap to the first result
-        // set (the rows from SELECT inside the procedure). Mirrors Rails'
-        // raw_connection.abandon_results! which discards trailing result sets.
-        const result =
-          Array.isArray(rawResult) && Array.isArray(rawResult[0])
-            ? (rawResult[0] as mysql.RowDataPacket[])
-            : rawResult;
+        // CALL statements set _resultIndex > 0 in mysql2, which wraps every
+        // result set in a nested array: [[rows|header, ...], ...]. Unwrap to
+        // the first result set and discard the rest — mirrors Rails'
+        // raw_connection.abandon_results! + cast_result's fields.empty? guard.
+        // First nested element may be rows (SELECT) or a ResultSetHeader
+        // (DML-only CALL); the existing !Array.isArray(result) branch below
+        // handles the DML case once it is unwrapped here.
+        let result: mysql.RowDataPacket[] | mysql.ResultSetHeader = rawResult as
+          | mysql.RowDataPacket[]
+          | mysql.ResultSetHeader;
+        if (Array.isArray(rawResult) && rawResult.length > 0) {
+          const first = rawResult[0];
+          if (Array.isArray(first)) {
+            result = first as mysql.RowDataPacket[];
+          } else if (first != null && typeof first === "object" && "affectedRows" in first) {
+            result = first as mysql.ResultSetHeader;
+          }
+        }
         // DML results in a ResultSetHeader (no rows array); SELECT results
         // in an array of row objects. Return empty Result for DML to avoid
         // throwing on INSERT/UPDATE/DELETE passed to execQuery.
@@ -735,11 +744,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           ? await conn.execute(driverSql, driverBinds as any[])
           : await conn.query(driverSql, driverBinds);
         // Unwrap nested result sets from stored procedure CALL (see execQuery).
-        const r = (Array.isArray(rows) && Array.isArray(rows[0]) ? rows[0] : rows) as Record<
-          string,
-          unknown
-        >[];
-        payload.row_count = Array.isArray(r) ? r.length : 0;
+        let r: Record<string, unknown>[] = Array.isArray(rows)
+          ? (rows as Record<string, unknown>[])
+          : [];
+        if (Array.isArray(rows) && rows.length > 0) {
+          const first = rows[0];
+          if (Array.isArray(first)) {
+            r = first as Record<string, unknown>[];
+          } else if (first != null && typeof first === "object" && "affectedRows" in first) {
+            r = [];
+          }
+        }
+        payload.row_count = r.length;
         await this._handleWarningsOn(conn, driverSql);
         return r;
       } catch (e: any) {
