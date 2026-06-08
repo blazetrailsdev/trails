@@ -527,6 +527,42 @@ describe("commitAndPush (git mutation flow)", () => {
       seen.push(label);
       return "" as never;
     });
+    let mutatorCalls = 0;
+    expect(() =>
+      commitAndPush({
+        message: "claim: x",
+        fileToStage: "/some/file.md",
+        mutator: () => mutatorCalls++,
+        raceMessage: "lost claim race",
+        raceExitCode: 3,
+      }),
+    ).toThrow(/exit 1/);
+    expect(exit).toHaveBeenCalledWith(1);
+    // The guard fires before the mutation loop: it never restores generated
+    // files, pulls, runs the mutator, commits, or pushes — the tree is untouched.
+    expect(seen).toEqual([]);
+    expect(mutatorCalls).toBe(0);
+    // And it exits 1 (a real config error), NOT the raceExitCode (a lost race) —
+    // the whole point is to stop masquerading a stuck checkout as a lost claim.
+    expect(exit).not.toHaveBeenCalledWith(3);
+    const msg = errSpy.mock.calls.at(-1)?.[0] as string;
+    expect(msg).toMatch(/is on branch "rfc-some-feature", not "main"/);
+    // The actionable recovery command is part of the contract — lock it so a
+    // refactor can't silently drop the one line an operator needs to copy.
+    expect(msg).toMatch(/checkout main && .*pull --ff-only origin main/);
+  });
+
+  it("reports a detached HEAD (symbolic-ref exits non-zero) and still exits 1", () => {
+    const { seen, exit } = setup();
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      // `git symbolic-ref --quiet HEAD` exits non-zero on a detached HEAD; the
+      // git() helper surfaces that as a throw, which the guard must swallow.
+      if (label === "symbolic-ref") throw new Error("fatal: ref HEAD is not a symbolic ref");
+      seen.push(label);
+      return "" as never;
+    });
     expect(() =>
       commitAndPush({
         message: "claim: x",
@@ -537,12 +573,8 @@ describe("commitAndPush (git mutation flow)", () => {
       }),
     ).toThrow(/exit 1/);
     expect(exit).toHaveBeenCalledWith(1);
-    // No pull/add/commit/push — the guard fires before the mutation loop, and
-    // it exits 1 (a real config error), NOT the raceExitCode (a lost race).
-    expect(seen).not.toContain("pull");
-    expect(seen).not.toContain("push");
-    expect(exit).not.toHaveBeenCalledWith(3);
-    expect(errSpy.mock.calls.at(-1)?.[0]).toMatch(/is on branch "rfc-some-feature", not "main"/);
+    expect(seen).toEqual([]);
+    expect(errSpy.mock.calls.at(-1)?.[0]).toMatch(/is on branch "\(detached HEAD\)", not "main"/);
   });
 
   // refine commits in an agent worktree (on a feature branch) and must push
