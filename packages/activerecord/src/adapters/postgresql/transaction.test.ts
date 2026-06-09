@@ -35,8 +35,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.beginIsolatedDbTransaction("serializable");
         await other.beginIsolatedDbTransaction("serializable");
-        // Both read the same set, then both write based on it — the second
-        // write to commit raises serialization_failure.
+        // Both read the same set, then write based on it — the second writer
+        // raises serialization_failure.
         await adapter.execute("SELECT sum(value) FROM samples");
         await other.execute("SELECT sum(value) FROM samples");
         await other.execute("UPDATE samples SET value = 1 WHERE id = 1");
@@ -57,25 +57,24 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raises Interrupt when canceling statement via interrupt", async () => {
-      // Rails injects a Ruby `Interrupt` (`thread.raise Interrupt`) and asserts
-      // the statement aborts promptly (duration < 5s). Node has no thread-
-      // interrupt analog, so we cancel the backend from a second connection
-      // (libpq's PQcancel, what Ruby's interrupt handler ultimately sends) —
-      // same QueryCanceled (57014), same observable: the long query is aborted.
+      // Rails uses `thread.raise Interrupt` and asserts a prompt abort (< 5s).
+      // Node has no thread-interrupt analog, so we cancel from a second
+      // connection (libpq PQcancel, what Ruby's interrupt sends) — same 57014.
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
         const rows = await adapter.execute("SELECT pg_backend_pid() AS pid");
         const pid = (rows[0] as { pid: number }).pid;
         const start = Date.now();
-        // Attach the handler at creation so the canceled query is never
-        // momentarily unhandled while we await the cancel (vitest fails on
-        // unhandled rejections).
+        // Handler attached at creation so the canceled query is never
+        // momentarily unhandled (vitest fails on unhandled rejections).
         let slowError: unknown;
         const slow = adapter.execute("SELECT pg_sleep(10)").catch((e) => {
           slowError = e;
         });
         await new Promise<void>((r) => setTimeout(r, 500));
-        await other.execute("SELECT pg_cancel_backend(?)", [pid]);
+        // Assert the cancel landed, else a no-op leaves `slow` pending to timeout.
+        const sent = await other.execute("SELECT pg_cancel_backend(?) AS ok", [pid]);
+        expect((sent[0] as { ok: boolean }).ok).toBe(true);
         await slow;
         expect(slowError).toBeInstanceOf(QueryCanceled);
         expect(Date.now() - start).toBeLessThan(5000);
@@ -130,10 +129,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.beginDbTransaction();
         await adapter.execute("SELECT * FROM samples WHERE id = 1 FOR UPDATE");
-        // `other` blocks on the row `adapter` holds; a third connection finds
-        // its pid in pg_stat_activity and cancels it — mirrors Rails. Handler
-        // attached at creation so the canceled query is never momentarily
-        // unhandled while we await the cancel (vitest fails on those).
+        // `other` blocks on `adapter`'s row; a third connection cancels it via
+        // pg_stat_activity (mirrors Rails). Handler attached at creation (vitest).
         let blockedError: unknown;
         const blocked = other
           .execute("SELECT * FROM samples WHERE id = 1 FOR UPDATE")
@@ -143,10 +140,12 @@ describeIfPg("PostgreSQLAdapter", () => {
         await new Promise<void>((r) => setTimeout(r, 200));
         const canceler = new PostgreSQLAdapter(PG_TEST_URL);
         try {
-          await canceler.execute(
-            "SELECT pg_cancel_backend(pid) FROM pg_stat_activity " +
+          // Assert the cancel matched, else a no-op leaves `blocked` to timeout.
+          const sent = await canceler.execute(
+            "SELECT pg_cancel_backend(pid) AS ok FROM pg_stat_activity " +
               "WHERE state = 'active' AND query LIKE '% FOR UPDATE'",
           );
+          expect(sent.length).toBe(1);
           await blocked;
           expect(blockedError).toBeInstanceOf(QueryCanceled);
         } finally {
