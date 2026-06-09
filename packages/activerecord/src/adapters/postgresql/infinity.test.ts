@@ -115,11 +115,17 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("assigning 'infinity' on a datetime column with TZ aware attributes", async () => {
-      // reset_column_information should be called to recreate types with TimeZoneConverter
-      setZone("Pacific Time (US & Canada)");
+      // setZone is the first statement inside try{} so the finally{} resetZone()
+      // always restores it, even if a later await throws (mirrors Rails'
+      // in_time_zone ensure block).
       try {
+        setZone("Pacific Time (US & Canada)");
         const { Base } = await import("../../index.js");
         const a = adapter;
+        // Rails' in_time_zone flips the global Base.time_zone_aware_attributes;
+        // we scope the flag to this subclass instead — the production hook reads
+        // `this.timeZoneAwareAttributes` per-class, so it's equivalent at runtime
+        // and avoids leaking global state across the shared-worker test suite.
         class PostgresqlInfinity extends Base {
           static tableName = "postgresql_infinities";
           static timeZoneAwareAttributes = true;

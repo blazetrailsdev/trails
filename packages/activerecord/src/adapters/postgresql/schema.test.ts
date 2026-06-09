@@ -281,6 +281,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       ).rejects.toBeInstanceOf(StatementInvalid);
     });
     it("schema change with prepared stmt", async () => {
+      // Rails gates this test on `if connection.prepared_statements`. Our adapter
+      // defaults preparedStatements to true with no test-helper path to disable
+      // it, but assert it explicitly so the cached-plan retry path is actually
+      // exercised rather than trivially passing if it were ever turned off.
+      expect(adapter.preparedStatements).toBe(true);
       // Rails uses the fixture-isolated `developers` table; our PG adapter files
       // share one database per worker, so we use a uniquely-named table to avoid
       // racing the canonical `developers` table other files create.

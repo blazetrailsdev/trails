@@ -121,15 +121,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     // Rational(3, 4) has no JavaScript equivalent — and is reclassified in
     // scripts/api-compare/unported-files.ts.
 
-    it("quote binary", async () => {
-      await adapter.exec(`CREATE TABLE "quoting_test" (id serial primary key, payload bytea)`);
-      const bytes = new Uint8Array([0, 1, 2, 253, 254, 255]);
-      await adapter.execute(
-        `INSERT INTO "quoting_test" (payload) VALUES (${adapter.quotedBinary(bytes)})`,
-      );
-      const rows = await adapter.execute(`SELECT payload FROM "quoting_test"`);
-      expect(new Uint8Array(rows[0].payload as ArrayBufferLike)).toEqual(bytes);
-    });
+    // NOTE: PG `quoting_test.rb` has no `test_quote_binary`. Binary-quoting
+    // coverage lives where Rails keeps it: `quotedBinary`/`escape_bytea` is
+    // unit-tested in connection-adapters/postgresql/quoting.test.ts, and the
+    // bytea round-trip is covered by bytea.test.ts (Rails bytea_test.rb). The
+    // phantom-named stub that used to sit here was removed to avoid an
+    // unmatched test:compare entry.
 
     it("quote bit string", () => {
       // binary path
