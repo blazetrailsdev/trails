@@ -27,8 +27,10 @@ import {
 import { deprecator } from "../../deprecator.js";
 
 // Mirrors Rails' `deprecate :unsigned_float, :unsigned_decimal` on MySQL::ColumnMethods,
-// which passes no `:message` — so ActiveSupport emits the bare default
-// "<method> is deprecated and will be removed from <gem_name>" with no usage hint.
+// which passes no `:message`, so ActiveSupport builds the default
+// "<method> is deprecated and will be removed from <gem_name> <deprecation_horizon>"
+// (deprecation/reporting.rb) with no usage hint. The trailing horizon is omitted here
+// because this deprecator carries no horizon infrastructure.
 const UNSIGNED_FLOAT_DEPRECATION =
   "unsigned_float is deprecated and will be removed from Active Record";
 const UNSIGNED_DECIMAL_DEPRECATION =
