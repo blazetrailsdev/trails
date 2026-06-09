@@ -1041,26 +1041,6 @@ export class TableDefinition {
   }
 
   /** @internal Builds MySQL inline INDEX clause for use inside CREATE TABLE (...). */
-  private _mysqlInlineIndexSql(idx: IndexDefinition): string {
-    const indexType = idx.type?.toUpperCase() ?? (idx.unique ? "UNIQUE" : undefined);
-    const parts: string[] = [];
-    if (indexType) parts.push(indexType);
-    parts.push("INDEX");
-    parts.push(this._adapter.quoteIdentifier(idx.name));
-    if (idx.using) parts.push(`USING ${idx.using}`);
-    const cols = Array.isArray(idx.columns) ? idx.columns : [idx.columns];
-    const quotedCols = cols.map((c) => {
-      let q = this._adapter.quoteIdentifier(c);
-      const lengths = idx.lengths as Record<string, number> | number | undefined;
-      const len = typeof lengths === "number" ? lengths : (lengths as Record<string, number>)?.[c];
-      if (len != null) q += `(${len})`;
-      return q;
-    });
-    parts.push(`(${quotedCols.join(", ")})`);
-    let sql = parts.join(" ");
-    if (idx.comment) sql += ` COMMENT '${idx.comment.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
-    return sql;
-  }
 
   /**
    * Generate CREATE TABLE SQL.
@@ -1230,8 +1210,6 @@ export class TableDefinition {
       // use MySQL::SchemaCreation#add_column_options!; the DDL-generator-convergence RFC
       // will route this through the visitor and remove the branch.
       if (this._adapterName === "mysql" && col.options.comment?.trim())
-        // Escape backslashes and quotes like a MySQL string literal (matches
-        // `_mysqlInlineIndexSql` in this file and Rails' quoted_comment).
         parts.push(`COMMENT '${col.options.comment.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`);
 
       return parts.join(" ");
