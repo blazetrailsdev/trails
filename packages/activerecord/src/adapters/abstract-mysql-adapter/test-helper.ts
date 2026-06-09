@@ -2,6 +2,7 @@ import { describe } from "vitest";
 import mysql from "mysql2/promise";
 import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-adapter.js";
 import { Mysql2Adapter } from "../../connection-adapters/mysql2-adapter.js";
+import { Version } from "../../connection-adapters/abstract-adapter.js";
 import type { SQLWarning } from "../../errors.js";
 
 /**
@@ -58,4 +59,21 @@ export const describeIfMysql = mysqlAvailable ? describe : (describe.skip as typ
 export const isMariaDb = mariaDb;
 /** Raw VERSION() string from the connected MySQL/MariaDB server (empty when unavailable). */
 export const mysqlVersion = mysqlVersionStr;
+
+// Parse the dotted version out of the raw VERSION() string the same way
+// AbstractMysqlAdapter#version_string does (strips the MariaDB 5.5.5- prefix).
+function parseMysqlVersion(full: string): Version | null {
+  const m = full.match(/^(?:5\.5\.5-)?(\d+\.\d+\.\d+)/);
+  return m ? new Version(m[1]) : null;
+}
+const _serverVersion = parseMysqlVersion(mysqlVersionStr);
+
+/**
+ * Mirrors AbstractMysqlAdapter#supports_optimizer_hints?: MySQL ≥ 5.7.7 only;
+ * never MariaDB. Lets adapter tests gate on hint support the way the Rails
+ * suite wraps `OptimizerHintsTest` in `if supports_optimizer_hints?`.
+ */
+export const supportsOptimizerHints =
+  mysqlAvailable && !mariaDb && _serverVersion?.gte("5.7.7") === true;
+
 export { Mysql2Adapter };
