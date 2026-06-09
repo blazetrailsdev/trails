@@ -34,13 +34,7 @@ describeIfMysql("Mysql2Adapter", () => {
       expect((column as any).isBigint()).toBe(false);
     });
 
-    // BLOCKED: schema-dumper columnSpec divergence (Wave 3 Story 3.3). For a raw
-    // string-typed column trails' emitTable appends `{ limit, collation }` option
-    // literals, whereas Rails emits a bare `t.column "enum_column", "enum(...)"`.
-    // The `unsigned`/`bigint` introspection this file proves is unaffected; un-skip
-    // when the schema dumper stops emitting native-type options for opaque string
-    // types. (See enum_tests dump: the column line carries `{ limit: 8, collation }`.)
-    it.skip("schema dumping", async () => {
+    it("schema dumping", async () => {
       const schema = await SchemaDumper.dumpTableSchema(
         adapter as unknown as SchemaSource,
         "enum_tests",
