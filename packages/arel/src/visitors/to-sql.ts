@@ -668,9 +668,8 @@ export class ToSql extends Visitor {
     }
     this.visit(node.attribute, collector);
     collector.append(node.type === "in" ? " IN (" : " NOT IN (");
-    // Mirrors Rails: `collector.add_binds(o.values, &@block)` — raw values go
-    // through addBinds so each produces a placeholder (? or $N), not a quoted literal.
-    collector.addBinds(node.values, null, this.bindBlock());
+    // Mirrors Rails to_sql.rb: `collector.add_binds(o.casted_values, o.proc_for_binds, &bind_block)`
+    collector.addBinds(node.castedValues, node.procForBinds, this.bindBlock());
     collector.append(")");
     return collector;
   }

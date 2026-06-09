@@ -162,11 +162,7 @@ export class MySQL extends ToSql {
   ): SQLString {
     this.visitNodeOrValue(node.left, collector);
     collector.append(" <=> ");
-    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
-      collector.append("NULL");
-    } else {
-      this.visitNodeOrValue(node.right, collector);
-    }
+    this.visitNodeOrValue(node.right, collector);
     return collector;
   }
 
@@ -177,11 +173,7 @@ export class MySQL extends ToSql {
     collector.append("NOT ");
     this.visitNodeOrValue(node.left, collector);
     collector.append(" <=> ");
-    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
-      collector.append("NULL");
-    } else {
-      this.visitNodeOrValue(node.right, collector);
-    }
+    this.visitNodeOrValue(node.right, collector);
     return collector;
   }
 
