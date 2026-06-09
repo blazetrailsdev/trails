@@ -10,7 +10,11 @@
 
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import { isWriteQuery as mysqlIsWriteQuery } from "./mysql/database-statements.js";
+import {
+  isWriteQuery as mysqlIsWriteQuery,
+  returningColumnValues as mysqlReturningColumnValues,
+} from "./mysql/database-statements.js";
+import { Result } from "../result.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
@@ -464,6 +468,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return this.supportsInsertReturning()
       ? column.isAutoPopulated()
       : column.isAutoIncrementedByDb();
+  }
+
+  /** Mirrors: AbstractMysqlAdapter#returning_column_values — the full first row
+   *  when RETURNING is supported (MariaDB ≥ 10.5); otherwise `undefined`, which
+   *  routes the caller to the `last_inserted_id` path. *
+   * @internal
+   */
+  override returningColumnValues(result: Result): unknown[] | undefined {
+    return mysqlReturningColumnValues.call(this, result);
   }
 
   supportsSavepoints(): boolean {

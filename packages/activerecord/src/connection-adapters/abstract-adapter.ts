@@ -395,6 +395,10 @@ export interface AbstractAdapter {
   ): Promise<unknown>;
   update(arel: unknown, name?: string | null, binds?: unknown[]): Promise<number>;
   delete(arel: unknown, name?: string | null, binds?: unknown[]): Promise<number>;
+  /** @internal Extracts the RETURNING values from an INSERT result. Adapters
+   *  override for full-row dispatch (PG/SQLite/MySQL); the base yields a single
+   *  value. Mirrors DatabaseStatements#returning_column_values. */
+  returningColumnValues?(result: Result): unknown[] | undefined;
   /** @internal */
   rawExecute(
     sql: string,

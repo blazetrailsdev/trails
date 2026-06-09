@@ -214,8 +214,22 @@ export async function _insertRecord(
     emptyInsertStatementValue?(): string;
   },
   values: Record<string, unknown>,
+  returning?: string[] | null,
 ): Promise<unknown> {
-  const table: ArelTable = (this as any).arelTable;
+  const ctor = this as any;
+  const primaryKey = ctor.primaryKey;
+  let primaryKeyValue: unknown = null;
+  // `prefetch_primary_key?` is false for every adapter the port currently ships
+  // (no client-side sequence prefetch), so this branch is inert today; it is
+  // mirrored to keep the structure aligned with Rails.
+  if (ctor.isPrefetchPrimaryKey?.() && primaryKey && !Array.isArray(primaryKey)) {
+    if (values[primaryKey] == null) {
+      primaryKeyValue = ctor.nextSequenceValue?.() ?? null;
+      if (primaryKeyValue != null) values[primaryKey] = primaryKeyValue;
+    }
+  }
+
+  const table: ArelTable = ctor.arelTable;
   const im = new InsertManager(table);
 
   const entries = Object.entries(values);
@@ -224,7 +238,12 @@ export async function _insertRecord(
   }
 
   if (typeof connection.insert === "function") {
-    return connection.insert(im);
+    // Rails: `connection.insert(im, "#{self} Create", primary_key || false,
+    //         primary_key_value, returning: returning)`.
+    const pkArg: string | false = !Array.isArray(primaryKey) && primaryKey ? primaryKey : false;
+    return connection.insert(im, `${ctor.name} Create`, pkArg, primaryKeyValue, undefined, [], {
+      returning: returning ?? null,
+    });
   }
 
   // Fallback for simple adapters without insert()
@@ -1510,15 +1529,33 @@ async function _createRecord(this: PersistenceInternalHost): Promise<unknown> {
   }
 
   const doInsert = async (connection: unknown) => {
+    const returningColumns: string[] = (ctor as any)._returningColumnsForInsert(connection);
     // _insertRecord takes PersistenceHost (requires new/instantiate); cast is
     // unavoidable here — the constructor IS PersistenceHost at runtime.
-    const insertedId = await _insertRecord.call(
+    const returningValues = await _insertRecord.call(
       ctor as unknown as PersistenceHost,
       connection as any,
       values,
+      returningColumns,
     );
-    if (!Array.isArray(ctor.primaryKey) && this._readAttribute(ctor.primaryKey) == null) {
-      this._writeAttribute(ctor.primaryKey as string, insertedId);
+    // Mirrors Rails: zip the returned values back into the unset attributes
+    // (the auto-increment PK, DB-computed defaults). `returningColumnValues`
+    // currently surfaces a single value, so columns beyond the first are left
+    // for the result to populate; guarding on `undefined` keeps that safe.
+    if (returningValues != null) {
+      const valuesArr = Array.isArray(returningValues) ? returningValues : [returningValues];
+      returningColumns.forEach((column, i) => {
+        const value = valuesArr[i];
+        // Rails writes when `!_read_attribute(column)` — truthy for `nil` AND
+        // `false` — so a column currently holding `null`/`undefined`/`false` is
+        // (re)filled from the returned value. `value === undefined` means the
+        // column had no returned value (see insert()), so skip it.
+        const current = this._readAttribute(column);
+        if (value !== undefined && (current == null || current === false)) {
+          const type = (ctor as any).typeForAttribute?.(column);
+          this._writeAttribute(column, type?.deserialize ? type.deserialize(value) : value);
+        }
+      });
     }
   };
 
