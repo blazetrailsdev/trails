@@ -452,7 +452,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "no equivalent in Node.js request-parameter handling.",
   },
   {
-    testFile: "quoting_test.rb",
+    testFile: "adapters/postgresql/quoting_test.rb",
     tests: ["quote rational"],
     reason:
       'Ruby Rational(3, 4) quotes to the string "3/4"; JavaScript has no Rational ' +
