@@ -36,17 +36,16 @@ describeIfPg("PostgreSQLAdapter", () => {
         undefined,
         false,
         async () => {
-          await Post.optimizerHints("SeqScan(posts)")
+          const posts = Post.optimizerHints("SeqScan(posts)")
             .select("id")
-            .where({ author_id: [0, 1] })
-            .load();
+            .where({ author_id: [0, 1] });
+          // `explain` runs the underlying SELECT (emitting the hinted query the
+          // regex matches) and then EXPLAINs it — mirrors Rails calling
+          // `posts.explain` inside the assert_queries_match block.
+          const plan = await posts.explain();
+          expect(plan).toContain("Seq Scan on posts");
         },
       );
-      const plan = await Post.optimizerHints("SeqScan(posts)")
-        .select("id")
-        .where({ author_id: [0, 1] })
-        .explain();
-      expect(plan).toContain("Seq Scan on posts");
     });
 
     it("optimizer hints with count subquery", async () => {
