@@ -219,6 +219,63 @@ describe("MySQL::SchemaDumper", () => {
     });
   });
 
+  describe("populateVirtualExpressionCache", () => {
+    it("caches the inspect-ready generation expression per column", async () => {
+      const d = make();
+      d.connection = {
+        tableOptions: async () => ({}),
+        schemaQuery: async () => [
+          { name: "upper_name", expr: "upper(`name`)" },
+          { name: "name_length", expr: "length(`name`)" },
+        ],
+        quote: (v) => `'${String(v)}'`,
+      };
+      await (d as any).populateVirtualExpressionCache("t");
+      expect(d.virtualExpressionCache["t"]).toEqual({
+        upper_name: '"upper(`name`)"',
+        name_length: '"length(`name`)"',
+      });
+    });
+
+    it("unescapes doubled backslashes (mirrors Rails gsub('\\\\\\\\', '\\\\'))", async () => {
+      const d = make();
+      d.connection = {
+        tableOptions: async () => ({}),
+        // MySQL doubles backslashes in generation_expression; String.raw keeps the
+        // two literal backslashes the engine would report (e.g. a `\d` regex member).
+        schemaQuery: async () => [{ name: "c", expr: String.raw`a\\d` }],
+        quote: (v) => `'${String(v)}'`,
+      };
+      await (d as any).populateVirtualExpressionCache("t");
+      // The pair collapses to one backslash, then JSON.stringify re-escapes it.
+      expect(d.virtualExpressionCache["t"]!["c"]).toBe(JSON.stringify(String.raw`a\d`));
+    });
+
+    it("does not re-query when the table is already cached", async () => {
+      const d = make();
+      let calls = 0;
+      d.connection = {
+        tableOptions: async () => ({}),
+        schemaQuery: async () => {
+          calls++;
+          return [];
+        },
+        quote: (v) => `'${String(v)}'`,
+      };
+      d.virtualExpressionCache["t"] = { existing: '"e"' };
+      await (d as any).populateVirtualExpressionCache("t");
+      expect(calls).toBe(0);
+      expect(d.virtualExpressionCache["t"]).toEqual({ existing: '"e"' });
+    });
+
+    it("no-ops when the connection cannot run schema queries", async () => {
+      const d = make();
+      d.connection = { tableOptions: async () => ({}) };
+      await (d as any).populateVirtualExpressionCache("t");
+      expect(Object.hasOwn(d.virtualExpressionCache, "t")).toBe(false);
+    });
+  });
+
   describe("orderPrimaryKeyColumns", () => {
     it("reorders composite PK columns by primaryKeyOrderCache", () => {
       const d = make();

@@ -46,14 +46,17 @@ describeIfMysql("Mysql2Adapter", () => {
 
     it("schema dumping", async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter as any, "virtual_columns");
+      // A non-stored generated column dumps without `stored: true`; a STORED one with it.
+      // The backtick around `name` and the function casing follow MySQL's normalized
+      // GENERATION_EXPRESSION (e.g. UPPER → upper); OCTET_LENGTH normalizes to length.
       expect(output).toMatch(
-        /t\.virtual\("upper_name", \{ type: "string", as: "[^"]*name[^"]*" \}\);/,
+        /t\.virtual\("upper_name", \{ type: "string", as: "upper\(`?name`?\)" \}\);/i,
       );
       expect(output).toMatch(
-        /t\.virtual\("name_length", \{ type: "integer", as: "[^"]*name[^"]*", stored: true \}\);/,
+        /t\.virtual\("name_length", \{ type: "integer", as: "length\(`?name`?\)", stored: true \}\);/i,
       );
       expect(output).toMatch(
-        /t\.virtual\("name_octet_length", \{ type: "integer", as: "[^"]*name[^"]*", stored: true \}\);/,
+        /t\.virtual\("name_octet_length", \{ type: "integer", as: "(?:octet_)?length\(`?name`?\)", stored: true \}\);/i,
       );
     });
   });
