@@ -98,7 +98,11 @@ describeIfMysql("Mysql2Adapter", () => {
 
     it("buildExplainClause combines string flag and format hash space-separated", () => {
       const clause = adapter.buildExplainClause(["analyze", { format: "json" }]);
-      expect(clause).toBe("EXPLAIN ANALYZE FORMAT=JSON for:");
+      // MariaDB >= 10.1 drops the EXPLAIN prefix for ANALYZE (analyze_without_explain?).
+      const analyzeWithoutExplain = isMariaDb && adapter.databaseVersion.gte("10.1.0");
+      expect(clause).toBe(
+        analyzeWithoutExplain ? "ANALYZE FORMAT=JSON for:" : "EXPLAIN ANALYZE FORMAT=JSON for:",
+      );
     });
 
     it("buildExplainClause rejects unknown format", () => {
