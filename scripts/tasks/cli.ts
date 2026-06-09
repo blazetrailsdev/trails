@@ -31,10 +31,30 @@ const envDir = (v: string | undefined): string | undefined => {
   const t = v?.trim();
   return t ? t : undefined;
 };
-export const TASKS_DIR =
-  envDir(process.env.TASKS_DIR) ??
-  envDir(process.env.RFCS_DIR) ??
-  join(homedir(), "github", "blazetrailsdev", "tasks");
+
+// Resolution order:
+//   1. $TASKS_DIR env var (explicit user override)
+//   2. $RFCS_DIR env var (transition fallback)
+//   3. <cwd>/tasks if that directory has a .git entry (per-worktree symlink
+//      created by start-worktree.sh)
+//   4. ~/github/blazetrailsdev/tasks (canonical fallback)
+export function resolveTasksDir(cwd = process.cwd()): string {
+  const explicit = envDir(process.env.TASKS_DIR) ?? envDir(process.env.RFCS_DIR);
+  if (explicit) return explicit;
+  const local = join(cwd, "tasks");
+  if (existsSync(join(local, ".git"))) return local;
+  return join(homedir(), "github", "blazetrailsdev", "tasks");
+}
+
+export const TASKS_DIR = resolveTasksDir();
+
+// True when TASKS_DIR resolved to the per-worktree symlink (not from env
+// var and not the canonical fallback). Read commands sync from origin/main
+// before loading the index so a per-worktree checkout never serves stale data.
+const TASKS_DIR_IS_SYMLINK =
+  TASKS_DIR !== join(homedir(), "github", "blazetrailsdev", "tasks") &&
+  !envDir(process.env.TASKS_DIR) &&
+  !envDir(process.env.RFCS_DIR);
 
 export type StoryStatus = "draft" | "ready" | "claimed" | "in-progress" | "done" | "blocked";
 export type RfcStatus = "draft" | "active" | "closed" | "postponed" | "superseded";
@@ -264,6 +284,21 @@ function restoreGeneratedFiles(cwd: string | undefined): void {
   }
 }
 
+// Fetch + hard-reset the per-worktree tasks checkout to origin/main before
+// read commands. Keeps `ready`/`next-bundle`/`list`/`status` from serving
+// a stale index when the checkout hasn't been updated since spawn. Only
+// runs when using the per-worktree symlink (TASKS_DIR_IS_SYMLINK); the
+// canonical fallback and explicit $TASKS_DIR overrides are left alone.
+function syncFromOrigin(): void {
+  if (!TASKS_DIR_IS_SYMLINK) return;
+  try {
+    git(["fetch", "--quiet", "origin"], { silent: true });
+    git(["reset", "--hard", "--quiet", "origin/main"], { silent: true });
+  } catch {
+    /* best-effort — stale data is better than a broken CLI */
+  }
+}
+
 function storyFilePath(index: Index, id: string): string {
   const entry = index.stories.find((s) => s.id === id);
   if (!entry) {
@@ -335,25 +370,26 @@ export function commitAndPush(opts: {
   mutator: () => void;
   raceMessage: string;
   raceExitCode: number;
-  // Defaults target the canonical checkout on `main`. `refine` overrides
-  // both: it commits in an agent's worktree (on a feature branch) and pushes
-  // `HEAD:main` so the branch name is irrelevant to where the work lands.
+  // Default pushRefspec is `HEAD:main` so per-worktree checkouts on their
+  // own branch push to origin/main regardless of branch name. Pass an
+  // explicit bare-branch refspec (e.g. `"main"`) only when calling from a
+  // checkout known to be on that branch.
   cwd?: string;
   pushRefspec?: string;
 }): void {
   const cwd = opts.cwd;
-  const pushRefspec = opts.pushRefspec ?? "main";
-  // Guard the canonical-checkout invariant. A bare-branch refspec (the default
-  // "main") pushes the LOCAL branch of that name — NOT HEAD. If the checkout is
-  // parked on some other branch, `git pull --rebase origin main` rebases the
-  // wrong branch, the commit lands off `main`, and `git push origin main` shoves
-  // a stale local `main` ref at origin → rejected non-fast-forward on every
-  // attempt. That rejection is indistinguishable from a lost race in the loop
-  // below, so without this guard the mutation silently burns both attempts,
-  // exits with raceExitCode ("lost claim race — pick another story"), and
-  // `reset --hard` throws the edit away — the claim is lost, not lost to a
-  // rival. Fail loudly instead. (`refine` pushes `HEAD:main` from a worktree and
-  // is exempt: its refspec carries a colon, so the branch name is irrelevant.)
+  const pushRefspec = opts.pushRefspec ?? "HEAD:main";
+  // Guard for bare-branch refspecs (e.g. an explicit `pushRefspec: "main"`).
+  // A bare refspec pushes the LOCAL branch of that name — NOT HEAD. If the
+  // checkout is parked on some other branch, `git pull --rebase origin main`
+  // rebases the wrong branch, the commit lands off `main`, and `git push
+  // origin main` shoves a stale local `main` ref at origin → rejected
+  // non-fast-forward on every attempt. That rejection is indistinguishable
+  // from a lost race in the loop below, so without this guard the mutation
+  // silently burns both attempts, exits with raceExitCode, and `reset --hard`
+  // throws the edit away — the claim is lost, not lost to a rival. Fail
+  // loudly instead. Refspecs containing a colon (e.g. `HEAD:main`, the
+  // default) are exempt because they push HEAD regardless of branch name.
   if (!pushRefspec.includes(":")) {
     let head = "";
     try {
@@ -422,6 +458,11 @@ function flip(
     fileToStage: file,
     raceMessage,
     raceExitCode,
+    // Per-worktree checkout: HEAD:main pushes the mutation regardless of
+    // branch name. Canonical checkout: bare "main" preserves the branch
+    // guard so a stray-branch checkout fails loudly rather than pushing
+    // stale content to origin/main.
+    pushRefspec: TASKS_DIR_IS_SYMLINK ? "HEAD:main" : "main",
     mutator: () => {
       mutate(file);
       editFrontmatter(file, { updated: today() });
@@ -753,6 +794,7 @@ export function newStory(
     raceMessage: `failed to create ${storySlug} after retry — pull manually and retry`,
     raceExitCode: 4,
     cwd: tasksDir,
+    pushRefspec: TASKS_DIR_IS_SYMLINK ? "HEAD:main" : "main",
   });
   console.log(`created ${rfcSlug}/stories/${storySlug}.md`);
 }
@@ -908,11 +950,13 @@ function main(): void {
 
   switch (cmd) {
     case "ready": {
+      syncFromOrigin();
       const rows = ready(loadIndex(), { rfc: stringFlag(flags, "rfc") });
       flags.json ? console.log(JSON.stringify(rows, null, 2)) : fmt(rows);
       break;
     }
     case "next-bundle": {
+      syncFromOrigin();
       const maxLocRaw = stringFlag(flags, "max-loc") ?? "250";
       if (!/^\d+$/.test(maxLocRaw) || Number(maxLocRaw) <= 0) usage();
       const maxLoc = Number(maxLocRaw);
@@ -935,6 +979,7 @@ function main(): void {
       break;
     }
     case "list": {
+      syncFromOrigin();
       const rows = listFiltered(loadIndex(), {
         rfc: stringFlag(flags, "rfc"),
         status: stringFlag(flags, "status"),
@@ -944,6 +989,7 @@ function main(): void {
       break;
     }
     case "status":
+      syncFromOrigin();
       statusCounts(loadIndex());
       break;
     case "claim": {

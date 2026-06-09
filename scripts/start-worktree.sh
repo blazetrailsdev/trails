@@ -213,6 +213,54 @@ done <<< "$VENDOR_PATHS"
 
 WORKTREE_CREATED=0  # success — disable EXIT-trap cleanup
 
+# Provision a per-worktree tasks checkout so this agent has its own isolated
+# tasks working tree. Each worktree gets `tasks/` symlinked to its own branch
+# so concurrent mutations never race on a shared checkout.
+#
+# Best-effort: failures below are warned but do not abort — the agent falls
+# back to the canonical ~/github/blazetrailsdev/tasks path via cli.ts.
+TASKS_CANONICAL="$HOME/github/blazetrailsdev/tasks"
+TASKS_WORKTREES_ROOT="$HOME/github/blazetrailsdev/tasks-worktrees"
+TASKS_WT="$TASKS_WORKTREES_ROOT/$NAME"
+
+# Run in a subshell so any unexpected failure (set -euo pipefail inside)
+# is caught by the outer `|| echo` and never aborts the parent script.
+# The trails worktree is already complete at this point; tasks provisioning
+# is best-effort — a failure here degrades gracefully to the canonical
+# ~/github/blazetrailsdev/tasks fallback.
+(
+  echo "==> Provisioning per-worktree tasks checkout at $TASKS_WT"
+  if [[ ! -e "$TASKS_CANONICAL/.git" ]]; then
+    echo "    skip — canonical tasks repo not found at $TASKS_CANONICAL" >&2
+    exit 0
+  fi
+  mkdir -p "$TASKS_WORKTREES_ROOT"
+  # Branch `tasks-<NAME>` tracks origin/main. push `HEAD:main` from this
+  # branch always lands on origin/main regardless of branch name.
+  if ! git -C "$TASKS_CANONICAL" worktree add -b "tasks-$NAME" "$TASKS_WT" origin/main 2>/dev/null; then
+    echo "    warning: git worktree add for tasks failed (branch tasks-$NAME may already exist)" >&2
+    echo "    Falling back to canonical $TASKS_CANONICAL for pnpm tasks" >&2
+    exit 0
+  fi
+  # node_modules are required: the tasks pre-commit hook runs
+  # build-index/validate/markdownlint/prettier, and a missing node_modules
+  # crashes the hook, leaving a stale index and failing CI. If install fails,
+  # remove the worktree entirely so cli.ts falls back to the canonical checkout
+  # (which has a working node_modules) rather than using a broken one.
+  echo "==> Installing tasks worktree dependencies"
+  if ! ( cd "$TASKS_WT" && pnpm install ); then
+    echo "    warning: pnpm install failed — removing tasks worktree, falling back to canonical" >&2
+    git -C "$TASKS_CANONICAL" worktree remove --force "$TASKS_WT" 2>/dev/null || true
+    exit 0
+  fi
+  ln -s "$TASKS_WT" "$TARGET/tasks"
+  echo "    linked tasks -> $TASKS_WT"
+) || echo "    warning: tasks worktree provisioning failed — falling back to canonical $TASKS_CANONICAL" >&2
+# Cleanup note: removing this trails worktree does not automatically remove
+# the tasks worktree at $TASKS_WT. Remove it manually with:
+#   git -C "$TASKS_CANONICAL" worktree remove "$TASKS_WT"
+# A prune helper is tracked as a follow-up story.
+
 echo
 echo "Done. New worktree:"
 echo "  $TARGET"
