@@ -219,6 +219,68 @@ describe("MySQL::SchemaDumper", () => {
     });
   });
 
+  describe("populateVirtualExpressionCache", () => {
+    it("caches the inspect-ready generation expression per column", async () => {
+      const d = make();
+      d.connection = {
+        tableOptions: async () => ({}),
+        schemaQuery: async () => [
+          { name: "upper_name", expr: "upper(`name`)" },
+          { name: "name_length", expr: "length(`name`)" },
+        ],
+        quote: (v) => `'${String(v)}'`,
+      };
+      await (d as any).populateVirtualExpressionCache("t");
+      expect(d.virtualExpressionCache["t"]).toEqual({
+        upper_name: '"upper(`name`)"',
+        name_length: '"length(`name`)"',
+      });
+    });
+
+    it('strips escaped single quotes (mirrors Rails gsub("\\\\\'", "\'"))', async () => {
+      const d = make();
+      d.connection = {
+        tableOptions: async () => ({}),
+        // MySQL escapes single quotes inside string literals in generation_expression,
+        // e.g. a JSON path. The `\\'` below is a literal backslash-quote, exactly what
+        // the engine reports for json_extract(`profile`,_utf8mb4'$.email').
+        schemaQuery: async () => [
+          { name: "c", expr: "json_extract(`profile`,_utf8mb4\\'$.email\\')" },
+        ],
+        quote: (v) => `'${String(v)}'`,
+      };
+      await (d as any).populateVirtualExpressionCache("t");
+      // \' collapses to ', then JSON.stringify re-quotes the whole expression.
+      expect(d.virtualExpressionCache["t"]!["c"]).toBe(
+        JSON.stringify("json_extract(`profile`,_utf8mb4'$.email')"),
+      );
+    });
+
+    it("does not re-query when the table is already cached", async () => {
+      const d = make();
+      let calls = 0;
+      d.connection = {
+        tableOptions: async () => ({}),
+        schemaQuery: async () => {
+          calls++;
+          return [];
+        },
+        quote: (v) => `'${String(v)}'`,
+      };
+      d.virtualExpressionCache["t"] = { existing: '"e"' };
+      await (d as any).populateVirtualExpressionCache("t");
+      expect(calls).toBe(0);
+      expect(d.virtualExpressionCache["t"]).toEqual({ existing: '"e"' });
+    });
+
+    it("no-ops when the connection cannot run schema queries", async () => {
+      const d = make();
+      d.connection = { tableOptions: async () => ({}) };
+      await (d as any).populateVirtualExpressionCache("t");
+      expect(Object.hasOwn(d.virtualExpressionCache, "t")).toBe(false);
+    });
+  });
+
   describe("orderPrimaryKeyColumns", () => {
     it("reorders composite PK columns by primaryKeyOrderCache", () => {
       const d = make();

@@ -220,7 +220,45 @@ export class SchemaDumper extends AbstractSchemaDumper {
         // Live introspection is best-effort; fall through to declaration order.
       }
     }
+    await this.populateVirtualExpressionCache(tableName);
     await super.table(tableName, lines);
+  }
+
+  /**
+   * Query `information_schema.columns.generation_expression` for the table's
+   * generated columns and cache the inspect-ready (`as:`) literal per column,
+   * so `extractExpressionForVirtualColumn` can serve it during column iteration.
+   *
+   * Mirrors Rails' `MySQL::SchemaDumper#extract_expression_for_virtual_column`,
+   * which reads the same column and applies `gsub("\\'", "'").inspect`. MySQL's
+   * `generation_expression` already escapes single quotes inside string literals
+   * (e.g. `json_extract(\`profile\`,_utf8mb4\'$.email\')`); Rails strips that
+   * escape before re-quoting so the dumped `as:` round-trips. We do the same and
+   * emit a JSON string literal.
+   * @internal
+   */
+  protected async populateVirtualExpressionCache(tableName: string): Promise<void> {
+    if (Object.hasOwn(this.virtualExpressionCache, tableName)) return;
+    const conn = this.connection;
+    if (!conn?.schemaQuery || !conn.quote) return;
+    const rows = await conn.schemaQuery(
+      `SELECT column_name AS name, generation_expression AS expr
+         FROM information_schema.columns
+        WHERE table_schema = database()
+          AND table_name = ${conn.quote(tableName)}
+          AND generation_expression <> ''`,
+    );
+    const byColumn: Record<string, string> = Object.create(null);
+    for (const row of rows) {
+      const name = (row["name"] ?? row["NAME"] ?? row["COLUMN_NAME"]) as string | undefined;
+      const expr = (row["expr"] ?? row["EXPR"] ?? row["GENERATION_EXPRESSION"]) as
+        | string
+        | undefined;
+      if (typeof name === "string" && typeof expr === "string") {
+        byColumn[name] = JSON.stringify(expr.replace(/\\'/g, "'"));
+      }
+    }
+    this.virtualExpressionCache[tableName] = byColumn;
   }
 
   /** @internal */
