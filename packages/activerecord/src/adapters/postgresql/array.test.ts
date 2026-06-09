@@ -8,6 +8,7 @@ import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
 import { Base, serialize, ColumnNotSerializableError } from "../../index.js";
+import { TimeWithZone, TimeZone, setZone, resetZone } from "@blazetrails/activesupport";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -36,6 +37,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         id serial primary key,
         tags character varying(255)[],
         ratings integer[],
+        datetimes timestamp[],
         decimals numeric(10,2)[] DEFAULT '{}',
         timestamps timestamp[] DEFAULT '{}'
       )
@@ -421,12 +423,32 @@ describeIfPg("PostgreSQLAdapter", () => {
       // an `hstore[]` column would not deserialize to per-element hash objects. Both the
       // hstore-extension table setup and the array-of-hstore OID wiring are prerequisites.
     });
-    it.skip("datetime with timezone awareness", async () => {
-      // BLOCKED: TimeZone infra + missing schema column.
-      // The pg_arrays table above omits the `datetimes datetime[]` column, and the
-      // timestamp/datetime array subtype does not respect ActiveSupport::TimeZone when
-      // casting elements (`in_time_zone` / `Time.zone` not ported). Requires the TimeZone
-      // registry port — defer to a dedicated timezone PR.
+    it("datetime with timezone awareness", async () => {
+      const tz = "Pacific Time (US & Canada)";
+      const zone = TimeZone.find(tz)!;
+      setZone(tz);
+      try {
+        class PgArraysTz extends Base {
+          static tableName = "pg_arrays";
+          static timeZoneAwareAttributes = true;
+        }
+        await PgArraysTz.loadSchema();
+
+        // Rails uses `Time.current.to_s`, which carries the zone offset; mirror
+        // that with an offset-bearing string so the cast and parse agree on the
+        // absolute instant (a bare naive string would be zone-ambiguous).
+        const timeString = "2020-06-15T10:00:00-07:00";
+        const time = zone.parse(timeString) as TimeWithZone;
+        const record = new PgArraysTz({ datetimes: [timeString] } as any);
+        const datetimes = (record as any).datetimes as TimeWithZone[];
+        // Rails: assert_equal [time], record.datetimes
+        expect(datetimes[0]).toBeInstanceOf(TimeWithZone);
+        expect(datetimes[0].utc().epochMilliseconds).toBe(time.utc().epochMilliseconds);
+        // Rails: assert_equal ActiveSupport::TimeZone[tz], record.datetimes.first.time_zone
+        expect(datetimes[0].timeZone.name).toBe(zone.name);
+      } finally {
+        resetZone();
+      }
     });
     it("assigning non array value", async () => {
       class PgArrays extends Base {
@@ -507,11 +529,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("precision is respected on timestamp columns", async () => {
-      // BLOCKED: adapter-pg — timestamp array microsecond precision not preserved
-      // ROOT-CAUSE: OID::DateTime subtype used for timestamp[] columns does not cast the usec
-      //   component of a Temporal.Instant/Date through the Temporal.PlainDateTime precision path;
-      //   precision: 6 column metadata is not plumbed to the timestamp array subtype's cast.
-      // SCOPE: ~20 LOC — plumb precision through OID::Array → DateTime subtype constructor
+      // BLOCKED: adapter-pg — timestamp array microsecond precision survives the
+      // in-memory create-time cast but is dropped on the DB round-trip: the
+      // timestamp[] serialize/deserialize path truncates the usec component.
+      // SCOPE: array OID element serialize/deserialize — see follow-on story
+      //   p3-pg-array-oid-subtypes (also covers hstore[] and the precision plumb).
     });
   });
 });
