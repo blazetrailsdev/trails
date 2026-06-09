@@ -1546,7 +1546,12 @@ async function _createRecord(this: PersistenceInternalHost): Promise<unknown> {
       const valuesArr = Array.isArray(returningValues) ? returningValues : [returningValues];
       returningColumns.forEach((column, i) => {
         const value = valuesArr[i];
-        if (value !== undefined && this._readAttribute(column) == null) {
+        // Rails writes when `!_read_attribute(column)` — truthy for `nil` AND
+        // `false` — so a column currently holding `null`/`undefined`/`false` is
+        // (re)filled from the returned value. `value === undefined` means the
+        // column had no returned value (see insert()), so skip it.
+        const current = this._readAttribute(column);
+        if (value !== undefined && (current == null || current === false)) {
           const type = (ctor as any).typeForAttribute?.(column);
           this._writeAttribute(column, type?.deserialize ? type.deserialize(value) : value);
         }

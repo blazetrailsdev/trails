@@ -203,6 +203,77 @@ describe("DatabaseStatements#insert id extraction", () => {
     expect(await adapter.insert("INSERT INTO t VALUES (1)")).toBe(77);
     expect(customLastInserted).toHaveBeenCalled();
   });
+
+  it("forwards opts.returning to execInsert", async () => {
+    const adapter = new InsertTestAdapter() as any;
+    const execInsert = vi.fn(async () => new Result(["id"], [[5]]));
+    adapter.execInsert = execInsert;
+    await adapter.insert("INSERT INTO t VALUES (1)", null, "id", undefined, null, [], {
+      returning: ["id"],
+    });
+    // execInsert(sql, name, binds, pk, sequenceName, returning)
+    expect(execInsert).toHaveBeenCalledWith("INSERT INTO t VALUES (1)", null, [], "id", null, [
+      "id",
+    ]);
+  });
+
+  it("returns returningColumnValues row when returning requested and result is a Result", async () => {
+    const adapter = new InsertTestAdapter() as any;
+    adapter.execInsert = async () => new Result(["id", "uuid"], [[7, "abc"]]);
+    const rcv = vi.fn((result: Result) => result.rows[0]);
+    adapter.returningColumnValues = rcv;
+    const out = await adapter.insert(
+      "INSERT INTO t DEFAULT VALUES",
+      null,
+      "id",
+      undefined,
+      null,
+      [],
+      {
+        returning: ["id", "uuid"],
+      },
+    );
+    expect(out).toEqual([7, "abc"]);
+    expect(rcv).toHaveBeenCalled();
+  });
+
+  it("preserves a legitimate null RETURNING value rather than falling back to the insert id", async () => {
+    const adapter = new InsertTestAdapter() as any;
+    adapter.execInsert = async () => new Result(["created_by"], [[null]]);
+    adapter.returningColumnValues = (result: Result) => result.rows[0];
+    const out = await adapter.insert(
+      "INSERT INTO t DEFAULT VALUES",
+      null,
+      false,
+      undefined,
+      null,
+      [],
+      {
+        returning: ["created_by"],
+      },
+    );
+    expect(out).toEqual([null]);
+  });
+
+  it("falls back to [insertId] when returning requested but execInsert returns a number", async () => {
+    const adapter = new InsertTestAdapter() as any;
+    adapter.execInsert = async () => 42;
+    const out = await adapter.insert("INSERT INTO t VALUES (1)", null, "id", undefined, null, [], {
+      returning: ["id"],
+    });
+    expect(out).toEqual([42]);
+  });
+
+  it("falls back to [insertId] when RETURNING yields no value (empty rows)", async () => {
+    const adapter = new InsertTestAdapter() as any;
+    adapter.execInsert = async () => new Result(["id"], []);
+    adapter.returningColumnValues = (result: Result) => result.rows[0]; // undefined for empty rows
+    adapter.lastInsertedId = () => 13;
+    const out = await adapter.insert("INSERT INTO t VALUES (1)", null, "id", undefined, null, [], {
+      returning: ["id"],
+    });
+    expect(out).toEqual([13]);
+  });
 });
 
 describe("per-adapter visitor isolation", () => {

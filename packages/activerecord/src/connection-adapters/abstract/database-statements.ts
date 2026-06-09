@@ -1545,7 +1545,12 @@ export const DatabaseStatements = {
       // array to match Rails' `returning_column_values` shape.
       if (result instanceof Result) {
         const rv = (this.returningColumnValues ?? returningColumnValues).call(this, result);
-        if (rv != null && rv.length > 0 && rv[0] != null) return rv;
+        // `undefined` first element means no value was extracted (no RETURNING
+        // clause emitted) — fall back to the insert id. A real `null` is a
+        // legitimate RETURNING value and must be preserved, so guard on
+        // `!== undefined`, not `!= null` (Rails has no such guard because its
+        // adapter dispatch never yields the no-value case here).
+        if (rv != null && rv.length > 0 && rv[0] !== undefined) return rv;
       }
       return [insertedId()];
     }

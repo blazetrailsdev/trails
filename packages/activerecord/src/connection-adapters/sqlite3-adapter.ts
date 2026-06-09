@@ -48,6 +48,8 @@ import {
 } from "@blazetrails/activemodel";
 import { getFs, Notifications, runLoadHooks } from "@blazetrails/activesupport";
 import { typeCastedBinds } from "./abstract/database-statements.js";
+import { returningColumnValues as sqliteReturningColumnValues } from "./sqlite3/database-statements.js";
+import { Result } from "../result.js";
 import { isWriteQuerySql } from "./sql-classification.js";
 import {
   quote as sqliteQuote,
@@ -788,6 +790,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   supportsInsertReturning(): boolean {
     return this.databaseVersion.gte("3.35.0");
+  }
+
+  /** Mirrors: SQLite3::DatabaseStatements#returning_column_values — the full
+   *  first row of the RETURNING result (supports multi-column RETURNING). *
+   * @internal
+   */
+  override returningColumnValues(result: Result): unknown[] | undefined {
+    return sqliteReturningColumnValues(result);
   }
 
   supportsInsertOnConflict(): boolean {
