@@ -29,7 +29,7 @@ import { Column } from "./column.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
-import { typeCastedBinds } from "./abstract/database-statements.js";
+import { typeCastedBinds, transactionIsolationLevels } from "./abstract/database-statements.js";
 import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import type { SchemaSource } from "../schema-dumper.js";
@@ -774,6 +774,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         const translated = await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
+        this.invalidateTransaction(translated);
         throw translated;
       }
     });
@@ -836,6 +837,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         const translated = await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
+        this.invalidateTransaction(translated);
         throw translated;
       }
     });
@@ -853,6 +855,49 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     await this._ensureClient();
     await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
     this._inTransaction = true;
+  }
+
+  override isSavepointErrorsInvalidateTransactions(): boolean {
+    return true;
+  }
+
+  /**
+   * Mirrors Rails' `AbstractMysqlAdapter#begin_isolated_db_transaction`:
+   * issues `SET TRANSACTION ISOLATION LEVEL {level}` then `BEGIN`. `SET
+   * TRANSACTION` applies only to the next transaction, so on a `ConnectionFailed`
+   * the whole batch must be replayed — hence the loop re-runs both statements
+   * after reconnecting (mirrors Rails' `execute_batch(allow_retry: true)`, which
+   * routes through `with_raw_connection` and retries the batch once).
+   *
+   * The reconnect goes through the full `reconnectBang({ restoreTransactions:
+   * true })` lifecycle — re-enabling lazy transactions, clearing the statement
+   * cache, reconfiguring the session, and restoring the transaction stack —
+   * exactly as Rails' `with_raw_connection` calls `reconnect!(restore_transactions:
+   * true)` (abstract_adapter.rb:1027). Restoring is safe mid-materialize: this
+   * frame isn't marked materialized until `super.materializeBang()` runs *after*
+   * this method returns, so `restoreBang()`'s `isMaterialized()` guard makes the
+   * restore a no-op here (mirroring Rails' `Transaction#restore!` `materialized?`
+   * guard) and the replay below is the single re-issue of the batch.
+   */
+  override async beginIsolatedDbTransaction(isolation: string): Promise<void> {
+    const level = transactionIsolationLevels()[isolation];
+    if (!level) throw new Error(`Unknown transaction isolation level: ${isolation}`);
+    for (let attempt = 0; attempt <= 1; attempt++) {
+      try {
+        await this.internalExecute(`SET TRANSACTION ISOLATION LEVEL ${level}`, "TRANSACTION", {
+          materializeTransactions: false,
+        });
+        await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
+        this._inTransaction = true;
+        return;
+      } catch (e) {
+        if (attempt === 0 && e instanceof ConnectionFailed) {
+          await this.reconnectBang({ restoreTransactions: true });
+          continue;
+        }
+        throw e;
+      }
+    }
   }
 
   async beginDeferredTransaction(): Promise<void> {
@@ -930,6 +975,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         const translated = await this._translateAndEnrich(e, driverSql, []);
         payload.exception = translated;
         payload.exception_object = translated;
+        this.invalidateTransaction(translated);
         throw translated;
       }
     });
