@@ -163,6 +163,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
     // bigint reflects with limit 8 but Rails suppresses it (column.bigint?); detect off sqlType
     // since the cast map reports type:"integer".
     if (/^bigint\b/i.test(column.sqlType ?? "")) return undefined;
+    // int(N) reflects with limit 4 (the native default); suppress so dumps stay clean.
+    if (column.type === "integer" && column.limit === 4) return undefined;
     // Mirrors Rails schema_limit: suppress limit when it equals the native default
     // (string varchar(255), float 24, emulated boolean tinyint(1)).
     if (column.type === "string" && column.limit === 255) return undefined;

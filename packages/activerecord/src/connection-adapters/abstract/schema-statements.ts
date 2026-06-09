@@ -103,6 +103,7 @@ export class SchemaStatements {
           collation?: string;
           temporary?: boolean;
           as?: string;
+          autoIncrement?: boolean;
         }
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
@@ -119,6 +120,7 @@ export class SchemaStatements {
       collation?: string;
       temporary?: boolean;
       as?: string;
+      autoIncrement?: boolean;
     } = {};
     let definer: ((t: TableDefinition) => void) | undefined;
 

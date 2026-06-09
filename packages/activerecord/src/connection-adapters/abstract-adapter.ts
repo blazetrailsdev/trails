@@ -213,6 +213,7 @@ export interface AbstractAdapter {
           collation?: string;
           temporary?: boolean;
           as?: string;
+          autoIncrement?: boolean;
         }
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
