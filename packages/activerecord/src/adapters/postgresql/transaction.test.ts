@@ -1,11 +1,9 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/transaction_test.rb
  *
- * Rails drives these through `Sample.transaction` on a model backed by the
- * `samples` table; this port drives the same SQLSTATE -> exception mapping at
- * the adapter level (two `PostgreSQLAdapter` instances coordinating real
- * serialization / deadlock / lock-timeout / cancel conflicts), which is the
- * idiom for the `adapters/postgresql/*.test.ts` directory.
+ * Rails drives these through `Sample.transaction`; this port drives the same
+ * SQLSTATE -> exception mapping at the adapter level (two `PostgreSQLAdapter`
+ * instances coordinating real conflicts), the idiom for `adapters/postgresql/`.
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
@@ -21,9 +19,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTransactionTest", () => {
-    // Mirrors Rails' setup/teardown (samples table, value column). The global
-    // beforeEach (test-setup-ar) drops all tables, so (re)create the table here
-    // — after the reset — rather than in beforeAll.
+    // Mirrors Rails' setup/teardown (samples table, value column). Created in
+    // beforeEach — after the global reset (test-setup-ar drops all tables).
     beforeEach(async () => {
       await adapter.exec("DROP TABLE IF EXISTS samples");
       await adapter.exec("CREATE TABLE samples (id int PRIMARY KEY, value integer)");
@@ -38,8 +35,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.beginIsolatedDbTransaction("serializable");
         await other.beginIsolatedDbTransaction("serializable");
-        // Both transactions read the same set, then both try to write based on
-        // that read — the second write to commit raises serialization_failure.
+        // Both read the same set, then both write based on it — the second
+        // write to commit raises serialization_failure.
         await adapter.execute("SELECT sum(value) FROM samples");
         await other.execute("SELECT sum(value) FROM samples");
         await other.execute("UPDATE samples SET value = 1 WHERE id = 1");
@@ -60,22 +57,27 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raises Interrupt when canceling statement via interrupt", async () => {
-      // Rails injects a Ruby `Interrupt` into the thread running the query
-      // (`thread.raise Interrupt`) and asserts the in-flight statement aborts
-      // promptly (duration < 5s). Node has no thread-interrupt analog, so the
-      // faithful adaptation is to cancel the backend from a second connection
-      // (libpq's PQcancel, which is what Ruby's interrupt handler ultimately
-      // sends) — surfacing the same QueryCanceled (SQLSTATE 57014) and the same
-      // observable: the long query is aborted well before it would finish.
+      // Rails injects a Ruby `Interrupt` (`thread.raise Interrupt`) and asserts
+      // the statement aborts promptly (duration < 5s). Node has no thread-
+      // interrupt analog, so we cancel the backend from a second connection
+      // (libpq's PQcancel, what Ruby's interrupt handler ultimately sends) —
+      // same QueryCanceled (57014), same observable: the long query is aborted.
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
         const rows = await adapter.execute("SELECT pg_backend_pid() AS pid");
         const pid = (rows[0] as { pid: number }).pid;
         const start = Date.now();
-        const slow = adapter.execute("SELECT pg_sleep(10)");
+        // Attach the handler at creation so the canceled query is never
+        // momentarily unhandled while we await the cancel (vitest fails on
+        // unhandled rejections).
+        let slowError: unknown;
+        const slow = adapter.execute("SELECT pg_sleep(10)").catch((e) => {
+          slowError = e;
+        });
         await new Promise<void>((r) => setTimeout(r, 500));
         await other.execute("SELECT pg_cancel_backend(?)", [pid]);
-        await expect(slow).rejects.toThrow(QueryCanceled);
+        await slow;
+        expect(slowError).toBeInstanceOf(QueryCanceled);
         expect(Date.now() - start).toBeLessThan(5000);
       } finally {
         await other.close();
@@ -89,8 +91,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await other.beginDbTransaction();
         await adapter.execute("UPDATE samples SET value = 1 WHERE id = 1");
         await other.execute("UPDATE samples SET value = 2 WHERE id = 2");
-        // Each transaction now waits on the row the other already holds — a
-        // deadlock. PostgreSQL's deadlock detector aborts exactly one.
+        // Each now waits on the row the other holds — deadlock; PG aborts one.
         const [r1, r2] = await Promise.allSettled([
           adapter.execute("UPDATE samples SET value = 3 WHERE id = 2"),
           other.execute("UPDATE samples SET value = 4 WHERE id = 1"),
@@ -130,8 +131,15 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.beginDbTransaction();
         await adapter.execute("SELECT * FROM samples WHERE id = 1 FOR UPDATE");
         // `other` blocks on the row `adapter` holds; a third connection finds
-        // its pid in pg_stat_activity and cancels it — mirrors Rails.
-        const blocked = other.execute("SELECT * FROM samples WHERE id = 1 FOR UPDATE");
+        // its pid in pg_stat_activity and cancels it — mirrors Rails. Handler
+        // attached at creation so the canceled query is never momentarily
+        // unhandled while we await the cancel (vitest fails on those).
+        let blockedError: unknown;
+        const blocked = other
+          .execute("SELECT * FROM samples WHERE id = 1 FOR UPDATE")
+          .catch((e) => {
+            blockedError = e;
+          });
         await new Promise<void>((r) => setTimeout(r, 200));
         const canceler = new PostgreSQLAdapter(PG_TEST_URL);
         try {
@@ -139,7 +147,8 @@ describeIfPg("PostgreSQLAdapter", () => {
             "SELECT pg_cancel_backend(pid) FROM pg_stat_activity " +
               "WHERE state = 'active' AND query LIKE '% FOR UPDATE'",
           );
-          await expect(blocked).rejects.toThrow(QueryCanceled);
+          await blocked;
+          expect(blockedError).toBeInstanceOf(QueryCanceled);
         } finally {
           await canceler.close();
         }

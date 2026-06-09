@@ -5,8 +5,7 @@
  * SAVEPOINT) on the `samples`/`bits` tables; this port drives the same
  * SQLSTATE -> exception mapping at the adapter level. As in Rails, the parent
  * transaction is dirtied via a read on the separate `bits` table
- * (`make_parent_transaction_dirty` / `Bit.take`) so the dirtying query is not
- * an active participant in the serializable conflict on `samples`.
+ * (`make_parent_transaction_dirty` / `Bit.take`).
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
@@ -38,16 +37,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec("DROP TABLE IF EXISTS bits");
     });
 
-    // Mirrors Rails' make_parent_transaction_dirty (Bit.take): dirty the parent
-    // transaction with a read that does NOT touch the contended `samples` rows.
+    // Mirrors make_parent_transaction_dirty (Bit.take): a read off `samples`.
     async function makeParentTransactionDirty(conn: PostgreSQLAdapter): Promise<void> {
       await conn.execute("SELECT * FROM bits LIMIT 1");
     }
 
-    // Open a serializable parent transaction on each connection, dirty each
-    // parent, take a savepoint on `adapter`, then commit a conflicting write on
-    // `other`. The next write on `adapter` inside the savepoint raises
-    // SerializationFailure.
+    // Open a serializable parent on each connection, dirty each, take a
+    // savepoint on `adapter`, then commit a conflicting write on `other`. The
+    // next write inside `adapter`'s savepoint raises SerializationFailure.
     async function serializationConflict(): Promise<PostgreSQLAdapter> {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       await other.beginIsolatedDbTransaction("serializable");
@@ -86,8 +83,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await other.rollbackDbTransaction().catch(() => {});
         await other.close();
       }
-      // Mirrors Rails' recovery assertion: the connection is usable again and
-      // sees the committed state from the conflicting transaction.
+      // Recovery: the connection is usable and sees the committed conflict.
       const rows = await adapter.execute("SELECT value FROM samples WHERE id = 1");
       expect((rows[0] as { value: number }).value).toBe(1);
     });
