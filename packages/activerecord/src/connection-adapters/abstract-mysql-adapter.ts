@@ -954,15 +954,16 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
     const scope = quotedScope(tableName);
 
-    let sql =
-      `SELECT cc.constraint_name AS 'name',` +
-      ` cc.check_clause AS 'expression'` +
-      ` FROM information_schema.check_constraints cc` +
-      ` JOIN information_schema.table_constraints tc` +
-      ` USING (constraint_schema, constraint_name)` +
-      ` WHERE tc.table_schema = ${scope.schema}` +
-      ` AND tc.table_name = ${scope.name}` +
-      ` AND cc.constraint_schema = ${scope.schema}`;
+    let sql = `SELECT cc.constraint_name AS 'name',
+        cc.check_clause AS 'expression'
+      FROM information_schema.check_constraints cc
+      JOIN information_schema.table_constraints tc
+      USING (constraint_schema, constraint_name)
+      WHERE tc.table_schema = ${scope.schema}
+        AND tc.table_name = ${scope.name}
+        AND cc.constraint_schema = ${scope.schema}`;
+    // MariaDB lacks the schema+name uniqueness MySQL's JOIN relies on, so it
+    // additionally filters cc.table_name (mirrors Rails).
     if (this._mariadb) sql += ` AND cc.table_name = ${scope.name}`;
 
     const rows = await this.schemaQuery(sql);
