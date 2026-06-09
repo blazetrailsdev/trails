@@ -288,12 +288,10 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   // /*+ ... */. SelectCore stores its optimizer hints as an OptimizerHints
   // node and `emitOptimizerHints` delegates here.
   protected visitArelNodesOptimizerHints(node: Nodes.OptimizerHints): SQLString {
-    // Mirrors Rails: plain string hints are sanitized (newlines, comment
-    // delimiters, `--` line comments stripped) and empty results dropped.
-    // SqlLiteral hints are the explicit escape hatch and pass through
-    // unchanged — same contract as `sanitizeAsSqlComment`.
+    // Each hint routes through `sanitizeAsSqlComment` — the same
+    // connection-delegating helper `visitArelNodesComment` uses (to_sql.rb:171).
     const sanitized = node.hints
-      .map((h) => (h instanceof Nodes.SqlLiteral ? h.value : this.sanitizeHint(h)))
+      .map((h) => this.sanitizeAsSqlComment(h))
       .filter((h) => h.length > 0);
     if (sanitized.length === 0) return this.collector;
     this.collector.append(` /*+ ${sanitized.join(" ")} */`);
@@ -1350,18 +1348,15 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   /**
-   * Mirrors `to_sql.rb#sanitize_as_sql_comment`. SqlLiteral values pass
-   * through unchanged; otherwise strip newlines and `/*`/`* /` so the value
-   * is safe to embed inside a `/* … * /` SQL comment.
+   * Mirrors `to_sql.rb#sanitize_as_sql_comment` (to_sql.rb:882): SqlLiteral
+   * passes through; everything else delegates to the connection so the
+   * adapter's comment-escaping rules apply. Both `visitArelNodesComment` and
+   * `visitArelNodesOptimizerHints` route through here (real adapters
+   * neutralize-and-space delimiters; the default quoters strip them).
    */
   protected sanitizeAsSqlComment(value: string | Nodes.SqlLiteral): string {
     if (value instanceof Nodes.SqlLiteral) return value.value;
-    return String(value)
-      .replace(/[\r\n]+/g, " ")
-      .replace(/\/\*/g, "")
-      .replace(/\*\//g, "")
-      .replace(/\s+/g, " ")
-      .trim();
+    return this.connection.sanitizeAsSqlComment(String(value));
   }
 
   /**
@@ -1862,16 +1857,6 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return micros > 0
       ? `'${date} ${time}.${String(micros).padStart(6, "0")}'`
       : `'${date} ${time}'`;
-  }
-
-  private sanitizeHint(hint: string): string {
-    return hint
-      .replace(/[\r\n]+/g, " ")
-      .replace(/\/\*/g, "")
-      .replace(/\*\//g, "")
-      .replace(/--/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
   }
 
   /**
