@@ -91,6 +91,7 @@ import {
   castResult,
   performQuery,
   handleWarnings,
+  returningColumnValues as pgReturningColumnValues,
 } from "./postgresql/database-statements.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./postgresql/schema-statements.js";
 import {
@@ -2062,6 +2063,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       const currvalSql = `SELECT currval(${this.quote(sequenceName)})`;
       return this._instrumentedQueryOnClient(client, currvalSql, "SQL", []);
     });
+  }
+
+  /** Mirrors: PostgreSQL::DatabaseStatements#returning_column_values — the full
+   *  first row of the RETURNING result (supports multi-column RETURNING). *
+   * @internal
+   */
+  override returningColumnValues(result: Result): unknown[] | undefined {
+    return pgReturningColumnValues(result);
   }
 
   /** Returns true for raw pg errors that indicate the database doesn't exist (SQLSTATE 3D000). */

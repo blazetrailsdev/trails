@@ -443,7 +443,18 @@ export function realInheritanceColumn(this: SchemaHost, value: string): void {
 
 export const _inheritanceColumn = realInheritanceColumn;
 
-export function _returningColumnsForInsert(this: SchemaHost): string[] {
+export function _returningColumnsForInsert(
+  this: SchemaHost,
+  connection: { returnValueAfterInsert?(column: { name: string }): boolean },
+): string[] {
+  // Mirrors Rails: columns the adapter populates server-side on INSERT (the
+  // auto-increment PK, DB-computed defaults, …). Falls back to the PK when the
+  // adapter reports none.
+  const autoPopulated = columns
+    .call(this)
+    .filter((c: { name: string }) => connection.returnValueAfterInsert?.(c))
+    .map((c: { name: string }) => c.name);
+  if (autoPopulated.length > 0) return autoPopulated;
   const pk = this.primaryKey;
   if (Array.isArray(pk)) return pk;
   return pk ? [pk] : [];
