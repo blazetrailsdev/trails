@@ -288,12 +288,13 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   // /*+ ... */. SelectCore stores its optimizer hints as an OptimizerHints
   // node and `emitOptimizerHints` delegates here.
   protected visitArelNodesOptimizerHints(node: Nodes.OptimizerHints): SQLString {
-    // Mirrors Rails: plain string hints are sanitized (newlines, comment
-    // delimiters, `--` line comments stripped) and empty results dropped.
-    // SqlLiteral hints are the explicit escape hatch and pass through
-    // unchanged — same contract as `sanitizeAsSqlComment`.
+    // Mirrors Rails: visit_Arel_Nodes_OptimizerHints maps each hint through
+    // `@connection.sanitize_as_sql_comment` and joins with a space. SqlLiteral
+    // hints are the explicit escape hatch and pass through unchanged.
     const sanitized = node.hints
-      .map((h) => (h instanceof Nodes.SqlLiteral ? h.value : this.sanitizeHint(h)))
+      .map((h) =>
+        h instanceof Nodes.SqlLiteral ? h.value : this.connection.sanitizeAsSqlComment(h),
+      )
       .filter((h) => h.length > 0);
     if (sanitized.length === 0) return this.collector;
     this.collector.append(` /*+ ${sanitized.join(" ")} */`);
@@ -1862,16 +1863,6 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return micros > 0
       ? `'${date} ${time}.${String(micros).padStart(6, "0")}'`
       : `'${date} ${time}'`;
-  }
-
-  private sanitizeHint(hint: string): string {
-    return hint
-      .replace(/[\r\n]+/g, " ")
-      .replace(/\/\*/g, "")
-      .replace(/\*\//g, "")
-      .replace(/--/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
   }
 
   /**

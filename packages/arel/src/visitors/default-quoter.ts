@@ -1,6 +1,22 @@
 import type { ArelConnection } from "./connection.js";
 import { quoteSchemaQualifiedName } from "./split-schema-qualified-name.js";
 
+/**
+ * Standalone sanitize used when no AR adapter connection is in scope (e.g.
+ * `Node#toSql()` in tests). Strips comment delimiters outright. The real
+ * adapters override this via `AbstractAdapter#sanitizeAsSqlComment`, which
+ * mirrors Rails' neutralize-and-space behavior.
+ */
+function defaultSanitizeAsSqlComment(value: string): string {
+  return String(value)
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\/\*/g, "")
+    .replace(/\*\//g, "")
+    .replace(/--/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function quoteScalar(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
   if (typeof value === "number") {
@@ -55,6 +71,8 @@ export const mysqlDefaultQuoter: ArelConnection = {
   quotedFalse(): string {
     return "FALSE";
   },
+
+  sanitizeAsSqlComment: defaultSanitizeAsSqlComment,
 };
 
 /**
@@ -98,4 +116,6 @@ export const defaultQuoter: ArelConnection = {
   quotedFalse(): string {
     return "FALSE";
   },
+
+  sanitizeAsSqlComment: defaultSanitizeAsSqlComment,
 };
