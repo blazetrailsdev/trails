@@ -533,8 +533,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       let conn: mysql.Connection | undefined;
+      // connAcquired gates dirtyCurrentTransaction: Rails' with_raw_connection
+      // runs dirty_current_transaction in the ensure of the `begin…yield…ensure`
+      // loop, AFTER connection setup succeeds (abstract_adapter.rb:983-1015,
+      // :1044-1047). Connection-setup failures happen before that loop and do
+      // not dirty the transaction.
+      let connAcquired = false;
       try {
         conn = await this.getConn();
+        connAcquired = true;
         const prepare = options?.prepare ?? this._shouldPrepare(binds ?? []);
         if (prepare) this._trackPrepared(conn, driverSql);
         const [rawResult, rawFields] = prepare
@@ -566,7 +573,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // in an array of row objects. Return empty Result for DML to avoid
         // throwing on INSERT/UPDATE/DELETE passed to execQuery.
         if (!Array.isArray(result)) {
-          this.dirtyCurrentTransaction();
           payload.row_count = (result as mysql.ResultSetHeader).affectedRows ?? 0;
           await this._handleWarningsOn(conn, driverSql);
           return new Result([], []);
@@ -584,6 +590,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
+      } finally {
+        // Mirrors Rails' with_raw_connection ensure: dirty after any query
+        // attempt — success or failure — but not on connection-setup failure.
+        if (connAcquired) this.dirtyCurrentTransaction();
       }
     });
   }
