@@ -127,6 +127,14 @@ describe("MySQL::SchemaCreation", () => {
     expect(sc.typeToSql("string", {})).toMatch(/varchar/i);
   });
 
+  it("typeToSql preserves enum/set literal type fragments verbatim", () => {
+    // Rails' type_to_sql returns an unrecognized type unchanged; the abstract
+    // default branch must not uppercase a quoted value list, or enum/set member
+    // values get corrupted (e.g. enum('text') -> enum('TEXT')).
+    expect(sc.typeToSql("enum('text','blob','tiny')", {})).toBe("enum('text','blob','tiny')");
+    expect(sc.typeToSql("set('a','b')", {})).toBe("set('a','b')");
+  });
+
   it("addColumnOptions emits ON UPDATE when onUpdate is set (MySQL-specific)", () => {
     const opts: MysqlAddColumnOptions = { onUpdate: "CURRENT_TIMESTAMP" };
     const result = sc.addColumnOptions("`updated_at` datetime", opts);

@@ -160,6 +160,11 @@ export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
   protected override schemaLimit(column: MysqlColumn): string | undefined {
     if (/^(?:tiny|medium|long)?(?:text|blob)\b/i.test(column.sqlType ?? "")) return undefined;
+    // enum/set register as bare string cast types in Rails (no limit), so column.limit is
+    // nil there and the dump emits a verbatim `t.column "c", "enum(...)"`. Our introspection
+    // fills limit from information_schema's CHARACTER_MAXIMUM_LENGTH (the longest member),
+    // so suppress it to keep the dumped type opaque.
+    if (/^(?:enum|set)\b/i.test(column.sqlType ?? "")) return undefined;
     // bigint reflects with limit 8 but Rails suppresses it (column.bigint?); detect off sqlType
     // since the cast map reports type:"integer".
     if (/^bigint\b/i.test(column.sqlType ?? "")) return undefined;
