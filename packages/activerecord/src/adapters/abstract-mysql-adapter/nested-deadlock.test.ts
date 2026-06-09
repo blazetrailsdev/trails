@@ -4,6 +4,7 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { Deadlocked, Rollback } from "../../errors.js";
+import { SavepointTransaction } from "../../connection-adapters/abstract/transaction.js";
 
 function createBarrier(n: number): { wait: () => Promise<void> } {
   let count = 0;
@@ -18,6 +19,22 @@ function createBarrier(n: number): { wait: () => Promise<void> } {
       return promise;
     },
   };
+}
+
+/**
+ * Rails' `make_parent_transaction_dirty` runs `Sample.take` (a SELECT) so the
+ * next nested transaction is forced to be a real SavepointTransaction rather
+ * than a restartable no-op. Rails dirties the transaction on any materialized
+ * query; the trails mysql2 adapter only dirties on DML (`executeMutation`), so
+ * a 0-row UPDATE is the faithful way to dirty without touching data.
+ */
+async function makeParentDirty(a: Mysql2Adapter): Promise<void> {
+  await a.executeMutation("UPDATE `samples` SET value = value WHERE 1 = 0");
+}
+
+/** Mirrors `assert_current_transaction_is_savepoint_transaction`. */
+function assertSavepoint(a: Mysql2Adapter): void {
+  expect(a.currentTransaction()).toBeInstanceOf(SavepointTransaction);
 }
 
 describeIfMysql("Mysql2Adapter", () => {
@@ -54,8 +71,9 @@ describeIfMysql("Mysql2Adapter", () => {
         const [result1, result2] = await Promise.allSettled([
           (async () => {
             await adapter.transaction(async () => {
-              await adapter.execute("SELECT * FROM `samples` LIMIT 1");
+              await makeParentDirty(adapter);
               await adapter.transaction({ requiresNew: true }, async () => {
+                assertSavepoint(adapter);
                 await adapter.execute(`SELECT * FROM \`samples\` WHERE id = ${s1id} FOR UPDATE`);
                 await barrier.wait();
                 await adapter.executeMutation(
@@ -66,8 +84,9 @@ describeIfMysql("Mysql2Adapter", () => {
           })(),
           (async () => {
             await adapter2.transaction(async () => {
-              await adapter2.execute("SELECT * FROM `samples` LIMIT 1");
+              await makeParentDirty(adapter2);
               await adapter2.transaction({ requiresNew: true }, async () => {
+                assertSavepoint(adapter2);
                 await adapter2.execute(`SELECT * FROM \`samples\` WHERE id = ${s2id} FOR UPDATE`);
                 await barrier.wait();
                 await adapter2.executeMutation(
@@ -107,8 +126,9 @@ describeIfMysql("Mysql2Adapter", () => {
         const [result1, result2] = await Promise.allSettled([
           (async () => {
             await adapter.transaction(async () => {
-              await adapter.execute("SELECT * FROM `samples` LIMIT 1");
+              await makeParentDirty(adapter);
               await adapter.transaction({ requiresNew: true }, async () => {
+                assertSavepoint(adapter);
                 await adapter.execute(`SELECT * FROM \`samples\` WHERE id = ${s1id} FOR UPDATE`);
                 await barrier.wait();
                 try {
@@ -128,8 +148,9 @@ describeIfMysql("Mysql2Adapter", () => {
           })(),
           (async () => {
             await adapter2.transaction(async () => {
-              await adapter2.execute("SELECT * FROM `samples` LIMIT 1");
+              await makeParentDirty(adapter2);
               await adapter2.transaction({ requiresNew: true }, async () => {
+                assertSavepoint(adapter2);
                 await adapter2.execute(`SELECT * FROM \`samples\` WHERE id = ${s2id} FOR UPDATE`);
                 await barrier.wait();
                 try {

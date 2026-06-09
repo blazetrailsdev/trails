@@ -29,7 +29,7 @@ import { Column } from "./column.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
-import { typeCastedBinds } from "./abstract/database-statements.js";
+import { typeCastedBinds, transactionIsolationLevels } from "./abstract/database-statements.js";
 import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import type { SchemaSource } from "../schema-dumper.js";
@@ -151,14 +151,6 @@ class Mysql2StatementPool extends MysqlStatementPool {
  * callers within a pinned trails-context serialize through that single
  * connection — no inner pool layer.
  */
-
-const ISOLATION_LEVELS: Record<string, string> = {
-  read_uncommitted: "READ UNCOMMITTED",
-  read_committed: "READ COMMITTED",
-  repeatable_read: "REPEATABLE READ",
-  serializable: "SERIALIZABLE",
-};
-
 export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapter {
   // Cached liveness state — true until a failure is observed (ping fail,
   // disconnect, permanent close). Does not require _client to be non-null:
@@ -871,11 +863,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /**
    * Mirrors Rails' `AbstractMysqlAdapter#begin_isolated_db_transaction`:
-   * issues `SET TRANSACTION ISOLATION LEVEL {level}` followed by `BEGIN`.
-   * Retries once on `ConnectionFailed` (mirrors `allow_retry: true`).
+   * issues `SET TRANSACTION ISOLATION LEVEL {level}` then `BEGIN`. `SET
+   * TRANSACTION` applies only to the next transaction, so on a `ConnectionFailed`
+   * retry the whole batch must be re-issued — hence the loop re-runs both
+   * statements after reconnecting (mirrors Rails' `execute_batch` +
+   * `allow_retry: true`, which discards the dead client and replays the batch).
    */
   override async beginIsolatedDbTransaction(isolation: string): Promise<void> {
-    const level = ISOLATION_LEVELS[isolation];
+    const level = transactionIsolationLevels()[isolation];
     if (!level) throw new Error(`Unknown transaction isolation level: ${isolation}`);
     for (let attempt = 0; attempt <= 1; attempt++) {
       try {
@@ -887,18 +882,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         return;
       } catch (e) {
         if (attempt === 0 && e instanceof ConnectionFailed) {
-          await this._reconnectForRetry();
+          this.reconnect();
+          await this._ensureClient();
           continue;
         }
         throw e;
       }
     }
-  }
-
-  private async _reconnectForRetry(): Promise<void> {
-    this.disconnectBang();
-    this._activeState = true;
-    await this._ensureClient();
   }
 
   async beginDeferredTransaction(): Promise<void> {
@@ -976,6 +966,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         const translated = await this._translateAndEnrich(e, driverSql, []);
         payload.exception = translated;
         payload.exception_object = translated;
+        this.invalidateTransaction(translated);
         throw translated;
       }
     });
