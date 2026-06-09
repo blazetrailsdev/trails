@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/sql_types_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 
 describeIfMysql("Mysql2Adapter", () => {
@@ -14,10 +14,14 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("SqlTypesTest", () => {
-    it.skip("binary types", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in sql-types
-      // ROOT-CAUSE: adapters/mysql2/sql-types.ts or abstract-mysql-adapter/sql-types.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/sql-types.ts; affects ~10–26 tests in sql-types.test.ts
+    const typeToSql = (type: string, limit?: number) =>
+      (adapter as any).typeToSql(type, limit == null ? {} : { limit });
+
+    it("binary types", () => {
+      expect(typeToSql("binary", 64)).toBe("varbinary(64)");
+      expect(typeToSql("binary", 4095)).toBe("varbinary(4095)");
+      expect(typeToSql("binary", 4096)).toBe("blob");
+      expect(typeToSql("binary")).toBe("blob");
     });
   });
 });

@@ -58,6 +58,8 @@ export interface ColumnInfo {
   comment?: string | null;
   /** MySQL `AUTO_INCREMENT` flag — consulted by the dialect `isDefaultPrimaryKey`. */
   autoIncrement?: boolean;
+  /** MySQL `UNSIGNED` flag — emitted as `unsigned: true` by the dialect dumper. */
+  unsigned?: boolean;
 }
 
 export interface IndexInfo {
@@ -440,6 +442,7 @@ class AdapterSchemaSource implements SchemaSource {
       isSerial: (col as any).isSerial === true ? true : undefined,
       comment: col.comment ?? undefined,
       autoIncrement: (col as any).autoIncrement === true ? true : undefined,
+      unsigned: (col as any).unsigned === true ? true : undefined,
     }));
   }
 

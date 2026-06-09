@@ -24,6 +24,15 @@ import {
   SchemaCreation as MysqlSchemaCreation,
   type VisitorHostAdapter,
 } from "./schema-creation.js";
+import { deprecator } from "../../deprecator.js";
+
+// Mirrors Rails' `deprecate :unsigned_float, :unsigned_decimal` on MySQL::ColumnMethods.
+const UNSIGNED_FLOAT_DEPRECATION =
+  "unsigned_float is deprecated and will be removed in a future version of Active Record. " +
+  "Use `t.float ..., unsigned: true` instead.";
+const UNSIGNED_DECIMAL_DEPRECATION =
+  "unsigned_decimal is deprecated and will be removed in a future version of Active Record. " +
+  "Use `t.decimal ..., unsigned: true` instead.";
 
 /**
  * MySQL-specific column type methods mixed into TableDefinition.
@@ -148,10 +157,12 @@ export class TableDefinition extends AbstractTableDefinition {
   }
 
   unsignedFloat(name: string, options: ColumnOptions = {}): this {
+    deprecator().warn(UNSIGNED_FLOAT_DEPRECATION);
     return this.mysqlColumn(name, "float" as ColumnType, "FLOAT UNSIGNED", options);
   }
 
   unsignedDecimal(name: string, options: ColumnOptions = {}): this {
+    deprecator().warn(UNSIGNED_DECIMAL_DEPRECATION);
     if (options.scale !== undefined && options.precision === undefined) {
       throw new Error("Error adding decimal column: precision is required if scale is specified");
     }
@@ -260,5 +271,27 @@ export class Table extends AbstractTable {
    */
   override async primaryKey(): Promise<string | null> {
     return super.primaryKey();
+  }
+
+  // Mirrors the column-type methods MySQL::ColumnMethods mixes into both
+  // TableDefinition and Table. The `unsigned_<type>` type is normalized to its
+  // base type + `unsigned: true` by MySQL::TableDefinition#newColumnDefinition
+  // along the addColumn/alter path.
+  async unsignedInteger(name: string, options: ColumnOptions = {}): Promise<void> {
+    await this.column(name, "unsigned_integer" as ColumnType, options);
+  }
+
+  async unsignedBigint(name: string, options: ColumnOptions = {}): Promise<void> {
+    await this.column(name, "unsigned_bigint" as ColumnType, options);
+  }
+
+  async unsignedFloat(name: string, options: ColumnOptions = {}): Promise<void> {
+    deprecator().warn(UNSIGNED_FLOAT_DEPRECATION);
+    await this.column(name, "unsigned_float" as ColumnType, options);
+  }
+
+  async unsignedDecimal(name: string, options: ColumnOptions = {}): Promise<void> {
+    deprecator().warn(UNSIGNED_DECIMAL_DEPRECATION);
+    await this.column(name, "unsigned_decimal" as ColumnType, options);
   }
 }
