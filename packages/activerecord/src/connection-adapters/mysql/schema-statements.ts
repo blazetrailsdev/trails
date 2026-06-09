@@ -187,6 +187,7 @@ export function newColumnFromField(
     unsigned: /\bunsigned(?: zerofill)?$/.test(field["Type"] ?? ""),
     autoIncrement: /auto_increment/i.test(field["Extra"] ?? ""),
     virtual: /(virtual|stored|persistent)\s+generated/i.test(field["Extra"] ?? ""),
+    extra: extraRaw,
     onUpdate: onUpdateForColumn,
     comment: presence(field["Comment"] as string | undefined) ?? null,
   });

@@ -1349,6 +1349,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           // reports information_schema COLUMN_TYPE lowercased.
           unsigned: /\bunsigned(?: zerofill)?$/.test(sqlType),
           virtual: /\b(?:virtual|stored|persistent)\b/i.test(extra),
+          extra: extraRaw,
           onUpdate: onUpdateForColumn,
         },
       );

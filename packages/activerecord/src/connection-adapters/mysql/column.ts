@@ -12,6 +12,11 @@ export class Column extends BaseColumn {
   readonly unsigned: boolean;
   readonly autoIncrement: boolean;
   readonly virtual: boolean;
+  /** Raw MySQL `Extra` string (e.g. "VIRTUAL GENERATED", "STORED GENERATED",
+   *  "auto_increment"). Mirrors Rails' `MySQL::Column#extra` (delegated from
+   *  sql_type_metadata); the schema dumper reads it to distinguish stored from
+   *  virtual generated columns. */
+  readonly extra: string;
   /** MySQL `ON UPDATE <expr>` extracted from `Extra`. null when not set. Mirrors the
    *  unparsed `ON UPDATE` portion of the column definition; used by renameColumnForAlter
    *  to round-trip the attribute when folding into defaultFunction is not possible. */
@@ -36,6 +41,7 @@ export class Column extends BaseColumn {
       unsigned?: boolean;
       autoIncrement?: boolean;
       virtual?: boolean;
+      extra?: string;
       onUpdate?: string | null;
     } = {},
   ) {
@@ -55,6 +61,7 @@ export class Column extends BaseColumn {
     this.unsigned = options.unsigned ?? false;
     this.autoIncrement = options.autoIncrement ?? false;
     this.virtual = options.virtual ?? false;
+    this.extra = options.extra ?? "";
     this.onUpdate = options.onUpdate ?? null;
   }
 
@@ -85,6 +92,7 @@ export class Column extends BaseColumn {
       unsigned: this.unsigned,
       autoIncrement: this.autoIncrement,
       virtual: this.virtual,
+      extra: this.extra,
       onUpdate: this.onUpdate,
     };
   }
@@ -110,6 +118,7 @@ export class Column extends BaseColumn {
         unsigned: m.unsigned,
         autoIncrement: m.autoIncrement,
         virtual: m.virtual,
+        extra: m.extra ?? "",
         onUpdate: m.onUpdate ?? null,
       },
     );
@@ -121,5 +130,6 @@ export interface MysqlColumnJSON extends ColumnJSON {
   unsigned: boolean;
   autoIncrement: boolean;
   virtual: boolean;
+  extra?: string;
   onUpdate?: string | null;
 }

@@ -60,6 +60,10 @@ export interface ColumnInfo {
   autoIncrement?: boolean;
   /** MySQL `UNSIGNED` flag — emitted as `unsigned: true` by the dialect dumper. */
   unsigned?: boolean;
+  /** Generated-column flag — emitted as `t.virtual` by the dialect dumper. */
+  virtual?: boolean;
+  /** Raw adapter `Extra` string (MySQL) — read to distinguish stored vs virtual generated columns. */
+  extra?: string | null;
 }
 
 export interface IndexInfo {
@@ -443,6 +447,8 @@ class AdapterSchemaSource implements SchemaSource {
       comment: col.comment ?? undefined,
       autoIncrement: (col as any).autoIncrement === true ? true : undefined,
       unsigned: (col as any).unsigned === true ? true : undefined,
+      virtual: (col as any).virtual === true ? true : undefined,
+      extra: (col as any).extra ?? undefined,
     }));
   }
 
@@ -608,7 +614,7 @@ export class SchemaDumper {
   static async dumpTableSchema(source: SchemaSource, tableName: string): Promise<string> {
     const wrappedSource = isDatabaseAdapter(source) ? new AdapterSchemaSource(source) : source;
     // Instantiate the adapter-specific subclass when the adapter exposes
-    // createSchemaDumper() (currently only PostgreSQLAdapter). Falls back to
+    // createSchemaDumper() (PostgreSQLAdapter and Mysql2Adapter). Falls back to
     // the base class when unavailable, which is what the old code always did.
     let dumper: SchemaDumper;
     if (isDatabaseAdapter(source) && typeof (source as any).createSchemaDumper === "function") {
