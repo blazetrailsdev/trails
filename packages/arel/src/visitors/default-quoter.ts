@@ -1,12 +1,9 @@
 import type { ArelConnection } from "./connection.js";
 import { quoteSchemaQualifiedName } from "./split-schema-qualified-name.js";
 
-/**
- * Standalone sanitize used when no AR adapter connection is in scope (e.g.
- * `Node#toSql()` in tests). Strips comment delimiters outright. The real
- * adapters override this via `AbstractAdapter#sanitizeAsSqlComment`, which
- * mirrors Rails' neutralize-and-space behavior.
- */
+// Standalone comment sanitize for connection-less `Node#toSql()` (debug aid):
+// strips delimiters outright. Real adapters override via
+// `AbstractAdapter#sanitizeAsSqlComment` (Rails' neutralize-and-space).
 function defaultSanitizeAsSqlComment(value: string): string {
   return String(value)
     .replace(/[\r\n]+/g, " ")

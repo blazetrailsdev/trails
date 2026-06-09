@@ -18,11 +18,10 @@ const describeOptimizerHints = pgSupportsOptimizerHints ? describe : describe.sk
 
 describeIfPg("PostgreSQLAdapter", () => {
   describeOptimizerHints("PostgresqlOptimizerHintsTest", () => {
-    // Mirrors Rails: fixtures :posts. Rails' posts.yml uses literal
-    // `author_id: 1` (David); our ported fixture references the author by label
-    // (`ref("authors", "david")`), so the authors fixture must be declared
-    // first for that ref to resolve to David's id (1) rather than the
-    // label-hash fallback. Loading both keeps `author_id` faithful to Rails.
+    // Mirrors Rails' `fixtures :posts`. Rails' posts.yml uses literal
+    // `author_id: 1` (David); our ported posts fixture references the author by
+    // label, so authors must be declared first for that ref to resolve to
+    // David's id (1) rather than the label-hash fallback.
     useHandlerFixtures(["authors", "posts"], { schema: canonicalSchema });
 
     beforeAll(async () => {

@@ -22,10 +22,9 @@ import { Notifications } from "@blazetrails/activesupport";
  * Runs `fn` and returns every SQL string emitted via `sql.active_record`
  * during its execution.  Subscription is cleaned up afterward.
  *
- * Pass `{ includeSchema: false }` to drop introspection queries (those the
- * adapter tags `name: "SCHEMA"`, e.g. PG type-map reloads) and cached
- * statements, mirroring Rails' `capture_sql(include_schema: false)`. The
- * default keeps every query for backward compatibility.
+ * Cached statements are always dropped (Rails SQLCounter parity). Pass
+ * `{ includeSchema: false }` to also drop `name: "SCHEMA"` introspection
+ * queries, mirroring Rails' `capture_sql(include_schema: false)`.
  * @internal
  */
 export async function captureSql(
@@ -38,7 +37,8 @@ export async function captureSql(
     const payload = event.payload;
     const sql: unknown = payload?.sql;
     if (typeof sql !== "string") return;
-    if (!includeSchema && (payload?.cached || payload?.name === "SCHEMA")) return;
+    if (payload?.cached) return;
+    if (!includeSchema && payload?.name === "SCHEMA") return;
     sqls.push(sql);
   });
   try {

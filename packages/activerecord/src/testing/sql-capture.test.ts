@@ -15,8 +15,10 @@ function emitTrio(): void {
 }
 
 describe("captureSql", () => {
-  it("captures every emitted SQL string by default", async () => {
-    expect(await captureSql(emitTrio)).toEqual(["LOAD", "INTROSPECT", "CACHED"]);
+  it("drops cached queries but keeps SCHEMA queries by default", async () => {
+    // Cached statements are always excluded (Rails SQLCounter parity); SCHEMA
+    // introspection is kept unless includeSchema is false.
+    expect(await captureSql(emitTrio)).toEqual(["LOAD", "INTROSPECT"]);
   });
 
   it("drops SCHEMA and cached queries when includeSchema is false", async () => {
