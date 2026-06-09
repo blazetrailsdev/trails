@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { describeIfMysql, isMariaDb, Mysql2Adapter } from "./test-helper.js";
+import { Version } from "../../connection-adapters/abstract-adapter.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { Base } from "../../index.js";
@@ -33,17 +34,33 @@ describeIfMysql("Mysql2Adapter", () => {
         schema: canonicalSchema,
       });
 
-      // explain_option: :analyze for MySQL >= 6.0 / MariaDB; :extended as fallback
+      // Mirror Rails' explain_option / expected_analyze_clause split exactly:
+      //   supports_analyze?         = mariadb && version >= 10.1.0       → "ANALYZE"
+      //   supports_explain_analyze? = mariadb ? version <= 10.0          → "EXPLAIN ANALYZE"
+      //                                       : version >= 6.0
+      //   else                                                          → "EXPLAIN EXTENDED"
+      // explain_option picks :analyze when either holds, else :extended.
+      // MariaDB >= 10.1 prints a bare ANALYZE clause (no EXPLAIN prefix).
       let explainOpt: string;
+      let expectedClause: string;
       beforeAll(() => {
-        explainOpt = isMariaDb || adapter.databaseVersion.gte("6.0") ? "analyze" : "extended";
+        const ver = adapter.databaseVersion;
+        const supportsAnalyze = isMariaDb && ver.gte("10.1.0");
+        // `version <= "10.0"` expressed as `Version("10.0") >= version`.
+        const supportsExplainAnalyze = isMariaDb ? new Version("10.0").gte(ver) : ver.gte("6.0");
+        explainOpt = supportsAnalyze || supportsExplainAnalyze ? "analyze" : "extended";
+        expectedClause = supportsAnalyze
+          ? "ANALYZE"
+          : supportsExplainAnalyze
+            ? "EXPLAIN ANALYZE"
+            : "EXPLAIN EXTENDED";
       });
 
       it("explain with options as symbol", async () => {
         // Rails: Author.where(id: 1).explain(explain_option)
         const result = await Author.where({ id: authors("david").id }).explain(explainOpt);
-        // Our header format: "EXPLAIN ANALYZE for: ..." vs Rails' plain "EXPLAIN ANALYZE ..."
-        expect(result).toContain(`EXPLAIN ${explainOpt.toUpperCase()} for:`);
+        // Our header appends " for:" where Rails prints a bare clause.
+        expect(result).toContain(`${expectedClause} for:`);
         expect(result).toContain("SELECT `authors`");
       });
 
@@ -52,7 +69,7 @@ describeIfMysql("Mysql2Adapter", () => {
         const result = await Author.where({ id: authors("david").id }).explain(
           explainOpt.toUpperCase(),
         );
-        expect(result).toContain(`EXPLAIN ${explainOpt.toUpperCase()} for:`);
+        expect(result).toContain(`${expectedClause} for:`);
         expect(result).toContain("SELECT `authors`");
       });
 
@@ -61,8 +78,8 @@ describeIfMysql("Mysql2Adapter", () => {
         const result = await Author.where({ id: authors("david").id })
           .includes("posts")
           .explain(explainOpt);
-        expect(result).toContain(`EXPLAIN ${explainOpt.toUpperCase()} for:`);
-        const blocks = result.split("\n\n").filter((b) => /EXPLAIN/.test(b));
+        expect(result).toContain(`${expectedClause} for:`);
+        const blocks = result.split("\n\n").filter((b) => /EXPLAIN|ANALYZE/.test(b));
         expect(blocks.length).toBeGreaterThanOrEqual(2);
       });
     });
