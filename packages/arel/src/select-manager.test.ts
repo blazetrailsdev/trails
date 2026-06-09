@@ -611,7 +611,7 @@ describe("SelectManagerTest", () => {
       w.frame(new Nodes.Rows(new Nodes.Preceding(new Nodes.Quoted(3))));
       const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(new Nodes.Over(fn, w))).toContain("? PRECEDING");
+      expect(visitor.compile(new Nodes.Over(fn, w))).toContain("3 PRECEDING");
     });
 
     it("takes a rows frame, unbounded following", () => {
@@ -621,7 +621,7 @@ describe("SelectManagerTest", () => {
 
     it("takes a rows frame, bounded following", () => {
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(new Nodes.Following(new Nodes.Quoted(5)))).toBe("? FOLLOWING");
+      expect(visitor.compile(new Nodes.Following(new Nodes.Quoted(5)))).toBe("5 FOLLOWING");
     });
 
     it("takes a rows frame, current row", () => {
@@ -655,7 +655,7 @@ describe("SelectManagerTest", () => {
       w.frame(new Nodes.Range(new Nodes.Preceding(new Nodes.Quoted(3))));
       const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(new Nodes.Over(fn, w))).toContain("? PRECEDING");
+      expect(visitor.compile(new Nodes.Over(fn, w))).toContain("3 PRECEDING");
     });
 
     it("takes a range frame, bounded following", () => {
@@ -700,7 +700,7 @@ describe("SelectManagerTest", () => {
       const mgr = new SelectManager();
       mgr.from(users).where(users.get("id").eq(10));
       const stmt = mgr.compileDelete();
-      expect(stmt.toSql()).toBe('DELETE FROM "users" WHERE "users"."id" = ?');
+      expect(stmt.toSql()).toBe('DELETE FROM "users" WHERE "users"."id" = 10');
     });
   });
 
@@ -759,7 +759,7 @@ describe("SelectManagerTest", () => {
       mgr.from(users).take(1);
       const stmt = mgr.compileUpdate(new Nodes.SqlLiteral("foo = bar"), users.get("id"));
       expect(stmt.toSql()).toBe(
-        'UPDATE "users" SET foo = bar WHERE ("users"."id") IN (SELECT "users"."id" FROM "users" LIMIT ?)',
+        'UPDATE "users" SET foo = bar WHERE ("users"."id") IN (SELECT "users"."id" FROM "users" LIMIT 1)',
       );
     });
 
@@ -776,7 +776,7 @@ describe("SelectManagerTest", () => {
       const mgr = new SelectManager();
       mgr.where(users.get("id").eq(10)).from(users);
       const stmt = mgr.compileUpdate([[users.get("id"), 1]], users.get("id"));
-      expect(stmt.toSql()).toBe('UPDATE "users" SET "id" = 1 WHERE "users"."id" = ?');
+      expect(stmt.toSql()).toBe('UPDATE "users" SET "id" = 1 WHERE "users"."id" = 10');
     });
 
     it("copies where clauses when nesting is triggered", () => {
@@ -784,7 +784,7 @@ describe("SelectManagerTest", () => {
       mgr.where(users.get("foo").eq(10)).take(42).from(users);
       const stmt = mgr.compileUpdate([[users.get("id"), 1]], users.get("id"));
       expect(stmt.toSql()).toBe(
-        'UPDATE "users" SET "id" = 1 WHERE ("users"."id") IN (SELECT "users"."id" FROM "users" WHERE "users"."foo" = ? LIMIT ?)',
+        'UPDATE "users" SET "id" = 1 WHERE ("users"."id") IN (SELECT "users"."id" FROM "users" WHERE "users"."foo" = 10 LIMIT 42)',
       );
     });
   });
@@ -911,7 +911,7 @@ describe("SelectManagerTest", () => {
         .skip(5)
         .toSql(),
     ).toBe(
-      'SELECT "users"."name" FROM "users" WHERE "users"."age" > ? ORDER BY "users"."name" ASC LIMIT 10 OFFSET 5',
+      'SELECT "users"."name" FROM "users" WHERE "users"."age" > 21 ORDER BY "users"."name" ASC LIMIT 10 OFFSET 5',
     );
   });
 

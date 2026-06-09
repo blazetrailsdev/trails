@@ -7,13 +7,13 @@ describe("AttributeTest", () => {
   describe("#not_eq", () => {
     it("should create a NotEqual node", () => {
       expect(users.project(star).where(users.get("id").notEq(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."id" != ?',
+        'SELECT * FROM "users" WHERE "users"."id" != 10',
       );
     });
 
     it("should generate != in sql", () => {
       const result = users.project(star).where(users.get("id").notEq(10)).toSql();
-      expect(result).toBe('SELECT * FROM "users" WHERE "users"."id" != ?');
+      expect(result).toBe('SELECT * FROM "users" WHERE "users"."id" != 10');
     });
 
     it("should handle nil", () => {
@@ -32,7 +32,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").eqAll([1, 2]));
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" = ? AND "users"."id" = ?)',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" = 1 AND "users"."id" = 2)',
       );
     });
 
@@ -53,7 +53,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").gtAll([1, 2]));
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" > ? AND "users"."id" > ?)',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" > 1 AND "users"."id" > 2)',
       );
     });
   });
@@ -61,13 +61,13 @@ describe("AttributeTest", () => {
   describe("#gt", () => {
     it("should create a GreaterThan node", () => {
       expect(users.project(star).where(users.get("age").gt(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" > ?',
+        'SELECT * FROM "users" WHERE "users"."age" > 10',
       );
     });
 
     it("should generate > in sql", () => {
       expect(users.project(star).where(users.get("age").gt(21)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" > ?',
+        'SELECT * FROM "users" WHERE "users"."age" > 21',
       );
     });
 
@@ -81,14 +81,14 @@ describe("AttributeTest", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("name").gt("fake_name"));
-      expect(mgr.toSql()).toContain("?");
+      expect(mgr.toSql()).toContain("fake_name");
     });
   });
 
   describe("#lteq", () => {
     it("should accept various data types.", () => {
       expect(users.project(star).where(users.get("age").gt(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" > ?',
+        'SELECT * FROM "users" WHERE "users"."age" > 10',
       );
     });
   });
@@ -111,7 +111,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").gteqAny([1, 2]));
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" >= ? OR "users"."id" >= ?)',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" >= 1 OR "users"."id" >= 2)',
       );
     });
   });
@@ -125,7 +125,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").gteqAll([1, 2]));
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" >= ? AND "users"."id" >= ?)',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" >= 1 AND "users"."id" >= 2)',
       );
     });
   });
@@ -138,21 +138,21 @@ describe("AttributeTest", () => {
 
     it("should generate >= in sql", () => {
       const result = users.project(star).where(users.get("age").gteq(10)).toSql();
-      expect(result).toBe('SELECT * FROM "users" WHERE "users"."age" >= ?');
+      expect(result).toBe('SELECT * FROM "users" WHERE "users"."age" >= 10');
     });
 
     it("should accept various data types.", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("name").gteq("fake_name"));
-      expect(mgr.toSql()).toContain("?");
+      expect(mgr.toSql()).toContain("fake_name");
     });
   });
 
   describe("#lteq", () => {
     it("should accept various data types.", () => {
       expect(users.project(star).where(users.get("age").gteq(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" >= ?',
+        'SELECT * FROM "users" WHERE "users"."age" >= 10',
       );
     });
   });
@@ -175,7 +175,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").ltAny([1, 2]));
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" < ? OR "users"."id" < ?)',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" < 1 OR "users"."id" < 2)',
       );
     });
   });
@@ -189,7 +189,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").ltAll([1, 2]));
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" < ? AND "users"."id" < ?)',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" < 1 AND "users"."id" < 2)',
       );
     });
   });
@@ -197,27 +197,27 @@ describe("AttributeTest", () => {
   describe("#lt", () => {
     it("should create a LessThan node", () => {
       expect(users.project(star).where(users.get("age").lt(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" < ?',
+        'SELECT * FROM "users" WHERE "users"."age" < 10',
       );
     });
 
     it("should generate < in sql", () => {
       const result = users.project(star).where(users.get("age").lt(10)).toSql();
-      expect(result).toBe('SELECT * FROM "users" WHERE "users"."age" < ?');
+      expect(result).toBe('SELECT * FROM "users" WHERE "users"."age" < 10');
     });
 
     it("should accept various data types.", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("name").lt("fake_name"));
-      expect(mgr.toSql()).toContain("?");
+      expect(mgr.toSql()).toContain("fake_name");
     });
   });
 
   describe("#lteq", () => {
     it("should accept various data types.", () => {
       expect(users.project(star).where(users.get("age").lt(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" < ?',
+        'SELECT * FROM "users" WHERE "users"."age" < 10',
       );
     });
   });
@@ -240,7 +240,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").lteqAny([1, 2]));
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" <= ? OR "users"."id" <= ?)',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" <= 1 OR "users"."id" <= 2)',
       );
     });
   });
@@ -254,7 +254,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").lteqAll([1, 2]));
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" <= ? AND "users"."id" <= ?)',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" <= 1 AND "users"."id" <= 2)',
       );
     });
   });
@@ -267,12 +267,12 @@ describe("AttributeTest", () => {
 
     it("should generate <= in sql", () => {
       const result = users.project(star).where(users.get("age").lteq(10)).toSql();
-      expect(result).toBe('SELECT * FROM "users" WHERE "users"."age" <= ?');
+      expect(result).toBe('SELECT * FROM "users" WHERE "users"."age" <= 10');
     });
 
     it("should accept various data types.", () => {
       expect(users.project(star).where(users.get("age").lteq(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" <= ?',
+        'SELECT * FROM "users" WHERE "users"."age" <= 10',
       );
     });
   });
@@ -302,7 +302,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").eqAny([1, 2]));
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" = ? OR "users"."id" = ?)',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" = 1 OR "users"."id" = 2)',
       );
     });
   });
@@ -316,7 +316,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").eqAll([1, 2]));
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" = ? AND "users"."id" = ?)',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" = 1 AND "users"."id" = 2)',
       );
     });
   });
@@ -389,13 +389,13 @@ describe("AttributeTest", () => {
   describe("#eq", () => {
     it("should return an equality node", () => {
       expect(users.project(star).where(users.get("id").eq(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."id" = ?',
+        'SELECT * FROM "users" WHERE "users"."id" = 10',
       );
     });
 
     it("should generate = in sql", () => {
       expect(users.project(star).where(users.get("id").eq(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."id" = ?',
+        'SELECT * FROM "users" WHERE "users"."id" = 10',
       );
     });
 
@@ -430,7 +430,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("name").matchesAny(["%foo%", "%bar%"]));
       expect(mgr.toSql()).toBe(
-        `SELECT "users"."id" FROM "users" WHERE ("users"."name" LIKE ? OR "users"."name" LIKE ?)`,
+        `SELECT "users"."id" FROM "users" WHERE ("users"."name" LIKE '%foo%' OR "users"."name" LIKE '%bar%')`,
       );
     });
   });
@@ -451,7 +451,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("name").matchesAll(["%foo%", "%bar%"]));
       expect(mgr.toSql()).toBe(
-        `SELECT "users"."id" FROM "users" WHERE ("users"."name" LIKE ? AND "users"."name" LIKE ?)`,
+        `SELECT "users"."id" FROM "users" WHERE ("users"."name" LIKE '%foo%' AND "users"."name" LIKE '%bar%')`,
       );
     });
 
@@ -466,13 +466,13 @@ describe("AttributeTest", () => {
   describe("#matches", () => {
     it("should create a Matches node", () => {
       expect(users.project(star).where(users.get("name").matches("%bacon%")).toSql()).toBe(
-        `SELECT * FROM "users" WHERE "users"."name" LIKE ?`,
+        `SELECT * FROM "users" WHERE "users"."name" LIKE '%bacon%'`,
       );
     });
 
     it("should generate LIKE in sql", () => {
       expect(users.project(star).where(users.get("name").matches("%bacon%")).toSql()).toBe(
-        `SELECT * FROM "users" WHERE "users"."name" LIKE ?`,
+        `SELECT * FROM "users" WHERE "users"."name" LIKE '%bacon%'`,
       );
     });
   });
@@ -495,7 +495,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("name").doesNotMatchAny(["%foo%", "%bar%"]));
       expect(mgr.toSql()).toBe(
-        `SELECT "users"."id" FROM "users" WHERE ("users"."name" NOT LIKE ? OR "users"."name" NOT LIKE ?)`,
+        `SELECT "users"."id" FROM "users" WHERE ("users"."name" NOT LIKE '%foo%' OR "users"."name" NOT LIKE '%bar%')`,
       );
     });
   });
@@ -509,7 +509,7 @@ describe("AttributeTest", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("name").doesNotMatchAll(["%foo%", "%bar%"]));
       expect(mgr.toSql()).toBe(
-        `SELECT "users"."id" FROM "users" WHERE ("users"."name" NOT LIKE ? AND "users"."name" NOT LIKE ?)`,
+        `SELECT "users"."id" FROM "users" WHERE ("users"."name" NOT LIKE '%foo%' AND "users"."name" NOT LIKE '%bar%')`,
       );
     });
   });
@@ -517,13 +517,13 @@ describe("AttributeTest", () => {
   describe("#does_not_match", () => {
     it("should create a DoesNotMatch node", () => {
       expect(users.project(star).where(users.get("name").doesNotMatch("%bacon%")).toSql()).toBe(
-        `SELECT * FROM "users" WHERE "users"."name" NOT LIKE ?`,
+        `SELECT * FROM "users" WHERE "users"."name" NOT LIKE '%bacon%'`,
       );
     });
 
     it("should generate NOT LIKE in sql", () => {
       expect(users.project(star).where(users.get("name").doesNotMatch("%bacon%")).toSql()).toBe(
-        `SELECT * FROM "users" WHERE "users"."name" NOT LIKE ?`,
+        `SELECT * FROM "users" WHERE "users"."name" NOT LIKE '%bacon%'`,
       );
     });
   });
@@ -556,7 +556,7 @@ describe("AttributeTest", () => {
         ]),
       );
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" IN (?, ?) OR "users"."id" IN (?, ?))',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" IN (1, 2) OR "users"."id" IN (3, 4))',
       );
     });
   });
@@ -580,7 +580,7 @@ describe("AttributeTest", () => {
         ]),
       );
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" IN (?, ?) AND "users"."id" IN (?, ?))',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" IN (1, 2) AND "users"."id" IN (3, 4))',
       );
     });
   });
@@ -758,7 +758,7 @@ describe("AttributeTest", () => {
     it("can be constructed with a list", () => {
       const node = users.get("id").in([1, 2, 3]);
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."id" IN (?, ?, ?)');
+      expect(visitor.compile(node)).toBe('"users"."id" IN (1, 2, 3)');
     });
 
     it("can be constructed with a random object", () => {
@@ -787,7 +787,7 @@ describe("AttributeTest", () => {
     it("should generate IN in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").in([1, 2, 3]));
-      expect(mgr.toSql()).toBe('SELECT "users"."id" FROM "users" WHERE "users"."id" IN (?, ?, ?)');
+      expect(mgr.toSql()).toBe('SELECT "users"."id" FROM "users" WHERE "users"."id" IN (1, 2, 3)');
     });
 
     it("can be constructed with a subquery", () => {
@@ -835,7 +835,7 @@ describe("AttributeTest", () => {
         ]),
       );
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" NOT IN (?, ?) OR "users"."id" NOT IN (?, ?))',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" NOT IN (1, 2) OR "users"."id" NOT IN (3, 4))',
       );
     });
   });
@@ -859,7 +859,7 @@ describe("AttributeTest", () => {
         ]),
       );
       expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" NOT IN (?, ?) AND "users"."id" NOT IN (?, ?))',
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" NOT IN (1, 2) AND "users"."id" NOT IN (3, 4))',
       );
     });
   });
@@ -869,13 +869,13 @@ describe("AttributeTest", () => {
       const node = users.get("age").notBetween(18, 65);
       const visitor = new Visitors.ToSql();
       const sql = visitor.compile(node);
-      expect(sql).toBe('("users"."age" < ? OR "users"."age" > ?)');
+      expect(sql).toBe('("users"."age" < 18 OR "users"."age" > 65)');
     });
 
     it("can be constructed with a range starting from -Infinity", () => {
       const node = users.get("age").notBetween(-Infinity, 65);
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."age" > ?');
+      expect(visitor.compile(node)).toBe('"users"."age" > 65');
     });
 
     it("can be constructed with a range implicitly starting at Infinity", () => {
@@ -907,7 +907,7 @@ describe("AttributeTest", () => {
       const node = users.get("age").notBetween({ begin: 18, end: 65, excludeEnd: true });
       const visitor = new Visitors.ToSql();
       const result = visitor.compile(node);
-      expect(result).toBe('("users"."age" < ? OR "users"."age" >= ?)');
+      expect(result).toBe('("users"."age" < 18 OR "users"."age" >= 65)');
     });
   });
 
@@ -922,7 +922,7 @@ describe("AttributeTest", () => {
     it("can be constructed with a list", () => {
       const node = users.get("id").notIn([1, 2, 3]);
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."id" NOT IN (?, ?, ?)');
+      expect(visitor.compile(node)).toBe('"users"."id" NOT IN (1, 2, 3)');
     });
 
     it("can be constructed with a random object", () => {
@@ -936,7 +936,7 @@ describe("AttributeTest", () => {
           .project(star)
           .where(users.get("id").notIn([1, 2]))
           .toSql(),
-      ).toBe('SELECT * FROM "users" WHERE "users"."id" NOT IN (?, ?)');
+      ).toBe('SELECT * FROM "users" WHERE "users"."id" NOT IN (1, 2)');
     });
   });
 
@@ -1030,7 +1030,7 @@ describe("AttributeTest", () => {
     it("should generate @> in sql", () => {
       const visitor = new Visitors.ToSql();
       const node = users.get("tags").contains("foo");
-      expect(visitor.compile(node)).toBe('"users"."tags" @> ?');
+      expect(visitor.compile(node)).toBe('"users"."tags" @> \'foo\'');
     });
   });
 
@@ -1038,7 +1038,7 @@ describe("AttributeTest", () => {
     it("should generate && in sql", () => {
       const visitor = new Visitors.ToSql();
       const node = users.get("tags").overlaps("bar");
-      expect(visitor.compile(node)).toBe('"users"."tags" && ?');
+      expect(visitor.compile(node)).toBe('"users"."tags" && \'bar\'');
     });
   });
 
@@ -1046,7 +1046,7 @@ describe("AttributeTest", () => {
     it("should produce sql", () => {
       const visitor = new Visitors.ToSql();
       const node = users.get("tags").contains("foo");
-      expect(visitor.compile(node)).toBe('"users"."tags" @> ?');
+      expect(visitor.compile(node)).toBe('"users"."tags" @> \'foo\'');
     });
 
     describe("#to_sql", () => {
@@ -1054,7 +1054,7 @@ describe("AttributeTest", () => {
         const relation = new Table("users");
         const node = relation.get("id").eq(10);
         const visitor = new Visitors.ToSql();
-        expect(visitor.compile(node)).toContain('"users"."id" = ?');
+        expect(visitor.compile(node)).toContain('"users"."id" = 10');
       });
     });
   });
@@ -1064,7 +1064,7 @@ describe("AttributeTest", () => {
       const attr = new Nodes.Attribute(users, "name");
       const node = attr.eq("hello");
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."name" = ?');
+      expect(visitor.compile(node)).toBe('"users"."name" = \'hello\'');
     });
 
     it("type casts when given an explicit caster", () => {
@@ -1076,7 +1076,7 @@ describe("AttributeTest", () => {
       const attr = new Nodes.Attribute(users, "name", caster);
       const node = attr.eq("hello");
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."name" = ?');
+      expect(visitor.compile(node)).toBe('"users"."name" = \'HELLO\'');
     });
 
     it("does not type cast SqlLiteral nodes", () => {
@@ -1101,13 +1101,13 @@ describe("AttributeTest", () => {
 
   it("gteq generates >=", () => {
     expect(users.project(star).where(users.get("age").gteq(10)).toSql()).toBe(
-      'SELECT * FROM "users" WHERE "users"."age" >= ?',
+      'SELECT * FROM "users" WHERE "users"."age" >= 10',
     );
   });
 
   it("lteq generates <=", () => {
     expect(users.project(star).where(users.get("age").lteq(10)).toSql()).toBe(
-      'SELECT * FROM "users" WHERE "users"."age" <= ?',
+      'SELECT * FROM "users" WHERE "users"."age" <= 10',
     );
   });
 
@@ -1117,7 +1117,7 @@ describe("AttributeTest", () => {
         .project(star)
         .where(users.get("id").in([1, 2, 3]))
         .toSql(),
-    ).toBe('SELECT * FROM "users" WHERE "users"."id" IN (?, ?, ?)');
+    ).toBe('SELECT * FROM "users" WHERE "users"."id" IN (1, 2, 3)');
   });
 
   it("in with empty array generates 1=0 (always false)", () => {
@@ -1134,14 +1134,14 @@ describe("AttributeTest", () => {
 
   it("between generates BETWEEN", () => {
     expect(users.project(star).where(users.get("age").between(18, 65)).toSql()).toBe(
-      'SELECT * FROM "users" WHERE "users"."age" BETWEEN ? AND ?',
+      'SELECT * FROM "users" WHERE "users"."age" BETWEEN 18 AND 65',
     );
   });
 
   it("notBetween generates NOT BETWEEN", () => {
     // Mirrors Rails: not_between renders as `(col < begin OR col > end)`.
     expect(users.project(star).where(users.get("age").notBetween(18, 65)).toSql()).toBe(
-      'SELECT * FROM "users" WHERE ("users"."age" < ? OR "users"."age" > ?)',
+      'SELECT * FROM "users" WHERE ("users"."age" < 18 OR "users"."age" > 65)',
     );
   });
 
@@ -1160,21 +1160,21 @@ describe("AttributeTest", () => {
   it("and combines with AND", () => {
     const cond = users.get("name").eq("dean").and(users.get("age").gt(21));
     expect(users.project(star).where(cond).toSql()).toBe(
-      `SELECT * FROM "users" WHERE "users"."name" = ? AND "users"."age" > ?`,
+      `SELECT * FROM "users" WHERE "users"."name" = 'dean' AND "users"."age" > 21`,
     );
   });
 
   it("or combines with OR wrapped in Grouping", () => {
     const cond = users.get("name").eq("dean").or(users.get("name").eq("sam"));
     expect(users.project(star).where(cond).toSql()).toBe(
-      `SELECT * FROM "users" WHERE ("users"."name" = ? OR "users"."name" = ?)`,
+      `SELECT * FROM "users" WHERE ("users"."name" = 'dean' OR "users"."name" = 'sam')`,
     );
   });
 
   it("not negates", () => {
     const cond = users.get("name").eq("dean").not();
     expect(users.project(star).where(cond).toSql()).toBe(
-      `SELECT * FROM "users" WHERE NOT ("users"."name" = ?)`,
+      `SELECT * FROM "users" WHERE NOT ("users"."name" = 'dean')`,
     );
   });
 
@@ -1183,7 +1183,9 @@ describe("AttributeTest", () => {
       .project(star)
       .where(users.get("name").eqAny(["dean", "sam"]))
       .toSql();
-    expect(result).toBe(`SELECT * FROM "users" WHERE ("users"."name" = ? OR "users"."name" = ?)`);
+    expect(result).toBe(
+      `SELECT * FROM "users" WHERE ("users"."name" = 'dean' OR "users"."name" = 'sam')`,
+    );
   });
 
   it("eqAll generates AND group", () => {
@@ -1191,7 +1193,9 @@ describe("AttributeTest", () => {
       .project(star)
       .where(users.get("name").eqAll(["dean", "sam"]))
       .toSql();
-    expect(result).toBe(`SELECT * FROM "users" WHERE ("users"."name" = ? AND "users"."name" = ?)`);
+    expect(result).toBe(
+      `SELECT * FROM "users" WHERE ("users"."name" = 'dean' AND "users"."name" = 'sam')`,
+    );
   });
 
   it("gtAny generates OR group", () => {
@@ -1199,7 +1203,7 @@ describe("AttributeTest", () => {
       .project(star)
       .where(users.get("age").gtAny([10, 20]))
       .toSql();
-    expect(result).toBe(`SELECT * FROM "users" WHERE ("users"."age" > ? OR "users"."age" > ?)`);
+    expect(result).toBe(`SELECT * FROM "users" WHERE ("users"."age" > 10 OR "users"."age" > 20)`);
   });
 
   it("ltAll generates AND group", () => {
@@ -1207,7 +1211,7 @@ describe("AttributeTest", () => {
       .project(star)
       .where(users.get("age").ltAll([50, 100]))
       .toSql();
-    expect(result).toBe(`SELECT * FROM "users" WHERE ("users"."age" < ? AND "users"."age" < ?)`);
+    expect(result).toBe(`SELECT * FROM "users" WHERE ("users"."age" < 50 AND "users"."age" < 100)`);
   });
 
   it("matchesAny generates OR group", () => {
@@ -1216,7 +1220,7 @@ describe("AttributeTest", () => {
       .where(users.get("name").matchesAny(["%dean%", "%sam%"]))
       .toSql();
     expect(result).toBe(
-      `SELECT * FROM "users" WHERE ("users"."name" LIKE ? OR "users"."name" LIKE ?)`,
+      `SELECT * FROM "users" WHERE ("users"."name" LIKE '%dean%' OR "users"."name" LIKE '%sam%')`,
     );
   });
 
@@ -1253,7 +1257,7 @@ describe("AttributeTest", () => {
     mgr.project(fn);
     const sql = mgr.toSql();
     expect(sql).toContain("COALESCE");
-    expect(sql).toContain("?");
+    expect(sql).toContain("'Unknown'");
   });
 
   it("generates LENGTH()", () => {
@@ -1278,7 +1282,7 @@ describe("AttributeTest", () => {
 
   it("generates SUBSTRING()", () => {
     const node = users.attr("name").substring(1, 3);
-    expect(visitor.compile(node)).toBe('SUBSTRING("users"."name", ?, ?)');
+    expect(visitor.compile(node)).toBe('SUBSTRING("users"."name", 1, 3)');
   });
 
   it("generates a `||` Concat infix node", () => {
@@ -1306,7 +1310,7 @@ describe("AttributeTest", () => {
 
   it("generates ROUND()", () => {
     const node = users.attr("score").round(2);
-    expect(visitor.compile(node)).toBe('ROUND("users"."score", ?)');
+    expect(visitor.compile(node)).toBe('ROUND("users"."score", 2)');
   });
 
   it("generates ROUND() without precision", () => {
@@ -1337,7 +1341,7 @@ describe("AttributeTest", () => {
   it("should generate ORs in sql from eq", () => {
     const cond = users.get("id").eq(1).or(users.get("id").eq(2));
     const result = users.project(star).where(cond).toSql();
-    expect(result).toBe('SELECT * FROM "users" WHERE ("users"."id" = ? OR "users"."id" = ?)');
+    expect(result).toBe('SELECT * FROM "users" WHERE ("users"."id" = 1 OR "users"."id" = 2)');
   });
 
   it("should create a Grouping node from and wrapped in grouping via eqAll", () => {
@@ -1350,7 +1354,9 @@ describe("AttributeTest", () => {
       .project(star)
       .where(users.get("name").eqAll(["dean", "sam"]))
       .toSql();
-    expect(result).toBe(`SELECT * FROM "users" WHERE ("users"."name" = ? AND "users"."name" = ?)`);
+    expect(result).toBe(
+      `SELECT * FROM "users" WHERE ("users"."name" = 'dean' AND "users"."name" = 'sam')`,
+    );
   });
 
   describe("#gt", () => {
@@ -1362,7 +1368,7 @@ describe("AttributeTest", () => {
 
   it("should accept various data types for gt", () => {
     expect(users.project(star).where(users.get("age").gt(10)).toSql()).toBe(
-      'SELECT * FROM "users" WHERE "users"."age" > ?',
+      'SELECT * FROM "users" WHERE "users"."age" > 10',
     );
   });
 
@@ -1450,7 +1456,7 @@ describe("AttributeTest", () => {
         .project(star)
         .where(users.get("id").in([1, 2, 3]))
         .toSql(),
-    ).toBe('SELECT * FROM "users" WHERE "users"."id" IN (?, ?, ?)');
+    ).toBe('SELECT * FROM "users" WHERE "users"."id" IN (1, 2, 3)');
   });
 
   describe("#not_in", () => {
@@ -1460,7 +1466,7 @@ describe("AttributeTest", () => {
           .project(star)
           .where(users.get("id").notIn([1, 2]))
           .toSql(),
-      ).toBe('SELECT * FROM "users" WHERE "users"."id" NOT IN (?, ?)');
+      ).toBe('SELECT * FROM "users" WHERE "users"."id" NOT IN (1, 2)');
     });
   });
 
@@ -1492,7 +1498,7 @@ describe("AttributeTest", () => {
   it("can be constructed with a standard range for between", () => {
     const node = users.get("age").between({ begin: 18, end: 65 });
     const visitor = new Visitors.ToSql();
-    expect(visitor.compile(node)).toBe('"users"."age" BETWEEN ? AND ?');
+    expect(visitor.compile(node)).toBe('"users"."age" BETWEEN 18 AND 65');
   });
 
   it("is equal with equal ivars (same table and column)", () => {
@@ -1543,7 +1549,7 @@ describe("AttributeTest", () => {
     it("should generate NOT IN in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").notIn([1, 2]));
-      expect(mgr.toSql()).toBe('SELECT "users"."id" FROM "users" WHERE "users"."id" NOT IN (?, ?)');
+      expect(mgr.toSql()).toBe('SELECT "users"."id" FROM "users" WHERE "users"."id" NOT IN (1, 2)');
     });
   });
 
@@ -1552,7 +1558,7 @@ describe("AttributeTest", () => {
       // Mirrors Rails: not_between(-Inf..end) collapses to gt(end).
       const node = users.get("age").notBetween(-Infinity, 65);
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."age" > ?');
+      expect(visitor.compile(node)).toBe('"users"."age" > 65');
     });
   });
 
@@ -1590,14 +1596,14 @@ describe("AttributeTest", () => {
       const node = users.get("id").between([1, 100]);
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("BETWEEN");
-      expect(sql).toContain("? AND ?");
+      expect(sql).toContain("1 AND 100");
     });
 
     it("can be constructed with a range starting from -Infinity", () => {
       const node = users.get("id").between(-Infinity, 100);
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toContain("<=");
-      expect(sql).toContain("?");
+      expect(sql).toContain("100");
     });
 
     it("can be constructed with an exclusive range", () => {
@@ -1630,7 +1636,7 @@ describe("AttributeTest", () => {
     it("should generate the proper SQL", () => {
       const node = users.get("tags").contains("foo");
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe('"users"."tags" @> ?');
+      expect(sql).toBe('"users"."tags" @> \'foo\'');
     });
   });
 
@@ -1638,7 +1644,7 @@ describe("AttributeTest", () => {
     it("should generate proper SQL", () => {
       const node = users.get("tags").overlaps("bar");
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe('"users"."tags" && ?');
+      expect(sql).toBe('"users"."tags" && \'bar\'');
     });
   });
 
@@ -1655,7 +1661,7 @@ describe("AttributeTest", () => {
       const relation = new Table("users");
       const node = relation.get("id").eq(10);
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toContain('"users"."id" = ?');
+      expect(visitor.compile(node)).toContain('"users"."id" = 10');
     });
   });
 

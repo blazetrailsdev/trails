@@ -146,11 +146,10 @@ describe("PostgresTest", () => {
       const d = new Date("2020-01-02T12:00:00.000Z");
       const node = users.get("created_at").eq(new Nodes.Quoted(d));
       const [sql, binds] = visitor.compileWithBinds(node);
-      expect(sql).toContain("$1");
-      expect(sql).not.toContain("?");
-      expect(sql).not.toContain("2020-01-02");
-      expect(binds).toHaveLength(1);
-      expect(binds[0]).toBe(d);
+      // Quoted(Date) inlines as a literal — only BindParam/ActiveModel::Attribute produce $N.
+      expect(sql).toContain("2020-01-02");
+      expect(sql).not.toContain("$1");
+      expect(binds).toHaveLength(0);
     });
   });
 
@@ -158,7 +157,7 @@ describe("PostgresTest", () => {
     it("should know how to visit with array arguments", () => {
       const node = users.get("id").in([1, 2, 3]);
       const sql = new Visitors.PostgreSQL().compile(node);
-      expect(sql).toContain("IN (?, ?, ?)");
+      expect(sql).toContain("IN (1, 2, 3)");
     });
 
     it("should know how to visit with CubeDimension Argument", () => {
@@ -222,14 +221,14 @@ describe("PostgresTest", () => {
       const visitor = new Visitors.ToSql();
       const products = new Table("products");
       const node = products.get("metadata").contains('{"foo":"bar"}');
-      expect(visitor.compile(node)).toBe('"products"."metadata" @> ?');
+      expect(visitor.compile(node)).toBe(`"products"."metadata" @> '{"foo":"bar"}'`);
     });
 
     it("should handle Overlaps", () => {
       const visitor = new Visitors.ToSql();
       const products = new Table("products");
       const node = products.get("tags").overlaps("{foo,bar,baz}");
-      expect(visitor.compile(node)).toBe('"products"."tags" && ?');
+      expect(visitor.compile(node)).toBe(`"products"."tags" && '{foo,bar,baz}'`);
     });
   });
 
@@ -286,6 +285,7 @@ describe("PostgresTest", () => {
       const node = users.get("name").matchesRegexp("foo.*");
       const sql = new Visitors.PostgreSQL().compile(node);
       expect(sql).toContain("~");
+      expect(sql).toContain("foo.*");
     });
 
     it("can handle case insensitive", () => {
@@ -336,7 +336,7 @@ describe("PostgresTest", () => {
     it("quotes array values as PG array literals", () => {
       const node = users.get("tags").eq(["a", "b"]);
       const sql = new Visitors.PostgreSQL().compile(node);
-      expect(sql).toBe('"users"."tags" = ?');
+      expect(sql).toContain('\'{"a","b"}\'');
     });
 
     it("quotes nested arrays", () => {
@@ -345,13 +345,13 @@ describe("PostgresTest", () => {
         [3, 4],
       ]);
       const sql = new Visitors.PostgreSQL().compile(node);
-      expect(sql).toBe('"users"."tags" = ?');
+      expect(sql).toContain("'{{1,2},{3,4}}'");
     });
 
     it("escapes single quotes in array elements", () => {
       const node = users.get("tags").eq(["O'Reilly"]);
       const sql = new Visitors.PostgreSQL().compile(node);
-      expect(sql).toBe('"users"."tags" = ?');
+      expect(sql).toContain("'{\"O''Reilly\"}'");
     });
   });
 });

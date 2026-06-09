@@ -157,7 +157,7 @@ describe("MysqlTest", () => {
     it("concats a string", () => {
       const node = new Nodes.Concat(users.get("name"), new Nodes.Quoted("x"));
       const sql = new Visitors.MySQL().compile(node);
-      expect(sql).toBe(" CONCAT(`users`.`name`, ?) ");
+      expect(sql).toBe(" CONCAT(`users`.`name`, 'x') ");
     });
   });
 
@@ -178,7 +178,7 @@ describe("MysqlTest", () => {
 
     it("should construct a valid generic SQL statement", () => {
       const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted(1));
-      expect(new Visitors.MySQL().compile(node)).toBe("`users`.`name` <=> ?");
+      expect(new Visitors.MySQL().compile(node)).toBe("`users`.`name` <=> 1");
     });
   });
 

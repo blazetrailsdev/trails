@@ -31,7 +31,7 @@ describe("SqlLiteralTest", () => {
       const lit = new Nodes.SqlLiteral("foo");
       const eq = new Nodes.Equality(lit, new Nodes.Quoted(1));
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(eq)).toBe("foo = ?");
+      expect(visitor.compile(eq)).toBe("foo = 1");
     });
 
     it("is equal with equal contents", () => {

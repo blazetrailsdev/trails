@@ -70,7 +70,7 @@ describe("TestNode", () => {
   it("operation ordering via sql", () => {
     const visitor = new Visitors.ToSql();
     const node = new Nodes.InfixOperation("+", users.get("a"), new Nodes.Quoted(1));
-    expect(visitor.compile(node)).toBe('"users"."a" + ?');
+    expect(visitor.compile(node)).toBe('"users"."a" + 1');
   });
 
   it("construct with alias via constructor", () => {
@@ -200,8 +200,8 @@ describe("setToSqlVisitor", () => {
       expect(mgr.toSql()).toContain("IS NOT DISTINCT FROM");
       setToSqlVisitor(Visitors.SQLite);
       const sqlite = mgr.toSql();
-      // SQLite emits IS for IS NOT DISTINCT FROM, and ? for parameterized values.
-      expect(sqlite).toContain('"users"."active" IS ?');
+      // SQLite emits IS for IS NOT DISTINCT FROM; Quoted(true) inlines as 1 in SQLite.
+      expect(sqlite).toContain('"users"."active" IS 1');
       expect(sqlite).not.toContain("IS NOT DISTINCT FROM");
     } finally {
       restore();

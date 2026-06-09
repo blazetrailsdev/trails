@@ -21,6 +21,6 @@ describe("GroupingTest", () => {
   it("should create Equality nodes", () => {
     const grouped = new Nodes.Grouping(users.get("id").eq(1));
     const sql = new Visitors.ToSql().compile(grouped);
-    expect(sql).toBe('("users"."id" = ?)');
+    expect(sql).toBe('("users"."id" = 1)');
   });
 });

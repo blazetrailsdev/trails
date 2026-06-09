@@ -30,7 +30,7 @@ describe("SqliteTest", () => {
     const visitor = new Visitors.SQLite();
     expect(visitor.compile(new Nodes.True())).toBe("1");
     expect(visitor.compile(new Nodes.False())).toBe("0");
-    expect(visitor.compile(users.get("active").eq(true))).toBe('"users"."active" = ?');
+    expect(visitor.compile(users.get("active").eq(true))).toBe('"users"."active" = 1');
     expect(visitor.compile(new Nodes.Equality(users.get("active"), true))).toBe(
       '"users"."active" = 1',
     );
@@ -53,7 +53,7 @@ describe("SqliteTest", () => {
     it("should construct a valid generic SQL statement", () => {
       const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted(1));
       const sql = new Visitors.SQLite().compile(node);
-      expect(sql).toBe('"users"."name" IS ?');
+      expect(sql).toBe('"users"."name" IS 1');
     });
   });
 

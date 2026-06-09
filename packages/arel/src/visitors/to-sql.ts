@@ -184,11 +184,11 @@ export class ToSql extends Visitor {
     node: Nodes.Casted | Nodes.Quoted,
     collector: SQLString,
   ): SQLString {
-    // Mirrors AbstractAdapter#quote: resolve valueForDatabase on the wrapped
-    // value before quoting, so types that carry a valueForDatabase getter
-    // (e.g. encrypted AdditionalValue) surface the serialized form.
+    // Mirrors Rails to_sql.rb: `collector << quote(o.value_for_database).to_s`
+    // — Quoted/Casted values are always inlined as literal SQL, not bound.
+    // Only BindParam/ActiveModel::Attribute nodes use add_bind.
     const value = resolveValueForDatabase(node.valueForDatabase());
-    collector.addBind(value, this.bindBlock());
+    collector.append(this.quote(value));
     return collector;
   }
 
@@ -668,11 +668,9 @@ export class ToSql extends Visitor {
     }
     this.visit(node.attribute, collector);
     collector.append(node.type === "in" ? " IN (" : " NOT IN (");
-    const values = node.right;
-    for (let i = 0; i < values.length; i++) {
-      if (i > 0) collector.append(", ");
-      this.visit(values[i], collector);
-    }
+    // Mirrors Rails: `collector.add_binds(o.values, &@block)` — raw values go
+    // through addBinds so each produces a placeholder (? or $N), not a quoted literal.
+    collector.addBinds(node.values, null, this.bindBlock());
     collector.append(")");
     return collector;
   }
@@ -1793,24 +1791,10 @@ export class ToSql extends Visitor {
     return this.groupingParentheses(node.subquery, true, collector);
   }
 
-  // Mirrors Rails to_sql.rb: when ESCAPE is set, Rails calls `visit
-  // o.escape, collector`. The escape is wrapped to a Node in the
-  // Matches/DoesNotMatch constructor (matches.rb does the same via
-  // Nodes.build_quoted), normally a Quoted/Casted. Rails' visit_Arel_
-  // Nodes_Quoted/Casted always renders inline via `quote(value_for_database)`
-  // (to_sql.rb:87-90) — never as a bind placeholder. Trails' generic
-  // Casted/Quoted visitor routes through `add_bind` under
-  // threading; the ESCAPE field is meant to always be inlined,
-  // so render literally here.
   protected appendEscape(escape: Node | null, collector: SQLString): void {
     if (escape == null) return;
     collector.append(" ESCAPE ");
-    if (escape instanceof Nodes.Quoted || (escape as Nodes.Casted).valueForDatabase !== undefined) {
-      const v = (escape as Nodes.Quoted | Nodes.Casted).valueForDatabase();
-      collector.append(this.quote(v));
-    } else {
-      this.visit(escape, collector);
-    }
+    this.visit(escape, collector);
   }
 
   private visitQuoted(node: Nodes.Quoted, collector: SQLString): SQLString {
@@ -1856,11 +1840,9 @@ export class ToSql extends Visitor {
       "toISOString" in v &&
       typeof (v as { toISOString: unknown }).toISOString === "function"
     ) {
-      // boundary: Date/Temporal binds pass through addBind so the collector
-      // handles routing (SQLString emits placeholder; Composite collects).
-      const bind =
-        v instanceof Date ? v : this.quotedDate(v as { toISOString(): string }).slice(1, -1);
-      this.addDateBind(bind, collector);
+      // Mirrors Rails quote behavior: date-like values are formatted and inlined.
+      // Only BindParam/ActiveModel::Attribute go through addBind.
+      collector.append(this.quotedDate(v as { toISOString(): string }));
     } else {
       // Unknown object types (e.g. Temporal.Instant) — defer to `quote()`
       // so the value is properly escaped/quoted rather than concatenated
