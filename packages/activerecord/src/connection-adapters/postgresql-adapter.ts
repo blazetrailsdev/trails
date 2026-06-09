@@ -4515,6 +4515,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         // "Client has encountered a connection error", …) surfaces as a
         // generic Error or non-DatabaseError; map it to ConnectionNotEstablished
         // so callers see the lost connection rather than a raw driver error.
+        //
+        // Rails' translate_exception (postgresql_adapter.rb:801-821) additionally
+        // splits a libpq PG::ConnectionBad whose message ends with "\n" into
+        // ConnectionFailed (vs ConnectionNotEstablished for the pg-internal case).
+        // That distinction is a libpq PQerrorMessage artifact; node-pg is pure JS
+        // with no libpq layer and doesn't carry the pg-internal/libpq split, so
+        // there is no reliable signal to reproduce it — every severed-connection
+        // error maps to ConnectionNotEstablished here.
         if (PostgreSQLAdapter._isConnectionError(e)) {
           return new ConnectionNotEstablished(msg, { cause });
         }
