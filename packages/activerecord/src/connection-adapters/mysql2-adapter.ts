@@ -151,6 +151,14 @@ class Mysql2StatementPool extends MysqlStatementPool {
  * callers within a pinned trails-context serialize through that single
  * connection — no inner pool layer.
  */
+
+const ISOLATION_LEVELS: Record<string, string> = {
+  read_uncommitted: "READ UNCOMMITTED",
+  read_committed: "READ COMMITTED",
+  repeatable_read: "REPEATABLE READ",
+  serializable: "SERIALIZABLE",
+};
+
 export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapter {
   // Cached liveness state — true until a failure is observed (ping fail,
   // disconnect, permanent close). Does not require _client to be non-null:
@@ -774,6 +782,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         const translated = await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
+        this.invalidateTransaction(translated);
         throw translated;
       }
     });
@@ -836,6 +845,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         const translated = await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
+        this.invalidateTransaction(translated);
         throw translated;
       }
     });
@@ -853,6 +863,42 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     await this._ensureClient();
     await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
     this._inTransaction = true;
+  }
+
+  override isSavepointErrorsInvalidateTransactions(): boolean {
+    return true;
+  }
+
+  /**
+   * Mirrors Rails' `AbstractMysqlAdapter#begin_isolated_db_transaction`:
+   * issues `SET TRANSACTION ISOLATION LEVEL {level}` followed by `BEGIN`.
+   * Retries once on `ConnectionFailed` (mirrors `allow_retry: true`).
+   */
+  override async beginIsolatedDbTransaction(isolation: string): Promise<void> {
+    const level = ISOLATION_LEVELS[isolation];
+    if (!level) throw new Error(`Unknown transaction isolation level: ${isolation}`);
+    for (let attempt = 0; attempt <= 1; attempt++) {
+      try {
+        await this.internalExecute(`SET TRANSACTION ISOLATION LEVEL ${level}`, "TRANSACTION", {
+          materializeTransactions: false,
+        });
+        await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
+        this._inTransaction = true;
+        return;
+      } catch (e) {
+        if (attempt === 0 && e instanceof ConnectionFailed) {
+          await this._reconnectForRetry();
+          continue;
+        }
+        throw e;
+      }
+    }
+  }
+
+  private async _reconnectForRetry(): Promise<void> {
+    this.disconnectBang();
+    this._activeState = true;
+    await this._ensureClient();
   }
 
   async beginDeferredTransaction(): Promise<void> {
