@@ -27,14 +27,12 @@ import {
 import { deprecator } from "../../deprecator.js";
 
 // Mirrors Rails' `deprecate :unsigned_float, :unsigned_decimal` on MySQL::ColumnMethods,
-// whose ActiveSupport::Deprecation message reads "<method> is deprecated and will be
-// removed from Active Record".
+// which passes no `:message` — so ActiveSupport emits the bare default
+// "<method> is deprecated and will be removed from <gem_name>" with no usage hint.
 const UNSIGNED_FLOAT_DEPRECATION =
-  "unsigned_float is deprecated and will be removed from Active Record. " +
-  "Use `t.float ..., unsigned: true` instead.";
+  "unsigned_float is deprecated and will be removed from Active Record";
 const UNSIGNED_DECIMAL_DEPRECATION =
-  "unsigned_decimal is deprecated and will be removed from Active Record. " +
-  "Use `t.decimal ..., unsigned: true` instead.";
+  "unsigned_decimal is deprecated and will be removed from Active Record";
 
 /**
  * MySQL-specific column type methods mixed into TableDefinition.
