@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Range } from "../../index.js";
+import { setZone, resetZone } from "@blazetrails/activesupport";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
 
@@ -113,11 +114,34 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
     });
 
-    it.skip("assigning 'infinity' on a datetime column with TZ aware attributes", () => {
-      // BLOCKED: type — missing InTimeZone test helper + Base.timeZoneAwareAttributes /
-      // reset_column_information lifecycle. Sentinels already unified; this
-      // gap is purely about TZ-aware type wrapping + per-block time-zone state.
-      // SCOPE: ~80 LOC — InTimeZone helper + TimeZoneConverter integration test plumbing
+    it("assigning 'infinity' on a datetime column with TZ aware attributes", async () => {
+      // reset_column_information should be called to recreate types with TimeZoneConverter
+      setZone("Pacific Time (US & Canada)");
+      try {
+        const { Base } = await import("../../index.js");
+        const a = adapter;
+        class PostgresqlInfinity extends Base {
+          static tableName = "postgresql_infinities";
+          static timeZoneAwareAttributes = true;
+          static {
+            this.adapter = a;
+          }
+        }
+        await PostgresqlInfinity.loadSchema();
+
+        let record = await (PostgresqlInfinity as any).create({ datetime: "infinity" });
+        expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+        await (record as any).reload();
+        expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+
+        record = await (PostgresqlInfinity as any).create({ datetime: Number.POSITIVE_INFINITY });
+        expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+        await (record as any).reload();
+        expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+      } finally {
+        // setting time_zone_aware_attributes causes the types to change.
+        resetZone();
+      }
     });
 
     it("where clause with infinite range on a datetime column", async () => {

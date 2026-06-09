@@ -117,12 +117,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(adapter.quote(4.2)).toBe("4.2");
     });
 
-    it.skip("quote rational", () => {
-      // PERMANENT: Ruby-only — Rational(3,4) has no JavaScript equivalent.
-    });
+    // NOTE: `quote rational` (Rails `test_quote_rational`) is Ruby-only —
+    // Rational(3, 4) has no JavaScript equivalent — and is reclassified in
+    // scripts/api-compare/unported-files.ts.
 
-    it.skip("quote binary", async () => {
-      // BLOCKED: requires bytea column + quotedBinary round-trip; see bytea.test.ts for DB-backed coverage
+    it("quote binary", async () => {
+      await adapter.exec(`CREATE TABLE "quoting_test" (id serial primary key, payload bytea)`);
+      const bytes = new Uint8Array([0, 1, 2, 253, 254, 255]);
+      await adapter.execute(
+        `INSERT INTO "quoting_test" (payload) VALUES (${adapter.quotedBinary(bytes)})`,
+      );
+      const rows = await adapter.execute(`SELECT payload FROM "quoting_test"`);
+      expect(new Uint8Array(rows[0].payload as ArrayBufferLike)).toEqual(bytes);
     });
 
     it("quote bit string", () => {

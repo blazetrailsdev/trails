@@ -280,11 +280,27 @@ describeIfPg("PostgreSQLAdapter", () => {
         ),
       ).rejects.toBeInstanceOf(StatementInvalid);
     });
-    it.skip("schema change with prepared stmt", () => {
-      // BLOCKED: adapter-pg — requires adapter.preparedStatements=true path
-      // ROOT-CAUSE: test exercises schema changes invalidating prepared statement cache; our adapter
-      // doesn't expose a prepared_statements toggle in the test helper
-      // SCOPE: needs AdapterPool prepared-statements mode wired in schema test setup
+    it("schema change with prepared stmt", async () => {
+      // Rails uses the fixture-isolated `developers` table; our PG adapter files
+      // share one database per worker, so we use a uniquely-named table to avoid
+      // racing the canonical `developers` table other files create.
+      const tbl = "schema_prepared_stmt_devs";
+      await adapter.exec(`DROP TABLE IF EXISTS ${tbl}`);
+      await adapter.exec(`CREATE TABLE ${tbl} (id serial primary key, name varchar(255))`);
+      let altered = false;
+      try {
+        await adapter.execQuery(`select * from ${tbl} where id = $1`, "sql", [1]);
+        await adapter.execQuery(`alter table ${tbl} add column zomg int`, "sql", []);
+        altered = true;
+        await adapter.execQuery(`select * from ${tbl} where id = $1`, "sql", [1]);
+      } finally {
+        // We are not using DROP COLUMN IF EXISTS because that syntax is only
+        // supported by pg 9.X
+        if (altered) {
+          await adapter.execQuery(`alter table ${tbl} drop column zomg`, "sql", []);
+        }
+        await adapter.exec(`DROP TABLE IF EXISTS ${tbl}`);
+      }
     });
 
     it("data source exists?", async () => {
