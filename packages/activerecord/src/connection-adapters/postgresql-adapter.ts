@@ -4158,13 +4158,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // raised by the block earns the missing-privileges warning; every other
   // error bubbles up unchanged.
   override async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
-    const tableNames = await this.tables();
     let originalException: Error | null = null;
 
     try {
       await this.transaction(
         async () => {
-          await this.execute(disableReferentialIntegritySql(tableNames).join(";"));
+          await this.execute(disableReferentialIntegritySql(await this.tables()).join(";"));
         },
         { requiresNew: true },
       );
@@ -4190,7 +4189,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     try {
       await this.transaction(
         async () => {
-          await this.execute(enableReferentialIntegritySql(tableNames).join(";"));
+          await this.execute(enableReferentialIntegritySql(await this.tables()).join(";"));
         },
         { requiresNew: true },
       );
