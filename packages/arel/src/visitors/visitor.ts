@@ -36,6 +36,8 @@ export abstract class Visitor {
     this.dispatch = this.getDispatchCache();
   }
 
+  accept<C>(object: Node, collector: C): C;
+  accept(object: Node): unknown;
   accept(object: Node, collector?: unknown): unknown {
     return this.visit(object, collector);
   }
@@ -48,6 +50,8 @@ export abstract class Visitor {
     return (this.constructor as VisitorCtor).dispatchCache();
   }
 
+  protected visit<C>(object: Node, collector: C): C;
+  protected visit(object: Node): unknown;
   protected visit(object: Node, collector?: unknown): unknown {
     const ctor = object.constructor as NodeCtor;
     const methodName = this.resolveDispatch(ctor);
