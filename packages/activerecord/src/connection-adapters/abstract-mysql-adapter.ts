@@ -1272,7 +1272,31 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    */
   override buildExplainClause(options: ExplainOption[] = []): string {
     if (options.length === 0) return "EXPLAIN for:";
-    return `EXPLAIN ${this._validateExplainOptions(options).join(" ")} for:`;
+    return `${this._explainClause(options)} for:`;
+  }
+
+  /**
+   * MariaDB ≥ 10.1.0 runs `ANALYZE <stmt>` rather than `EXPLAIN ANALYZE
+   * <stmt>` — the leading EXPLAIN keyword is dropped. Other servers keep
+   * the `EXPLAIN` prefix. https://mariadb.com/kb/en/analyze-statement/
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#analyze_without_explain?
+   */
+  protected analyzeWithoutExplain(): boolean {
+    return this._mariadb && this._databaseVersion?.gte("10.1.0") === true;
+  }
+
+  /**
+   * Compose the `EXPLAIN ...` clause shared by the printed header
+   * (`buildExplainClause`) and the actual statement prefix
+   * (`_explainStatementClause`), applying the MariaDB `ANALYZE`-without-
+   * `EXPLAIN` rewrite. Mirrors MySQL::DatabaseStatements#build_explain_clause.
+   */
+  private _explainClause(options: ExplainOption[]): string {
+    const clause = `EXPLAIN ${this._validateExplainOptions(options).join(" ")}`;
+    return this.analyzeWithoutExplain() && clause.includes("ANALYZE")
+      ? clause.replace("EXPLAIN ", "")
+      : clause;
   }
 
   protected _validateExplainOptions(options: ExplainOption[]): string[] {
@@ -1316,7 +1340,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    */
   protected _explainStatementClause(options: ExplainOption[]): string {
     if (options.length === 0) return "EXPLAIN";
-    return `EXPLAIN ${this._validateExplainOptions(options).join(" ")}`;
+    return this._explainClause(options);
   }
 
   /**

@@ -1,23 +1,51 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/optimizer_hints_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
-import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { describe, it, expect, beforeAll } from "vitest";
+import { describeIfMysql, supportsOptimizerHints, Mysql2Adapter } from "./test-helper.js";
+import { captureSql } from "../../testing/sql-capture.js";
+import { Base } from "../../index.js";
+import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
+import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { Post } from "../../test-helpers/models/post.js";
+
+// Rails wraps the whole OptimizerHintsTest body in `if supports_optimizer_hints?`
+// (MySQL ≥ 5.7.7, never MariaDB), so the examples never run on a server that
+// reports no support. Mirror that with a conditional describe.
+const describeOptimizerHints = supportsOptimizerHints ? describe : describe.skip;
 
 describeIfMysql("Mysql2Adapter", () => {
-  let adapter: Mysql2Adapter;
-  beforeEach(async () => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.close();
-  });
+  describeOptimizerHints("OptimizerHintsTest", () => {
+    // mirrors Rails: fixtures :posts
+    useHandlerFixtures(["posts"], { schema: canonicalSchema });
 
-  describe("OptimizerHintsTest", () => {
-    it.skip("optimizer hints", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in optimizer-hints
-      // ROOT-CAUSE: adapters/mysql2/optimizer-hints.ts or abstract-mysql-adapter/optimizer-hints.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/optimizer-hints.ts; affects ~10–26 tests in optimizer-hints.test.ts
+    let adapter: Mysql2Adapter;
+    beforeAll(async () => {
+      adapter = Base.connection as Mysql2Adapter;
+      await adapter.addIndex("posts", ["author_id"], {
+        name: "index_posts_on_author_id",
+        ifNotExists: true,
+      });
+    });
+
+    it("optimizer hints", async () => {
+      const hint = "NO_RANGE_OPTIMIZATION(posts index_posts_on_author_id)";
+      const sqls = await captureSql(async () => {
+        await Post.optimizerHints(hint)
+          .select("id")
+          .where({ author_id: [0, 1] })
+          .toArray();
+      });
+      // Rails: assert_queries_match(%r{\ASELECT /\*\+ NO_RANGE_OPTIMIZATION(...) \*/})
+      expect(sqls[0]).toMatch(
+        /^SELECT \/\*\+ NO_RANGE_OPTIMIZATION\(posts index_posts_on_author_id\) \*\//,
+      );
+      // Rails: assert_includes posts.explain.inspect, "| index | index_posts_on_author_id |"
+      const plan = await Post.optimizerHints(hint)
+        .select("id")
+        .where({ author_id: [0, 1] })
+        .explain();
+      expect(plan).toContain("index_posts_on_author_id");
     });
   });
 });
