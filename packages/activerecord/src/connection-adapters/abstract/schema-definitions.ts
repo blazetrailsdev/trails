@@ -231,6 +231,7 @@ export interface IdHashOptions {
   scale?: number;
   unsigned?: boolean;
   comment?: string;
+  autoIncrement?: boolean;
 }
 
 export interface ColumnOptions {
@@ -643,6 +644,7 @@ export class TableDefinition {
       charset?: string;
       collation?: string;
       default?: unknown;
+      autoIncrement?: boolean;
     } = {},
   ) {
     this.tableName = tableName;
@@ -696,13 +698,17 @@ export class TableDefinition {
         pkType = (idType || "primary_key") as string as ColumnType;
         pkOpts = { primaryKey: true };
         if (tdOptions.default !== undefined) pkOpts.default = tdOptions.default;
+        if (tdOptions.autoIncrement !== undefined) pkOpts.autoIncrement = tdOptions.autoIncrement;
         // Merge id hash options (charset, collation, limit, etc.) but keep primaryKey: true.
+        // Mirrors Rails set_primary_key: outer options merge first, id hash merges on top
+        // (options.merge!(id.except(:type))), so id hash wins on collision.
         Object.assign(pkOpts, idRest as Partial<ColumnOptions>);
         pkOpts.primaryKey = true;
       } else {
         pkType = (typeof this._id === "string" ? this._id : "primary_key") as ColumnType;
         pkOpts = { primaryKey: true };
         if (tdOptions.default !== undefined) pkOpts.default = tdOptions.default;
+        if (tdOptions.autoIncrement !== undefined) pkOpts.autoIncrement = tdOptions.autoIncrement;
       }
       this.columns.push(this.newColumnDefinition(pkNameOverride ?? "id", pkType, pkOpts));
     }
