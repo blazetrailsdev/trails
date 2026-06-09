@@ -213,6 +213,42 @@ done <<< "$VENDOR_PATHS"
 
 WORKTREE_CREATED=0  # success — disable EXIT-trap cleanup
 
+# Provision a per-worktree tasks checkout so this agent has its own isolated
+# tasks working tree. Each worktree gets `tasks/` symlinked to its own branch
+# so concurrent mutations never race on a shared checkout.
+#
+# Best-effort: failures below are warned but do not abort — the agent falls
+# back to the canonical ~/github/blazetrailsdev/tasks path via cli.ts.
+TASKS_CANONICAL="$HOME/github/blazetrailsdev/tasks"
+TASKS_WORKTREES_ROOT="$HOME/github/blazetrailsdev/tasks-worktrees"
+TASKS_WT="$TASKS_WORKTREES_ROOT/$NAME"
+
+echo "==> Provisioning per-worktree tasks checkout at $TASKS_WT"
+if [[ -e "$TASKS_CANONICAL/.git" ]]; then
+  mkdir -p "$TASKS_WORKTREES_ROOT"
+  # Branch `tasks-<NAME>` tracks origin/main. push `HEAD:main` from this
+  # branch always lands on origin/main regardless of branch name.
+  if git -C "$TASKS_CANONICAL" worktree add -b "tasks-$NAME" "$TASKS_WT" origin/main 2>/dev/null; then
+    # node_modules are required: the tasks pre-commit hook runs
+    # build-index/validate/markdownlint/prettier, and a missing node_modules
+    # crashes the hook, leaving a stale index and failing CI.
+    echo "==> Installing tasks worktree dependencies"
+    ( cd "$TASKS_WT" && pnpm install ) || \
+      echo "    warning: pnpm install failed in tasks worktree — pre-commit hook will not work" >&2
+    ln -s "$TASKS_WT" "$TARGET/tasks"
+    echo "    linked tasks -> $TASKS_WT"
+  else
+    echo "    warning: git worktree add for tasks failed (branch tasks-$NAME may already exist)" >&2
+    echo "    Falling back to canonical $TASKS_CANONICAL for pnpm tasks" >&2
+  fi
+else
+  echo "    skip — canonical tasks repo not found at $TASKS_CANONICAL" >&2
+fi
+# Cleanup note: removing this trails worktree does not automatically remove
+# the tasks worktree at $TASKS_WT. Remove it manually with:
+#   git -C "$TASKS_CANONICAL" worktree remove "$TASKS_WT"
+# A prune helper is tracked as a follow-up story.
+
 echo
 echo "Done. New worktree:"
 echo "  $TARGET"

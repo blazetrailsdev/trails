@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -33,6 +33,7 @@ import {
   parseFlags,
   ready,
   removeFrontmatterKey,
+  resolveTasksDir,
   STORY_STATUSES,
   stringFlag,
   StoryEntry,
@@ -516,10 +517,10 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(seen).toEqual(["pull", "add", "commit", "push"]);
   });
 
-  // The canonical checkout pushes a bare `main` ref, which pushes the LOCAL
-  // `main` branch — not HEAD. If the checkout is parked on another branch, that
-  // push is rejected non-fast-forward forever and looks like a lost race. Guard
-  // it: bail with exit 1 before pulling/committing, never touching the tree.
+  // A bare-branch refspec (e.g. `pushRefspec: "main"`) pushes the LOCAL branch
+  // of that name — not HEAD. If the checkout is parked on another branch, that
+  // push is rejected forever and looks like a lost race. Guard it: bail with
+  // exit 1 before pulling/committing, never touching the tree.
   it("refuses a bare-branch push when the checkout is on the wrong branch", () => {
     const { seen, exit } = setup();
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -537,6 +538,7 @@ describe("commitAndPush (git mutation flow)", () => {
         mutator: () => mutatorCalls++,
         raceMessage: "lost claim race",
         raceExitCode: 3,
+        pushRefspec: "main", // explicit bare-branch to trigger guard
       }),
     ).toThrow(/exit 1/);
     expect(exit).toHaveBeenCalledWith(1);
@@ -572,11 +574,30 @@ describe("commitAndPush (git mutation flow)", () => {
         mutator: () => {},
         raceMessage: "lost claim race",
         raceExitCode: 3,
+        pushRefspec: "main", // explicit bare-branch to trigger guard
       }),
     ).toThrow(/exit 1/);
     expect(exit).toHaveBeenCalledWith(1);
     expect(seen).toEqual([]);
     expect(errSpy.mock.calls.at(-1)?.[0]).toMatch(/is on branch "\(detached HEAD\)", not "main"/);
+  });
+
+  it("defaults to HEAD:main push refspec when no pushRefspec given", () => {
+    setup();
+    const fullArgs: string[][] = [];
+    execFileSyncMock.mockImplementation((_file, args) => {
+      fullArgs.push(args ?? []);
+      return "" as never;
+    });
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => {},
+      raceMessage: "no",
+      raceExitCode: 4,
+    });
+    const push = fullArgs.find((a) => a[2] === "push");
+    expect(push).toEqual(["-C", TASKS_DIR, "push", "--quiet", "origin", "HEAD:main"]);
   });
 
   // refine commits in an agent worktree (on a feature branch) and must push
@@ -869,5 +890,59 @@ describe("newStory cluster validation", () => {
     const msg = (console.error as ReturnType<typeof vi.spyOn>).mock.calls[0]?.[0] as string;
     expect(msg).toMatch(/scaffold/);
     expect(msg).toMatch(/conversion/);
+  });
+});
+
+describe("resolveTasksDir (TASKS_DIR resolution order)", () => {
+  function withEnv(vars: Record<string, string | undefined>, fn: () => void): void {
+    const orig: Record<string, string | undefined> = {};
+    for (const k of Object.keys(vars)) orig[k] = process.env[k];
+    try {
+      for (const [k, v] of Object.entries(vars)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+      fn();
+    } finally {
+      for (const [k, v] of Object.entries(orig)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+  }
+
+  it("explicit $TASKS_DIR env wins over symlink and canonical", () => {
+    withEnv({ TASKS_DIR: "/custom/tasks", RFCS_DIR: undefined }, () => {
+      expect(resolveTasksDir("/any/cwd")).toBe("/custom/tasks");
+    });
+  });
+
+  it("$RFCS_DIR is honored as transition fallback when $TASKS_DIR is unset", () => {
+    withEnv({ TASKS_DIR: undefined, RFCS_DIR: "/rfcs/path" }, () => {
+      expect(resolveTasksDir("/any/cwd")).toBe("/rfcs/path");
+    });
+  });
+
+  it("$TASKS_DIR takes precedence over $RFCS_DIR when both are set", () => {
+    withEnv({ TASKS_DIR: "/tasks/wins", RFCS_DIR: "/rfcs/loses" }, () => {
+      expect(resolveTasksDir("/any/cwd")).toBe("/tasks/wins");
+    });
+  });
+
+  it("uses <cwd>/tasks when its .git entry exists (the per-worktree symlink)", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "trails-wt-"));
+    mkdirSync(join(cwd, "tasks"));
+    // A tasks worktree has .git as a file (gitdir pointer), not a directory.
+    writeFileSync(join(cwd, "tasks", ".git"), "gitdir: ../../tasks-worktrees/x/.git\n");
+    withEnv({ TASKS_DIR: undefined, RFCS_DIR: undefined }, () => {
+      expect(resolveTasksDir(cwd)).toBe(join(cwd, "tasks"));
+    });
+  });
+
+  it("falls back to canonical ~/github/blazetrailsdev/tasks when <cwd>/tasks has no .git", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "trails-no-tasks-"));
+    withEnv({ TASKS_DIR: undefined, RFCS_DIR: undefined }, () => {
+      expect(resolveTasksDir(cwd)).toBe(join(homedir(), "github", "blazetrailsdev", "tasks"));
+    });
   });
 });
