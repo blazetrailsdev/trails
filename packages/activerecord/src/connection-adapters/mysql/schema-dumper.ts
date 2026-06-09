@@ -230,9 +230,11 @@ export class SchemaDumper extends AbstractSchemaDumper {
    * so `extractExpressionForVirtualColumn` can serve it during column iteration.
    *
    * Mirrors Rails' `MySQL::SchemaDumper#extract_expression_for_virtual_column`,
-   * which reads the same column and applies `gsub('\\\\', '\\').inspect` to turn
-   * MySQL's escaped expression into a Ruby string literal. We unescape doubled
-   * backslashes the same way and emit a JSON string literal.
+   * which reads the same column and applies `gsub("\\'", "'").inspect`. MySQL's
+   * `generation_expression` already escapes single quotes inside string literals
+   * (e.g. `json_extract(\`profile\`,_utf8mb4\'$.email\')`); Rails strips that
+   * escape before re-quoting so the dumped `as:` round-trips. We do the same and
+   * emit a JSON string literal.
    * @internal
    */
   protected async populateVirtualExpressionCache(tableName: string): Promise<void> {
@@ -253,7 +255,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
         | string
         | undefined;
       if (typeof name === "string" && typeof expr === "string") {
-        byColumn[name] = JSON.stringify(expr.replace(/\\\\/g, "\\"));
+        byColumn[name] = JSON.stringify(expr.replace(/\\'/g, "'"));
       }
     }
     this.virtualExpressionCache[tableName] = byColumn;

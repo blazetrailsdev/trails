@@ -237,18 +237,23 @@ describe("MySQL::SchemaDumper", () => {
       });
     });
 
-    it("unescapes doubled backslashes (mirrors Rails gsub('\\\\\\\\', '\\\\'))", async () => {
+    it('strips escaped single quotes (mirrors Rails gsub("\\\\\'", "\'"))', async () => {
       const d = make();
       d.connection = {
         tableOptions: async () => ({}),
-        // MySQL doubles backslashes in generation_expression; String.raw keeps the
-        // two literal backslashes the engine would report (e.g. a `\d` regex member).
-        schemaQuery: async () => [{ name: "c", expr: String.raw`a\\d` }],
+        // MySQL escapes single quotes inside string literals in generation_expression,
+        // e.g. a JSON path. The `\\'` below is a literal backslash-quote, exactly what
+        // the engine reports for json_extract(`profile`,_utf8mb4'$.email').
+        schemaQuery: async () => [
+          { name: "c", expr: "json_extract(`profile`,_utf8mb4\\'$.email\\')" },
+        ],
         quote: (v) => `'${String(v)}'`,
       };
       await (d as any).populateVirtualExpressionCache("t");
-      // The pair collapses to one backslash, then JSON.stringify re-escapes it.
-      expect(d.virtualExpressionCache["t"]!["c"]).toBe(JSON.stringify(String.raw`a\d`));
+      // \' collapses to ', then JSON.stringify re-quotes the whole expression.
+      expect(d.virtualExpressionCache["t"]!["c"]).toBe(
+        JSON.stringify("json_extract(`profile`,_utf8mb4'$.email')"),
+      );
     });
 
     it("does not re-query when the table is already cached", async () => {
