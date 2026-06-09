@@ -614,7 +614,7 @@ export class SchemaDumper {
   static async dumpTableSchema(source: SchemaSource, tableName: string): Promise<string> {
     const wrappedSource = isDatabaseAdapter(source) ? new AdapterSchemaSource(source) : source;
     // Instantiate the adapter-specific subclass when the adapter exposes
-    // createSchemaDumper() (currently only PostgreSQLAdapter). Falls back to
+    // createSchemaDumper() (PostgreSQLAdapter and Mysql2Adapter). Falls back to
     // the base class when unavailable, which is what the old code always did.
     let dumper: SchemaDumper;
     if (isDatabaseAdapter(source) && typeof (source as any).createSchemaDumper === "function") {
