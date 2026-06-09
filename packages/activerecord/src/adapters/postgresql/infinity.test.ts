@@ -138,6 +138,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
         await (record as any).reload();
         expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+
+        // Rails also exercises `create!(datetime: BigDecimal::INFINITY)`. JavaScript
+        // has no BigDecimal type; `Number.POSITIVE_INFINITY` (covered above) is the
+        // only infinity literal, so that input-type variant has no TS counterpart.
       } finally {
         // setting time_zone_aware_attributes causes the types to change.
         resetZone();
