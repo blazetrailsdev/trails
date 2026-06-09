@@ -21,15 +21,9 @@ function createBarrier(n: number): { wait: () => Promise<void> } {
   };
 }
 
-/**
- * Rails' `make_parent_transaction_dirty` runs `Sample.take` (a SELECT) so the
- * next nested transaction is forced to be a real SavepointTransaction rather
- * than a restartable no-op. Rails dirties the transaction on any materialized
- * query; the trails mysql2 adapter only dirties on DML (`executeMutation`), so
- * a 0-row UPDATE is the faithful way to dirty without touching data.
- */
+/** Mirrors Rails' `make_parent_transaction_dirty` which runs `Sample.take`. */
 async function makeParentDirty(a: Mysql2Adapter): Promise<void> {
-  await a.executeMutation("UPDATE `samples` SET value = value WHERE 1 = 0");
+  await a.execQuery("SELECT * FROM `samples` LIMIT 1");
 }
 
 /** Mirrors `assert_current_transaction_is_savepoint_transaction`. */
@@ -55,6 +49,15 @@ describeIfMysql("Mysql2Adapter", () => {
     });
     afterEach(async () => {
       await adapter.execute("DROP TABLE IF EXISTS `samples`").catch(() => {});
+    });
+
+    it("select inside transaction forces nested requiresNew to use a SavepointTransaction", async () => {
+      await adapter.transaction(async () => {
+        await makeParentDirty(adapter);
+        await adapter.transaction({ requiresNew: true }, async () => {
+          assertSavepoint(adapter);
+        });
+      });
     });
 
     it("deadlock correctly raises Deadlocked inside nested SavepointTransaction", async () => {

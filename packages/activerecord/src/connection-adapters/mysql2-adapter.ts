@@ -562,11 +562,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           // Unwrap so !Array.isArray(result) below returns empty Result.
           result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
         }
+        // Mirrors Rails' with_raw_connection: dirty_current_transaction after
+        // any materialized query, not just DML.
+        this.dirtyCurrentTransaction();
         // DML results in a ResultSetHeader (no rows array); SELECT results
         // in an array of row objects. Return empty Result for DML to avoid
         // throwing on INSERT/UPDATE/DELETE passed to execQuery.
         if (!Array.isArray(result)) {
-          this.dirtyCurrentTransaction();
           payload.row_count = (result as mysql.ResultSetHeader).affectedRows ?? 0;
           await this._handleWarningsOn(conn, driverSql);
           return new Result([], []);
