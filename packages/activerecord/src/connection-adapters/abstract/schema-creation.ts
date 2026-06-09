@@ -358,14 +358,20 @@ export class SchemaCreation {
           ((options as Record<string, unknown>)["type"] as ColumnType | undefined) ?? "string";
         return this.typeToSql(realType, options);
       }
-      default:
+      default: {
         // Pass-through for adapter-specific type strings (e.g.
         // "timestamptz", "inet", "hstore", custom PG enum names).
-        // Rails' `type_to_sql` does the equivalent fallthrough to the
-        // native-db-types map for unrecognized types. Uppercasing
-        // matches SQL-DDL convention.
-        sql = String(type).toUpperCase();
+        // Rails' `type_to_sql` returns an unrecognized type verbatim
+        // (`type.to_s`, abstract/schema_statements.rb) — it never uppercases.
+        // We uppercase a bare keyword as a trails DDL-style convention (a
+        // cosmetic divergence; DBs fold type-name case), but a literal type
+        // fragment carrying a value list or args — e.g. enum('text','blob')
+        // or set('a','b') — MUST be emitted verbatim, since uppercasing would
+        // corrupt the quoted member values, where case is significant.
+        const raw = String(type);
+        sql = /[('"]/.test(raw) ? raw : raw.toUpperCase();
         break;
+      }
     }
 
     if (options.array && type !== "primary_key") {
