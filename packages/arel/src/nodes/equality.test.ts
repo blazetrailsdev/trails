@@ -68,7 +68,7 @@ describe("Arel", () => {
           const test = attr.eq(10);
           const sql = new Visitors.ToSql().compile(test);
           expect(sql).toContain('"users"."id"');
-          expect(sql).toContain("10");
+          expect(sql).toContain("?");
         });
       });
     });

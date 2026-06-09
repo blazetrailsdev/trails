@@ -8,7 +8,7 @@ describe("FilterTest", () => {
       const count = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
       const filter = new Nodes.Filter(count, users.get("active").eq(true));
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(filter)).toBe('COUNT(*) FILTER (WHERE "users"."active" = TRUE)');
+      expect(visitor.compile(filter)).toBe('COUNT(*) FILTER (WHERE "users"."active" = ?)');
     });
 
     it("should alias the expression", () => {

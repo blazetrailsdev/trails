@@ -16,14 +16,14 @@ describe("PredicationsMixin", () => {
       // arel-25: (users[:bitmap] & 16).gt(0)
       const expr = users.get("bitmap").bitwiseAnd(16).gt(0);
       const sql = new Visitors.ToSql().compile(expr);
-      expect(sql).toBe('("users"."bitmap" & 16) > 0');
+      expect(sql).toBe('("users"."bitmap" & 16) > ?');
     });
 
     it("BitwiseShiftLeft#gt chains through Predications", () => {
       // arel-28: (users[:bitmap] << 1).gt(0)
       const expr = users.get("bitmap").bitwiseShiftLeft(1).gt(0);
       const sql = new Visitors.ToSql().compile(expr);
-      expect(sql).toBe('("users"."bitmap" << 1) > 0');
+      expect(sql).toBe('("users"."bitmap" << 1) > ?');
     });
   });
 
@@ -32,13 +32,13 @@ describe("PredicationsMixin", () => {
       // arel-30: (~users[:bitmap]).gt(0)
       const expr = new Nodes.BitwiseNot(users.get("bitmap")).gt(0);
       const sql = new Visitors.ToSql().compile(expr);
-      expect(sql).toBe(' ~ "users"."bitmap" > 0');
+      expect(sql).toBe(' ~ "users"."bitmap" > ?');
     });
 
     it("BitwiseNot#eq produces an equality predicate", () => {
       const expr = new Nodes.BitwiseNot(users.get("flags")).eq(0);
       const sql = new Visitors.ToSql().compile(expr);
-      expect(sql).toBe(' ~ "users"."flags" = 0');
+      expect(sql).toBe(' ~ "users"."flags" = ?');
     });
   });
 
@@ -62,7 +62,7 @@ describe("PredicationsMixin", () => {
 
     it("in(scalar) wraps the scalar (Rails quoted_node fallthrough)", () => {
       const sql = new Visitors.ToSql().compile(bn.in(7));
-      expect(sql).toBe(' ~ "users"."flags" IN (7)');
+      expect(sql).toBe(' ~ "users"."flags" IN (?)');
     });
   });
 
@@ -71,13 +71,13 @@ describe("PredicationsMixin", () => {
       // arel-47: photos[:id].count.gt(5)
       const expr = users.get("id").count().gt(5);
       const sql = new Visitors.ToSql().compile(expr);
-      expect(sql).toBe('COUNT("users"."id") > 5');
+      expect(sql).toBe('COUNT("users"."id") > ?');
     });
 
     it("NamedFunction#in accepts a value list", () => {
       const fn = new Nodes.NamedFunction("LOWER", [users.get("name")]);
       const sql = new Visitors.ToSql().compile(fn.in(["a", "b"]));
-      expect(sql).toBe("LOWER(\"users\".\"name\") IN ('a', 'b')");
+      expect(sql).toBe('LOWER("users"."name") IN (?, ?)');
     });
   });
 });

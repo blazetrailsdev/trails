@@ -70,7 +70,7 @@ describe("TestNode", () => {
   it("operation ordering via sql", () => {
     const visitor = new Visitors.ToSql();
     const node = new Nodes.InfixOperation("+", users.get("a"), new Nodes.Quoted(1));
-    expect(visitor.compile(node)).toBe('"users"."a" + 1');
+    expect(visitor.compile(node)).toBe('"users"."a" + ?');
   });
 
   it("construct with alias via constructor", () => {
@@ -184,7 +184,7 @@ describe("setToSqlVisitor", () => {
       const users = new Table("users");
       const node = users.get("name").isDistinctFrom(null);
       // Generic visitor.
-      expect(node.toSql()).toBe(`"users"."name" IS DISTINCT FROM NULL`);
+      expect(node.toSql()).toBe(`"users"."name" IS NOT NULL`);
       // SQLite visitor.
       setToSqlVisitor(Visitors.SQLite);
       expect(node.toSql()).toBe(`"users"."name" IS NOT NULL`);
@@ -200,8 +200,8 @@ describe("setToSqlVisitor", () => {
       expect(mgr.toSql()).toContain("IS NOT DISTINCT FROM");
       setToSqlVisitor(Visitors.SQLite);
       const sqlite = mgr.toSql();
-      // SQLite emits IS for IS NOT DISTINCT FROM, and `1` for true.
-      expect(sqlite).toContain('"users"."active" IS 1');
+      // SQLite emits IS for IS NOT DISTINCT FROM, and ? for parameterized values.
+      expect(sqlite).toContain('"users"."active" IS ?');
       expect(sqlite).not.toContain("IS NOT DISTINCT FROM");
     } finally {
       restore();

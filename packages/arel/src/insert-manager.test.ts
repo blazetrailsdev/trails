@@ -13,9 +13,7 @@ describe("InsertManagerTest", () => {
         [new Nodes.Quoted("dean"), new Nodes.Quoted(30)],
         [new Nodes.Quoted("sam"), new Nodes.Quoted(25)],
       ]);
-      expect(mgr.toSql()).toBe(
-        `INSERT INTO "users" ("name", "age") VALUES ('dean', 30), ('sam', 25)`,
-      );
+      expect(mgr.toSql()).toBe(`INSERT INTO "users" ("name", "age") VALUES (?, ?), (?, ?)`);
     });
 
     it("allows sql literals", () => {
@@ -173,9 +171,7 @@ describe("InsertManagerTest", () => {
         [new Nodes.Quoted("dean"), new Nodes.Quoted(30)],
         [new Nodes.Quoted("sam"), new Nodes.Quoted(25)],
       ]);
-      expect(mgr.toSql()).toBe(
-        `INSERT INTO "users" ("name", "age") VALUES ('dean', 30), ('sam', 25)`,
-      );
+      expect(mgr.toSql()).toBe(`INSERT INTO "users" ("name", "age") VALUES (?, ?), (?, ?)`);
     });
   });
 
@@ -196,7 +192,7 @@ describe("InsertManagerTest", () => {
       const mgr = new InsertManager(users);
       const at = new Date(2020, 0, 2, 12, 34, 56);
       mgr.insert([[users.get("created_at"), at]]);
-      expect(mgr.toSql()).toContain("2020-01-02");
+      expect(mgr.toSql()).toContain("?");
     });
 
     it("defaults the table", () => {

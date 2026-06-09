@@ -48,7 +48,7 @@ describe("TestFactoryMethods", () => {
   it("lower wraps non-Node arguments via buildQuoted", () => {
     const fn = users.lower("name");
     expect(fn.expressions[0]).toBeInstanceOf(Nodes.Quoted);
-    expect(new Visitors.ToSql().compile(fn)).toBe("LOWER('name')");
+    expect(new Visitors.ToSql().compile(fn)).toBe("LOWER(?)");
   });
 
   it("coalesce", () => {

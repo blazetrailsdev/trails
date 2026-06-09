@@ -9,57 +9,68 @@ import { ToSql } from "./to-sql.js";
  * Mirrors: Arel::Visitors::SQLite
  */
 export class SQLite extends ToSql {
-  protected override visitArelNodesLock(_node: Nodes.Lock): SQLString {
+  protected override visitArelNodesLock(_node: Nodes.Lock, collector: SQLString): SQLString {
     // SQLite does not support locking — silently ignore.
-    return this.collector;
+    return collector;
   }
 
-  protected override visitArelNodesSelectStatement(node: Nodes.SelectStatement): SQLString {
+  protected override visitArelNodesSelectStatement(
+    node: Nodes.SelectStatement,
+    collector: SQLString,
+  ): SQLString {
     if (node.with) {
-      this.visit(node.with);
-      this.collector.append(" ");
+      this.visit(node.with, collector);
+      collector.append(" ");
     }
 
     for (let i = 0; i < node.cores.length; i++) {
-      if (i > 0) this.collector.append(" ");
-      this.visit(node.cores[i]);
+      if (i > 0) collector.append(" ");
+      this.visit(node.cores[i], collector);
     }
 
     if (node.orders.length > 0) {
-      this.collector.append(" ORDER BY ");
-      this.injectJoin(node.orders, ", ");
+      collector.append(" ORDER BY ");
+      this.injectJoin(node.orders, ", ", collector);
     }
 
     if (node.limit) {
-      this.collector.append(" ");
-      this.visit(node.limit);
+      collector.append(" ");
+      this.visit(node.limit, collector);
     } else if (node.offset) {
       // SQLite requires LIMIT when using OFFSET; -1 means "no limit".
-      this.collector.append(" LIMIT -1");
+      collector.append(" LIMIT -1");
     }
 
     if (node.offset) {
-      this.collector.append(" ");
-      this.visit(node.offset);
+      collector.append(" ");
+      this.visit(node.offset, collector);
     }
 
     // SQLite does not support locking; ignore lock clause entirely.
 
-    return this.collector;
+    return collector;
   }
 
-  protected override visitArelNodesTrue(_node: Nodes.True): SQLString {
-    this.collector.append("1");
-    return this.collector;
+  protected override visitArelNodesTrue(_node: Nodes.True, collector: SQLString): SQLString {
+    collector.append("1");
+    return collector;
   }
 
-  protected override visitArelNodesFalse(_node: Nodes.False): SQLString {
-    this.collector.append("0");
-    return this.collector;
+  protected override visitArelNodesFalse(_node: Nodes.False, collector: SQLString): SQLString {
+    collector.append("0");
+    return collector;
   }
 
-  protected override visitArelNodesIsNotDistinctFrom(node: Nodes.IsNotDistinctFrom): SQLString {
-    return this.visitBinaryOp(node, "IS");
+  protected override visitArelNodesIsNotDistinctFrom(
+    node: Nodes.IsNotDistinctFrom,
+    collector: SQLString,
+  ): SQLString {
+    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
+      this.visitNodeOrValue(node.left, collector);
+      collector.append(" IS NULL");
+      return collector;
+    }
+    return this.visitBinaryOp(node, "IS", collector);
   }
 
   /**
@@ -68,8 +79,16 @@ export class SQLite extends ToSql {
    * `IsNotDistinctFrom` through the SQLite adapter and emits `IS NOT` /
    * `IS` accordingly.
    */
-  protected override visitArelNodesIsDistinctFrom(node: Nodes.IsDistinctFrom): SQLString {
-    return this.visitBinaryOp(node, "IS NOT");
+  protected override visitArelNodesIsDistinctFrom(
+    node: Nodes.IsDistinctFrom,
+    collector: SQLString,
+  ): SQLString {
+    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
+      this.visitNodeOrValue(node.left, collector);
+      collector.append(" IS NOT NULL");
+      return collector;
+    }
+    return this.visitBinaryOp(node, "IS NOT", collector);
   }
 
   /**
@@ -81,26 +100,27 @@ export class SQLite extends ToSql {
     o: Node & { left: Node; right: Node },
     value: string,
     suppressParens = false,
+    collector: SQLString,
   ): SQLString {
     const sameClass = (child: Node): child is typeof o =>
       Object.getPrototypeOf(child) === Object.getPrototypeOf(o);
 
-    if (!suppressParens) this.collector.append("( ");
+    if (!suppressParens) collector.append("( ");
     const left = this.unwrapGrouping(o.left);
     if (sameClass(left)) {
-      this.infixValueWithParen(left, value, true);
+      this.infixValueWithParen(left, value, true, collector);
     } else {
-      this.groupingParentheses(left, false);
+      this.groupingParentheses(left, false, collector);
     }
-    this.collector.append(value);
+    collector.append(value);
     const right = this.unwrapGrouping(o.right);
     if (sameClass(right)) {
-      this.infixValueWithParen(right, value, true);
+      this.infixValueWithParen(right, value, true, collector);
     } else {
-      this.groupingParentheses(right, false);
+      this.groupingParentheses(right, false, collector);
     }
-    if (!suppressParens) this.collector.append(" )");
-    return this.collector;
+    if (!suppressParens) collector.append(" )");
+    return collector;
   }
 
   protected override quote(value: unknown): string {

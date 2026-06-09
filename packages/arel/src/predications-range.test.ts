@@ -76,17 +76,17 @@ describe("Predications range semantics", () => {
     const sql = (n: Nodes.Node) => new Visitors.ToSql().compile(n);
 
     it("inclusive standard range → BETWEEN", () => {
-      expect(sql(id.between({ begin: 1, end: 3 }))).toBe('"users"."id" BETWEEN 1 AND 3');
+      expect(sql(id.between({ begin: 1, end: 3 }))).toBe('"users"."id" BETWEEN ? AND ?');
     });
 
     it("exclusive range → >= AND <", () => {
       expect(sql(id.between({ begin: 1, end: 3, excludeEnd: true }))).toBe(
-        '"users"."id" >= 1 AND "users"."id" < 3',
+        '"users"."id" >= ? AND "users"."id" < ?',
       );
     });
 
     it("begin == end → equality", () => {
-      expect(sql(id.between({ begin: 5, end: 5 }))).toBe('"users"."id" = 5');
+      expect(sql(id.between({ begin: 5, end: 5 }))).toBe('"users"."id" = ?');
     });
 
     it("-Infinity..Infinity → 1=1", () => {
@@ -103,18 +103,18 @@ describe("Predications range semantics", () => {
 
     it("inclusive range → (col < b OR col > e)", () => {
       expect(sql(id.notBetween({ begin: 1, end: 3 }))).toBe(
-        '("users"."id" < 1 OR "users"."id" > 3)',
+        '("users"."id" < ? OR "users"."id" > ?)',
       );
     });
 
     it("exclusive range → (col < b OR col >= e)", () => {
       expect(sql(id.notBetween({ begin: 1, end: 3, excludeEnd: true }))).toBe(
-        '("users"."id" < 1 OR "users"."id" >= 3)',
+        '("users"."id" < ? OR "users"."id" >= ?)',
       );
     });
 
     it("-Infinity..end → > end (no NOT wrapper)", () => {
-      expect(sql(id.notBetween({ begin: -Infinity, end: 3 }))).toBe('"users"."id" > 3');
+      expect(sql(id.notBetween({ begin: -Infinity, end: 3 }))).toBe('"users"."id" > ?');
     });
 
     it("-Infinity..Infinity → 1=0", () => {

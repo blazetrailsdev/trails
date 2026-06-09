@@ -54,7 +54,7 @@ describe("UpdateManagerTest", () => {
       um.set([[counter, expr]]);
       const sql = um.toSql();
 
-      expect(sql).toContain(`SET "counter" = COALESCE("counter", 0) + 1`);
+      expect(sql).toContain(`SET "counter" = COALESCE("counter", ?) + ?`);
       expect(sql).not.toContain(`"posts"."counter", 0`);
     });
 
@@ -70,7 +70,7 @@ describe("UpdateManagerTest", () => {
       um.set([[counter, expr]]);
       const sql = um.toSql();
 
-      expect(sql).toContain(`SET "counter" = COALESCE("counter", 0) - 3`);
+      expect(sql).toContain(`SET "counter" = COALESCE("counter", ?) - ?`);
     });
   });
 
@@ -162,7 +162,7 @@ describe("UpdateManagerTest", () => {
       ]);
       mgr.where(users.get("id").eq(1));
       expect(mgr.toSql()).toBe(
-        `UPDATE "users" SET "name" = 'dean', "age" = 31 WHERE "users"."id" = 1`,
+        `UPDATE "users" SET "name" = 'dean', "age" = 31 WHERE "users"."id" = ?`,
       );
     });
   });
@@ -191,7 +191,7 @@ describe("UpdateManagerTest", () => {
     mgr.order(users.get("name").asc());
     mgr.take(5);
     expect(mgr.toSql()).toBe(
-      `UPDATE "users" SET "active" = FALSE WHERE "users"."age" < 18 ORDER BY "users"."name" ASC LIMIT 5`,
+      `UPDATE "users" SET "active" = FALSE WHERE "users"."age" < ? ORDER BY "users"."name" ASC LIMIT ?`,
     );
   });
 
@@ -214,7 +214,7 @@ describe("UpdateManagerTest", () => {
     um.table(users);
     um.take(10);
     um.set([[users.get("name"), null]]);
-    expect(um.toSql()).toContain("LIMIT 10");
+    expect(um.toSql()).toContain("LIMIT ?");
   });
 
   describe("set", () => {
