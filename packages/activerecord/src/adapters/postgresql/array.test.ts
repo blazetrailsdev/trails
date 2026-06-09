@@ -422,11 +422,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       // hstore-extension table setup and the array-of-hstore OID wiring are prerequisites.
     });
     it.skip("datetime with timezone awareness", async () => {
-      // BLOCKED: TimeZone infra + missing schema column.
-      // The pg_arrays table above omits the `datetimes datetime[]` column, and the
-      // timestamp/datetime array subtype does not respect ActiveSupport::TimeZone when
-      // casting elements (`in_time_zone` / `Time.zone` not ported). Requires the TimeZone
-      // registry port — defer to a dedicated timezone PR.
+      // BLOCKED: tz-aware timestamp[] DB round-trip — the in-memory cast already
+      // wraps each element in a TimeWithZone (TimeZoneConverter recurses into
+      // arrays), but the DB round-trip mis-converts: write stores the correct UTC
+      // wall-clock ("2020-06-15 17:00:00", identical to the scalar path), yet the
+      // array element deserialize reads it back shifted by +4h while the scalar
+      // datetime reads it back correctly. The array element subtype's read path
+      // does not interpret the stored wall-clock the way the scalar DateTime does.
+      // SCOPE: array OID element deserialize — see follow-on p3-pg-array-oid-subtypes
+      //   (same family as the timestamp[] precision round-trip loss below).
     });
     it("assigning non array value", async () => {
       class PgArrays extends Base {
@@ -507,11 +511,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("precision is respected on timestamp columns", async () => {
-      // BLOCKED: adapter-pg — timestamp array microsecond precision not preserved
-      // ROOT-CAUSE: OID::DateTime subtype used for timestamp[] columns does not cast the usec
-      //   component of a Temporal.Instant/Date through the Temporal.PlainDateTime precision path;
-      //   precision: 6 column metadata is not plumbed to the timestamp array subtype's cast.
-      // SCOPE: ~20 LOC — plumb precision through OID::Array → DateTime subtype constructor
+      // BLOCKED: adapter-pg — timestamp array microsecond precision survives the
+      // in-memory create-time cast but is dropped on the DB round-trip: the
+      // timestamp[] serialize/deserialize path truncates the usec component.
+      // SCOPE: array OID element serialize/deserialize — see follow-on story
+      //   p3-pg-array-oid-subtypes (also covers hstore[] and the precision plumb).
     });
   });
 });

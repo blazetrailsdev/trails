@@ -117,13 +117,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(adapter.quote(4.2)).toBe("4.2");
     });
 
-    it.skip("quote rational", () => {
-      // PERMANENT: Ruby-only — Rational(3,4) has no JavaScript equivalent.
-    });
+    // NOTE: `quote rational` (Rails `test_quote_rational`) is Ruby-only —
+    // Rational(3, 4) has no JavaScript equivalent — and is reclassified in
+    // scripts/api-compare/unported-files.ts.
 
-    it.skip("quote binary", async () => {
-      // BLOCKED: requires bytea column + quotedBinary round-trip; see bytea.test.ts for DB-backed coverage
-    });
+    // NOTE: PG `quoting_test.rb` has no `test_quote_binary`. Binary-quoting
+    // coverage lives where Rails keeps it: `quotedBinary`/`escape_bytea` is
+    // unit-tested in connection-adapters/postgresql/quoting.test.ts, and the
+    // bytea round-trip is covered by bytea.test.ts (Rails bytea_test.rb). The
+    // phantom-named stub that used to sit here was removed to avoid an
+    // unmatched test:compare entry.
 
     it("quote bit string", () => {
       // binary path

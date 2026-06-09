@@ -452,6 +452,13 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "no equivalent in Node.js request-parameter handling.",
   },
   {
+    testFile: "adapters/postgresql/quoting_test.rb",
+    tests: ["quote rational"],
+    reason:
+      'Ruby Rational(3, 4) quotes to the string "3/4"; JavaScript has no Rational ' +
+      "literal or stdlib type, so there is nothing to quote.",
+  },
+  {
     testFile: "has_and_belongs_to_many_associations_test.rb",
     tests: ["marshal dump"],
     reason: "Ruby Marshal binary serialization — no Node.js equivalent.",
