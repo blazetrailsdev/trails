@@ -64,8 +64,15 @@ import {
   ForeignKeyDefinition,
   IndexDefinition,
 } from "./abstract/schema-definitions.js";
-import type { ColumnType, ColumnOptions } from "./abstract/schema-definitions.js";
-import { TableDefinition as MysqlTableDefinition } from "./mysql/schema-definitions.js";
+import type {
+  ColumnType,
+  ColumnOptions,
+  SchemaStatementsLike,
+} from "./abstract/schema-definitions.js";
+import {
+  TableDefinition as MysqlTableDefinition,
+  Table as MysqlTable,
+} from "./mysql/schema-definitions.js";
 import {
   dataSourceSql as mysqlDataSourceSql,
   isRowFormatDynamicByDefault,
@@ -213,6 +220,18 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // (postgresql-adapter.ts) so the dispatch is symmetric across dialects.
     const { adapter: _adapterOpt, adapterName: _adapterNameOpt, ...rest } = options;
     return new MysqlTableDefinition(name, { ...rest, adapter: this });
+  }
+
+  /**
+   * Override `SchemaStatements#updateTableDefinition` to instantiate the
+   * MySQL-specific {@link MysqlTable} subclass, so `changeTable` blocks expose
+   * MySQL's `ColumnMethods` (`t.unsignedInteger`, `t.unsignedFloat`, ...).
+   *
+   * Mirrors: `ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#update_table_definition`
+   * @internal
+   */
+  updateTableDefinition(tableName: string, base?: unknown): MysqlTable {
+    return new MysqlTable(tableName, (base ?? this) as SchemaStatementsLike);
   }
 
   protected _mariadb = false;
