@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { Trailtie, type ActiveRecordConfig } from "./trailtie.js";
+import { Trailtie, loadDefaults, type ActiveRecordConfig } from "./trailtie.js";
 import { Base } from "./base.js";
 import { Railtie as BaseRailtie, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { SchemaReflection } from "./connection-adapters/schema-cache.js";
@@ -20,6 +20,7 @@ describe("RailtieTest", () => {
   let savedStrictStrings: boolean;
   let savedDecodeDates: boolean;
   let savedEncryptionSupportUnencryptedData: boolean;
+  let savedPartialInserts: boolean;
 
   beforeEach(() => {
     savedSubclasses = [...BaseRailtie.subclasses];
@@ -31,6 +32,7 @@ describe("RailtieTest", () => {
     savedStrictStrings = SQLite3Adapter.strictStringsByDefault;
     savedDecodeDates = PostgreSQLAdapter.decodeDates;
     savedEncryptionSupportUnencryptedData = EncryptionConfigurable.config.supportUnencryptedData;
+    savedPartialInserts = Base.partialInserts;
 
     // Simulate a fresh app boot for each test: clear the load-hook registry
     // and re-emit the load events that base.ts / the adapter files would
@@ -52,6 +54,7 @@ describe("RailtieTest", () => {
     SQLite3Adapter.strictStringsByDefault = savedStrictStrings;
     PostgreSQLAdapter.decodeDates = savedDecodeDates;
     EncryptionConfigurable.config.supportUnencryptedData = savedEncryptionSupportUnencryptedData;
+    Base.partialInserts = savedPartialInserts;
     for (const key of Object.keys(deprecators)) {
       delete deprecators[key];
     }
@@ -136,5 +139,20 @@ describe("RailtieTest", () => {
     cfg.encryption = { supportUnencryptedData: true };
     Trailtie.runInitializers();
     expect(EncryptionConfigurable.config.supportUnencryptedData).toBe(true);
+  });
+
+  it("load_defaults: partial_inserts is true without any version load", () => {
+    Base.partialInserts = true; // framework default before load_defaults
+    expect(Base.partialInserts).toBe(true);
+  });
+
+  it("load_defaults 7.0 sets partial_inserts to false", () => {
+    Base.partialInserts = true; // reset to framework default
+    loadDefaults("7.0");
+    expect(Base.partialInserts).toBe(false);
+  });
+
+  it("load_defaults raises for an unknown version string", () => {
+    expect(() => loadDefaults("bogus")).toThrow('Unknown version "bogus"');
   });
 });
