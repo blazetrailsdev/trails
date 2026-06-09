@@ -1363,14 +1363,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       try {
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const client = conn as unknown as pg.Client;
-          const result = await this._runQuery(client, rewritten, binds);
+          const queryResult = await this._runQuery(client, rewritten, binds);
           // Mirrors Rails' raw_execute → verified! (database_statements.rb):
           // a successful round-trip proves the connection is live, so mark it
           // verified to skip the verify ping on the next withRawConnection.
           this.verifiedBang();
-          payload.row_count = result.rows.length;
+          // A multi-statement string (e.g. disable_referential_integrity's
+          // joined ALTERs) runs under the simple-query protocol, where node-pg
+          // returns one Result per statement. Mirror Rails' execute and surface
+          // the last command's result.
+          const result = Array.isArray(queryResult)
+            ? queryResult[queryResult.length - 1]
+            : queryResult;
+          const rows = result?.rows ?? [];
+          payload.row_count = rows.length;
           this._flushWarnings(rewritten);
-          return result.rows;
+          return rows;
         });
       } catch (e: any) {
         const translated = this._translateException(e, rewritten, binds);
