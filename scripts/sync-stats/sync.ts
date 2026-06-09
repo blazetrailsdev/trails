@@ -1,15 +1,20 @@
 import { execSync } from "child_process";
-import { mkdirSync } from "fs";
+import { mkdirSync, readdirSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
 import "@blazetrails/activerecord/sqlite/better-sqlite3";
 import { Base, MigrationContext } from "@blazetrails/activerecord";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 
-const REPO = "blazetrailsdev/blazetrails";
+const REPO = "blazetrailsdev/trails";
 const [REPO_OWNER, REPO_NAME] = REPO.split("/");
 const DB_PATH = join(homedir(), "github", "blazetrailsdev", "stats.db");
 mkdirSync(dirname(DB_PATH), { recursive: true });
+
+// Reviews delivered via the /review-pr skill are written here by btwhooks (never
+// posted to GitHub), so the API sync above can't see them. Same owner/repo as
+// the GitHub remote — derived from REPO so it stays in sync.
+const BTWHOOKS_REVIEWS_DIR = join(homedir(), ".btwhooks", "data", "github", REPO_OWNER, REPO_NAME);
 
 // Throttle gh calls to stay under GitHub's secondary rate limit (~80 req/min
 // for bursty patterns). Compute requests/minute from the interval so the
@@ -197,6 +202,8 @@ class PrReview extends Base {
     this.attribute("state", "string");
     this.attribute("body", "string");
     this.attribute("submitted_at", "string");
+    this.attribute("source", "string");
+    this.attribute("source_path", "string");
   }
 }
 
@@ -490,6 +497,23 @@ async function migrateDb(adapter: SQLite3Adapter) {
       }
     }
 
+    if (await tableExists(adapter, "pr_reviews")) {
+      if (!(await columnExists(adapter, "pr_reviews", "source"))) {
+        await adapter.executeMutation(
+          `ALTER TABLE pr_reviews ADD COLUMN source TEXT DEFAULT 'github'`,
+        );
+      }
+      if (!(await columnExists(adapter, "pr_reviews", "source_path"))) {
+        await adapter.executeMutation(`ALTER TABLE pr_reviews ADD COLUMN source_path TEXT`);
+      }
+      // Match the fresh-DB schema below. NULLs (every github-sourced row) are
+      // distinct under a SQLite unique index, so this only constrains the
+      // source_path of local reviews.
+      await adapter.executeMutation(
+        `CREATE UNIQUE INDEX IF NOT EXISTS index_pr_reviews_on_source_path ON pr_reviews (source_path)`,
+      );
+    }
+
     if (await tableExists(adapter, "workflow_runs")) {
       if (!(await columnExists(adapter, "workflow_runs", "run_attempt"))) {
         await adapter.executeMutation(
@@ -660,7 +684,10 @@ async function migrateDb(adapter: SQLite3Adapter) {
       t.string("state");
       t.text("body");
       t.string("submitted_at");
+      t.string("source", { default: "github" });
+      t.string("source_path");
       t.index(["pr_number"]);
+      t.index(["source_path"], { unique: true });
     });
 
     await ctx.createTable("pr_requested_reviewers", {}, (t) => {
@@ -1270,6 +1297,102 @@ async function syncPrComments() {
       );
     }
   }
+}
+
+// Stable, deterministic, collision-free synthetic id for a filesystem-sourced
+// review. GitHub review ids are positive, so we return a NEGATIVE 52-bit value
+// (within Number.MAX_SAFE_INTEGER) derived from the path — re-ingesting the same
+// file upserts the same row by id rather than duplicating it.
+function localReviewId(sourcePath: string): number {
+  // FNV-1a 64-bit, folded into the low 52 bits to stay a safe integer.
+  let hash = 0xcbf29ce484222325n;
+  for (let i = 0; i < sourcePath.length; i++) {
+    hash ^= BigInt(sourcePath.charCodeAt(i));
+    hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn;
+  }
+  return -(Number(hash & 0xfffffffffffffn) + 1);
+}
+
+// Reviews delivered via the /review-pr skill live only on the filesystem (see
+// BTWHOOKS_REVIEWS_DIR) — they're never posted to GitHub, so the API-driven
+// syncPrComments above misses them. Scan the btwhooks tree and upsert them into
+// pr_reviews. Pure filesystem + DB; no GitHub API, so no rate-limit concerns.
+//
+// We deliberately do NOT touch pull_requests.review_count here: that column is
+// the syncPrComments fetch sentinel (-1 = needs fetch) and reflects the GitHub
+// review count only. Aggregate over pr_reviews rows when a local-inclusive count
+// is needed.
+async function syncLocalReviews() {
+  let prDirs: string[];
+  try {
+    prDirs = readdirSync(BTWHOOKS_REVIEWS_DIR, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && /^\d+$/.test(e.name))
+      .map((e) => e.name);
+  } catch (err) {
+    console.warn(
+      `  Skipping local /review-pr ingest: cannot read ${BTWHOOKS_REVIEWS_DIR} (${err instanceof Error ? err.message : err})`,
+    );
+    return;
+  }
+
+  const rows: Record<string, unknown>[] = [];
+  for (const dir of prDirs) {
+    const prNumber = Number(dir);
+    let files: string[];
+    try {
+      files = readdirSync(join(BTWHOOKS_REVIEWS_DIR, dir)).filter((f) =>
+        /^\d+-review\.md$/.test(f),
+      );
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      try {
+        const raw = readFileSync(join(BTWHOOKS_REVIEWS_DIR, dir, file), "utf8");
+        // Copilot reviews are already ingested from the GitHub API; skip them.
+        const firstLine = raw.split("\n").find((l) => l.trim() !== "") ?? "";
+        if (/^#\s*Copilot Review:/i.test(firstLine)) continue;
+
+        const ts = Number(file.slice(0, file.indexOf("-")));
+        const submittedAt = Number.isFinite(ts) ? new Date(ts * 1000).toISOString() : null;
+
+        // The /review-pr skill template prepends `<!-- comments: N -->`, where N
+        // is the reviewer's blocking-comment count. Derive state from it, then
+        // strip the marker line from the stored body. Older reviews predate the
+        // marker — those get a null state.
+        const marker = raw.match(/<!--\s*comments:\s*(\d+)\s*-->/);
+        const state = marker ? (Number(marker[1]) > 0 ? "CHANGES_REQUESTED" : "COMMENTED") : null;
+        const body = marker
+          ? raw.replace(/[^\n]*<!--\s*comments:\s*\d+\s*-->[^\n]*\n?/, "").trimStart()
+          : raw;
+
+        const sourcePath = `${dir}/${file}`;
+        rows.push({
+          id: localReviewId(sourcePath),
+          pr_number: prNumber,
+          author: "review-pr",
+          state,
+          body,
+          submitted_at: submittedAt,
+          source: "review-pr",
+          source_path: sourcePath,
+        });
+      } catch (err) {
+        console.warn(
+          `  Failed to read local review ${dir}/${file}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+  }
+
+  // Chunk the upsert: one statement binds rows × columns params, and SQLite
+  // caps bound variables (~32k). The local-review set only grows, so batch to
+  // stay well under the limit regardless of how large it gets.
+  const CHUNK = 500;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    await PrReview.upsertAll(rows.slice(i, i + CHUNK), { uniqueBy: "id" });
+  }
+  console.log(`  Ingested ${rows.length} local /review-pr reviews.`);
 }
 
 async function syncPrRequestedReviewers() {
@@ -2132,14 +2255,21 @@ async function printSummary() {
 
 async function main() {
   const args = process.argv.slice(2);
-  const knownFlags = ["--latest", "--refresh", "--compare-only", "--missing", "--prs"];
+  const knownFlags = [
+    "--latest",
+    "--refresh",
+    "--compare-only",
+    "--missing",
+    "--prs",
+    "--local-reviews-only",
+  ];
   const unknownFlags = args.filter(
     (a) => a.startsWith("--") && !knownFlags.includes(a.split("=")[0]),
   );
   if (unknownFlags.length > 0) {
     console.error(`Unknown flag(s): ${unknownFlags.join(", ")}`);
     console.error(
-      "Usage: stats:sync [--latest | --refresh | --compare-only | --missing | --prs <spec>]",
+      "Usage: stats:sync [--latest | --refresh | --compare-only | --missing | --prs <spec> | --local-reviews-only]",
     );
     process.exit(1);
   }
@@ -2159,6 +2289,7 @@ async function main() {
       }
     }
   }
+  const localReviewsOnly = args.includes("--local-reviews-only");
   const backfillMissing = args.includes("--missing");
   const isBackfill = prsSpec !== null || backfillMissing;
 
@@ -2170,7 +2301,9 @@ async function main() {
         ? "compare-only"
         : "latest";
 
-  if (mode === "latest") {
+  if (localReviewsOnly) {
+    console.log("Running local-reviews-only mode: ingesting /review-pr reviews from disk.\n");
+  } else if (mode === "latest") {
     console.log(
       "Running in latest mode (default): re-verify open PRs, fetch new PRs, and deep-sync. Use --refresh for full sync.\n",
     );
@@ -2189,6 +2322,13 @@ async function main() {
 
   try {
     await migrateDb(adapter);
+
+    if (localReviewsOnly) {
+      console.log("=== Ingesting local /review-pr reviews ===");
+      await syncLocalReviews();
+      await printSummary();
+      return;
+    }
 
     if (mode === "backfill") {
       let numbers: number[] = [];
@@ -2211,6 +2351,8 @@ async function main() {
       await syncPrCommits();
       console.log("\n=== Syncing PR comments & reviews ===");
       await syncPrComments();
+      console.log("\n=== Ingesting local /review-pr reviews ===");
+      await syncLocalReviews();
       console.log("\n=== Syncing PR requested reviewers ===");
       await syncPrRequestedReviewers();
       console.log("\n=== Syncing PR linked issues ===");
