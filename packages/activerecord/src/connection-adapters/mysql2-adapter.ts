@@ -865,9 +865,19 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Mirrors Rails' `AbstractMysqlAdapter#begin_isolated_db_transaction`:
    * issues `SET TRANSACTION ISOLATION LEVEL {level}` then `BEGIN`. `SET
    * TRANSACTION` applies only to the next transaction, so on a `ConnectionFailed`
-   * retry the whole batch must be re-issued — hence the loop re-runs both
-   * statements after reconnecting (mirrors Rails' `execute_batch` +
-   * `allow_retry: true`, which discards the dead client and replays the batch).
+   * the whole batch must be replayed — hence the loop re-runs both statements
+   * after reconnecting (mirrors Rails' `execute_batch(allow_retry: true)`, which
+   * routes through `with_raw_connection` and retries the batch once).
+   *
+   * The reconnect goes through the full `reconnectBang({ restoreTransactions:
+   * true })` lifecycle — re-enabling lazy transactions, clearing the statement
+   * cache, reconfiguring the session, and restoring the transaction stack —
+   * exactly as Rails' `with_raw_connection` calls `reconnect!(restore_transactions:
+   * true)` (abstract_adapter.rb:1027). Restoring is safe mid-materialize: this
+   * frame isn't marked materialized until `super.materializeBang()` runs *after*
+   * this method returns, so `restoreBang()`'s `isMaterialized()` guard makes the
+   * restore a no-op here (mirroring Rails' `Transaction#restore!` `materialized?`
+   * guard) and the replay below is the single re-issue of the batch.
    */
   override async beginIsolatedDbTransaction(isolation: string): Promise<void> {
     const level = transactionIsolationLevels()[isolation];
@@ -882,8 +892,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         return;
       } catch (e) {
         if (attempt === 0 && e instanceof ConnectionFailed) {
-          this.reconnect();
-          await this._ensureClient();
+          await this.reconnectBang({ restoreTransactions: true });
           continue;
         }
         throw e;
