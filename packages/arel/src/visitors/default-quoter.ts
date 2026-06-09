@@ -2,14 +2,13 @@ import type { ArelConnection } from "./connection.js";
 import { quoteSchemaQualifiedName } from "./split-schema-qualified-name.js";
 
 // Standalone comment sanitize for connection-less `Node#toSql()` (debug aid):
-// strips delimiters outright. Real adapters override via
-// `AbstractAdapter#sanitizeAsSqlComment` (Rails' neutralize-and-space).
+// strips block-comment delimiters (leaving `--` alone, like Rails' abstract
+// sanitize). Real adapters override via `AbstractAdapter#sanitizeAsSqlComment`.
 function defaultSanitizeAsSqlComment(value: string): string {
   return String(value)
     .replace(/[\r\n]+/g, " ")
     .replace(/\/\*/g, "")
     .replace(/\*\//g, "")
-    .replace(/--/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }

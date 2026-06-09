@@ -77,14 +77,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         },
       );
 
-      // Rails' upstream regex here is `/\*\+  "posts"\.\*,  \*/` — it predates
-      // the CVE-era rewrite of `sanitize_as_sql_comment`, which now *neutralizes*
-      // comment delimiters by spacing them (`**//` → `** //`, `//**` → `// **`)
-      // rather than stripping them. That rewrite shipped in Rails 8.0, but this
-      // PostgreSQL example never re-runs in Rails CI (it needs the pg_hint_plan
-      // extension), so the stale regex was never updated. We assert the actual
-      // faithful output of the current `sanitize_as_sql_comment` — the security
-      // property is intact: no `*/` or `/*` survives to break out of the comment.
+      // Rails' upstream regex expects the pre-CVE strip; the current
+      // `sanitize_as_sql_comment` neutralizes delimiters by spacing (`**//` → `** //`).
+      // This example never re-runs in Rails CI (needs pg_hint_plan), so that regex
+      // went stale — we assert the faithful output (no `*/`/`/*` escapes the comment).
       await assertQueriesMatch(
         /^SELECT \/\*\+ \*\* \/\/ "posts"\.\*, \/\/ \*\* \*\//,
         undefined,
