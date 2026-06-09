@@ -1,28 +1,60 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/virtual_column_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
+
+  // The table is built per test (in beforeEach, after the global drop-all reset)
+  // because the adapter dir runs under the AR setup, which wipes all tables before
+  // every test. Mirrors Rails' `setup`/`teardown` create_table/drop_table dance.
   beforeEach(async () => {
     adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    await adapter.dropTable("virtual_columns", { ifExists: true }).catch(() => {});
+    await adapter.createTable("virtual_columns", { force: "cascade" }, (t: any) => {
+      t.string("name");
+      t.virtual("upper_name", { type: "string", as: "UPPER(`name`)" });
+      t.virtual("name_length", { type: "integer", as: "LENGTH(`name`)", stored: true });
+      t.virtual("name_octet_length", { type: "integer", as: "OCTET_LENGTH(`name`)", stored: true });
+    });
+    await adapter.exec("INSERT INTO virtual_columns (name) VALUES ('Rails')");
   });
+
   afterEach(async () => {
+    await adapter.dropTable("virtual_columns", { ifExists: true }).catch(() => {});
     await adapter.close();
   });
 
   describe("VirtualColumnTest", () => {
-    it.skip("virtual column", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: adapters/mysql2/virtual-column.ts or abstract-mysql-adapter/virtual-column.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/virtual-column.ts; affects ~10–26 tests in virtual-column.test.ts
+    const findColumn = async (name: string) => {
+      const cols = (await adapter.columns("virtual_columns")) as Array<{
+        name: string;
+        isVirtual(): boolean;
+      }>;
+      return cols.find((c) => c.name === name);
+    };
+
+    it("virtual column", async () => {
+      const column = await findColumn("upper_name");
+      expect(column!.isVirtual()).toBe(true);
+      const value = await adapter.selectValue("SELECT upper_name FROM virtual_columns LIMIT 1");
+      expect(value).toBe("RAILS");
     });
-    it.skip("schema dumping", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: adapters/mysql2/virtual-column.ts or abstract-mysql-adapter/virtual-column.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/virtual-column.ts; affects ~10–26 tests in virtual-column.test.ts
+
+    it("schema dumping", async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter as any, "virtual_columns");
+      expect(output).toMatch(
+        /t\.virtual\("upper_name", \{ type: "string", as: "[^"]*name[^"]*" \}\);/,
+      );
+      expect(output).toMatch(
+        /t\.virtual\("name_length", \{ type: "integer", as: "[^"]*name[^"]*", stored: true \}\);/,
+      );
+      expect(output).toMatch(
+        /t\.virtual\("name_octet_length", \{ type: "integer", as: "[^"]*name[^"]*", stored: true \}\);/,
+      );
     });
   });
 });
