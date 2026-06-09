@@ -562,9 +562,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           // Unwrap so !Array.isArray(result) below returns empty Result.
           result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
         }
-        // Mirrors Rails' with_raw_connection: dirty_current_transaction after
-        // any materialized query, not just DML.
-        this.dirtyCurrentTransaction();
         // DML results in a ResultSetHeader (no rows array); SELECT results
         // in an array of row objects. Return empty Result for DML to avoid
         // throwing on INSERT/UPDATE/DELETE passed to execQuery.
@@ -586,6 +583,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
+      } finally {
+        // Mirrors Rails' with_raw_connection ensure: dirty_current_transaction
+        // runs after any materialized query — success or failure, SELECT or DML.
+        this.dirtyCurrentTransaction();
       }
     });
   }
