@@ -7,6 +7,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import * as Arel from "@blazetrails/arel";
 import {
+  ConnectionFailed,
   ConnectionNotEstablished,
   Deadlocked,
   InvalidForeignKey,
@@ -400,8 +401,28 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       });
     });
-    it.skip("only reload type map once for every unrecognized type", async () => {
-      // BLOCKED: adapter-pg — assert_queries_count needed; SQLCounter doesn't isolate pg_type queries.
+    it("only reload type map once for every unrecognized type", async () => {
+      // Eagerly initialize so the spy captures only unrecognized-type reloads,
+      // not the first-connection type-map bootstrap.
+      await adapter.execQuery("SELECT 1");
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const loadSpy = vi.spyOn(adapter, "loadAdditionalTypes");
+      try {
+        // First encounter of an unrecognized OID reloads the type map.
+        await adapter.execQuery("select 'pg_catalog.pg_class'::regclass");
+        const afterFirst = loadSpy.mock.calls.length;
+        expect(afterFirst).toBeGreaterThan(0);
+        // Same unrecognized OID again — a fallback type is already registered,
+        // so no further reload.
+        await adapter.execQuery("select 'pg_catalog.pg_class'::regclass");
+        expect(loadSpy.mock.calls.length).toBe(afterFirst);
+        // A different unrecognized type reloads the map again.
+        await adapter.execQuery("SELECT NULL::anyarray");
+        expect(loadSpy.mock.calls.length).toBeGreaterThan(afterFirst);
+      } finally {
+        loadSpy.mockRestore();
+        warnSpy.mockRestore();
+      }
     });
     it("only warn on first encounter of unrecognized oid", async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -711,34 +732,23 @@ describeIfPg("PostgreSQLAdapter", () => {
       await bad.close();
     });
 
-    it("reconnection_error", async () => {
-      // Mirrors Rails: test_reconnection_error — adapter raises ConnectionNotEstablished
-      // when the underlying connect() returns an error. After the Phase D-X collapse
-      // there is no inner pg.Pool to inject; instead stub pg.Client.connect to reject.
-      const pgModule = (await import("pg")).default;
-      const fakeClient = {
-        connect: () =>
-          Promise.reject(Object.assign(new Error("connection lost"), { code: "57P01" })),
-        end: () => Promise.resolve(),
-        on: () => fakeClient,
-        query: () => Promise.reject(new Error("not connected")),
-      };
-      const clientSpy = vi
-        .spyOn(pgModule, "Client" as never)
-        .mockImplementation((() => fakeClient) as never);
-      const a = new PostgreSQLAdapter(PG_TEST_URL);
-      try {
-        await expect(a.execute("SELECT 1")).rejects.toThrow(ConnectionNotEstablished);
-      } finally {
-        clientSpy.mockRestore();
-        await a.close().catch(() => {});
-      }
-    });
+    it("reconnect after bad connection on check version", async () => {
+      // Cache the true version off a live connection.
+      expect(await adapter.getDatabaseVersion()).toBeGreaterThan(0);
+      // Mimic a connection that hasn't checked and cached the server version yet.
+      (adapter as unknown as { _databaseVersion: number | null })._databaseVersion = null;
+      // Stub server_version to 0 (Rails: raw_connection.stub(:server_version, 0)).
+      const versionSpy = vi.spyOn(adapter, "_serverVersion").mockResolvedValue(0);
+      await expect(adapter.getDatabaseVersion()).rejects.toBeInstanceOf(ConnectionFailed);
+      await expect(adapter.getDatabaseVersion()).rejects.toThrow(
+        "Could not determine PostgreSQL version",
+      );
+      versionSpy.mockRestore();
 
-    it.skip("reconnect after bad connection on check version", async () => {
-      // BLOCKED: adapter-pg — Rails stubs raw_connection.server_version=0 on the PG::Connection to
-      // simulate a bad version check during reconnect!. Our adapter wraps pg.Client
-      // and exposes no equivalent low-level server_version stub point.
+      // Can reconnect after a bad connection.
+      await adapter.reconnectBang();
+      (adapter as unknown as { _databaseVersion: number | null })._databaseVersion = null;
+      expect(await adapter.getDatabaseVersion()).toBeGreaterThan(0);
     });
 
     it("primary key works tables containing capital letters", async () => {
@@ -910,8 +920,49 @@ describeIfPg("PostgreSQLAdapter", () => {
       const result = await adapter.pkAndSequenceFor("does_not_exist_xyz");
       expect(result).toBeNull();
     });
-    it.skip("pk and sequence for with collision pg class oid", async () => {
-      // BLOCKED: adapter-pg — Requires superuser access to manipulate pg_depend for OID collision.
+    it("pk and sequence for with collision pg class oid", async () => {
+      await adapter.exec(`CREATE TABLE "ex" ("id" SERIAL PRIMARY KEY)`);
+      await adapter.exec(`CREATE TABLE "ex2" ("id" SERIAL PRIMARY KEY)`);
+      try {
+        // classid, objid, objsubid, refclassid, refobjid, refobjsubid, deptype
+        const correctDependRecord = [
+          "'pg_class'::regclass",
+          "'ex_id_seq'::regclass",
+          "0",
+          "'pg_class'::regclass",
+          "'ex'::regclass",
+          "1",
+          "'a'",
+        ];
+        // A spurious dependency whose classid is pg_attrdef rather than pg_class —
+        // a "collision" that the correct query must ignore when resolving ex's sequence.
+        const collisionDependRecord = [
+          "'pg_attrdef'::regclass",
+          "'ex2_id_seq'::regclass",
+          "0",
+          "'pg_class'::regclass",
+          "'ex'::regclass",
+          "1",
+          "'a'",
+        ];
+
+        await adapter.exec(
+          `DELETE FROM pg_depend WHERE objid = 'ex_id_seq'::regclass AND refobjid = 'ex'::regclass AND deptype = 'a'`,
+        );
+        await adapter.exec(`INSERT INTO pg_depend VALUES(${collisionDependRecord.join(",")})`);
+        await adapter.exec(`INSERT INTO pg_depend VALUES(${correctDependRecord.join(",")})`);
+
+        const result = await adapter.pkAndSequenceFor("ex");
+        expect(result).not.toBeNull();
+        expect(result![1]).toEqual({ schema: "public", name: "ex_id_seq" });
+
+        await adapter.exec(
+          `DELETE FROM pg_depend WHERE objid = 'ex2_id_seq'::regclass AND refobjid = 'ex'::regclass AND deptype = 'a'`,
+        );
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS "ex" CASCADE`);
+        await adapter.exec(`DROP TABLE IF EXISTS "ex2" CASCADE`);
+      }
     });
 
     it("partial index on column named like keyword", async () => {
@@ -1013,15 +1064,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       // execute(null) propagates TypeError unchanged (pg rejects null text; not a DatabaseError).
       await expect(adapter.execute(null as any)).rejects.toBeInstanceOf(TypeError);
     });
-    it.skip("translate no connection exception to not established", async () => {
-      // BLOCKED: adapter-pg — pg_terminate_backend approach is inherently racy — pg.Pool reconnects
-      // transparently after a backend is killed, so the subsequent execute() may succeed
-      // instead of raising ConnectionNotEstablished. Rails avoids this by calling
-      // raw_connection.send_query() directly on a PG::Connection (no pool), but pg npm
-      // has no send_query equivalent. A reliable implementation requires holding an open
-      // pg.Client (not pool), terminating it, and exercising the error-translation path
-      // directly. 57P01 → ConnectionNotEstablished translation is verified by the
-      // reconnection_error test above (fake pool injection path).
+    it("translate no connection exception to not established", async () => {
+      // Open the connection and capture its backend pid.
+      const pidRows = await adapter.execute("SELECT pg_backend_pid() AS pid");
+      const pid = (pidRows[0] as { pid: number }).pid;
+      // Terminate this backend from a separate connection. After the single
+      // persistent client's backend is gone, the next query on it surfaces a
+      // connection error that translates to ConnectionNotEstablished — rather
+      // than transparently retrying (allowRetry defaults to false).
+      await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
+        await adapter2.execute(`SELECT pg_terminate_backend(${pid})`);
+      });
+      await expect(adapter.execute("SELECT 1")).rejects.toBeInstanceOf(ConnectionNotEstablished);
     });
     it("reload type map for newly defined types", async () => {
       const { Enum: OidEnum } = await import("../../connection-adapters/postgresql/oid/enum.js");
@@ -1242,10 +1296,30 @@ describeIfPg("PostgreSQLAdapter", () => {
       await bad.close();
     });
 
-    it.skip("reconnection error", () => {
-      // BLOCKED: adapter-pg — Rails creates a fake PG::Connection object with a reset() that
-      // throws PG::ConnectionBad, then stubs PG.connect to throw. The pg npm
-      // driver doesn't expose equivalent interception points.
+    it("reconnection error", async () => {
+      // Mirrors Rails: test_reconnection_error. Rails stubs PG.connect to raise
+      // "actual bad connection error" and asserts reconnect! re-raises it as
+      // ConnectionNotEstablished. Our adapter connects lazily on first use and
+      // wraps pg.Client, so stub Client.connect to reject with that message and
+      // assert the translated ConnectionNotEstablished carries it through.
+      const pgModule = (await import("pg")).default;
+      const fakeClient = {
+        connect: () => Promise.reject(new Error("actual bad connection error")),
+        end: () => Promise.resolve(),
+        on: () => fakeClient,
+        query: () => Promise.reject(new Error("not connected")),
+      };
+      const clientSpy = vi
+        .spyOn(pgModule, "Client" as never)
+        .mockImplementation((() => fakeClient) as never);
+      const a = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        await expect(a.execute("SELECT 1")).rejects.toBeInstanceOf(ConnectionNotEstablished);
+        await expect(a.execute("SELECT 1")).rejects.toThrow("actual bad connection error");
+      } finally {
+        clientSpy.mockRestore();
+        await a.close().catch(() => {});
+      }
     });
 
     it("database exists returns true when the database exists", async () => {
