@@ -45,6 +45,22 @@ type FrameworkDefaultsEntry = {
   partialInserts?: boolean;
 };
 
+// Mirrors the set of version strings Rails' Configuration#load_defaults
+// accepts (its case/when branches). Raise for anything else, matching Rails'
+// `else raise "Unknown version ..."` branch (configuration.rb:349-350).
+const KNOWN_VERSIONS = new Set([
+  "5.0",
+  "5.1",
+  "5.2",
+  "6.0",
+  "6.1",
+  "7.0",
+  "7.1",
+  "7.2",
+  "8.0",
+  "8.1",
+]);
+
 // Rails' version→{flag: value} table. Apply all entries whose version is ≤
 // the requested version (rails/railties: Configuration#load_defaults).
 // Seed only flags that have been ported; grow per-story.
@@ -64,6 +80,9 @@ function compareVersions(a: string, b: string): number {
  * call this in app init (or test setup) to opt into modern defaults.
  */
 export function loadDefaults(version: string): void {
+  if (!KNOWN_VERSIONS.has(version)) {
+    throw new Error(`Unknown version ${JSON.stringify(version)}`);
+  }
   for (const [v, defaults] of FRAMEWORK_DEFAULTS) {
     if (compareVersions(v, version) <= 0) {
       if (defaults.partialInserts !== undefined) Base.partialInserts = defaults.partialInserts;

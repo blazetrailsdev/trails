@@ -151,4 +151,8 @@ describe("RailtieTest", () => {
     loadDefaults("7.0");
     expect(Base.partialInserts).toBe(false);
   });
+
+  it("load_defaults raises for an unknown version string", () => {
+    expect(() => loadDefaults("bogus")).toThrow('Unknown version "bogus"');
+  });
 });
