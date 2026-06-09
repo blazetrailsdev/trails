@@ -253,16 +253,4 @@ describe("TableDefinition id hash form", () => {
     const id = td.columns.find((c) => c.name === "id")!;
     expect(id.options.default).toBe("generated");
   });
-
-  it("emits CHARACTER SET and COLLATE per-column in toSql for mysql", () => {
-    const td = new TableDefinition("charset_collations", {
-      id: { type: "string", collation: "utf8mb4_bin" },
-      adapterName: "mysql",
-      adapter: mysqlAdapter,
-    });
-    (td as any).string("string_ascii_bin", { charset: "ascii", collation: "ascii_bin" });
-    const sql = td.toSql();
-    expect(sql).toContain("CHARACTER SET ascii COLLATE ascii_bin");
-    expect(sql).toContain("COLLATE utf8mb4_bin");
-  });
 });

@@ -1080,8 +1080,6 @@ export class TableDefinition {
           case "primary_key":
             if (this._adapterName === "postgres") {
               parts.push("SERIAL PRIMARY KEY");
-            } else if (this._adapterName === "mysql") {
-              parts.push("BIGINT AUTO_INCREMENT PRIMARY KEY");
             } else {
               parts.push("INTEGER PRIMARY KEY AUTOINCREMENT");
             }
@@ -1089,8 +1087,6 @@ export class TableDefinition {
           case "uuid": {
             if (this._adapterName === "postgres") {
               parts.push("UUID");
-            } else if (this._adapterName === "mysql") {
-              parts.push("CHAR(36)");
             } else {
               parts.push("VARCHAR(36)");
             }
@@ -1184,17 +1180,6 @@ export class TableDefinition {
 
       if (this._adapterName === "sqlite" && col.options.collation) {
         parts.push(`COLLATE ${this._adapter.quoteIdentifier(col.options.collation)}`);
-      } else if (this._adapterName === "mysql") {
-        // MySQL emits CHARACTER SET and COLLATE as bare identifiers; the shared
-        // guard substitutes for quoting (see assertSafeMysqlIdentifier).
-        if (col.options.charset) {
-          assertSafeMysqlIdentifier(col.options.charset, "charset");
-          parts.push(`CHARACTER SET ${col.options.charset}`);
-        }
-        if (col.options.collation) {
-          assertSafeMysqlIdentifier(col.options.collation, "collation");
-          parts.push(`COLLATE ${col.options.collation}`);
-        }
       }
 
       if (col.options.array && col.type !== "primary_key") {
@@ -1214,12 +1199,8 @@ export class TableDefinition {
       const asExpr = (col.options as Record<string, unknown>)["as"] as string | undefined;
       if (asExpr != null) {
         if (this._adapterName !== "postgres") {
-          // MySQL and SQLite3 support generated columns via addColumn/changeTable
-          // (their SchemaCreation#add_column_options! branches are already wired).
-          // createTable → toSql() is not yet wired for those adapters.
           throw new Error(
-            `Generated columns (as: ...) in createTable are not yet implemented for the ` +
-              `${this._adapterName} adapter; use changeTable or addColumn instead.`,
+            `Generated columns (as: ...) in createTable are not yet implemented; use changeTable or addColumn instead.`,
           );
         }
         const isStored = (col.options as Record<string, unknown>)["stored"] as boolean | undefined;
@@ -1263,12 +1244,7 @@ export class TableDefinition {
     sql += ` ${this._adapter.quoteTableName(this.tableName)}`;
 
     if (this.as) {
-      if (this._adapterName === "mysql" && this.indexes.length > 0) {
-        const inlineIdxSql = this.indexes.map((idx) => this._mysqlInlineIndexSql(idx));
-        sql += ` (${inlineIdxSql.join(", ")}) AS ${this.as}`;
-      } else {
-        sql += ` AS ${this.as}`;
-      }
+      sql += ` AS ${this.as}`;
     } else {
       const tableElements = [...columnDefs];
       for (const chk of this.checkConstraints) {
@@ -1307,29 +1283,10 @@ export class TableDefinition {
           .join(", ");
         tableElements.push(`PRIMARY KEY (${quotedCols})`);
       }
-      if (this._adapterName === "mysql") {
-        for (const idx of this.indexes) {
-          tableElements.push(this._mysqlInlineIndexSql(idx));
-        }
-      }
       sql += ` (${tableElements.join(", ")})`;
     }
 
-    if (this._adapterName === "mysql") {
-      if (this.charset) {
-        assertSafeMysqlIdentifier(this.charset, "charset");
-        sql += ` DEFAULT CHARSET=${this.charset}`;
-      }
-      if (this.collation) {
-        assertSafeMysqlIdentifier(this.collation, "collation");
-        sql += ` COLLATE=${this.collation}`;
-      }
-    }
     if (this.options) sql += ` ${this.options}`;
-    if (this.comment && this._adapterName === "mysql") {
-      const escaped = this.comment.replace(/'/g, "''");
-      sql += ` COMMENT '${escaped}'`;
-    }
 
     return sql;
   }
