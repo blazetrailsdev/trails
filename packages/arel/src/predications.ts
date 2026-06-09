@@ -44,7 +44,7 @@ function groupedAny(nodes: Node[]): Grouping {
   // `NULL`. Preserve three-valued semantics (NULL is *not* the same as
   // FALSE under SQL: `NULL OR FALSE` is NULL, `FALSE OR FALSE` is FALSE)
   // while still guarding against the `Array#reduce` TypeError on empty.
-  if (nodes.length === 0) return new Grouping(new SqlLiteral("NULL"));
+  if (nodes.length === 0) return new Grouping(new SqlLiteral("NULL", { retryable: true }));
   return new Grouping(nodes.reduce((acc, n) => new Or(acc, n)));
 }
 
