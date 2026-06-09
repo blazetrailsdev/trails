@@ -108,7 +108,13 @@ export class DirtyTracker {
   changesApplied(
     currentAttributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
   ): void {
-    this._previousChanges = new Map(this._changedAttributes);
+    const snapshot = new Map(this._changedAttributes);
+    this._attrs?.forEach((attr, name) => {
+      if (!snapshot.has(name) && attr.type.isMutable() && attr.changedInPlace()) {
+        snapshot.set(name, [attr.originalValue, attr.value]);
+      }
+    });
+    this._previousChanges = snapshot;
     if (currentAttributes instanceof Map) {
       this._originalAttributes = new Map(currentAttributes);
       this._originalHas = new Set(currentAttributes.keys());

@@ -677,6 +677,26 @@ describe("DirtyTest", () => {
     });
   });
 
+  it("previous changes includes in place serialized attribute mutation", async () => {
+    const topic = (await Topic.createBang({ content: { a: "a" } })) as Rec;
+
+    expect(topic.previousChanges).toHaveProperty("content");
+
+    (topic.content as Record<string, string>)["b"] = "b";
+
+    expect(topic.changed).toBe(true);
+
+    await (topic as unknown as Topic).saveBang();
+
+    expect(topic.changed).toBe(false);
+    expect(topic.previousChanges).toHaveProperty("content");
+    expect(topic.savedChanges).toHaveProperty("content");
+    expect((topic.previousChanges["content"][0] as Record<string, string>)["a"]).toBe("a");
+    expect((topic.previousChanges["content"][0] as Record<string, string>)["b"]).toBeUndefined();
+    expect((topic.previousChanges["content"][1] as Record<string, string>)["a"]).toBe("a");
+    expect((topic.previousChanges["content"][1] as Record<string, string>)["b"]).toBe("b");
+  });
+
   it("save always should update timestamps when serialized attributes are present", async () => {
     await withPartialWrites(Topic, true, async () => {
       const topic = (await Topic.createBang({ content: { a: "a" } })) as Rec;
