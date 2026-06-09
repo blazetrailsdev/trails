@@ -27,6 +27,7 @@ import {
   NotNullViolation,
   QueryCanceled,
   RangeError as ARRangeError,
+  NotImplementedError,
   RecordNotUnique,
   SQLWarning,
   StatementInvalid,
@@ -59,6 +60,7 @@ import {
 import {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
+  CheckConstraintDefinition,
   ColumnDefinition,
   CreateIndexDefinition,
   ForeignKeyDefinition,
@@ -963,9 +965,45 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
   }
 
-  async checkConstraints(tableName: string): Promise<unknown[]> {
-    void tableName;
-    return [];
+  async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
+    // supportsCheckConstraints() reads the cached databaseVersion, which throws
+    // pre-init; ensure it is loaded first (mirrors the indexes() guard).
+    await this.getDatabaseVersion();
+    if (!this.supportsCheckConstraints()) {
+      // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb:545
+      throw new NotImplementedError("check constraints are not supported by this database");
+    }
+    const scope = quotedScope(tableName);
+
+    let sql = `SELECT cc.constraint_name AS 'name',
+        cc.check_clause AS 'expression'
+      FROM information_schema.check_constraints cc
+      JOIN information_schema.table_constraints tc
+      USING (constraint_schema, constraint_name)
+      WHERE tc.table_schema = ${scope.schema}
+        AND tc.table_name = ${scope.name}
+        AND cc.constraint_schema = ${scope.schema}`;
+    // MariaDB lacks the schema+name uniqueness MySQL's JOIN relies on, so it
+    // additionally filters cc.table_name (mirrors Rails).
+    if (this._mariadb) sql += ` AND cc.table_name = ${scope.name}`;
+
+    const rows = await this.schemaQuery(sql);
+
+    return rows.map((row) => {
+      const name = row["name"] as string;
+      let expression = row["expression"] as string;
+      if (expression.startsWith("(") && expression.endsWith(")")) {
+        expression = expression.slice(1, -1);
+      }
+      expression = this.stripWhitespaceCharacters(expression);
+      if (!this._mariadb) {
+        // MySQL returns check constraints expression in an already escaped form.
+        // This leads to duplicate escaping later (e.g. when the expression is
+        // used in the SchemaDumper).
+        expression = expression.replace(/\\'/g, "'");
+      }
+      return new CheckConstraintDefinition(tableName, expression, name);
+    });
   }
 
   async tableOptions(tableName: string): Promise<Record<string, string>> {

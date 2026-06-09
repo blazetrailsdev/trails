@@ -106,26 +106,28 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(col?.collation).toBe("utf8mb4_unicode_ci");
     });
 
-    it.skip("schema dump includes collation", async () => {
-      // BLOCKED on Epic 3.3-U2/U3: the live `emitTable` builds its colspec inline
-      // and never routes through `columnSpecForPrimaryKey` / `prepareColumnOptions`,
-      // so it emits neither the `id: { type, collation }` primary-key wrapping nor
-      // the native-default `limit` suppression these assertions require. The MySQL
-      // dialect helpers (mysql/schema-dumper.ts) that produce this output are still
-      // dead vs live dumps. Un-skip once U3 wires emitTable → columnSpec.
-      // Caveat: also needs a real-MySQL CI lane — `schema_collation` suppresses a
-      // column collation equal to the table default, and a MariaDB whose database
-      // default collation is `utf8mb4_bin` (e.g. the local 13306 box) would suppress
-      // the `id` collation. The helper port itself (dumpTableSchema) is exercised by
-      // test-helpers/schema-dumping-helper.test.ts.
-      //
-      // The regexes below are PROVISIONAL placeholders mirroring Rails'
-      // charset_collation_test.rb:79-84 intent (id-collation wrapping; collation
-      // immediately after the column name with no native-default limit between).
-      // Rails end-anchors each column line (`…collation: "ascii_bin"$`); our TS DSL
-      // terminates the call with `});` instead, and the exact emitted spacing/order
-      // is set by the U3 `emitTable → columnSpec` rewrite. Re-derive these against
-      // the ACTUAL U3 output when un-skipping rather than trusting them verbatim.
+    it("schema dump includes collation", async () => {
+      // Recreate the table with a non-binary table-level collation. Rails' MySQL
+      // test database defaults to utf8mb4_unicode_ci (config.example.yml), so the
+      // per-column collations differ from the table default and are emitted. This
+      // suite's DB default is utf8mb4_bin (template-global-setup), which would
+      // otherwise equal the id collation and suppress it (matching Rails'
+      // schema_collation logic). Set the table default explicitly to mirror Rails'
+      // environment so the dump exercises per-column collation preservation.
+      await adapter.dropTable("charset_collations", { ifExists: true });
+      await adapter.createTable(
+        "charset_collations",
+        {
+          id: { type: "string", collation: "utf8mb4_bin" },
+          charset: "utf8mb4",
+          collation: "utf8mb4_unicode_ci",
+          force: true,
+        },
+        (t: any) => {
+          t.string("string_ascii_bin", { charset: "ascii", collation: "ascii_bin" });
+          t.text("text_ucs2_unicode_ci", { charset: "ucs2", collation: "ucs2_unicode_ci" });
+        },
+      );
       const output = await dumpTableSchema(
         adapter as unknown as SchemaSource,
         "charset_collations",
