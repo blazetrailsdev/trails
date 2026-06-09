@@ -65,11 +65,6 @@ export class SQLite extends ToSql {
     node: Nodes.IsNotDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
-      this.visitNodeOrValue(node.left, collector);
-      collector.append(" IS NULL");
-      return collector;
-    }
     return this.visitBinaryOp(node, "IS", collector);
   }
 
@@ -83,11 +78,6 @@ export class SQLite extends ToSql {
     node: Nodes.IsDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
-      this.visitNodeOrValue(node.left, collector);
-      collector.append(" IS NOT NULL");
-      return collector;
-    }
     return this.visitBinaryOp(node, "IS NOT", collector);
   }
 
