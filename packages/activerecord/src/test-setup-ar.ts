@@ -12,16 +12,15 @@
 // for non-test consumers.
 import "./sqlite/better-sqlite3.js";
 import { beforeEach } from "vitest";
-import { Base } from "./base.js";
+import { loadDefaults } from "./trailtie.js";
 import { resetTestAdapterState } from "./test-adapter.js";
 import { shouldSkipGlobalReset } from "./test-helpers/skip-global-reset.js";
 
 // The test app runs with the Rails 7.0+ defaults (`config.load_defaults 7.0`),
 // which sets `config.active_record.partial_inserts = false` (partial_updates
-// stays true). Apply that here rather than on Base, whose framework default
-// stays Rails' `true`. Tests that need partial inserts opt in per-class via
-// `with_partial_writes` (see dirty.test.ts).
-Base.partialInserts = false;
+// stays true). Use the versioned-defaults mechanism rather than poking Base
+// directly; this exercises the real code path that a consuming app would use.
+loadDefaults("7.0");
 
 // Wipe shared test-adapter state before every test so each test starts
 // from a clean slate.

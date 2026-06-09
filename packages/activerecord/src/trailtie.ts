@@ -41,6 +41,36 @@ import { instrument } from "./trailties/job-runtime.js";
 export const ControllerRuntime = { processAction, cleanupViewRuntime, appendInfoToPayload };
 export const JobRuntime = { instrument };
 
+type FrameworkDefaultsEntry = {
+  partialInserts?: boolean;
+};
+
+// Rails' version→{flag: value} table. Apply all entries whose version is ≤
+// the requested version (rails/railties: Configuration#load_defaults).
+// Seed only flags that have been ported; grow per-story.
+const FRAMEWORK_DEFAULTS: Array<[string, FrameworkDefaultsEntry]> = [
+  ["7.0", { partialInserts: false }],
+];
+
+function compareVersions(a: string, b: string): number {
+  const [aMaj = 0, aMin = 0] = a.split(".").map(Number);
+  const [bMaj = 0, bMin = 0] = b.split(".").map(Number);
+  return aMaj !== bMaj ? aMaj - bMaj : aMin - bMin;
+}
+
+/**
+ * Apply every versioned framework default whose version is ≤ `version` onto
+ * `ActiveRecord.Base`. Mirrors Rails' `config.load_defaults <version>` —
+ * call this in app init (or test setup) to opt into modern defaults.
+ */
+export function loadDefaults(version: string): void {
+  for (const [v, defaults] of FRAMEWORK_DEFAULTS) {
+    if (compareVersions(v, version) <= 0) {
+      if (defaults.partialInserts !== undefined) Base.partialInserts = defaults.partialInserts;
+    }
+  }
+}
+
 /**
  * Shape of `config.activeRecord` — mirrors the
  * `ActiveSupport::OrderedOptions` block at the top of Rails' railtie.rb.
