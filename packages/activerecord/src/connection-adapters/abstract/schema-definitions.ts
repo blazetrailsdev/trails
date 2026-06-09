@@ -763,6 +763,14 @@ export class TableDefinition {
       type = this.integerLikePrimaryKeyType(type, options);
     }
     type = this.aliasedTypes(type, type) as ColumnType;
+    // Mirrors Rails' TableDefinition#new_column_definition:
+    //   if @conn.supports_datetime_with_precision? && type == :datetime && !options.key?(:precision)
+    //     options[:precision] = 6
+    // All adapters we support report supports_datetime_with_precision? = true.
+    // precision: null means "no precision suffix"; absence means "use default (6)".
+    if (type === "datetime" && !("precision" in options)) {
+      options = { ...options, precision: 6 };
+    }
     options.primaryKey ||= type === "primary_key";
     if (options.primaryKey) options.null = false;
     return this.createColumnDefinition(name, type, options);
@@ -1040,28 +1048,6 @@ export class TableDefinition {
     return this;
   }
 
-  /** @internal Builds MySQL inline INDEX clause for use inside CREATE TABLE (...). */
-  private _mysqlInlineIndexSql(idx: IndexDefinition): string {
-    const indexType = idx.type?.toUpperCase() ?? (idx.unique ? "UNIQUE" : undefined);
-    const parts: string[] = [];
-    if (indexType) parts.push(indexType);
-    parts.push("INDEX");
-    parts.push(this._adapter.quoteIdentifier(idx.name));
-    if (idx.using) parts.push(`USING ${idx.using}`);
-    const cols = Array.isArray(idx.columns) ? idx.columns : [idx.columns];
-    const quotedCols = cols.map((c) => {
-      let q = this._adapter.quoteIdentifier(c);
-      const lengths = idx.lengths as Record<string, number> | number | undefined;
-      const len = typeof lengths === "number" ? lengths : (lengths as Record<string, number>)?.[c];
-      if (len != null) q += `(${len})`;
-      return q;
-    });
-    parts.push(`(${quotedCols.join(", ")})`);
-    let sql = parts.join(" ");
-    if (idx.comment) sql += ` COMMENT '${idx.comment.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
-    return sql;
-  }
-
   /**
    * Generate CREATE TABLE SQL.
    */
@@ -1080,8 +1066,6 @@ export class TableDefinition {
           case "primary_key":
             if (this._adapterName === "postgres") {
               parts.push("SERIAL PRIMARY KEY");
-            } else if (this._adapterName === "mysql") {
-              parts.push("BIGINT AUTO_INCREMENT PRIMARY KEY");
             } else {
               parts.push("INTEGER PRIMARY KEY AUTOINCREMENT");
             }
@@ -1089,8 +1073,6 @@ export class TableDefinition {
           case "uuid": {
             if (this._adapterName === "postgres") {
               parts.push("UUID");
-            } else if (this._adapterName === "mysql") {
-              parts.push("CHAR(36)");
             } else {
               parts.push("VARCHAR(36)");
             }
@@ -1184,17 +1166,6 @@ export class TableDefinition {
 
       if (this._adapterName === "sqlite" && col.options.collation) {
         parts.push(`COLLATE ${this._adapter.quoteIdentifier(col.options.collation)}`);
-      } else if (this._adapterName === "mysql") {
-        // MySQL emits CHARACTER SET and COLLATE as bare identifiers; the shared
-        // guard substitutes for quoting (see assertSafeMysqlIdentifier).
-        if (col.options.charset) {
-          assertSafeMysqlIdentifier(col.options.charset, "charset");
-          parts.push(`CHARACTER SET ${col.options.charset}`);
-        }
-        if (col.options.collation) {
-          assertSafeMysqlIdentifier(col.options.collation, "collation");
-          parts.push(`COLLATE ${col.options.collation}`);
-        }
       }
 
       if (col.options.array && col.type !== "primary_key") {
@@ -1214,12 +1185,8 @@ export class TableDefinition {
       const asExpr = (col.options as Record<string, unknown>)["as"] as string | undefined;
       if (asExpr != null) {
         if (this._adapterName !== "postgres") {
-          // MySQL and SQLite3 support generated columns via addColumn/changeTable
-          // (their SchemaCreation#add_column_options! branches are already wired).
-          // createTable → toSql() is not yet wired for those adapters.
           throw new Error(
-            `Generated columns (as: ...) in createTable are not yet implemented for the ` +
-              `${this._adapterName} adapter; use changeTable or addColumn instead.`,
+            `Generated columns (as: ...) in createTable are not yet implemented; use changeTable or addColumn instead.`,
           );
         }
         const isStored = (col.options as Record<string, unknown>)["stored"] as boolean | undefined;
@@ -1244,15 +1211,6 @@ export class TableDefinition {
         if (clause) parts.push(clause.trimStart());
       }
 
-      // MySQL carries column comments inline in CREATE TABLE. This hand-rolled toSql()
-      // (used by MigrationContext.createTable) branches on adapter name where Rails would
-      // use MySQL::SchemaCreation#add_column_options!; the DDL-generator-convergence RFC
-      // will route this through the visitor and remove the branch.
-      if (this._adapterName === "mysql" && col.options.comment?.trim())
-        // Escape backslashes and quotes like a MySQL string literal (matches
-        // `_mysqlInlineIndexSql` in this file and Rails' quoted_comment).
-        parts.push(`COMMENT '${col.options.comment.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`);
-
       return parts.join(" ");
     });
 
@@ -1263,12 +1221,7 @@ export class TableDefinition {
     sql += ` ${this._adapter.quoteTableName(this.tableName)}`;
 
     if (this.as) {
-      if (this._adapterName === "mysql" && this.indexes.length > 0) {
-        const inlineIdxSql = this.indexes.map((idx) => this._mysqlInlineIndexSql(idx));
-        sql += ` (${inlineIdxSql.join(", ")}) AS ${this.as}`;
-      } else {
-        sql += ` AS ${this.as}`;
-      }
+      sql += ` AS ${this.as}`;
     } else {
       const tableElements = [...columnDefs];
       for (const chk of this.checkConstraints) {
@@ -1307,29 +1260,10 @@ export class TableDefinition {
           .join(", ");
         tableElements.push(`PRIMARY KEY (${quotedCols})`);
       }
-      if (this._adapterName === "mysql") {
-        for (const idx of this.indexes) {
-          tableElements.push(this._mysqlInlineIndexSql(idx));
-        }
-      }
       sql += ` (${tableElements.join(", ")})`;
     }
 
-    if (this._adapterName === "mysql") {
-      if (this.charset) {
-        assertSafeMysqlIdentifier(this.charset, "charset");
-        sql += ` DEFAULT CHARSET=${this.charset}`;
-      }
-      if (this.collation) {
-        assertSafeMysqlIdentifier(this.collation, "collation");
-        sql += ` COLLATE=${this.collation}`;
-      }
-    }
     if (this.options) sql += ` ${this.options}`;
-    if (this.comment && this._adapterName === "mysql") {
-      const escaped = this.comment.replace(/'/g, "''");
-      sql += ` COMMENT '${escaped}'`;
-    }
 
     return sql;
   }
