@@ -332,9 +332,6 @@ describe("commitAndPush (git mutation flow)", () => {
       const sub = (args ?? []).find((a) => !a.startsWith("-") && a !== "git") ?? "";
       // Use the first non-flag token after `-C <dir>` to label the call.
       const label = args && args.length >= 3 ? args[2] : sub;
-      // The branch guard probes the current branch; the canonical checkout is on
-      // main. Answer without recording so the seen[] flow assertions are unaffected.
-      if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
       return "" as never;
     });

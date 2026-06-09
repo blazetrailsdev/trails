@@ -244,10 +244,15 @@ TASKS_WT="$TASKS_WORKTREES_ROOT/$NAME"
   fi
   # node_modules are required: the tasks pre-commit hook runs
   # build-index/validate/markdownlint/prettier, and a missing node_modules
-  # crashes the hook, leaving a stale index and failing CI.
+  # crashes the hook, leaving a stale index and failing CI. If install fails,
+  # remove the worktree entirely so cli.ts falls back to the canonical checkout
+  # (which has a working node_modules) rather than using a broken one.
   echo "==> Installing tasks worktree dependencies"
-  ( cd "$TASKS_WT" && pnpm install ) || \
-    echo "    warning: pnpm install failed in tasks worktree — pre-commit hook will not work" >&2
+  if ! ( cd "$TASKS_WT" && pnpm install ); then
+    echo "    warning: pnpm install failed — removing tasks worktree, falling back to canonical" >&2
+    git -C "$TASKS_CANONICAL" worktree remove --force "$TASKS_WT" 2>/dev/null || true
+    exit 0
+  fi
   ln -s "$TASKS_WT" "$TARGET/tasks"
   echo "    linked tasks -> $TASKS_WT"
 ) || echo "    warning: tasks worktree provisioning failed — falling back to canonical $TASKS_CANONICAL" >&2

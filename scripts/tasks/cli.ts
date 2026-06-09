@@ -458,6 +458,11 @@ function flip(
     fileToStage: file,
     raceMessage,
     raceExitCode,
+    // Per-worktree checkout: HEAD:main pushes the mutation regardless of
+    // branch name. Canonical checkout: bare "main" preserves the branch
+    // guard so a stray-branch checkout fails loudly rather than pushing
+    // stale content to origin/main.
+    pushRefspec: TASKS_DIR_IS_SYMLINK ? "HEAD:main" : "main",
     mutator: () => {
       mutate(file);
       editFrontmatter(file, { updated: today() });
@@ -789,6 +794,7 @@ export function newStory(
     raceMessage: `failed to create ${storySlug} after retry — pull manually and retry`,
     raceExitCode: 4,
     cwd: tasksDir,
+    pushRefspec: TASKS_DIR_IS_SYMLINK ? "HEAD:main" : "main",
   });
   console.log(`created ${rfcSlug}/stories/${storySlug}.md`);
 }

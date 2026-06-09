@@ -11,7 +11,7 @@ scripts/api-compare/.rails-source
 # Local cache for the rfcs sibling-repo CLI (pnpm tasks).
 .tasks/
 # Per-worktree tasks checkout symlinked by start-worktree.sh.
-/tasks/
+/tasks
 .claude/settings.local.json
 .claude/worktrees/
 .claude/hooks/
