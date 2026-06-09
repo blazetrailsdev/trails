@@ -27,6 +27,7 @@ import {
   NotNullViolation,
   QueryCanceled,
   RangeError as ARRangeError,
+  NotImplementedError,
   RecordNotUnique,
   SQLWarning,
   StatementInvalid,
@@ -950,7 +951,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // pre-init; ensure it is loaded first (mirrors the indexes() guard).
     await this.getDatabaseVersion();
     if (!this.supportsCheckConstraints()) {
-      throw new Error("NotImplementedError: check constraints are not supported");
+      // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb:545
+      throw new NotImplementedError("check constraints are not supported by this database");
     }
     const scope = quotedScope(tableName);
 
@@ -969,8 +971,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const rows = await this.schemaQuery(sql);
 
     return rows.map((row) => {
-      const name = (row["name"] ?? row["NAME"]) as string;
-      let expression = (row["expression"] ?? row["EXPRESSION"]) as string;
+      const name = row["name"] as string;
+      let expression = row["expression"] as string;
       if (expression.startsWith("(") && expression.endsWith(")")) {
         expression = expression.slice(1, -1);
       }
