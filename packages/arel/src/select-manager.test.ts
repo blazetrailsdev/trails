@@ -1334,7 +1334,8 @@ describe("SelectManagerTest", () => {
         .project(star)
         .optimizerHints("HINT */ DROP TABLE users --");
       const sql = mgr.toSql();
-      expect(sql).toBe('SELECT /*+ HINT DROP TABLE users */ * FROM "users"');
+      // `*/` stripped; `--` left intact, matching Rails' sanitize_as_sql_comment.
+      expect(sql).toBe('SELECT /*+ HINT DROP TABLE users -- */ * FROM "users"');
     });
 
     it("sanitizes newlines from hints", () => {
@@ -1345,7 +1346,7 @@ describe("SelectManagerTest", () => {
     });
 
     it("strips empty hints after sanitization", () => {
-      const mgr = new SelectManager(users).project(star).optimizerHints("/* */", "--");
+      const mgr = new SelectManager(users).project(star).optimizerHints("/* */", "/**/");
       expect(mgr.toSql()).toBe('SELECT * FROM "users"');
     });
 

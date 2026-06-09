@@ -54,6 +54,7 @@ interface CalculationRelation {
   };
   _limitValue: number | null;
   _offsetValue: number | null;
+  _optimizerHints: string[];
   _isNone: boolean;
   _isDistinct: boolean;
   _groupColumns: string[];
@@ -537,6 +538,10 @@ export async function performCount(
     const countNode = new Nodes.NamedFunction("COUNT", [columnAlias]);
     const outerManager = innerTable.project(countNode.as("count"));
     outerManager.from(subqueryNode);
+    // Rails' build_subquery strips optimizer hints from the inner relation
+    // (except(:optimizer_hints)) and re-applies them to the outer COUNT
+    // SelectManager — keeping the hint at the front of the emitted query.
+    if (this._optimizerHints.length > 0) outerManager.optimizerHints(...this._optimizerHints);
     const result = await this._modelClass.connection.selectAll(
       prependCtes(this, this._modelClass.connection.toSql(outerManager)),
       `${this._modelClass.name} Count`,

@@ -9,27 +9,50 @@ export const PG_TEST_URL = process.env.PG_TEST_URL ?? "postgres://localhost:5432
 
 let pgAvailable = false;
 let pgServerVersionNum = 0;
+let pgHasHintPlan = false;
 
-async function checkPg(): Promise<{ available: boolean; serverVersionNum: number }> {
+async function checkPg(): Promise<{
+  available: boolean;
+  serverVersionNum: number;
+  hasHintPlan: boolean;
+}> {
   const client = new pg.Client({ connectionString: PG_TEST_URL });
   try {
     await client.connect();
     const res = await client.query<{ v: string }>(
       "SELECT current_setting('server_version_num') AS v",
     );
-    return { available: true, serverVersionNum: Number(res.rows[0]?.v ?? 0) };
+    const ext = await client.query<{ count: string }>(
+      "SELECT COUNT(*) AS count FROM pg_available_extensions WHERE name = 'pg_hint_plan'",
+    );
+    return {
+      available: true,
+      serverVersionNum: Number(res.rows[0]?.v ?? 0),
+      hasHintPlan: Number(ext.rows[0]?.count ?? 0) > 0,
+    };
   } catch {
-    return { available: false, serverVersionNum: 0 };
+    return { available: false, serverVersionNum: 0, hasHintPlan: false };
   } finally {
     await client.end().catch(() => {});
   }
 }
 
-({ available: pgAvailable, serverVersionNum: pgServerVersionNum } = await checkPg());
+({
+  available: pgAvailable,
+  serverVersionNum: pgServerVersionNum,
+  hasHintPlan: pgHasHintPlan,
+} = await checkPg());
 
 export const describeIfPg = pgAvailable ? describe : (describe.skip as typeof describe);
 /** PG server_version_num at module load (0 when unavailable). */
 export const pgServerVersion = pgServerVersionNum;
+/**
+ * Mirrors PostgreSQLAdapter#supports_optimizer_hints? — true when the
+ * `pg_hint_plan` extension is installed and available. Rails wraps the whole
+ * `PostgresqlOptimizerHintsTest` body in `if supports_optimizer_hints?`, so the
+ * examples never run on a server without the extension.
+ */
+export const pgSupportsOptimizerHints = pgAvailable && pgHasHintPlan;
 /** Mirrors PostgreSQLAdapter#supportsNativePartitioning — PG 10+ (100000). */
 export const pgSupportsNativePartitioning = pgServerVersionNum >= 100000;
 
