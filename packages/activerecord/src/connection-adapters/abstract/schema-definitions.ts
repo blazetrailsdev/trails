@@ -1040,8 +1040,6 @@ export class TableDefinition {
     return this;
   }
 
-  /** @internal Builds MySQL inline INDEX clause for use inside CREATE TABLE (...). */
-
   /**
    * Generate CREATE TABLE SQL.
    */
@@ -1204,13 +1202,6 @@ export class TableDefinition {
         const clause = this._adapter.quoteDefaultExpression(col.options.default, col);
         if (clause) parts.push(clause.trimStart());
       }
-
-      // MySQL carries column comments inline in CREATE TABLE. This hand-rolled toSql()
-      // (used by MigrationContext.createTable) branches on adapter name where Rails would
-      // use MySQL::SchemaCreation#add_column_options!; the DDL-generator-convergence RFC
-      // will route this through the visitor and remove the branch.
-      if (this._adapterName === "mysql" && col.options.comment?.trim())
-        parts.push(`COMMENT '${col.options.comment.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`);
 
       return parts.join(" ");
     });
