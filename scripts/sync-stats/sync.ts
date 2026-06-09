@@ -506,6 +506,12 @@ async function migrateDb(adapter: SQLite3Adapter) {
       if (!(await columnExists(adapter, "pr_reviews", "source_path"))) {
         await adapter.executeMutation(`ALTER TABLE pr_reviews ADD COLUMN source_path TEXT`);
       }
+      // Match the fresh-DB schema below. NULLs (every github-sourced row) are
+      // distinct under a SQLite unique index, so this only constrains the
+      // source_path of local reviews.
+      await adapter.executeMutation(
+        `CREATE UNIQUE INDEX IF NOT EXISTS index_pr_reviews_on_source_path ON pr_reviews (source_path)`,
+      );
     }
 
     if (await tableExists(adapter, "workflow_runs")) {
@@ -1311,6 +1317,11 @@ function localReviewId(sourcePath: string): number {
 // BTWHOOKS_REVIEWS_DIR) — they're never posted to GitHub, so the API-driven
 // syncPrComments above misses them. Scan the btwhooks tree and upsert them into
 // pr_reviews. Pure filesystem + DB; no GitHub API, so no rate-limit concerns.
+//
+// We deliberately do NOT touch pull_requests.review_count here: that column is
+// the syncPrComments fetch sentinel (-1 = needs fetch) and reflects the GitHub
+// review count only. Aggregate over pr_reviews rows when a local-inclusive count
+// is needed.
 async function syncLocalReviews() {
   let prDirs: string[];
   try {
@@ -1374,8 +1385,12 @@ async function syncLocalReviews() {
     }
   }
 
-  if (rows.length > 0) {
-    await PrReview.upsertAll(rows, { uniqueBy: "id" });
+  // Chunk the upsert: one statement binds rows × columns params, and SQLite
+  // caps bound variables (~32k). The local-review set only grows, so batch to
+  // stay well under the limit regardless of how large it gets.
+  const CHUNK = 500;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    await PrReview.upsertAll(rows.slice(i, i + CHUNK), { uniqueBy: "id" });
   }
   console.log(`  Ingested ${rows.length} local /review-pr reviews.`);
 }
