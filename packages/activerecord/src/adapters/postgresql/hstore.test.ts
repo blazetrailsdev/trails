@@ -399,8 +399,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(output).toMatch(/t\.hstore\("tags",\s+\{?\s*default:\s*\{\}/);
     });
 
-    it.skip("supports to unsafe h values", () => {
-      // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — protected-params
-    });
+    // NOTE: `supports to unsafe h values` (ActionController::Parameters#to_unsafe_h)
+    // is a Ruby-only ProtectedParams API; reclassified in
+    // scripts/api-compare/unported-files.ts.
   });
 });

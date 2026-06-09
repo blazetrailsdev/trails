@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Range } from "../../index.js";
+import { setZone, resetZone } from "@blazetrails/activesupport";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
 
@@ -113,11 +114,44 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
     });
 
-    it.skip("assigning 'infinity' on a datetime column with TZ aware attributes", () => {
-      // BLOCKED: type — missing InTimeZone test helper + Base.timeZoneAwareAttributes /
-      // reset_column_information lifecycle. Sentinels already unified; this
-      // gap is purely about TZ-aware type wrapping + per-block time-zone state.
-      // SCOPE: ~80 LOC — InTimeZone helper + TimeZoneConverter integration test plumbing
+    it("assigning 'infinity' on a datetime column with TZ aware attributes", async () => {
+      // setZone is the first statement inside try{} so the finally{} resetZone()
+      // always restores it, even if a later await throws (mirrors Rails'
+      // in_time_zone ensure block).
+      try {
+        setZone("Pacific Time (US & Canada)");
+        const { Base } = await import("../../index.js");
+        const a = adapter;
+        // Rails' in_time_zone flips the global Base.time_zone_aware_attributes;
+        // we scope the flag to this subclass instead — the production hook reads
+        // `this.timeZoneAwareAttributes` per-class, so it's equivalent at runtime
+        // and avoids leaking global state across the shared-worker test suite.
+        class PostgresqlInfinity extends Base {
+          static tableName = "postgresql_infinities";
+          static timeZoneAwareAttributes = true;
+          static {
+            this.adapter = a;
+          }
+        }
+        await PostgresqlInfinity.loadSchema();
+
+        let record = await (PostgresqlInfinity as any).create({ datetime: "infinity" });
+        expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+        await (record as any).reload();
+        expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+
+        record = await (PostgresqlInfinity as any).create({ datetime: Number.POSITIVE_INFINITY });
+        expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+        await (record as any).reload();
+        expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+
+        // Rails also exercises `create!(datetime: BigDecimal::INFINITY)`. JavaScript
+        // has no BigDecimal type; `Number.POSITIVE_INFINITY` (covered above) is the
+        // only infinity literal, so that input-type variant has no TS counterpart.
+      } finally {
+        // setting time_zone_aware_attributes causes the types to change.
+        resetZone();
+      }
     });
 
     it("where clause with infinite range on a datetime column", async () => {
