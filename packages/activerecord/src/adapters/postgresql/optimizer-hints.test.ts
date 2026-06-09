@@ -121,18 +121,24 @@ describeIfPg("PostgreSQLAdapter", () => {
         },
       );
 
-      let queries = await captureSql(async () => {
-        await Post.optimizerHints("SeqScan(posts)")
-          .or(Post.optimizerHints("IndexScan(posts)"))
-          .load();
-      });
+      let queries = await captureSql(
+        async () => {
+          await Post.optimizerHints("SeqScan(posts)")
+            .or(Post.optimizerHints("IndexScan(posts)"))
+            .load();
+        },
+        { includeSchema: false },
+      );
       expect(queries.length).toBe(1);
       expect(queries[0]).toContain("/*+ SeqScan(posts) */");
       expect(queries[0]).not.toContain("/*+ IndexScan(posts) */");
 
-      queries = await captureSql(async () => {
-        await Post.all().or(Post.optimizerHints("IndexScan(posts)")).load();
-      });
+      queries = await captureSql(
+        async () => {
+          await Post.all().or(Post.optimizerHints("IndexScan(posts)")).load();
+        },
+        { includeSchema: false },
+      );
       expect(queries.length).toBe(1);
       expect(queries[0]).not.toContain("/*+ IndexScan(posts) */");
     });
