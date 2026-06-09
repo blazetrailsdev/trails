@@ -2,41 +2,76 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/mysql_explain_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { describeIfMysql, Mysql2Adapter } from "./test-helper.js";
+import { describeIfMysql, isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../../test-helpers/setup-handler-suite.js";
 import { Base } from "../../index.js";
+import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
+import { useHandlerFixtures } from "../../test-helpers/use-handler-fixtures.js";
+import { Author } from "../../test-helpers/models/author.js";
+import { Post } from "../../test-helpers/models/post.js";
+import { registerModel } from "../../index.js";
 
 setupHandlerSuite();
 
 describeIfMysql("Mysql2Adapter", () => {
+  registerModel(Author);
+  registerModel(Post);
+
   let adapter: Mysql2Adapter;
-  beforeAll(() => {
+  beforeAll(async () => {
     adapter = Base.connection as Mysql2Adapter;
+    await adapter.getDatabaseVersion();
   });
 
   describe("MysqlExplainTest", () => {
+    // mirrors Rails: fixtures :authors, :author_addresses
+    // Scoped to its own sub-describe so transactional wrapping doesn't
+    // affect the defineSchema-based tests below.
+    describe("fixture-backed", () => {
+      const { authors } = useHandlerFixtures(["authors", "authorAddresses", "posts"], {
+        schema: canonicalSchema,
+      });
+
+      // explain_option: :analyze for MySQL >= 6.0 / MariaDB; :extended as fallback
+      let explainOpt: string;
+      beforeAll(() => {
+        explainOpt = isMariaDb || adapter.databaseVersion.gte("6.0") ? "analyze" : "extended";
+      });
+
+      it("explain with options as symbol", async () => {
+        // Rails: Author.where(id: 1).explain(explain_option)
+        const result = await Author.where({ id: authors("david").id }).explain(explainOpt);
+        // Our header format: "EXPLAIN ANALYZE for: ..." vs Rails' plain "EXPLAIN ANALYZE ..."
+        expect(result).toContain(`EXPLAIN ${explainOpt.toUpperCase()} for:`);
+        expect(result).toContain("SELECT `authors`");
+      });
+
+      it("explain with options as strings", async () => {
+        // Rails: Author.where(id: 1).explain(explain_option.to_s.upcase) — uppercase string
+        const result = await Author.where({ id: authors("david").id }).explain(
+          explainOpt.toUpperCase(),
+        );
+        expect(result).toContain(`EXPLAIN ${explainOpt.toUpperCase()} for:`);
+        expect(result).toContain("SELECT `authors`");
+      });
+
+      it("explain options with eager loading", async () => {
+        // Rails: Author.where(id: 1).includes(:posts).explain(explain_option)
+        const result = await Author.where({ id: authors("david").id })
+          .includes("posts")
+          .explain(explainOpt);
+        expect(result).toContain(`EXPLAIN ${explainOpt.toUpperCase()} for:`);
+        const blocks = result.split("\n\n").filter((b) => /EXPLAIN/.test(b));
+        expect(blocks.length).toBeGreaterThanOrEqual(2);
+      });
+    });
+
     it("explain for one query", async () => {
       const result = await adapter.explain("SELECT 1");
       expect(result).toBeDefined();
       expect(typeof result).toBe("string");
       expect(result.length).toBeGreaterThan(0);
-    });
-
-    it.skip("explain with options as symbol", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-explain
-      // ROOT-CAUSE: adapters/mysql2/mysql-explain.ts or abstract-mysql-adapter/mysql-explain.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-explain.ts; affects ~10–26 tests in mysql-explain.test.ts
-    });
-    it.skip("explain with options as strings", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-explain
-      // ROOT-CAUSE: adapters/mysql2/mysql-explain.ts or abstract-mysql-adapter/mysql-explain.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-explain.ts; affects ~10–26 tests in mysql-explain.test.ts
-    });
-    it.skip("explain options with eager loading", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-explain
-      // ROOT-CAUSE: adapters/mysql2/mysql-explain.ts or abstract-mysql-adapter/mysql-explain.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-explain.ts; affects ~10–26 tests in mysql-explain.test.ts
     });
 
     it("buildExplainClause renders FORMAT=JSON without parens for { format: 'json' }", () => {
