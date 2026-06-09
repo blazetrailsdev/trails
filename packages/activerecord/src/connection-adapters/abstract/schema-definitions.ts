@@ -763,6 +763,14 @@ export class TableDefinition {
       type = this.integerLikePrimaryKeyType(type, options);
     }
     type = this.aliasedTypes(type, type) as ColumnType;
+    // Mirrors Rails' TableDefinition#new_column_definition:
+    //   if @conn.supports_datetime_with_precision? && type == :datetime && !options.key?(:precision)
+    //     options[:precision] = 6
+    // All adapters we support report supports_datetime_with_precision? = true.
+    // precision: null means "no precision suffix"; absence means "use default (6)".
+    if (type === "datetime" && !("precision" in options)) {
+      options = { ...options, precision: 6 };
+    }
     options.primaryKey ||= type === "primary_key";
     if (options.primaryKey) options.null = false;
     return this.createColumnDefinition(name, type, options);
