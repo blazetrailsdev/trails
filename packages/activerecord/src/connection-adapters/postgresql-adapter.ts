@@ -13,7 +13,11 @@ import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { splitQuotedIdentifier, unquoteIdentifier, Utils } from "./postgresql/utils.js";
-import { CHECK_ALL_FOREIGN_KEYS_SQL } from "./postgresql/referential-integrity.js";
+import {
+  CHECK_ALL_FOREIGN_KEYS_SQL,
+  disableReferentialIntegritySql,
+  enableReferentialIntegritySql,
+} from "./postgresql/referential-integrity.js";
 import { Column } from "./postgresql/column.js";
 import { ExplainPrettyPrinter } from "./postgresql/explain-pretty-printer.js";
 import {
@@ -41,6 +45,8 @@ import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import type { PostgreSQLAdapterOptions } from "./pool-config.js";
 import {
+  ActiveRecordError,
+  ConnectionFailed,
   ConnectionNotEstablished,
   DatabaseAlreadyExists,
   DatabaseConnectionError,
@@ -981,17 +987,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // configure/drain calls or the final return.
     let client = this._rawConnection;
     if (client == null) {
-      const newClient = new pg.Client(this._pgClientOptions!);
-      try {
-        await newClient.connect();
-      } catch (error) {
-        // Failed connect: ensure the partially-initialized client is
-        // closed so it doesn't leak file descriptors or pending
-        // notifications. end() on an unconnected client may itself
-        // throw — swallow that and surface the original connect error.
-        newClient.end().catch(() => {});
-        throw error;
-      }
+      // Route through newClient so a failed connect is translated to
+      // ConnectionNotEstablished / NoDatabaseError (mirrors Rails' connect →
+      // new_client) rather than surfacing the raw pg driver error. newClient
+      // tears the partial client down on failure.
+      const newClient = await PostgreSQLAdapter.newClient(this._pgClientOptions!);
       // Guard against a close / disconnect / discard / reconnect
       // that raced with the in-flight connect(). If the adapter was
       // torn down between the await above and this point, do NOT
@@ -1363,14 +1363,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       try {
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const client = conn as unknown as pg.Client;
-          const result = await this._runQuery(client, rewritten, binds);
+          const queryResult = await this._runQuery(client, rewritten, binds);
           // Mirrors Rails' raw_execute → verified! (database_statements.rb):
           // a successful round-trip proves the connection is live, so mark it
           // verified to skip the verify ping on the next withRawConnection.
           this.verifiedBang();
-          payload.row_count = result.rows.length;
+          // A multi-statement string (e.g. disable_referential_integrity's
+          // joined ALTERs) runs under the simple-query protocol, where node-pg
+          // returns one Result per statement. Mirror Rails' execute and surface
+          // the last command's result.
+          const result = Array.isArray(queryResult)
+            ? queryResult[queryResult.length - 1]
+            : queryResult;
+          const rows = result?.rows ?? [];
+          payload.row_count = rows.length;
           this._flushWarnings(rewritten);
-          return result.rows;
+          return rows;
         });
       } catch (e: any) {
         const translated = this._translateException(e, rewritten, binds);
@@ -2431,6 +2439,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
+   * Mirrors PG::Connection#server_version — reads the live server version
+   * number off the raw connection. A standalone seam so tests can stub a
+   * bad (zero) version the way Rails stubs `raw_connection.server_version`.
+   *
+   * @internal
+   */
+  async _serverVersion(client: pg.Client): Promise<number> {
+    const result = await client.query("SHOW server_version_num");
+    return parseInt(String(result.rows[0]?.server_version_num ?? "0"), 10);
+  }
+
+  /**
    * Fetch and cache the server version number. Called automatically on
    * the first query via _ensureInitialized(). Version-dependent
    * supports_* methods throw if called before initialization.
@@ -2440,8 +2460,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // Use raw client directly to avoid re-entering execute() which could
     // interfere with savepoint nesting in test adapters or wrappers.
     await this.withClient(async (client) => {
-      const result = await client.query("SHOW server_version_num");
-      this._databaseVersion = parseInt(String(result.rows[0]?.server_version_num ?? "0"), 10);
+      const version = await this._serverVersion(client);
+      // Mirrors Rails' get_database_version: a zero version means the version
+      // probe failed (e.g. a half-open connection), so don't cache it — raise
+      // ConnectionFailed so the reconnect path can retry.
+      if (version === 0) {
+        throw new ConnectionFailed("Could not determine PostgreSQL version");
+      }
+      this._databaseVersion = version;
     });
     // Eagerly populate optimizer hints flag
     if (this._hasOptimizerHints === null) {
@@ -4132,6 +4158,54 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return Number(rows[0].count) > 0;
   }
 
+  // Mirrors: ReferentialIntegrity#disable_referential_integrity. Disables
+  // every table's triggers (FK checks) inside a requires_new transaction,
+  // yields, then re-enables them. Both ALTER passes are wrapped in
+  // `requiresNew` so a missing-superuser failure rolls back to the savepoint
+  // and leaves any surrounding transaction usable. Only an InvalidForeignKey
+  // raised by the block earns the missing-privileges warning; every other
+  // error bubbles up unchanged.
+  override async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
+    let originalException: Error | null = null;
+
+    try {
+      await this.transaction(
+        async () => {
+          await this.execute(disableReferentialIntegritySql(await this.tables()).join(";"));
+        },
+        { requiresNew: true },
+      );
+    } catch (e) {
+      if (e instanceof ActiveRecordError) originalException = e as Error;
+      else throw e;
+    }
+
+    try {
+      await fn();
+    } catch (e) {
+      if (e instanceof InvalidForeignKey) {
+        console.warn(
+          `WARNING: Rails was not able to disable referential integrity.\n\n` +
+            `This is most likely caused due to missing permissions.\n` +
+            `Rails needs superuser privileges to disable referential integrity.\n\n` +
+            `    cause: ${originalException?.message ?? ""}\n`,
+        );
+      }
+      throw e;
+    }
+
+    try {
+      await this.transaction(
+        async () => {
+          await this.execute(enableReferentialIntegritySql(await this.tables()).join(";"));
+        },
+        { requiresNew: true },
+      );
+    } catch (e) {
+      if (!(e instanceof ActiveRecordError)) throw e;
+    }
+  }
+
   // Mirrors: ReferentialIntegrity#check_all_foreign_keys_valid!
   // Rails uses `transaction(requires_new: true)` — a savepoint when already
   // inside a transaction, or a fresh BEGIN otherwise.
@@ -4445,6 +4519,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       case "57P01": // admin_shutdown (pg_terminate_backend or server restart)
         return new ConnectionNotEstablished(msg, { cause });
       default:
+        // A severed connection (08xxx, "Connection terminated", pg's
+        // "Client has encountered a connection error", …) surfaces as a
+        // generic Error or non-DatabaseError; map it to ConnectionNotEstablished
+        // so callers see the lost connection rather than a raw driver error.
+        //
+        // Rails' translate_exception (postgresql_adapter.rb:801-821) additionally
+        // splits a libpq PG::ConnectionBad whose message ends with "\n" into
+        // ConnectionFailed (vs ConnectionNotEstablished for the pg-internal case).
+        // That distinction is a libpq PQerrorMessage artifact; node-pg is pure JS
+        // with no libpq layer and doesn't carry the pg-internal/libpq split, so
+        // there is no reliable signal to reproduce it — every severed-connection
+        // error maps to ConnectionNotEstablished here.
+        if (PostgreSQLAdapter._isConnectionError(e)) {
+          return new ConnectionNotEstablished(msg, { cause });
+        }
         // Only wrap node-postgres `DatabaseError`s. The SQLSTATE
         // 5-char shape alone isn't enough — Node system errors like
         // `EPIPE` / `EBADF` also match it, so gating on
