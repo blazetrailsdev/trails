@@ -48,18 +48,7 @@ type FrameworkDefaultsEntry = {
 // Mirrors the set of version strings Rails' Configuration#load_defaults
 // accepts (its case/when branches). Raise for anything else, matching Rails'
 // `else raise "Unknown version ..."` branch (configuration.rb:349-350).
-const KNOWN_VERSIONS = new Set([
-  "5.0",
-  "5.1",
-  "5.2",
-  "6.0",
-  "6.1",
-  "7.0",
-  "7.1",
-  "7.2",
-  "8.0",
-  "8.1",
-]);
+const KNOWN_VERSIONS = new Set(["5.0", "5.1", "5.2", "6.0", "6.1", "7.0", "7.1", "7.2", "8.0"]);
 
 // Rails' version→{flag: value} table. Apply all entries whose version is ≤
 // the requested version (rails/railties: Configuration#load_defaults).
