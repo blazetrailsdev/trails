@@ -1918,7 +1918,7 @@ export class MigrationContext {
     if (options?.ifNotExists && this.tableExists(name)) {
       return;
     }
-    const td = new TableDefinition(name, {
+    const tdOpts = {
       id: options?.as != null ? false : options?.id,
       primaryKey: options?.primaryKey,
       default: options?.default,
@@ -1927,9 +1927,14 @@ export class MigrationContext {
       charset: options?.charset,
       collation: options?.collation,
       as: options?.as,
-      adapterName: this._adapterName,
-      adapter: this.connection,
-    });
+    };
+    const td =
+      this.connection.createTableDefinition?.(name, tdOpts) ??
+      new TableDefinition(name, {
+        ...tdOpts,
+        adapterName: this._adapterName,
+        adapter: this.connection,
+      });
     if (fn) fn(td);
     await this.connection.executeMutation(this.connection.toSql(td));
     if (options?.comment != null && options.comment.trim().length > 0) {
