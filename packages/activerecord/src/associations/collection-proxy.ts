@@ -985,12 +985,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Wire `record` into this collection's target from the inverse side.
    *
-   * Mirrors `CollectionAssociation#target=` → `replace_on_target(record, true,
-   * replace: true, inversing: true)` (collection_association.rb:285-295), the
-   * path Rails takes when `set_inverse_instance` folds a belongs_to-loaded or
-   * preloaded record back into its `has_many` owner: `skip_callbacks` (no
-   * before/after_add — inverse wiring is not a user `<<`), `replace: true`, and
-   * `inversing: true`. Per that method we always record the record in
+   * Mirrors the Rails inverse-wiring chain `set_inverse_instance`
+   * (association.rb:132) → `inversed_from` → `self.target =`
+   * (CollectionAssociation#target=, collection_association.rb:285) →
+   * `replace_on_target(record, true, replace: true, inversing: true)`
+   * (the call at collection_association.rb:294), the path Rails takes when a
+   * belongs_to-loaded or preloaded record is folded back into its `has_many`
+   * owner: `skip_callbacks` (no before/after_add — inverse wiring is not a user
+   * `<<`), `replace: true`, and `inversing: true`. Per that method we always
+   * record the record in
    * `@replaced_or_added_targets` (so a later `<<`/`push` of the same record
    * replaces in place rather than appending a duplicate) and, because
    * `@_was_loaded` is forced true there, always append to `@target` — loaded or
@@ -1010,13 +1013,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   _wireInverseTarget(record: T): void {
     // replace && (!new_record? || @replaced_or_added_targets.include?(record))
-    let index =
+    const index =
       !record.isNewRecord() || this._replacedOrAddedTargets.has(record)
         ? this._indexInTarget(record)
         : -1;
-    if (index === -1 && this._replacedOrAddedTargets.has(record)) {
-      index = this._indexInTarget(record);
-    }
+    // Rails re-runs `@target.index(record)` after `set_inverse_instance` / the
+    // `yield` block (collection_association.rb:478-480) because that block can
+    // mutate `_target` / `_replacedOrAddedTargets` between the two searches.
+    // The `inversing: true` path passes no block and we deliberately do not
+    // re-invoke `set_inverse_instance` here (see above), so nothing changes in
+    // between — the re-search would be a no-op and is omitted.
     // inversing: true → unconditionally tracked.
     this._replacedOrAddedTargets.add(record);
     if (index !== -1) {
