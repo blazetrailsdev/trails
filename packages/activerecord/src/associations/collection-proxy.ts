@@ -982,6 +982,44 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._target.findIndex((r) => r === record || r.isEqual(record));
   }
 
+  /**
+   * Wire `record` into this collection's target from the inverse side, the way
+   * Rails' `CollectionAssociation#replace_on_target(record, inversing: true)`
+   * folds a preloaded / belongs_to-loaded record into `@target`. Append with
+   * identity dedup; fires no add callbacks (inverse wiring is not a
+   * user-initiated `<<`).
+   *
+   * This is the single write entry point for inverse has_many targets — it owns
+   * both `@replaced_or_added_targets` (so a later `<<`/`push` of the same record
+   * replaces in place rather than appending a duplicate) and the legacy
+   * `_cachedAssociations` mirror. The C2 (#2591) seam, which used to seed
+   * `_replacedOrAddedTargets` from outside in `associations.ts`, is now internal
+   * here. The mirror keeps the still-live direct `_cachedAssociations` readers
+   * (and the S1 `_cachedAssociationTarget` fallback) in sync until S4 deletes the
+   * map; when the proxy is unloaded we extend the cache slot rather than the
+   * unloaded `_target`, matching the prior behavior so a later real load is not
+   * pre-seeded with a partial array.
+   * @internal
+   */
+  _wireInverseTarget(record: T): void {
+    let collection: T[];
+    if (this._targetLoaded) {
+      collection = this._target;
+    } else {
+      const existing = this._record._cachedAssociations?.get(this._assocName);
+      collection = Array.isArray(existing)
+        ? (existing as T[])
+        : existing != null
+          ? [existing as T]
+          : [];
+    }
+    if (!collection.includes(record)) {
+      collection.push(record);
+      if (this._targetLoaded) this._replacedOrAddedTargets.add(record);
+    }
+    (this._record._cachedAssociations ??= new Map()).set(this._assocName, collection);
+  }
+
   // NOTE: If _pushThrough fails after the target is saved, the target record
   // will be orphaned (no join row). Rails wraps this in a transaction. We don't
   // have transaction support yet — tracked in the roadmap under "Transactions".

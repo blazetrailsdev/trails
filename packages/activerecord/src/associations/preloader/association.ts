@@ -2,6 +2,7 @@ import type { Base } from "../../base.js";
 import type { Table } from "@blazetrails/arel";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 import { ConnectionNotDefined } from "../../errors.js";
+import { _wireInverseAssociation } from "../../associations.js";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
@@ -262,11 +263,14 @@ export class Association {
       inverseName = (this.reflection as any).options?.inverseOf;
     }
     if (inverseName) {
+      // Route through the shared inverse-wiring helper rather than poking
+      // `_cachedAssociations` directly. For a belongs_to inverse it caches the
+      // owner scalar (unchanged); for a has_many inverse it populates the
+      // child's collection proxy target — the single write path for has_many
+      // targets. Mirrors Rails' `add_to_target` → `set_inverse_instance`, where
+      // preloaded and inverse-wired records both land in `@target`.
       for (const child of records) {
-        if (!(child as any)._cachedAssociations) {
-          (child as any)._cachedAssociations = new Map();
-        }
-        (child as any)._cachedAssociations.set(inverseName, owner);
+        _wireInverseAssociation(owner, child, inverseName);
       }
     }
   }

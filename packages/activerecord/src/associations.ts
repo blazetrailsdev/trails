@@ -290,49 +290,22 @@ function _resolveInverseName(
  *
  * @internal
  */
-function _wireInverseAssociation(owner: Base, child: Base, inverseName: string): void {
+export function _wireInverseAssociation(owner: Base, child: Base, inverseName: string): void {
   const childCtor = child.constructor as typeof Base;
   const inverseRefl = childCtor._reflectOnAssociation?.(inverseName);
   // Rails `BelongsToAssociation#invertible_for?` (belongs_to_association.rb:159):
   // when the inverse is a has_many, wiring is gated on `klass.has_many_inversing`.
-  // Without the flag, Rails does NOT touch the parent collection cache. trails'
-  // equivalent cache target is `_cachedAssociations`; mirror the gate here so we
-  // never poison a hasMany cache slot with a scalar (loadHasMany casts the slot
-  // to Base[] unconditionally).
+  // Without the flag, Rails does NOT touch the parent collection. Route the
+  // write through the proxy's `_wireInverseTarget` so the in-memory target,
+  // `@replaced_or_added_targets`, and the legacy `_cachedAssociations` mirror
+  // are all maintained in one place (the proxy). This removes the C2 (#2591)
+  // seam that used to reach into `proxy._replacedOrAddedTargets` from here.
   if (inverseRefl?.macro === "hasMany") {
     if (!childCtor.hasManyInversing) return;
-    child._cachedAssociations = child._cachedAssociations ?? new Map();
-    // Mirror Rails `replace_on_target(..., inversing: true)`: append + identity
-    // dedup. Rails has a single `@target` per CollectionAssociation; trails
-    // splits state across `_cachedAssociations` and `_collectionProxies`, so
-    // seed `collection` from the proxy's loaded target when one exists to keep
-    // them in sync (otherwise a later `_cachedAssociations` read could return
-    // a partial array). Promote stray scalars from legacy pre-flag writes.
-    const proxy = child._collectionProxies?.get(inverseName) as
-      | { loaded?: boolean; target?: Base[]; _replacedOrAddedTargets?: Set<Base> }
-      | undefined;
-    const existing = child._cachedAssociations.get(inverseName);
-    let collection: Base[];
-    let onLoadedProxy = false;
-    if (proxy?.loaded && Array.isArray(proxy.target)) {
-      collection = proxy.target;
-      onLoadedProxy = true;
-    } else if (Array.isArray(existing)) {
-      collection = existing as Base[];
-    } else if (existing != null) {
-      collection = [existing as Base];
-    } else {
-      collection = [];
-    }
-    if (!collection.includes(owner)) {
-      collection.push(owner);
-      // Mirror Rails `replace_on_target(..., inversing: true)`, which records the
-      // record in `@replaced_or_added_targets`. A later `<<`/`push` of the same
-      // record then finds it via that set and replaces in place instead of
-      // appending a duplicate (collection_association.rb:472-476).
-      if (onLoadedProxy) proxy?._replacedOrAddedTargets?.add(owner);
-    }
-    child._cachedAssociations.set(inverseName, collection);
+    const proxy = association(child, inverseName) as unknown as {
+      _wireInverseTarget: (record: Base) => void;
+    };
+    proxy._wireInverseTarget(owner);
     return;
   }
   child._cachedAssociations = child._cachedAssociations ?? new Map();
