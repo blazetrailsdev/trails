@@ -76,6 +76,7 @@ export interface DatabaseAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#to_sql
    */
   toSql(arel: unknown, binds?: unknown[]): string;
+  toSqlAndBinds(arel: unknown, binds?: unknown[]): [string, unknown[]];
 
   /**
    * Sanitize a string so it is safe to embed inside a `/* … *\/` SQL comment

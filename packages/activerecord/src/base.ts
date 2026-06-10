@@ -2870,8 +2870,9 @@ export class Base extends Model {
     }
     _Persistence.applyDefaultAndGlobalConstraints(um as any, ctor);
 
+    const [updateSql, updateBinds] = ctor.connection.toSqlAndBinds(um);
     this._pendingOperation = ctor.connection
-      .execUpdate(ctor.connection.toSql(um), `${ctor.name} Update`)
+      .execUpdate(updateSql, `${ctor.name} Update`, updateBinds)
       .then((affected) => {
         if (ctor.lockingEnabled && affected === 0) {
           // Mirrors Rails _update_row rescue: `@attributes[locking_column] =
@@ -2938,9 +2939,11 @@ export class Base extends Model {
         }
         _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
 
+        const [deleteSql, deleteBinds] = ctor.connection.toSqlAndBinds(dm);
         const affected = await ctor.connection.execDelete(
-          ctor.connection.toSql(dm),
+          deleteSql,
           `${ctor.name} Destroy`,
+          deleteBinds,
         );
         if (ctor.lockingEnabled && affected === 0) {
           throw new StaleObjectError(this, "destroy");

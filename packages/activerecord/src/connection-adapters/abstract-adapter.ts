@@ -343,6 +343,8 @@ export interface AbstractAdapter {
    * visitor. Mirrors `DatabaseStatements#to_sql`.
    */
   toSql(arel: unknown, binds?: unknown[]): string;
+  /** @internal */
+  toSqlAndBinds(arel: unknown, binds?: unknown[]): [string, unknown[]];
   selectAll(
     sql: string,
     name?: string | null,

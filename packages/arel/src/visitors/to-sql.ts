@@ -61,7 +61,16 @@ export class ToSql extends Visitor {
   }
 
   compile(node: Node): string {
-    return this.visit(node, new SQLString()).value;
+    const [sql, binds] = this.compileWithBinds(node);
+    if (binds.length === 0) return sql;
+    let i = 0;
+    return sql.replace(/\?|\$\d+/g, (match) => {
+      const raw = binds[i++];
+      // Valueless BindParam (used as a raw placeholder/Substitute slot): preserve.
+      if (raw === undefined) return match;
+      const val = resolveValueForDatabase(raw);
+      return this.quote(val);
+    });
   }
 
   protected visitArelNodesDeleteStatement(
@@ -180,15 +189,11 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  protected visitArelNodesCasted(
-    node: Nodes.Casted | Nodes.Quoted,
-    collector: SQLString,
-  ): SQLString {
-    // Mirrors Rails to_sql.rb: `collector << quote(o.value_for_database).to_s`
-    // — Quoted/Casted values are always inlined as literal SQL, not bound.
-    // Only BindParam/ActiveModel::Attribute nodes use add_bind.
+  protected visitArelNodesCasted(node: Nodes.Casted, collector: SQLString): SQLString {
+    // Mirrors Rails to_sql.rb `visit_Arel_Nodes_Casted`: collector.add_bind(o, &bind_block).
+    // Quoted nodes (null comparisons, hard-coded literals) inline via visitQuoted.
     const value = resolveValueForDatabase(node.valueForDatabase());
-    collector.append(this.quote(value));
+    collector.addBind(value, this.bindBlock());
     return collector;
   }
 
@@ -1636,17 +1641,17 @@ export class ToSql extends Visitor {
 
   /**
    * Compile an AST node and extract bind values separately.
-   * Returns [sql_with_placeholders, bind_values].
+   * Returns [sql_with_placeholders, bind_values, retryable].
    *
    * Mirrors: Rails' compilation with Arel::Collectors::Composite
    */
-  compileWithBinds(node: Node): [string, unknown[]] {
+  compileWithBinds(node: Node): [string, unknown[], boolean] {
     const sqlCollector = new SQLString();
     const bindCollector = new Bind();
     const composite = new Composite(sqlCollector, bindCollector);
     this.visit(node, composite as unknown as SQLString);
     const binds = bindCollector.value.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
-    return [sqlCollector.value, binds];
+    return [sqlCollector.value, binds, sqlCollector.retryable];
   }
 
   protected emitOptimizerHints(node: Nodes.SelectCore, collector: SQLString): void {
@@ -1797,7 +1802,11 @@ export class ToSql extends Visitor {
   }
 
   private visitQuoted(node: Nodes.Quoted, collector: SQLString): SQLString {
-    return this.visitArelNodesCasted(node, collector);
+    // Mirrors Rails to_sql.rb `visit_Arel_Nodes_Quoted`: collector << quote(o.value_for_database).
+    // Quoted nodes (null, hard-coded literals) are always inlined; only Casted uses add_bind.
+    const value = resolveValueForDatabase(node.valueForDatabase());
+    collector.append(this.quote(value));
+    return collector;
   }
 
   // -- Helpers --

@@ -3845,7 +3845,17 @@ export class Relation<T extends Base> {
         except: "EXCEPT",
       }[this._setOperation.type];
       const isSqlite = this._modelClass.connection?.adapterName === "sqlite";
-      return isSqlite ? `${leftSql} ${op} ${rightSql}` : `(${leftSql}) ${op} (${rightSql})`;
+      // PG uses numbered $N placeholders. Each side compiles independently with
+      // a fresh SQLString starting at $1, so both sides may contain $1, $2, etc.
+      // Renumber the right side to continue from where the left side left off so
+      // the combined SQL has globally unique placeholder numbers.
+      const rightSqlFinal =
+        leftBinds.length > 0 && /\$\d+/.test(rightSql)
+          ? rightSql.replace(/\$(\d+)/g, (_, n) => `$${parseInt(n, 10) + leftBinds.length}`)
+          : rightSql;
+      return isSqlite
+        ? `${leftSql} ${op} ${rightSqlFinal}`
+        : `(${leftSql}) ${op} (${rightSqlFinal})`;
     }
     return this._toSqlWithoutSetOp();
   }
@@ -4038,13 +4048,13 @@ export class Relation<T extends Base> {
         // Compile via the same visitor _compileSelectSql uses so identifier
         // quoting stays dialect-consistent across the whole SELECT.
         const av = this._arelVisitor();
-        const [fromSql, fromBinds] = av.compileWithBinds(raw);
+        const [fromSql, fromBinds, fromRetryable] = av.compileWithBinds(raw);
         fromExpr = fromSql;
         // Rails compiles the whole arel (including the FROM clause) through a
         // single collector, so a non-retryable FROM node lowers the overall
         // classification. We compile it separately, so AND its retryability
         // into the captured SELECT flag rather than letting it clobber.
-        this._lastSelectRetryable &&= (av as any).collector?.retryable ?? false;
+        this._lastSelectRetryable &&= fromRetryable;
         // FROM node binds precede the outer WHERE binds in the final SQL.
         this._lastSelectBinds = [...this._typeCastBinds(fromBinds), ...this._lastSelectBinds];
       } else if (alias) {
@@ -4139,10 +4149,8 @@ export class Relation<T extends Base> {
    */
   private _compileSelectSql(manager: { ast: Nodes.Node; toSql(): string }): string {
     const v = this._arelVisitor();
-    const [sql, binds] = v.compileWithBinds(manager.ast);
-    // Capture retryability immediately — FROM-clause recompiles reset the
-    // shared visitor's collector before toArray() reads the flag.
-    this._lastSelectRetryable = (v as any).collector?.retryable ?? false;
+    const [sql, binds, retryable] = v.compileWithBinds(manager.ast);
+    this._lastSelectRetryable = retryable;
     this._lastSelectBinds = this._typeCastBinds(binds);
     return sql;
   }

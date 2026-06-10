@@ -1074,10 +1074,10 @@ describe("the to_sql visitor", () => {
 
   it("works with BindParams", () => {
     const v = new Visitors.ToSql();
+    // Valueless BindParam: preserved as ? (raw placeholder slot).
     expect(v.compile(new Nodes.BindParam())).toBe("?");
-    // BindParam always routes through addBind — collector threading eliminated
-    // _extractBinds, so compile() now emits ? (not the raw value).
-    expect(v.compile(new Nodes.BindParam(1))).toBe("?");
+    // BindParam with value: compile() inlines the value for display SQL.
+    expect(v.compile(new Nodes.BindParam(1))).toBe("1");
   });
 
   it("compileWithBinds extracts bind values", () => {
@@ -1138,11 +1138,11 @@ describe("the to_sql visitor", () => {
     };
 
     v.compileWithCollector(mgr.ast, collector);
-    // Quoted/Casted values inline — no addBind calls from the visitor layer.
-    // Only BindParam/ActiveModel::Attribute would call addBind.
-    expect(binds).toHaveLength(0);
-    // The inlined value and table name appear in parts
-    expect(parts.some((p) => typeof p === "string" && p.includes("'alice'"))).toBe(true);
+    // Casted values route through addBind (mirrors Rails visit_Arel_Nodes_Casted).
+    expect(binds).toHaveLength(1);
+    expect(binds[0]).toBe("alice");
+    // The Casted value becomes a ? placeholder in parts (not inlined).
+    expect(parts.some((p) => p === "?")).toBe(true);
     expect(parts.some((p) => typeof p === "string" && p.includes("users"))).toBe(true);
   });
 
@@ -1467,8 +1467,8 @@ describe("the to_sql visitor", () => {
       }
       const tbl = new Table("users");
       const v = new NumberedVisitor();
-      // Only BindParam routes through addBind (and therefore bindBlock).
-      // Casted/Quoted values always inline — they do not call addBind.
+      // Both BindParam and Casted route through addBind (and therefore bindBlock).
+      // Quoted values (null comparisons, hard literals) still inline.
       const [sql] = v.compileWithBinds(
         tbl
           .where(tbl.get("id").eq(new Nodes.BindParam(1)))
@@ -1476,8 +1476,8 @@ describe("the to_sql visitor", () => {
           .project(tbl.get("id")).ast,
       );
       expect(sql).toContain("$1"); // BindParam → addBind → $1
-      expect(sql).toContain("'hi'"); // Casted → inline, not a bind
-      expect(sql).not.toContain("$2"); // No second bind from Casted
+      expect(sql).toContain("$2"); // Casted → addBind → $2
+      expect(sql).not.toContain("'hi'"); // Casted value is bound, not inlined
       expect(sql).not.toContain("?");
     });
 

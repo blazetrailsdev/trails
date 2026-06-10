@@ -22,13 +22,13 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
     it("compiles IN with values", () => {
       const node = new Nodes.HomogeneousIn([1, 2, 3], users.get("id"), "in");
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe('"users"."id" IN (?, ?, ?)');
+      expect(sql).toBe('"users"."id" IN (1, 2, 3)');
     });
 
     it("compiles NOT IN with values", () => {
       const node = new Nodes.HomogeneousIn([4, 5], users.get("id"), "notin");
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe('"users"."id" NOT IN (?, ?)');
+      expect(sql).toBe('"users"."id" NOT IN (4, 5)');
     });
 
     it("compiles empty IN as 1=0", () => {
@@ -46,7 +46,7 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
     it("compiles string values", () => {
       const node = new Nodes.HomogeneousIn(["a", "b"], users.get("name"), "in");
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe('"users"."name" IN (?, ?)');
+      expect(sql).toBe("\"users\".\"name\" IN ('a', 'b')");
     });
   });
 
