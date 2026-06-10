@@ -670,6 +670,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * @internal
    */
   protected override async rawConnectionForBlock(): Promise<AbstractAdapter | null> {
+    // getConn() is called inside withRawConnection's try/finally, so a
+    // connection-acquisition failure still triggers dirtyCurrentTransaction()
+    // in the finally. Rails gates the ensure-dirty inside the begin…yield…ensure
+    // that wraps the already-resolved @raw_connection (abstract_adapter.rb:1044),
+    // not the pre-loop connect! — so this is a minor fidelity gap. It matches the
+    // PG adapter's posture and is intentional: over-dirtying on acquisition
+    // failure is conservative (may produce an extra savepoint) but cannot produce
+    // the reverse wrong behavior (skipping a needed savepoint).
     return (await this.getConn()) as unknown as AbstractAdapter;
   }
 
