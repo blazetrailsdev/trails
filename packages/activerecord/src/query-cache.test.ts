@@ -70,6 +70,25 @@ function trackHits(adapter: unknown): { count: number; reset(): void } {
   return hits;
 }
 
+// Counts *uncached* `sql.active_record` queries (no `cached: true`) for one
+// adapter — the equivalent of Rails' `assert_no_queries` / `assert_queries`,
+// which count queries that actually reach the connection.
+function trackQueries(adapter: unknown): { count: number; reset(): void } {
+  const queries = {
+    count: 0,
+    reset() {
+      this.count = 0;
+    },
+  };
+  trackedSubs.push(
+    Notifications.subscribe("sql.active_record", (e: unknown) => {
+      const payload = (e as { payload?: { cached?: boolean; connection?: unknown } })?.payload;
+      if (payload?.cached !== true && payload?.connection === adapter) queries.count++;
+    }),
+  );
+  return queries;
+}
+
 function makeMiddleware(
   app: () => Promise<void>,
   targets: (QueryCacheRunTarget & QueryCacheCompleteTarget)[],
@@ -537,23 +556,25 @@ describe("QueryCacheTest", () => {
     const { cached } = await setup();
     cached.enableQueryCacheBang();
 
-    // Like Rails' `arel.locked` short-circuit in QueryCache#select_all: a locked
-    // relation (`SELECT ... FOR UPDATE`) is never served from or stored in the
-    // cache, so each call reaches the underlying connection. SQLite can't run a
-    // real `FOR UPDATE`, so drive the wrapper directly with a counting `super`.
+    // Unlocked path through the adapter's *wired* `selectAll`: the second
+    // identical query is served from the cache (size doesn't grow). This proves
+    // the live `selectAll` override actually routes through the query cache.
+    await cached.selectAll("SELECT 1 AS val");
+    const sizeAfterSelect = cached.queryCache.size;
+    expect(sizeAfterSelect).toBeGreaterThan(0);
+    await cached.selectAll("SELECT 1 AS val");
+    expect(cached.queryCache.size).toBe(sizeAfterSelect);
+
+    // Locked path — Rails' `arel.locked` short-circuit in QueryCache#select_all:
+    // a locked relation (`SELECT ... FOR UPDATE`) is never served from or stored
+    // in the cache, so each call reaches the underlying connection. SQLite can't
+    // run a real `FOR UPDATE`, so drive the same wrapper with a counting `super`
+    // to confirm the locked query bypasses the cache entirely.
     let calls = 0;
     const selectAll = makeCachedSelectAll(async () => {
       calls++;
       return Result.fromRowHashes([{ val: 1 }]);
     });
-
-    // Unlocked: second identical query is served from cache (one real call).
-    await selectAll.call(cached, "SELECT 1 AS val");
-    await selectAll.call(cached, "SELECT 1 AS val");
-    expect(calls).toBe(1);
-
-    // Locked: cache is ignored — both calls hit the connection.
-    calls = 0;
     const forUpdateSql = 'SELECT 1 AS val FROM "tasks" FOR UPDATE';
     await selectAll.call(cached, forUpdateSql);
     await selectAll.call(cached, forUpdateSql);
@@ -598,7 +619,8 @@ describe("QueryCacheTest", () => {
   });
 
   it("query cached even when types are reset", async () => {
-    const { cached, hits, Task } = await setup();
+    const { cached, Task } = await setup();
+    const queries = trackQueries(cached);
     const t = await Task.create({ title: "reset" });
     await cached.cache(async () => {
       // Warm the cache
@@ -610,11 +632,12 @@ describe("QueryCacheTest", () => {
       // map this test guards.)
       (Task as any).resetColumnInformation();
 
-      hits.reset();
+      // Mirrors Rails' `assert_no_queries { Task.find(1) }`: the find is served
+      // entirely from the query cache, so no query reaches the connection.
+      queries.reset();
       const r = await Task.find(t.id);
       expect(r.title).toBe("reset");
-      // Served entirely from the query cache — no new query was issued.
-      expect(hits.count).toBeGreaterThan(0);
+      expect(queries.count).toBe(0);
     });
   });
 
