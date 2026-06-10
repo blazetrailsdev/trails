@@ -185,7 +185,7 @@ describe("WithTest", () => {
       .joins("LEFT OUTER JOIN commented_posts ON commented_posts.post_id = posts.id")
       .select("posts.*, commented_posts.post_id as has_comments");
 
-    const records = await relation.order("posts.id").toArray();
+    const records = await relation.order("id").toArray();
 
     // Make sure we load all records (thus, left outer join is used)
     expect(records.length).toEqual(await Post.count());
