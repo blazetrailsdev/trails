@@ -87,7 +87,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
       // "SERIAL PRIMARY KEY" for postgres.
       return super.typeToSql(type, options);
     }
-    return this.adapter.typeToSql(type as string, options as Record<string, unknown>);
+    // Delegate to the adapter's typeToSql when available (Rails parity:
+    // `delegate :type_to_sql, to: :@conn`). Fall back to the abstract
+    // implementation when no real adapter is present (e.g. unit-test context).
+    if (typeof (this.adapter as any).typeToSql === "function") {
+      return (this.adapter as any).typeToSql(type as string, options as Record<string, unknown>);
+    }
+    return super.typeToSql(type, options);
   }
 
   /** @internal */
@@ -324,6 +330,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected override tableConstraintStatements(o: AbstractTableDefinition): string[] {
+    if ((o as any).as) return [];
     const pg = o as PgTableDef;
     const result: string[] = [];
     for (const exc of pg.exclusionConstraints ?? []) {
