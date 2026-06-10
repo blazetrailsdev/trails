@@ -580,9 +580,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         });
       } catch (e: any) {
         const translated =
-          e instanceof ActiveRecordError
-            ? e
-            : await this._translateAndEnrich(e, driverSql, driverBinds);
+          e instanceof MismatchedForeignKey
+            ? await this._enrichMismatchedForeignKey(e)
+            : e instanceof ActiveRecordError
+              ? e
+              : await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
@@ -778,9 +780,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         });
       } catch (e: any) {
         const translated =
-          e instanceof ActiveRecordError
-            ? e
-            : await this._translateAndEnrich(e, driverSql, driverBinds);
+          e instanceof MismatchedForeignKey
+            ? await this._enrichMismatchedForeignKey(e)
+            : e instanceof ActiveRecordError
+              ? e
+              : await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
@@ -833,9 +837,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         });
       } catch (e: any) {
         const translated =
-          e instanceof ActiveRecordError
-            ? e
-            : await this._translateAndEnrich(e, driverSql, driverBinds);
+          e instanceof MismatchedForeignKey
+            ? await this._enrichMismatchedForeignKey(e)
+            : e instanceof ActiveRecordError
+              ? e
+              : await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
