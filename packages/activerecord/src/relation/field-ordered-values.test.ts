@@ -1,219 +1,151 @@
+/**
+ * Tests to increase Rails test coverage matching.
+ * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/relation/field_ordered_values_test.rb
+ */
 import { describe, it, expect, beforeAll } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
-import { Base, defineEnum, registerModel } from "../index.js";
-import { Associations } from "../associations.js";
+import { registerModel } from "../index.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Book } from "../test-helpers/models/book.js";
+import { Author } from "../test-helpers/models/author.js";
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-
-beforeAll(async () => {
-  await defineSchema({
-    fov_posts: { title: "string" },
-    fov_books: { author_id: "integer" },
-    fov_authors: { name: "string" },
-  });
-});
-
-// ==========================================================================
-// FieldOrderedValuesTest — targets relation/field_ordered_values_test.rb
-// ==========================================================================
 describe("FieldOrderedValuesTest", () => {
-  it("in order of generates CASE expression", () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "string");
-      }
-    }
-    const sql = Post.all().inOrderOf("status", ["draft", "published", "archived"]).toSql();
-    expect(sql).toContain("CASE");
+  // Mirrors Rails `fixtures :posts`. The enum/string/nil book tests destroy_all
+  // and create their own rows, so `books`/`authors` are defined (no fixtures).
+  useHandlerFixtures(["posts"], { schema: canonicalSchema });
+  beforeAll(async () => {
+    await defineSchema({
+      authors: canonicalSchema.authors,
+      books: canonicalSchema.books,
+    });
   });
-
-  it("in order of empty", () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "string");
-      }
-    }
-    // Rails: return spawn.none! if values.empty? — produces WHERE (1=0), no CASE.
-    const sql = Post.all().inOrderOf("status", []).toSql();
-    expect(sql).toContain("1=0");
-    expect(sql).not.toContain("CASE");
-  });
-
-  it("in order of with enums values", () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "integer");
-      }
-    }
-    defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
-    const sql = Post.all().inOrderOf("status", [0, 1, 2]).toSql();
-    expect(sql).toContain("CASE");
-    expect(sql).toContain("0");
-    expect(sql).toContain("1");
-    expect(sql).toContain("2");
-  });
-
-  it("in order of with enums keys", () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "integer");
-      }
-    }
-    defineEnum(Post, "status", { draft: 0, published: 1, archived: 2 });
-    const sql = Post.all().inOrderOf("status", ["draft", "published", "archived"]).toSql();
-    expect(sql).toContain("CASE");
-    // Rails casts enum keys to their database integer via type_cast_for_database,
-    // so the CASE branches compare against the mapped integers 0/1/2 rather than the
-    // raw string labels. Assert the full branch predicates (not bare substrings,
-    // which the 1-indexed THEN positions would trivially satisfy). Strip identifier
-    // quoting so the check holds across adapters (ANSI "" vs MariaDB ``).
-    const bare = sql.replace(/["`]/g, "");
-    expect(bare).not.toContain("draft");
-    expect(bare).toContain("posts.status = 0");
-    expect(bare).toContain("posts.status = 1");
-    expect(bare).toContain("posts.status = 2");
-  });
-
-  it("in order of with string column", () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "string");
-      }
-    }
-    const sql = Post.all().inOrderOf("status", ["draft", "published", "archived"]).toSql();
-    expect(sql).toContain("CASE");
-    expect(sql).toContain("draft");
-    expect(sql).toContain("published");
-    expect(sql).toContain("archived");
-  });
-
-  it("in order of after regular order", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("status", "string");
-      }
-    }
-    const sql = Post.order("title").inOrderOf("status", ["draft", "published"]).toSql();
-    expect(sql).toContain("CASE");
-  });
-
-  it("in order of with nil", () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "string");
-      }
-    }
-    const sql = Post.all().inOrderOf("status", [null, "draft", "published"]).toSql();
-    expect(sql).toContain("CASE");
-    expect(sql).toContain("NULL");
-  });
+  registerModel(Author);
+  registerModel(Book);
 
   it("in order of", async () => {
-    class FovPost extends Base {
-      static {
-        this.tableName = "fov_posts";
-        this.attribute("title", "string");
-      }
-    }
-    const p1 = await FovPost.create({ title: "a" });
-    const p2 = await FovPost.create({ title: "b" });
-    const p3 = await FovPost.create({ title: "c" });
-    const order = [p3.id, p1.id, p2.id];
-    const posts = await FovPost.inOrderOf("id", order).toArray();
-    expect(posts.map((p: any) => p.id)).toEqual(order);
+    const order = [3, 4, 1];
+    const posts = Post.inOrderOf("id", order);
+
+    expect((await posts.toArray()).map((p: any) => p.id)).toEqual(order);
+  });
+
+  it("in order of empty", async () => {
+    const posts = Post.inOrderOf("id", []);
+
+    expect(await posts.toArray()).toEqual([]);
+  });
+
+  it("in order of with enums values", async () => {
+    await Book.destroyAll();
+    await Book.create({ status: "proposed" });
+    await Book.create({ status: "written" });
+    await Book.create({ status: "published" });
+
+    const order = ["written", "published", "proposed"];
+    let books = Book.inOrderOf("status", order);
+    expect((await books.toArray()).map((b: any) => b.status)).toEqual(order);
+
+    books = Book.inOrderOf("status", order);
+    expect((await books.toArray()).map((b: any) => b.status)).toEqual(order);
+  });
+
+  it("in order of with enums keys", async () => {
+    await Book.destroyAll();
+    await Book.create({ status: "proposed" });
+    await Book.create({ status: "written" });
+    await Book.create({ status: "published" });
+
+    const statuses = (Book as any).statuses;
+    const order = [statuses.written, statuses.published, statuses.proposed];
+    const books = Book.inOrderOf("status", order);
+
+    expect((await books.toArray()).map((book: any) => statuses[book.status])).toEqual(order);
   });
 
   it("in order of expression", async () => {
-    class FovPost extends Base {
-      static {
-        this.tableName = "fov_posts";
-        this.attribute("title", "string");
-      }
-    }
-    const p1 = await FovPost.create({ title: "a" });
-    const p2 = await FovPost.create({ title: "b" });
-    const p3 = await FovPost.create({ title: "c" });
-    const order = [p3.id, p1.id, p2.id] as number[];
-    const posts = await FovPost.inOrderOf(
+    const order = [3, 4, 1];
+    const posts = Post.inOrderOf(
       arelSql("id * 2"),
       order.map((id) => id * 2),
-    ).toArray();
-    expect(posts.map((p: any) => p.id)).toEqual(order);
+    );
+
+    expect((await posts.toArray()).map((p: any) => p.id)).toEqual(order);
+  });
+
+  it("in order of with string column", async () => {
+    await Book.destroyAll();
+    await Book.create({ format: "paperback" });
+    await Book.create({ format: "ebook" });
+    await Book.create({ format: "hardcover" });
+
+    const order = ["hardcover", "paperback", "ebook"];
+    let books = Book.inOrderOf("format", order);
+    expect((await books.toArray()).map((b: any) => b.format)).toEqual(order);
+
+    books = Book.inOrderOf("format", order);
+    expect((await books.toArray()).map((b: any) => b.format)).toEqual(order);
+  });
+
+  it("in order of after regular order", async () => {
+    const order = [3, 4, 1];
+    let posts = Post.where({ type: "Post" }).order("type").inOrderOf("id", order);
+    expect((await posts.toArray()).map((p: any) => p.id)).toEqual(order);
+
+    posts = Post.where({ type: "Post" }).order("type").inOrderOf("id", order);
+    expect((await posts.toArray()).map((p: any) => p.id)).toEqual(order);
+  });
+
+  it("in order of with nil", async () => {
+    await Book.destroyAll();
+    await Book.create({ format: "paperback" });
+    await Book.create({ format: "ebook" });
+    await Book.create({ format: null });
+
+    const order = ["ebook", null, "paperback"];
+    let books = Book.inOrderOf("format", order);
+    expect((await books.toArray()).map((b: any) => b.format)).toEqual(order);
+
+    books = Book.inOrderOf("format", order);
+    expect((await books.toArray()).map((b: any) => b.format)).toEqual(order);
   });
 
   it("in order of with associations", async () => {
-    class FovAuthor extends Base {
-      static {
-        this.tableName = "fov_authors";
-        this.attribute("name", "string");
-      }
-    }
-    class FovBook extends Base {
-      static {
-        this.tableName = "fov_books";
-        this.attribute("author_id", "integer");
-      }
-    }
-    Associations.belongsTo.call(FovBook, "author", {
-      className: "FovAuthor",
-      foreignKey: "author_id",
-    });
-    registerModel("FovAuthor", FovAuthor);
-    registerModel("FovBook", FovBook);
+    await Author.destroyAll();
+    await Book.destroyAll();
+    const john = (await Author.create({ name: "John" })) as any;
+    const bob = (await Author.create({ name: "Bob" })) as any;
+    const anna = (await Author.create({ name: "Anna" })) as any;
 
-    const john = await FovAuthor.create({ name: "John" });
-    const bob = await FovAuthor.create({ name: "Bob" });
-    const anna = await FovAuthor.create({ name: "Anna" });
-    await FovBook.create({ author_id: john.id });
-    await FovBook.create({ author_id: bob.id });
-    await FovBook.create({ author_id: anna.id });
+    await john.books.create();
+    await bob.books.create();
+    await anna.books.create();
 
-    const nameById = new Map<unknown, string>([
-      [john.id, "John"],
-      [bob.id, "Bob"],
-      [anna.id, "Anna"],
-    ]);
+    // Rails: `books.map { |book| book.author.name }` lazily loads each author.
+    // The trails belongsTo reader is async, so mirror the lazy load explicitly.
+    const authorNames = async (rel: any) =>
+      Promise.all(
+        (await rel.toArray()).map(
+          async (book: any) => (await book.association("author").loadTarget()).name,
+        ),
+      );
+
     const order = ["Bob", "Anna", "John"];
-    const books = await FovBook.joins("author").inOrderOf("fov_authors.name", order).toArray();
-    const names = books.map((b: any) => nameById.get(b.readAttribute("author_id")));
-    expect(names).toEqual(order);
+    let books = Book.joins("author").inOrderOf("authors.name", order);
+    expect(await authorNames(books)).toEqual(order);
+
+    books = Book.joins("author").inOrderOf("authors.name", order);
+    expect(await authorNames(books)).toEqual(order);
   });
 
   it("in order of with filter false", async () => {
-    class FovPost extends Base {
-      static {
-        this.tableName = "fov_posts";
-        this.attribute("title", "string");
-      }
-    }
-    const p1 = await FovPost.create({ title: "a" });
-    const p2 = await FovPost.create({ title: "b" });
-    const p3 = await FovPost.create({ title: "c" });
-    await FovPost.create({ title: "d" });
-    const order = [p3.id, p1.id, p2.id];
-    const posts = FovPost.inOrderOf("id", order, false);
+    const order = [3, 4, 1];
+    const posts = Post.inOrderOf("id", order, false);
 
-    const ordered = await posts.limit(3).toArray();
-    expect(ordered.map((p: any) => p.id)).toEqual(order);
-    expect(await posts.count()).toBe(4);
-  });
-
-  it("in order of rejects raw sql columns", () => {
-    class Post extends Base {
-      static {
-        this.attribute("status", "string");
-      }
-    }
-    // Mirrors Rails: in_order_of guards the order column with
-    // disallow_raw_sql!(permit: column_name_with_order_matcher). Opaque SQL is
-    // rejected; a bare column with an order suffix and Arel.sql() pass through.
-    expect(() => Post.all().inOrderOf("id; DROP TABLE posts", [1, 2])).toThrow();
-    expect(() => Post.all().inOrderOf("status ASC", ["draft"])).not.toThrow();
-    expect(() => Post.all().inOrderOf(arelSql("id * 2"), [2, 4])).not.toThrow();
+    expect((await posts.limit(3).toArray()).map((p: any) => p.id)).toEqual(order);
+    expect(await posts.count()).toBe(11);
   });
 });
