@@ -2363,8 +2363,14 @@ export class Base extends Model {
    * returns the proxy's canonical target array; otherwise it falls back to the
    * legacy `_cachedAssociations` map (still used by singular associations and
    * the direct test pokes). Removed once S4 deletes `_cachedAssociations`.
+   *
+   * Named `_cachedAssociationTarget` (not `_associationCache`) deliberately:
+   * Rails' `@association_cache[name]` (associations.rb:82) returns the
+   * association *object* (e.g. `HasManyAssociation`), whereas this returns the
+   * cached *target value*, so reusing that name would mislead anyone
+   * cross-referencing the Rails source.
    */
-  _associationCache(name: string): Base | Base[] | null | undefined {
+  _cachedAssociationTarget(name: string): Base | Base[] | null | undefined {
     const proxy = this._collectionProxies.get(name) as
       | { loaded?: boolean; readTargets?: () => Base[] }
       | undefined;

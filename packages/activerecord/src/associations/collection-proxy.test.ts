@@ -408,17 +408,114 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect((proxy.targetsByPrimaryKey() as Map<string, ApPost>).size).toBe(3);
   });
 
-  it("_associationCache() delegates to the proxy read accessor for loaded collections", async () => {
+  it("_cachedAssociationTarget() delegates to the proxy read accessor for loaded collections", async () => {
     const blog = await blogWithPosts();
     const proxy = association<ApPost>(blog, "apPosts") as any;
-    expect((blog as any)._associationCache("apPosts")).toBe(proxy.readTargets());
+    expect((blog as any)._cachedAssociationTarget("apPosts")).toBe(proxy.readTargets());
   });
 
-  it("_associationCache() falls back to _cachedAssociations when no proxy is loaded", async () => {
+  it("_cachedAssociationTarget() falls back to _cachedAssociations when no proxy is loaded", async () => {
     const blog = new ApBlog({ name: "Dev" });
     await blog.save();
     const sentinel: ApPost[] = [];
     (blog as any)._cachedAssociations = new Map([["apPosts", sentinel]]);
-    expect((blog as any)._associationCache("apPosts")).toBe(sentinel);
+    expect((blog as any)._cachedAssociationTarget("apPosts")).toBe(sentinel);
+  });
+});
+
+// RFC 0006 S1 — targetsByPrimaryKey() across non-default primary keys. The
+// token routes through `record.id` → `_getId` → `_readAttribute(primaryKey)`,
+// so a custom string PK and a composite PK must key correctly, and a composite
+// new record (an `id` array with null parts) must be skipped.
+describe("CollectionProxy#targetsByPrimaryKey — non-default primary keys", () => {
+  let adapter: TestDatabaseAdapter;
+
+  class CpkOwner extends Base {
+    declare name: string;
+    declare cpkTags: CpkTag[];
+    static {
+      this.attribute("name", "string");
+    }
+  }
+
+  // Composite primary key on the target model.
+  class CpkTag extends Base {
+    declare cpkOwnerId: number | null;
+    static {
+      this._tableName = "cpk_tags";
+      this.attribute("region", "integer");
+      this.attribute("code", "integer");
+      this.attribute("cpk_owner_id", "integer");
+      this.primaryKey = ["region", "code"];
+    }
+  }
+
+  // Custom (non-`id`) single-column primary key on the target model.
+  class UuidTag extends Base {
+    declare cpkOwnerId: number | null;
+    static {
+      this._tableName = "uuid_tags";
+      this.attribute("uuid", "string");
+      this.attribute("cpk_owner_id", "integer");
+      this.primaryKey = "uuid";
+    }
+  }
+
+  CpkOwner.hasMany("cpkTags", { className: "CpkTag" });
+  CpkOwner.hasMany("uuidTags", { className: "UuidTag" });
+
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    CpkOwner.adapter = adapter;
+    CpkTag.adapter = adapter;
+    UuidTag.adapter = adapter;
+    registerModel(CpkOwner);
+    registerModel(CpkTag);
+    registerModel(UuidTag);
+    await defineSchema(adapter, {
+      cpk_owners: { name: "string" },
+      cpk_tags: {
+        columns: { region: "integer", code: "integer", cpk_owner_id: "integer" },
+        primaryKey: ["region", "code"],
+      },
+      uuid_tags: {
+        columns: { uuid: "string", cpk_owner_id: "integer" },
+        primaryKey: ["uuid"],
+      },
+    });
+  });
+  withTransactionalFixtures(() => adapter);
+
+  it("keys loaded targets by their composite primary key", async () => {
+    const owner = await CpkOwner.create({ name: "o" });
+    await CpkTag.create({ region: 1, code: 7, cpk_owner_id: owner.id as number });
+    await CpkTag.create({ region: 2, code: 9, cpk_owner_id: owner.id as number });
+    const proxy = association<CpkTag>(owner, "cpkTags") as any;
+    await proxy.load();
+    const byKey = proxy.targetsByPrimaryKey() as Map<string, CpkTag>;
+    expect(byKey.size).toBe(2);
+    // Distinct composite keys never collide, and every loaded tag is a value.
+    expect(new Set(byKey.values())).toEqual(new Set(proxy.target as CpkTag[]));
+  });
+
+  it("keys loaded targets by a custom single-column primary key", async () => {
+    const owner = await CpkOwner.create({ name: "o" });
+    await UuidTag.create({ uuid: "aaa", cpk_owner_id: owner.id as number });
+    await UuidTag.create({ uuid: "bbb", cpk_owner_id: owner.id as number });
+    const proxy = association<UuidTag>(owner, "uuidTags") as any;
+    await proxy.load();
+    const byKey = proxy.targetsByPrimaryKey() as Map<string, UuidTag>;
+    expect(byKey.size).toBe(2);
+    expect(byKey.get("aaa")?.id).toBe("aaa");
+    expect(byKey.get("bbb")?.id).toBe("bbb");
+  });
+
+  it("skips a composite new record whose key parts are unassigned", async () => {
+    const owner = await CpkOwner.create({ name: "o" });
+    await CpkTag.create({ region: 1, code: 7, cpk_owner_id: owner.id as number });
+    const proxy = association<CpkTag>(owner, "cpkTags") as any;
+    await proxy.load();
+    (proxy.target as CpkTag[]).push(new CpkTag({ region: 5 })); // code unassigned → null part
+    expect((proxy.targetsByPrimaryKey() as Map<string, CpkTag>).size).toBe(1);
   });
 });

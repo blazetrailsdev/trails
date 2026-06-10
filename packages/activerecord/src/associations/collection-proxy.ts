@@ -171,7 +171,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * @internal Canonical read accessor for RFC 0006 (collection-store
    * unification). The loaded target array IS the single source of truth for
    * has_many membership; the legacy `_cachedAssociations` map is a deprecated
-   * shim (see `Base#_associationCache`) that delegates here. Returns the
+   * shim (see `Base#_cachedAssociationTarget`) that delegates here. Returns the
    * in-memory target without triggering a DB load — JS has no blocking IO, so
    * a fresh load means awaiting the proxy / `loadTarget()` first.
    */
@@ -3001,7 +3001,7 @@ _setCollectionProxyCtor(
  * `undefined` in any position) returns `null` so callers skip it.
  */
 function primaryKeyToken(record: Base): string | null {
-  const id = (record as { id?: unknown }).id;
+  const id = record.id;
   if (Array.isArray(id)) {
     if (id.some((part) => part == null)) return null;
     return id.map((part) => String(part)).join("\u0000");
