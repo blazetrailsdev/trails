@@ -2,13 +2,12 @@
  * Regression for task #25: `SELECT *` projects all joined tables'
  * columns, and most drivers (better-sqlite3, pg's default mapper)
  * collapse same-named columns into a single key per row — last
- * write wins. For a `has_many :through source: belongsTo` like
- * `User.friends through: friendships source: friend`, the join's
- * target is the same `users` table, but `friendships` also has its
- * own `id` column. Without an explicit projection, `friendships.id`
- * silently overwrites `users.id` in the row hash, and the hydrated
- * record carries the friendship's id with the friend's other
- * columns.
+ * write wins. For a `has_many :through` like canonical
+ * `Person.followers through: friendships`, the join's target is the
+ * same `people` table, but `friendships` also has its own `id`
+ * column. Without an explicit projection, `friendships.id` silently
+ * overwrites `people.id` in the row hash, and the hydrated record
+ * carries the friendship's id with the follower's other columns.
  *
  * Fix: default projection is always `<target>.*` — matches Rails'
  * `Relation#build_select` at query_methods.rb:1909, which projects
@@ -17,93 +16,54 @@
  * behavior); callers who want bare `*` there override with
  * `.select("*")`.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "../index.js";
-import { Associations, loadHasMany } from "../associations.js";
-import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { describe, it, expect } from "vitest";
+import { registerModel } from "../index.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
+import { Person } from "../test-helpers/models/person.js";
+import { Friendship } from "../test-helpers/models/friendship.js";
 import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
 
+// Person self-registers on import; Friendship does not, but `followers`
+// (through friendships, source follower) needs it in the registry.
+registerModel(Friendship);
+
 describe("SELECT * column collision in joined relations", () => {
-  let adapter: SidecarAdapter;
-
-  class SsjUser extends Base {
-    static {
-      this._tableName = "ssj_users";
-      this.attribute("name", "string");
-    }
-  }
-  class SsjFriendship extends Base {
-    static {
-      this._tableName = "ssj_friendships";
-      this.attribute("ssj_user_id", "integer");
-      this.attribute("ssj_friend_id", "integer");
-    }
-  }
-
-  beforeAll(async () => {
-    ({ adapter: adapter } = createSidecarTestAdapter());
-    await defineSchema(adapter, {
-      ssj_users: { name: "string" },
-      ssj_friendships: { ssj_user_id: "integer", ssj_friend_id: "integer" },
-    });
-    SsjUser.adapter = adapter;
-    SsjFriendship.adapter = adapter;
-    registerModel("SsjUser", SsjUser);
-    registerModel("SsjFriendship", SsjFriendship);
-    (SsjUser as any)._associations = [];
-    (SsjUser as any)._reflections = {};
-    (SsjFriendship as any)._associations = [];
-    (SsjFriendship as any)._reflections = {};
-
-    Associations.hasMany.call(SsjUser, "friendships", {
-      className: "SsjFriendship",
-      foreignKey: "ssj_user_id",
-    });
-    Associations.belongsTo.call(SsjFriendship, "friend", {
-      className: "SsjUser",
-      foreignKey: "ssj_friend_id",
-    });
-    Associations.hasMany.call(SsjUser, "friends", {
-      className: "SsjUser",
-      through: "friendships",
-      source: "friend",
-    });
-  });
-  withTransactionalFixtures(() => adapter);
+  // `useHandlerFixtures` wires setupHandlerSuite + transactional fixtures +
+  // fixture seeding in one call; `schema` recreates the canonical `people` /
+  // `friendships` tables so a sibling file's reduced shape can't survive in.
+  const { people } = useHandlerFixtures(["people", "friendships"], { schema: TEST_SCHEMA });
 
   it("hydrates the target's columns, not the join table's, when ids collide", async () => {
-    const a = await SsjUser.create({ name: "a" });
-    const b = await SsjUser.create({ name: "b" });
-    // Friendship id will land at 1 (first row in ssj_friendships),
-    // shadowing users.id=1 (alice) if the projection is `*` — the
-    // result row's `id` key would be the friendship's id, not the
-    // friend's. The friend we expect (b) has user.id=2.
-    await SsjFriendship.create({ ssj_user_id: a.id, ssj_friend_id: b.id });
-
-    const reflection = (SsjUser as any)._reflectOnAssociation("friends");
-    const friends = await loadHasMany(a, "friends", reflection.options);
-    expect(friends.map((u: any) => ({ id: u.id, name: u.name }))).toEqual([
-      { id: b.id, name: "b" },
+    // friendships("Connection 1"): id=1, friend_id=michael(1), follower_id=david(2).
+    // michael.followers joins friendships (friend_id = michael.id=1) to its
+    // follower (david, people.id=2). The friendship's id=1 collides with
+    // michael's own id=1, so a bare `*` projection would hydrate id=1 (michael)
+    // instead of david. Reading `michael.followers` exercises the public
+    // CollectionProxy path, which routes this non-nested through association
+    // through AssociationScope — the same JOIN/projection path used in production.
+    const michael = people("michael");
+    const followers = await michael.followers;
+    expect(followers.map((p) => ({ id: p.id, first_name: p.first_name }))).toEqual([
+      { id: people("david").id, first_name: "David" },
     ]);
   });
 
-  it("default projection is `<target>.*` always (matches Rails — never bare `*`)", async () => {
+  it("default projection is `<target>.*` always (matches Rails — never bare `*`)", () => {
     // Always-qualified projection matches Rails'
     // `klass.arel_table[Arel.star]`. Holds with or without joins
     // so the no-joins case isn't a special case the user has to
     // know about.
-    const qUsers = escapeRegExp(quoteTableName("ssj_users"));
-    const noJoins = (SsjUser as any).all().toSql();
-    expect(noJoins).toMatch(new RegExp(`SELECT\\s+${qUsers}\\.\\*`, "i"));
+    const qPeople = escapeRegExp(quoteTableName("people"));
+    const noJoins = Person.all().toSql();
+    expect(noJoins).toMatch(new RegExp(`SELECT\\s+${qPeople}\\.\\*`, "i"));
     expect(noJoins).not.toMatch(/SELECT\s+\*/i);
 
-    const withJoins = (SsjUser as any).all().joins("INNER JOIN ssj_friendships ON 1 = 1").toSql();
-    expect(withJoins).toMatch(new RegExp(`SELECT\\s+${qUsers}\\.\\*`, "i"));
+    const withJoins = Person.all().joins("INNER JOIN friendships ON 1 = 1").toSql();
+    expect(withJoins).toMatch(new RegExp(`SELECT\\s+${qPeople}\\.\\*`, "i"));
   });
 
-  it("keeps qualified projection even when from() replaces the FROM source (Rails behavior)", async () => {
+  it("keeps qualified projection even when from() replaces the FROM source (Rails behavior)", () => {
     // Rails' `Relation#build_select` (query_methods.rb:1909)
     // projects `table[Arel.star]` unconditionally — it doesn't
     // special-case `from()`. The resulting SQL is the caller's
@@ -111,9 +71,9 @@ describe("SELECT * column collision in joined relations", () => {
     // the target table name, the caller overrides with
     // `.select("*")`. We match Rails here rather than silently
     // downgrading to bare `*`.
-    const sql = (SsjUser as any).all().from("(SELECT * FROM ssj_users) AS sub").toSql();
+    const sql = Person.all().from("(SELECT * FROM people) AS sub").toSql();
     expect(sql).toMatch(
-      new RegExp(`SELECT\\s+${escapeRegExp(quoteTableName("ssj_users"))}\\.\\*`, "i"),
+      new RegExp(`SELECT\\s+${escapeRegExp(quoteTableName("people"))}\\.\\*`, "i"),
     );
   });
 });
