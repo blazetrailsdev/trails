@@ -16,55 +16,41 @@
  * behavior); callers who want bare `*` there override with
  * `.select("*")`.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { loadHasManyThrough } from "../associations.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { loadHasMany } from "../associations.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Friendship } from "../test-helpers/models/friendship.js";
 import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
+// Person self-registers on import; Friendship does not, but `followers`
+// (through friendships, source follower) needs it in the registry.
+registerModel(Friendship);
 
 describe("SELECT * column collision in joined relations", () => {
-  beforeAll(async () => {
-    // Canonical `friendships` carries its own `id` and joins `people` back to
-    // `people` (self-referential through), so `Person.followers` is exactly the
-    // shape that triggers the id-shadowing bug. `dropExisting` rebuilds both
-    // tables from the canonical schema so a sibling file's reduced `people`
-    // shape can't survive into this suite.
-    await defineSchema(
-      {
-        people: TEST_SCHEMA.people,
-        friendships: TEST_SCHEMA.friendships,
-      },
-      { dropExisting: true },
-    );
-    // Person self-registers on import; Friendship does not.
-    registerModel(Friendship);
-  });
+  // `useHandlerFixtures` wires setupHandlerSuite + transactional fixtures +
+  // fixture seeding in one call; `schema` recreates the canonical `people` /
+  // `friendships` tables so a sibling file's reduced shape can't survive in.
+  const { people } = useHandlerFixtures(["people", "friendships"], { schema: TEST_SCHEMA });
 
   it("hydrates the target's columns, not the join table's, when ids collide", async () => {
-    const a = await Person.create({ first_name: "a" });
-    const b = await Person.create({ first_name: "b" });
-    // Friendship id will land at 1 (first row in friendships), shadowing
-    // people.id=1 (a) if the projection is `*` — the result row's `id` key
-    // would be the friendship's id, not the follower's. a.followers joins
-    // friendships (friend_id = a.id) to its follower (b, people.id=2).
-    await Friendship.create({ friend_id: a.id, follower_id: b.id });
-
+    // friendships("Connection 1"): id=1, friend_id=michael(1), follower_id=david(2).
+    // michael.followers joins friendships (friend_id = michael.id=1) to its
+    // follower (david, people.id=2). The friendship's id=1 collides with
+    // michael's own id=1, so a bare `*` projection would hydrate id=1 (michael)
+    // instead of david. `loadHasMany` routes this non-nested through association
+    // through AssociationScope — the same JOIN/projection path used in production.
+    const michael = people("michael");
     const reflection = (Person as any)._reflectOnAssociation("followers");
-    const followers = await loadHasManyThrough(a, "followers", reflection.options);
+    const followers = await loadHasMany(michael, "followers", reflection.options);
     expect(followers.map((p: any) => ({ id: p.id, first_name: p.first_name }))).toEqual([
-      { id: b.id, first_name: "b" },
+      { id: people("david").id, first_name: "David" },
     ]);
   });
 
-  it("default projection is `<target>.*` always (matches Rails — never bare `*`)", async () => {
+  it("default projection is `<target>.*` always (matches Rails — never bare `*`)", () => {
     // Always-qualified projection matches Rails'
     // `klass.arel_table[Arel.star]`. Holds with or without joins
     // so the no-joins case isn't a special case the user has to
@@ -78,7 +64,7 @@ describe("SELECT * column collision in joined relations", () => {
     expect(withJoins).toMatch(new RegExp(`SELECT\\s+${qPeople}\\.\\*`, "i"));
   });
 
-  it("keeps qualified projection even when from() replaces the FROM source (Rails behavior)", async () => {
+  it("keeps qualified projection even when from() replaces the FROM source (Rails behavior)", () => {
     // Rails' `Relation#build_select` (query_methods.rb:1909)
     // projects `table[Arel.star]` unconditionally — it doesn't
     // special-case `from()`. The resulting SQL is the caller's
