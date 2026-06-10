@@ -91,7 +91,7 @@ describe("PostgresTest", () => {
   it("should support DISTINCT ON", () => {
     const mgr = new SelectManager(users).project(star).distinctOn(users.get("id"));
     const sql = new Visitors.PostgreSQL().compile(mgr.ast);
-    expect(sql).toContain("DISTINCT ON");
+    expect(sql).toContain('DISTINCT ON ( "users"."id" )');
   });
 
   it("should support DISTINCT", () => {
