@@ -19,7 +19,10 @@ describe("EagerSingularizationTest", () => {
       octopi: { species: "string" },
       passes: { bus_id: "integer", rides: "integer" },
       buses: { name: "string" },
-      crises_messes: { crisis_id: "integer", mess_id: "integer" },
+      crises_messes: {
+        columns: { crisis_id: "integer", mess_id: "integer" },
+        primaryKey: false,
+      },
       messes: { name: "string" },
       crises: { name: "string" },
       successes: { name: "string" },
