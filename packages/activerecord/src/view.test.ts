@@ -244,17 +244,19 @@ describe("UpdateableViewTest", () => {
     expect((book as any).name).toBe("AWDwR");
   });
 
-  it.skip("insert record", () => {
-    // BLOCKED: adapter-mysql — insert-through-view PK assignment.
-    // Rails runs this on MySQL+Trilogy+PG. On our MySQL stack it can't pass:
-    // an updatable view reports its NOT-NULL `id` with default "0" (verified via
-    // SHOW FULL FIELDS), and the session sets NO_AUTO_VALUE_ON_ZERO (mirroring
-    // Rails' configure_connection). A new record's `id` is therefore 0 (not nil),
-    // so attributesForCreate keeps it and the INSERT stores a literal 0 instead of
-    // letting the underlying `books` table auto-assign; `last()` then returns the
-    // wrong row. Rails' green suite implies its CI MySQL reports that view PK
-    // default as NULL — a server-version reflection difference we can't control here.
-  });
+  // MySQL skip: the updatable view reports its NOT-NULL `id` with default "0"
+  // (via SHOW FULL FIELDS) and NO_AUTO_VALUE_ON_ZERO keeps id=0 in
+  // attributesForCreate, so the INSERT stores literal 0 instead of letting the
+  // underlying books table auto-assign. PG/Trilogy are unaffected.
+  itIfSupports.skipIf(adapterType === "mysql" || adapterType === "sqlite")(
+    "views",
+    "insert record",
+    async () => {
+      await PrintedBook.createBang({ name: "Rails in Action", status: 0, format: "paperback" });
+      const newBook = await PrintedBook.last();
+      expect((newBook as any).name).toBe("Rails in Action");
+    },
+  );
 
   // Rails: only runs on PostgreSQL (and SQLite) with supports_insert_returning?.
   // The outer UpdateableViewTest block already excludes SQLite, leaving PG only.
