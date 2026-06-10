@@ -1,6 +1,62 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "../index.js";
 
+// Mirrors Rails validations/callbacks_test.rb: a base `Dog` with a `history`
+// accumulator, plus subclasses registering before/after_validation callbacks
+// gated by `on:`.
+class Dog extends Model {
+  history: string[] = [];
+  static {
+    this.attribute("name", "string");
+  }
+}
+
+class DogValidatorWithOnCondition extends Dog {
+  static {
+    this.beforeValidation(
+      (d: DogValidatorWithOnCondition) => {
+        d.history.push("before_validation_marker");
+      },
+      { on: "create" },
+    );
+    this.afterValidation(
+      (d: DogValidatorWithOnCondition) => {
+        d.history.push("after_validation_marker");
+      },
+      { on: "create" },
+    );
+  }
+}
+
+class DogValidatorWithOnMultipleCondition extends Dog {
+  static {
+    this.beforeValidation(
+      (d: DogValidatorWithOnMultipleCondition) => {
+        d.history.push("before_validation_marker on context_a");
+      },
+      { on: "context_a" },
+    );
+    this.beforeValidation(
+      (d: DogValidatorWithOnMultipleCondition) => {
+        d.history.push("before_validation_marker on context_b");
+      },
+      { on: "context_b" },
+    );
+    this.afterValidation(
+      (d: DogValidatorWithOnMultipleCondition) => {
+        d.history.push("after_validation_marker on context_a");
+      },
+      { on: "context_a" },
+    );
+    this.afterValidation(
+      (d: DogValidatorWithOnMultipleCondition) => {
+        d.history.push("after_validation_marker on context_b");
+      },
+      { on: "context_b" },
+    );
+  }
+}
+
 describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   it("before validation and after validation callbacks should be called", () => {
     const order: string[] = [];
@@ -81,61 +137,52 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   });
 
   it("on condition is respected for validation without matching context", () => {
-    const log: string[] = [];
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, on: "create" });
-      }
-    }
-    const p = new Person({ name: "" });
-    // Without context, the on:create validation should not fire
-    expect(p.isValid()).toBe(true);
+    const d = new DogValidatorWithOnCondition();
+    d.isValid("save");
+    expect(d.history).toEqual([]);
   });
 
   it("on condition is respected for validation without context", () => {
-    const log: string[] = [];
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, on: "update" });
-      }
-    }
-    const p = new Person({ name: "" });
-    expect(p.isValid()).toBe(true);
+    const d = new DogValidatorWithOnCondition();
+    d.isValid();
+    expect(d.history).toEqual([]);
   });
 
   it("on multiple condition is respected for validation with matching context", () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, on: "create" });
-      }
-    }
-    const p = new Person({ name: "" });
-    expect(p.isValid("create")).toBe(false);
+    const d1 = new DogValidatorWithOnMultipleCondition();
+    d1.isValid("context_a");
+    expect(d1.history).toEqual([
+      "before_validation_marker on context_a",
+      "after_validation_marker on context_a",
+    ]);
+
+    const d2 = new DogValidatorWithOnMultipleCondition();
+    d2.isValid("context_b");
+    expect(d2.history).toEqual([
+      "before_validation_marker on context_b",
+      "after_validation_marker on context_b",
+    ]);
+
+    const d3 = new DogValidatorWithOnMultipleCondition();
+    d3.isValid(["context_a", "context_b"]);
+    expect(d3.history).toEqual([
+      "before_validation_marker on context_a",
+      "before_validation_marker on context_b",
+      "after_validation_marker on context_a",
+      "after_validation_marker on context_b",
+    ]);
   });
 
   it("on multiple condition is respected for validation without matching context", () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, on: "create" });
-      }
-    }
-    const p = new Person({ name: "" });
-    expect(p.isValid("update")).toBe(true);
+    const d = new DogValidatorWithOnMultipleCondition();
+    d.isValid("save");
+    expect(d.history).toEqual([]);
   });
 
   it("on multiple condition is respected for validation without context", () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, on: "create" });
-      }
-    }
-    const p = new Person({ name: "" });
-    expect(p.isValid()).toBe(true);
+    const d = new DogValidatorWithOnMultipleCondition();
+    d.isValid();
+    expect(d.history).toEqual([]);
   });
 
   it("further callbacks should be called if before validation returns false", () => {
@@ -173,25 +220,27 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   });
 
   it("before validation does not mutate the if options array", () => {
-    const conditions = [(_r: any) => true];
-    class Person extends Model {
+    // Rails: `before_validation(if: opts, on: :create)` must not mutate the
+    // caller's options — the on→if translation builds a fresh conditions object.
+    const opts = { if: (_r: any) => true, on: "create" as const };
+    class CreateDog extends Dog {
       static {
-        this.attribute("name", "string");
-        this.beforeValidation(() => {}, { if: conditions[0] });
+        this.beforeValidation(() => {}, opts);
       }
     }
-    expect(conditions.length).toBe(1);
+    void CreateDog;
+    expect(opts).toEqual({ if: opts.if, on: "create" });
   });
 
   it("after validation does not mutate the if options array", () => {
-    const conditions = [(_r: any) => true];
-    class Person extends Model {
+    const opts = { if: (_r: any) => true, on: "create" as const };
+    class CreateDog extends Dog {
       static {
-        this.attribute("name", "string");
-        this.afterValidation(() => {}, { if: conditions[0] });
+        this.afterValidation(() => {}, opts);
       }
     }
-    expect(conditions.length).toBe(1);
+    void CreateDog;
+    expect(opts).toEqual({ if: opts.if, on: "create" });
   });
 
   it("before validation and after validation callbacks should be called with proc", () => {
@@ -237,15 +286,8 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   });
 
   it("on condition is respected for validation with matching context", () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, on: "create" });
-      }
-    }
-    const p = new Person();
-    expect(p.isValid()).toBe(true); // no context, skipped
-    expect(p.isValid("create")).toBe(false); // matching context
-    expect(p.isValid("update")).toBe(true); // non-matching context
+    const d = new DogValidatorWithOnCondition();
+    d.isValid("create");
+    expect(d.history).toEqual(["before_validation_marker", "after_validation_marker"]);
   });
 });
