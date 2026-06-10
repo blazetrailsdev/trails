@@ -56,7 +56,10 @@ export interface ConcreteReflection {
   readonly activeRecord: typeof Base;
   readonly pluralName: string;
   readonly className: string;
+  readonly klass: typeof Base;
   readonly type?: string;
+  readonly foreignKey?: string | string[];
+  readonly scope?: ((...args: any[]) => any) | null;
   readonly joinPrimaryKey?: string | string[];
   readonly joinForeignKey?: string | string[];
   readonly parentReflection?: AssociationReflection | ThroughReflection | null;
@@ -833,7 +836,7 @@ export class AssociationReflection extends MacroReflection {
     }
 
     if (this.validInverseReflection(reflection)) {
-      return (reflection as any).name;
+      return asConcrete(reflection as AbstractReflection).name;
     }
     return null;
   }
@@ -844,11 +847,11 @@ export class AssociationReflection extends MacroReflection {
     if (!reflection) return false;
     if ((reflection as AbstractReflection) === this) return false;
 
-    const reflFk = (reflection as any).foreignKey;
+    const reflFk = asConcrete(reflection).foreignKey;
     const thisFk = this.foreignKey;
     if (JSON.stringify(reflFk) !== JSON.stringify(thisFk)) return false;
 
-    const reflActiveRecord = (reflection as any).activeRecord;
+    const reflActiveRecord = asConcrete(reflection).activeRecord;
     if (this.klass !== reflActiveRecord) {
       let proto = Object.getPrototypeOf(this.klass);
       let isSubclass = false;
@@ -869,9 +872,10 @@ export class AssociationReflection extends MacroReflection {
     reflection: AssociationReflection | ThroughReflection,
     inverseReflection = false,
   ): boolean {
-    if ((reflection as any).options?.inverseOf === false) return false;
-    if ((reflection as any).options?.through) return false;
-    if ((reflection as any).options?.foreignKey) return false;
+    const opts = asConcrete(reflection).options;
+    if (opts?.inverseOf === false) return false;
+    if (opts?.through) return false;
+    if (opts?.foreignKey) return false;
     return this.scopeAllowsAutomaticInverseOf(reflection, inverseReflection);
   }
 
@@ -880,11 +884,11 @@ export class AssociationReflection extends MacroReflection {
     inverseReflection: boolean,
   ): boolean {
     if (inverseReflection) {
-      return !(reflection as any).scope;
+      return !asConcrete(reflection).scope;
     }
-    if (!(reflection as any).scope) return true;
+    if (!asConcrete(reflection).scope) return true;
     try {
-      return !!(reflection as any).klass?.automaticScopeInversing;
+      return !!(asConcrete(reflection).klass as any)?.automaticScopeInversing;
     } catch {
       return false;
     }
