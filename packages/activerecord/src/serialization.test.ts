@@ -50,7 +50,7 @@ describe("SerializationTest", () => {
       name: "aaron stack",
       age: 25,
       avatar: "binarydata",
-      created_at: "2006-08-01",
+      created_at: new Date(Date.UTC(2006, 7, 1)),
       awesome: false,
       preferences: { gem: "<strong>ruby</strong>" },
       alternative_id: null,
@@ -108,6 +108,7 @@ describe("SerializationTest", () => {
       klazz.includeRootInJson = false;
       expect(Base.includeRootInJson).toBe(true);
       expect(klazz.includeRootInJson).toBe(false);
+      expect(new klazz().includeRootInJson).toBe(false);
     } finally {
       Base.includeRootInJson = originalRootInJson;
     }

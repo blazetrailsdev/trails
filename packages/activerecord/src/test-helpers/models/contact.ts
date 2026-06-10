@@ -12,8 +12,8 @@ function declareContactColumns(klass: typeof Base): void {
   klass.attribute("id", "integer");
   klass.attribute("name", "string");
   klass.attribute("age", "integer");
-  klass.attribute("avatar", "string");
-  klass.attribute("created_at", "string");
+  klass.attribute("avatar", "binary");
+  klass.attribute("created_at", "datetime");
   klass.attribute("awesome", "boolean");
   klass.attribute("preferences", "string");
   klass.attribute("alternative_id", "integer");
