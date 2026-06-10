@@ -7209,6 +7209,88 @@ describe("bigint aggregates (big_integer columns)", () => {
 // ==========================================================================
 
 // ==========================================================================
+// count + includes join dependency tests (calculations_test.rb)
+// ==========================================================================
+describe("count with includes join dependency", () => {
+  setupHandlerSuite();
+  useHandlerTransactionalFixtures();
+
+  beforeAll(async () => {
+    await defineSchema(
+      {
+        jd_posts: { title: "string" },
+        jd_comments: { jd_post_id: "integer", body: "string" },
+      },
+      { dropExisting: true },
+    );
+  });
+
+  function makeModels() {
+    class JdComment extends Base {
+      static _tableName = "jd_comments";
+      static {
+        this.attribute("jd_post_id", "integer");
+        this.attribute("body", "string");
+      }
+    }
+    class JdPost extends Base {
+      static _tableName = "jd_posts";
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    registerModel(JdComment);
+    registerModel(JdPost);
+    Associations.hasMany.call(JdPost, "jdComments", {
+      foreignKey: "jd_post_id",
+      className: "JdComment",
+    });
+    return { JdPost, JdComment };
+  }
+
+  // Rails: test "count with includes"
+  it("count with includes", async () => {
+    const { JdPost, JdComment } = makeModels();
+    const post = await JdPost.create({ title: "hello" });
+    await JdComment.create({ jd_post_id: post.id, body: "c1" });
+    await JdComment.create({ jd_post_id: post.id, body: "c2" });
+    const sql = JdPost.includes("jdComments").toSql();
+    expect(sql).not.toContain("LEFT OUTER JOIN");
+    // count("*") with includes must route through join dependency
+    const count = await JdPost.includes("jdComments").count("*");
+    // One post — DISTINCT on PK prevents fan-out from two comments
+    expect(count).toBe(1);
+  });
+
+  // Rails: test "count with eager_load"
+  it("count with eager_load", async () => {
+    const { JdPost, JdComment } = makeModels();
+    const post = await JdPost.create({ title: "eager" });
+    await JdComment.create({ jd_post_id: post.id, body: "e1" });
+    await JdComment.create({ jd_post_id: post.id, body: "e2" });
+    const count = await JdPost.eagerLoad("jdComments").count();
+    expect(count).toBe(1);
+  });
+
+  // Rails: test "grouped count with eager_load applies join dependency"
+  it("grouped count with eager_load applies join dependency", async () => {
+    const { JdPost, JdComment } = makeModels();
+    const p1 = await JdPost.create({ title: "x" });
+    const p2 = await JdPost.create({ title: "y" });
+    await JdComment.create({ jd_post_id: p1.id, body: "a" });
+    await JdComment.create({ jd_post_id: p1.id, body: "b" });
+    await JdComment.create({ jd_post_id: p2.id, body: "c" });
+    // group + eagerLoad: each post counted once despite multiple comments
+    const counts = (await JdPost.group("title").eagerLoad("jdComments").count()) as Record<
+      string,
+      number
+    >;
+    expect(counts["x"]).toBe(1);
+    expect(counts["y"]).toBe(1);
+  });
+});
+
+// ==========================================================================
 // lookupCastTypeFromJoinDependencies unit tests
 // ==========================================================================
 describe("lookupCastTypeFromJoinDependencies", () => {

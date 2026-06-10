@@ -401,13 +401,34 @@ export async function performCount(
   if (this._limitValue === 0) return 0;
   if (this._isNone) return this._groupColumns.length > 0 ? {} : 0;
 
+  // Mirrors calculations.rb:231: has_include? check precedes the grouped branch.
+  // When eager-loading with a group, Rails recurses into the grouped calculation on the
+  // joined relation (calculations.rb:454) — groupedAggregate has no hasInclude guard.
+  if (this._groupColumns.length > 0 && hasInclude(this, column ?? null)) {
+    const anyRel = this as any;
+    const eagerSpecs: string[] = (anyRel._eagerLoadAssociations as string[] | undefined) ?? [];
+    const includesSpecs: string[] = (anyRel._includesAssociations as string[] | undefined) ?? [];
+    const promoted: string[] =
+      (anyRel._includesToPromoteFromReferences?.() as string[] | undefined) ?? [];
+    const allEager = [...new Set([...eagerSpecs, ...includesSpecs, ...promoted])];
+    if (allEager.length > 0 && !Array.isArray(this._modelClass.primaryKey)) {
+      const pk = this._modelClass.primaryKey as string;
+      const jd = QueryMethodBangs.constructJoinDependency.call(anyRel, allEager, Nodes.OuterJoin);
+      const jdNodes: Nodes.Join[] = jd.joinConstraints([]);
+      const joinedRel = (this as any).joins(...jdNodes).distinct() as CalculationRelation;
+      // COUNT(DISTINCT pk) per group — "*" is invalid with DISTINCT in SQLite/PG/MySQL
+      return groupedAggregate(
+        joinedRel,
+        "count",
+        column != null && column !== "*" ? column : pk,
+        true,
+      ) as Promise<Record<string, number>>;
+    }
+  }
+
   if (this._groupColumns.length > 0) {
     return groupedAggregate(this, "count", column ?? "*", true) as Promise<Record<string, number>>;
   }
-  // Non-grouped count builds SQL inline (the grouped path delegates to
-  // groupedAggregate, which runs the check itself). Rails count routes through
-  // apply_join_dependency when eager loading, raising EagerLoadPolymorphicError
-  // for polymorphic specs (calculations.rb).
   this._checkEagerLoadable();
 
   // Mirrors Rails calculations.rb: when has_include? is true, apply_join_dependency
@@ -478,7 +499,8 @@ export async function performCount(
           const allIdBinds = [...idFromBinds, ...idSubqueryBinds];
           // Outer count mirrors Rails recursive calculate() call: COUNT(DISTINCT requested_col).
           // JD joins are re-applied so a cross-table column (e.g. "comments.id") is reachable.
-          const colForCount = column ?? pk;
+          // count("*") routes through JD and uses PK — COUNT(DISTINCT *) is invalid.
+          const colForCount = column != null && column !== "*" ? column : pk;
           const countManager = table.project(
             (aggregateColumn(this, colForCount) as any).count(true).as("count"),
           );
@@ -502,7 +524,8 @@ export async function performCount(
           return Number(limitedRows[0]?.count ?? 0);
         }
         // Mirrors Rails recursive calculate() on the JD relation: COUNT(DISTINCT requested_col).
-        const colForCount = column ?? pk;
+        // count("*") routes through JD and uses PK — COUNT(DISTINCT *) is invalid.
+        const colForCount = column != null && column !== "*" ? column : pk;
         const manager = table.project(
           (aggregateColumn(this, colForCount) as any).count(true).as("count"),
         );
@@ -819,9 +842,10 @@ export function hasInclude(rel: CalculationRelation, columnName: string | null):
   // includes_values with references → triggers via references_eager_loaded_tables?
   const promoted = anyRel._includesToPromoteFromReferences?.() as string[] | undefined;
   if (promoted && promoted.length > 0) return true;
-  // Plain includes: only triggers when a non-:all column is specified
+  // Plain includes: triggers when a non-:all column is specified.
+  // Rails excludes only the :all symbol (calculations.rb:94); explicit "*" is not excluded.
   if (anyRel._includesAssociations?.length > 0) {
-    return columnName != null && columnName !== "all" && columnName !== "*";
+    return columnName != null && columnName !== "all";
   }
   return false;
 }
