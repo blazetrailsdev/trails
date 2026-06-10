@@ -18,6 +18,9 @@ import { Notifications } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { Human } from "./test-helpers/models/human.js";
+import { Interest } from "./test-helpers/models/interest.js";
+import { repairValidations } from "./test-helpers/repair-validations.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -75,8 +78,7 @@ const TEST_SCHEMA = {
   n_bird1s: { name: "string", npirate1_id: "integer" },
   n_boat3s: { name: "string" },
   n_comment5s: { body: "string", npost5_id: "integer" },
-  n_human4s: { name: "string" },
-  n_interest4s: { topic: "string", nhuman4_id: "integer" },
+
   n_part3s: { name: "string", nboat3_id: "integer" },
   n_pirate0s: { catchphrase: "string" },
   n_pirate1s: { catchphrase: "string" },
@@ -1394,29 +1396,15 @@ describe("TestNestedAttributesInGeneral", () => {
     expect(birds.length).toBe(1);
   });
   it("should not create duplicates with create with", async () => {
-    class NCWInterest extends Base {
-      static {
-        this._tableName = "n_interest4s";
-        this.attribute("topic", "string");
-        this.attribute("nhuman4_id", "integer");
-      }
-    }
-    class NCWHuman extends Base {
-      static {
-        this._tableName = "n_human4s";
-        this.attribute("name", "string");
-        this.hasMany("ncwInterests", { className: "NCWInterest", foreignKey: "nhuman4_id" });
-      }
-    }
-    acceptsNestedAttributesFor(NCWHuman, "ncwInterests");
-    registerModel(NCWInterest);
-    registerModel(NCWHuman);
+    registerModel(Human);
+    registerModel(Interest);
+    acceptsNestedAttributesFor(Human, "interests");
 
-    const before = Number(await NCWInterest.count());
-    await NCWHuman.createWith({
-      ncwInterestsAttributes: [{ topic: "Pirate king" }],
+    const before = Number(await Interest.count());
+    await Human.createWith({
+      interestsAttributes: [{ topic: "Pirate king" }],
     }).findOrCreateByBang({ name: "Monkey D. Luffy" });
-    expect(Number(await NCWInterest.count()) - before).toBe(1);
+    expect(Number(await Interest.count()) - before).toBe(1);
   });
   it.skip("updating models with cpk provided as strings", () => {
     // BLOCKED: CPK — composite primary keys not supported in test adapter.
@@ -1547,32 +1535,17 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("has many association updating a single record", async () => {
-    class NInterest4 extends Base {
-      static {
-        this.attribute("topic", "string");
-        this.attribute("nhuman4_id", "integer");
-      }
-    }
-    class NHuman4 extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasMany.call(NHuman4, "nInterest4s", {
-      className: "NInterest4",
-      foreignKey: "nhuman4_id",
-    });
-    acceptsNestedAttributesFor(NHuman4, "nInterest4s");
-    registerModel(NInterest4);
-    registerModel(NHuman4);
+    registerModel(Human);
+    registerModel(Interest);
+    acceptsNestedAttributesFor(Human, "interests");
 
-    const human = await NHuman4.create({ name: "John" });
-    const interest = await NInterest4.create({ topic: "photography", nhuman4_id: human.id });
+    const human = await Human.create({ name: "John" });
+    const interest = await Interest.create({ topic: "photography", human_id: human.id });
 
-    assignNestedAttributes(human, "nInterest4s", [{ id: interest.id, topic: "gardening" }]);
+    assignNestedAttributes(human, "interests", [{ id: interest.id, topic: "gardening" }]);
     await human.save();
 
-    const updated = await NInterest4.find(interest.id);
+    const updated = await Interest.find(interest.id);
     expect((updated as any).topic).toBe("gardening");
   });
 });
@@ -2387,43 +2360,22 @@ describe("validate presence of parent works with inverse of", () => {
     await defineSchema(TEST_SCHEMA);
   });
   it("validate presence of parent works with inverse of", async () => {
-    class NVPInterest extends Base {
-      static {
-        this._tableName = "n_interest4s";
-        this.attribute("topic", "string");
-        this.attribute("nhuman4_id", "integer");
-        this.validates("nvpHuman", { presence: true });
-        this.belongsTo("nvpHuman", {
-          className: "NVPHuman",
-          foreignKey: "nhuman4_id",
-          inverseOf: "nvpInterests",
-        });
-      }
-    }
-    class NVPHuman extends Base {
-      static {
-        this._tableName = "n_human4s";
-        this.attribute("name", "string");
-        this.hasMany("nvpInterests", {
-          className: "NVPInterest",
-          foreignKey: "nhuman4_id",
-          inverseOf: "nvpHuman",
-        });
-      }
-    }
-    acceptsNestedAttributesFor(NVPHuman, "nvpInterests");
-    registerModel(NVPInterest);
-    registerModel(NVPHuman);
+    await repairValidations(Interest, async () => {
+      registerModel(Human);
+      registerModel(Interest);
+      acceptsNestedAttributesFor(Human, "interests");
+      Interest.validates("human", { presence: true });
 
-    const beforeH = Number(await NVPHuman.count());
-    const beforeI = Number(await NVPInterest.count());
-    const human = await NVPHuman.createBang({
-      name: "John",
-      nvpInterestsAttributes: [{ topic: "Cars" }, { topic: "Sports" }],
+      const beforeH = Number(await Human.count());
+      const beforeI = Number(await Interest.count());
+      const human = await Human.createBang({
+        name: "John",
+        interestsAttributes: [{ topic: "Cars" }, { topic: "Sports" }],
+      });
+      expect(Number(await Human.count()) - beforeH).toBe(1);
+      expect(Number(await Interest.count()) - beforeI).toBe(2);
+      expect(Number(await (human as any).interests.count())).toBe(2);
     });
-    expect(Number(await NVPHuman.count()) - beforeH).toBe(1);
-    expect(Number(await NVPInterest.count()) - beforeI).toBe(2);
-    expect(Number(await (human as any).nvpInterests.count())).toBe(2);
   });
 });
 

@@ -41,7 +41,7 @@ export class Human extends Base {
     this.hasMany("secretInterests", { className: "Interest", inverseOf: "secretHuman" });
     this.hasOne("mixedCaseMonkey");
 
-    this.attribute("addCallbackCalled", "boolean", { default: false });
+    this.attribute("addCallbackCalled", "boolean", { default: false, virtual: true });
   }
 
   addCalled(_interest: unknown) {
