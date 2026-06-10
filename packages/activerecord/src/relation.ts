@@ -3809,8 +3809,9 @@ export class Relation<T extends Base> {
     const binds = this._lastSelectBinds;
     if (binds.length === 0) return sql;
     // Substitute bind values inline for human-readable output (mirrors Rails to_sql).
+    // Handles both ? (SQLite/MySQL) and $N (PostgreSQL) placeholders.
     let i = 0;
-    return sql.replace(/\?/g, () => {
+    return sql.replace(/\?|\$\d+/g, () => {
       const val = binds[i++];
       if (val === null || val === undefined) return "NULL";
       if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;

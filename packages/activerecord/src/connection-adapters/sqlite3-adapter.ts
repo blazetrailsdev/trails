@@ -583,7 +583,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     _options: ExplainOption[] = [],
   ): Promise<string> {
     const explainStmt = await this.driver.prepare(`EXPLAIN QUERY PLAN ${sql}`);
-    const rows = (await explainStmt.all(binds as SqliteBinds)) as Record<string, unknown>[];
+    const driverBinds = binds.map(sqliteTypeCast) as SqliteBinds;
+    const rows = (await explainStmt.all(driverBinds)) as Record<string, unknown>[];
     return rows.map((r) => `${r.id}|${r.parent}|${r.notused}|${r.detail}`).join("\n");
   }
 

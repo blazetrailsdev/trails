@@ -274,7 +274,14 @@ function applyFromClause(rel: CalculationRelation, sql: string): [string, unknow
     fromExpr = alias ? `${raw} ${_safeAlias(alias)}` : raw;
   } else if (raw instanceof Nodes.Node) {
     // Alias is ignored — callers bake the alias into the node itself (mirrors relation.ts:3561-3565).
-    fromExpr = rel._modelClass.connection.visitor?.compile(raw) ?? raw.toSql();
+    const visitor = rel._modelClass.connection.visitor;
+    if (visitor?.compileWithBinds) {
+      const [nodeSql, nodeRawBinds] = visitor.compileWithBinds(raw) as [string, unknown[]];
+      fromExpr = nodeSql;
+      fromBinds = nodeRawBinds.map(typeCastCalcBind);
+    } else {
+      fromExpr = visitor?.compile(raw) ?? (raw as any).toSql();
+    }
   } else if (raw !== null && typeof (raw as any).toSql === "function") {
     // Relation or other object with toSql() — treat as subquery.
     const rawRelation = raw as any;

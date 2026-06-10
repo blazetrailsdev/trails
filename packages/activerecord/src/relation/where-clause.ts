@@ -102,8 +102,9 @@ export class WhereClause {
     const [sql, rawBinds] = visitor.compileWithBinds(node);
     if (rawBinds.length === 0) return sql;
     // Substitute bind values inline for human-readable inspect output.
+    // Handles both ? (SQLite/MySQL) and $N (PostgreSQL) placeholders.
     let i = 0;
-    return sql.replace(/\?/g, () => {
+    return sql.replace(/\?|\$\d+/g, () => {
       let val: unknown = rawBinds[i++];
       if (val !== null && typeof val === "object" && "valueForDatabase" in val) {
         val = (val as { valueForDatabase: unknown }).valueForDatabase;
