@@ -4915,6 +4915,24 @@ export class Relation<T extends Base> {
     ) as Promise<T>;
   }
 
+  /**
+   * Mirrors: ActiveRecord::TokenFor::RelationMethods#find_by_token_for
+   */
+  async findByTokenFor(purpose: string, token: string): Promise<T | null> {
+    return this.scoping(() =>
+      (this._modelClass as any).findByTokenFor(purpose, token),
+    ) as Promise<T | null>;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::TokenFor::RelationMethods#find_by_token_for!
+   */
+  async findByTokenForBang(purpose: string, token: string): Promise<T> {
+    return this.scoping(() =>
+      (this._modelClass as any).findByTokenForBang(purpose, token),
+    ) as Promise<T>;
+  }
+
   // Memoized per timestamp column, matching Rails' @cache_keys / @cache_versions.
   private _cacheKeys: Map<string, Promise<string>> | undefined;
   private _cacheVersions: Map<string, Promise<string | null>> | undefined;

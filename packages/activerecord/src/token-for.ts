@@ -6,7 +6,19 @@
 
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { getEnv } from "@blazetrails/activesupport";
+import { UnknownPrimaryKey } from "./errors.js";
 import type { Base } from "./base.js";
+
+/** Rails' `find_by_token_for` resolves through `primary_key`, which raises
+ * UnknownPrimaryKey for a table with no primary key. */
+function requirePrimaryKey(modelClass: typeof Base): string | string[] {
+  const pk = modelClass.primaryKey as string | string[] | null | undefined;
+  const present = Array.isArray(pk)
+    ? pk.length > 0 && pk.every((k) => typeof k === "string" && k.length > 0)
+    : typeof pk === "string" && pk.length > 0;
+  if (!present) throw new UnknownPrimaryKey(modelClass);
+  return pk as string | string[];
+}
 
 export { InvalidSignature };
 
@@ -134,7 +146,7 @@ export function generatesTokenFor(
   purpose: string,
   options: {
     expiresIn?: number;
-    generator?: (record: any) => string;
+    generator?: (record: any) => unknown;
   } = {},
 ): void {
   const def = new TokenDefinition(modelClass, purpose, options.expiresIn, options.generator);
@@ -197,8 +209,8 @@ export async function findByTokenFor(
   token: string,
 ): Promise<Base | null> {
   const def = getDefinition(modelClass, purpose);
-  if (!def) return null;
-  const pk = modelClass.primaryKey;
+  if (!def) throw new Error(`Unknown token purpose: ${purpose}`);
+  const pk = requirePrimaryKey(modelClass);
   return def.resolveToken(token, async (id) => {
     if (typeof pk === "string") {
       return modelClass.findBy({ [pk]: id });
@@ -221,6 +233,7 @@ export async function findByTokenForBang(
 ): Promise<Base> {
   const def = getDefinition(modelClass, purpose);
   if (!def) throw new InvalidSignature();
+  requirePrimaryKey(modelClass);
   const result = await def.resolveToken(token, (id) => modelClass.find(id));
   if (!result) throw new InvalidSignature();
   return result;
