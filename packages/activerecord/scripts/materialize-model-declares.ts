@@ -28,7 +28,12 @@ import type { ColumnSpec, TableSchema } from "../src/test-helpers/define-schema.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MODELS_DIR = path.resolve(__dirname, "../src/test-helpers/models");
 
-const PILOT = ["topic.ts", "post.ts", "developer.ts", "author.ts", "comment.ts"];
+// Models proven to materialize typecheck-green. post.ts / author.ts /
+// comment.ts are intentionally NOT here: each hits an unresolved-target,
+// subclass-loader-override, or `_tableName` gap (see tasks story
+// 0014/materialize-declares-rollout) and would write broken declares.
+// Pass them explicitly as args once those gaps are fixed.
+const PILOT = ["topic.ts", "developer.ts"];
 
 type SchemaColumnsByTable = Record<string, Record<string, SchemaColumnValue>>;
 

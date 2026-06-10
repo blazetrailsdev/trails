@@ -332,14 +332,16 @@ function readScopeCall(call: ts.CallExpression): ScopeCall | null {
  */
 function renderScopeParam(p: ts.ParameterDeclaration): string {
   const name = p.name.getText();
+  // Rest params (`...args`) come first: they're never optional, can't
+  // carry a default, and must keep the spread even when annotated — a
+  // typed-annotation-first branch would silently drop the `...`.
+  if (p.dotDotDotToken) return `...${name}: ${p.type ? p.type.getText() : "unknown[]"}`;
   const optional = p.questionToken != null || p.initializer != null ? "?" : "";
   if (p.type) return `${name}${optional}: ${p.type.getText()}`;
-  const inferred = p.initializer ? inferLiteralType(p.initializer) : "unknown";
   // No annotation and no default → an untyped positional param; emit
   // `name: unknown` (no `?`, since it isn't optional).
-  if (!p.initializer && !p.dotDotDotToken) return `${name}: unknown`;
-  if (p.dotDotDotToken) return `...${name}: unknown[]`;
-  return `${name}${optional}: ${inferred}`;
+  if (!p.initializer) return `${name}: unknown`;
+  return `${name}${optional}: ${inferLiteralType(p.initializer)}`;
 }
 
 function inferLiteralType(expr: ts.Expression): string {
