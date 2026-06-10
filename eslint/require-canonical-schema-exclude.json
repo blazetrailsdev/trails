@@ -54,6 +54,7 @@
   "packages/activerecord/src/collection-cache-key.test.ts",
   "packages/activerecord/src/counter-cache.test.ts",
   "packages/activerecord/src/custom-locking.test.ts",
+  "packages/activerecord/src/date.test.ts",
   "packages/activerecord/src/defaults.test.ts",
   "packages/activerecord/src/delegated-type.test.ts",
   "packages/activerecord/src/dup.test.ts",
