@@ -45,7 +45,13 @@ describe("SELECT * column collision in joined relations", () => {
   beforeAll(async () => {
     ({ adapter: adapter } = createSidecarTestAdapter());
     await defineSchema(adapter, {
+      // Bespoke regression tables for the SELECT * id-collision fix: a
+      // self-referential has_many :through whose join table carries its own
+      // `id`. No canonical table models this synthetic shape, so they stay
+      // inline by design.
+      // eslint-disable-next-line blazetrails/require-canonical-schema
       ssj_users: { name: "string" },
+      // eslint-disable-next-line blazetrails/require-canonical-schema
       ssj_friendships: { ssj_user_id: "integer", ssj_friend_id: "integer" },
     });
     SsjUser.adapter = adapter;
