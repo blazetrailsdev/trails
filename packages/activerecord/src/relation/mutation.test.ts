@@ -168,18 +168,21 @@ describe("RelationMutationTest", () => {
   });
 
   it("merge!", () => {
-    // Rails uses the hash form `merge!(select: :foo)`. trails' mergeBang merges a
-    // relation field-by-field, so we merge a relation carrying the select; the
-    // result is identical — select_values become [:foo] — and it returns self.
+    // Rails uses the hash form `merge!(select: :foo)`. trails' HashMerger doesn't
+    // dispatch per-key yet (KNOWN BUG — see story relation-merge-hash-and-proc-
+    // fidelity; it treats every hash key as a WHERE), so we merge an equivalent
+    // relation carrying the select. Same end state (select_values == [:foo]) and
+    // returns self. Restore to the hash form once that story lands.
     const rel = relation();
     expect(rel.mergeBang(Post.select("body"))).toBe(rel);
     expect(rel._selectColumns).toEqual(["body"]);
   });
 
   it("merge with a proc", () => {
-    // Rails: `merge(-> { select(:foo) })` instance-execs the proc in the relation
-    // context. trails' mergeBang invokes a function arg as `fn.call(this)`, so the
-    // proc mutates the relation directly.
+    // Rails: `merge(-> { select(:foo) })` instance-execs the proc. trails' non-bang
+    // `merge(fn)` throws on a function arg (KNOWN BUG — see story relation-merge-
+    // hash-and-proc-fidelity); `mergeBang` does support it via `fn.call(this)`, so
+    // we use that. Restore to `merge(fn)` once that story lands.
     const rel = relation();
     rel.mergeBang(function (this: any) {
       this._selectBang("body");
