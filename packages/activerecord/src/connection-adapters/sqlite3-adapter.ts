@@ -130,6 +130,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return (this._sqlite3SchemaCreation ??= new SQLite3SchemaCreation("sqlite", this));
   }
 
+  /** @internal */
   createTableDefinition(
     name: string,
     options: Record<string, unknown> = {},
@@ -1456,8 +1457,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async tableExists(name: string): Promise<boolean> {
-    // Rails quotes a nil/blank name into a catalog lookup that matches nothing,
-    // so `table_exists?(nil)` is simply false rather than an error.
+    // Rails guards with `if table_name.present?` and returns nil for nil/blank
+    // names (schema_statements.rb:61); we return false for the same observable
+    // `table_exists?(nil)` result rather than dereferencing a null name.
     if (name == null) return false;
     if (name.includes(".")) {
       // Schema-qualified name (e.g. "aux.widgets") — query the attached schema's catalog.
