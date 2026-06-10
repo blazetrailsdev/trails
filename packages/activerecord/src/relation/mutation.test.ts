@@ -1,13 +1,15 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/relation/mutation_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base } from "../index.js";
+import "../index.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
+import { Post } from "../test-helpers/models/post.js";
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
@@ -16,130 +18,101 @@ beforeAll(async () => {
 });
 
 describe("RelationMutationTest", () => {
-  function makeModel() {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    return { Post };
-  }
-
   it("#!", () => {
-    const { Post } = makeModel();
     // cover representative multi-value (where) and single-value (group) query methods via generated SQL
     expect(Post.where({ title: "x" }).toSql()).toContain("WHERE");
     expect(Post.group("title").toSql()).toContain("GROUP");
   });
 
   it("#_select!", () => {
-    const { Post } = makeModel();
     const sql = Post.select("title").toSql();
     expect(sql).toContain("title");
   });
 
   it("#order!", () => {
-    const { Post } = makeModel();
     const sql = Post.order("title").toSql();
     expect(sql).toContain("ORDER");
   });
 
   it("#order! with symbol prepends the table name", () => {
-    const { Post } = makeModel();
     const sql = Post.order("title").toSql();
     expect(sql).toContain("title");
   });
 
   it("#order! on non-string does not attempt regexp match for references", () => {
-    const { Post } = makeModel();
     const sql = Post.order("author").toSql();
     expect(sql).toContain("ORDER");
   });
 
   it("extending!", () => {
-    const { Post } = makeModel();
     const sql = Post.all().toSql();
     expect(sql).toContain("SELECT");
   });
 
   it("extending! with empty args", () => {
-    const { Post } = makeModel();
     const sql = Post.all().toSql();
     expect(sql).toContain("FROM");
   });
 
   it("#from!", () => {
-    const { Post } = makeModel();
     const sql = Post.all().toSql();
     expect(sql).toContain("FROM");
   });
 
   it("#lock!", () => {
-    const { Post } = makeModel();
     const sql = Post.where({ title: "x" }).toSql();
     expect(sql).toContain("WHERE");
   });
 
   it("#reorder!", () => {
-    const { Post } = makeModel();
     const sql = Post.order("title").reorder("author").toSql();
     expect(sql).toContain("author");
   });
 
   it("#reorder! with symbol prepends the table name", () => {
-    const { Post } = makeModel();
     const sql = Post.order("title").reorder("author").toSql();
     expect(sql).toContain("ORDER");
   });
 
   it("reverse_order!", () => {
-    const { Post } = makeModel();
     const sql = Post.order("title").reverseOrder().toSql();
     expect(sql).toContain("DESC");
   });
 
   it("create_with!", () => {
-    const { Post } = makeModel();
     const rel = Post.all().createWith({ author: "default" });
     expect(rel.toSql()).toContain("SELECT");
   });
 
   it("merge!", () => {
-    const { Post } = makeModel();
     const sql = Post.where({ title: "a" })
-      .merge(Post.where({ author: "b" }))
+      .merge(Post.where({ body: "b" }))
       .toSql();
     expect(sql).toContain("WHERE");
   });
 
   it("merge with a proc", () => {
-    const { Post } = makeModel();
     const sql = Post.where({ title: "a" }).toSql();
     expect(sql).toContain("WHERE");
   });
 
   it("none!", async () => {
-    const { Post } = makeModel();
     await Post.create({ title: "x", body: "y" });
     const results = await Post.none().toArray();
     expect(results.length).toBe(0);
   });
 
   it("skip_query_cache!", () => {
-    const { Post } = makeModel();
     const sql = Post.all().toSql();
     expect(sql).toContain("SELECT");
   });
 
   it("skip_preloading!", () => {
-    const { Post } = makeModel();
     const sql = Post.all().toSql();
     expect(sql).toContain("FROM");
   });
 
   it("#regroup!", () => {
-    const { Post } = makeModel();
     const sql = Post.group("title").regroup("author").toSql();
     expect(sql).toContain("GROUP");
   });
@@ -148,20 +121,17 @@ describe("RelationMutationTest", () => {
   // one for MULTI_VALUE_METHODS (above) and one for SINGLE_VALUE_METHODS (here).
   // The duplicate name is intentional — test:compare matches by description count.
   it("#!", () => {
-    const { Post } = makeModel();
     // covers SINGLE_VALUE_METHODS loop — single-value bang methods return the relation
     const rel = Post.limit(5);
     expect(rel.toSql()).toContain("LIMIT");
   });
 
   it("distinct!", () => {
-    const { Post } = makeModel();
     const sql = Post.distinct().toSql();
     expect(sql).toContain("DISTINCT");
   });
 
   it("uniq! deduplicates the named clause array", () => {
-    const { Post } = makeModel();
     const rel = Post.group("title").group("title").group("author");
     expect((rel as any)._groupColumns).toEqual(["title", "title", "author"]);
     (rel as any).uniqBang("group");
@@ -169,19 +139,16 @@ describe("RelationMutationTest", () => {
   });
 
   it("uniq! is a no-op for unknown clause names", () => {
-    const { Post } = makeModel();
     const rel = Post.group("title");
     expect(() => (rel as any).uniqBang("unknown_clause")).not.toThrow();
   });
 
   it("uniq! with no argument is a no-op", () => {
-    const { Post } = makeModel();
     const rel = Post.group("title");
     expect(() => (rel as any).uniqBang()).not.toThrow();
   });
 
   it("order! with empty string does not emit ORDER BY", () => {
-    const { Post } = makeModel();
     // Test the bang method directly — order() delegates to orderBang() on a clone.
     const rel = Post.all();
     (rel as any).orderBang("");
