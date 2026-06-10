@@ -39,6 +39,8 @@ describe("OrderTest", () => {
   });
 
   const ids = async (rel: any): Promise<unknown[]> => (await rel.toArray()).map((b: any) => b.id);
+  const incOrder = (...args: any[]): Promise<unknown[]> =>
+    ids(Book.includes("author").order(...args));
 
   it("order asc", async () => {
     const z = (await Book.create({ name: "Zulu", author: authors("david") })) as any;
@@ -81,57 +83,33 @@ describe("OrderTest", () => {
 
     const authorThenBookName = [x.id, z.id, y.id];
 
-    expect(
-      await ids(
-        Book.includes("author").order({ authors: { name: "asc" }, books: { name: "asc" } }),
-      ),
-    ).toEqual(authorThenBookName);
-    expect(
-      await ids(Book.includes("author").order("authors.name", { books: { name: "asc" } })),
-    ).toEqual(authorThenBookName);
-    expect(await ids(Book.includes("author").order("authors.name", "books.name"))).toEqual(
+    expect(await incOrder({ authors: { name: "asc" }, books: { name: "asc" } })).toEqual(
       authorThenBookName,
     );
-    expect(
-      await ids(
-        Book.includes("author").order({ authors: { name: "asc" } }, Book.arelTable.get("name")),
-      ),
-    ).toEqual(authorThenBookName);
-    expect(
-      await ids(
-        Book.includes("author").order(Author.arelTable.get("name"), Book.arelTable.get("name")),
-      ),
-    ).toEqual(authorThenBookName);
+    expect(await incOrder("authors.name", { books: { name: "asc" } })).toEqual(authorThenBookName);
+    expect(await incOrder("authors.name", "books.name")).toEqual(authorThenBookName);
+    expect(await incOrder({ authors: { name: "asc" } }, Book.arelTable.get("name"))).toEqual(
+      authorThenBookName,
+    );
+    expect(await incOrder(Author.arelTable.get("name"), Book.arelTable.get("name"))).toEqual(
+      authorThenBookName,
+    );
 
     const authorDescThenBookName = [y.id, x.id, z.id];
 
-    expect(
-      await ids(
-        Book.includes("author").order({ authors: { name: "desc" }, books: { name: "asc" } }),
-      ),
-    ).toEqual(authorDescThenBookName);
-    expect(
-      await ids(Book.includes("author").order("authors.name desc", { books: { name: "asc" } })),
-    ).toEqual(authorDescThenBookName);
-    expect(
-      await ids(
-        Book.includes("author").order(Author.arelTable.get("name").desc(), {
-          books: { name: "asc" },
-        }),
-      ),
-    ).toEqual(authorDescThenBookName);
-    expect(await ids(Book.includes("author").order({ authors: { name: "desc" } }, "name"))).toEqual(
+    expect(await incOrder({ authors: { name: "desc" }, books: { name: "asc" } })).toEqual(
       authorDescThenBookName,
     );
+    expect(await incOrder("authors.name desc", { books: { name: "asc" } })).toEqual(
+      authorDescThenBookName,
+    );
+    expect(await incOrder(Author.arelTable.get("name").desc(), { books: { name: "asc" } })).toEqual(
+      authorDescThenBookName,
+    );
+    expect(await incOrder({ authors: { name: "desc" } }, "name")).toEqual(authorDescThenBookName);
   });
 
-  // BLOCKED: ordering by the aliased association table ("author" rather than
-  // the real "authors") requires the eager-load JoinDependency to alias the
-  // belongs_to join to the singular association name. Our eager_load joins the
-  // table under its real name ("authors"), so `author.name` is "no such
-  // column". Un-skip once JoinDependency aliases single joins to the
-  // association name. (`order with association` — un-aliased — passes.)
-  it.skip("order with association alias", async () => {
+  it("order with association alias", async () => {
     const z = (await Book.create({ name: "Zulu", author: authors("david") })) as any;
     const y = (await Book.create({ name: "Yankee", author: authors("mary") })) as any;
     const x = (await Book.create({ name: "X-Ray", author: authors("david") })) as any;
@@ -140,34 +118,22 @@ describe("OrderTest", () => {
 
     const authorThenBookName = [x.id, z.id, y.id];
 
-    expect(
-      await ids(Book.includes("author").order({ author: { name: "asc" }, books: { name: "asc" } })),
-    ).toEqual(authorThenBookName);
-    expect(
-      await ids(Book.includes("author").order("author.name", { books: { name: "asc" } })),
-    ).toEqual(authorThenBookName);
-    expect(await ids(Book.includes("author").order({ author: { name: "asc" } }, "name"))).toEqual(
+    expect(await incOrder({ author: { name: "asc" }, books: { name: "asc" } })).toEqual(
       authorThenBookName,
     );
-    expect(await ids(Book.includes("author").order(authorName, "name"))).toEqual(
-      authorThenBookName,
-    );
+    expect(await incOrder("author.name", { books: { name: "asc" } })).toEqual(authorThenBookName);
+    expect(await incOrder({ author: { name: "asc" } }, "name")).toEqual(authorThenBookName);
+    expect(await incOrder(authorName, "name")).toEqual(authorThenBookName);
 
     const authorDescThenBookName = [y.id, x.id, z.id];
 
-    expect(
-      await ids(
-        Book.includes("author").order({ author: { name: "desc" }, books: { name: "asc" } }),
-      ),
-    ).toEqual(authorDescThenBookName);
-    expect(
-      await ids(Book.includes("author").order("author.name desc", { books: { name: "asc" } })),
-    ).toEqual(authorDescThenBookName);
-    expect(await ids(Book.includes("author").order({ author: { name: "desc" } }, "name"))).toEqual(
+    expect(await incOrder({ author: { name: "desc" }, books: { name: "asc" } })).toEqual(
       authorDescThenBookName,
     );
-    expect(await ids(Book.includes("author").order(authorName.desc(), "name"))).toEqual(
+    expect(await incOrder("author.name desc", { books: { name: "asc" } })).toEqual(
       authorDescThenBookName,
     );
+    expect(await incOrder({ author: { name: "desc" } }, "name")).toEqual(authorDescThenBookName);
+    expect(await incOrder(authorName.desc(), "name")).toEqual(authorDescThenBookName);
   });
 });

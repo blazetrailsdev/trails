@@ -2448,6 +2448,7 @@ export class Relation<T extends Base> {
     }
 
     const jd = new JoinDependency(this._modelClass);
+    jd.setReferences(this._referencesValues);
 
     const fallbackAssocs = this._addEagerSpecsToJoinDependency(jd, eagerAssociations);
 
@@ -3957,6 +3958,7 @@ export class Relation<T extends Base> {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
 
     const jd = new JoinDependency(this._modelClass);
+    jd.setReferences(this._referencesValues);
     this._addEagerSpecsToJoinDependency(jd, allEager);
     if (jd.nodes.length === 0) return null;
 
