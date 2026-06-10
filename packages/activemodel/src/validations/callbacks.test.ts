@@ -220,8 +220,12 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   });
 
   it("before validation does not mutate the if options array", () => {
-    // Rails: `before_validation(if: opts, on: :create)` must not mutate the
-    // caller's options — the on→if translation builds a fresh conditions object.
+    // Rails guards that registering with `if:` + `on:` doesn't mutate the
+    // caller's options (old Rails appended the on-predicate into the `:if`
+    // array). trails' `CallbackConditions.if` is a single callable, not a
+    // Rails-style array of conditions, so there is no array to append to; the
+    // faithful analogue is asserting the passed options object is untouched —
+    // the on→if translation builds a fresh conditions object instead.
     const opts = { if: (_r: any) => true, on: "create" as const };
     class CreateDog extends Dog {
       static {
