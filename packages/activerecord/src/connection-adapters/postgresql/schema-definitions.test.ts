@@ -261,7 +261,11 @@ describe("TableDefinition#toSql", () => {
     expect(sql).toContain("AS SELECT");
   });
 
-  it("emits PG-specific long-tail column SQL types verbatim from pgColumn helpers", () => {
+  it("emits PG-specific long-tail column SQL types verbatim from pgColumn helpers (no-adapter fallback)", () => {
+    // No adapter provided → PgSchemaCreation falls back to abstract typeToSql,
+    // whose default branch uppercases bare keywords. In production with a real
+    // PostgreSQLAdapter, typeToSql("cidr") returns "cidr" (lowercase) via
+    // NATIVE_DATABASE_TYPES. Both are valid SQL; DBs fold type-name case.
     const td = new TableDefinition("widgets", { id: false });
     td.cidr("net");
     td.inet("addr");
@@ -276,23 +280,43 @@ describe("TableDefinition#toSql", () => {
     td.oid("oid_col");
     td.tsrange("during");
     const sql = td.toSql();
-    // pgColumn helpers now pass a semantic column type (e.g. "cidr", "inet")
-    // and leave sqlType unset. TableDefinition#toSql's default branch emits
-    // the column type verbatim, which matches Rails' NATIVE_DATABASE_TYPES
-    // lowercase names. bit / bitVarying still set sqlType explicitly because
-    // they carry a (limit) suffix that the native map doesn't express.
+    expect(sql).toContain('"net" CIDR');
+    expect(sql).toContain('"addr" INET');
+    expect(sql).toContain('"props" HSTORE');
+    expect(sql).toContain('"mac" MACADDR');
+    expect(sql).toContain('"path" LTREE');
+    expect(sql).toContain('"doc" TSVECTOR');
+    expect(sql).toContain('"payload" XML');
+    expect(sql).toContain('"flags" BIT(8)');
+    expect(sql).toContain('"flex" BIT VARYING(16)');
+    expect(sql).toContain('"price" MONEY');
+    expect(sql).toContain('"oid_col" OID');
+    expect(sql).toContain('"during" TSRANGE');
+  });
+
+  it("emits PG-specific long-tail column SQL types lowercase when adapter provides typeToSql", () => {
+    // Stub adapter mirrors PostgreSQLAdapter.NATIVE_DATABASE_TYPES lowercase
+    // output — verifies that the visitor delegates to the adapter's typeToSql.
+    const stubAdapter = {
+      quoteIdentifier: (s: string) => `"${s}"`,
+      quoteTableName: (s: string) => `"${s}"`,
+      quoteDefaultExpression: (v: unknown) => ` DEFAULT ${String(v)}`,
+      typeToSql: (type: string) => type, // returns lowercase verbatim (mirrors PG native types)
+    };
+    const td = new TableDefinition("widgets", { id: false, adapter: stubAdapter as any });
+    td.cidr("net");
+    td.inet("addr");
+    td.hstore("props");
+    td.macaddr("mac");
+    td.tsvector("doc");
+    td.money("price");
+    const sql = td.toSql();
     expect(sql).toContain('"net" cidr');
     expect(sql).toContain('"addr" inet');
     expect(sql).toContain('"props" hstore');
     expect(sql).toContain('"mac" macaddr');
-    expect(sql).toContain('"path" ltree');
     expect(sql).toContain('"doc" tsvector');
-    expect(sql).toContain('"payload" xml');
-    expect(sql).toContain('"flags" BIT(8)');
-    expect(sql).toContain('"flex" BIT VARYING(16)');
     expect(sql).toContain('"price" money');
-    expect(sql).toContain('"oid_col" oid');
-    expect(sql).toContain('"during" tsrange');
   });
 
   it("handles default values containing doubled single-quotes without mis-parsing", () => {
