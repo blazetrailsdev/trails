@@ -35,6 +35,13 @@ const { books } = useFixtures({ books: [Book, bookFixtureData] }, () => Base.con
 
 const FORMATS = ["json"] as const;
 
+// Mirrors Rails' `public_send("to_#{format}")` / `from_#{format}` dispatch.
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const toFormat = (record: Contact, format: string, opts?: unknown) =>
+  (record as unknown as Record<string, (o?: unknown) => string>)[`to${cap(format)}`](opts);
+const fromFormat = (record: Contact, format: string, serialized: string) =>
+  (record as unknown as Record<string, (s: string) => Contact>)[`from${cap(format)}`](serialized);
+
 describe("SerializationTest", () => {
   let contactAttributes: Record<string, unknown>;
 
@@ -57,34 +64,35 @@ describe("SerializationTest", () => {
 
   it("serialize should be reversible", () => {
     for (const format of FORMATS) {
-      const serialized = new Contact().toJson();
-      const contact = new Contact().fromJson(serialized);
+      const serialized = toFormat(new Contact(), format);
+      const contact = fromFormat(new Contact(), format, serialized);
 
       expect(Object.keys(contact.attributes).map(String).sort()).toEqual(
         Object.keys(contactAttributes).map(String).sort(),
       );
-      void format;
     }
   });
 
   it("serialize should allow attribute only filtering", () => {
     for (const format of FORMATS) {
-      const serialized = new Contact(contactAttributes).toJson({ only: ["age", "name"] });
-      const contact = new Contact().fromJson(serialized);
+      const serialized = toFormat(new Contact(contactAttributes), format, {
+        only: ["age", "name"],
+      });
+      const contact = fromFormat(new Contact(), format, serialized);
       expect(contact.name).toBe(contactAttributes.name);
       expect(contact.avatar).toBeNull();
-      void format;
     }
   });
 
   it("serialize should allow attribute except filtering", () => {
     for (const format of FORMATS) {
-      const serialized = new Contact(contactAttributes).toJson({ except: ["age", "name"] });
-      const contact = new Contact().fromJson(serialized);
+      const serialized = toFormat(new Contact(contactAttributes), format, {
+        except: ["age", "name"],
+      });
+      const contact = fromFormat(new Contact(), format, serialized);
       expect(contact.name).toBeNull();
       expect(contact.age).toBeNull();
       expect(contact.awesome).toBe(contactAttributes.awesome);
-      void format;
     }
   });
 
@@ -134,7 +142,9 @@ describe("SerializationTest", () => {
     // `title` is `serialize`-wrapped (JSON coder), so the stored value is the
     // coder's encoded form. Assign/query the pre-serialized string so the
     // persisted value and the join predicate compare equal.
-    await (author as any).serializedPosts.create({ title: JSON.stringify("Hello") });
+    await (
+      author as unknown as { serializedPosts: { create(attrs: object): Promise<unknown> } }
+    ).serializedPosts.create({ title: JSON.stringify("Hello") });
 
     const results = await Author.joins("serializedPosts")
       .where({ name: "David", serialized_posts: { title: JSON.stringify("Hello") } })
