@@ -3629,7 +3629,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         } else if (["datetime", "timestamp", "time", "interval"].includes(type)) {
           if (precision != null) {
             if (precision < 0 || precision > 6)
-              throw new Error(
+              throw new ArgumentError(
                 `No ${baseName} type has precision of ${precision}. The allowed range of precision is from 0 to 6`,
               );
             sql += `(${precision})`;
