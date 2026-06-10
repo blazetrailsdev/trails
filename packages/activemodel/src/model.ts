@@ -1433,15 +1433,7 @@ export class Model {
     return this._attributes.getAttribute(resolved).valueBeforeTypeCast ?? null;
   }
 
-  /**
-   * Instance reader for the class-level `includeRootInJson` flag.
-   *
-   * Mirrors: ActiveModel::Serializers::JSON's
-   * `class_attribute :include_root_in_json, instance_writer: false` — the
-   * default `instance_reader: true` exposes the per-class value on instances
-   * (`record.include_root_in_json`), resolving through the record's own class
-   * so a subclass override is reflected.
-   */
+  /** Mirrors ActiveModel::Serializers::JSON `class_attribute :include_root_in_json` instance reader. */
   get includeRootInJson(): boolean | string {
     return (this.constructor as typeof Model).includeRootInJson;
   }
