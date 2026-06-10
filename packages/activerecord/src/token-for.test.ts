@@ -13,7 +13,6 @@ import { travel, travelBack } from "@blazetrails/activesupport";
 import { generatesTokenFor, setTokenForSecret } from "./token-for.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 
 // Rails: class User < ::User { generates_token_for :lookup; … }
@@ -34,8 +33,13 @@ class TokenUser extends User {
 const DAY = 24 * 60 * 60 * 1000;
 
 describe("TokenForTest", () => {
+  // NOT useHandlerTransactionalFixtures(): these tests `destroy` the user, and a
+  // model destroy opens its own transaction. On PostgreSQL, nesting that destroy
+  // transaction inside the per-test fixtures transaction double-starts the
+  // transaction instrumenter (InstrumentationAlreadyStartedError). Cleaning up
+  // with deleteAll in afterEach (the signed-id.test.ts pattern) keeps the shared
+  // `users` table isolated without an enclosing transaction.
   setupHandlerSuite();
-  useHandlerTransactionalFixtures();
   beforeAll(async () => {
     await defineSchema({
       users: TEST_SCHEMA.users,
@@ -61,9 +65,11 @@ describe("TokenForTest", () => {
     passwordResetToken = (user as any).generateTokenFor("password_reset");
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     travelBack();
     setTokenForSecret(null);
+    await TokenUser.deleteAll();
+    await CpkBook.deleteAll();
   });
 
   it("finds record by token", async () => {
