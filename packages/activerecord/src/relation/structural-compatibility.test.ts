@@ -1,101 +1,43 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/relation/structural_compatibility_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base } from "../index.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({
-    posts: { title: "string", score: "integer" },
-    users: { name: "string" },
-  });
-});
-// ==========================================================================
-// StructuralCompatibilityTest — targets relation/structural_compatibility_test.rb
-// ==========================================================================
-describe("StructuralCompatibilityTest", () => {
-  it("structurally compatible returns true for same model", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const r1 = Post.where({ title: "a" });
-    const r2 = Post.where({ title: "b" });
-    expect(r1.structurallyCompatible(r2)).toBe(true);
-  });
-});
+import { describe, it, expect } from "vitest";
+import "../index.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Post } from "../test-helpers/models/post.js";
 
 describe("StructuralCompatibilityTest", () => {
-  function makeModel() {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("score", "integer");
-      }
-    }
-    return { Post };
-  }
+  // Mirrors Rails `fixtures :posts`.
+  useHandlerFixtures(["posts"], { schema: canonicalSchema });
 
-  it("compatible values", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a", score: 1 });
-    const r = Post.where({ title: "a" }).or(Post.where({ title: "b" }));
-    expect(r.toSql()).toContain("OR");
+  it("compatible values", () => {
+    const left = Post.where({ id: 1 });
+    const right = Post.where({ id: 2 });
+
+    expect(left.structurallyCompatible(right)).toBe(true);
   });
 
   it("incompatible single value relations", () => {
-    const { Post } = makeModel();
-    const r = Post.where({ title: "a" }).or(Post.where({ score: 1 }));
-    expect(r.toSql()).toContain("OR");
+    const left = Post.distinct().where("id = 1");
+    const right = Post.where({ id: [2, 3] });
+
+    expect(left.structurallyCompatible(right)).toBe(false);
   });
 
   it("incompatible multi value relations", () => {
-    const { Post } = makeModel();
-    const sql = Post.where({ title: "a" }).where({ score: 1 }).toSql();
-    expect(sql).toContain("WHERE");
+    const left = Post.order("body asc").where("id = 1");
+    const right = Post.order("id desc").where({ id: [2, 3] });
+
+    expect(left.structurallyCompatible(right)).toBe(false);
   });
 
   it("incompatible unscope", () => {
-    const { Post } = makeModel();
-    const sql = Post.where({ title: "a" })
-      .or(Post.where({ title: "b" }))
-      .toSql();
-    expect(sql).toContain("OR");
-  });
-});
+    const left = Post.order("body asc").where("id = 1").unscope("order");
+    const right = Post.order("body asc").where("id = 2");
 
-describe("structurallyCompatible", () => {
-  it("returns true for relations of the same model", () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-
-    const r1 = User.all().where({ id: 1 });
-    const r2 = User.all().where({ id: 2 });
-    expect(r1.structurallyCompatible(r2)).toBe(true);
-  });
-
-  it("returns false for relations of different models", () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-
-    class Post extends Base {
-      static _tableName = "posts";
-    }
-    Post.attribute("id", "integer");
-
-    const r1 = User.all().where({ id: 1 });
-    const r2 = Post.all().where({ id: 2 });
-    expect(r1.structurallyCompatible(r2 as any)).toBe(false);
+    expect(left.structurallyCompatible(right)).toBe(false);
   });
 });
