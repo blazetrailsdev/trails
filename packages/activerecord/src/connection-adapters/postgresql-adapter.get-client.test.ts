@@ -1,11 +1,17 @@
 /**
- * PostgreSQLAdapter#withClient — single persistent connection.
+ * PostgreSQLAdapter#getClient — single persistent connection.
  *
  * After the dual-pool collapse the adapter owns one pg.Client for its
- * lifetime. Every withClient caller — inside or outside a transaction,
+ * lifetime. Every getClient() caller — inside or outside a transaction,
  * sequential or under Promise.all — uses the same connection; pg.Client
  * serializes concurrent query() calls on its socket, so a logical TX
  * can no longer fan across multiple sockets (root cause of #2253).
+ *
+ * Connection-error recovery is no longer a getClient() concern: callers
+ * route through withRawConnection, whose retry loop drives reconnectBang →
+ * the PG reconnect() override → lazy getClient() re-acquire. That recovery
+ * is asserted by the unskipped Rails mirrors (adapter.test.ts +
+ * adapters/postgresql/postgresql-adapter.test.ts reconnect cluster).
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -15,14 +21,14 @@ interface PrivatePgAdapter {
   _rawConnection: unknown;
   _client: unknown;
   _inFlightReset: Promise<void> | null;
-  withClient: <T>(fn: (client: unknown) => Promise<T>) => Promise<T>;
+  getClient: () => Promise<unknown>;
   _acquireFreshClient: () => Promise<unknown>;
   reconnect: () => void;
   resetBang: () => void;
   close: () => Promise<void>;
 }
 
-describe("PostgreSQLAdapter#withClient (single persistent connection)", () => {
+describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
   let adapter: PrivatePgAdapter;
 
   afterEach(async () => {
@@ -37,21 +43,13 @@ describe("PostgreSQLAdapter#withClient (single persistent connection)", () => {
       query: async () => ({ rows: [], fields: [] }),
     };
     // Pretend the lazy acquire has already opened the connection so the
-    // test exercises withClient without touching the real network.
+    // test exercises getClient without touching the real network.
     adapter._rawConnection = persistentClient;
     vi.spyOn(adapter, "_acquireFreshClient").mockResolvedValue(persistentClient);
 
-    const seen: unknown[] = [];
-    const work = Array.from({ length: 11 }, (_, i) =>
-      adapter.withClient(async (client) => {
-        await Promise.resolve();
-        seen.push(client);
-        return i;
-      }),
-    );
-    const results = await Promise.all(work);
+    const work = Array.from({ length: 11 }, () => adapter.getClient());
+    const seen = await Promise.all(work);
 
-    expect(results).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(seen).toHaveLength(11);
     for (const c of seen) expect(c).toBe(persistentClient);
   });
@@ -64,13 +62,11 @@ describe("PostgreSQLAdapter#withClient (single persistent connection)", () => {
 
     // No TX active.
     adapter._client = null;
-    let observed = await adapter.withClient(async (client) => client);
-    expect(observed).toBe(persistentClient);
+    expect(await adapter.getClient()).toBe(persistentClient);
 
     // TX active — _client points at the same persistent client.
     adapter._client = persistentClient;
-    observed = await adapter.withClient(async (client) => client);
-    expect(observed).toBe(persistentClient);
+    expect(await adapter.getClient()).toBe(persistentClient);
   });
 
   it("resetBang barrier: real _acquireFreshClient waits until DISCARD ALL resolves", async () => {
@@ -128,58 +124,6 @@ describe("PostgreSQLAdapter#withClient (single persistent connection)", () => {
     expect(order).toEqual(["discard-start", "discard-end", "acquire-done"]);
     // Barrier is cleared after reset completes.
     expect(adapter._inFlightReset).toBeNull();
-  });
-
-  it("calls reconnect() and rethrows when the callback throws a connection error", async () => {
-    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
-
-    const persistentClient = { query: async () => ({ rows: [], fields: [] }) };
-    adapter._rawConnection = persistentClient;
-    vi.spyOn(adapter, "_acquireFreshClient").mockResolvedValue(persistentClient);
-
-    const connErr = Object.assign(new Error("Connection terminated unexpectedly"), {
-      code: "08006",
-    });
-
-    let reconnectCalled = false;
-    vi.spyOn(adapter as unknown as { reconnect: () => void }, "reconnect").mockImplementation(
-      () => {
-        reconnectCalled = true;
-        adapter._rawConnection = null;
-      },
-    );
-
-    await expect(
-      adapter.withClient(async () => {
-        throw connErr;
-      }),
-    ).rejects.toThrow(connErr);
-    expect(reconnectCalled).toBe(true);
-    expect(adapter._rawConnection).toBeNull();
-  });
-
-  it("does not call reconnect() for non-connection errors", async () => {
-    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
-
-    const persistentClient = { query: async () => ({ rows: [], fields: [] }) };
-    adapter._rawConnection = persistentClient;
-    vi.spyOn(adapter, "_acquireFreshClient").mockResolvedValue(persistentClient);
-
-    let reconnectCalled = false;
-    vi.spyOn(adapter as unknown as { reconnect: () => void }, "reconnect").mockImplementation(
-      () => {
-        reconnectCalled = true;
-      },
-    );
-
-    const appErr = new Error("some query error");
-    await expect(
-      adapter.withClient(async () => {
-        throw appErr;
-      }),
-    ).rejects.toThrow(appErr);
-    expect(reconnectCalled).toBe(false);
-    expect(adapter._rawConnection).toBe(persistentClient);
   });
 
   it("serializes the initial connect so concurrent callers share one pg.Client", async () => {

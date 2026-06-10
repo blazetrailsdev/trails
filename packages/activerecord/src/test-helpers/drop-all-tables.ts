@@ -42,9 +42,10 @@ async function dropAllPgTables(adapter: DatabaseAdapter): Promise<void> {
   try {
     await _dropAllPgTablesOnce(adapter);
   } catch (e) {
-    // withClient() already called reconnect() on the adapter when it caught
-    // the connection error, so _rawConnection is now null and the next
-    // _acquireFreshClient() will open a fresh pg.Client. Retry exactly once.
+    // exec() routes through withRawConnection, whose retry loop calls
+    // reconnectBang → the PG reconnect() override on a connection error, so
+    // _rawConnection is now null and the next _acquireFreshClient() will open a
+    // fresh pg.Client. Retry exactly once.
     if (_isPgConnectionError(e)) {
       await _dropAllPgTablesOnce(adapter);
     } else {
