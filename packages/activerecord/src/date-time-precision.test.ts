@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instantToS } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -7,7 +7,6 @@ import type { DatabaseAdapter } from "./adapter.js";
 import { createTestAdapter } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
 
 function nsec(v: Temporal.Instant): number {
   let ns = v.epochNanoseconds % 1_000_000_000n;
@@ -15,21 +14,20 @@ function nsec(v: Temporal.Instant): number {
   return Number(ns);
 }
 
-// See time-precision.test.ts — placeholder schema; tests recreate `foos` per-test
-// with the precision under test via `ctx.createTable("foos", { force: true }, ...)`.
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, { foos: { name: "string" } });
-  return adapter;
-}
-
 describe("DateTimePrecisionTest", () => {
   let adapter: DatabaseAdapter;
   let ctx: MigrationContext;
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  // Rails: `foos` is not a schema.rb fixture table — each test builds it with
+  // `create_table(:foos, force: true)` for the precision under test and the
+  // `teardown` drops it (`drop_table :foos, if_exists: true`). Mirror that
+  // here rather than seeding a placeholder into the canonical schema.
+  beforeEach(() => {
+    adapter = createTestAdapter();
     ctx = new MigrationContext(adapter);
+  });
+  afterEach(async () => {
+    await ctx.dropTable("foos", { ifExists: true });
   });
   function makeFoo() {
     class Foo extends Base {

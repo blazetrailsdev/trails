@@ -5,17 +5,30 @@
  * JSON.stringify, where) with big_integer attributes. Runs on SQLite3
  * by default (no DB); runs on PG/MySQL when *_TEST_URL env vars are set.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
+import { MigrationContext } from "./migration.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
 const BIG = 2n ** 62n; // 4611686018427387904 — above Number.MAX_SAFE_INTEGER
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
+
+// `metrics` is a trails-only scratch table (no Rails counterpart). Build it via
+// the migration API and drop it afterward rather than seeding it into the
+// canonical schema, which mirrors only Rails' schema.rb fixture tables.
+function migrationCtx(): MigrationContext {
+  return new MigrationContext(Base.connection);
+}
 beforeAll(async () => {
-  await defineSchema({ metrics: { score: "big_integer", label: "string" } });
+  await migrationCtx().createTable("metrics", { force: true }, (t) => {
+    t.bigint("score");
+    t.string("label");
+  });
+});
+afterAll(async () => {
+  await migrationCtx().dropTable("metrics", { ifExists: true });
 });
 describe("bigint model round-trip (all adapters)", () => {
   function makeModel() {
