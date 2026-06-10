@@ -21,7 +21,10 @@ import type {
   SchemaStatementsLike,
 } from "../abstract/schema-definitions.js";
 import type { SchemaQuoter } from "../abstract/assert-schema-adapter.js";
-import { SchemaCreation as PgSchemaCreation } from "./schema-creation.js";
+import {
+  SchemaCreation as PgSchemaCreation,
+  type PgSchemaCreationHost,
+} from "./schema-creation.js";
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace PostgreSQL {
@@ -242,7 +245,9 @@ export class TableDefinition extends AbstractTableDefinition {
   }
 
   override toSql(): string {
-    return new PgSchemaCreation(this._adapter as any).accept(this);
+    const adapter: PgSchemaCreationHost | undefined =
+      "typeToSql" in this._adapter ? (this._adapter as PgSchemaCreationHost) : undefined;
+    return new PgSchemaCreation(adapter).accept(this);
   }
 
   bigserial(name: string, options: ColumnOptions = {}): this {

@@ -89,9 +89,10 @@ export class SchemaCreation extends AbstractSchemaCreation {
     }
     // Delegate to the adapter's typeToSql when available (Rails parity:
     // `delegate :type_to_sql, to: :@conn`). Fall back to the abstract
-    // implementation when no real adapter is present (e.g. unit-test context).
-    if (typeof (this.adapter as any).typeToSql === "function") {
-      return (this.adapter as any).typeToSql(type as string, options as Record<string, unknown>);
+    // implementation when no real adapter is present (e.g. unit-test context
+    // where only the minimal SchemaQuoter shim is wired).
+    if (typeof this.adapter.typeToSql === "function") {
+      return this.adapter.typeToSql(type as string, options as Record<string, unknown>);
     }
     return super.typeToSql(type, options);
   }
@@ -330,7 +331,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected override tableConstraintStatements(o: AbstractTableDefinition): string[] {
-    if ((o as any).as) return [];
+    if ((o as { as?: unknown }).as) return [];
     const pg = o as PgTableDef;
     const result: string[] = [];
     for (const exc of pg.exclusionConstraints ?? []) {
