@@ -44,13 +44,13 @@ export class PostgreSQL extends ToSql {
     node: Nodes.DistinctOn,
     collector: SQLString,
   ): SQLString {
-    collector.append("DISTINCT ON (");
+    collector.append("DISTINCT ON ( ");
     if (node.expr instanceof Node) {
       this.visit(node.expr, collector);
     } else if (node.expr !== null) {
       collector.append(String(node.expr));
     }
-    collector.append(")");
+    collector.append(" )");
     return collector;
   }
 
