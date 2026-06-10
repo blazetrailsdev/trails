@@ -35,7 +35,7 @@ describe("PostgresTest", () => {
     it("should handle nil", () => {
       const visitor = new Visitors.ToSql();
       const node = users.get("name").isDistinctFrom(null);
-      expect(visitor.compile(node)).toContain("IS DISTINCT FROM");
+      expect(visitor.compile(node)).toContain("IS NOT NULL");
     });
 
     it("should handle column names on both sides", () => {
@@ -146,11 +146,10 @@ describe("PostgresTest", () => {
       const d = new Date("2020-01-02T12:00:00.000Z");
       const node = users.get("created_at").eq(new Nodes.Quoted(d));
       const [sql, binds] = visitor.compileWithBinds(node);
-      expect(sql).toContain("$1");
-      expect(sql).not.toContain("?");
-      expect(sql).not.toContain("2020-01-02");
-      expect(binds).toHaveLength(1);
-      expect(binds[0]).toBe(d);
+      // Quoted(Date) inlines as a literal — only BindParam/ActiveModel::Attribute produce $N.
+      expect(sql).toContain("2020-01-02");
+      expect(sql).not.toContain("$1");
+      expect(binds).toHaveLength(0);
     });
   });
 

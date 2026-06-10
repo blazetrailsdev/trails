@@ -55,7 +55,7 @@ describe("MysqlTest", () => {
     it("should handle nil", () => {
       const visitor = new Visitors.ToSql();
       const node = users.get("name").isDistinctFrom(null);
-      expect(visitor.compile(node)).toContain("IS DISTINCT FROM");
+      expect(visitor.compile(node)).toContain("IS NOT NULL");
     });
   });
 

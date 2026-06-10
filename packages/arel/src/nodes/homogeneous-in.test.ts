@@ -7,6 +7,7 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
   it("in", () => {
     const node = users.get("id").in([1, 2, 3]);
     const sql = new Visitors.ToSql().compile(node);
+    // attr.in([...]) creates an In node with Quoted values — inlined like Rails.
     expect(sql).toBe('"users"."id" IN (1, 2, 3)');
   });
 

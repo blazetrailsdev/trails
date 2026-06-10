@@ -272,10 +272,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       row_count: 0,
       transaction: txPublic.isOpen() ? txPublic : null,
     };
+    // Type-cast binds to driver-compatible primitives. Phase 2 threads
+    // bind values through the visitor rather than inlining them, so the
+    // `execute` path now receives non-empty bind arrays where it received
+    // empty ones before.
+    const driverBinds = binds.map(sqliteTypeCast) as SqliteBinds;
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         const stmt = await this._cachedStatement(sql);
-        const rows = (await stmt.all(binds as SqliteBinds)) as Record<string, unknown>[];
+        const rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
         payload.row_count = rows.length;
         return rows;
       } catch (e: any) {
@@ -369,10 +374,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       row_count: 0,
       transaction: txPublic.isOpen() ? txPublic : null,
     };
+    const driverBinds = binds.map(sqliteTypeCast) as SqliteBinds;
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         const stmt = await this._cachedStatement(sql);
-        const result = await stmt.run(binds as SqliteBinds);
+        const result = await stmt.run(driverBinds);
         this.dirtyCurrentTransaction();
         payload.row_count = typeof result.changes === "number" ? result.changes : 0;
 
@@ -577,7 +583,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     _options: ExplainOption[] = [],
   ): Promise<string> {
     const explainStmt = await this.driver.prepare(`EXPLAIN QUERY PLAN ${sql}`);
-    const rows = (await explainStmt.all(binds as SqliteBinds)) as Record<string, unknown>[];
+    const driverBinds = binds.map(sqliteTypeCast) as SqliteBinds;
+    const rows = (await explainStmt.all(driverBinds)) as Record<string, unknown>[];
     return rows.map((r) => `${r.id}|${r.parent}|${r.notused}|${r.detail}`).join("\n");
   }
 

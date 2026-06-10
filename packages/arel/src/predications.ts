@@ -14,6 +14,7 @@ import { Matches, DoesNotMatch } from "./nodes/matches.js";
 import { In } from "./nodes/in.js";
 import { Regexp as RegexpNode, NotRegexp } from "./nodes/regexp.js";
 import { Quoted } from "./nodes/casted.js";
+import { SqlLiteral } from "./nodes/sql-literal.js";
 import { And } from "./nodes/and.js";
 import { Or } from "./nodes/or.js";
 import { Grouping } from "./nodes/grouping.js";
@@ -43,7 +44,7 @@ function groupedAny(nodes: Node[]): Grouping {
   // `NULL`. Preserve three-valued semantics (NULL is *not* the same as
   // FALSE under SQL: `NULL OR FALSE` is NULL, `FALSE OR FALSE` is FALSE)
   // while still guarding against the `Array#reduce` TypeError on empty.
-  if (nodes.length === 0) return new Grouping(new Quoted(null));
+  if (nodes.length === 0) return new Grouping(new SqlLiteral("NULL", { retryable: true }));
   return new Grouping(nodes.reduce((acc, n) => new Or(acc, n)));
 }
 
