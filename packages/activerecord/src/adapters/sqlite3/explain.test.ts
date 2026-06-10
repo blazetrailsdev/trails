@@ -24,7 +24,7 @@ describeIfSqlite("SQLite3ExplainTest", () => {
   it("explain for one query", async () => {
     const explain = await Author.where({ id: authors("david").id }).explain();
     expect(explain).toMatch(
-      /EXPLAIN for: SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\? \[\["id", 1\]\]|1)/,
+      /EXPLAIN for: SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\? \[\["id", 1\]\]|\? \[1\]|1)/,
     );
     expect(explain).toMatch(/(SEARCH )?(TABLE )?authors USING (INTEGER )?PRIMARY KEY/);
   });

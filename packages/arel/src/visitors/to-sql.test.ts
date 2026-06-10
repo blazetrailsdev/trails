@@ -19,7 +19,7 @@ describe("the to_sql visitor", () => {
     it("should handle nil", () => {
       const visitor = new Visitors.ToSql();
       const node = users.get("name").isDistinctFrom(null);
-      expect(visitor.compile(node)).toContain("IS DISTINCT FROM");
+      expect(visitor.compile(node)).toContain("IS NOT NULL");
     });
 
     it("should handle column names on both sides", () => {
@@ -194,7 +194,7 @@ describe("the to_sql visitor", () => {
     it("should handle nil", () => {
       const node = users.get("name").isNotDistinctFrom(null);
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("IS NOT DISTINCT FROM");
+      expect(sql).toContain("IS NULL");
     });
 
     it("should construct a valid generic SQL statement", () => {
@@ -885,11 +885,11 @@ describe("the to_sql visitor", () => {
     const d = new Date("2020-01-02T12:00:00.000Z");
     const node = users.get("created_at").eq(new Nodes.Quoted(d));
     const [sql, binds] = new Visitors.ToSql().compileWithBinds(node);
-    // Placeholder in SQL, actual Date in binds array.
-    expect(sql).toContain("?");
-    expect(sql).not.toContain("2020-01-02");
-    expect(binds).toHaveLength(1);
-    expect(binds[0]).toBe(d);
+    // Quoted(Date) inlines per Rails to_sql.rb — _extractBinds was removed by
+    // collector threading; only BindParam/ActiveModel::Attribute go to addBind.
+    expect(sql).toContain("2020-01-02");
+    expect(sql).not.toContain("?");
+    expect(binds).toHaveLength(0);
   });
 
   it("should visit_Float", () => {
@@ -1074,8 +1074,9 @@ describe("the to_sql visitor", () => {
 
   it("works with BindParams", () => {
     const v = new Visitors.ToSql();
+    // Valueless BindParam: preserved as ? (raw placeholder slot).
     expect(v.compile(new Nodes.BindParam())).toBe("?");
-    // compile() inlines values (like Rails' to_sql under unprepared_statement)
+    // BindParam with value: compile() inlines the value for display SQL.
     expect(v.compile(new Nodes.BindParam(1))).toBe("1");
   });
 
@@ -1137,9 +1138,11 @@ describe("the to_sql visitor", () => {
     };
 
     v.compileWithCollector(mgr.ast, collector);
-    // The collector received addBind calls for Casted values
-    expect(binds.length).toBeGreaterThan(0);
-    // SQL parts are accumulated
+    // Casted values route through addBind (mirrors Rails visit_Arel_Nodes_Casted).
+    expect(binds).toHaveLength(1);
+    expect(binds[0]).toBe("alice");
+    // The Casted value becomes a ? placeholder in parts (not inlined).
+    expect(parts.some((p) => p === "?")).toBe(true);
     expect(parts.some((p) => typeof p === "string" && p.includes("users"))).toBe(true);
   });
 
@@ -1464,16 +1467,17 @@ describe("the to_sql visitor", () => {
       }
       const tbl = new Table("users");
       const v = new NumberedVisitor();
-      // Two bind sites reachable via standard dispatch — BindParam (extracted)
-      // and Casted (extracted) — both routed through bindBlock.
+      // Both BindParam and Casted route through addBind (and therefore bindBlock).
+      // Quoted values (null comparisons, hard literals) still inline.
       const [sql] = v.compileWithBinds(
         tbl
           .where(tbl.get("id").eq(new Nodes.BindParam(1)))
           .where(tbl.get("name").eq(new Nodes.Casted("hi", tbl.get("name"))))
           .project(tbl.get("id")).ast,
       );
-      expect(sql).toContain("$1");
-      expect(sql).toContain("$2");
+      expect(sql).toContain("$1"); // BindParam → addBind → $1
+      expect(sql).toContain("$2"); // Casted → addBind → $2
+      expect(sql).not.toContain("'hi'"); // Casted value is bound, not inlined
       expect(sql).not.toContain("?");
     });
 
@@ -1493,15 +1497,16 @@ describe("the to_sql visitor", () => {
       class NumberedVisitor extends Visitors.ToSql {
         idx = 0;
         protected override bindBlock(): (i: number) => string {
-          return () => `$${++this.idx}`;
-        }
-        run(o: unknown): string {
-          this.compile(new Nodes.SqlLiteral(""));
-          this.visitActiveModelAttribute(o);
-          return (this as unknown as { collector: { value: string } }).collector.value;
+          return (i: number) => `$${i}`;
         }
       }
-      expect(new NumberedVisitor().run({ value: "x" })).toBe("$1");
+      const v = new NumberedVisitor();
+      const collector = new Collectors.SQLString();
+      (
+        v as unknown as { visitActiveModelAttribute(o: unknown, c: unknown): void }
+      ).visitActiveModelAttribute({ value: "x" }, collector);
+      // bindIndex starts at 1; the block receives 1, so `$1`
+      expect(collector.value).toBe("$1");
     });
 
     it("visitArelSelectManager wraps the manager's AST in parens", () => {
@@ -1511,13 +1516,11 @@ describe("the to_sql visitor", () => {
       const tbl = new Table("users");
       const mgr = new SelectManager(tbl).project(tbl.get("id"));
       const v = new Visitors.ToSql();
-      // Initialize the collector via a no-op compile.
-      v.compile(new Nodes.SqlLiteral(""));
+      const collector = new Collectors.SQLString();
       (
-        v as unknown as { visitArelSelectManager(o: { ast: Nodes.Node }): void }
-      ).visitArelSelectManager({ ast: mgr.ast as unknown as Nodes.Node });
-      const sql = (v as unknown as { collector: { value: string } }).collector.value;
-      expect(sql).toMatch(/^\(SELECT.*\)$/);
+        v as unknown as { visitArelSelectManager(o: { ast: Nodes.Node }, c: unknown): void }
+      ).visitArelSelectManager({ ast: mgr.ast as unknown as Nodes.Node }, collector);
+      expect(collector.value).toMatch(/^\(SELECT.*\)$/);
     });
 
     it("visitArelNodesWhen / Else are reachable as standalone visits (Case still works)", () => {
@@ -1656,15 +1659,12 @@ describe("the to_sql visitor", () => {
     it("visitArray handles a mix of Node and primitive entries", () => {
       const tbl = new Table("users");
       const v = new Visitors.ToSql();
-      v.compile(new Nodes.SqlLiteral(""));
-      (v as unknown as { visitArray(a: ReadonlyArray<unknown>): void }).visitArray([
-        tbl.get("a"),
-        1,
-        "text",
-      ]);
-      expect((v as unknown as { collector: { value: string } }).collector.value).toBe(
-        '"users"."a", 1, \'text\'',
+      const collector = new Collectors.SQLString();
+      (v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }).visitArray(
+        [tbl.get("a"), 1, "text"],
+        collector,
       );
+      expect(collector.value).toBe('"users"."a", 1, \'text\'');
     });
   });
 
@@ -1675,12 +1675,14 @@ describe("the to_sql visitor", () => {
     });
 
     it("Quoted Temporal.Instant binds through unified addBind path under extractBinds", () => {
+      // Quoted(Temporal.Instant) inlines via quotedDate — toISOString path.
+      // _extractBinds was removed; Quoted always inlines regardless of collector.
       const visitor = new Visitors.ToSql();
       const instant = Temporal.Instant.from("2026-04-30T12:34:56.000Z");
       const [sql, binds] = visitor.compileWithBinds(new Nodes.Quoted(instant));
-      expect(sql).toBe("?");
-      expect(binds).toHaveLength(1);
-      expect(binds[0]).toBe(instant);
+      expect(sql).toContain("2026-04-30");
+      expect(sql).not.toContain("?");
+      expect(binds).toHaveLength(0);
     });
 
     it("Quoted non-Date inlines under extractBinds=false", () => {
@@ -1689,23 +1691,25 @@ describe("the to_sql visitor", () => {
     });
 
     it("Quoted string binds raw under extractBinds", () => {
+      // Quoted("hi") inlines via quote() — _extractBinds was removed.
       const [sql, binds] = new Visitors.ToSql().compileWithBinds(new Nodes.Quoted("hi"));
-      expect(sql).toBe("?");
-      expect(binds).toEqual(["hi"]);
+      expect(sql).toBe("'hi'");
+      expect(binds).toHaveLength(0);
     });
 
     it("Quoted number binds raw under extractBinds", () => {
+      // Quoted(42) inlines via quote() — _extractBinds was removed.
       const [sql, binds] = new Visitors.ToSql().compileWithBinds(new Nodes.Quoted(42));
-      expect(sql).toBe("?");
-      expect(binds).toEqual([42]);
+      expect(sql).toBe("42");
+      expect(binds).toHaveLength(0);
     });
 
     it("Quoted toISOString-bearing object binds raw under extractBinds", () => {
+      // Quoted(date-like) inlines via quotedDate() — _extractBinds was removed.
       const value = { toISOString: () => "2026-04-30T00:00:00.000Z" };
       const [sql, binds] = new Visitors.ToSql().compileWithBinds(new Nodes.Quoted(value));
-      expect(sql).toBe("?");
-      expect(binds).toHaveLength(1);
-      expect(binds[0]).toBe(value);
+      expect(sql).toBe("'2026-04-30 00:00:00'");
+      expect(binds).toHaveLength(0);
     });
   });
 

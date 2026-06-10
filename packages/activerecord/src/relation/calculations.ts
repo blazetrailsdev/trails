@@ -46,10 +46,14 @@ interface CalculationRelation {
     _serializedAttributes?: { get(name: string): { load(raw: unknown): unknown } | undefined };
     connection: {
       adapterName: AdapterName;
-      visitor?: { compile(node: any): string };
+      visitor?: { compile(node: any): string; compileWithBinds?(node: any): [string, unknown[]] };
       toSql(arel: unknown): string;
       execute(sql: string): Promise<Record<string, unknown>[]>;
-      selectAll(sql: string, name?: string | null): Promise<import("../result.js").Result>;
+      selectAll(
+        sql: string,
+        name?: string | null,
+        binds?: unknown[],
+      ): Promise<import("../result.js").Result>;
     };
   };
   _limitValue: number | null;
@@ -240,8 +244,24 @@ function _safeAlias(alias: string): string {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(alias) ? alias : `"${alias.replace(/"/g, '""')}"`;
 }
 
-function applyFromClause(rel: CalculationRelation, sql: string): string {
-  if (rel._fromClause.isEmpty()) return sql;
+function typeCastCalcBind(b: unknown): unknown {
+  if (b !== null && typeof b === "object" && "valueForDatabase" in b) {
+    return (b as { valueForDatabase: unknown }).valueForDatabase;
+  }
+  return b;
+}
+
+function compileManagerWithBinds(rel: CalculationRelation, manager: any): [string, unknown[]] {
+  const visitor = rel._modelClass.connection.visitor;
+  if (visitor?.compileWithBinds) {
+    const [sql, rawBinds] = visitor.compileWithBinds(manager.ast) as [string, unknown[]];
+    return [sql, rawBinds.map(typeCastCalcBind)];
+  }
+  return [rel._modelClass.connection.toSql(manager), []];
+}
+
+function applyFromClause(rel: CalculationRelation, sql: string): [string, unknown[]] {
+  if (rel._fromClause.isEmpty()) return [sql, []];
   const raw = rel._fromClause.value;
   const alias = rel._fromClause.name;
   // Mirror Relation#toSql's FROM-clause handling (relation.ts ~3550):
@@ -249,23 +269,36 @@ function applyFromClause(rel: CalculationRelation, sql: string): string {
   //   Relation    → wrap compiled SQL in parens as subquery + alias
   //   string      → use as-is
   let fromExpr: string;
+  let fromBinds: unknown[] = [];
   if (typeof raw === "string") {
     fromExpr = alias ? `${raw} ${_safeAlias(alias)}` : raw;
   } else if (raw instanceof Nodes.Node) {
     // Alias is ignored — callers bake the alias into the node itself (mirrors relation.ts:3561-3565).
-    fromExpr = rel._modelClass.connection.visitor?.compile(raw) ?? raw.toSql();
+    const visitor = rel._modelClass.connection.visitor;
+    if (visitor?.compileWithBinds) {
+      const [nodeSql, nodeRawBinds] = visitor.compileWithBinds(raw) as [string, unknown[]];
+      fromExpr = nodeSql;
+      fromBinds = nodeRawBinds.map(typeCastCalcBind);
+    } else {
+      fromExpr = visitor?.compile(raw) ?? (raw as any).toSql();
+    }
   } else if (raw !== null && typeof (raw as any).toSql === "function") {
     // Relation or other object with toSql() — treat as subquery.
-    const subSql: string = rel._modelClass.connection.toSql(raw);
+    const rawRelation = raw as any;
+    const subSql: string = rawRelation._toSql?.() ?? rawRelation.toSql();
+    fromBinds = (rawRelation._lastSelectBinds ?? []) as unknown[];
     const safeName = alias ? _safeAlias(alias) : "subquery";
     fromExpr = `(${subSql}) ${safeName}`;
   } else {
-    return sql;
+    return [sql, []];
   }
-  return sql.replace(
-    /FROM\s+(?:"[^"]+"|[`][^`]+[`])(?:\.(?:"[^"]+"|[`][^`]+[`]))*/,
-    () => `FROM ${fromExpr}`,
-  );
+  return [
+    sql.replace(
+      /FROM\s+(?:"[^"]+"|[`][^`]+[`])(?:\.(?:"[^"]+"|[`][^`]+[`]))*/,
+      () => `FROM ${fromExpr}`,
+    ),
+    fromBinds,
+  ];
 }
 
 function isBigintColumn(rel: CalculationRelation, fn: AggFn, column: string): boolean {
@@ -293,13 +326,16 @@ async function singleAggregate(
   rel._applyWheresToManager(manager, table);
 
   const colType = resolveColType(rel, column);
-  const withSql = prependCtes(rel, applyFromClause(rel, rel._modelClass.connection.toSql(manager)));
+  const [rawSql, managerBinds] = compileManagerWithBinds(rel, manager);
+  const [withFrom, fromBinds] = applyFromClause(rel, rawSql);
+  const withCtes = prependCtes(rel, withFrom);
   const sql =
-    isBigintColumn(rel, fn, column) && needsBigintCast(rel) ? wrapBigintAgg(withSql) : withSql;
+    isBigintColumn(rel, fn, column) && needsBigintCast(rel) ? wrapBigintAgg(withCtes) : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
   const result = await rel._modelClass.connection.selectAll(
     sql,
     `${rel._modelClass.name} ${opName}`,
+    [...fromBinds, ...managerBinds],
   );
   const rows = result.toArray() as Record<string, unknown>[];
   const val = rows[0]?.val;
@@ -330,15 +366,18 @@ async function groupedAggregate(
   if (rel._offsetValue !== null) manager.skip(rel._offsetValue);
 
   const colType = resolveColType(rel, column);
-  const withSql = prependCtes(rel, applyFromClause(rel, rel._modelClass.connection.toSql(manager)));
+  const [rawSql, managerBinds] = compileManagerWithBinds(rel, manager);
+  const [withFrom, fromBinds] = applyFromClause(rel, rawSql);
+  const withCtes = prependCtes(rel, withFrom);
   const sql =
     isBigintColumn(rel, fn, column) && needsBigintCast(rel)
-      ? wrapBigintAgg(withSql, true)
-      : withSql;
+      ? wrapBigintAgg(withCtes, true)
+      : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
   const queryResult = await rel._modelClass.connection.selectAll(
     sql,
     `${rel._modelClass.name} ${opName}`,
+    [...fromBinds, ...managerBinds],
   );
   const rows = queryResult.toArray() as Record<string, unknown>[];
 
@@ -434,7 +473,9 @@ export async function performCount(
           this._applyWheresToManager(idSubquery, table);
           if (this._limitValue !== null) idSubquery.take(this._limitValue);
           if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
-          const innerSql = applyFromClause(this, this._modelClass.connection.toSql(idSubquery));
+          const [rawIdSql, idSubqueryBinds] = compileManagerWithBinds(this, idSubquery);
+          const [innerSql, idFromBinds] = applyFromClause(this, rawIdSql);
+          const allIdBinds = [...idFromBinds, ...idSubqueryBinds];
           // Outer count mirrors Rails recursive calculate() call: COUNT(DISTINCT requested_col).
           // JD joins are re-applied so a cross-table column (e.g. "comments.id") is reachable.
           const colForCount = column ?? pk;
@@ -451,9 +492,11 @@ export async function performCount(
           }
           this._applyJoinsToManager(countManager);
           countManager.where(table.get(pk).in(new Nodes.SqlLiteral(innerSql)));
+          const [countSql, countOwnBinds] = compileManagerWithBinds(this, countManager);
           const limitedResult = await this._modelClass.connection.selectAll(
-            prependCtes(this, this._modelClass.connection.toSql(countManager)),
+            prependCtes(this, countSql),
             `${this._modelClass.name} Count`,
+            [...allIdBinds, ...countOwnBinds],
           );
           const limitedRows = limitedResult.toArray() as Record<string, unknown>[];
           return Number(limitedRows[0]?.count ?? 0);
@@ -473,9 +516,12 @@ export async function performCount(
         }
         this._applyJoinsToManager(manager);
         this._applyWheresToManager(manager, table);
+        const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
+        const [withFrom, fromBinds] = applyFromClause(this, rawSql);
         const result = await this._modelClass.connection.selectAll(
-          prependCtes(this, applyFromClause(this, this._modelClass.connection.toSql(manager))),
+          prependCtes(this, withFrom),
           `${this._modelClass.name} Count`,
+          [...fromBinds, ...managerBinds],
         );
         const rows = result.toArray() as Record<string, unknown>[];
         return Number(rows[0]?.count ?? 0);
@@ -530,7 +576,9 @@ export async function performCount(
     // Mirrors Rails: Arel::Nodes::TableAlias.new(Arel::Nodes::Grouping.new(inner), alias)
     // Apply FROM override at SQL level before wrapping — innerManager builds from
     // the base table but a from() override must redirect it to the CTE/subquery.
-    const innerSql = applyFromClause(this, this._modelClass.connection.toSql(innerManager));
+    const [rawInnerSql, innerManagerBinds] = compileManagerWithBinds(this, innerManager);
+    const [innerSql, innerFromBinds] = applyFromClause(this, rawInnerSql);
+    const allInnerBinds = [...innerFromBinds, ...innerManagerBinds];
     const subqueryNode = new Nodes.TableAlias(
       new Nodes.Grouping(new Nodes.SqlLiteral(innerSql)),
       "subquery_for_count",
@@ -542,9 +590,11 @@ export async function performCount(
     // (except(:optimizer_hints)) and re-applies them to the outer COUNT
     // SelectManager — keeping the hint at the front of the emitted query.
     if (this._optimizerHints.length > 0) outerManager.optimizerHints(...this._optimizerHints);
+    const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
     const result = await this._modelClass.connection.selectAll(
-      prependCtes(this, this._modelClass.connection.toSql(outerManager)),
+      prependCtes(this, outerSql),
       `${this._modelClass.name} Count`,
+      [...allInnerBinds, ...outerBinds],
     );
     const rows = result.toArray() as Record<string, unknown>[];
     return Number(rows[0]?.count ?? 0);
@@ -558,9 +608,12 @@ export async function performCount(
     const manager = table.project(countNode.as("count"));
     this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
+    const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
+    const [withFrom, fromBinds] = applyFromClause(this, rawSql);
     const result = await this._modelClass.connection.selectAll(
-      prependCtes(this, applyFromClause(this, this._modelClass.connection.toSql(manager))),
+      prependCtes(this, withFrom),
       `${this._modelClass.name} Count`,
+      [...fromBinds, ...managerBinds],
     );
     const rows = result.toArray() as Record<string, unknown>[];
     return Number(rows[0]?.count ?? 0);
@@ -575,16 +628,17 @@ export async function performCount(
       innerManager.distinct();
       this._applyJoinsToManager(innerManager);
       this._applyWheresToManager(innerManager, table);
+      const [rawInnerSql, innerManagerBinds] = compileManagerWithBinds(this, innerManager);
+      const [innerSqlWithFrom, innerFromBinds] = applyFromClause(this, rawInnerSql);
+      const allInnerBinds = [...innerFromBinds, ...innerManagerBinds];
       const countAll = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
       const outerManager = table.project(countAll.as("count"));
-      outerManager.from(
-        new Nodes.SqlLiteral(
-          `(${applyFromClause(this, this._modelClass.connection.toSql(innerManager))}) AS subquery`,
-        ),
-      );
+      outerManager.from(new Nodes.SqlLiteral(`(${innerSqlWithFrom}) AS subquery`));
+      const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
       const result = await this._modelClass.connection.selectAll(
-        prependCtes(this, this._modelClass.connection.toSql(outerManager)),
+        prependCtes(this, outerSql),
         `${this._modelClass.name} Count`,
+        [...allInnerBinds, ...outerBinds],
       );
       const rows = result.toArray() as Record<string, unknown>[];
       return Number(rows[0]?.count ?? 0);
@@ -593,9 +647,12 @@ export async function performCount(
     const manager = table.project(countNode.as("count"));
     this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
+    const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
+    const [withFrom, fromBinds] = applyFromClause(this, rawSql);
     const result = await this._modelClass.connection.selectAll(
-      prependCtes(this, applyFromClause(this, this._modelClass.connection.toSql(manager))),
+      prependCtes(this, withFrom),
       `${this._modelClass.name} Count`,
+      [...fromBinds, ...managerBinds],
     );
     const rows = result.toArray() as Record<string, unknown>[];
     return Number(rows[0]?.count ?? 0);
@@ -605,9 +662,12 @@ export async function performCount(
   const manager = table.project(countAll.as("count"));
   this._applyJoinsToManager(manager);
   this._applyWheresToManager(manager, table);
+  const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
+  const [withFrom, fromBinds] = applyFromClause(this, rawSql);
   const result = await this._modelClass.connection.selectAll(
-    prependCtes(this, applyFromClause(this, this._modelClass.connection.toSql(manager))),
+    prependCtes(this, withFrom),
     `${this._modelClass.name} Count`,
+    [...fromBinds, ...managerBinds],
   );
   const rows = result.toArray() as Record<string, unknown>[];
   return Number(rows[0]?.count ?? 0);

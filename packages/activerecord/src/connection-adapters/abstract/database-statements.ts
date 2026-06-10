@@ -217,11 +217,7 @@ export function toSqlAndBinds(
     }
     const visitor = (this as any)?.visitor as Visitors.ToSql | undefined;
     if (visitor && node instanceof Nodes.Node) {
-      const [sql, extractedBinds] = visitor.compileWithBinds(node);
-      // compileWithBinds sets visitor.collector.retryable during traversal.
-      // A non-retryable SqlLiteral (raw SQL) or NamedFunction sets it false.
-      // This mirrors Rails' `allow_retry = collector.retryable` in to_sql_and_binds.
-      const compiledAllowRetry = (visitor as any).collector?.retryable ?? false;
+      const [sql, extractedBinds, compiledAllowRetry] = visitor.compileWithBinds(node);
       // Type-cast bind objects (QueryAttribute) to primitive values
       // for adapter execution, matching Rails' type_casted_binds
       const castedBinds = extractedBinds.map((b) =>
@@ -262,14 +258,7 @@ export function cacheableQuery(
 
   // Prepared path: compile with bind extraction, return Query + raw binds
   if (host?.preparedStatements && klass.query && visitor && node instanceof Nodes.Node) {
-    const [sql, binds] = visitor.compileWithBinds(node);
-    // Rails' cacheable_query does not carry retryability on the Query; its
-    // cached_find_by instead passes `allow_retry: true` at the execute() call
-    // site because the generated statement is always a simple equality. trails
-    // carries the collector's retryable flag on the Query (see Query/
-    // PartialQuery in statement-cache.ts) so StatementCache.execute can default
-    // allowRetry without caller-side knowledge. Raw SQL fragments leave it false.
-    const retryable = (visitor as any).collector?.retryable ?? false;
+    const [sql, binds, retryable] = visitor.compileWithBinds(node);
     return [klass.query(sql, { retryable }), binds];
   }
 

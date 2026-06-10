@@ -184,7 +184,7 @@ describe("setToSqlVisitor", () => {
       const users = new Table("users");
       const node = users.get("name").isDistinctFrom(null);
       // Generic visitor.
-      expect(node.toSql()).toBe(`"users"."name" IS DISTINCT FROM NULL`);
+      expect(node.toSql()).toBe(`"users"."name" IS NOT NULL`);
       // SQLite visitor.
       setToSqlVisitor(Visitors.SQLite);
       expect(node.toSql()).toBe(`"users"."name" IS NOT NULL`);
@@ -200,7 +200,7 @@ describe("setToSqlVisitor", () => {
       expect(mgr.toSql()).toContain("IS NOT DISTINCT FROM");
       setToSqlVisitor(Visitors.SQLite);
       const sqlite = mgr.toSql();
-      // SQLite emits IS for IS NOT DISTINCT FROM, and `1` for true.
+      // SQLite emits IS for IS NOT DISTINCT FROM; Quoted(true) inlines as 1 in SQLite.
       expect(sqlite).toContain('"users"."active" IS 1');
       expect(sqlite).not.toContain("IS NOT DISTINCT FROM");
     } finally {
