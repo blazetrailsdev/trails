@@ -7,13 +7,12 @@ import { Base } from "../index.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  await defineSchema({
-    posts: { title: "string", author: "string" },
-  });
+  await defineSchema({ posts: TEST_SCHEMA.posts });
 });
 
 describe("RelationMutationTest", () => {
@@ -21,7 +20,7 @@ describe("RelationMutationTest", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.attribute("author", "string");
+        this.attribute("body", "string");
       }
     }
     return { Post };
@@ -122,7 +121,7 @@ describe("RelationMutationTest", () => {
 
   it("none!", async () => {
     const { Post } = makeModel();
-    await Post.create({ title: "x" });
+    await Post.create({ title: "x", body: "y" });
     const results = await Post.none().toArray();
     expect(results.length).toBe(0);
   });

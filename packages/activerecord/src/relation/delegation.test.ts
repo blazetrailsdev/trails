@@ -1,40 +1,30 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base } from "../index.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+/**
+ * Tests to increase Rails test coverage matching.
+ * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/relation/delegation_test.rb
+ */
+import { describe, it, expect } from "vitest";
+import "../index.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Post } from "../test-helpers/models/post.js";
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({
-    arel_posts: { title: "string" },
-    posts: { title: "string" },
-  });
-});
 describe("DelegationTest", () => {
+  // Mirrors Rails `fixtures :posts` (DelegationCachingTest declares fixtures).
+  useHandlerFixtures(["posts"], { schema: canonicalSchema });
+
   it("not respond to arel method", () => {
-    class ArelPost extends Base {
-      static {
-        this._tableName = "arel_posts";
-        this.attribute("title", "string");
-      }
-    }
-    const post = new ArelPost({ title: "test" });
+    const post = new Post({ title: "test" });
     expect("arel" in post).toBe(false);
   });
 
   describe("QueryingMethodsDelegationTest", () => {
-    // D-Y-INCOMPATIBLE: canonical posts table has `body NOT NULL`; creating Post
-    // without body fails. Phase G: supply body or migrate to useFixtures().
+    // D-Y-INCOMPATIBLE: shared canonical posts fixtures are seeded, so the
+    // record-count assertions below cannot assume an empty table. Phase G:
+    // rewrite to Rails' respond_to-on-QUERYING_METHODS shape.
     it.skip("delegate querying methods", async () => {
-      class Post extends Base {
-        static {
-          this.attribute("title", "string");
-        }
-      }
-      await Post.create({ title: "a" });
-      await Post.create({ title: "b" });
+      await Post.create({ title: "a", body: "x" });
+      await Post.create({ title: "b", body: "y" });
       const all = await Post.all().toArray();
       expect(all.length).toBe(2);
       const filtered = await Post.where({ title: "a" }).toArray();
@@ -46,11 +36,6 @@ describe("DelegationTest", () => {
 
   describe("DelegationCachingTest", () => {
     it("delegation doesn't override methods defined in other relation subclasses", () => {
-      class Post extends Base {
-        static {
-          this.attribute("title", "string");
-        }
-      }
       const r1 = Post.where({ title: "x" });
       const r2 = Post.where({ title: "y" });
       expect(r1.toSql()).not.toBe(r2.toSql());
