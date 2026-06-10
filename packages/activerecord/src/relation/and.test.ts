@@ -1,110 +1,41 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/relation/and_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base } from "../index.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-beforeAll(async () => {
-  await defineSchema({
-    posts: { title: "string", body: "string", author: "string" },
-    users: { name: "string", role: "string", active: "boolean" },
-  });
-});
-// ==========================================================================
-// AndTest — targets relation/and_test.rb
-// ==========================================================================
-describe("AndTest", () => {
-  it("and combines two relations", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const r1 = Post.where({ title: "a" });
-    const r2 = Post.where({ body: "x" });
-    const sql = r1.and(r2).toSql();
-    expect(sql).toContain("AND");
-  });
-});
+import { describe, it, expect } from "vitest";
+import "../index.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Author } from "../test-helpers/models/author.js";
 
 describe("AndTest", () => {
-  function makeModel() {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author", "string");
-      }
-    }
-    return { Post };
-  }
+  const { authors } = useHandlerFixtures(["authors", "authorAddresses"], {
+    schema: canonicalSchema,
+  });
 
   it("and", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "a", author: "alice" });
-    await Post.create({ title: "b", author: "bob" });
-    const results = await Post.where({ title: "a" }).where({ author: "alice" }).toArray();
-    expect(results.length).toBe(1);
+    const david = authors("david");
+    const mary = authors("mary");
+    const bob = authors("bob");
+
+    const davidAndMary = Author.where({ id: [david, mary] }).order("id");
+    const maryAndBob = Author.where({ id: [mary, bob] }).order("id");
+
+    expect((await davidAndMary.and(maryAndBob).toArray()).map((a: any) => a.id)).toEqual([mary.id]);
   });
 
   it("and with non relation attribute", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "t", author: "a" });
-    const sql = Post.where({ title: "t" }).where({ author: "a" }).toSql();
-    expect(sql).toContain("WHERE");
+    const hash = { id: 123 };
+    expect(() => Author.and(hash as any)).toThrow(
+      "You have passed Hash object to #and. Pass an ActiveRecord::Relation object instead.",
+    );
   });
 
   it("and with structurally incompatible scope", async () => {
-    const { Post } = makeModel();
-    await Post.create({ title: "x", author: "y" });
-    const results = await Post.where({ title: "x" }).where({ author: "y" }).toArray();
-    expect(results.length).toBe(1);
-  });
-});
-
-describe("and()", () => {
-  it("combines two relations with AND", async () => {
-    class User extends Base {
-      static _tableName = "users";
-    }
-    User.attribute("id", "integer");
-    User.attribute("name", "string");
-    User.attribute("role", "string");
-
-    await User.create({ name: "Alice", role: "admin" });
-    await User.create({ name: "Bob", role: "user" });
-    await User.create({ name: "Charlie", role: "admin" });
-
-    const admins = User.all().where({ role: "admin" });
-    const alices = User.all().where({ name: "Alice" });
-    const results = await admins.and(alices).toArray();
-    expect(results.length).toBe(1);
-    expect(results[0].name).toBe("Alice");
-  });
-});
-
-describe("Relation And (Rails-guided)", () => {
-  it("and merges where conditions", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("active", "boolean");
-      }
-    }
-    await User.create({ name: "Alice", active: true });
-    await User.create({ name: "Bob", active: false });
-    await User.create({ name: "Charlie", active: true });
-
-    const result = await User.where({ active: true })
-      .and(User.where({ name: "Alice" }))
-      .toArray();
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe("Alice");
+    const postsScope = Author.unscope("order").limit(10).offset(10).select("id").order("id");
+    expect(() => Author.limit(10).select("id").order("name").and(postsScope)).toThrow(
+      "Relation passed to #and must be structurally compatible. Incompatible values: [:order, :offset]",
+    );
   });
 });

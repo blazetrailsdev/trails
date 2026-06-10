@@ -42,6 +42,13 @@ export class WhereClause {
     return new WhereClause(unionNodes(filtered, other.predicates));
   }
 
+  // Rails WhereClause#| — array union of predicates (dedups identical
+  // predicates, keeps distinct ones). Used by Relation#and! which ANDs both
+  // clauses' conditions together rather than letting one win on conflict.
+  union(other: WhereClause): WhereClause {
+    return new WhereClause(unionNodes(this.predicates, other.predicates));
+  }
+
   invert(): WhereClause {
     if (this.predicates.length === 0) return this.clone();
     if (this.predicates.length === 1) {
