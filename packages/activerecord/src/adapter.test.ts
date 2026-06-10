@@ -273,12 +273,11 @@ describe("AdapterTest", () => {
       ["CREATE TABLE subscribers (nick varchar PRIMARY KEY, name varchar)"],
       async (conn) => {
         await conn.executeMutation("INSERT INTO subscribers(nick) VALUES('me')");
-        const error = await conn.executeMutation("INSERT INTO subscribers(nick) VALUES('me')").then(
-          () => null,
-          (e) => e,
-        );
+        const error = await conn
+          .executeMutation("INSERT INTO subscribers(nick) VALUES('me')")
+          .catch((e) => e);
         expect(error).toBeInstanceOf(RecordNotUnique);
-        expect(error.cause).not.toBeNull();
+        expect(error.cause).toBeTruthy();
       },
     );
   });
@@ -286,12 +285,9 @@ describe("AdapterTest", () => {
     await withSchema(
       ["CREATE TABLE posts (id integer PRIMARY KEY, title varchar NOT NULL)"],
       async (conn) => {
-        const error = await conn.executeMutation("INSERT INTO posts(id) VALUES(1)").then(
-          () => null,
-          (e) => e,
-        );
+        const error = await conn.executeMutation("INSERT INTO posts(id) VALUES(1)").catch((e) => e);
         expect(error).toBeInstanceOf(NotNullViolation);
-        expect(error.cause).not.toBeNull();
+        expect(error.cause).toBeTruthy();
       },
     );
   });
@@ -312,10 +308,7 @@ describe("AdapterTest", () => {
   });
   it("database related exceptions are translated to statement invalid", async () => {
     await withSchema([], async (conn) => {
-      const error = await conn.execute("This is a syntax error").then(
-        () => null,
-        (e) => e,
-      );
+      const error = await conn.execute("This is a syntax error").catch((e) => e);
       expect(error).toBeInstanceOf(StatementInvalid);
       expect(error.cause).toBeInstanceOf(Error);
     });
