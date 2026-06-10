@@ -9,10 +9,15 @@ import {
   StatementPool as MysqlStatementPool,
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
-import { Version, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
+import {
+  AbstractAdapter,
+  Version,
+  RAW_CONNECTION_DEPRECATION_MESSAGE,
+} from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import {
+  ActiveRecordError,
   AdapterTimeout,
   ConnectionFailed,
   ConnectionNotEstablished,
@@ -517,7 +522,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     options?: { prepare?: boolean },
   ): Promise<Result> {
     sql = this.preprocessQuery(sql);
-    await this.materializeTransactions();
     this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds ?? []);
@@ -532,68 +536,56 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       transaction: txPublicQuery.isOpen() ? txPublicQuery : null,
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
-      let conn: mysql.Connection | undefined;
-      // connAcquired gates dirtyCurrentTransaction: Rails' with_raw_connection
-      // runs dirty_current_transaction in the ensure of the `begin…yield…ensure`
-      // loop, AFTER connection setup succeeds (abstract_adapter.rb:983-1015,
-      // :1044-1047). Connection-setup failures happen before that loop and do
-      // not dirty the transaction.
-      let connAcquired = false;
       try {
-        conn = await this.getConn();
-        connAcquired = true;
-        const prepare = options?.prepare ?? this._shouldPrepare(binds ?? []);
-        if (prepare) this._trackPrepared(conn, driverSql);
-        const [rawResult, rawFields] = prepare
-          ? await conn.execute(driverSql, driverBinds as any[])
-          : await conn.query(driverSql, driverBinds);
-        // CALL sets _resultIndex > 0 in mysql2, wrapping rows AND fields in
-        // parallel nested arrays. Mirror Rails' abandon_results! + cast_result:
-        // take the first result set and use rawFields[0] (field-descriptor array,
-        // or undefined for DML) — the same as Rails' fields.empty? check at
-        // database_statements.rb:116. For a plain non-CALL query rawFields is a
-        // flat FieldPacket[], so rawFields[0] is a FieldPacket object (not an
-        // array) and neither branch fires.
-        let result: mysql.RowDataPacket[] | mysql.ResultSetHeader = rawResult as
-          | mysql.RowDataPacket[]
-          | mysql.ResultSetHeader;
-        if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
-          // Multi-result CALL w/ SELECT: rawFields[0] is a FieldPacket[].
-          result = (rawResult as unknown[])[0] as mysql.RowDataPacket[];
-        } else if (
-          Array.isArray(rawFields) &&
-          rawFields[0] === undefined &&
-          Array.isArray(rawResult)
-        ) {
-          // Multi-result CALL w/ DML-only: rawFields[0] is undefined.
-          // Unwrap so !Array.isArray(result) below returns empty Result.
-          result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
-        }
-        // DML results in a ResultSetHeader (no rows array); SELECT results
-        // in an array of row objects. Return empty Result for DML to avoid
-        // throwing on INSERT/UPDATE/DELETE passed to execQuery.
-        if (!Array.isArray(result)) {
-          payload.row_count = (result as mysql.ResultSetHeader).affectedRows ?? 0;
-          await this._handleWarningsOn(conn, driverSql);
-          return new Result([], []);
-        }
-        payload.row_count = result.length;
-        await this._handleWarningsOn(conn, driverSql);
-        return Result.fromRowHashes(result as Record<string, unknown>[]);
+        return await this.withRawConnection(async (conn) => {
+          const mysqlConn = conn as unknown as mysql.Connection;
+          const prepare = options?.prepare ?? this._shouldPrepare(binds ?? []);
+          if (prepare) this._trackPrepared(mysqlConn, driverSql);
+          const [rawResult, rawFields] = prepare
+            ? await mysqlConn.execute(driverSql, driverBinds as any[])
+            : await mysqlConn.query(driverSql, driverBinds);
+          // CALL sets _resultIndex > 0 in mysql2, wrapping rows AND fields in
+          // parallel nested arrays. Mirror Rails' abandon_results! + cast_result:
+          // take the first result set and use rawFields[0] (field-descriptor array,
+          // or undefined for DML) — the same as Rails' fields.empty? check at
+          // database_statements.rb:116. For a plain non-CALL query rawFields is a
+          // flat FieldPacket[], so rawFields[0] is a FieldPacket object (not an
+          // array) and neither branch fires.
+          let result: mysql.RowDataPacket[] | mysql.ResultSetHeader = rawResult as
+            | mysql.RowDataPacket[]
+            | mysql.ResultSetHeader;
+          if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
+            // Multi-result CALL w/ SELECT: rawFields[0] is a FieldPacket[].
+            result = (rawResult as unknown[])[0] as mysql.RowDataPacket[];
+          } else if (
+            Array.isArray(rawFields) &&
+            rawFields[0] === undefined &&
+            Array.isArray(rawResult)
+          ) {
+            // Multi-result CALL w/ DML-only: rawFields[0] is undefined.
+            // Unwrap so !Array.isArray(result) below returns empty Result.
+            result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
+          }
+          // DML results in a ResultSetHeader (no rows array); SELECT results
+          // in an array of row objects. Return empty Result for DML to avoid
+          // throwing on INSERT/UPDATE/DELETE passed to execQuery.
+          if (!Array.isArray(result)) {
+            payload.row_count = (result as mysql.ResultSetHeader).affectedRows ?? 0;
+            await this._handleWarningsOn(mysqlConn, driverSql);
+            return new Result([], []);
+          }
+          payload.row_count = result.length;
+          await this._handleWarningsOn(mysqlConn, driverSql);
+          return Result.fromRowHashes(result as Record<string, unknown>[]);
+        });
       } catch (e: any) {
-        if (e instanceof SQLWarning) {
-          payload.exception = e;
-          payload.exception_object = e;
-          throw e;
-        }
-        const translated = await this._translateAndEnrich(e, driverSql, driverBinds);
+        const translated =
+          e instanceof ActiveRecordError
+            ? e
+            : await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
-      } finally {
-        // Mirrors Rails' with_raw_connection ensure: dirty after any query
-        // attempt — success or failure — but not on connection-setup failure.
-        if (connAcquired) this.dirtyCurrentTransaction();
       }
     });
   }
@@ -670,6 +662,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
+   * Overrides the abstract acquisition seam so withRawConnection's retry loop
+   * acquires a mysql.Connection. Called on every loop iteration so a
+   * reconnectBang() + continue picks up the fresh _client automatically.
+   * @internal
+   */
+  protected override async rawConnectionForBlock(): Promise<AbstractAdapter | null> {
+    return (await this.getConn()) as unknown as AbstractAdapter;
+  }
+
+  /**
    * Convert double-quoted identifiers to backtick-quoted for MySQL/MariaDB.
    *
    * CONVENTION: Arel-generated DML and SQL builders (Relation, InsertAll, etc.)
@@ -727,7 +729,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     name: string = "SQL",
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
-    await this.materializeTransactions();
     this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds);
@@ -744,47 +745,44 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       transaction: txPublicExec.isOpen() ? txPublicExec : null,
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
-      let conn: mysql.Connection | undefined;
       try {
-        conn = await this.getConn();
-        // Use server-side prepared statements when enabled and binds
-        // are present — matches PR #589's preparedStatements toggle.
-        // Track the SQL in our statement pool first so LRU eviction
-        // sends COM_STMT_CLOSE (via unprepare) when we exceed
-        // `statement_limit`.
-        const prepare = this._shouldPrepare(binds);
-        if (prepare) this._trackPrepared(conn, driverSql);
-        const [rows, rowFields] = prepare
-          ? await conn.execute(driverSql, driverBinds as any[])
-          : await conn.query(driverSql, driverBinds);
-        // Unwrap nested result sets from CALL (see execQuery for the full
-        // comment). Use rowFields[0] as the fields.empty? discriminator.
-        let r: Record<string, unknown>[];
-        if (Array.isArray(rowFields) && Array.isArray(rowFields[0])) {
-          r = (rows as unknown[])[0] as Record<string, unknown>[];
-        } else if (Array.isArray(rowFields) && rowFields[0] === undefined && Array.isArray(rows)) {
-          r = [];
-        } else {
-          r = Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
-        }
-        payload.row_count = r.length;
-        await this._handleWarningsOn(conn, driverSql);
-        return r;
+        return await this.withRawConnection(async (conn) => {
+          const mysqlConn = conn as unknown as mysql.Connection;
+          // Use server-side prepared statements when enabled and binds
+          // are present — matches PR #589's preparedStatements toggle.
+          // Track the SQL in our statement pool first so LRU eviction
+          // sends COM_STMT_CLOSE (via unprepare) when we exceed
+          // `statement_limit`.
+          const prepare = this._shouldPrepare(binds);
+          if (prepare) this._trackPrepared(mysqlConn, driverSql);
+          const [rows, rowFields] = prepare
+            ? await mysqlConn.execute(driverSql, driverBinds as any[])
+            : await mysqlConn.query(driverSql, driverBinds);
+          // Unwrap nested result sets from CALL (see execQuery for the full
+          // comment). Use rowFields[0] as the fields.empty? discriminator.
+          let r: Record<string, unknown>[];
+          if (Array.isArray(rowFields) && Array.isArray(rowFields[0])) {
+            r = (rows as unknown[])[0] as Record<string, unknown>[];
+          } else if (
+            Array.isArray(rowFields) &&
+            rowFields[0] === undefined &&
+            Array.isArray(rows)
+          ) {
+            r = [];
+          } else {
+            r = Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
+          }
+          payload.row_count = r.length;
+          await this._handleWarningsOn(mysqlConn, driverSql);
+          return r;
+        });
       } catch (e: any) {
-        if (e instanceof SQLWarning) {
-          payload.exception = e;
-          payload.exception_object = e;
-          throw e;
-        }
-        // getConn() itself can throw (connection refused / closed);
-        // catching here lets subscribers see acquisition failures as
-        // `payload.exception` too. Query-level driver errors
-        // (ER_DUP_ENTRY etc.) are translated to Rails' typed exception
-        // classes via _translateAndEnrich.
-        const translated = await this._translateAndEnrich(e, driverSql, driverBinds);
+        const translated =
+          e instanceof ActiveRecordError
+            ? e
+            : await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
-        this.invalidateTransaction(translated);
         throw translated;
       }
     });
@@ -796,7 +794,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     sql = this.preprocessQuery(sql);
-    await this.materializeTransactions();
     this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds);
@@ -811,43 +808,36 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       transaction: txPublicMut.isOpen() ? txPublicMut : null,
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
-      let conn: mysql.Connection | undefined;
       try {
-        conn = await this.getConn();
-        const prepare = this._shouldPrepare(binds);
-        if (prepare) this._trackPrepared(conn, driverSql);
-        const [result] = prepare
-          ? await conn.execute(driverSql, driverBinds as any[])
-          : await conn.query(driverSql, driverBinds);
-        this.dirtyCurrentTransaction();
-        const info = result as mysql.ResultSetHeader;
-        payload.row_count = info.affectedRows ?? 0;
-        await this._handleWarningsOn(conn, driverSql);
+        return await this.withRawConnection(async (conn) => {
+          const mysqlConn = conn as unknown as mysql.Connection;
+          const prepare = this._shouldPrepare(binds);
+          if (prepare) this._trackPrepared(mysqlConn, driverSql);
+          const [result] = prepare
+            ? await mysqlConn.execute(driverSql, driverBinds as any[])
+            : await mysqlConn.query(driverSql, driverBinds);
+          const info = result as mysql.ResultSetHeader;
+          payload.row_count = info.affectedRows ?? 0;
+          await this._handleWarningsOn(mysqlConn, driverSql);
 
-        // For INSERT, return the last inserted ID (or affected rows for multi-row)
-        if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-          if (info.affectedRows > 1) {
-            return info.affectedRows;
+          // For INSERT, return the last inserted ID (or affected rows for multi-row)
+          if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
+            if (info.affectedRows > 1) {
+              return info.affectedRows;
+            }
+            return info.insertId;
           }
-          return info.insertId;
-        }
 
-        // For UPDATE/DELETE, return affected rows
-        return info.affectedRows;
+          // For UPDATE/DELETE, return affected rows
+          return info.affectedRows;
+        });
       } catch (e: any) {
-        if (e instanceof SQLWarning) {
-          payload.exception = e;
-          payload.exception_object = e;
-          throw e;
-        }
-        // Guard acquisition failures (connection refused / closed) so
-        // subscribers still see `payload.exception`. Driver errors
-        // (ER_DUP_ENTRY etc.) are translated to Rails' typed exception
-        // classes via _translateAndEnrich.
-        const translated = await this._translateAndEnrich(e, driverSql, driverBinds);
+        const translated =
+          e instanceof ActiveRecordError
+            ? e
+            : await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
-        this.invalidateTransaction(translated);
         throw translated;
       }
     });
@@ -892,22 +882,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   override async beginIsolatedDbTransaction(isolation: string): Promise<void> {
     const level = transactionIsolationLevels()[isolation];
     if (!level) throw new Error(`Unknown transaction isolation level: ${isolation}`);
-    for (let attempt = 0; attempt <= 1; attempt++) {
-      try {
-        await this.internalExecute(`SET TRANSACTION ISOLATION LEVEL ${level}`, "TRANSACTION", {
-          materializeTransactions: false,
-        });
-        await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
-        this._inTransaction = true;
-        return;
-      } catch (e) {
-        if (attempt === 0 && e instanceof ConnectionFailed) {
-          await this.reconnectBang({ restoreTransactions: true });
-          continue;
-        }
-        throw e;
-      }
-    }
+    await this.withRawConnection({ allowRetry: true, materializeTransactions: false }, async () => {
+      await this.internalExecute(`SET TRANSACTION ISOLATION LEVEL ${level}`, "TRANSACTION", {
+        materializeTransactions: false,
+      });
+      await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
+      this._inTransaction = true;
+    });
   }
 
   async beginDeferredTransaction(): Promise<void> {
