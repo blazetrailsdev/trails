@@ -147,6 +147,11 @@ interface QueryMethodsHost {
   _annotations: string[];
   _optimizerHints: string[];
   _referencesValues: string[];
+  // References added by an explicit `.references(...)` call. Rails only seeds
+  // JoinDependency's alias map from SqlLiteral references (those auto-derived by
+  // column_references / arel_column_with_table), NOT from these bare-string
+  // manual references — so they are excluded when aliasing eager-load joins.
+  _manualReferences: string[];
   _fromClause: FromClause;
   _createWithAttrs: Record<string, unknown>;
   _extending: Array<Record<string, (...args: any[]) => any>>;
@@ -432,38 +437,11 @@ function expandOrderHash(
   return clauses;
 }
 
-// Mirrors Rails' QueryMethods#column_references: extract table names from order
-// args so `includes(:author).order("authors.name")` (or the hash/Arel forms)
-// auto-adds `authors` to references_values, promoting the include to eager_load.
-function columnReferencesFromOrderArgs(args: OrderArg[]): string[] {
-  const extractTableName = (s: string): string | null => {
-    const m = s.match(/^\W?(\w+)\W?\./);
-    return m ? m[1] : null;
-  };
-  const refs: string[] = [];
-  const push = (r: string | null | undefined): void => {
-    if (r) refs.push(r);
-  };
-  for (const arg of args) {
-    if (typeof arg === "string") {
-      push(extractTableName(arg));
-    } else if (arg instanceof Nodes.Attribute) {
-      push((arg.relation as { name?: string })?.name);
-    } else if (arg instanceof Nodes.Ordering) {
-      const expr = (arg as { expr?: unknown }).expr;
-      if (expr instanceof Nodes.Attribute) push((expr.relation as { name?: string })?.name);
-    } else if (arg !== null && typeof arg === "object" && !(arg instanceof Nodes.Node)) {
-      for (const [key, value] of Object.entries(arg as Record<string, unknown>)) {
-        if (value !== null && typeof value === "object") push(key);
-        else push(extractTableName(key));
-      }
-    }
-  }
-  return refs;
-}
-
 function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
-  const refs = columnReferencesFromOrderArgs(args);
+  // Mirrors Rails' preprocess_order_args adding column_references to
+  // references_values, so `includes(:author).order("authors.name")` (or the
+  // hash/Arel forms) promotes the include to eager_load.
+  const refs = columnReferences(args as unknown[]);
   if (refs.length > 0) referencesBang.call(this, ...refs);
   let i = 0;
   while (i < args.length) {
@@ -538,7 +516,7 @@ function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
   this._orderClauses = [];
   this._rawOrderClauses = [];
   this._reordering = true;
-  const refs = columnReferencesFromOrderArgs(args);
+  const refs = columnReferences(args as unknown[]);
   if (refs.length > 0) referencesBang.call(this, ...refs);
   let i = 0;
   while (i < args.length) {
@@ -1042,6 +1020,7 @@ function andBang(this: QueryMethodsHost, other: any): any {
   this._havingClause = this._havingClause.merge(other._havingClause);
   const unionStrings = (a: string[], b: string[]): string[] => [...new Set([...a, ...b])];
   this._referencesValues = unionStrings(this._referencesValues, other._referencesValues);
+  this._manualReferences = unionStrings(this._manualReferences, other._manualReferences ?? []);
   return this;
 }
 
@@ -1055,6 +1034,7 @@ function orBang(this: QueryMethodsHost, other: any): any {
   this._havingClause = this._havingClause.or(other._havingClause);
   const unionStrings = (a: string[], b: string[]): string[] => [...new Set([...a, ...b])];
   this._referencesValues = unionStrings(this._referencesValues, other._referencesValues);
+  this._manualReferences = unionStrings(this._manualReferences, other._manualReferences ?? []);
   return this;
 }
 
