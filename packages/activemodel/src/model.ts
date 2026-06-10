@@ -1433,6 +1433,11 @@ export class Model {
     return this._attributes.getAttribute(resolved).valueBeforeTypeCast ?? null;
   }
 
+  /** Mirrors ActiveModel::Serializers::JSON `class_attribute :include_root_in_json` instance reader. */
+  get includeRootInJson(): boolean | string {
+    return (this.constructor as typeof Model).includeRootInJson;
+  }
+
   /**
    * Get all attributes before type cast as a plain object.
    *
