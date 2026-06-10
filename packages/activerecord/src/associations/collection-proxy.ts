@@ -3004,7 +3004,7 @@ function primaryKeyToken(record: Base): string | null {
   const id = (record as { id?: unknown }).id;
   if (Array.isArray(id)) {
     if (id.some((part) => part == null)) return null;
-    return id.map((part) => String(part)).join(" ");
+    return id.map((part) => String(part)).join("\u0000");
   }
   if (id == null) return null;
   return String(id);
