@@ -21,7 +21,10 @@ import type { DatabaseAdapter } from "../adapter.js";
 import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { defineSchema } from "./define-schema.js";
+import { generateSchemaFile } from "./schema-file-generator.js";
 import { TEST_SCHEMA } from "./test-schema.js";
+import { InternalMetadata } from "../internal-metadata.js";
+import { schemaSha1 } from "../tasks/database-tasks.js";
 import {
   RUN_TOKEN_ENV,
   TEMPLATE_PATH_ENV,
@@ -103,6 +106,8 @@ const sqliteAdapter: DbTemplateAdapter = {
 // PostgreSQL adapter
 // ---------------------------------------------------------------------------
 
+// Set to the template DB name once globalSetup has built and stamped it; unset
+// means the PG template path did not run (sqlite/MySQL run, or globalSetup off).
 export const PG_TEMPLATE_ENV = "AR_TEST_PG_TEMPLATE";
 
 function pgAdminUrl(baseUrl: string): string {
@@ -140,10 +145,20 @@ const pgAdapter: DbTemplateAdapter = {
       connectionString: tplUrl.toString(),
       max: 1,
     }) as unknown as DatabaseAdapter;
-    await buildTemplateSchema(adapter, async () => {
+    try {
+      await defineSchema(adapter, TEST_SCHEMA);
+      // Stamp ar_internal_metadata so every slot cloned from this template
+      // reports `schemaUpToDate` → each worker's reconstructFromSchema only
+      // TRUNCATEs (no DDL) instead of paying a full purge+reload per test
+      // file. The SHA1 must match the file workers generate from TEST_SCHEMA
+      // (generateSchemaFile + reconstructFromSchema in test-setup-dy.ts).
+      const schemaFile = await generateSchemaFile(TEST_SCHEMA, "postgres");
+      const sha1 = await schemaSha1(schemaFile);
+      await new InternalMetadata(adapter).createTableAndSetFlags("test", sha1);
+    } finally {
       await (adapter as unknown as { disconnect(): Promise<void> }).disconnect?.();
       await pgTerminateConnections(admin, templateDb);
-    });
+    }
 
     for (let slot = 1; slot <= slotCount(); slot++) {
       const slotDb = slot === 1 ? baseDb : `${baseDb}_${slot}`;
@@ -152,7 +167,7 @@ const pgAdapter: DbTemplateAdapter = {
       await admin.query(`CREATE DATABASE "${slotDb}" TEMPLATE "${templateDb}"`);
     }
 
-    process.env[PG_TEMPLATE_ENV] = "1";
+    process.env[PG_TEMPLATE_ENV] = templateDb;
     await admin.end();
 
     return async () => {
