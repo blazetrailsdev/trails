@@ -181,6 +181,8 @@ async function processNestedAttributes(record: Base): Promise<void> {
     const targetModel = modelRegistry.get(className);
     if (!targetModel) continue;
 
+    await (targetModel as any).ensureSchemaLoaded();
+
     const foreignKey = assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`;
 
     // limit-check already fired in assignNestedAttributes (Rails
