@@ -1936,7 +1936,13 @@ export class MigrationContext {
         adapter: this.connection,
       });
     if (fn) fn(td);
-    await this.connection.executeMutation(this.connection.toSql(td));
+    const schemaCreation = this.connection.schemaCreation;
+    if (!schemaCreation) {
+      throw new Error(
+        `Adapter ${this.connection.adapterName} does not expose schemaCreation; cannot render CREATE TABLE DDL.`,
+      );
+    }
+    await this.connection.executeMutation(schemaCreation.accept(td));
     if (options?.comment != null && options.comment.trim().length > 0) {
       const adapterWithComments = this.connection as {
         supportsComments?: () => boolean;
