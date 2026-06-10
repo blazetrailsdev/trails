@@ -1656,4 +1656,16 @@ export const TEST_SCHEMA: Schema = {
     },
     primaryKey: ["as"],
   },
+
+  // Trails-only scratch tables (no counterpart in Rails' schema.rb). They are
+  // recreated per-test under `force: true` migrations or back ad-hoc type
+  // round-trip models; canonicalizing them here converges the shape across the
+  // sibling files that share the table (see require-canonical-schema).
+  //
+  // `foos` — placeholder shape for the *_precision tests, which drop and rebuild
+  // it per-test with the precision column under test (Rails creates `:foos`
+  // dynamically via `create_table(:foos, force: true)`; it is not a fixture).
+  foos: { name: "string" },
+  // `metrics` — backs the bigint round-trip model tests (no Rails counterpart).
+  metrics: { score: "big_integer", label: "string" },
 };

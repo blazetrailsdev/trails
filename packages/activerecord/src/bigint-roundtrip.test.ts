@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
@@ -15,7 +16,7 @@ const BIG = 2n ** 62n; // 4611686018427387904 — above Number.MAX_SAFE_INTEGER
 setupHandlerSuite();
 useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  await defineSchema({ metrics: { score: "big_integer", label: "string" } });
+  await defineSchema({ metrics: TEST_SCHEMA.metrics });
 });
 describe("bigint model round-trip (all adapters)", () => {
   function makeModel() {

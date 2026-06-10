@@ -7,6 +7,7 @@ import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 
 function nsecTime(v: Temporal.PlainTime): number {
@@ -19,7 +20,7 @@ function nsecTime(v: Temporal.PlainTime): number {
 // the `force: true` migrations drop and rebuild it with the precision under test.
 async function freshAdapter(): Promise<DatabaseAdapter> {
   const adapter = createTestAdapter();
-  await defineSchema(adapter, { foos: { name: "string" } });
+  await defineSchema(adapter, { foos: TEST_SCHEMA.foos });
   return adapter;
 }
 
