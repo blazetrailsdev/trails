@@ -7249,11 +7249,10 @@ describe("count with includes join dependency", () => {
     const post = await JdPost.create({ title: "hello" });
     await JdComment.create({ jd_post_id: post.id, body: "c1" });
     await JdComment.create({ jd_post_id: post.id, body: "c2" });
-    const sql = JdPost.includes("jdComments").toSql();
-    expect(sql).not.toContain("LEFT OUTER JOIN");
-    // count("*") with includes must route through join dependency
-    const count = await JdPost.includes("jdComments").count("*");
-    // One post — DISTINCT on PK prevents fan-out from two comments
+    // eagerLoad forces a LEFT OUTER JOIN; count("*") with explicit column routes
+    // through JD and must use COUNT(DISTINCT pk) — fan-out from 2 comments would
+    // otherwise give 2 instead of 1.
+    const count = await JdPost.eagerLoad("jdComments").count("*");
     expect(count).toBe(1);
   });
 

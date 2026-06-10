@@ -412,7 +412,7 @@ export async function performCount(
       (anyRel._includesToPromoteFromReferences?.() as string[] | undefined) ?? [];
     const allEager = [...new Set([...eagerSpecs, ...includesSpecs, ...promoted])];
     // CPK + grouped eagerLoad not yet supported; fall through to plain groupedAggregate.
-    if (allEager.length > 0 && !Array.isArray(this._modelClass.primaryKey)) {
+    if (!Array.isArray(this._modelClass.primaryKey)) {
       const pk = this._modelClass.primaryKey as string;
       const jd = QueryMethodBangs.constructJoinDependency.call(anyRel, allEager, Nodes.OuterJoin);
       const jdNodes: Nodes.Join[] = jd.joinConstraints([]);
