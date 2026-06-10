@@ -170,12 +170,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return !this._closed && this._pgClientOptions != null;
   }
 
-  // Mirrors Rails' PostgreSQLAdapter#connected? — checks that the raw
-  // connection has been opened and not torn down.
-  override isConnected(): boolean {
-    return this._rawConnection != null;
-  }
-
   // Mirrors: PostgreSQLAdapter::NATIVE_DATABASE_TYPES (postgresql_adapter.rb:134)
   static readonly NATIVE_DATABASE_TYPES: Record<
     string,
@@ -248,7 +242,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // pg.Client owned by the adapter for its lifetime. The trails outer
   // ConnectionPool is the only pooling layer; concurrent callers under a
   // pinned context all share this single client and queue on its socket.
-  private _rawConnection: pg.Client | null = null;
+  //
+  // This is the single base `_connection` slot, not a parallel one: Rails'
+  // `@raw_connection` IS the one connection ivar every adapter shares, and
+  // trails unifies PG onto the inherited `_connection` field so base helpers
+  // (`active`, `secondsSinceLastActivity`, `validRawConnection`, `isConnected`)
+  // see PG's live handle with no PG-specific shim. `_rawConnection` is kept as
+  // a thin typed accessor so the PG lifecycle code (which needs the concrete
+  // `pg.Client`) reads naturally; the base field is typed `AbstractAdapter |
+  // null`, so the accessor narrows it.
+  private get _rawConnection(): pg.Client | null {
+    return this._connection as unknown as pg.Client | null;
+  }
+  private set _rawConnection(value: pg.Client | null) {
+    this._connection = value as unknown as AbstractAdapter | null;
+  }
   private _pgClientOptions: pg.ClientConfig | null = null;
   // Non-null when a transaction is open on _rawConnection. Always equals
   // _rawConnection while set — kept as a field for legibility of the
