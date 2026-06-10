@@ -41,14 +41,15 @@ function buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationIn
 }
 
 function syncAssociationInstance(this: Base, name: string, instance: AssociationInstance): void {
-  const proxy = this._collectionProxies.get(name) as { loaded?: boolean; target?: unknown };
-  if (proxy && proxy.loaded) {
-    instance.setTarget(proxy.target as any);
-    return;
-  }
-  const cached = this._cachedAssociations;
-  if (cached && cached.has(name)) {
-    instance.setTarget(cached.get(name) ?? null);
+  // Reads the loaded has_many target through the proxy read accessor
+  // (`Base#_cachedAssociationTarget`), which returns the canonical proxy
+  // target array when a loaded collection proxy exists and otherwise falls
+  // back to the legacy `_cachedAssociations` map. A cached "nil association"
+  // surfaces as `null` (not `undefined`), so the `!== undefined` guard still
+  // marks the instance loaded — matching `Association#doFindTarget`.
+  const cached = this._cachedAssociationTarget(name);
+  if (cached !== undefined) {
+    instance.setTarget(cached ?? null);
     return;
   }
   // Use `has()` so an eagerly-preloaded "nil association" (the preloader
