@@ -130,6 +130,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return (this._sqlite3SchemaCreation ??= new SQLite3SchemaCreation("sqlite", this));
   }
 
+  /** @internal */
   createTableDefinition(
     name: string,
     options: Record<string, unknown> = {},
@@ -1456,6 +1457,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async tableExists(name: string): Promise<boolean> {
+    // Rails guards with `if table_name.present?` and returns nil for nil/blank
+    // names (schema_statements.rb:61); we return false for the same observable
+    // `table_exists?(nil)` result rather than dereferencing a null name.
+    if (name == null) return false;
     if (name.includes(".")) {
       // Schema-qualified name (e.g. "aux.widgets") — query the attached schema's catalog.
       const { sqliteMaster, bare } = this._sqliteMasterFor(name);
@@ -1618,7 +1623,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // only, and the auto ones are redundant with the CREATE TABLE sql.
     const userIndexes = rows.filter((r) => r.origin === "c");
     const sqliteMaster = schema ? `${quoteColumnName(schema)}.sqlite_master` : "sqlite_master";
-    const result: Array<{ name: string; columns: string[]; unique: boolean; where?: string }> = [];
+    const result: Array<{
+      table: string;
+      name: string;
+      columns: string[];
+      unique: boolean;
+      where?: string;
+    }> = [];
     for (const idx of userIndexes) {
       // index_info takes the bare index name; the schema qualifier, if
       // any, comes before the PRAGMA keyword — same shape as above.
@@ -1633,6 +1644,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const idxSqlRow = (await idxSqlStmt.get()) as { sql: string } | undefined;
       const whereMatch = idxSqlRow?.sql ? /\bWHERE\b\s+(.+)$/i.exec(idxSqlRow.sql) : null;
       result.push({
+        table: bare,
         name: idx.name,
         columns: cols.sort((a, b) => a.seqno - b.seqno).map((c) => c.name),
         unique: idx.unique === 1,

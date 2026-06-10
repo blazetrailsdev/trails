@@ -55,13 +55,16 @@ describe("SQLite3Adapter schema introspection", () => {
     );
     await adapter.executeMutation("CREATE INDEX widgets_on_owner ON widgets (owner)");
     const indexes = (await adapter.indexes("widgets")) as Array<{
+      table: string;
       name: string;
       columns: string[];
       unique: boolean;
     }>;
     // Only the explicitly-created index should surface; the auto-index for
     // UNIQUE(email) and the primary-key rowid mapping are filtered out.
-    expect(indexes).toEqual([{ name: "widgets_on_owner", columns: ["owner"], unique: false }]);
+    expect(indexes).toEqual([
+      { table: "widgets", name: "widgets_on_owner", columns: ["owner"], unique: false },
+    ]);
   });
 
   it("introspection PRAGMAs work against schema-qualified names", async () => {
@@ -82,10 +85,13 @@ describe("SQLite3Adapter schema introspection", () => {
     const cols = await adapter.columns("aux.widgets");
     expect(cols.map((c) => c.name)).toEqual(["id", "name"]);
     const indexes = (await adapter.indexes("aux.widgets")) as Array<{
+      table: string;
       name: string;
       columns: string[];
     }>;
-    expect(indexes).toEqual([{ name: "widgets_on_name", columns: ["name"], unique: false }]);
+    expect(indexes).toEqual([
+      { table: "widgets", name: "widgets_on_name", columns: ["name"], unique: false },
+    ]);
   });
 
   it("dataSourceExists matches both tables and views, hides sqlite_* internals", async () => {

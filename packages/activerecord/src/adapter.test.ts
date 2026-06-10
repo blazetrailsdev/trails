@@ -4,8 +4,33 @@ import type { DatabaseAdapter } from "./adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
-import { Base, disablePreparedStatements, setDisablePreparedStatements } from "./index.js";
+import {
+  Base,
+  disablePreparedStatements,
+  setDisablePreparedStatements,
+  NotNullViolation,
+  RecordNotUnique,
+  StatementInvalid,
+} from "./index.js";
 import { Result } from "./result.js";
+
+// Spin up a fresh in-memory adapter with the given DDL applied, run the body,
+// then close. Mirrors AdapterTest's per-test `@connection` against the schema
+// the corresponding Rails fixtures (accounts/authors/tasks/topics/subscribers/
+// posts) materialize — created inline here so the suite stays self-contained
+// rather than leaning on a shared handler DB.
+async function withSchema(
+  ddl: string[],
+  body: (conn: SQLite3Adapter) => Promise<void>,
+): Promise<void> {
+  const conn = new SQLite3Adapter(":memory:");
+  try {
+    for (const stmt of ddl) await conn.executeMutation(stmt);
+    await body(conn);
+  } finally {
+    await conn.close();
+  }
+}
 
 class LifecycleTestAdapter extends AbstractAdapter {
   private _connected = false;
@@ -116,20 +141,54 @@ describe("AdapterTest", () => {
       await conn.close();
     }
   });
-  it.skip("table exists?", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs accounts table for tableExists round-trip across coercions
-    // SCOPE: ~15 LOC port; affects ~1 test
+  it("table exists?", async () => {
+    await withSchema(
+      ["CREATE TABLE accounts (id integer PRIMARY KEY, firm_id integer)"],
+      async (conn) => {
+        expect(await conn.tableExists("accounts")).toBe(true);
+        expect(await conn.tableExists("nonexistingtable")).toBe(false);
+        expect(await conn.tableExists("'")).toBe(false);
+        expect(await conn.tableExists(null as unknown as string)).toBe(false);
+      },
+    );
   });
-  it.skip("data sources", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs accounts/authors/tasks/topics fixtures for dataSources enumeration
-    // SCOPE: ~10 LOC port; affects ~2 tests
+  it("data sources", async () => {
+    await withSchema(
+      [
+        "CREATE TABLE accounts (id integer PRIMARY KEY)",
+        "CREATE TABLE authors (id integer PRIMARY KEY)",
+        "CREATE TABLE tasks (id integer PRIMARY KEY)",
+        "CREATE TABLE topics (id integer PRIMARY KEY)",
+      ],
+      async (conn) => {
+        const dataSources = await conn.dataSources();
+        expect(dataSources).toContain("accounts");
+        expect(dataSources).toContain("authors");
+        expect(dataSources).toContain("tasks");
+        expect(dataSources).toContain("topics");
+      },
+    );
   });
-  it.skip("indexes", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs accounts table for addIndex/indexes/removeIndex round-trip
-    // SCOPE: ~25 LOC port; affects ~3 tests
+  it("indexes", async () => {
+    const idxName = "accounts_idx";
+    await withSchema(
+      ["CREATE TABLE accounts (id integer PRIMARY KEY, firm_id integer)"],
+      async (conn) => {
+        expect(await conn.indexes("accounts")).toEqual([]);
+
+        await conn.addIndex("accounts", "firm_id", { name: idxName });
+        const indexes = (await conn.indexes("accounts")) as Array<{
+          table: string;
+          name: string;
+          unique: boolean;
+          columns: string[];
+        }>;
+        expect(indexes[0].table).toBe("accounts");
+        expect(indexes[0].name).toBe(idxName);
+        expect(indexes[0].unique).toBe(false);
+        expect(indexes[0].columns).toEqual(["firm_id"]);
+      },
+    );
   });
   it("returns empty indexes for non existing table", async () => {
     const conn = new SQLite3Adapter(":memory:");
@@ -209,15 +268,28 @@ describe("AdapterTest", () => {
     expect(conn.tableAliasFor("posts_comments")).toBe("posts_comm");
     expect(conn.tableAliasFor("dbo.posts")).toBe("dbo_posts");
   });
-  it.skip("uniqueness violations are translated to specific exception", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs subscribers table; exercises RecordNotUnique translation from raw INSERT
-    // SCOPE: ~15 LOC port; affects ~1 test
+  it("uniqueness violations are translated to specific exception", async () => {
+    await withSchema(
+      ["CREATE TABLE subscribers (nick varchar PRIMARY KEY, name varchar)"],
+      async (conn) => {
+        await conn.executeMutation("INSERT INTO subscribers(nick) VALUES('me')");
+        const error = await conn
+          .executeMutation("INSERT INTO subscribers(nick) VALUES('me')")
+          .catch((e) => e);
+        expect(error).toBeInstanceOf(RecordNotUnique);
+        expect(error.cause).toBeTruthy();
+      },
+    );
   });
-  it.skip("not null violations are translated to specific exception", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs Post model with NOT NULL constraints for NotNullViolation translation
-    // SCOPE: ~10 LOC port; affects ~1 test
+  it("not null violations are translated to specific exception", async () => {
+    await withSchema(
+      ["CREATE TABLE posts (id integer PRIMARY KEY, title varchar NOT NULL)"],
+      async (conn) => {
+        const error = await conn.executeMutation("INSERT INTO posts(id) VALUES(1)").catch((e) => e);
+        expect(error).toBeInstanceOf(NotNullViolation);
+        expect(error.cause).toBeTruthy();
+      },
+    );
   });
   it.skip("value limit violations are translated to specific exception", () => {
     // BLOCKED: fixture
@@ -234,15 +306,21 @@ describe("AdapterTest", () => {
     // ROOT-CAUSE: test-helpers/fixtures: needs posts table + ActiveSupport::Notifications.subscribe equivalent for sql.active_record event
     // SCOPE: ~20 LOC port; affects ~1 test
   });
-  it.skip("database related exceptions are translated to statement invalid", () => {
-    // BLOCKED: schema
-    // ROOT-CAUSE: connection-adapters/abstract-adapter.ts#execute: must translate raw-SQL parse errors into StatementInvalid
-    // SCOPE: ~10 LOC + error-translator wiring; affects ~1 test
+  it("database related exceptions are translated to statement invalid", async () => {
+    await withSchema([], async (conn) => {
+      const error = await conn.execute("This is a syntax error").catch((e) => e);
+      expect(error).toBeInstanceOf(StatementInvalid);
+      expect(error.cause).toBeInstanceOf(Error);
+    });
   });
-  it.skip("select all always return activerecord result", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers/fixtures: needs posts table; exercises selectAll returning Result instance
-    // SCOPE: ~10 LOC port; affects ~1 test
+  it("select all always return activerecord result", async () => {
+    await withSchema(
+      ["CREATE TABLE posts (id integer PRIMARY KEY, title varchar)"],
+      async (conn) => {
+        const result = await conn.selectAll("SELECT * FROM posts");
+        expect(result).toBeInstanceOf(Result);
+      },
+    );
   });
   it.skip("select all insert update delete with casted binds", () => {
     // BLOCKED: fixture
