@@ -4915,6 +4915,45 @@ export class Relation<T extends Base> {
     ) as Promise<T>;
   }
 
+  /**
+   * Mirrors: ActiveRecord::TokenFor::RelationMethods#find_by_token_for
+   */
+  async findByTokenFor(purpose: string, token: string): Promise<T | null> {
+    return this.scoping(() =>
+      this._modelTokenForMethod("findByTokenFor")(purpose, token),
+    ) as Promise<T | null>;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::TokenFor::RelationMethods#find_by_token_for!
+   */
+  async findByTokenForBang(purpose: string, token: string): Promise<T> {
+    return this.scoping(() =>
+      this._modelTokenForMethod("findByTokenForBang")(purpose, token),
+    ) as Promise<T>;
+  }
+
+  /**
+   * Resolve the model's class-level token-for finder. In Rails `TokenFor` is
+   * included in every AR model, so the finder always exists and raises
+   * `KeyError` via `token_definitions.fetch(purpose)` for an unknown purpose.
+   * Here the finder is only installed by `generatesTokenFor`; when no token
+   * purpose has ever been declared on the model (or an ancestor) it is absent,
+   * so raise the same unknown-purpose error rather than a cryptic
+   * `undefined is not a function`.
+   */
+  private _modelTokenForMethod(
+    name: "findByTokenFor" | "findByTokenForBang",
+  ): (purpose: string, token: string) => Promise<unknown> {
+    const fn = (this._modelClass as any)[name];
+    if (typeof fn !== "function") {
+      return (purpose: string) => {
+        throw new Error(`Unknown token purpose: ${purpose}`);
+      };
+    }
+    return fn.bind(this._modelClass);
+  }
+
   // Memoized per timestamp column, matching Rails' @cache_keys / @cache_versions.
   private _cacheKeys: Map<string, Promise<string>> | undefined;
   private _cacheVersions: Map<string, Promise<string | null>> | undefined;

@@ -45,7 +45,7 @@ const MINIMUM_TOKEN_LENGTH = 24;
 export function hasSecureToken(
   modelClass: typeof Base,
   attribute: string = "token",
-  options?: { length?: number },
+  options?: { length?: number; on?: "create" | "initialize" },
 ): void {
   const tokenLength = options?.length ?? MINIMUM_TOKEN_LENGTH;
   if (tokenLength < MINIMUM_TOKEN_LENGTH) {
@@ -54,12 +54,34 @@ export function hasSecureToken(
     );
   }
 
-  // Before create: auto-generate token if blank
-  modelClass.beforeCreate((record: any) => {
-    if (!record.readAttribute(attribute)) {
-      record._attributes.set(attribute, generateToken(tokenLength));
+  // Mirrors Rails:
+  //   set_callback on, on == :initialize ? :after : :before do
+  //     if new_record? && !query_attribute(attribute)
+  //       send("#{attribute}=", generate_unique_secure_token(length:))
+  //     end
+  //   end
+  // Routing the assignment through the property setter (rather than
+  // `_attributes.set`) lets a subclass that overrides `attribute=` observe the
+  // generated value, exactly as Rails' `send("#{attribute}=", …)` does.
+  //
+  // Default `on` is "create" to match the ActiveRecord *framework* default —
+  // `vendor/rails/activerecord/lib/active_record.rb:461` sets
+  // `self.generate_secure_token_on = :create`. The `:initialize` value
+  // documented on `has_secure_token` is the railtie/`load_defaults` value
+  // (railtie.rb:40 also sets `:create` at the framework level), which is only
+  // applied in a booted app — not in the AR test suite. Rails' own
+  // SecureTokenTest therefore runs against `:create` (its tests `save` before
+  // asserting the token), which is exactly what these ports do.
+  const generateIfBlank = (record: any): void => {
+    if (record.isNewRecord() && !record.queryAttribute(attribute)) {
+      record[attribute] = generateToken(tokenLength);
     }
-  });
+  };
+  if (options?.on === "initialize") {
+    modelClass.afterInitialize(generateIfBlank);
+  } else {
+    modelClass.beforeCreate(generateIfBlank);
+  }
 
   // Instance method to regenerate the token
   const methodName =

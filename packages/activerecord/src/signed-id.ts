@@ -93,7 +93,13 @@ export function signedId(
   }
   const ctor = instance.constructor as typeof Base;
   const verifier = signedIdVerifier(ctor);
-  return verifier.generate(instance.id, {
+  // BigInt is not JSON-serializable; coerce to a plain number so the signed
+  // payload round-trips (Rails signs an integer id).
+  const coerce = (v: unknown): unknown => (typeof v === "bigint" ? Number(v) : v);
+  const id = Array.isArray(instance.id)
+    ? (instance.id as unknown[]).map(coerce)
+    : coerce(instance.id);
+  return verifier.generate(id, {
     expiresIn: options?.expiresIn,
     expiresAt: options?.expiresAt,
     purpose: combinePurposes(ctor, options?.purpose),
