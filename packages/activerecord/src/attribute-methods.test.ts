@@ -42,7 +42,7 @@ const TEST_SCHEMA = {
     count: "integer",
     code: "string",
   },
-  am_people: {
+  people: {
     name: "string",
     age: "integer",
     active: "boolean",
@@ -1667,7 +1667,6 @@ describe("AttributeMethodsTest", () => {
 describe("AttributeMethodsTest", () => {
   class Person extends Base {
     static {
-      this._tableName = "am_people";
       this.attribute("name", "string");
       this.attribute("age", "integer");
       this.attribute("email", "string");

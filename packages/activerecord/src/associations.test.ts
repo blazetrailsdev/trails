@@ -6026,7 +6026,7 @@ describe("HasManyAssociationsTest", () => {
     grandchildren: { child_id: "integer", name: "string" },
     logs: { name: "string" },
     parents: { name: "string" },
-    hm_people: { name: "string" },
+    people: { name: "string" },
     posts: { title: "string" },
     products: { buyer_id: "integer", name: "string", seller_id: "integer" },
     roots: { name: "string" },
@@ -6590,7 +6590,6 @@ describe("HasManyAssociationsTest", () => {
     }
     class Person extends Base {
       static {
-        this._tableName = "hm_people";
         this.attribute("name", "string");
       }
     }

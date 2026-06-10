@@ -102,7 +102,7 @@ const TEST_SCHEMA: Schema = {
   friendships: {
     friend_id: "integer",
   },
-  cc_people: {
+  people: {
     name: "string",
     cars_count: "integer",
   },

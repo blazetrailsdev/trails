@@ -99,6 +99,33 @@ export type NormalizesArgs =
 type ValidatorLike = ValidatorBase | EachValidator | { validate(record: ValidatableRecord): void };
 
 /**
+ * Conditions accepted by `before_validation` / `after_validation`. Unlike the
+ * generic callback conditions, validation callbacks also accept `on:` (Rails
+ * `ActiveModel::Validations.before_validation`).
+ */
+export type ValidationCallbackConditions<TRecord> = CallbackConditions<TRecord> & {
+  on?: string | string[];
+};
+
+/**
+ * Mirrors Rails `ActiveModel::Validations.before_validation` / `after_validation`:
+ * the `on:` option is translated into an `:if` predicate over the record's
+ * current `validation_context` (Rails prepends `predicate_for_validation_context`
+ * to any existing `:if`). We AND it with an existing `if` so both must pass.
+ */
+function _validationOnToIf<TRecord extends object>(
+  conditions?: ValidationCallbackConditions<TRecord>,
+): CallbackConditions<TRecord> | undefined {
+  if (!conditions || conditions.on === undefined) return conditions;
+  const { on, if: existingIf, ...rest } = conditions;
+  const onPredicate = validationsPredicateForValidationContext(on) as (r: TRecord) => boolean;
+  return {
+    ...rest,
+    if: (record: TRecord) => onPredicate(record) && (existingIf ? existingIf(record) : true),
+  };
+}
+
+/**
  * Model — the base class that bundles Attributes, Validations, Callbacks,
  * Dirty tracking, Serialization, and Naming.
  *
@@ -717,28 +744,28 @@ export class Model {
   static beforeValidation<T extends typeof Model>(
     this: T,
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: CallbackConditions<InstanceType<T>>,
+    conditions?: ValidationCallbackConditions<InstanceType<T>>,
   ): void {
     _registerCallbackOnProto(
       this.prototype,
       "before",
       "validation",
       fn as CallbackFn | CallbackObject,
-      conditions,
+      _validationOnToIf(conditions),
     );
   }
 
   static afterValidation<T extends typeof Model>(
     this: T,
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: CallbackConditions<InstanceType<T>>,
+    conditions?: ValidationCallbackConditions<InstanceType<T>>,
   ): void {
     _registerCallbackOnProto(
       this.prototype,
       "after",
       "validation",
       fn as CallbackFn | CallbackObject,
-      conditions,
+      _validationOnToIf(conditions),
     );
   }
 

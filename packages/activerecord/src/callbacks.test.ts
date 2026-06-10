@@ -15,6 +15,7 @@ import {
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 // Union of every table referenced by the CallbacksTest describe blocks below.
 // Overlapping tables share a consistent column shape, so one up-front schema
@@ -22,7 +23,6 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 const TEST_SCHEMA: Schema = {
   topics: { title: "string" },
   animals: { name: "string", type: "string" },
-  cb_people: { name: "string" },
   cb_posts: { title: "string" },
   trackeds: { name: "string" },
   guardeds: { name: "string" },
@@ -38,7 +38,7 @@ const TEST_SCHEMA: Schema = {
   tasks: { name: "string", important: "boolean", skip: "boolean" },
   blocked: { name: "string" },
   users: { name: "string", updated_at: "datetime" },
-  developers: { name: "string", salary: "integer" },
+  developers: canonicalSchema.developers,
   orders: { total: "integer", discount_code: "string", silent: "boolean" },
   widgets: { name: "string" },
   gadgets: { value: "integer" },
@@ -125,10 +125,43 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
+  // Rails callbacks_test.rb declares `fixtures :developers`; the callback models
+  // ride the canonical `developers` table. ContextualCallbacksDeveloper records
+  // a per-instance callback history and asserts validation-context ordering.
+  class ContextualCallbacksDeveloper extends Base {
+    history: string[] = [];
+    static {
+      this._tableName = "developers";
+      this.attribute("name", "string");
+      this.attribute("salary", "integer");
+      this.beforeValidation((r: ContextualCallbacksDeveloper) => {
+        r.history.push("before_validation");
+      });
+      this.beforeValidation(
+        (r: ContextualCallbacksDeveloper) => {
+          r.history.push(`before_validation_on_${r._validationContext}`);
+        },
+        { on: ["create", "update"] },
+      );
+      this.validate((r: ContextualCallbacksDeveloper) => {
+        r.history.push("validate");
+      });
+      this.afterValidation((r: ContextualCallbacksDeveloper) => {
+        r.history.push("after_validation");
+      });
+      this.afterValidation(
+        (r: ContextualCallbacksDeveloper) => {
+          r.history.push(`after_validation_on_${r._validationContext}`);
+        },
+        { on: ["create", "update"] },
+      );
+    }
+  }
+
   it("save person", async () => {
     class Person extends Base {
       static {
-        this._tableName = "cb_people";
+        this._tableName = "developers";
         this.attribute("name", "string");
       }
     }
@@ -140,7 +173,7 @@ describe("CallbacksTest", () => {
   it("existing valid?", async () => {
     class Person extends Base {
       static {
-        this._tableName = "cb_people";
+        this._tableName = "developers";
         this.attribute("name", "string");
       }
     }
@@ -150,29 +183,33 @@ describe("CallbacksTest", () => {
   });
 
   it("validate on contextual create", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "cb_people";
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, on: "create" });
-      }
-    }
-    const p = new Person({ name: "" });
-    expect(p.isValid("create")).toBe(false);
-    expect(p.isValid("update")).toBe(true);
+    const david = await ContextualCallbacksDeveloper.create({
+      name: "David",
+      salary: 1000000,
+    });
+    expect(david.history).toEqual([
+      "before_validation",
+      "before_validation_on_create",
+      "validate",
+      "after_validation",
+      "after_validation_on_create",
+    ]);
   });
 
   it("validate on contextual update", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "cb_people";
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, on: "update" });
-      }
-    }
-    const p = new Person({ name: "" });
-    expect(p.isValid("create")).toBe(true);
-    expect(p.isValid("update")).toBe(false);
+    const david = await ContextualCallbacksDeveloper.create({
+      name: "David",
+      salary: 1000000,
+    });
+    david.history.length = 0;
+    await david.save();
+    expect(david.history).toEqual([
+      "before_validation",
+      "before_validation_on_update",
+      "validate",
+      "after_validation",
+      "after_validation_on_update",
+    ]);
   });
 
   it("inheritance of callbacks", async () => {

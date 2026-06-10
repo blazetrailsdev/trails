@@ -38,16 +38,16 @@ describe("OptimisticLockingTest", () => {
     // Force-recreate every canonical table this suite touches. The worker's
     // canonical schema preload keeps their signatures cache-warm, so a plain
     // `defineSchema` (including the fixtures' own) is a no-op — meaning a sibling
-    // file that physically replaced a table with a bespoke shape would survive
-    // into this suite. `dropExisting` bypasses the signature cache and rebuilds
-    // them from the canonical schema verbatim, so we never write a reduced shape
-    // that could in turn contaminate later suites. The `people` table no longer
-    // needs shielding here: its bespoke siblings were converged to file-unique
-    // names (shared-table-convergence). Covers the fixture tables plus the
+    // file that physically replaced a table with a bespoke shape (e.g.
+    // autosave-association's `people: { name, first_name }`) would survive into
+    // this suite. `dropExisting` bypasses the signature cache and rebuilds them
+    // from the canonical schema verbatim, so we never write a reduced shape that
+    // could in turn contaminate later suites. Covers the fixture tables plus the
     // bespoke-class tables: `ships` (ReadonlyNameShip) and the
     // `lock_without_defaults*` pair (Rails: `t.timestamps null: true`).
     await defineSchema(
       {
+        people: canonicalSchema.people,
         references: canonicalSchema.references,
         legacy_things: canonicalSchema.legacy_things,
         string_key_objects: canonicalSchema.string_key_objects,
@@ -469,6 +469,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   beforeAll(async () => {
     await defineSchema(
       {
+        people: canonicalSchema.people,
         personal_legacy_things: canonicalSchema.personal_legacy_things,
         lock_without_defaults: canonicalSchema.lock_without_defaults,
         lock_without_defaults_cust: canonicalSchema.lock_without_defaults_cust,
