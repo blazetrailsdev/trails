@@ -7248,7 +7248,6 @@ describe("count with includes join dependency", () => {
     return { JdPost, JdComment };
   }
 
-  // Rails: test "count with includes"
   it("count with includes", async () => {
     const { JdPost, JdComment } = makeModels();
     const post = await JdPost.create({ title: "hello" });
@@ -7262,7 +7261,6 @@ describe("count with includes join dependency", () => {
     expect(count).toBe(1);
   });
 
-  // Rails: test "count with eager_load"
   it("count with eager_load", async () => {
     const { JdPost, JdComment } = makeModels();
     const post = await JdPost.create({ title: "eager" });
@@ -7272,7 +7270,6 @@ describe("count with includes join dependency", () => {
     expect(count).toBe(1);
   });
 
-  // Rails: test "grouped count with eager_load applies join dependency"
   it("grouped count with eager_load applies join dependency", async () => {
     const { JdPost, JdComment } = makeModels();
     const p1 = await JdPost.create({ title: "x" });
