@@ -411,12 +411,18 @@ export async function performCount(
     const promoted: string[] =
       (anyRel._includesToPromoteFromReferences?.() as string[] | undefined) ?? [];
     const allEager = [...new Set([...eagerSpecs, ...includesSpecs, ...promoted])];
+    // CPK + grouped eagerLoad not yet supported; fall through to plain groupedAggregate.
     if (allEager.length > 0 && !Array.isArray(this._modelClass.primaryKey)) {
       const pk = this._modelClass.primaryKey as string;
       const jd = QueryMethodBangs.constructJoinDependency.call(anyRel, allEager, Nodes.OuterJoin);
       const jdNodes: Nodes.Join[] = jd.joinConstraints([]);
-      const joinedRel = (this as any).joins(...jdNodes).distinct() as CalculationRelation;
-      // COUNT(DISTINCT pk) per group — "*" is invalid with DISTINCT in SQLite/PG/MySQL
+      // Mirror calculations.rb:235: only set distinct when the relation isn't already distinct.
+      const joinedRel = (
+        this._isDistinct
+          ? (this as any).joins(...jdNodes)
+          : (this as any).joins(...jdNodes).distinct()
+      ) as CalculationRelation;
+      // count("*") → pk: COUNT(DISTINCT *) is invalid SQL.
       return groupedAggregate(
         joinedRel,
         "count",

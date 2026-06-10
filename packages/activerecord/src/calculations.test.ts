@@ -7215,6 +7215,20 @@ describe("count with includes join dependency", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
 
+  class JdComment extends Base {
+    static _tableName = "jd_comments";
+    static {
+      this.attribute("jd_post_id", "integer");
+      this.attribute("body", "string");
+    }
+  }
+  class JdPost extends Base {
+    static _tableName = "jd_posts";
+    static {
+      this.attribute("title", "string");
+    }
+  }
+
   beforeAll(async () => {
     await defineSchema(
       {
@@ -7223,33 +7237,15 @@ describe("count with includes join dependency", () => {
       },
       { dropExisting: true },
     );
-  });
-
-  function makeModels() {
-    class JdComment extends Base {
-      static _tableName = "jd_comments";
-      static {
-        this.attribute("jd_post_id", "integer");
-        this.attribute("body", "string");
-      }
-    }
-    class JdPost extends Base {
-      static _tableName = "jd_posts";
-      static {
-        this.attribute("title", "string");
-      }
-    }
     registerModel(JdComment);
     registerModel(JdPost);
     Associations.hasMany.call(JdPost, "jdComments", {
       foreignKey: "jd_post_id",
       className: "JdComment",
     });
-    return { JdPost, JdComment };
-  }
+  });
 
   it("count with includes", async () => {
-    const { JdPost, JdComment } = makeModels();
     const post = await JdPost.create({ title: "hello" });
     await JdComment.create({ jd_post_id: post.id, body: "c1" });
     await JdComment.create({ jd_post_id: post.id, body: "c2" });
@@ -7262,7 +7258,6 @@ describe("count with includes join dependency", () => {
   });
 
   it("count with eager_load", async () => {
-    const { JdPost, JdComment } = makeModels();
     const post = await JdPost.create({ title: "eager" });
     await JdComment.create({ jd_post_id: post.id, body: "e1" });
     await JdComment.create({ jd_post_id: post.id, body: "e2" });
@@ -7271,7 +7266,6 @@ describe("count with includes join dependency", () => {
   });
 
   it("grouped count with eager_load applies join dependency", async () => {
-    const { JdPost, JdComment } = makeModels();
     const p1 = await JdPost.create({ title: "x" });
     const p2 = await JdPost.create({ title: "y" });
     await JdComment.create({ jd_post_id: p1.id, body: "a" });
