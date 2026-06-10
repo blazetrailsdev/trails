@@ -2485,7 +2485,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           ["pg_hint_plan"],
         );
         this._hasOptimizerHints = Number(result.rows[0]?.count) > 0;
-      } catch {
+      } catch (error) {
+        // Carry the version-probe block's recovery forward: tear down on a
+        // dead socket so the next getClient() opens a fresh pg.Client rather
+        // than handing back the stale handle (the recovery the former
+        // withClient body provided before being swallowed by a bare catch).
+        if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
         this._hasOptimizerHints = false;
       }
     }
@@ -5415,11 +5420,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   async reconfigureConnectionTimezone(): Promise<void> {
     const tz = getDefaultTimezone();
-    // Off the withRawConnection loop: this runs from performQuery via
-    // updateTypemapForDefaultTimezone, i.e. already inside a withRawConnection
-    // scope — routing it through the loop would re-enter _lockQueue and
-    // deadlock. Acquire the raw client directly via getClient(); tear down on a
-    // dead socket so the next caller gets a fresh connection.
+    // Off the withRawConnection loop. This runs as the first step of
+    // performQuery (database-statements.ts), which is itself the block
+    // executing inside withRawConnection on the same async chain. Re-entering
+    // withRawConnection would NOT deadlock — TransactionManager.synchronize is
+    // reentrant per async chain (transaction.ts: getStore() === _currentLockOwner
+    // passes straight through). It is bypassed because this SET SESSION is a
+    // sub-step of an already-in-flight query on the already-acquired live
+    // handle: re-entering the leaf loop would redundantly re-run its verify /
+    // materialize / dirtyCurrentTransaction bookkeeping for a session variable.
+    // Acquire the raw client directly via getClient(); tear down on a dead
+    // socket so the next caller gets a fresh connection.
     const client = await this.getClient();
     try {
       if (tz === "utc") {
