@@ -802,7 +802,13 @@ export class AbstractAdapter implements Quoting {
   // callbacks tagged `before`/`after`, so callers (the pool, the QueryCache
   // mixin) register checkout/checkin hooks through one generic API instead of
   // the pool hard-coding the effects inline.
-  private static _connectionCallbacks: Record<ConnectionCallbackPhase, ConnectionCallback[]> = {
+  //
+  // Per-class clone-on-write: subclasses inherit `AbstractAdapter`'s registry
+  // through the static prototype chain (shared static behavior, matching Rails
+  // today). A subclass that registers its own callback gets its own copy first,
+  // mirroring Rails' `define_callbacks` deep-dup on inheritance — so a concrete
+  // adapter's hooks never leak back onto `AbstractAdapter` or its siblings.
+  protected static _connectionCallbacks: Record<ConnectionCallbackPhase, ConnectionCallback[]> = {
     checkout: [],
     checkin: [],
   };
@@ -818,11 +824,18 @@ export class AbstractAdapter implements Quoting {
     kind: ConnectionCallbackKind,
     method: (this: AbstractAdapter) => void,
   ): void {
+    if (!Object.prototype.hasOwnProperty.call(this, "_connectionCallbacks")) {
+      const inherited = this._connectionCallbacks;
+      this._connectionCallbacks = {
+        checkout: [...inherited.checkout],
+        checkin: [...inherited.checkin],
+      };
+    }
     this._connectionCallbacks[phase].push({ kind, method });
   }
 
   private _runCallbacks(phase: ConnectionCallbackPhase, block: () => void): void {
-    const callbacks = AbstractAdapter._connectionCallbacks[phase];
+    const callbacks = (this.constructor as typeof AbstractAdapter)._connectionCallbacks[phase];
     for (const cb of callbacks) if (cb.kind === "before") cb.method.call(this);
     block();
     // Rails runs `:after` callbacks in reverse registration order.

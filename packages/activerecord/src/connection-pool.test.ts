@@ -1620,4 +1620,30 @@ describe("checkout/checkin callbacks", () => {
       )._connectionCallbacks.checkout.pop();
     }
   });
+
+  it("setCallback on a subclass clones the registry and does not leak onto AbstractAdapter", () => {
+    class SubAdapter extends AbstractAdapter {}
+    const before = (AbstractAdapter as unknown as { _connectionCallbacks: { checkout: unknown[] } })
+      ._connectionCallbacks.checkout.length;
+
+    SubAdapter.setCallback("checkout", "after", function () {});
+
+    const sub = (SubAdapter as unknown as { _connectionCallbacks: { checkout: unknown[] } })
+      ._connectionCallbacks;
+    const base = (AbstractAdapter as unknown as { _connectionCallbacks: { checkout: unknown[] } })
+      ._connectionCallbacks;
+    // The subclass got its own copy; the base registry is untouched.
+    expect(sub).not.toBe(base);
+    expect(sub.checkout.length).toBe(before + 1);
+    expect(base.checkout.length).toBe(before);
+  });
+
+  it("subclass without its own callback inherits AbstractAdapter's shared registry", () => {
+    class SharedAdapter extends AbstractAdapter {}
+    const sub = (SharedAdapter as unknown as { _connectionCallbacks: unknown })
+      ._connectionCallbacks;
+    const base = (AbstractAdapter as unknown as { _connectionCallbacks: unknown })
+      ._connectionCallbacks;
+    expect(sub).toBe(base);
+  });
 });
