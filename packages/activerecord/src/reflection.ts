@@ -40,6 +40,41 @@ import {
 
 type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
 
+/**
+ * The shape a concrete reflection exposes that `AbstractReflection`'s shared
+ * methods reach for but cannot see on the base type. Reflection inherently
+ * doesn't know its subclass shape statically (Rails-parity tax), so base-class
+ * methods narrow `this` through this interface instead of `(this as any)`.
+ *
+ * `macro` is the discriminant: narrow to a single branch with
+ * `ReflectionWithMacro<"hasMany">`.
+ */
+export interface ConcreteReflection {
+  readonly macro: MacroType;
+  readonly name: string;
+  readonly options: Record<string, unknown>;
+  readonly activeRecord: typeof Base;
+  readonly pluralName: string;
+  readonly className: string;
+  readonly type?: string;
+  readonly joinPrimaryKey?: string | string[];
+  readonly joinForeignKey?: string | string[];
+  readonly parentReflection?: AssociationReflection | ThroughReflection | null;
+  scopeFor?(relation: any, owner?: any): any;
+}
+
+/** One branch of the `macro` discriminated union. */
+export type ReflectionWithMacro<M extends MacroType> = ConcreteReflection & { readonly macro: M };
+
+/**
+ * Narrow a reflection to its concrete shape. Replaces `(reflection as any).X`
+ * field access on values typed as the abstract base. Runtime-equivalent to the
+ * cast it replaces — the interface only documents the expected fields.
+ */
+function asConcrete(reflection: AbstractReflection): ConcreteReflection {
+  return reflection as unknown as ConcreteReflection;
+}
+
 function arrayLen(value: string | string[]): number {
   return Array.isArray(value) ? value.length : 1;
 }
@@ -128,6 +163,16 @@ export function resolveAliasedColumn(
  * Mirrors: ActiveRecord::Reflection::AbstractReflection
  */
 export class AbstractReflection {
+  /**
+   * @internal
+   * Narrow `this` to the concrete reflection shape so shared base-class methods
+   * can read subclass fields (`name`, `options`, `macro`, …) without casting to
+   * `any`. See {@link ConcreteReflection}.
+   */
+  protected _concrete(): ConcreteReflection {
+    return this as unknown as ConcreteReflection;
+  }
+
   isThroughReflection(): boolean {
     return false;
   }
@@ -177,7 +222,7 @@ export class AbstractReflection {
   }
 
   isHasMany(): boolean {
-    return (this as any).macro === "hasMany";
+    return this._concrete().macro === "hasMany";
   }
 
   isCollection(): boolean {
@@ -207,7 +252,7 @@ export class AbstractReflection {
   joinScope(table: Table, foreignTable: Table, foreignKlass: typeof Base): any {
     let scope = this.klassJoinScope(table);
 
-    const typeCol = (this as any).type;
+    const typeCol = this._concrete().type;
     if (typeCol) {
       scope = scope.where({ [typeCol]: foreignKlass.name });
     }
@@ -216,8 +261,8 @@ export class AbstractReflection {
       scope = scope.merge(chainScope);
     }
 
-    const primaryKeys = this._arrayWrap((this as any).joinPrimaryKey);
-    const foreignKeys = this._arrayWrap((this as any).joinForeignKey);
+    const primaryKeys = this._arrayWrap(this._concrete().joinPrimaryKey);
+    const foreignKeys = this._arrayWrap(this._concrete().joinForeignKey);
 
     if (primaryKeys.length !== foreignKeys.length) {
       throw new ArgumentError(
@@ -236,7 +281,7 @@ export class AbstractReflection {
   joinScopes(table: Table, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
     if (this.scope) {
       const rel = this.buildScope(table, predicateBuilder, klass);
-      const result = (this as any).scopeFor?.(rel, record) ?? this.scope(rel);
+      const result = this._concrete().scopeFor?.(rel, record) ?? this.scope(rel);
       return [result || rel];
     }
     return [];
@@ -251,11 +296,12 @@ export class AbstractReflection {
   }
 
   counterCacheColumn(): string | null {
-    const counterCache = (this as any).options?.counterCache;
+    const self = this._concrete();
+    const counterCache = self.options?.counterCache;
     if (this.belongsTo()) {
-      return belongsToCounterCacheColumn(counterCache, (this as any).activeRecord?.name ?? "");
+      return belongsToCounterCacheColumn(counterCache, self.activeRecord?.name ?? "");
     }
-    return counterCacheColumnOption(counterCache) || `${(this as any).name}_count`;
+    return counterCacheColumnOption(counterCache) || `${self.name}_count`;
   }
 
   checkValidityOfInverseBang(): void {
@@ -267,20 +313,20 @@ export class AbstractReflection {
         // message falls back to `reflection.class_name` (errors.rb). Thread the
         // target class name so the `in <class>` clause is always present.
         throw new InverseOfAssociationNotFoundError(
-          (this as any).name,
+          this._concrete().name,
           inverseOf,
           [],
-          (this as any).className,
+          this._concrete().className,
         );
       }
       if (
-        (inverse as any).name === (this as any).name &&
-        (inverse as any).activeRecord === (this as any).activeRecord
+        asConcrete(inverse).name === this._concrete().name &&
+        asConcrete(inverse).activeRecord === this._concrete().activeRecord
       ) {
         throw new InverseOfAssociationRecursiveError(
-          (this as any).name,
-          (inverse as any).name,
-          (this as any).className,
+          this._concrete().name,
+          asConcrete(inverse).name,
+          this._concrete().className,
         );
       }
     }
@@ -296,7 +342,7 @@ export class AbstractReflection {
         try {
           return (
             c.counterCacheColumn?.() === col &&
-            (c.isPolymorphic?.() || c.klass === (this as any).activeRecord)
+            (c.isPolymorphic?.() || c.klass === this._concrete().activeRecord)
           );
         } catch {
           return false;
@@ -311,28 +357,29 @@ export class AbstractReflection {
     const iwucc = this.inverseWhichUpdatesCounterCache();
     if (iwucc == null) return false;
     return (
-      (inv as any).name === (iwucc as any).name &&
-      (inv as any).activeRecord === (iwucc as any).activeRecord
+      asConcrete(inv).name === asConcrete(iwucc).name &&
+      asConcrete(inv).activeRecord === asConcrete(iwucc).activeRecord
     );
   }
 
   hasCachedCounter(): boolean {
-    const opts = (this as any).options ?? {};
+    const opts = this._concrete().options ?? {};
     if (opts.counterCache) return true;
     const iwucc = this.inverseWhichUpdatesCounterCache();
-    if (iwucc && (iwucc as any).options?.counterCache) {
+    if (iwucc && asConcrete(iwucc).options?.counterCache) {
       const col = this.counterCacheColumn();
-      if (col && (this as any).activeRecord?.hasAttribute?.(col)) return true;
+      if (col && (this._concrete().activeRecord as any)?.hasAttribute?.(col)) return true;
     }
     return false;
   }
 
   hasActiveCachedCounter(): boolean {
     if (!this.hasCachedCounter()) return false;
-    const opts = (this as any).options ?? {};
+    const opts = this._concrete().options ?? {};
+    const iwucc = this.inverseWhichUpdatesCounterCache();
     const counterCache =
-      opts.counterCache || (this.inverseWhichUpdatesCounterCache() as any)?.options?.counterCache;
-    if (counterCache && counterCache.active === false) return false;
+      opts.counterCache || (iwucc ? asConcrete(iwucc).options?.counterCache : undefined);
+    if (counterCache && (counterCache as { active?: unknown }).active === false) return false;
     return true;
   }
 
@@ -341,12 +388,12 @@ export class AbstractReflection {
   }
 
   aliasCandidate(name: string): string {
-    return `${(this as any).pluralName}_${name}`;
+    return `${this._concrete().pluralName}_${name}`;
   }
 
   strictLoadingViolationMessage(owner: unknown): string {
     return strictLoadingViolationMessage(owner, {
-      name: (this as any).name,
+      name: this._concrete().name,
       polymorphic: this.isPolymorphic(),
       className: this.className,
     });
@@ -377,7 +424,7 @@ export class AbstractReflection {
    * Mirrors: AbstractReflection#ensure_option_not_given_as_class!
    */
   protected ensureOptionNotGivenAsClassBang(optionName: string): void {
-    const opts = (this as any).options as Record<string, unknown> | undefined;
+    const opts = this._concrete().options as Record<string, unknown> | undefined;
     const val = opts?.[optionName];
     if (typeof val === "function" && /^class[\s{]/.test(Function.prototype.toString.call(val))) {
       throw new ArgumentError(
@@ -424,7 +471,7 @@ export class MacroReflection extends AbstractReflection {
 
   set autosave(value: boolean) {
     (this.options as any).autosave = value;
-    const parent = (this as any).parentReflection;
+    const parent = asConcrete(this).parentReflection;
     if (parent) {
       if (parent instanceof MacroReflection) {
         parent.autosave = value;
@@ -795,7 +842,7 @@ export class AssociationReflection extends MacroReflection {
     reflection: AssociationReflection | ThroughReflection | null | false,
   ): boolean {
     if (!reflection) return false;
-    if (reflection === (this as any)) return false;
+    if ((reflection as AbstractReflection) === this) return false;
 
     const reflFk = (reflection as any).foreignKey;
     const thisFk = this.foreignKey;
