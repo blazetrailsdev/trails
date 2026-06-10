@@ -90,7 +90,12 @@ export class TokenDefinition {
   }
 
   payloadFor(model: Base): unknown[] {
-    return this.block ? [model.id, this.block(model)] : [model.id];
+    // BigInt is not JSON-serializable; coerce to a plain number so the token
+    // payload round-trips. PG bigserial PKs surface as BigInt (mirrors the
+    // coercion in signed-id.ts#signedId).
+    const coerce = (v: unknown): unknown => (typeof v === "bigint" ? Number(v) : v);
+    const id = Array.isArray(model.id) ? (model.id as unknown[]).map(coerce) : coerce(model.id);
+    return this.block ? [id, this.block(model)] : [id];
   }
 
   generateToken(model: Base): string {

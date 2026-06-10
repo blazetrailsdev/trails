@@ -63,6 +63,15 @@ export function hasSecureToken(
   // Routing the assignment through the property setter (rather than
   // `_attributes.set`) lets a subclass that overrides `attribute=` observe the
   // generated value, exactly as Rails' `send("#{attribute}=", …)` does.
+  //
+  // Default `on` is "create" to match the ActiveRecord *framework* default —
+  // `vendor/rails/activerecord/lib/active_record.rb:461` sets
+  // `self.generate_secure_token_on = :create`. The `:initialize` value
+  // documented on `has_secure_token` is the railtie/`load_defaults` value
+  // (railtie.rb:40 also sets `:create` at the framework level), which is only
+  // applied in a booted app — not in the AR test suite. Rails' own
+  // SecureTokenTest therefore runs against `:create` (its tests `save` before
+  // asserting the token), which is exactly what these ports do.
   const generateIfBlank = (record: any): void => {
     if (record.isNewRecord() && !record.queryAttribute(attribute)) {
       record[attribute] = generateToken(tokenLength);
