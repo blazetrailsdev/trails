@@ -2353,6 +2353,27 @@ export class Base extends Model {
   /** @internal */
   _cachedAssociations?: Map<string, Base | Base[] | null>;
 
+  /**
+   * @internal
+   * @deprecated RFC 0006 (collection-store unification). Reads of has_many
+   * targets should go through the `CollectionProxy` read accessor
+   * (`proxy.readTargets()`), which is the single source of truth. This shim
+   * exists so the legacy `_cachedAssociations` reads can be migrated one
+   * caller at a time: when a loaded collection proxy exists for `name`, it
+   * returns the proxy's canonical target array; otherwise it falls back to the
+   * legacy `_cachedAssociations` map (still used by singular associations and
+   * the direct test pokes). Removed once S4 deletes `_cachedAssociations`.
+   */
+  _associationCache(name: string): Base | Base[] | null | undefined {
+    const proxy = this._collectionProxies.get(name) as
+      | { loaded?: boolean; readTargets?: () => Base[] }
+      | undefined;
+    if (proxy?.loaded && typeof proxy.readTargets === "function") {
+      return proxy.readTargets();
+    }
+    return this._cachedAssociations?.get(name);
+  }
+
   constructor(attrs: Record<string, unknown> = {}) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
     // Forbid/unwrap strong-params before anything inspects the attribute bag.

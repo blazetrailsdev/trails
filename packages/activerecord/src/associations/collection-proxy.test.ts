@@ -382,4 +382,43 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     await proxy.destroyAll();
     expect(instance._associationIds).toBeNull();
   });
+
+  // RFC 0006 S1 — proxy-backed read API + deprecated _cachedAssociations shim.
+  it("readTargets() returns the loaded target array (single source of truth)", async () => {
+    const blog = await blogWithPosts();
+    const proxy = association<ApPost>(blog, "apPosts") as any;
+    expect(proxy.readTargets()).toBe(proxy.target);
+    expect(proxy.readTargets().map((p: ApPost) => p.title)).toEqual(["a", "b", "c"]);
+  });
+
+  it("targetsByPrimaryKey() keys loaded targets by primary key", async () => {
+    const blog = await blogWithPosts();
+    const proxy = association<ApPost>(blog, "apPosts") as any;
+    const byKey = proxy.targetsByPrimaryKey() as Map<string, ApPost>;
+    expect(byKey.size).toBe(3);
+    for (const post of proxy.target as ApPost[]) {
+      expect(byKey.get(String(post.id))).toBe(post);
+    }
+  });
+
+  it("targetsByPrimaryKey() skips targets with an unassigned key", async () => {
+    const blog = await blogWithPosts();
+    const proxy = association<ApPost>(blog, "apPosts") as any;
+    (proxy.target as ApPost[]).push(new ApPost({ title: "unsaved" }));
+    expect((proxy.targetsByPrimaryKey() as Map<string, ApPost>).size).toBe(3);
+  });
+
+  it("_associationCache() delegates to the proxy read accessor for loaded collections", async () => {
+    const blog = await blogWithPosts();
+    const proxy = association<ApPost>(blog, "apPosts") as any;
+    expect((blog as any)._associationCache("apPosts")).toBe(proxy.readTargets());
+  });
+
+  it("_associationCache() falls back to _cachedAssociations when no proxy is loaded", async () => {
+    const blog = new ApBlog({ name: "Dev" });
+    await blog.save();
+    const sentinel: ApPost[] = [];
+    (blog as any)._cachedAssociations = new Map([["apPosts", sentinel]]);
+    expect((blog as any)._associationCache("apPosts")).toBe(sentinel);
+  });
 });
