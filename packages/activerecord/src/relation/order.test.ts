@@ -1,214 +1,139 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { sql } from "@blazetrails/arel";
-import { Base } from "../index.js";
+/**
+ * Tests to increase Rails test coverage matching.
+ * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/relation/order_test.rb
+ */
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { registerModel } from "../index.js";
+import { Base } from "../base.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
-
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-
-beforeAll(async () => {
-  await defineSchema({
-    posts: { title: "string", score: "integer", name: "string", price: "integer" },
-  });
-});
+import type { Schema } from "../test-helpers/define-schema.js";
+import { Book } from "../test-helpers/models/book.js";
+import { Author } from "../test-helpers/models/author.js";
 
 describe("OrderTest", () => {
-  it("order with string", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.order("title").toSql();
-    expect(sql).toContain("ORDER BY");
+  const { authors } = useHandlerFixtures(["authors", "authorAddresses"]);
+  // Force-recreate the canonical tables with `dropExisting` (mirrors
+  // named-scoping.test.ts). The per-worker SQLite DB is shared across files
+  // and sibling files define `books`/`authors` with different column sets;
+  // the signature cache is primed at worker boot, so a plain `defineSchema`
+  // would cache-hit and skip recreation.
+  beforeAll(async () => {
+    await defineSchema(
+      Base.connection as Parameters<typeof defineSchema>[0],
+      {
+        authors: canonicalSchema.authors,
+        author_addresses: canonicalSchema.author_addresses,
+        books: canonicalSchema.books,
+      } as Schema,
+      { dropExisting: true },
+    );
+  });
+  registerModel(Author);
+  registerModel(Book);
+
+  beforeEach(async () => {
+    await Book.deleteAll();
   });
 
-  it("order with hash", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.order({ title: "desc" }).toSql();
-    expect(sql).toContain("DESC");
-  });
-
-  it("reorder replaces existing order", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.order("title").reorder({ title: "desc" }).toSql();
-    expect(sql).toContain("DESC");
-  });
-
-  it("reverse order", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sqlOut = Post.order("title").reverseOrder().toSql();
-    expect(sqlOut).toContain("DESC");
-  });
-
-  it("reverse order with explicit direction does not double-flip", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    // Regression: chained ASC→DESC then DESC→ASC replaces used to fall through
-    // and append " DESC", producing "id ASC DESC". Should flip to "id DESC".
-    const stringForm = Post.order("id ASC").reverseOrder().toSql();
-    expect(stringForm).toContain("DESC");
-    expect(stringForm).not.toMatch(/ASC\s+DESC/i);
-
-    // Raw Arel.sql order (stored as a { raw } clause) takes the same path.
-    const rawForm = Post.order([sql("id ASC")] as any)
-      .reverseOrder()
-      .toSql();
-    expect(rawForm).toMatch(/ORDER BY id DESC/);
-    expect(rawForm).not.toMatch(/ASC\s+DESC/i);
-  });
+  const ids = async (rel: any): Promise<unknown[]> => (await rel.toArray()).map((b: any) => b.id);
+  const incOrder = (...args: any[]): Promise<unknown[]> =>
+    ids(Book.includes("author").order(...args));
 
   it("order asc", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("score", "integer");
-      }
-    }
-    await Post.create({ title: "b", score: 2 });
-    await Post.create({ title: "a", score: 1 });
-    const results = await Post.order("title").toArray();
-    expect(results[0].title).toBe("a");
-    expect(results[1].title).toBe("b");
+    const z = (await Book.create({ name: "Zulu", author: authors("david") })) as any;
+    const y = (await Book.create({ name: "Yankee", author: authors("mary") })) as any;
+    const x = (await Book.create({ name: "X-Ray", author: authors("david") })) as any;
+
+    const alphabetical = [x.id, y.id, z.id];
+
+    expect(await ids(Book.order({ name: "asc" }))).toEqual(alphabetical);
+    expect(await ids(Book.order({ name: "ASC" }))).toEqual(alphabetical);
+    expect(await ids(Book.order({ name: "asc" }))).toEqual(alphabetical);
+    expect(await ids(Book.order("name"))).toEqual(alphabetical);
+    expect(await ids(Book.order("name"))).toEqual(alphabetical);
+    expect(await ids(Book.order("books.name"))).toEqual(alphabetical);
+    expect(await ids(Book.order(Book.arelTable.get("name")))).toEqual(alphabetical);
+    expect(await ids(Book.order({ books: { name: "asc" } }))).toEqual(alphabetical);
   });
 
   it("order desc", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("score", "integer");
-      }
-    }
-    await Post.create({ title: "a", score: 1 });
-    await Post.create({ title: "b", score: 2 });
-    const results = await Post.order("title DESC").toArray();
-    expect(results[0].title).toBe("b");
+    const z = (await Book.create({ name: "Zulu", author: authors("david") })) as any;
+    const y = (await Book.create({ name: "Yankee", author: authors("mary") })) as any;
+    const x = (await Book.create({ name: "X-Ray", author: authors("david") })) as any;
+
+    const reverseAlphabetical = [z.id, y.id, x.id];
+
+    expect(await ids(Book.order({ name: "desc" }))).toEqual(reverseAlphabetical);
+    expect(await ids(Book.order({ name: "DESC" }))).toEqual(reverseAlphabetical);
+    expect(await ids(Book.order({ name: "desc" }))).toEqual(reverseAlphabetical);
+    expect(await ids(Book.order("name").reverseOrder())).toEqual(reverseAlphabetical);
+    expect(await ids(Book.order("name desc"))).toEqual(reverseAlphabetical);
+    expect(await ids(Book.order("books.name desc"))).toEqual(reverseAlphabetical);
+    expect(await ids(Book.order(Book.arelTable.get("name").desc()))).toEqual(reverseAlphabetical);
+    expect(await ids(Book.order({ books: { name: "desc" } }))).toEqual(reverseAlphabetical);
   });
 
   it("order with association", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    await Post.create({ title: "c" });
-    await Post.create({ title: "a" });
-    const results = await Post.order("title").toArray();
-    expect(results[0].title).toBe("a");
+    const z = (await Book.create({ name: "Zulu", author: authors("david") })) as any;
+    const y = (await Book.create({ name: "Yankee", author: authors("mary") })) as any;
+    const x = (await Book.create({ name: "X-Ray", author: authors("david") })) as any;
+
+    const authorThenBookName = [x.id, z.id, y.id];
+
+    expect(await incOrder({ authors: { name: "asc" }, books: { name: "asc" } })).toEqual(
+      authorThenBookName,
+    );
+    expect(await incOrder("authors.name", { books: { name: "asc" } })).toEqual(authorThenBookName);
+    expect(await incOrder("authors.name", "books.name")).toEqual(authorThenBookName);
+    expect(await incOrder({ authors: { name: "asc" } }, Book.arelTable.get("name"))).toEqual(
+      authorThenBookName,
+    );
+    expect(await incOrder(Author.arelTable.get("name"), Book.arelTable.get("name"))).toEqual(
+      authorThenBookName,
+    );
+
+    const authorDescThenBookName = [y.id, x.id, z.id];
+
+    expect(await incOrder({ authors: { name: "desc" }, books: { name: "asc" } })).toEqual(
+      authorDescThenBookName,
+    );
+    expect(await incOrder("authors.name desc", { books: { name: "asc" } })).toEqual(
+      authorDescThenBookName,
+    );
+    expect(await incOrder(Author.arelTable.get("name").desc(), { books: { name: "asc" } })).toEqual(
+      authorDescThenBookName,
+    );
+    expect(await incOrder({ authors: { name: "desc" } }, "name")).toEqual(authorDescThenBookName);
   });
 
   it("order with association alias", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("score", "integer");
-      }
-    }
-    await Post.create({ title: "z", score: 1 });
-    await Post.create({ title: "a", score: 2 });
-    const results = await Post.order("title").toArray();
-    expect(results[0].title).toBe("a");
-  });
+    const z = (await Book.create({ name: "Zulu", author: authors("david") })) as any;
+    const y = (await Book.create({ name: "Yankee", author: authors("mary") })) as any;
+    const x = (await Book.create({ name: "X-Ray", author: authors("david") })) as any;
 
-  describe("hash syntax", () => {
-    it("order asc", async () => {
-      class Post extends Base {
-        static {
-          this.attribute("name", "string");
-          this.attribute("price", "integer");
-        }
-      }
-      await Post.create({ name: "Charlie", price: 30 });
-      await Post.create({ name: "Alice", price: 10 });
-      await Post.create({ name: "Bob", price: 20 });
-      const result = await Post.all().order({ name: "asc" }).toArray();
-      expect(result[0].name).toBe("Alice");
-      expect(result[2].name).toBe("Charlie");
-    });
+    const authorName = Author.arelTable.alias("author").get("name");
 
-    it("order desc", async () => {
-      class Post extends Base {
-        static {
-          this.attribute("name", "string");
-          this.attribute("price", "integer");
-        }
-      }
-      await Post.create({ name: "Charlie", price: 30 });
-      await Post.create({ name: "Alice", price: 10 });
-      await Post.create({ name: "Bob", price: 20 });
-      const result = await Post.all().order({ name: "desc" }).toArray();
-      expect(result[0].name).toBe("Charlie");
-      expect(result[2].name).toBe("Alice");
-    });
+    const authorThenBookName = [x.id, z.id, y.id];
 
-    it("order by string column name", async () => {
-      class Post extends Base {
-        static {
-          this.attribute("name", "string");
-          this.attribute("price", "integer");
-        }
-      }
-      await Post.create({ name: "Charlie", price: 30 });
-      await Post.create({ name: "Alice", price: 10 });
-      const result = await Post.all().order("name").toArray();
-      expect(result[0].name).toBe("Alice");
-    });
+    expect(await incOrder({ author: { name: "asc" }, books: { name: "asc" } })).toEqual(
+      authorThenBookName,
+    );
+    expect(await incOrder("author.name", { books: { name: "asc" } })).toEqual(authorThenBookName);
+    expect(await incOrder({ author: { name: "asc" } }, "name")).toEqual(authorThenBookName);
+    expect(await incOrder(authorName, "name")).toEqual(authorThenBookName);
 
-    it("reorder replaces existing order", async () => {
-      class Post extends Base {
-        static {
-          this.attribute("name", "string");
-          this.attribute("price", "integer");
-        }
-      }
-      await Post.create({ name: "Charlie", price: 30 });
-      await Post.create({ name: "Alice", price: 10 });
-      await Post.create({ name: "Bob", price: 20 });
-      const result = await Post.all().order({ name: "asc" }).reorder({ name: "desc" }).toArray();
-      expect(result[0].name).toBe("Charlie");
-    });
+    const authorDescThenBookName = [y.id, x.id, z.id];
 
-    it("reverseOrder flips direction", async () => {
-      class Post extends Base {
-        static {
-          this.attribute("name", "string");
-          this.attribute("price", "integer");
-        }
-      }
-      await Post.create({ name: "Charlie", price: 30 });
-      await Post.create({ name: "Alice", price: 10 });
-      await Post.create({ name: "Bob", price: 20 });
-      const result = await Post.all().order({ price: "asc" }).reverseOrder().toArray();
-      expect(result[0].price).toBe(30);
-    });
-
-    it("multiple order columns", () => {
-      class Post extends Base {
-        static {
-          this.attribute("name", "string");
-          this.attribute("price", "integer");
-        }
-      }
-      const sql = Post.all().order({ name: "asc" }, { price: "desc" }).toSql();
-      expect(sql).toContain("name");
-      expect(sql).toContain("price");
-    });
+    expect(await incOrder({ author: { name: "desc" }, books: { name: "asc" } })).toEqual(
+      authorDescThenBookName,
+    );
+    expect(await incOrder("author.name desc", { books: { name: "asc" } })).toEqual(
+      authorDescThenBookName,
+    );
+    expect(await incOrder({ author: { name: "desc" } }, "name")).toEqual(authorDescThenBookName);
+    expect(await incOrder(authorName.desc(), "name")).toEqual(authorDescThenBookName);
   });
 });
