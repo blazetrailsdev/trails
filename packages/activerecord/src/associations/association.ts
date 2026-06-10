@@ -368,14 +368,15 @@ export class Association {
    * undefined if no cached data is available.
    */
   protected doFindTarget(): Base | Base[] | null | undefined {
-    const ownerAny = this.owner as any;
+    const owner = this.owner;
     const name = this.reflection.name;
 
-    if (ownerAny._cachedAssociations?.has(name)) {
-      return ownerAny._cachedAssociations.get(name);
+    const cached = owner._cachedAssociationTarget(name);
+    if (cached !== undefined) {
+      return cached;
     }
-    if (ownerAny._preloadedAssociations?.has(name)) {
-      return ownerAny._preloadedAssociations.get(name);
+    if (owner._preloadedAssociations.has(name)) {
+      return owner._preloadedAssociations.get(name) as Base | Base[] | null;
     }
     return undefined;
   }
