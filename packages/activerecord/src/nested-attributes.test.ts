@@ -78,7 +78,6 @@ const TEST_SCHEMA = {
   n_bird1s: { name: "string", npirate1_id: "integer" },
   n_boat3s: { name: "string" },
   n_comment5s: { body: "string", npost5_id: "integer" },
-
   n_part3s: { name: "string", nboat3_id: "integer" },
   n_pirate0s: { catchphrase: "string" },
   n_pirate1s: { catchphrase: "string" },
@@ -2360,10 +2359,13 @@ describe("validate presence of parent works with inverse of", () => {
     await defineSchema(TEST_SCHEMA);
   });
   it("validate presence of parent works with inverse of", async () => {
+    registerModel(Human);
+    registerModel(Interest);
+    acceptsNestedAttributesFor(Human, "interests");
+    expect(Human.reflectOnAssociation("interests")?.options.inverseOf).toBe("human");
+    expect(Interest.reflectOnAssociation("human")?.options.inverseOf).toBe("interests");
+
     await repairValidations(Interest, async () => {
-      registerModel(Human);
-      registerModel(Interest);
-      acceptsNestedAttributesFor(Human, "interests");
       Interest.validates("human", { presence: true });
 
       const beforeH = Number(await Human.count());
