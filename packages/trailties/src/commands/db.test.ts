@@ -1641,10 +1641,13 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
 
     const cachePath = path.join(tmpDir, "db", "schema_cache.json");
     const parsed = JSON.parse(fs.readFileSync(cachePath, "utf8")) as {
-      indexes: Record<string, Array<{ name: string; columns: string[]; unique: boolean }>>;
+      indexes: Record<
+        string,
+        Array<{ table: string; name: string; columns: string[]; unique: boolean }>
+      >;
     };
     expect(parsed.indexes["users"]).toEqual([
-      { name: "users_on_email", columns: ["email"], unique: true },
+      { table: "users", name: "users_on_email", columns: ["email"], unique: true },
     ]);
   });
 
