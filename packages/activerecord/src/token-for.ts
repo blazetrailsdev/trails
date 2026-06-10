@@ -236,8 +236,12 @@ export async function findByTokenForBang(
   purpose: string,
   token: string,
 ): Promise<Base> {
+  // Rails `find_by_token_for!` (token_for.rb:51) calls `token_definitions
+  // .fetch(purpose)`, which raises KeyError for an unknown purpose — distinct
+  // from the InvalidSignature raised for a bad/expired token. Mirror that by
+  // raising a generic error here (same as the non-bang path).
   const def = getDefinition(modelClass, purpose);
-  if (!def) throw new InvalidSignature();
+  if (!def) throw new Error(`Unknown token purpose: ${purpose}`);
   requirePrimaryKey(modelClass);
   const result = await def.resolveToken(token, (id) => modelClass.find(id));
   if (!result) throw new InvalidSignature();
