@@ -18,7 +18,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { loadHasMany } from "../associations.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Person } from "../test-helpers/models/person.js";
@@ -40,12 +39,12 @@ describe("SELECT * column collision in joined relations", () => {
     // michael.followers joins friendships (friend_id = michael.id=1) to its
     // follower (david, people.id=2). The friendship's id=1 collides with
     // michael's own id=1, so a bare `*` projection would hydrate id=1 (michael)
-    // instead of david. `loadHasMany` routes this non-nested through association
+    // instead of david. Reading `michael.followers` exercises the public
+    // CollectionProxy path, which routes this non-nested through association
     // through AssociationScope — the same JOIN/projection path used in production.
     const michael = people("michael");
-    const reflection = (Person as any)._reflectOnAssociation("followers");
-    const followers = await loadHasMany(michael, "followers", reflection.options);
-    expect(followers.map((p: any) => ({ id: p.id, first_name: p.first_name }))).toEqual([
+    const followers = await michael.followers;
+    expect(followers.map((p) => ({ id: p.id, first_name: p.first_name }))).toEqual([
       { id: people("david").id, first_name: "David" },
     ]);
   });
@@ -56,11 +55,11 @@ describe("SELECT * column collision in joined relations", () => {
     // so the no-joins case isn't a special case the user has to
     // know about.
     const qPeople = escapeRegExp(quoteTableName("people"));
-    const noJoins = (Person as any).all().toSql();
+    const noJoins = Person.all().toSql();
     expect(noJoins).toMatch(new RegExp(`SELECT\\s+${qPeople}\\.\\*`, "i"));
     expect(noJoins).not.toMatch(/SELECT\s+\*/i);
 
-    const withJoins = (Person as any).all().joins("INNER JOIN friendships ON 1 = 1").toSql();
+    const withJoins = Person.all().joins("INNER JOIN friendships ON 1 = 1").toSql();
     expect(withJoins).toMatch(new RegExp(`SELECT\\s+${qPeople}\\.\\*`, "i"));
   });
 
@@ -72,7 +71,7 @@ describe("SELECT * column collision in joined relations", () => {
     // the target table name, the caller overrides with
     // `.select("*")`. We match Rails here rather than silently
     // downgrading to bare `*`.
-    const sql = (Person as any).all().from("(SELECT * FROM people) AS sub").toSql();
+    const sql = Person.all().from("(SELECT * FROM people) AS sub").toSql();
     expect(sql).toMatch(
       new RegExp(`SELECT\\s+${escapeRegExp(quoteTableName("people"))}\\.\\*`, "i"),
     );

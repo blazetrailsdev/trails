@@ -2,8 +2,11 @@
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
+import type { CollectionProxy } from "../../associations/collection-proxy.js";
 
 export class Person extends Base {
+  declare followers: CollectionProxy<Person>;
+
   static {
     this.hasMany("readers");
     this.hasMany("secureReaders");
