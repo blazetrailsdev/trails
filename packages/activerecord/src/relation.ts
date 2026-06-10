@@ -49,6 +49,7 @@ import {
   referencesFromConditions,
   type UnscopeType,
   type AssociationSpec,
+  type OrderArg,
 } from "./relation/query-methods.js";
 import * as _qm from "./relation/query-methods.js";
 import {
@@ -328,6 +329,7 @@ export class Relation<T extends Base> {
   private _annotations: string[] = [];
   private _optimizerHints: string[] = [];
   private _referencesValues: string[] = [];
+  private _manualReferences: string[] = [];
   private _fromClause: FromClause = FromClause.empty();
   private _createWithAttrs: Record<string, unknown> = {};
   private _extending: Array<Record<string, (...args: any[]) => any>> = [];
@@ -857,16 +859,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#order
    */
-  order(
-    ...args: Array<
-      | string
-      | Record<string, "asc" | "desc" | "ASC" | "DESC">
-      | Nodes.Node
-      | string[]
-      | [Nodes.Node, ...unknown[]]
-      | Map<Nodes.Node | string, "asc" | "desc" | "ASC" | "DESC">
-    >
-  ): Relation<T> {
+  order(...args: OrderArg[]): Relation<T> {
     return this._clone().orderBang(...args);
   }
 
@@ -984,16 +977,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#reorder
    */
-  reorder(
-    ...args: Array<
-      | string
-      | Record<string, "asc" | "desc" | "ASC" | "DESC">
-      | Nodes.Node
-      | string[]
-      | [Nodes.Node, ...unknown[]]
-      | Map<Nodes.Node | string, "asc" | "desc" | "ASC" | "DESC">
-    >
-  ): Relation<T> {
+  reorder(...args: OrderArg[]): Relation<T> {
     return this._clone().reorderBang(...args);
   }
 
@@ -2353,6 +2337,15 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#references_eager_loaded_tables?
    */
+  /**
+   * References eligible to alias an eager-load join (Rails seeds @references
+   * only from SqlLiteral references). Excludes bare-string `.references(...)`
+   * calls, which promote includes to eager_load but never rename the join.
+   */
+  private _aliasableReferences(): string[] {
+    return this._referencesValues.filter((r) => !this._manualReferences.includes(r));
+  }
+
   private referencesEagerLoadedTables(): boolean {
     if (this._referencesValues.length === 0) return false;
     if (this._includesAssociations.length === 0) return false;
@@ -2465,6 +2458,7 @@ export class Relation<T extends Base> {
     }
 
     const jd = new JoinDependency(this._modelClass);
+    jd.setReferences(this._aliasableReferences());
 
     const fallbackAssocs = this._addEagerSpecsToJoinDependency(jd, eagerAssociations);
 
@@ -3974,6 +3968,7 @@ export class Relation<T extends Base> {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
 
     const jd = new JoinDependency(this._modelClass);
+    jd.setReferences(this._aliasableReferences());
     this._addEagerSpecsToJoinDependency(jd, allEager);
     if (jd.nodes.length === 0) return null;
 
@@ -4436,7 +4431,12 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#references
    */
   references(...tables: string[]): Relation<T> {
-    return this._clone().referencesBang(...tables);
+    const rel = this._clone().referencesBang(...tables) as Relation<T>;
+    // Tag these as manual (bare-string) references so they don't act as
+    // eager-load join aliases — mirrors Rails seeding @references only from
+    // SqlLiteral references. See QueryMethodsHost._manualReferences.
+    rel._manualReferences = [...new Set([...rel._manualReferences, ...tables])];
+    return rel;
   }
 
   /**
@@ -5175,6 +5175,7 @@ export class Relation<T extends Base> {
     this._annotations = [...source._annotations];
     this._optimizerHints = [...source._optimizerHints];
     this._referencesValues = [...source._referencesValues];
+    this._manualReferences = [...source._manualReferences];
     this._fromClause = source._fromClause;
     this._createWithAttrs = { ...source._createWithAttrs };
     this._extending = [...source._extending];

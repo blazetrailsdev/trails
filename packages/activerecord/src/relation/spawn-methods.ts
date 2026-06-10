@@ -51,6 +51,11 @@ export function mergeBang(this: any, other: any): any {
         if (!this._referencesValues.includes(ref)) this._referencesValues.push(ref);
       }
     }
+    if (other._manualReferences) {
+      for (const ref of other._manualReferences) {
+        if (!this._manualReferences.includes(ref)) this._manualReferences.push(ref);
+      }
+    }
     // mergeSingleValues
     if (other._limitValue != null) this._limitValue = other._limitValue;
     if (other._offsetValue != null) this._offsetValue = other._offsetValue;

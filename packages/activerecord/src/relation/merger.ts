@@ -109,6 +109,11 @@ export class Merger {
         if (!rel._referencesValues.includes(ref)) rel._referencesValues.push(ref);
       }
     }
+    if (this.other._manualReferences) {
+      for (const ref of this.other._manualReferences) {
+        if (!rel._manualReferences.includes(ref)) rel._manualReferences.push(ref);
+      }
+    }
   }
 
   private mergeSingleValues(rel: any): void {

@@ -136,6 +136,17 @@ export class JoinDependency {
     return result;
   }
 
+  /**
+   * Seed the references map (mirrors the `references` arg threaded into Rails'
+   * `JoinDependency#join_constraints`). A reference whose name matches an
+   * association name aliases that association's join to the reference name.
+   * @internal
+   */
+  setReferences(references: string[]): void {
+    this._references = Object.create(null) as Record<string, string>;
+    for (const name of references) this._references[name] = name;
+  }
+
   addAssociation(
     assocName: string,
     options?: { fromModel?: any; fromAlias?: string; parentAssocName?: string },
@@ -220,8 +231,19 @@ export class JoinDependency {
       return null;
     }
 
+    // Rails join_dependency.rb:204 — `table_name = @references[reflection.name]`
+    // is preferred over the derived alias, so `includes(:author)` with an
+    // `order(author: …)`/references(:author) aliases the join to that name
+    // (`authors AS author`). Only honored when the referenced alias is free.
+    const referencedAlias = this._references[assocName];
     const effectiveName =
-      (this._aliasTracker.aliases.get(targetTable!) ?? 0) > 0 ? tableAlias : targetTable!;
+      referencedAlias &&
+      referencedAlias !== targetTable! &&
+      (this._aliasTracker.aliases.get(referencedAlias) ?? 0) === 0
+        ? referencedAlias
+        : (this._aliasTracker.aliases.get(targetTable!) ?? 0) > 0
+          ? tableAlias
+          : targetTable!;
 
     const targetArelTable =
       effectiveName === targetTable!
@@ -233,10 +255,13 @@ export class JoinDependency {
     const targetModelPk = (targetModel as any).primaryKey ?? "id";
     if (Array.isArray(targetModelPk)) return null;
 
-    // Commit-point: all failure guards passed; register the table name.
+    // Commit-point: all failure guards passed; register the emitted name so
+    // later joins to the same table collide correctly (mirrors aliased_table_for
+    // bumping the alias count, whether that is the real table or a reference).
+    const registeredName = effectiveName === referencedAlias ? referencedAlias : targetTable!;
     this._aliasTracker.aliases.set(
-      targetTable!,
-      (this._aliasTracker.aliases.get(targetTable!) ?? 0) + 1,
+      registeredName,
+      (this._aliasTracker.aliases.get(registeredName) ?? 0) + 1,
     );
 
     const columns = getModelColumns(targetModel);
