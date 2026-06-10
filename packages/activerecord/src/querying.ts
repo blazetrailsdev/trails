@@ -631,6 +631,15 @@ export function findOrCreateBy<T extends typeof Base>(
   return this.all().findOrCreateBy(conditions, extra);
 }
 
+/** Mirrors: ActiveRecord::Querying#find_or_create_by! — delegates through all(). */
+export function findOrCreateByBang<T extends typeof Base>(
+  this: T,
+  conditions: Record<string, unknown>,
+  extra?: Record<string, unknown>,
+): Promise<InstanceType<T>> {
+  return this.all().findOrCreateByBang(conditions, extra) as Promise<InstanceType<T>>;
+}
+
 /**
  * Mirrors: ActiveRecord::Querying#find_or_initialize_by — same
  * scope-aware dispatch as findOrCreateBy; the new record inherits
