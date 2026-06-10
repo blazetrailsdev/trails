@@ -318,8 +318,43 @@ function readScopeCall(call: ts.CallExpression): ScopeCall | null {
   return {
     kind: "scope",
     name: nameArg.text,
-    paramsAfterRel: rest.map((p) => p.getText()),
+    paramsAfterRel: rest.map(renderScopeParam),
   };
+}
+
+/**
+ * Render a scope parameter as text usable inside a FUNCTION TYPE
+ * (`(<params>) => Relation<...>`). A default initializer (`approved =
+ * false`) is illegal in a type position, so drop it and mark the
+ * parameter optional, inferring a type from the default literal when the
+ * source carries no explicit annotation. Parameters that already have a
+ * type annotation keep it; their default (if any) just becomes `?`.
+ */
+function renderScopeParam(p: ts.ParameterDeclaration): string {
+  const name = p.name.getText();
+  const optional = p.questionToken != null || p.initializer != null ? "?" : "";
+  if (p.type) return `${name}${optional}: ${p.type.getText()}`;
+  const inferred = p.initializer ? inferLiteralType(p.initializer) : "unknown";
+  // No annotation and no default → an untyped positional param; emit
+  // `name: unknown` (no `?`, since it isn't optional).
+  if (!p.initializer && !p.dotDotDotToken) return `${name}: unknown`;
+  if (p.dotDotDotToken) return `...${name}: unknown[]`;
+  return `${name}${optional}: ${inferred}`;
+}
+
+function inferLiteralType(expr: ts.Expression): string {
+  switch (expr.kind) {
+    case ts.SyntaxKind.TrueKeyword:
+    case ts.SyntaxKind.FalseKeyword:
+      return "boolean";
+    case ts.SyntaxKind.NumericLiteral:
+      return "number";
+    case ts.SyntaxKind.StringLiteral:
+    case ts.SyntaxKind.NoSubstitutionTemplateLiteral:
+      return "string";
+    default:
+      return "unknown";
+  }
 }
 
 function readEnumCall(call: ts.CallExpression): EnumCall | null {

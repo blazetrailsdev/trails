@@ -1,3 +1,14 @@
+import type { Comment } from "./comment.js";
+import type { Company } from "./company.js";
+import type { Computer } from "./computer.js";
+import type { Contract } from "./contract.js";
+import type { Firm } from "./company.js";
+import type { Mentor } from "./mentor.js";
+import type { Project } from "./project.js";
+import type { Rating } from "./rating.js";
+import type { Ship } from "./ship.js";
+import type { SpecialContract } from "./contract.js";
+import type { SpecialProject } from "./project.js";
 // vendor/rails/activerecord/test/models/developer.rb
 import { StringType, typeRegistry } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
@@ -5,6 +16,56 @@ import type { Relation } from "../../relation.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Developer extends Base {
+  declare projects: import("@blazetrails/activerecord").AssociationProxy<Project>;
+  declare mentor: Mentor | null;
+  declare strictLoadingMentor: Mentor | null;
+  declare strictLoadingOffMentor: Mentor | null;
+  declare sharedComputers: import("@blazetrails/activerecord").AssociationProxy<Computer>;
+  declare computers: import("@blazetrails/activerecord").AssociationProxy<Computer>;
+  declare projectsExtendedByName: import("@blazetrails/activerecord").AssociationProxy<Project>;
+  declare projectsExtendedByNameTwice: import("@blazetrails/activerecord").AssociationProxy<Project>;
+  declare projectsExtendedByNameAndBlock: import("@blazetrails/activerecord").AssociationProxy<Project>;
+  declare strictLoadingProjects: import("@blazetrails/activerecord").AssociationProxy<Project>;
+  declare specialProjects: import("@blazetrails/activerecord").AssociationProxy<SpecialProject>;
+  declare symSpecialProjects: import("@blazetrails/activerecord").AssociationProxy<SpecialProject>;
+  declare auditLogs: import("@blazetrails/activerecord").AssociationProxy<AuditLog>;
+  declare requiredAuditLogs: import("@blazetrails/activerecord").AssociationProxy<AuditLogRequired>;
+  declare strictLoadingAuditLogs: import("@blazetrails/activerecord").AssociationProxy<AuditLog>;
+  declare strictLoadingOptAuditLogs: import("@blazetrails/activerecord").AssociationProxy<AuditLog>;
+  declare contracts: import("@blazetrails/activerecord").AssociationProxy<Contract>;
+  declare firms: import("@blazetrails/activerecord").AssociationProxy<Firm>;
+  declare comments: import("@blazetrails/activerecord").AssociationProxy<Comment>;
+  declare ratings: import("@blazetrails/activerecord").AssociationProxy<Rating>;
+  declare ship: Ship | null;
+  declare strictLoadingShip: Ship | null;
+  declare firm: Firm | null;
+  declare contractedProjects: import("@blazetrails/activerecord").AssociationProxy<Project>;
+  declare static jamises: () => import("@blazetrails/activerecord").Relation<Developer>;
+  declare lastName: string;
+  declare loadBelongsTo: ((name: "mentor") => Promise<Mentor | null>) &
+    ((name: "strictLoadingMentor") => Promise<Mentor | null>) &
+    ((name: "strictLoadingOffMentor") => Promise<Mentor | null>) &
+    ((name: "firm") => Promise<Firm | null>);
+  declare loadHasOne: ((name: "ship") => Promise<Ship | null>) &
+    ((name: "strictLoadingShip") => Promise<Ship | null>);
+  declare firm_id: number;
+  declare first_name: string;
+  declare legacy_created_at:
+    | import("@blazetrails/activesupport/temporal").Temporal.Instant
+    | import("@blazetrails/activesupport/temporal").Temporal.PlainDateTime;
+  declare legacy_created_on:
+    | import("@blazetrails/activesupport/temporal").Temporal.Instant
+    | import("@blazetrails/activesupport/temporal").Temporal.PlainDateTime;
+  declare legacy_updated_at:
+    | import("@blazetrails/activesupport/temporal").Temporal.Instant
+    | import("@blazetrails/activesupport/temporal").Temporal.PlainDateTime;
+  declare legacy_updated_on:
+    | import("@blazetrails/activesupport/temporal").Temporal.Instant
+    | import("@blazetrails/activesupport/temporal").Temporal.PlainDateTime;
+  declare mentor_id: number;
+  declare name: string;
+  declare salary: number | null;
+
   static instanceCount: number | undefined;
 
   // Rails `module ProjectsAssociationExtension { def find_most_recent ... }`
@@ -151,6 +212,8 @@ acceptsNestedAttributesFor(Developer, "projects");
 export class SubDeveloper extends Developer {}
 
 export class SpecialDeveloper extends Base {
+  declare specialContracts: import("@blazetrails/activerecord").AssociationProxy<SpecialContract>;
+
   static {
     this.tableName = "developers";
     this.hasMany("specialContracts", { foreignKey: "developer_id" });
@@ -158,6 +221,8 @@ export class SpecialDeveloper extends Base {
 }
 
 export class SymbolIgnoredDeveloper extends Base {
+  declare lastName: string;
+
   static {
     this.tableName = "developers";
     this.ignoredColumns = ["first_name", "last_name"];
@@ -166,6 +231,14 @@ export class SymbolIgnoredDeveloper extends Base {
 }
 
 export class AuditLog extends Base {
+  declare developer: Developer | null;
+  declare unvalidatedDeveloper: Developer | null;
+  declare loadBelongsTo: ((name: "developer") => Promise<Developer | null>) &
+    ((name: "unvalidatedDeveloper") => Promise<Developer | null>);
+  declare developer_id: number;
+  declare message: string;
+  declare unvalidated_developer_id: number;
+
   static {
     this.belongsTo("developer", { validate: true });
     this.belongsTo("unvalidatedDeveloper", { className: "Developer" });
@@ -173,6 +246,9 @@ export class AuditLog extends Base {
 }
 
 export class AuditLogRequired extends Base {
+  declare developer: Developer | null;
+  declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
+
   static {
     this.tableName = "audit_logs";
     this.belongsTo("developer", { required: true });
@@ -180,6 +256,8 @@ export class AuditLogRequired extends Base {
 }
 
 export class DeveloperWithBeforeDestroyRaise extends Base {
+  declare projects: import("@blazetrails/activerecord").AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -236,6 +314,8 @@ export class DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScope
 }
 
 export class DeveloperWithIncludes extends Base {
+  declare auditLogs: import("@blazetrails/activerecord").AssociationProxy<AuditLog>;
+
   static {
     this.tableName = "developers";
     this.hasMany("auditLogs", { foreignKey: "developer_id" });
@@ -244,6 +324,8 @@ export class DeveloperWithIncludes extends Base {
 }
 
 export class DeveloperFilteredOnJoins extends Base {
+  declare projects: import("@blazetrails/activerecord").AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -258,6 +340,8 @@ export class DeveloperFilteredOnJoins extends Base {
 }
 
 export class DeveloperOrderedBySalary extends Base {
+  declare static byName: () => import("@blazetrails/activerecord").Relation<DeveloperOrderedBySalary>;
+
   static {
     this.tableName = "developers";
     this.aliasAttribute("createdAt", "legacyCreatedAt");
@@ -305,6 +389,8 @@ export class ClassMethodDeveloperCalledDavid extends Base {
 }
 
 export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
+  declare static david: () => import("@blazetrails/activerecord").Relation<ClassMethodReferencingScopeDeveloperCalledDavid>;
+
   static {
     this.tableName = "developers";
     this.scope("david", (q: any) => q.where({ name: "David" }));
@@ -313,6 +399,8 @@ export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
 }
 
 export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
+  declare static david: () => import("@blazetrails/activerecord").Relation<LazyBlockReferencingScopeDeveloperCalledDavid>;
+
   static {
     this.tableName = "developers";
     this.scope("david", (q: any) => q.where({ name: "David" }));
@@ -321,6 +409,10 @@ export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
 }
 
 export class DeveloperCalledJamis extends Base {
+  declare static poor: () => import("@blazetrails/activerecord").Relation<DeveloperCalledJamis>;
+  declare static david: () => import("@blazetrails/activerecord").Relation<DeveloperCalledJamis>;
+  declare static david2: () => import("@blazetrails/activerecord").Relation<DeveloperCalledJamis>;
+
   static {
     this.tableName = "developers";
     this.aliasAttribute("createdAt", "legacyCreatedAt");
@@ -365,6 +457,8 @@ export class ModuleIncludedPoorDeveloperCalledJamis extends DeveloperCalledJamis
 }
 
 export class EagerDeveloperWithDefaultScope extends Base {
+  declare projects: import("@blazetrails/activerecord").AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -377,6 +471,8 @@ export class EagerDeveloperWithDefaultScope extends Base {
 }
 
 export class EagerDeveloperWithClassMethodDefaultScope extends Base {
+  declare projects: import("@blazetrails/activerecord").AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -389,6 +485,8 @@ export class EagerDeveloperWithClassMethodDefaultScope extends Base {
 }
 
 export class EagerDeveloperWithLambdaDefaultScope extends Base {
+  declare projects: import("@blazetrails/activerecord").AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -401,6 +499,8 @@ export class EagerDeveloperWithLambdaDefaultScope extends Base {
 }
 
 export class EagerDeveloperWithBlockDefaultScope extends Base {
+  declare projects: import("@blazetrails/activerecord").AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -413,6 +513,8 @@ export class EagerDeveloperWithBlockDefaultScope extends Base {
 }
 
 export class EagerDeveloperWithCallableDefaultScope extends Base {
+  declare projects: import("@blazetrails/activerecord").AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -442,6 +544,9 @@ export class CachedDeveloper extends Base {
 }
 
 export class DeveloperWithIncorrectlyOrderedHasManyThrough extends Base {
+  declare companies: import("@blazetrails/activerecord").AssociationProxy<Company>;
+  declare contracts: import("@blazetrails/activerecord").AssociationProxy<Contract>;
+
   static {
     this.tableName = "developers";
     this.hasMany("companies", { through: "contracts" });
@@ -458,6 +563,8 @@ export class DeveloperName extends StringType {
 typeRegistry.register("developer_name", () => new DeveloperName());
 
 export class AttributedDeveloper extends Base {
+  declare name: unknown;
+
   static {
     this.tableName = "developers";
     this.attribute("name", "developer_name");
@@ -472,6 +579,8 @@ export class ColumnNamesCachedDeveloper extends Base {
 }
 
 export class AuditRequiredDeveloper extends Base {
+  declare requiredAuditLogs: import("@blazetrails/activerecord").AssociationProxy<AuditLogRequired>;
+
   static {
     this.tableName = "developers";
     this.hasMany("requiredAuditLogs", { className: "AuditLogRequired" });
