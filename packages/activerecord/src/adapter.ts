@@ -10,6 +10,7 @@ import type {
   AlterTable,
   TableDefinition,
 } from "./connection-adapters/abstract/schema-definitions.js";
+import type { SchemaCreation } from "./connection-adapters/abstract/schema-creation.js";
 import type { Visitors } from "@blazetrails/arel";
 
 export type { AdapterName } from "./connection-adapters/abstract-adapter.js";
@@ -453,6 +454,18 @@ export interface DatabaseAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#create_table_definition
    */
   createTableDefinition?(name: string, options?: Record<string, unknown>): TableDefinition;
+
+  /**
+   * The adapter's dialect-specific `SchemaCreation` visitor, used to render
+   * DDL nodes (`TableDefinition`, `AddColumnDefinition`, `CreateIndexDefinition`,
+   * `AlterTable`, …) to SQL via `accept(node)`. This is the canonical
+   * CREATE TABLE DDL path — `MigrationContext.createTable` and
+   * `SchemaStatements.createTable` both route through it. Adapters that don't
+   * mix in `SchemaStatements` (direct mocks in tests) may omit it.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#schema_creation
+   */
+  readonly schemaCreation?: SchemaCreation;
 
   /**
    * Whether the adapter supports a conflict target in INSERT...ON CONFLICT.

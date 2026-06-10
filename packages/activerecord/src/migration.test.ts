@@ -22,9 +22,15 @@ import { Schema } from "./schema.js";
 
 function emitTableSql(td: TableDefinition): string {
   const adapterName = (td as any)._adapterName;
-  if (adapterName === "postgres") return new PgSchemaCreation().accept(td);
+  const adapter = (td as any)._adapter;
+  // PG and SQLite visitors take a SchemaQuoter for identifier/default quoting, so
+  // thread the table definition's quoter through (matches the real adapter call sites
+  // and the production `*.toSql()` overrides). The MySQL visitor hardcodes its quoter
+  // and its constructor arg is a VisitorHostAdapter (isMariadb()/supports* flags), not a
+  // quoter — none of which these abstract-TableDefinition fixtures exercise.
+  if (adapterName === "postgres") return new PgSchemaCreation(adapter).accept(td);
   if (adapterName === "mysql") return new MysqlSchemaCreation().accept(td);
-  return new SQLite3SchemaCreation("sqlite", (td as any)._adapter).accept(td);
+  return new SQLite3SchemaCreation("sqlite", adapter).accept(td);
 }
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { itIfSupports } from "./test-helpers/supports.js";
