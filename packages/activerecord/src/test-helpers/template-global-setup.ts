@@ -174,6 +174,18 @@ const pgAdapter: DbTemplateAdapter = {
 // globalSetup. Same DDL cost as the current per-file preload, but moved to
 // before any worker forks — test-setup-dy.ts can then seed signatures and
 // make every subsequent per-file defineSchema(TEST_SCHEMA) a cache-hit.
+//
+// RFC 0008 Phase 2 (phase2-mariadb-template) spiked two clone-like
+// alternatives against this baseline and BOTH lost — kept this preload, no
+// change. The two strategies (mysqldump --no-data + replay; SHOW CREATE TABLE
+// statement cache + replay) build a template ONCE then replay its raw DDL into
+// each slot. Raw replay is cheaper per slot than defineSchema (it skips the
+// client-side schema introspection + signature work), but every approach still
+// pays the irreducible server-side cost of N × ~249 CREATE TABLEs, and the
+// replay strategies add a serial template-build step on top. Measured on
+// mysql:8, 4 slots (249 tables): baseline 16.8s end-to-end, vs DDL-cache
+// 7.7s build + 12.7s replay = 20.7s, vs mysqldump 7.7s build + 14.1s replay =
+// ~23s. Without a TEMPLATE-clone primitive to amortize the build, neither wins.
 
 export const MYSQL_TEMPLATE_ENV = "AR_TEST_MYSQL_TEMPLATE";
 
