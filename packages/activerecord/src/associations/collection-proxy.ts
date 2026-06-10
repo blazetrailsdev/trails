@@ -983,41 +983,49 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Wire `record` into this collection's target from the inverse side, the way
-   * Rails' `CollectionAssociation#replace_on_target(record, inversing: true)`
-   * folds a preloaded / belongs_to-loaded record into `@target`. Append with
-   * identity dedup; fires no add callbacks (inverse wiring is not a
-   * user-initiated `<<`).
+   * Wire `record` into this collection's target from the inverse side.
    *
-   * This is the single write entry point for inverse has_many targets — it owns
-   * both `@replaced_or_added_targets` (so a later `<<`/`push` of the same record
-   * replaces in place rather than appending a duplicate) and the legacy
-   * `_cachedAssociations` mirror. The C2 (#2591) seam, which used to seed
-   * `_replacedOrAddedTargets` from outside in `associations.ts`, is now internal
-   * here. The mirror keeps the still-live direct `_cachedAssociations` readers
-   * (and the S1 `_cachedAssociationTarget` fallback) in sync until S4 deletes the
-   * map; when the proxy is unloaded we extend the cache slot rather than the
-   * unloaded `_target`, matching the prior behavior so a later real load is not
-   * pre-seeded with a partial array.
+   * Mirrors `CollectionAssociation#target=` → `replace_on_target(record, true,
+   * replace: true, inversing: true)` (collection_association.rb:285-295), the
+   * path Rails takes when `set_inverse_instance` folds a belongs_to-loaded or
+   * preloaded record back into its `has_many` owner: `skip_callbacks` (no
+   * before/after_add — inverse wiring is not a user `<<`), `replace: true`, and
+   * `inversing: true`. Per that method we always record the record in
+   * `@replaced_or_added_targets` (so a later `<<`/`push` of the same record
+   * replaces in place rather than appending a duplicate) and, because
+   * `@_was_loaded` is forced true there, always append to `@target` — loaded or
+   * not. A subsequent real `load()` merges this in-memory record by primary key
+   * (the trails analog of `merge_target_lists`), so the early append is not
+   * double-counted.
+   *
+   * This is the single write entry point for inverse has_many targets. The C2
+   * (#2591) seam, which used to reach into `proxy._replacedOrAddedTargets` from
+   * `associations.ts`, is now internal here. `set_inverse_instance(record)` is
+   * deliberately NOT re-invoked: the reciprocal (record → owner) side is
+   * established by the caller in `associations.ts`, and re-wiring here would
+   * recurse. The `_cachedAssociations` slot is kept pointed at `_target` as a
+   * transitional mirror for the still-live direct-cache readers (and the S1
+   * `_cachedAssociationTarget` fallback) until S4 deletes the map.
    * @internal
    */
   _wireInverseTarget(record: T): void {
-    let collection: T[];
-    if (this._targetLoaded) {
-      collection = this._target;
+    // replace && (!new_record? || @replaced_or_added_targets.include?(record))
+    let index =
+      !record.isNewRecord() || this._replacedOrAddedTargets.has(record)
+        ? this._indexInTarget(record)
+        : -1;
+    if (index === -1 && this._replacedOrAddedTargets.has(record)) {
+      index = this._indexInTarget(record);
+    }
+    // inversing: true → unconditionally tracked.
+    this._replacedOrAddedTargets.add(record);
+    if (index !== -1) {
+      this._target[index] = record;
     } else {
-      const existing = this._record._cachedAssociations?.get(this._assocName);
-      collection = Array.isArray(existing)
-        ? (existing as T[])
-        : existing != null
-          ? [existing as T]
-          : [];
+      this._target.push(record);
+      this._invalidateAssociationIds();
     }
-    if (!collection.includes(record)) {
-      collection.push(record);
-      if (this._targetLoaded) this._replacedOrAddedTargets.add(record);
-    }
-    (this._record._cachedAssociations ??= new Map()).set(this._assocName, collection);
+    (this._record._cachedAssociations ??= new Map()).set(this._assocName, this._target);
   }
 
   // NOTE: If _pushThrough fails after the target is saved, the target record
