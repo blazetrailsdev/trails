@@ -1,74 +1,52 @@
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
+ * Mirrors: activerecord/test/cases/relation/with_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
-import { Base } from "../index.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
-import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import "../index.js";
+import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
+import { Company } from "../test-helpers/models/company.js";
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
+const SPECIAL_POSTS = [2];
+const POSTS_WITH_TAGS = [1, 2, 7, 8, 9, 10, 11];
+const POSTS_WITH_COMMENTS = [1, 2, 4, 5, 7];
+const POSTS_WITH_MULTIPLE_COMMENTS = [1, 4, 5];
+const POSTS_WITH_TAGS_AND_COMMENTS = POSTS_WITH_COMMENTS.filter((id) =>
+  POSTS_WITH_TAGS.includes(id),
+).sort((a, b) => a - b);
+const POSTS_WITH_TAGS_AND_MULTIPLE_COMMENTS = POSTS_WITH_MULTIPLE_COMMENTS.filter((id) =>
+  POSTS_WITH_TAGS.includes(id),
+).sort((a, b) => a - b);
 
-beforeAll(async () => {
-  await defineSchema({
-    posts: {
-      title: "string",
-      tags_count: "integer",
-      legacy_comments_count: "integer",
-      type: "string",
-    },
-    comments: { post_id: "integer" },
-    companies: { firm_id: "integer" },
-  });
-});
-
-function ids(records: any[]): number[] {
-  return records.map((r) => Number(r.id)).sort((a, b) => a - b);
+// Rails asserts `relation.order(:id).pluck(:id)`. trails' `pluck` builds its
+// projection off the model's arel_table and does not thread the `from("cte AS
+// posts")` / CTE clause, so it would read the real `posts` table. We mirror the
+// assertion through `order("id").toArray()` + id extraction instead (no re-sort:
+// the ordering is supplied by `order("id")`, exactly as in Rails).
+function pluckIds(records: any[]): number[] {
+  return records.map((r) => Number(r.id));
 }
 
 // ==========================================================================
 // WithTest — targets relation/with_test.rb
 // ==========================================================================
 describe("WithTest", () => {
-  it("with when hash is passed as an argument", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("legacy_comments_count", "integer");
-      }
-    }
-    await Post.create({ title: "no comments", legacy_comments_count: 0 });
-    const p2 = await Post.create({ title: "has comments", legacy_comments_count: 1 });
-    const postsWithComments = [p2.id as number];
+  useHandlerFixtures(["comments", "posts", "companies"], { schema: canonicalSchema });
 
+  it("with when hash is passed as an argument", async () => {
     const relation = Post.with({
       posts_with_comments: Post.where("legacy_comments_count > 0"),
     }).from("posts_with_comments AS posts");
 
-    expect(ids(await relation.order("id").toArray())).toEqual(postsWithComments);
+    expect(pluckIds(await relation.order("id").toArray())).toEqual(POSTS_WITH_COMMENTS);
   });
 
   it("with when hash with multiple elements of different type is passed as an argument", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("tags_count", "integer");
-        this.attribute("legacy_comments_count", "integer");
-      }
-    }
-    const p1 = await Post.create({
-      title: "tagged+multi-comment",
-      tags_count: 1,
-      legacy_comments_count: 2,
-    });
-    await Post.create({ title: "tagged only", tags_count: 1, legacy_comments_count: 0 });
-    await Post.create({ title: "tagged+1comment", tags_count: 1, legacy_comments_count: 1 });
-    await Post.create({ title: "none", tags_count: 0, legacy_comments_count: 0 });
-    const postsWithTagsAndMultipleComments = [p1.id as number];
-
     const cteOptions = {
       posts_with_tags: Post.arelTable
         .project(arelSql("*"))
@@ -84,41 +62,18 @@ describe("WithTest", () => {
       "posts_with_tags_and_multiple_comments AS posts",
     );
 
-    expect(ids(await relation.order("id").toArray())).toEqual(postsWithTagsAndMultipleComments);
+    expect(pluckIds(await relation.order("id").toArray())).toEqual(
+      POSTS_WITH_TAGS_AND_MULTIPLE_COMMENTS,
+    );
   });
 
   it("with when invalid argument is passed", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     expect(() => {
       (Post.with as any)(Post.where({ type: "Post" }));
     }).toThrow(/Unsupported argument type/);
   });
 
   it("multiple with calls", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("tags_count", "integer");
-        this.attribute("legacy_comments_count", "integer");
-      }
-    }
-    const p1 = await Post.create({
-      title: "tagged+comment1",
-      tags_count: 1,
-      legacy_comments_count: 1,
-    });
-    const p2 = await Post.create({
-      title: "tagged+comment2",
-      tags_count: 1,
-      legacy_comments_count: 2,
-    });
-    await Post.create({ title: "none", tags_count: 0 });
-    const postsWithTagsAndComments = [p1.id as number, p2.id as number].sort((a, b) => a - b);
-
     const relation = Post.with({ posts_with_tags: Post.where("tags_count > 0") })
       .from("posts_with_tags_and_comments AS posts")
       .with({
@@ -127,78 +82,40 @@ describe("WithTest", () => {
         ) as any,
       });
 
-    expect(ids(await relation.order("id").toArray())).toEqual(postsWithTagsAndComments);
+    expect(pluckIds(await relation.order("id").toArray())).toEqual(POSTS_WITH_TAGS_AND_COMMENTS);
   });
 
   it("multiple dupicate with calls", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("tags_count", "integer");
-      }
-    }
-    const p1 = await Post.create({ title: "t1", tags_count: 1 });
-    const p2 = await Post.create({ title: "t2", tags_count: 2 });
-    const p3 = await Post.create({ title: "t3", tags_count: 3 });
-    await Post.create({ title: "none", tags_count: 0 });
-    const postsWithTags = [p1.id as number, p2.id as number, p3.id as number].sort((a, b) => a - b);
-
-    const postsWithTagsRel = Post.where("tags_count > 0");
+    const postsWithTags = Post.where("tags_count > 0");
     const relation = Post.with({
-      posts_with_tags: postsWithTagsRel,
-      one_more_posts_with_tags: postsWithTagsRel,
+      posts_with_tags: postsWithTags,
+      one_more_posts_with_tags: postsWithTags,
     })
-      .with({ posts_with_tags: postsWithTagsRel })
+      .with({ posts_with_tags: postsWithTags })
       .from("posts_with_tags AS posts");
 
-    expect(ids(await relation.order("id").toArray())).toEqual(postsWithTags);
+    expect(pluckIds(await relation.order("id").toArray())).toEqual(POSTS_WITH_TAGS);
   });
 
   it("count after with call", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("legacy_comments_count", "integer");
-      }
-    }
-    await Post.create({ title: "with comment", legacy_comments_count: 1 });
-    await Post.create({ title: "without", legacy_comments_count: 0 });
     const relation = Post.with({ posts_with_comments: Post.where("legacy_comments_count > 0") });
 
-    expect(await Post.count()).toEqual(await relation.count());
-    expect(await relation.from("posts_with_comments AS posts").count()).toEqual(1);
+    expect(await relation.count()).toEqual(await Post.count());
+    expect(await relation.from("posts_with_comments AS posts").count()).toEqual(
+      POSTS_WITH_COMMENTS.length,
+    );
     expect(
       await relation.joins("JOIN posts_with_comments ON posts_with_comments.id = posts.id").count(),
-    ).toEqual(1);
+    ).toEqual(POSTS_WITH_COMMENTS.length);
   });
 
   it("with when called from active record scope", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("tags_count", "integer");
-      }
-      static withTagsCte() {
-        return Post.with({ posts_with_tags: Post.where("tags_count > 0") }).from(
-          "posts_with_tags AS posts",
-        );
-      }
-    }
-    const p1 = await Post.create({ title: "tagged1", tags_count: 2 });
-    const p2 = await Post.create({ title: "tagged2", tags_count: 1 });
-    await Post.create({ title: "untagged", tags_count: 0 });
-    const postsWithTags = [p1.id as number, p2.id as number].sort((a, b) => a - b);
-
-    expect(ids(await Post.withTagsCte().order("id").toArray())).toEqual(postsWithTags);
+    expect(pluckIds(await (Post as any).withTagsCte().order("id").toArray())).toEqual(
+      POSTS_WITH_TAGS,
+    );
   });
 
   it("with when invalid params are passed", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("tags_count", "integer");
-      }
-    }
     expect(() => Post.with({ posts_with_tags: null as any }).load()).toThrow();
     expect(() =>
       Post.with({ posts_with_tags: [Post.where("tags_count > 0"), 5 as any] }).load(),
@@ -206,65 +123,36 @@ describe("WithTest", () => {
   });
 
   it("with when passing arrays", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("tags_count", "integer");
-        this.attribute("legacy_comments_count", "integer");
-        this.attribute("type", "string");
-      }
-    }
-    const special = await Post.create({ title: "special", type: "SpecialPost" });
-    const tagged = await Post.create({ title: "tagged", tags_count: 1 });
-    const commented = await Post.create({ title: "commented", legacy_comments_count: 1 });
-    const expected = [special.id as number, tagged.id as number, commented.id as number].sort(
-      (a, b) => a - b,
-    );
-
     const relation = Post.with({
       posts_with_special_type_or_tags_or_comments: [
         Post.where({ type: "SpecialPost" }),
-        arelSql("SELECT * FROM posts WHERE tags_count > 0") as any,
+        arelSql("SELECT * FROM posts WHERE tags_count > 0") as any, // arel node on purpose
         Post.where("legacy_comments_count > 0"),
       ],
     }).from("posts_with_special_type_or_tags_or_comments AS posts");
 
-    expect(ids(await relation.order("id").toArray())).toEqual(expected);
+    const expected = [...SPECIAL_POSTS, ...POSTS_WITH_TAGS, ...POSTS_WITH_COMMENTS].sort(
+      (a, b) => a - b,
+    );
+    expect(pluckIds(await relation.order("id").toArray())).toEqual(expected);
   });
 
   it("with when passing single item array", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("type", "string");
-      }
-    }
-    const special = await Post.create({ title: "special", type: "SpecialPost" });
-    await Post.create({ title: "normal" });
-    const specialIds = [special.id as number];
-
     const relation = Post.with({
       posts_with_special_type_or_tags_or_comments: [Post.where({ type: "SpecialPost" })],
     }).from("posts_with_special_type_or_tags_or_comments AS posts");
 
-    expect(ids(await relation.order("id").toArray())).toEqual(specialIds);
+    expect(pluckIds(await relation.order("id").toArray())).toEqual(
+      [...SPECIAL_POSTS].sort((a, b) => a - b),
+    );
   });
 
   it("with recursive", async () => {
-    class Company extends Base {
-      static {
-        this.attribute("firm_id", "integer");
-      }
-    }
-    const top1 = await Company.create({ firm_id: null });
-    const top2 = await Company.create({ firm_id: null });
-    const child1 = await Company.create({ firm_id: top1.id });
-    const child2 = await Company.create({ firm_id: top2.id });
+    const topCompanies = await Company.where({ firm_id: null }).toArray();
+    const childCompanies = await Company.where({ firm_id: topCompanies }).toArray();
     const topCompaniesAndChildren = [
-      top1.id as number,
-      top2.id as number,
-      child1.id as number,
-      child2.id as number,
+      ...topCompanies.map((c: any) => Number(c.id)),
+      ...childCompanies.map((c: any) => Number(c.id)),
     ].sort((a, b) => a - b);
 
     const relation = (Company.withRecursive as any)({
@@ -276,61 +164,36 @@ describe("WithTest", () => {
       ],
     }).from("top_companies_and_children AS companies");
 
-    expect(ids(await relation.order("id").toArray())).toEqual(topCompaniesAndChildren);
-    expect(relation.toSql()).toMatch(/WITH RECURSIVE/i);
+    expect(pluckIds(await relation.order("id").toArray())).toEqual(topCompaniesAndChildren);
+    expect(relation.toSql()).toMatch("WITH RECURSIVE");
   });
 
   it("with joins", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class Comment extends Base {
-      static {
-        this.attribute("post_id", "integer");
-      }
-    }
-    const p1 = await Post.create({ title: "with comment" });
-    await Post.create({ title: "no comment" });
-    await Comment.create({ post_id: p1.id });
-    const postsWithComments = [p1.id as number];
-
+    // Rails: `.joins(:commented_posts)`. trails' inner-join API does not accept a
+    // bare CTE name as a symbol (the CTEJoin partition only runs on the
+    // left_outer/eager paths), so we join the CTE by its SQL name instead — the
+    // assertion (POSTS_WITH_COMMENTS) is unchanged.
     const relation = Post.with({ commented_posts: Comment.select("post_id").distinct() }).joins(
       "JOIN commented_posts ON commented_posts.post_id = posts.id",
     );
 
-    expect(ids(await relation.order("id").toArray())).toEqual(postsWithComments);
+    expect(pluckIds(await relation.order("id").toArray())).toEqual(POSTS_WITH_COMMENTS);
   });
 
   it("with left joins", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    class Comment extends Base {
-      static {
-        this.attribute("post_id", "integer");
-      }
-    }
-    const p1 = await Post.create({ title: "with comment" });
-    await Post.create({ title: "no comment" });
-    await Comment.create({ post_id: p1.id });
-    const postsWithComments = [p1.id as number];
-
     const relation = Post.with({ commented_posts: Comment.select("post_id").distinct() })
       .joins("LEFT OUTER JOIN commented_posts ON commented_posts.post_id = posts.id")
       .select("posts.*, commented_posts.post_id as has_comments");
 
     const records = await relation.order("posts.id").toArray();
 
+    // Make sure we load all records (thus, left outer join is used)
     expect(records.length).toEqual(await Post.count());
     expect(
       records
         .filter((r: any) => r.readAttribute("has_comments") != null)
         .map((r: any) => Number(r.id)),
-    ).toEqual(postsWithComments);
+    ).toEqual(POSTS_WITH_COMMENTS);
   });
 
   it.skip("raises when using block", () => {
@@ -338,15 +201,6 @@ describe("WithTest", () => {
   });
 
   it("unscoping", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("legacy_comments_count", "integer");
-      }
-    }
-    await Post.create({ title: "a" });
-    await Post.create({ title: "b" });
-
     const relation = Post.with({ posts_with_comments: Post.where("legacy_comments_count > 0") });
 
     const ctes = relation.values()["with"] as Array<{ name: string }>;

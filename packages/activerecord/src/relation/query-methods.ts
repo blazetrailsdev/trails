@@ -246,11 +246,14 @@ function resolveCteEntry(name: string, query: unknown): string {
       }
     }
     // Do NOT wrap individual subqueries in extra parens: the CTE body is already
-    // wrapped as `AS (...)` in toSql(), so `SELECT ... UNION SELECT ...` is valid.
-    // Parenthesized `(SELECT ...) UNION (SELECT ...)` is rejected by SQLite inside CTEs.
+    // wrapped as `AS (...)` in toSql(), so `SELECT ... UNION ALL SELECT ...` is
+    // valid. Parenthesized `(SELECT ...) UNION ALL (SELECT ...)` is rejected by
+    // SQLite inside CTEs. Rails joins array sub-queries with UNION ALL
+    // (build_with_expression_from_value → Arel::Nodes::UnionAll), preserving
+    // duplicate rows across the parts.
     return (query as any[])
       .map((q: any) => (typeof q === "string" ? q : q.toSql()))
-      .join(" UNION ");
+      .join(" UNION ALL ");
   }
   const q = query as any;
   if (typeof q !== "string" && typeof q?.toSql !== "function") {
