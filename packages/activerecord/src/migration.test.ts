@@ -14,7 +14,18 @@ import type { DatabaseAdapter } from "./adapter.js";
 import { Migration } from "./migration.js";
 import { Logger } from "@blazetrails/activesupport";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
+import { SchemaCreation } from "./connection-adapters/abstract/schema-creation.js";
+import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";
+import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mysql/schema-creation.js";
+import { SchemaCreation as SQLite3SchemaCreation } from "./connection-adapters/sqlite3/schema-creation.js";
 import { Schema } from "./schema.js";
+
+function emitTableSql(td: TableDefinition): string {
+  const adapterName = (td as any)._adapterName;
+  if (adapterName === "postgres") return new PgSchemaCreation().accept(td);
+  if (adapterName === "mysql") return new MysqlSchemaCreation().accept(td);
+  return new SQLite3SchemaCreation("sqlite", (td as any)._adapter).accept(td);
+}
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
@@ -297,7 +308,7 @@ describe("MigrationTest", () => {
       executeMutation: async (sql: string) => {
         executed.push(sql);
       },
-      toSql: (node: { toSql(): string }) => node.toSql(),
+      schemaCreation: new SchemaCreation("postgres"),
       supportsIndexesInCreate: () => false,
       schemaCache: { clearDataSourceCacheBang: () => {} },
     } as unknown as DatabaseAdapter;
@@ -541,7 +552,7 @@ describe("Migrations", () => {
       td.integer("age");
       td.boolean("active", { default: true });
 
-      const sql = td.toSql();
+      const sql = emitTableSql(td);
       expect(sql).toContain('CREATE TABLE "users"');
       expect(sql).toContain('"id" INTEGER PRIMARY KEY AUTOINCREMENT');
       expect(sql).toContain('"name" VARCHAR(255)');
@@ -552,24 +563,24 @@ describe("Migrations", () => {
     it("supports id: uuid option", () => {
       const td = new TableDefinition("accounts", { id: "uuid", adapterName: "postgres" });
       td.string("name");
-      const sql = td.toSql();
-      expect(sql).toContain("UUID DEFAULT gen_random_uuid() PRIMARY KEY");
+      const sql = emitTableSql(td);
+      expect(sql).toContain("UUID DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY");
       expect(sql).not.toContain("SERIAL");
     });
 
     it("supports id: uuid option for sqlite", () => {
       const td = new TableDefinition("accounts", { id: "uuid" });
       td.string("name");
-      const sql = td.toSql();
-      expect(sql).toContain("VARCHAR(36) PRIMARY KEY");
+      const sql = emitTableSql(td);
+      expect(sql).toContain("VARCHAR(36) NOT NULL PRIMARY KEY");
       expect(sql).not.toContain("AUTOINCREMENT");
     });
 
     it("supports id: uuid option for mysql", () => {
       const td = new TableDefinition("accounts", { id: "uuid", adapterName: "mysql" });
       td.string("name");
-      const sql = td.toSql();
-      expect(sql).toContain("CHAR(36) PRIMARY KEY");
+      const sql = emitTableSql(td);
+      expect(sql).toContain("CHAR(36) NOT NULL PRIMARY KEY");
       expect(sql).not.toContain("AUTO_INCREMENT");
     });
 
@@ -578,7 +589,7 @@ describe("Migrations", () => {
       td.integer("user_id");
       td.integer("role_id");
 
-      const sql = td.toSql();
+      const sql = emitTableSql(td);
       expect(sql).not.toContain("PRIMARY KEY");
       expect(sql).toContain('"user_id" INTEGER');
     });
@@ -587,7 +598,7 @@ describe("Migrations", () => {
       const td = new TableDefinition("posts");
       td.timestamps();
 
-      const sql = td.toSql();
+      const sql = emitTableSql(td);
       expect(sql).toContain('"created_at" DATETIME(6) NOT NULL');
       expect(sql).toContain('"updated_at" DATETIME(6) NOT NULL');
     });
@@ -596,7 +607,7 @@ describe("Migrations", () => {
       const td = new TableDefinition("posts");
       td.references("user");
 
-      const sql = td.toSql();
+      const sql = emitTableSql(td);
       expect(sql).toContain('"user_id" INTEGER');
     });
 
@@ -604,7 +615,7 @@ describe("Migrations", () => {
       const td = new TableDefinition("posts");
       td.string("title", { null: false });
 
-      const sql = td.toSql();
+      const sql = emitTableSql(td);
       expect(sql).toContain('"title" VARCHAR(255) NOT NULL');
     });
 
@@ -612,7 +623,7 @@ describe("Migrations", () => {
       const td = new TableDefinition("products");
       td.decimal("price", { precision: 8, scale: 2 });
 
-      const sql = td.toSql();
+      const sql = emitTableSql(td);
       expect(sql).toContain('"price" DECIMAL(8, 2)');
     });
 
@@ -620,7 +631,7 @@ describe("Migrations", () => {
       const td = new TableDefinition("posts");
       td.string("slug", { limit: 100 });
 
-      const sql = td.toSql();
+      const sql = emitTableSql(td);
       expect(sql).toContain('"slug" VARCHAR(100)');
     });
 
@@ -628,7 +639,7 @@ describe("Migrations", () => {
       const td = new TableDefinition("counters");
       td.bigint("value");
 
-      const sql = td.toSql();
+      const sql = emitTableSql(td);
       expect(sql).toContain('"value" BIGINT');
     });
 
@@ -636,7 +647,7 @@ describe("Migrations", () => {
       const td = new TableDefinition("games");
       td.char("board", { limit: 9 });
 
-      const sql = td.toSql();
+      const sql = emitTableSql(td);
       expect(sql).toContain('"board" CHAR(9)');
     });
 
@@ -644,7 +655,7 @@ describe("Migrations", () => {
       const td = new TableDefinition("flags");
       td.char("status");
 
-      const sql = td.toSql();
+      const sql = emitTableSql(td);
       expect(sql).toContain('"status" CHAR(1)');
     });
 
@@ -652,7 +663,7 @@ describe("Migrations", () => {
       const td = new TableDefinition("routes", { adapterName: "postgres" });
       td.array("transports", "text");
 
-      const sql = td.toSql();
+      const sql = emitTableSql(td);
       expect(sql).toContain('"transports" TEXT[]');
     });
 
@@ -660,14 +671,14 @@ describe("Migrations", () => {
       const td = new TableDefinition("routes", { adapterName: "sqlite" });
       td.array("transports", "text");
 
-      expect(() => td.toSql()).toThrow(/only supported on PostgreSQL/);
+      expect(() => emitTableSql(td)).toThrow(/only supported on PostgreSQL/);
     });
 
     it("throws for array columns on mysql", () => {
       const td = new TableDefinition("routes", { adapterName: "mysql" });
       td.array("transports", "text");
 
-      expect(() => td.toSql()).toThrow(/only supported on PostgreSQL/);
+      expect(() => emitTableSql(td)).toThrow(/only supported on PostgreSQL/);
     });
 
     it("supports array: true flag on any column type", () => {
@@ -675,7 +686,7 @@ describe("Migrations", () => {
       td.text("tags", { array: true });
       td.integer("scores", { array: true });
 
-      const sql = td.toSql();
+      const sql = emitTableSql(td);
       expect(sql).toContain('"tags" TEXT[]');
       expect(sql).toContain('"scores" INTEGER[]');
     });
