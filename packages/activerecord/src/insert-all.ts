@@ -188,7 +188,7 @@ export class InsertAll {
     const timestamps = this.recordTimestamps() ? this.timestampsForCreate() : undefined;
     const keysList = [...this.keysIncludingTimestamps()];
     return this.inserts.map((row) => {
-      const merged = { ...this._scopeAttributes, ...row };
+      const merged = { ...row, ...this._scopeAttributes };
       if (timestamps) {
         for (const [col, val] of Object.entries(timestamps)) {
           if (!(col in merged)) merged[col] = val;

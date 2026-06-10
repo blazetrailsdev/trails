@@ -247,10 +247,12 @@ describe("InsertAllTest", () => {
 
   it("insert all on relation precedence", async () => {
     const Book = makeBook();
-    // Explicitly provided values take precedence over scope
-    await Book.where({ author: "Default" }).insertAll([{ title: "Override", author: "Explicit" }]);
-    const found = await Book.where({ author: "Explicit" }).toArray();
+    // Scope attributes take precedence over row values (matches Rails attributes.merge!(scope_attributes))
+    await Book.where({ author: "Scope" }).insertAll([{ title: "Override", author: "Row" }]);
+    const found = await Book.where({ author: "Scope" }).toArray();
     expect(found).toHaveLength(1);
+    const notFound = await Book.where({ author: "Row" }).toArray();
+    expect(notFound).toHaveLength(0);
   });
 
   it("insert all create with", async () => {
@@ -271,9 +273,12 @@ describe("InsertAllTest", () => {
 
   it("upsert all on relation precedence", async () => {
     const Book = makeBook();
-    await Book.where({ author: "Scope" }).upsertAll([{ title: "Book", author: "Explicit" }]);
-    const found = await Book.where({ author: "Explicit" }).toArray();
+    // Scope attributes take precedence over row values (matches Rails attributes.merge!(scope_attributes))
+    await Book.where({ author: "Scope" }).upsertAll([{ title: "Book", author: "Row" }]);
+    const found = await Book.where({ author: "Scope" }).toArray();
     expect(found).toHaveLength(1);
+    const notFound = await Book.where({ author: "Row" }).toArray();
+    expect(notFound).toHaveLength(0);
   });
 
   it("upsert all create with", async () => {
@@ -676,11 +681,12 @@ describe("InsertAllTest", () => {
   it("insert all and upsert all with sti", async () => {
     const { Category, SpecialCategory } = makeCategoryHierarchy();
     const before = (await Category.count()) as number;
+    // Scope type wins even when row explicitly passes type: null (attributes.merge!(scope_attributes))
     await SpecialCategory.insertAll([{ name: "First" }, { name: "Second", type: null }]);
     expect(await Category.count()).toBe(before + 2);
     const [first, second] = (await Category.order("id").last(2)) as any[];
     expect(first.type).toBe("SpecialCategory");
-    expect(second.type).toBeNull();
+    expect(second.type).toBe("SpecialCategory");
     await SpecialCategory.upsertAll([
       { id: 103, name: "Third" },
       { id: 104, name: "Fourth", type: null },
@@ -688,7 +694,7 @@ describe("InsertAllTest", () => {
     const third = (await Category.find(103)) as any;
     expect(third.type).toBe("SpecialCategory");
     const fourth = (await Category.find(104)) as any;
-    expect(fourth.type).toBeNull();
+    expect(fourth.type).toBe("SpecialCategory");
   });
   it.skip("upsert and db warnings", () => {
     // BLOCKED: relation — insert_all.rb: DB warnings emitted on upsert
