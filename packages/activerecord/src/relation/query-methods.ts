@@ -963,10 +963,27 @@ function isRelationForCombining(value: unknown): value is QueryMethodsHost {
   );
 }
 
+function rubyClassNameOf(value: unknown): string {
+  if (value === null) return "NilClass";
+  if (Array.isArray(value)) return "Array";
+  switch (typeof value) {
+    case "object":
+      return "Hash";
+    case "string":
+      return "String";
+    case "boolean":
+      return value ? "TrueClass" : "FalseClass";
+    case "number":
+      return Number.isInteger(value) ? "Integer" : "Float";
+    default:
+      return typeof value;
+  }
+}
+
 function assertRelationForCombining(other: unknown, methodName: string): void {
   if (!isRelationForCombining(other)) {
     throw argumentError(
-      `You have passed ${typeof other} object to #${methodName}. Pass an ActiveRecord::Relation object instead.`,
+      `You have passed ${rubyClassNameOf(other)} object to #${methodName}. Pass an ActiveRecord::Relation object instead.`,
     );
   }
 }
@@ -1000,8 +1017,8 @@ function andBang(this: QueryMethodsHost, other: any): any {
   // Mirrors Rails: where_clause |= other.where_clause;
   //                having_clause |= other.having_clause;
   //                references_values |= other.references_values
-  this._whereClause = this._whereClause.merge(other._whereClause);
-  this._havingClause = this._havingClause.merge(other._havingClause);
+  this._whereClause = this._whereClause.union(other._whereClause);
+  this._havingClause = this._havingClause.union(other._havingClause);
   const unionStrings = (a: string[], b: string[]): string[] => [...new Set([...a, ...b])];
   this._referencesValues = unionStrings(this._referencesValues, other._referencesValues);
   return this;
