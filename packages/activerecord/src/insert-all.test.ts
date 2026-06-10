@@ -247,10 +247,12 @@ describe("InsertAllTest", () => {
 
   it("insert all on relation precedence", async () => {
     const Book = makeBook();
-    // Explicitly provided values take precedence over scope
-    await Book.where({ author: "Default" }).insertAll([{ title: "Override", author: "Explicit" }]);
-    const found = await Book.where({ author: "Explicit" }).toArray();
+    // Scope attributes take precedence over row values (matches Rails attributes.merge!(scope_attributes))
+    await Book.where({ author: "Scope" }).insertAll([{ title: "Override", author: "Row" }]);
+    const found = await Book.where({ author: "Scope" }).toArray();
     expect(found).toHaveLength(1);
+    const notFound = await Book.where({ author: "Row" }).toArray();
+    expect(notFound).toHaveLength(0);
   });
 
   it("insert all create with", async () => {
@@ -262,6 +264,18 @@ describe("InsertAllTest", () => {
     expect(all).toHaveLength(2);
   });
 
+  it("insert all create with wins over where for same key", async () => {
+    const Book = makeBook();
+    // createWith wins over where when both supply the same key (Rails: where_values_hash.merge(create_with_value))
+    await Book.where({ author: "Where" })
+      .createWith({ author: "CreateWith" })
+      .insertAll([{ title: "Book" }]);
+    const found = await Book.where({ author: "CreateWith" }).toArray();
+    expect(found).toHaveLength(1);
+    const notFound = await Book.where({ author: "Where" }).toArray();
+    expect(notFound).toHaveLength(0);
+  });
+
   it("upsert all on relation", async () => {
     const Book = makeBook();
     await Book.where({ author: "King" }).upsertAll([{ title: "The Shining" }]);
@@ -271,9 +285,12 @@ describe("InsertAllTest", () => {
 
   it("upsert all on relation precedence", async () => {
     const Book = makeBook();
-    await Book.where({ author: "Scope" }).upsertAll([{ title: "Book", author: "Explicit" }]);
-    const found = await Book.where({ author: "Explicit" }).toArray();
+    // Scope attributes take precedence over row values (matches Rails attributes.merge!(scope_attributes))
+    await Book.where({ author: "Scope" }).upsertAll([{ title: "Book", author: "Row" }]);
+    const found = await Book.where({ author: "Scope" }).toArray();
     expect(found).toHaveLength(1);
+    const notFound = await Book.where({ author: "Row" }).toArray();
+    expect(notFound).toHaveLength(0);
   });
 
   it("upsert all create with", async () => {
@@ -680,6 +697,8 @@ describe("InsertAllTest", () => {
     expect(await Category.count()).toBe(before + 2);
     const [first, second] = (await Category.order("id").last(2)) as any[];
     expect(first.type).toBe("SpecialCategory");
+    // inheritance_column is excluded from scope_attributes (Rails: scope_for_create.except(inheritance_column))
+    // so an explicit type: null in the row is preserved
     expect(second.type).toBeNull();
     await SpecialCategory.upsertAll([
       { id: 103, name: "Third" },
