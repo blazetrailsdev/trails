@@ -128,7 +128,7 @@ const TEST_SCHEMA: Schema = {
   parents: { name: "string" },
   parts: { ship_id: "integer" },
   patients: {},
-  people: { name: "string", age: "integer", active: "boolean" },
+  ref_people: { name: "string", age: "integer", active: "boolean" },
   pets: { owner_id: "integer" },
   post_tags: { post_id: "integer", tag_id: "integer" },
   posts: {

@@ -105,7 +105,7 @@ const UNIVERSAL_AUTOSAVE_SCHEMA: Schema = {
   ps: { name: "string" },
   cs: { favorite: "boolean", p_id: "integer" },
   references: { favorite: "boolean", job_id: "integer", person_id: "integer" },
-  people: { name: "string", first_name: "string" },
+  as_people: { name: "string", first_name: "string" },
   widgets: { status: "string", owner_id: "integer" },
   owners: { name: "string" },
   books: { title: "string", author_id: "integer" },
@@ -2495,6 +2495,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // standard (:create/:update) validation context — only custom contexts propagate.
     class Person extends Base {
       static {
+        this._tableName = "as_people";
         this.attribute("first_name", "string");
         // :create-only validation — should not fire when context is :update
         this.validate(

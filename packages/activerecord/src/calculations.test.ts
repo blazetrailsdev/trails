@@ -2705,7 +2705,7 @@ describe("CalculationsTest", () => {
         question_type: "integer",
       },
       orders: { status: "string", total: "integer" },
-      people: { name: "string", age: "integer" },
+      calc_people: { name: "string", age: "integer" },
       posts: {
         title: "string",
         status: "string",
@@ -6001,7 +6001,7 @@ describe("CalculationsTest", () => {
   it("attributeChanged? supports from: and to: options (Active Model Dirty)", async () => {
     class Person extends Base {
       static {
-        this._tableName = "people";
+        this._tableName = "calc_people";
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("age", "integer");

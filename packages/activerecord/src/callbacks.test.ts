@@ -22,7 +22,7 @@ import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-tran
 const TEST_SCHEMA: Schema = {
   topics: { title: "string" },
   animals: { name: "string", type: "string" },
-  people: { name: "string" },
+  cb_people: { name: "string" },
   cb_posts: { title: "string" },
   trackeds: { name: "string" },
   guardeds: { name: "string" },
@@ -128,6 +128,7 @@ describe("CallbacksTest", () => {
   it("save person", async () => {
     class Person extends Base {
       static {
+        this._tableName = "cb_people";
         this.attribute("name", "string");
       }
     }
@@ -139,6 +140,7 @@ describe("CallbacksTest", () => {
   it("existing valid?", async () => {
     class Person extends Base {
       static {
+        this._tableName = "cb_people";
         this.attribute("name", "string");
       }
     }
@@ -150,6 +152,7 @@ describe("CallbacksTest", () => {
   it("validate on contextual create", async () => {
     class Person extends Base {
       static {
+        this._tableName = "cb_people";
         this.attribute("name", "string");
         this.validates("name", { presence: true, on: "create" });
       }
@@ -162,6 +165,7 @@ describe("CallbacksTest", () => {
   it("validate on contextual update", async () => {
     class Person extends Base {
       static {
+        this._tableName = "cb_people";
         this.attribute("name", "string");
         this.validates("name", { presence: true, on: "update" });
       }

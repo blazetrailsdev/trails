@@ -110,8 +110,7 @@ describe("DirtyTest", () => {
   // declaring its own, so the worker's signature cache keeps each `defineSchema`
   // a no-op. But a sibling file that ran earlier in this worker can physically
   // DROP+CREATE a shared table with a reduced shape (e.g. callbacks.test.ts'
-  // `topics: { title }` / `people: { name }`, clone.test.ts' trimmed `topics`,
-  // reflection.test.ts' `people: { name, age, active }`). That leaves the table
+  // `topics: { title }`, clone.test.ts' trimmed `topics`). That leaves the table
   // missing the columns these tests read — `written_on` (datetime tests) and
   // `created_at`/`updated_at` (whose auto-write is the only thing populating
   // `saved_changes` after an INSERT) — so the suite reflects the wrong shape and
@@ -122,7 +121,6 @@ describe("DirtyTest", () => {
   beforeAll(async () => {
     await defineSchema(
       {
-        people: canonicalSchema.people,
         topics: canonicalSchema.topics,
         pirates: canonicalSchema.pirates,
         parrots: canonicalSchema.parrots,
