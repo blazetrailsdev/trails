@@ -16,6 +16,7 @@ import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { ContextualCallbacksDeveloper } from "./test-helpers/models/contextual-callbacks-developer.js";
 
 // Union of every table referenced by the CallbacksTest describe blocks below.
 // Overlapping tables share a consistent column shape, so one up-front schema
@@ -126,59 +127,18 @@ describe("CallbacksTest", () => {
 
 describe("CallbacksTest", () => {
   // Rails callbacks_test.rb declares `fixtures :developers`; the callback models
-  // ride the canonical `developers` table. ContextualCallbacksDeveloper records
-  // a per-instance callback history and asserts validation-context ordering.
-  class ContextualCallbacksDeveloper extends Base {
-    history: string[] = [];
-    static {
-      this._tableName = "developers";
-      this.attribute("name", "string");
-      this.attribute("salary", "integer");
-      this.beforeValidation((r: ContextualCallbacksDeveloper) => {
-        r.history.push("before_validation");
-      });
-      this.beforeValidation(
-        (r: ContextualCallbacksDeveloper) => {
-          r.history.push(`before_validation_on_${r._validationContext}`);
-        },
-        { on: ["create", "update"] },
-      );
-      this.validate((r: ContextualCallbacksDeveloper) => {
-        r.history.push("validate");
-      });
-      this.afterValidation((r: ContextualCallbacksDeveloper) => {
-        r.history.push("after_validation");
-      });
-      this.afterValidation(
-        (r: ContextualCallbacksDeveloper) => {
-          r.history.push(`after_validation_on_${r._validationContext}`);
-        },
-        { on: ["create", "update"] },
-      );
-    }
-  }
+  // ride the canonical `developers` table (ContextualCallbacksDeveloper from
+  // test-helpers/models records a per-instance callback history).
 
   it("save person", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "developers";
-        this.attribute("name", "string");
-      }
-    }
-    const p = await Person.create({ name: "Alice" });
+    const p = await ContextualCallbacksDeveloper.create({ name: "Alice" });
     expect(p.isPersisted()).toBe(true);
     expect(p.name).toBe("Alice");
   });
 
   it("existing valid?", async () => {
-    class Person extends Base {
-      static {
-        this._tableName = "developers";
-        this.attribute("name", "string");
-      }
-    }
-    const p = await Person.create({ name: "Bob" });
-    const found = await Person.find(p.id);
+    const p = await ContextualCallbacksDeveloper.create({ name: "Bob" });
+    const found = await ContextualCallbacksDeveloper.find(p.id);
     expect(found.isValid()).toBe(true);
   });
 
