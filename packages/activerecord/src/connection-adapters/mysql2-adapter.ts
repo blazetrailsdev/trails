@@ -581,7 +581,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       } catch (e: any) {
         const translated =
           e instanceof MismatchedForeignKey
-            ? await this._enrichMismatchedForeignKey(e)
+            ? await this._translateAndEnrich(e.cause ?? e, driverSql, driverBinds)
             : e instanceof ActiveRecordError
               ? e
               : await this._translateAndEnrich(e, driverSql, driverBinds);
@@ -781,7 +781,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       } catch (e: any) {
         const translated =
           e instanceof MismatchedForeignKey
-            ? await this._enrichMismatchedForeignKey(e)
+            ? await this._translateAndEnrich(e.cause ?? e, driverSql, driverBinds)
             : e instanceof ActiveRecordError
               ? e
               : await this._translateAndEnrich(e, driverSql, driverBinds);
@@ -838,7 +838,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       } catch (e: any) {
         const translated =
           e instanceof MismatchedForeignKey
-            ? await this._enrichMismatchedForeignKey(e)
+            ? await this._translateAndEnrich(e.cause ?? e, driverSql, driverBinds)
             : e instanceof ActiveRecordError
               ? e
               : await this._translateAndEnrich(e, driverSql, driverBinds);
