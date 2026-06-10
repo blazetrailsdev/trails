@@ -20,7 +20,7 @@ const UUID_OID = 2950;
 function makeAdapter(queryImpl: (...args: unknown[]) => Promise<unknown>): PostgreSQLAdapter {
   const adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
   // Stub the client acquisition so tests don't touch a real pool.
-  // `fakeClient.release` is a no-op; `withClient()` / `execQuery()` call
+  // `fakeClient.release` is a no-op; `getClient()` / `execQuery()` call
   // it directly once the block resolves.
   const fakeClient = { query: queryImpl, release: () => {} };
   vi.spyOn(adapter as unknown as { getClient: () => unknown }, "getClient").mockResolvedValue(
