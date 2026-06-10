@@ -244,7 +244,7 @@ export class TableDefinition extends AbstractTableDefinition {
     }
   }
 
-  override toSql(): string {
+  toSql(): string {
     const adapter: PgSchemaCreationHost | undefined =
       "typeToSql" in this._adapter ? (this._adapter as PgSchemaCreationHost) : undefined;
     return new PgSchemaCreation(adapter).accept(this);

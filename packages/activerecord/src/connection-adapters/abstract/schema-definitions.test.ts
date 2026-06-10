@@ -5,6 +5,7 @@ import {
   TableDefinition,
   Table,
 } from "./schema-definitions.js";
+import { SchemaCreation } from "./schema-creation.js";
 
 describe("IndexDefinition#concise_options", () => {
   it("keeps hash when values differ", () => {
@@ -90,13 +91,17 @@ describe("TableDefinition#toSql blank type guard", () => {
   it("throws a descriptive error for an empty custom type", () => {
     const td = new TableDefinition("t", { id: false });
     td.column("bad", "" as any);
-    expect(() => td.toSql()).toThrow(/Column "bad" has an empty or blank type/);
+    expect(() => new SchemaCreation("sqlite").accept(td)).toThrow(
+      /Column "bad" has an empty or blank type/,
+    );
   });
 
   it("throws a descriptive error for a whitespace-only custom type", () => {
     const td = new TableDefinition("t", { id: false });
     td.column("bad", "   " as any);
-    expect(() => td.toSql()).toThrow(/Column "bad" has an empty or blank type/);
+    expect(() => new SchemaCreation("sqlite").accept(td)).toThrow(
+      /Column "bad" has an empty or blank type/,
+    );
   });
 });
 

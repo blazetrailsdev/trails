@@ -84,6 +84,9 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   override typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
+    if (options.array && type !== "primary_key") {
+      throw new Error("Array columns are only supported on PostgreSQL");
+    }
     const limit = options.limit as number | null | undefined;
     const unsigned = options.unsigned;
     let sql: string;

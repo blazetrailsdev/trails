@@ -50,7 +50,7 @@ export class TableDefinition extends AbstractTableDefinition {
     return super.newColumnDefinition(name, type, options);
   }
 
-  override toSql(): string {
+  toSql(): string {
     return new SQLite3SchemaCreation("sqlite", this._adapter).accept(this);
   }
 

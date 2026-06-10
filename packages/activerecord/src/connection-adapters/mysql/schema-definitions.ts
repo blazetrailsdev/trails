@@ -103,7 +103,7 @@ export class TableDefinition extends AbstractTableDefinition {
    * other column options consistent between `createTable`, `addColumn`, and
    * `changeColumn` — they all go through {@link SchemaCreation#addColumnOptions}.
    */
-  override toSql(): string {
+  toSql(): string {
     // Build the visitor directly from the stored host adapter — its support flags and
     // `isMariadb()` are the only state the visitor consults, and going through
     // `schemaStatements().schemaCreation` would allocate a fresh `SchemaStatements` per call
