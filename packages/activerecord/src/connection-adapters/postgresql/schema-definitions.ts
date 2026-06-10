@@ -21,6 +21,10 @@ import type {
   SchemaStatementsLike,
 } from "../abstract/schema-definitions.js";
 import type { SchemaQuoter } from "../abstract/assert-schema-adapter.js";
+import {
+  SchemaCreation as PgSchemaCreation,
+  type PgSchemaCreationHost,
+} from "./schema-creation.js";
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace PostgreSQL {
@@ -156,12 +160,6 @@ export class UniqueConstraintDefinition {
   }
 }
 
-function deferrableSql(deferrable: boolean | "immediate" | "deferred" | undefined): string[] {
-  if (!deferrable) return [];
-  if (deferrable === true) return ["DEFERRABLE"];
-  return [`DEFERRABLE INITIALLY ${deferrable.toUpperCase()}`];
-}
-
 export class TableDefinition extends AbstractTableDefinition {
   readonly exclusionConstraints: ExclusionConstraintDefinition[] = [];
   readonly uniqueConstraints: UniqueConstraintDefinition[] = [];
@@ -247,147 +245,9 @@ export class TableDefinition extends AbstractTableDefinition {
   }
 
   override toSql(): string {
-    let sql = super.toSql();
-
-    if (this.unlogged) {
-      sql = sql.replace(/^CREATE TABLE/, "CREATE UNLOGGED TABLE");
-    }
-
-    if (!this.as && (this.exclusionConstraints.length > 0 || this.uniqueConstraints.length > 0)) {
-      const constraintSql = [
-        ...this.exclusionConstraints.map((ec) => this.exclusionConstraintSql(ec)),
-        ...this.uniqueConstraints.map((uc) => this.uniqueConstraintSql(uc)),
-      ].join(", ");
-      sql = this.appendConstraintsToSql(sql, constraintSql);
-    }
-
-    return sql;
-  }
-
-  private appendConstraintsToSql(sql: string, constraintSql: string): string {
-    const range = this.tableElementListRange(sql);
-    if (range === null)
-      throw new Error(
-        `Unable to append constraints to CREATE TABLE statement for ${this.tableName}: ${sql}`,
-      );
-    const { openingParenIndex, closingParenIndex } = range;
-    const inner = sql.slice(openingParenIndex + 1, closingParenIndex).trim();
-    const separator = inner.length === 0 ? "" : ", ";
-    return (
-      sql.slice(0, closingParenIndex) + separator + constraintSql + sql.slice(closingParenIndex)
-    );
-  }
-
-  private tableElementListRange(
-    sql: string,
-  ): { openingParenIndex: number; closingParenIndex: number } | null {
-    let inSingleQuote = false;
-    let inDoubleQuote = false;
-    let openingParenIndex = -1;
-
-    for (let i = 0; i < sql.length; i++) {
-      const ch = sql[i];
-
-      if (inSingleQuote) {
-        if (ch === "'" && sql[i + 1] === "'") {
-          i++;
-          continue;
-        }
-        if (ch === "'") inSingleQuote = false;
-        continue;
-      }
-      if (inDoubleQuote) {
-        if (ch === '"' && sql[i + 1] === '"') {
-          i++;
-          continue;
-        }
-        if (ch === '"') inDoubleQuote = false;
-        continue;
-      }
-      if (ch === "'") {
-        inSingleQuote = true;
-        continue;
-      }
-      if (ch === '"') {
-        inDoubleQuote = true;
-        continue;
-      }
-      if (ch === "(") {
-        openingParenIndex = i;
-        break;
-      }
-    }
-
-    if (openingParenIndex === -1) return null;
-
-    let depth = 0;
-    inSingleQuote = false;
-    inDoubleQuote = false;
-
-    for (let i = openingParenIndex; i < sql.length; i++) {
-      const ch = sql[i];
-
-      if (inSingleQuote) {
-        if (ch === "'" && sql[i + 1] === "'") {
-          i++;
-          continue;
-        }
-        if (ch === "'") inSingleQuote = false;
-        continue;
-      }
-      if (inDoubleQuote) {
-        if (ch === '"' && sql[i + 1] === '"') {
-          i++;
-          continue;
-        }
-        if (ch === '"') inDoubleQuote = false;
-        continue;
-      }
-      if (ch === "'") {
-        inSingleQuote = true;
-        continue;
-      }
-      if (ch === '"') {
-        inDoubleQuote = true;
-        continue;
-      }
-      if (ch === "(") {
-        depth++;
-        continue;
-      }
-      if (ch === ")") {
-        depth--;
-        if (depth === 0) return { openingParenIndex, closingParenIndex: i };
-      }
-    }
-
-    return null;
-  }
-
-  private exclusionConstraintSql(ec: ExclusionConstraintDefinition): string {
-    const parts: string[] = [];
-    if (ec.name) parts.push("CONSTRAINT", this._adapter.quoteIdentifier(ec.name));
-    parts.push("EXCLUDE");
-    if (ec.using) parts.push(`USING ${ec.using}`);
-    parts.push(`(${ec.expression})`);
-    if (ec.where) parts.push(`WHERE (${ec.where})`);
-    parts.push(...deferrableSql(ec.deferrable));
-    return parts.join(" ");
-  }
-
-  private uniqueConstraintSql(uc: UniqueConstraintDefinition): string {
-    const columns = Array.isArray(uc.column) ? uc.column : [uc.column];
-    const parts: string[] = [];
-    if (uc.name) parts.push("CONSTRAINT", this._adapter.quoteIdentifier(uc.name));
-    parts.push("UNIQUE");
-    if (uc.nullsNotDistinct) parts.push("NULLS NOT DISTINCT");
-    if (uc.usingIndex) {
-      parts.push(`USING INDEX ${this._adapter.quoteIdentifier(uc.usingIndex)}`);
-    } else {
-      parts.push(`(${columns.map((c) => this._adapter.quoteIdentifier(c)).join(", ")})`);
-    }
-    parts.push(...deferrableSql(uc.deferrable));
-    return parts.join(" ");
+    const adapter: PgSchemaCreationHost | undefined =
+      "typeToSql" in this._adapter ? (this._adapter as PgSchemaCreationHost) : undefined;
+    return new PgSchemaCreation(adapter).accept(this);
   }
 
   bigserial(name: string, options: ColumnOptions = {}): this {
