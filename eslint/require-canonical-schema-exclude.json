@@ -101,7 +101,6 @@
   "packages/activerecord/src/scoping/relation-scoping.test.ts",
   "packages/activerecord/src/secure-password.test.ts",
   "packages/activerecord/src/secure-token.test.ts",
-  "packages/activerecord/src/serialization.test.ts",
   "packages/activerecord/src/serialized-attribute.test.ts",
   "packages/activerecord/src/signed-id.test.ts",
   "packages/activerecord/src/statement-cache.test.ts",
