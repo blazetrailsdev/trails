@@ -1214,9 +1214,7 @@ export class ToSql extends Visitor {
   /**
    * Mirrors Rails: `visit_ActiveModel_Attribute` (to_sql.rb:756).
    * Rails calls `collector.add_bind(o, &bind_block)` — always emits an
-   * unbound placeholder regardless of bind-extraction state. We do the
-   * same: the dispatch never delegates to the BindParam visitor (which
-   * would inline-quote when `_extractBinds` is false).
+   * unbound placeholder; the dispatch never delegates to the BindParam visitor.
    */
   protected visitActiveModelAttribute(o: unknown, collector: SQLString): SQLString {
     collector.addBind(o, this.bindBlock());
