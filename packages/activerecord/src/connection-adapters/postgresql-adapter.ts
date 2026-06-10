@@ -1072,22 +1072,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * pinned trails context cannot fan across sockets the way the old
    * pg.Pool-backed path could (the root cause of #2253).
    */
-  private async withClient<T>(fn: (client: pg.Client) => Promise<T>): Promise<T> {
-    // Route through `getClient()` so unit tests can stub the
-    // acquisition (see postgresql-adapter.exec-query.test.ts).
-    const client = await this.getClient();
-    try {
-      return await fn(client);
-    } catch (error) {
-      // A dead socket (08P01, server-side disconnect, etc.) leaves
-      // _rawConnection unusable for all subsequent queries. Tear down
-      // eagerly so the next caller gets a fresh pg.Client rather than
-      // hitting the same corrupted connection repeatedly.
-      if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
-      throw error;
-    }
-  }
-
   /**
    * Overrides the abstract acquisition seam so the base withRawConnection
    * retry loop acquires a pg.Client instead of the generic _connection.
@@ -1508,8 +1492,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   async beginTransaction(): Promise<void> {
     // Force materialization (_lazy: false) so _client is acquired and
-    // _inTransaction is set immediately. createSavepoint() uses withClient()
-    // which falls back to a fresh pool connection when _client is null,
+    // _inTransaction is set immediately. createSavepoint() runs on the raw
+    // client which falls back to a fresh connection when _client is null,
     // causing "SAVEPOINT can only be used in transaction blocks".
     await this._transactionManager.beginTransaction({ _lazy: false });
   }
@@ -1768,7 +1752,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       row_count: 0,
     };
     return Notifications.instrumentAsync("sql.active_record", payload, () =>
-      this.withClient(async (client) => {
+      // materializeTransactions is handled above (not delegated to
+      // withRawConnection) so transaction-control SQL — COMMIT/ROLLBACK/
+      // SAVEPOINT — keeps its exact pre-existing materialize semantics and the
+      // loop's `finally dirtyCurrentTransaction()` does not fire on txn-control
+      // SQL. The leaf still gains the retry/verify/reconnect loop.
+      this.withRawConnection({ materializeTransactions: false }, async (conn) => {
+        const client = conn as unknown as pg.Client;
         try {
           const result = await this._runQuery(client, sql, [], { rowMode: "array" });
           const count = result.rowCount ?? result.rows.length;
@@ -2113,8 +2103,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Execute raw SQL (for DDL and other non-query statements).
    */
   async exec(sql: string): Promise<void> {
-    await this.withClient(async (client) => {
-      await client.query(sql);
+    await this.withRawConnection(async (conn) => {
+      await (conn as unknown as pg.Client).query(sql);
     });
   }
 
@@ -2466,29 +2456,41 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   async getDatabaseVersion(): Promise<number> {
     if (this._databaseVersion !== null) return this._databaseVersion;
-    // Use raw client directly to avoid re-entering execute() which could
-    // interfere with savepoint nesting in test adapters or wrappers.
-    await this.withClient(async (client) => {
-      const version = await this._serverVersion(client);
-      // Mirrors Rails' get_database_version: a zero version means the version
-      // probe failed (e.g. a half-open connection), so don't cache it — raise
-      // ConnectionFailed so the reconnect path can retry.
-      if (version === 0) {
-        throw new ConnectionFailed("Could not determine PostgreSQL version");
+    // Off the withRawConnection loop: this is a memoized bootstrap probe run
+    // during init / schema introspection (lock-free). Acquire the raw client
+    // directly via getClient(); tear down on a dead socket so the next caller
+    // gets a fresh connection (the recovery withClient used to provide).
+    {
+      const client = await this.getClient();
+      try {
+        const version = await this._serverVersion(client);
+        // Mirrors Rails' get_database_version: a zero version means the version
+        // probe failed (e.g. a half-open connection), so don't cache it — raise
+        // ConnectionFailed so the reconnect path can retry.
+        if (version === 0) {
+          throw new ConnectionFailed("Could not determine PostgreSQL version");
+        }
+        this._databaseVersion = version;
+      } catch (error) {
+        if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
+        throw error;
       }
-      this._databaseVersion = version;
-    });
+    }
     // Eagerly populate optimizer hints flag
     if (this._hasOptimizerHints === null) {
       try {
-        await this.withClient(async (client) => {
-          const result = await client.query(
-            "SELECT COUNT(*) AS count FROM pg_available_extensions WHERE name = $1",
-            ["pg_hint_plan"],
-          );
-          this._hasOptimizerHints = Number(result.rows[0]?.count) > 0;
-        });
-      } catch {
+        const client = await this.getClient();
+        const result = await client.query(
+          "SELECT COUNT(*) AS count FROM pg_available_extensions WHERE name = $1",
+          ["pg_hint_plan"],
+        );
+        this._hasOptimizerHints = Number(result.rows[0]?.count) > 0;
+      } catch (error) {
+        // Carry the version-probe block's recovery forward: tear down on a
+        // dead socket so the next getClient() opens a fresh pg.Client rather
+        // than handing back the stale handle (the recovery the former
+        // withClient body provided before being swallowed by a bare catch).
+        if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
         this._hasOptimizerHints = false;
       }
     }
@@ -2902,7 +2904,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const extName = parts[parts.length - 1];
     const cascade = options.force === "cascade" ? " CASCADE" : "";
     if (options.schema) {
-      await this.withClient(async (client) => {
+      await this.withRawConnection(async (conn) => {
+        const client = conn as unknown as pg.Client;
         const { rows } = await client.query(`SHOW search_path`);
         const originalSearchPath = rows[0]?.search_path as string;
         await client.query(`SELECT set_config('search_path', $1, false)`, [options.schema]);
@@ -5417,13 +5420,28 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   async reconfigureConnectionTimezone(): Promise<void> {
     const tz = getDefaultTimezone();
-    await this.withClient(async (client) => {
+    // Off the withRawConnection loop. This runs as the first step of
+    // performQuery (database-statements.ts), which is itself the block
+    // executing inside withRawConnection on the same async chain. Re-entering
+    // withRawConnection would NOT deadlock — TransactionManager.synchronize is
+    // reentrant per async chain (transaction.ts: getStore() === _currentLockOwner
+    // passes straight through). It is bypassed because this SET SESSION is a
+    // sub-step of an already-in-flight query on the already-acquired live
+    // handle: re-entering the leaf loop would redundantly re-run its verify /
+    // materialize / dirtyCurrentTransaction bookkeeping for a session variable.
+    // Acquire the raw client directly via getClient(); tear down on a dead
+    // socket so the next caller gets a fresh connection.
+    const client = await this.getClient();
+    try {
       if (tz === "utc") {
         await client.query("SET SESSION timezone TO 'UTC'");
       } else {
         await client.query("SET SESSION timezone TO DEFAULT");
       }
-    });
+    } catch (error) {
+      if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
+      throw error;
+    }
   }
 
   /**

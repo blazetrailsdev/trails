@@ -104,6 +104,35 @@ class ExecuteRetryAdapter extends LifecycleTestAdapter {
   }
 }
 
+// Adapter whose configureConnection() raises a queued ConnectionFailed until
+// the queue drains — drives the reconnect! retry loop (connection_retries) the
+// way Rails' "disconnect and recover on #configure_connection failure" does.
+class ConfigureFailureAdapter extends AbstractAdapter {
+  failures: Error[] = [];
+  private _live = false;
+
+  override get active(): boolean {
+    return this._live;
+  }
+  override reconnect(): void {
+    this._live = true;
+    this._connection = this;
+  }
+  override disconnectBang(): void {
+    this._live = false;
+    super.disconnectBang();
+  }
+  override configureConnection(): void {
+    const err = this.failures.shift();
+    if (err) throw err;
+  }
+  override clearCacheBang(): void {}
+
+  override async execute(_sql?: string): Promise<Record<string, unknown>[]> {
+    return this.withRawConnection(async () => [{ "1": 1 }]);
+  }
+}
+
 // Minimal Post model for retryable-classification tests.
 class PostForRetryTest extends Base {
   static {
@@ -744,14 +773,20 @@ describe("AdapterConnectionTest", () => {
     expect(adapter.attempts).toBe(2);
     expect(adapter.active).toBe(true);
   });
-  it.skip("disconnect and recover on #configure_connection failure", () => {
-    // BLOCKED: connection-pool
-    // ROOT-CAUSE: attemptConfigureConnection disconnect-on-failure and the
-    // verifyBang unconfigured fast-path are now in place (see "AbstractAdapter
-    // reconnect/verify lifecycle" tests). The full Rails flow additionally
-    // needs reconnect!'s retry loop (connection_retries) driving a
-    // base-controlled raw reconnect, plus pool.new_connection wiring.
-    // SCOPE: reconnect! retry loop; affects ~1 test
+  it("disconnect and recover on #configure_connection failure", async () => {
+    // Mirrors adapter_test.rb:852 — a connection whose configure_connection
+    // fails twice (raising ConnectionFailed) makes the first query raise after
+    // the reconnect! retry loop (connection_retries) is exhausted; once the
+    // failures drain, the next query reconfigures cleanly and succeeds.
+    const adapter = new ConfigureFailureAdapter();
+    (adapter as any)._config.connectionRetries = 1;
+    (adapter as any).backoff = () => Promise.resolve();
+    adapter.failures = [new ConnectionFailed("Oops"), new ConnectionFailed("Oops 2")];
+
+    await expect(adapter.execute("SELECT 1")).rejects.toBeInstanceOf(ConnectionFailed);
+
+    expect(await adapter.execute("SELECT 1")).toEqual([{ "1": 1 }]);
+    expect(adapter.failures).toEqual([]);
   });
 });
 
