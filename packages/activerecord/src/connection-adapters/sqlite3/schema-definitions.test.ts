@@ -27,4 +27,12 @@ describe("SQLite3::TableDefinition", () => {
     const col = td.newColumnDefinition("full_name", "virtual" as any, { type: "string" } as any);
     expect(col.type).toBe("string");
   });
+
+  it("emits GENERATED ALWAYS AS ... STORED via visitor", () => {
+    const td = new TableDefinition("items", { id: false });
+    td.column("x", "integer");
+    td.column("expr", "integer", { as: "x + 1", stored: true } as any);
+    const sql = td.toSql();
+    expect(sql).toContain("GENERATED ALWAYS AS (x + 1) STORED");
+  });
 });

@@ -16,7 +16,6 @@ import { SchemaCreation } from "./schema-creation.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
-import { TableDefinition } from "./schema-definitions.js";
 
 export interface SchemaStatements {
   dataSources(): Promise<string[]>;
@@ -126,14 +125,6 @@ export function schemaCreation(): SchemaCreation {
 /** @internal */
 function validTableDefinitionOptions(): string[] {
   return ["rename"];
-}
-
-/** @internal */
-function createTableDefinition(
-  name: string,
-  options: Record<string, unknown> = {},
-): TableDefinition {
-  return new TableDefinition(name, options as any);
 }
 
 /** @internal */
