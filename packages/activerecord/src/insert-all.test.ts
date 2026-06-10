@@ -681,12 +681,13 @@ describe("InsertAllTest", () => {
   it("insert all and upsert all with sti", async () => {
     const { Category, SpecialCategory } = makeCategoryHierarchy();
     const before = (await Category.count()) as number;
-    // Scope type wins even when row explicitly passes type: null (attributes.merge!(scope_attributes))
     await SpecialCategory.insertAll([{ name: "First" }, { name: "Second", type: null }]);
     expect(await Category.count()).toBe(before + 2);
     const [first, second] = (await Category.order("id").last(2)) as any[];
     expect(first.type).toBe("SpecialCategory");
-    expect(second.type).toBe("SpecialCategory");
+    // inheritance_column is excluded from scope_attributes (Rails: scope_for_create.except(inheritance_column))
+    // so an explicit type: null in the row is preserved
+    expect(second.type).toBeNull();
     await SpecialCategory.upsertAll([
       { id: 103, name: "Third" },
       { id: 104, name: "Fourth", type: null },
@@ -694,7 +695,7 @@ describe("InsertAllTest", () => {
     const third = (await Category.find(103)) as any;
     expect(third.type).toBe("SpecialCategory");
     const fourth = (await Category.find(104)) as any;
-    expect(fourth.type).toBe("SpecialCategory");
+    expect(fourth.type).toBeNull();
   });
   it.skip("upsert and db warnings", () => {
     // BLOCKED: relation — insert_all.rb: DB warnings emitted on upsert

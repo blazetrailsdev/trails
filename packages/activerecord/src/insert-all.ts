@@ -109,10 +109,15 @@ export class InsertAll {
       this.keys = new Set(Object.keys(this.inserts[0]));
     }
 
-    this._scopeAttributes = {
+    const inheritanceCol = this.model.inheritanceColumn;
+    const rawScopeAttrs: Record<string, unknown> = {
       ...(relation as any)._createWithAttrs,
       ...(relation as any)._scopeAttributes(),
     };
+    // Rails: scope_for_create.except(model.inheritance_column) — STI type is
+    // handled by resolveSti (reverse_merge) so it must not be re-injected here.
+    if (inheritanceCol) delete rawScopeAttrs[inheritanceCol];
+    this._scopeAttributes = rawScopeAttrs;
     for (const key of Object.keys(this._scopeAttributes)) {
       this.keys.add(key);
     }
