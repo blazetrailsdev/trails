@@ -8,7 +8,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import { MigrationContext } from "./migration.js";
-import type { DatabaseAdapter } from "./adapter.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
@@ -20,7 +19,7 @@ useHandlerTransactionalFixtures();
 // the migration API and drop it afterward rather than seeding it into the
 // canonical schema, which mirrors only Rails' schema.rb fixture tables.
 function migrationCtx(): MigrationContext {
-  return new MigrationContext(Base.connection as unknown as DatabaseAdapter);
+  return new MigrationContext(Base.connection);
 }
 beforeAll(async () => {
   await migrationCtx().createTable("metrics", { force: true }, (t) => {
