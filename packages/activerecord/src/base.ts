@@ -2208,6 +2208,7 @@ export class Base extends Model {
   declare static sole: typeof Querying.sole;
   declare static exists: typeof Querying.exists;
   declare static findOrCreateBy: typeof Querying.findOrCreateBy;
+  declare static findOrCreateByBang: typeof Querying.findOrCreateByBang;
   declare static findOrInitializeBy: typeof Querying.findOrInitializeBy;
   declare static isAny: typeof Querying.isAny;
   declare static isMany: typeof Querying.isMany;

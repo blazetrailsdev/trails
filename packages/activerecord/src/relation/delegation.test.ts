@@ -16,11 +16,12 @@ describe("DelegationTest", () => {
   useHandlerFixtures(["posts"], { schema: canonicalSchema });
 
   it("not respond to arel method", () => {
-    // Rails: `assert_not_respond_to target, :exists` — the relation must not
-    // leak Arel SelectManager internals. trails' Relation already owns `exists`
-    // (ActiveRecord's `exists?`), so we probe `project`, which is likewise an
-    // Arel SelectManager method exposed only via `relation.arel()`, never on
-    // the relation itself.
+    // Rails: `assert_not_respond_to target, :exists` — `:exists` is an Arel
+    // SelectManager method that must NOT leak onto the Relation. We can't reuse
+    // the same probe here because trails' `Relation.exists()` is the legitimate
+    // port of ActiveRecord's `exists?` (not an Arel leak), so we pick `project`,
+    // another Arel SelectManager method that lives only on `relation.arel()`
+    // and must likewise stay off the relation itself.
     const target = Comment.all();
     expect("project" in target).toBe(false);
     expect(typeof target.arel().project).toBe("function");
@@ -31,11 +32,18 @@ describe("DelegationTest", () => {
     // `klass.all` (the relation) and `klass` (delegated via
     // `delegate(*QUERYING_METHODS, to: :all)`). trails has no single module
     // constant to diff against — the delegators are the `declare static`
-    // block in base.ts, individually wired by `extend()` — so the literal
-    // list-equality half of the Rails test has no source-of-truth analogue;
-    // the comprehensive respond-to sweep below is the faithful substitute,
-    // covering the full delegated set (not a hand-picked slice) so a method
-    // silently dropped from querying.ts/base.ts fails the test.
+    // block in base.ts, individually wired by `extend(Base, Querying)` — so the
+    // literal list-equality half of the Rails test has no source-of-truth
+    // analogue; the comprehensive respond-to sweep below is the faithful
+    // substitute, covering the full delegated set (not a hand-picked slice) so
+    // a method silently dropped from querying.ts/base.ts fails the test.
+    //
+    // Intentionally excluded:
+    //   - `isNone`: Rails QUERYING_METHODS' `none?` is the no-records predicate,
+    //     which trails delegates as `isEmpty` (see querying.ts isEmpty doc:
+    //     "Rails' `none?` … falls through to `empty?`"). `Relation#isNone()` is
+    //     a separate null-relation predicate (`_isNone`), intentionally not a
+    //     class-level querying delegator.
     const QUERYING_METHODS = [
       "where",
       "whereNot",
@@ -91,16 +99,23 @@ describe("DelegationTest", () => {
       "findInBatches",
       "inBatches",
       "findOrCreateBy",
+      "findOrCreateByBang",
       "findOrInitializeBy",
       "firstOrCreate",
+      "firstOrCreateBang",
       "firstOrInitialize",
+      "createOrFindBy",
+      "createOrFindByBang",
       "destroyAll",
       "deleteAll",
       "updateAll",
+      "touchAll",
       "deleteBy",
       "destroyBy",
       "insert",
+      "insertBang",
       "insertAll",
+      "insertAllBang",
       "upsert",
       "upsertAll",
       "isAny",
@@ -127,15 +142,18 @@ describe("DelegationTest", () => {
       expect("target" in Relation.prototype).toBe(false);
       expect("target" in CollectionProxy.prototype).toBe(true);
 
-      // trails has no `Developer.all.target == :__target__` delegation-cache
-      // sentinel to probe, so we assert the invariant directly: exercising the
-      // delegated querying methods on a relation must not generate a `target`
-      // on Relation that would shadow CollectionProxy's own definition.
+      // Rails triggers the contamination path by calling `Developer.all.target`
+      // (which would insert `target` into the delegation cache); the assertion
+      // is that this never shadows `CollectionProxy#target`. trails has no
+      // `:__target__` sentinel, so we read `.target` off a Relation directly —
+      // it is `undefined` (correct trails behavior: Relation has no `target`) —
+      // and assert that touching it neither defines `target` on Relation nor
+      // mutates CollectionProxy's own `target` getter.
       const targetGetter = Object.getOwnPropertyDescriptor(
         CollectionProxy.prototype,
         "target",
       )?.get;
-      Post.all().where({ title: "x" }).order("id").limit(1);
+      expect((Post.all() as any).target).toBeUndefined();
       expect("target" in Relation.prototype).toBe(false);
       expect(Object.getOwnPropertyDescriptor(CollectionProxy.prototype, "target")?.get).toBe(
         targetGetter,
