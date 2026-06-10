@@ -1,4 +1,4 @@
-import { describe, expect, beforeEach } from "vitest";
+import { describe, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
@@ -6,31 +6,26 @@ import type { DatabaseAdapter } from "./adapter.js";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 
 function nsecTime(v: Temporal.PlainTime): number {
   return v.millisecond * 1_000_000 + v.microsecond * 1_000 + v.nanosecond;
 }
 
-// Tests recreate `foos` per-test via `ctx.createTable("foos", { force: true }, ...)`
-// with varying precision options, so the schema seeded here is a placeholder that
-// satisfies AR_NO_AUTO_SCHEMA=1's "schema must be declared up front" requirement;
-// the `force: true` migrations drop and rebuild it with the precision under test.
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, { foos: TEST_SCHEMA.foos });
-  return adapter;
-}
-
 describe("TimePrecisionTest", () => {
   let adapter: DatabaseAdapter;
   let ctx: MigrationContext;
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  // Rails: `foos` is not a schema.rb fixture table — each test builds it with
+  // `create_table(:foos, force: true)` for the precision under test and the
+  // `teardown` drops it (`drop_table :foos, if_exists: true`). Mirror that
+  // here rather than seeding a placeholder into the canonical schema.
+  beforeEach(() => {
+    adapter = createTestAdapter();
     ctx = new MigrationContext(adapter);
+  });
+  afterEach(async () => {
+    await ctx.dropTable("foos", { ifExists: true });
   });
   function makeFoo() {
     class Foo extends Base {
