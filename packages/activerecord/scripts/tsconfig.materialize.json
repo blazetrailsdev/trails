@@ -1,0 +1,11 @@
+{
+  "comment": "Run-only config for materialize-model-declares.ts: maps the one cross-package import (activesupport) to source so `tsx` needs no built dist/.",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "paths": {
+      "@blazetrails/activesupport": ["../../activesupport/src/index.ts"]
+    }
+  }
+}
