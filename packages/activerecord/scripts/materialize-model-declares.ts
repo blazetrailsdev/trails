@@ -185,6 +185,47 @@ function collectNamesInScope(sf: ts.SourceFile): Set<string> {
   return names;
 }
 
+// The virtualizer qualifies its built-in generic types with inline
+// `import("…").X` expressions so it never has to touch a user file's
+// import list (that's correct for a compile-time transform). When we
+// MATERIALIZE the output into source we'd rather read normal top-level
+// imports, so this pass rewrites every `import("mod").Sym` to a bare
+// `Sym` and hoists one `import type { … } from "mod"` line per module.
+//
+// Symbols already in scope (e.g. a model that already imports `Relation`,
+// or `Temporal` imported as a value) are reused — no duplicate import.
+// AR built-ins are pointed at the same relative paths the hand-written
+// model declares use, to match convention; anything else keeps its
+// original module specifier.
+const INLINE_IMPORT_RE = /import\("([^"]+)"\)\.([A-Za-z_$][\w$]*)/g;
+const BUILTIN_IMPORT_SPECIFIER: Record<string, string> = {
+  AssociationProxy: "../../associations/collection-proxy.js",
+  Relation: "../../relation.js",
+  IPAddr: "../../connection-adapters/postgresql/oid/cidr.js",
+};
+
+function hoistInlineImports(
+  text: string,
+  inScope: ReadonlySet<string>,
+): { text: string; importLines: string[] } {
+  const bySpecifier = new Map<string, Set<string>>();
+  const rewritten = text.replace(INLINE_IMPORT_RE, (_match, mod: string, sym: string) => {
+    if (!inScope.has(sym)) {
+      const specifier = BUILTIN_IMPORT_SPECIFIER[sym] ?? mod;
+      (bySpecifier.get(specifier) ?? bySpecifier.set(specifier, new Set()).get(specifier)!).add(
+        sym,
+      );
+    }
+    return sym;
+  });
+  const importLines = [...bySpecifier]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(
+      ([specifier, syms]) => `import type { ${[...syms].sort().join(", ")} } from "${specifier}";`,
+    );
+  return { text: rewritten, importLines };
+}
+
 function main(): void {
   const args = process.argv.slice(2);
   const targets = (args.length > 0 ? args.map((a) => path.basename(a)) : PILOT).map((f) =>
@@ -198,11 +239,19 @@ function main(): void {
     const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
     const baseNames = computeBaseNames(sf);
     const prependImports = resolveAutoImports(sf, file, registry, baseNames);
-    const { text } = virtualize(source, file, { baseNames, prependImports, schemaColumnsByTable });
-    if (text === source) {
+    const { text: virtualized } = virtualize(source, file, {
+      baseNames,
+      prependImports,
+      schemaColumnsByTable,
+    });
+    if (virtualized === source) {
       process.stdout.write(`  unchanged ${path.basename(file)}\n`);
       continue;
     }
+    // Rewrite the virtualizer's inline `import("…").X` type expressions
+    // into bare references + hoisted top-level `import type` lines.
+    const { text: hoisted, importLines } = hoistInlineImports(virtualized, collectNamesInScope(sf));
+    const text = importLines.length > 0 ? importLines.join("\n") + "\n" + hoisted : hoisted;
     fs.writeFileSync(file, text);
     const added = text.split("\n").length - source.split("\n").length;
     process.stdout.write(`  materialized ${path.basename(file)} (+${added} lines)\n`);

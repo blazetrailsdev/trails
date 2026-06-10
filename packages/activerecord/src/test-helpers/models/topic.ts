@@ -1,3 +1,5 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { Relation } from "../../relation.js";
 import type { Reply } from "./reply.js";
 import type { SillyUniqueReply } from "./reply.js";
 import type { UniqueReply } from "./reply.js";
@@ -7,59 +9,45 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "../../base.js";
 
 export class Topic extends Base {
-  declare static base: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static writtenBefore: (time: any) => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static approved: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static rejected: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static children: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static hasChildren: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static byLifo: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static replied: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static true: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static false: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static scopeWithLambda: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static approvedAsString: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static anonymousExtension: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static scopeStats: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static withObject: () => import("@blazetrails/activerecord").Relation<Topic>;
-  declare static withKwargs: (
-    approved?: boolean,
-  ) => import("@blazetrails/activerecord").Relation<Topic>;
-  declare replies: import("@blazetrails/activerecord").AssociationProxy<Reply>;
-  declare approvedReplies: import("@blazetrails/activerecord").AssociationProxy<Reply>;
-  declare openReplies: import("@blazetrails/activerecord").AssociationProxy<Reply>;
-  declare uniqueReplies: import("@blazetrails/activerecord").AssociationProxy<UniqueReply>;
-  declare sillyUniqueReplies: import("@blazetrails/activerecord").AssociationProxy<SillyUniqueReply>;
+  declare static base: () => Relation<Topic>;
+  declare static writtenBefore: (time: any) => Relation<Topic>;
+  declare static approved: () => Relation<Topic>;
+  declare static rejected: () => Relation<Topic>;
+  declare static children: () => Relation<Topic>;
+  declare static hasChildren: () => Relation<Topic>;
+  declare static byLifo: () => Relation<Topic>;
+  declare static replied: () => Relation<Topic>;
+  declare static true: () => Relation<Topic>;
+  declare static false: () => Relation<Topic>;
+  declare static scopeWithLambda: () => Relation<Topic>;
+  declare static approvedAsString: () => Relation<Topic>;
+  declare static anonymousExtension: () => Relation<Topic>;
+  declare static scopeStats: () => Relation<Topic>;
+  declare static withObject: () => Relation<Topic>;
+  declare static withKwargs: (approved?: boolean) => Relation<Topic>;
+  declare replies: AssociationProxy<Reply>;
+  declare approvedReplies: AssociationProxy<Reply>;
+  declare openReplies: AssociationProxy<Reply>;
+  declare uniqueReplies: AssociationProxy<UniqueReply>;
+  declare sillyUniqueReplies: AssociationProxy<SillyUniqueReply>;
   declare approved: boolean | null;
   declare author_email_address: string;
   declare author_name: string;
   declare binary_content: Uint8Array;
-  declare bonus_time: import("@blazetrails/activesupport/temporal").Temporal.PlainTime;
+  declare bonus_time: Temporal.PlainTime;
   declare content: string;
-  declare created_at:
-    | (
-        | import("@blazetrails/activesupport/temporal").Temporal.Instant
-        | import("@blazetrails/activesupport/temporal").Temporal.PlainDateTime
-      )
-    | null;
+  declare created_at: (Temporal.Instant | Temporal.PlainDateTime) | null;
   declare group: string;
   declare important: string;
-  declare last_read: import("@blazetrails/activesupport/temporal").Temporal.PlainDate;
+  declare last_read: Temporal.PlainDate;
   declare parent_id: number;
   declare parent_title: string;
   declare replies_count: number | null;
   declare title: string | null;
   declare "type": string;
   declare unique_replies_count: number | null;
-  declare updated_at:
-    | (
-        | import("@blazetrails/activesupport/temporal").Temporal.Instant
-        | import("@blazetrails/activesupport/temporal").Temporal.PlainDateTime
-      )
-    | null;
-  declare written_on:
-    | import("@blazetrails/activesupport/temporal").Temporal.Instant
-    | import("@blazetrails/activesupport/temporal").Temporal.PlainDateTime;
+  declare updated_at: (Temporal.Instant | Temporal.PlainDateTime) | null;
+  declare written_on: Temporal.Instant | Temporal.PlainDateTime;
 
   static {
     this.scope("base", (q: any) => q.all());
@@ -194,7 +182,7 @@ export class TitlePrimaryKeyTopic extends Topic {
 }
 
 export class WebTopic extends Base {
-  declare replies: import("@blazetrails/activerecord").AssociationProxy<WebReply>;
+  declare replies: AssociationProxy<WebReply>;
 
   static _tableName = "topics";
 
