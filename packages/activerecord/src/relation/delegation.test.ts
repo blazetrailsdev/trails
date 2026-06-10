@@ -4,48 +4,109 @@
  * Mirrors: activerecord/test/cases/relation/delegation_test.rb
  */
 import { describe, it, expect } from "vitest";
-import "../index.js";
+import { Relation } from "../index.js";
+import { CollectionProxy } from "../associations/collection-proxy.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
 
 describe("DelegationTest", () => {
   // Mirrors Rails `fixtures :posts` (DelegationCachingTest declares fixtures).
   useHandlerFixtures(["posts"], { schema: canonicalSchema });
 
   it("not respond to arel method", () => {
-    const post = new Post({ title: "test" });
-    expect("arel" in post).toBe(false);
+    // Rails: `assert_not_respond_to target, :exists` — the relation must not
+    // leak Arel SelectManager internals. trails' Relation already owns `exists`
+    // (ActiveRecord's `exists?`), so we probe `project`, which is likewise an
+    // Arel SelectManager method exposed only via `relation.arel()`, never on
+    // the relation itself.
+    const target = Comment.all();
+    expect("project" in target).toBe(false);
+    expect(typeof target.arel().project).toBe("function");
   });
 
   describe("QueryingMethodsDelegationTest", () => {
-    // Rails iterates the full Querying::QUERYING_METHODS list, asserting both
-    // `klass.all` (the relation) and `klass` itself respond to each. trails
-    // delegates the same methods statically via `delegate(*QUERYING_METHODS,
-    // to: :all)` (querying.ts); the camelCase subset below is the trails mirror.
+    // Rails asserts every Querying::QUERYING_METHODS entry responds on both
+    // `klass.all` (the relation) and `klass` (delegated via
+    // `delegate(*QUERYING_METHODS, to: :all)`). trails has no single module
+    // constant to diff against — the delegators are the `declare static`
+    // block in base.ts, individually wired by `extend()` — so the literal
+    // list-equality half of the Rails test has no source-of-truth analogue;
+    // the comprehensive respond-to sweep below is the faithful substitute,
+    // covering the full delegated set (not a hand-picked slice) so a method
+    // silently dropped from querying.ts/base.ts fails the test.
     const QUERYING_METHODS = [
       "where",
       "whereNot",
       "select",
+      "reselect",
       "order",
+      "reorder",
       "group",
+      "regroup",
       "having",
       "limit",
       "offset",
       "distinct",
       "joins",
+      "leftJoins",
+      "leftOuterJoins",
       "includes",
+      "preload",
+      "eagerLoad",
       "references",
       "none",
       "from",
+      "lock",
+      "readonly",
+      "rewhere",
+      "unscope",
+      "extending",
+      "annotate",
+      "optimizerHints",
+      "or",
+      "excluding",
       "find",
+      "findBy",
       "first",
       "last",
       "take",
+      "second",
+      "third",
+      "fourth",
+      "fifth",
+      "fortyTwo",
+      "sole",
       "exists",
       "count",
       "sum",
+      "average",
+      "minimum",
+      "maximum",
       "pluck",
+      "pick",
+      "ids",
+      "findEach",
+      "findInBatches",
+      "inBatches",
+      "findOrCreateBy",
+      "findOrInitializeBy",
+      "firstOrCreate",
+      "firstOrInitialize",
+      "destroyAll",
+      "deleteAll",
+      "updateAll",
+      "deleteBy",
+      "destroyBy",
+      "insert",
+      "insertAll",
+      "upsert",
+      "upsertAll",
+      "isAny",
+      "isMany",
+      "isOne",
+      "isEmpty",
     ] as const;
 
     it("delegate querying methods", () => {
@@ -58,15 +119,27 @@ describe("DelegationTest", () => {
   }); // QueryingMethodsDelegationTest
 
   describe("DelegationCachingTest", () => {
-    // Rails' body relies on its Delegation method-cache sentinel
-    // (`Developer.all.target == :__target__`, CollectionProxy#target's owner
-    // unchanged after caching) — trails has no `target`/`method_defined?`
-    // delegation-cache primitive, so we assert the spirit instead: per-relation
-    // delegation caching does not clobber across differently-scoped relations.
     it("delegation doesn't override methods defined in other relation subclasses", () => {
-      const r1 = Post.where({ title: "x" });
-      const r2 = Post.where({ title: "y" });
-      expect(r1.toSql()).not.toBe(r2.toSql());
+      // Precondition (Rails): some methods exist on Relation subclasses but not
+      // on Relation itself — `target` is defined on CollectionProxy but not on
+      // Relation. (Rails: Relation.method_defined?(:target) == false,
+      // CollectionProxy.method_defined?(:target) == true.)
+      expect("target" in Relation.prototype).toBe(false);
+      expect("target" in CollectionProxy.prototype).toBe(true);
+
+      // trails has no `Developer.all.target == :__target__` delegation-cache
+      // sentinel to probe, so we assert the invariant directly: exercising the
+      // delegated querying methods on a relation must not generate a `target`
+      // on Relation that would shadow CollectionProxy's own definition.
+      const targetGetter = Object.getOwnPropertyDescriptor(
+        CollectionProxy.prototype,
+        "target",
+      )?.get;
+      Post.all().where({ title: "x" }).order("id").limit(1);
+      expect("target" in Relation.prototype).toBe(false);
+      expect(Object.getOwnPropertyDescriptor(CollectionProxy.prototype, "target")?.get).toBe(
+        targetGetter,
+      );
     });
   }); // DelegationCachingTest
 });
