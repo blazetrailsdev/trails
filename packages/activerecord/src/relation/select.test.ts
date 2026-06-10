@@ -27,7 +27,23 @@ describe("SelectTest", () => {
   // `fixtures :posts, :comments`; the canonical `welcome` post
   // ("Welcome to the weblog") drives the `UPPER(title)` assertions and its
   // `greetings` comment ("Thank you for the welcome") drives the merge tests.
-  useHandlerFixtures(["posts", "comments"], { schema: canonicalSchema });
+  //
+  // The four `not exists` / `invalid nested field` tests deliberately issue a
+  // SELECT against a non-existent column. On PostgreSQL that aborts the
+  // surrounding transaction ("current transaction is aborted…"), which would
+  // poison the shared transactional-fixtures rollback at teardown. They read no
+  // fixture rows (only assert `to_sql` + that the query raises), so they opt out
+  // of the wrapping transaction via `usesTransaction` and run in autocommit —
+  // the failed statement then errors cleanly without leaving an aborted txn.
+  useHandlerFixtures(["posts", "comments"], {
+    schema: canonicalSchema,
+    usesTransaction: [
+      "select with not exists field",
+      "select with hash with not exists field",
+      "select with hash array value with not exists field",
+      "select with invalid nested field",
+    ],
+  });
   const q = (name: string) => escapeRegExp(quoteTableName(name));
 
   it("select with nil argument", () => {
