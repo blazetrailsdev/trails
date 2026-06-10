@@ -156,8 +156,15 @@ const pgAdapter: DbTemplateAdapter = {
       const sha1 = await schemaSha1(schemaFile);
       await new InternalMetadata(adapter).createTableAndSetFlags("test", sha1);
     } finally {
-      await (adapter as unknown as { disconnect(): Promise<void> }).disconnect?.();
-      await pgTerminateConnections(admin, templateDb);
+      // Teardown must not mask a build/stamp failure: if defineSchema threw,
+      // a disconnect/terminate that also throws would replace the original
+      // error. Swallow teardown errors so the meaningful one always surfaces.
+      try {
+        await (adapter as unknown as { disconnect(): Promise<void> }).disconnect?.();
+        await pgTerminateConnections(admin, templateDb);
+      } catch {
+        // best-effort cleanup; the template DB is dropped at teardown anyway
+      }
     }
 
     for (let slot = 1; slot <= slotCount(); slot++) {

@@ -583,7 +583,7 @@ jobs:
         env:
           ARCONN: postgresql
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
-          AR_DB_FORKS: 4
+          AR_DB_FORKS: 8
       - run: pnpm vitest run packages/activerecord-cli
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
