@@ -102,6 +102,21 @@ export class CTEJoin {
  */
 export type AssociationSpec = string | { [assoc: string]: AssociationSpec | AssociationSpec[] };
 
+type OrderDirection = "asc" | "desc" | "ASC" | "DESC";
+
+/**
+ * A single argument to `order`/`reorder`. Besides the flat
+ * `{ col: "asc" }` hash, Rails accepts a nested `{ table: { col: "asc" } }`
+ * form that expands to a `table.col dir` qualified order.
+ */
+export type OrderArg =
+  | string
+  | Record<string, OrderDirection | Record<string, OrderDirection>>
+  | Nodes.Node
+  | string[]
+  | [Nodes.Node, ...unknown[]]
+  | Map<Nodes.Node | string, OrderDirection>;
+
 // ---------------------------------------------------------------------------
 // Host interface: the shape of `this` for bang methods mixed into Relation.
 // Uses TS `private` keyword fields which are accessible at runtime.
@@ -397,17 +412,59 @@ function orderHashEntry(
   return [String(key), direction];
 }
 
-function orderBang(
-  this: QueryMethodsHost,
-  ...args: Array<
-    | string
-    | Record<string, "asc" | "desc" | "ASC" | "DESC">
-    | Nodes.Node
-    | string[]
-    | [Nodes.Node, ...unknown[]]
-    | Map<Nodes.Node | string, "asc" | "desc" | "ASC" | "DESC">
-  >
-): any {
+// Expand an order hash into clauses. Flat `{ col: "asc" }` yields
+// `["col", "asc"]`; nested `{ table: { col: "asc" } }` mirrors Rails'
+// preprocess_order_args, expanding to a `table.col` qualified order.
+function expandOrderHash(
+  host: QueryMethodsHost,
+  arg: Record<string, unknown>,
+): Array<Nodes.Node | [string, "asc" | "desc"]> {
+  const clauses: Array<Nodes.Node | [string, "asc" | "desc"]> = [];
+  for (const [key, value] of Object.entries(arg)) {
+    if (value !== null && typeof value === "object" && !(value instanceof Nodes.Node)) {
+      for (const [col, dir] of Object.entries(value as Record<string, unknown>)) {
+        clauses.push(orderHashEntry(host, `${key}.${col}`, dir));
+      }
+    } else {
+      clauses.push(orderHashEntry(host, key, value));
+    }
+  }
+  return clauses;
+}
+
+// Mirrors Rails' QueryMethods#column_references: extract table names from order
+// args so `includes(:author).order("authors.name")` (or the hash/Arel forms)
+// auto-adds `authors` to references_values, promoting the include to eager_load.
+function columnReferencesFromOrderArgs(args: OrderArg[]): string[] {
+  const extractTableName = (s: string): string | null => {
+    const m = s.match(/^\W?(\w+)\W?\./);
+    return m ? m[1] : null;
+  };
+  const refs: string[] = [];
+  const push = (r: string | null | undefined): void => {
+    if (r) refs.push(r);
+  };
+  for (const arg of args) {
+    if (typeof arg === "string") {
+      push(extractTableName(arg));
+    } else if (arg instanceof Nodes.Attribute) {
+      push((arg.relation as { name?: string })?.name);
+    } else if (arg instanceof Nodes.Ordering) {
+      const expr = (arg as { expr?: unknown }).expr;
+      if (expr instanceof Nodes.Attribute) push((expr.relation as { name?: string })?.name);
+    } else if (arg !== null && typeof arg === "object" && !(arg instanceof Nodes.Node)) {
+      for (const [key, value] of Object.entries(arg as Record<string, unknown>)) {
+        if (value !== null && typeof value === "object") push(key);
+        else push(extractTableName(key));
+      }
+    }
+  }
+  return refs;
+}
+
+function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
+  const refs = columnReferencesFromOrderArgs(args);
+  if (refs.length > 0) referencesBang.call(this, ...refs);
   let i = 0;
   while (i < args.length) {
     const arg = args[i];
@@ -463,15 +520,10 @@ function orderBang(
       }
       this._orderClauses.push(arg);
     } else if (arg !== null && typeof arg === "object") {
-      // Hash form { col: "asc"|"desc" } — validate column and direction immediately.
-      for (const [col, dir] of Object.entries(arg)) {
-        disallowRawSqlBang([col], resolveOrderMatcher(this));
-        if (!/^(asc|desc)$/i.test(String(dir))) {
-          throw argumentError(
-            `Direction "${dir}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
-          );
-        }
-        this._orderClauses.push([col, (dir as string).toLowerCase() as "asc" | "desc"]);
+      // Hash form { col: "asc"|"desc" } — and nested { table: { col: "asc" } },
+      // which Rails expands to a `table.col dir` qualified order.
+      for (const clause of expandOrderHash(this, arg as Record<string, unknown>)) {
+        this._orderClauses.push(clause);
       }
     } else {
       const argType = arg === null ? "null" : typeof arg;
@@ -482,20 +534,12 @@ function orderBang(
   return this;
 }
 
-function reorderBang(
-  this: QueryMethodsHost,
-  ...args: Array<
-    | string
-    | Record<string, "asc" | "desc" | "ASC" | "DESC">
-    | Nodes.Node
-    | string[]
-    | [Nodes.Node, ...unknown[]]
-    | Map<Nodes.Node | string, "asc" | "desc" | "ASC" | "DESC">
-  >
-): any {
+function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
   this._orderClauses = [];
   this._rawOrderClauses = [];
   this._reordering = true;
+  const refs = columnReferencesFromOrderArgs(args);
+  if (refs.length > 0) referencesBang.call(this, ...refs);
   let i = 0;
   while (i < args.length) {
     const arg = args[i];
@@ -544,14 +588,8 @@ function reorderBang(
       }
       this._orderClauses.push(arg);
     } else if (arg !== null && typeof arg === "object") {
-      for (const [col, dir] of Object.entries(arg as Record<string, string>)) {
-        disallowRawSqlBang([col], resolveOrderMatcher(this));
-        if (!/^(asc|desc)$/i.test(String(dir))) {
-          throw argumentError(
-            `Direction "${dir}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
-          );
-        }
-        this._orderClauses.push([col, (dir as string).toLowerCase() as "asc" | "desc"]);
+      for (const clause of expandOrderHash(this, arg as Record<string, unknown>)) {
+        this._orderClauses.push(clause);
       }
     } else {
       const argType = arg === null ? "null" : typeof arg;

@@ -49,6 +49,7 @@ import {
   referencesFromConditions,
   type UnscopeType,
   type AssociationSpec,
+  type OrderArg,
 } from "./relation/query-methods.js";
 import * as _qm from "./relation/query-methods.js";
 import {
@@ -857,16 +858,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#order
    */
-  order(
-    ...args: Array<
-      | string
-      | Record<string, "asc" | "desc" | "ASC" | "DESC">
-      | Nodes.Node
-      | string[]
-      | [Nodes.Node, ...unknown[]]
-      | Map<Nodes.Node | string, "asc" | "desc" | "ASC" | "DESC">
-    >
-  ): Relation<T> {
+  order(...args: OrderArg[]): Relation<T> {
     return this._clone().orderBang(...args);
   }
 
@@ -984,16 +976,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#reorder
    */
-  reorder(
-    ...args: Array<
-      | string
-      | Record<string, "asc" | "desc" | "ASC" | "DESC">
-      | Nodes.Node
-      | string[]
-      | [Nodes.Node, ...unknown[]]
-      | Map<Nodes.Node | string, "asc" | "desc" | "ASC" | "DESC">
-    >
-  ): Relation<T> {
+  reorder(...args: OrderArg[]): Relation<T> {
     return this._clone().reorderBang(...args);
   }
 
