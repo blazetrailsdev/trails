@@ -8457,11 +8457,18 @@ describe("PreloaderTest", () => {
     const fav = favorites[0] as any;
     expect(fav._preloadedAssociations.get("iaAuthor").name).toBe("Mary");
     expect(fav._preloadedAssociations.get("iaFavoriteAuthor").name).toBe("Bob");
-    // Inverse caching: the loaded mary record must have iaFavs back-pointing
-    // to the same fav instance via the inverse cache populated during grouped
-    // preloading (mirrors Rails' inverse_of behavior under Batch).
-    const loadedMary = fav._preloadedAssociations.get("iaAuthor");
-    expect(loadedMary._cachedAssociations?.get("iaFavs")).toBe(fav);
+    // Mirrors Rails `test_preload_with_grouping_sets_inverse_association`
+    // (associations_test.rb:1120): after the coalesced preload, both belongs_to
+    // targets are reachable with no further queries. The has_many inverse
+    // (`mary.iaFavs`) is intentionally NOT back-populated — Rails gates that on
+    // `has_many_inversing` (BelongsToAssociation#invertible_for?), which is unset
+    // here, so the loaded author carries no inverse collection.
+    spy.mockClear();
+    const reloadedAuthor = (await loadBelongsTo(fav, "iaAuthor", { inverseOf: "iaFavs" })) as any;
+    const reloadedFavorite = (await loadBelongsTo(fav, "iaFavoriteAuthor", {})) as any;
+    expect(reloadedAuthor.name).toBe("Mary");
+    expect(reloadedFavorite.name).toBe("Bob");
+    expect(spy).not.toHaveBeenCalled();
   });
   it("preload can group separate levels", async () => {
     class SLAuthor extends Base {
