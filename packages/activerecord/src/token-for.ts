@@ -213,9 +213,12 @@ export async function findByTokenFor(
   purpose: string,
   token: string,
 ): Promise<Base | null> {
+  // Rails (token_for.rb:42-43) checks `model.primary_key` first, then
+  // `token_definitions.fetch(purpose)` — so a no-PK model raises
+  // UnknownPrimaryKey even for an unknown purpose.
+  const pk = requirePrimaryKey(modelClass);
   const def = getDefinition(modelClass, purpose);
   if (!def) throw new Error(`Unknown token purpose: ${purpose}`);
-  const pk = requirePrimaryKey(modelClass);
   return def.resolveToken(token, async (id) => {
     if (typeof pk === "string") {
       return modelClass.findBy({ [pk]: id });
@@ -236,13 +239,13 @@ export async function findByTokenForBang(
   purpose: string,
   token: string,
 ): Promise<Base> {
-  // Rails `find_by_token_for!` (token_for.rb:51) calls `token_definitions
-  // .fetch(purpose)`, which raises KeyError for an unknown purpose — distinct
-  // from the InvalidSignature raised for a bad/expired token. Mirror that by
-  // raising a generic error here (same as the non-bang path).
+  // Rails `find_by_token_for!` (token_for.rb:50-51) has NO primary_key guard
+  // (unlike the non-bang path): it goes straight to `token_definitions
+  // .fetch(purpose)` — which raises KeyError for an unknown purpose, distinct
+  // from the InvalidSignature raised for a bad/expired token — then `find(id)`
+  // (which itself surfaces UnknownPrimaryKey for a no-PK model).
   const def = getDefinition(modelClass, purpose);
   if (!def) throw new Error(`Unknown token purpose: ${purpose}`);
-  requirePrimaryKey(modelClass);
   const result = await def.resolveToken(token, (id) => modelClass.find(id));
   if (!result) throw new InvalidSignature();
   return result;
