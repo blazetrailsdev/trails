@@ -108,11 +108,11 @@ describeIfSqlite("SQLite3QuotingTest", () => {
 
   it("quote numeric infinity", async () => {
     adapter.exec(`CREATE TABLE "inf_test" ("id" INTEGER PRIMARY KEY, "val" REAL)`);
-    // SQLite doesn't natively support Infinity — it becomes NULL
+    // Mirrors Rails SQLite3::Quoting#type_cast: Float::INFINITY → nil.
+    // Binds pass through sqliteTypeCast before driver hand-off, so Infinity → null.
     await adapter.executeMutation(`INSERT INTO "inf_test" ("val") VALUES (?)`, [Infinity]);
     const rows = await adapter.execute(`SELECT "val" FROM "inf_test"`);
-    // better-sqlite3 stores Infinity as Infinity in REAL columns
-    expect(rows[0].val).toBe(Infinity);
+    expect(rows[0].val).toBeNull();
   });
 
   it("quote float nan", async () => {
