@@ -1,3 +1,16 @@
+import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Comment } from "./comment.js";
+import type { Company } from "./company.js";
+import type { Computer } from "./computer.js";
+import type { Contract } from "./contract.js";
+import type { Firm } from "./company.js";
+import type { Mentor } from "./mentor.js";
+import type { Project } from "./project.js";
+import type { Rating } from "./rating.js";
+import type { Ship } from "./ship.js";
+import type { SpecialContract } from "./contract.js";
+import type { SpecialProject } from "./project.js";
 // vendor/rails/activerecord/test/models/developer.rb
 import { StringType, typeRegistry } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
@@ -5,6 +18,48 @@ import type { Relation } from "../../relation.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Developer extends Base {
+  declare projects: AssociationProxy<Project>;
+  declare mentor: Mentor | null;
+  declare strictLoadingMentor: Mentor | null;
+  declare strictLoadingOffMentor: Mentor | null;
+  declare sharedComputers: AssociationProxy<Computer>;
+  declare computers: AssociationProxy<Computer>;
+  declare projectsExtendedByName: AssociationProxy<Project>;
+  declare projectsExtendedByNameTwice: AssociationProxy<Project>;
+  declare projectsExtendedByNameAndBlock: AssociationProxy<Project>;
+  declare strictLoadingProjects: AssociationProxy<Project>;
+  declare specialProjects: AssociationProxy<SpecialProject>;
+  declare symSpecialProjects: AssociationProxy<SpecialProject>;
+  declare auditLogs: AssociationProxy<AuditLog>;
+  declare requiredAuditLogs: AssociationProxy<AuditLogRequired>;
+  declare strictLoadingAuditLogs: AssociationProxy<AuditLog>;
+  declare strictLoadingOptAuditLogs: AssociationProxy<AuditLog>;
+  declare contracts: AssociationProxy<Contract>;
+  declare firms: AssociationProxy<Firm>;
+  declare comments: AssociationProxy<Comment>;
+  declare ratings: AssociationProxy<Rating>;
+  declare ship: Ship | null;
+  declare strictLoadingShip: Ship | null;
+  declare firm: Firm | null;
+  declare contractedProjects: AssociationProxy<Project>;
+  declare static jamises: () => Relation<Developer>;
+  declare lastName: string;
+  declare loadBelongsTo: ((name: "mentor") => Promise<Mentor | null>) &
+    ((name: "strictLoadingMentor") => Promise<Mentor | null>) &
+    ((name: "strictLoadingOffMentor") => Promise<Mentor | null>) &
+    ((name: "firm") => Promise<Firm | null>);
+  declare loadHasOne: ((name: "ship") => Promise<Ship | null>) &
+    ((name: "strictLoadingShip") => Promise<Ship | null>);
+  declare firm_id: number;
+  declare first_name: string;
+  declare legacy_created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare legacy_created_on: Temporal.Instant | Temporal.PlainDateTime;
+  declare legacy_updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare legacy_updated_on: Temporal.Instant | Temporal.PlainDateTime;
+  declare mentor_id: number;
+  declare name: string;
+  declare salary: number | null;
+
   static instanceCount: number | undefined;
 
   // Rails `module ProjectsAssociationExtension { def find_most_recent ... }`
@@ -151,6 +206,8 @@ acceptsNestedAttributesFor(Developer, "projects");
 export class SubDeveloper extends Developer {}
 
 export class SpecialDeveloper extends Base {
+  declare specialContracts: AssociationProxy<SpecialContract>;
+
   static {
     this.tableName = "developers";
     this.hasMany("specialContracts", { foreignKey: "developer_id" });
@@ -158,6 +215,8 @@ export class SpecialDeveloper extends Base {
 }
 
 export class SymbolIgnoredDeveloper extends Base {
+  declare lastName: string;
+
   static {
     this.tableName = "developers";
     this.ignoredColumns = ["first_name", "last_name"];
@@ -166,6 +225,14 @@ export class SymbolIgnoredDeveloper extends Base {
 }
 
 export class AuditLog extends Base {
+  declare developer: Developer | null;
+  declare unvalidatedDeveloper: Developer | null;
+  declare loadBelongsTo: ((name: "developer") => Promise<Developer | null>) &
+    ((name: "unvalidatedDeveloper") => Promise<Developer | null>);
+  declare developer_id: number;
+  declare message: string;
+  declare unvalidated_developer_id: number;
+
   static {
     this.belongsTo("developer", { validate: true });
     this.belongsTo("unvalidatedDeveloper", { className: "Developer" });
@@ -173,6 +240,9 @@ export class AuditLog extends Base {
 }
 
 export class AuditLogRequired extends Base {
+  declare developer: Developer | null;
+  declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
+
   static {
     this.tableName = "audit_logs";
     this.belongsTo("developer", { required: true });
@@ -180,6 +250,8 @@ export class AuditLogRequired extends Base {
 }
 
 export class DeveloperWithBeforeDestroyRaise extends Base {
+  declare projects: AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -236,6 +308,8 @@ export class DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScope
 }
 
 export class DeveloperWithIncludes extends Base {
+  declare auditLogs: AssociationProxy<AuditLog>;
+
   static {
     this.tableName = "developers";
     this.hasMany("auditLogs", { foreignKey: "developer_id" });
@@ -244,6 +318,8 @@ export class DeveloperWithIncludes extends Base {
 }
 
 export class DeveloperFilteredOnJoins extends Base {
+  declare projects: AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -258,6 +334,8 @@ export class DeveloperFilteredOnJoins extends Base {
 }
 
 export class DeveloperOrderedBySalary extends Base {
+  declare static byName: () => Relation<DeveloperOrderedBySalary>;
+
   static {
     this.tableName = "developers";
     this.aliasAttribute("createdAt", "legacyCreatedAt");
@@ -305,6 +383,8 @@ export class ClassMethodDeveloperCalledDavid extends Base {
 }
 
 export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
+  declare static david: () => Relation<ClassMethodReferencingScopeDeveloperCalledDavid>;
+
   static {
     this.tableName = "developers";
     this.scope("david", (q: any) => q.where({ name: "David" }));
@@ -313,6 +393,8 @@ export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
 }
 
 export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
+  declare static david: () => Relation<LazyBlockReferencingScopeDeveloperCalledDavid>;
+
   static {
     this.tableName = "developers";
     this.scope("david", (q: any) => q.where({ name: "David" }));
@@ -321,6 +403,10 @@ export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
 }
 
 export class DeveloperCalledJamis extends Base {
+  declare static poor: () => Relation<DeveloperCalledJamis>;
+  declare static david: () => Relation<DeveloperCalledJamis>;
+  declare static david2: () => Relation<DeveloperCalledJamis>;
+
   static {
     this.tableName = "developers";
     this.aliasAttribute("createdAt", "legacyCreatedAt");
@@ -365,6 +451,8 @@ export class ModuleIncludedPoorDeveloperCalledJamis extends DeveloperCalledJamis
 }
 
 export class EagerDeveloperWithDefaultScope extends Base {
+  declare projects: AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -377,6 +465,8 @@ export class EagerDeveloperWithDefaultScope extends Base {
 }
 
 export class EagerDeveloperWithClassMethodDefaultScope extends Base {
+  declare projects: AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -389,6 +479,8 @@ export class EagerDeveloperWithClassMethodDefaultScope extends Base {
 }
 
 export class EagerDeveloperWithLambdaDefaultScope extends Base {
+  declare projects: AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -401,6 +493,8 @@ export class EagerDeveloperWithLambdaDefaultScope extends Base {
 }
 
 export class EagerDeveloperWithBlockDefaultScope extends Base {
+  declare projects: AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -413,6 +507,8 @@ export class EagerDeveloperWithBlockDefaultScope extends Base {
 }
 
 export class EagerDeveloperWithCallableDefaultScope extends Base {
+  declare projects: AssociationProxy<Project>;
+
   static {
     this.tableName = "developers";
     this.hasAndBelongsToMany("projects", {
@@ -442,6 +538,9 @@ export class CachedDeveloper extends Base {
 }
 
 export class DeveloperWithIncorrectlyOrderedHasManyThrough extends Base {
+  declare companies: AssociationProxy<Company>;
+  declare contracts: AssociationProxy<Contract>;
+
   static {
     this.tableName = "developers";
     this.hasMany("companies", { through: "contracts" });
@@ -458,6 +557,8 @@ export class DeveloperName extends StringType {
 typeRegistry.register("developer_name", () => new DeveloperName());
 
 export class AttributedDeveloper extends Base {
+  declare name: unknown;
+
   static {
     this.tableName = "developers";
     this.attribute("name", "developer_name");
@@ -472,6 +573,8 @@ export class ColumnNamesCachedDeveloper extends Base {
 }
 
 export class AuditRequiredDeveloper extends Base {
+  declare requiredAuditLogs: AssociationProxy<AuditLogRequired>;
+
   static {
     this.tableName = "developers";
     this.hasMany("requiredAuditLogs", { className: "AuditLogRequired" });
