@@ -371,8 +371,9 @@ export class Association {
     const ownerAny = this.owner as any;
     const name = this.reflection.name;
 
-    if (ownerAny._cachedAssociations?.has(name)) {
-      return ownerAny._cachedAssociations.get(name);
+    const cached = ownerAny._cachedAssociationTarget?.(name);
+    if (cached !== undefined) {
+      return cached;
     }
     if (ownerAny._preloadedAssociations?.has(name)) {
       return ownerAny._preloadedAssociations.get(name);
