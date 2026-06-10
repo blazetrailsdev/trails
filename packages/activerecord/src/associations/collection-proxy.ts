@@ -167,6 +167,34 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._target;
   }
 
+  /**
+   * @internal Canonical read accessor for RFC 0006 (collection-store
+   * unification). The loaded target array IS the single source of truth for
+   * has_many membership; the legacy `_cachedAssociations` map is a deprecated
+   * shim (see `Base#_cachedAssociationTarget`) that delegates here. Returns the
+   * in-memory target without triggering a DB load — JS has no blocking IO, so
+   * a fresh load means awaiting the proxy / `loadTarget()` first.
+   */
+  readTargets(): T[] {
+    return this._target;
+  }
+
+  /**
+   * @internal Identify the loaded targets by primary key. Composite primary
+   * keys (`string[]`) are joined into a single token so the map key is stable
+   * for both `string` and `string[]` primary-key values; records whose key is
+   * not yet assigned (new records) are skipped. Used by the migration stories
+   * to dedup proxy writes against the canonical store.
+   */
+  targetsByPrimaryKey(): Map<string, T> {
+    const byKey = new Map<string, T>();
+    for (const record of this._target) {
+      const token = primaryKeyToken(record);
+      if (token != null) byKey.set(token, record);
+    }
+    return byKey;
+  }
+
   /** @internal Owner record — used by AssociationRelation. */
   get owner(): Base {
     return this._record;
@@ -2965,6 +2993,22 @@ applyThenable(CollectionProxy.prototype, "load");
 _setCollectionProxyCtor(
   CollectionProxy as unknown as Parameters<typeof _setCollectionProxyCtor>[0],
 );
+
+/**
+ * @internal Build a stable string token from a record's primary key. A
+ * composite key (`string[]`) is joined with a NUL separator so distinct
+ * key tuples can never collide; a record without an assigned key (`null` /
+ * `undefined` in any position) returns `null` so callers skip it.
+ */
+function primaryKeyToken(record: Base): string | null {
+  const id = record.id;
+  if (Array.isArray(id)) {
+    if (id.some((part) => part == null)) return null;
+    return id.map((part) => String(part)).join("\u0000");
+  }
+  if (id == null) return null;
+  return String(id);
+}
 
 /** @internal */
 function findNthWithLimit(
