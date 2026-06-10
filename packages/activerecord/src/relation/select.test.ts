@@ -172,7 +172,9 @@ describe("SelectTest", () => {
 
     const assertNonSelectColumnsWontBeLoaded = (post: { title: string; body: unknown }) => {
       expect(post.title).toBe("WELCOME TO THE WEBLOG");
+      // Rails: assert_raise(ActiveModel::MissingAttributeError, match: /attribute 'body' for Post/)
       expect(() => post.body).toThrow(MissingAttributeError);
+      expect(() => post.body).toThrow(/attribute 'body' for Post/);
     };
 
     assertNonSelectColumnsWontBeLoaded((await posts.first()) as never);
