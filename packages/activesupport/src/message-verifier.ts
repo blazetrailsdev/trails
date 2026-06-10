@@ -5,6 +5,10 @@
 
 import { getCrypto } from "./crypto-adapter.js";
 import { Temporal } from "./temporal.js";
+// Use the travel-aware clock so expiry honors ActiveSupport::Testing::TimeHelpers
+// (`travel`/`travelTo`). With no travel active this is identical to
+// `Temporal.Now.instant()`, so production behavior is unchanged.
+import { currentTimeInstant } from "./time-travel.js";
 
 export class InvalidSignature extends Error {
   constructor(message = "Invalid signature") {
@@ -68,7 +72,7 @@ export class MessageVerifier {
       // sub-second precision is preserved without violating Temporal's
       // integer-component invariant.
       const milliseconds = Math.round(options.expiresIn * 1000);
-      payload._expiresAt = Temporal.Now.instant()
+      payload._expiresAt = currentTimeInstant()
         .add({ milliseconds })
         .toString({ smallestUnit: "millisecond" });
     }
@@ -111,7 +115,7 @@ export class MessageVerifier {
 
       if (payload._expiresAt) {
         const expiresAt = Temporal.Instant.from(payload._expiresAt as string);
-        if (Temporal.Instant.compare(expiresAt, Temporal.Now.instant()) <= 0) {
+        if (Temporal.Instant.compare(expiresAt, currentTimeInstant()) <= 0) {
           throw new InvalidSignature("Expired message");
         }
       }

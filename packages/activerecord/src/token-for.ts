@@ -6,7 +6,19 @@
 
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { getEnv } from "@blazetrails/activesupport";
+import { UnknownPrimaryKey } from "./errors.js";
 import type { Base } from "./base.js";
+
+/** Rails' `find_by_token_for` resolves through `primary_key`, which raises
+ * UnknownPrimaryKey for a table with no primary key. */
+function requirePrimaryKey(modelClass: typeof Base): string | string[] {
+  const pk = modelClass.primaryKey as string | string[] | null | undefined;
+  const present = Array.isArray(pk)
+    ? pk.length > 0 && pk.every((k) => typeof k === "string" && k.length > 0)
+    : typeof pk === "string" && pk.length > 0;
+  if (!present) throw new UnknownPrimaryKey(modelClass);
+  return pk as string | string[];
+}
 
 export { InvalidSignature };
 
@@ -78,7 +90,12 @@ export class TokenDefinition {
   }
 
   payloadFor(model: Base): unknown[] {
-    return this.block ? [model.id, this.block(model)] : [model.id];
+    // BigInt is not JSON-serializable; coerce to a plain number so the token
+    // payload round-trips. PG bigserial PKs surface as BigInt (mirrors the
+    // coercion in signed-id.ts#signedId).
+    const coerce = (v: unknown): unknown => (typeof v === "bigint" ? Number(v) : v);
+    const id = Array.isArray(model.id) ? (model.id as unknown[]).map(coerce) : coerce(model.id);
+    return this.block ? [id, this.block(model)] : [id];
   }
 
   generateToken(model: Base): string {
@@ -134,7 +151,7 @@ export function generatesTokenFor(
   purpose: string,
   options: {
     expiresIn?: number;
-    generator?: (record: any) => string;
+    generator?: (record: any) => unknown;
   } = {},
 ): void {
   const def = new TokenDefinition(modelClass, purpose, options.expiresIn, options.generator);
@@ -196,9 +213,12 @@ export async function findByTokenFor(
   purpose: string,
   token: string,
 ): Promise<Base | null> {
+  // Rails (token_for.rb:42-43) checks `model.primary_key` first, then
+  // `token_definitions.fetch(purpose)` — so a no-PK model raises
+  // UnknownPrimaryKey even for an unknown purpose.
+  const pk = requirePrimaryKey(modelClass);
   const def = getDefinition(modelClass, purpose);
-  if (!def) return null;
-  const pk = modelClass.primaryKey;
+  if (!def) throw new Error(`Unknown token purpose: ${purpose}`);
   return def.resolveToken(token, async (id) => {
     if (typeof pk === "string") {
       return modelClass.findBy({ [pk]: id });
@@ -219,8 +239,13 @@ export async function findByTokenForBang(
   purpose: string,
   token: string,
 ): Promise<Base> {
+  // Rails `find_by_token_for!` (token_for.rb:50-51) has NO primary_key guard
+  // (unlike the non-bang path): it goes straight to `token_definitions
+  // .fetch(purpose)` — which raises KeyError for an unknown purpose, distinct
+  // from the InvalidSignature raised for a bad/expired token — then `find(id)`
+  // (which itself surfaces UnknownPrimaryKey for a no-PK model).
   const def = getDefinition(modelClass, purpose);
-  if (!def) throw new InvalidSignature();
+  if (!def) throw new Error(`Unknown token purpose: ${purpose}`);
   const result = await def.resolveToken(token, (id) => modelClass.find(id));
   if (!result) throw new InvalidSignature();
   return result;
