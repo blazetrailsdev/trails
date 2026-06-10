@@ -158,7 +158,9 @@ describe("TokenForTest", () => {
     expect(((await (TokenUser as any).findByTokenFor("snapshot", snapshotToken)) as any).id).toBe(
       user.id,
     );
-    await (user as any).update({ updated_at: new Date(Date.now() + 1000) });
+    // Rails: @user.touch(time: @user.updated_at.advance(seconds: 1))
+    const advanced = new Date(new Date(String((user as any).updated_at)).getTime() + 1000);
+    await (user as any).touch({ time: advanced });
     expect(await (TokenUser as any).findByTokenFor("snapshot", snapshotToken)).toBeNull();
   });
 

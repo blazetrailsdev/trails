@@ -109,22 +109,37 @@ describe("SecureTokenTest", () => {
     expect((u as any).token).toBeTruthy();
   });
 
-  it("token calls the setter method", () => {
+  it("token calls the setter method", async () => {
+    // Rails: a model with `has_secure_token on: :initialize` overriding
+    //   def token=(value); super; self.modified_token = "#{value}_modified"; end
+    // The on-initialize callback assigns via the writer, so the override sees
+    // the generated value. We emulate `super` by wrapping the column's own
+    // accessor descriptor (installed by loadSchema) before overriding.
     class TokenUser extends Base {
       static _tableName = "users";
-
-      get token(): unknown {
-        return this.readAttribute("token");
-      }
-      set token(value: unknown) {
-        this.writeAttribute("token", value);
-        (this as any).modifiedToken = `${value}_modified`;
-      }
     }
+    await TokenUser.loadSchema();
     hasSecureToken(TokenUser, "token", { on: "initialize" });
+
+    const proto = TokenUser.prototype as any;
+    let superDesc: PropertyDescriptor | undefined;
+    for (let p = proto; p && !superDesc; p = Object.getPrototypeOf(p)) {
+      superDesc = Object.getOwnPropertyDescriptor(p, "token");
+    }
+    Object.defineProperty(proto, "token", {
+      configurable: true,
+      get(this: any) {
+        return superDesc!.get!.call(this);
+      },
+      set(this: any, value: unknown) {
+        superDesc!.set!.call(this, value);
+        this.modifiedToken = `${value}_modified`;
+      },
+    });
 
     const u = new TokenUser();
 
-    expect((u as any).modifiedToken).toBe(`${u.token}_modified`);
+    expect((u as any).token).toBeTruthy();
+    expect((u as any).modifiedToken).toBe(`${(u as any).token}_modified`);
   });
 });

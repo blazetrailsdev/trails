@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -64,11 +65,15 @@ describe("SecurePasswordTest", () => {
   });
 
   it("authenticate_by short circuits when password is nil", async () => {
-    expect(await (User as any).authenticateBy({ token: user.token, password: null })).toBeNull();
+    await assertNoQueries(false, async () => {
+      expect(await (User as any).authenticateBy({ token: user.token, password: null })).toBeNull();
+    });
   });
 
   it("authenticate_by short circuits when password is an empty string", async () => {
-    expect(await (User as any).authenticateBy({ token: user.token, password: "" })).toBeNull();
+    await assertNoQueries(false, async () => {
+      expect(await (User as any).authenticateBy({ token: user.token, password: "" })).toBeNull();
+    });
   });
 
   it("authenticate_by finds record using multiple attributes", async () => {
