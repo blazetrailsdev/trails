@@ -240,9 +240,7 @@ describe("OrTest", () => {
     const { User } = makeModel();
     expect(() =>
       User.where({ name: ["alice", "bob", "charlie"] }).or({ name: "Rails" } as any),
-    ).toThrow(
-      "You have passed object object to #or. Pass an ActiveRecord::Relation object instead.",
-    );
+    ).toThrow("You have passed Hash object to #or. Pass an ActiveRecord::Relation object instead.");
   });
 
   it("or with references inequality", () => {

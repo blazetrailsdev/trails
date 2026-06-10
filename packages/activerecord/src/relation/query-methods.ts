@@ -967,8 +967,12 @@ function rubyClassNameOf(value: unknown): string {
   if (value === null) return "NilClass";
   if (Array.isArray(value)) return "Array";
   switch (typeof value) {
-    case "object":
-      return "Hash";
+    case "object": {
+      // Rails uses `other.class.name`; a plain object maps to Ruby's Hash,
+      // but a class instance should report its own constructor name.
+      const ctor = (value as object).constructor;
+      return ctor && ctor !== Object ? ctor.name : "Hash";
+    }
     case "string":
       return "String";
     case "boolean":
