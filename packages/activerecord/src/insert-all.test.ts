@@ -264,6 +264,18 @@ describe("InsertAllTest", () => {
     expect(all).toHaveLength(2);
   });
 
+  it("insert all create with wins over where for same key", async () => {
+    const Book = makeBook();
+    // createWith wins over where when both supply the same key (Rails: where_values_hash.merge(create_with_value))
+    await Book.where({ author: "Where" })
+      .createWith({ author: "CreateWith" })
+      .insertAll([{ title: "Book" }]);
+    const found = await Book.where({ author: "CreateWith" }).toArray();
+    expect(found).toHaveLength(1);
+    const notFound = await Book.where({ author: "Where" }).toArray();
+    expect(notFound).toHaveLength(0);
+  });
+
   it("upsert all on relation", async () => {
     const Book = makeBook();
     await Book.where({ author: "King" }).upsertAll([{ title: "The Shining" }]);
