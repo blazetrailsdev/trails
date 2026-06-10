@@ -3810,10 +3810,15 @@ export class Relation<T extends Base> {
     if (binds.length === 0) return sql;
     // Substitute bind values inline for human-readable output (mirrors Rails to_sql).
     // Handles both ? (SQLite/MySQL) and $N (PostgreSQL) placeholders.
+    // Use the connection's quote() so binary, temporal, and other non-primitive
+    // values are formatted correctly (e.g. bytea → '\x271f5c', not raw bytes).
     let i = 0;
-    return sql.replace(/\?|\$\d+/g, () => {
+    const adapter = this._resolveAdapter();
+    return sql.replace(/\?|\$\d+/g, (match) => {
       const val = binds[i++];
-      if (val === null || val === undefined) return "NULL";
+      if (val === undefined) return match;
+      if (adapter) return adapter.quote(val);
+      if (val === null) return "NULL";
       if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
       return String(val);
     });
