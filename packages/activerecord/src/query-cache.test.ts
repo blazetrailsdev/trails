@@ -1,8 +1,10 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Base } from "./index.js";
+import { Base, registerModel } from "./index.js";
+import { Associations, association } from "./associations.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 import { adapterType, newRawTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { TEST_SCHEMA as CANONICAL_SCHEMA } from "./test-helpers/test-schema.js";
 import {
   QueryCache,
   QueryCacheStore as Store,
@@ -10,7 +12,11 @@ import {
   type QueryCacheCompleteTarget,
 } from "./query-cache.js";
 import { QueryCacheStore as RootQueryCacheStore } from "./index.js";
-import { Store as AbstractStore } from "./connection-adapters/abstract/query-cache.js";
+import {
+  Store as AbstractStore,
+  makeCachedSelectAll,
+} from "./connection-adapters/abstract/query-cache.js";
+import { Result } from "./result.js";
 import { Notifications } from "@blazetrails/activesupport";
 import {
   ConnectionPool,
@@ -120,6 +126,43 @@ async function setup() {
   }
   const hits = trackHits(cached);
   return { cached, hits, Task };
+}
+
+// Post<=>Category HABTM bound to a standalone raw adapter, mirroring Rails'
+// `Post.has_and_belongs_to_many :categories`. Join-table writes (`<<` /
+// `delete_all`) route through `cached`, so they trip `dirtiesQueryCache` and
+// clear the per-connection query cache — the behavior the two tests below
+// assert (Rails checks `query_cache.clear` is called once).
+async function setupHabtm() {
+  const cached = rawAdapter();
+  await defineSchema(cached, {
+    posts: CANONICAL_SCHEMA.posts,
+    categories: CANONICAL_SCHEMA.categories,
+    categories_posts: CANONICAL_SCHEMA.categories_posts,
+  });
+  cached._queryCache = new Store();
+
+  class Post extends Base {
+    static _tableName = "posts";
+  }
+  Post.attribute("id", "integer");
+  Post.attribute("title", "string");
+  Post.attribute("body", "text");
+  Post.adapter = cached;
+  Associations.hasAndBelongsToMany.call(Post, "categories", {
+    joinTable: "categories_posts",
+  });
+
+  class Category extends Base {
+    static _tableName = "categories";
+  }
+  Category.attribute("id", "integer");
+  Category.attribute("name", "string");
+  Category.adapter = cached;
+  registerModel(Category);
+  registerModel(Post);
+
+  return { cached, Post, Category };
 }
 
 describe("QueryCacheTest", () => {
@@ -490,15 +533,31 @@ describe("QueryCacheTest", () => {
     });
   });
 
-  it.skip("cache is ignored for locked relations", async () => {
+  it("cache is ignored for locked relations", async () => {
     const { cached } = await setup();
     cached.enableQueryCacheBang();
-    await cached.selectAll("SELECT 1 AS val");
-    const sizeAfterSelect = cached.queryCache.size;
-    expect(sizeAfterSelect).toBeGreaterThan(0);
+
+    // Like Rails' `arel.locked` short-circuit in QueryCache#select_all: a locked
+    // relation (`SELECT ... FOR UPDATE`) is never served from or stored in the
+    // cache, so each call reaches the underlying connection. SQLite can't run a
+    // real `FOR UPDATE`, so drive the wrapper directly with a counting `super`.
+    let calls = 0;
+    const selectAll = makeCachedSelectAll(async () => {
+      calls++;
+      return Result.fromRowHashes([{ val: 1 }]);
+    });
+
+    // Unlocked: second identical query is served from cache (one real call).
+    await selectAll.call(cached, "SELECT 1 AS val");
+    await selectAll.call(cached, "SELECT 1 AS val");
+    expect(calls).toBe(1);
+
+    // Locked: cache is ignored — both calls hit the connection.
+    calls = 0;
     const forUpdateSql = 'SELECT 1 AS val FROM "tasks" FOR UPDATE';
-    await cached.selectAll(forUpdateSql);
-    expect(cached.queryCache.size).toBe(sizeAfterSelect);
+    await selectAll.call(cached, forUpdateSql);
+    await selectAll.call(cached, forUpdateSql);
+    expect(calls).toBe(2);
   });
 
   it("cache is available when connection is connected", async () => {
@@ -538,8 +597,25 @@ describe("QueryCacheTest", () => {
     expect(results[0].title).toBe("before");
   });
 
-  it.skip("query cached even when types are reset", () => {
-    // BLOCKED: query-cache — resetColumnInformation not implemented
+  it("query cached even when types are reset", async () => {
+    const { cached, hits, Task } = await setup();
+    const t = await Task.create({ title: "reset" });
+    await cached.cache(async () => {
+      // Warm the cache
+      await Task.find(t.id);
+
+      // Clear the place where type information is cached. (Rails also clears the
+      // find-by and attribute-method caches; those aren't separately exposed as
+      // statics here, and resetting column information already drops the type
+      // map this test guards.)
+      (Task as any).resetColumnInformation();
+
+      hits.reset();
+      const r = await Task.find(t.id);
+      expect(r.title).toBe("reset");
+      // Served entirely from the query cache — no new query was issued.
+      expect(hits.count).toBeGreaterThan(0);
+    });
   });
 
   it("query cache does not establish connection if unconnected", async () => {
@@ -846,15 +922,28 @@ describe("QueryCacheExpiryTest", () => {
       expect(cached.queryCache.empty).toBe(true);
     });
   });
-  it.skip("cache is expired by habtm update", () => {
-    // BLOCKED: needs habtm association setup (Post<=>Category collection proxy
-    // <<) in the raw-adapter harness; the per-thread wiring is now in place
-    // (see "insert all bang" / "upsert all"). Deferred — follow-up.
+  it("cache is expired by habtm update", async () => {
+    const { cached, Post, Category } = await setupHabtm();
+    const p = await Post.create({ title: "p", body: "b" });
+    const c = await Category.create({ name: "c" });
+    await cached.cache(async () => {
+      await Post.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await association(p as any, "categories").push(c as any);
+      expect(cached.queryCache.empty).toBe(true);
+    });
   });
-  it.skip("cache is expired by habtm delete", () => {
-    // BLOCKED: needs habtm association setup (Post<=>Category collection proxy
-    // delete_all) in the raw-adapter harness; the per-thread wiring is now in
-    // place (see "insert all bang" / "upsert all"). Deferred — follow-up.
+  it("cache is expired by habtm delete", async () => {
+    const { cached, Post, Category } = await setupHabtm();
+    const p = await Post.create({ title: "p", body: "b" });
+    const c = await Category.create({ name: "c" });
+    await association(p as any, "categories").push(c as any);
+    await cached.cache(async () => {
+      await Post.all().toArray();
+      expect(cached.queryCache.size).toBeGreaterThan(0);
+      await association(p as any, "categories").deleteAll();
+      expect(cached.queryCache.empty).toBe(true);
+    });
   });
 
   it("store checkVersion clears cache on version increment", async () => {
