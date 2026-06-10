@@ -11,7 +11,7 @@ import {
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import { ConnectionNotEstablished, RecordNotSaved, RecordNotUnique } from "./errors.js";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
 import { disallowRawSqlBang } from "./sanitization.js";
 import { sanitizeAsSqlComment } from "./connection-adapters/abstract/quoting.js";
@@ -342,10 +342,11 @@ export class Relation<T extends Base> {
   // committing stale records/loaded state.
   private _loadToken = 0;
 
-  // Retryability of the most recently compiled SELECT, captured in
-  // _compileSelectSql before any FROM-clause recompile can reset the shared
-  // visitor's collector. Read by toArray() to set allowRetry.
+  // Retryability and bind values of the most recently compiled SELECT, captured
+  // in _compileSelectSql before any FROM-clause recompile can reset the shared
+  // visitor's collector. Read by toArray() to set allowRetry and pass binds.
   private _lastSelectRetryable = false;
+  private _lastSelectBinds: unknown[] = [];
 
   private _table: Table | null = null;
 
@@ -2288,15 +2289,15 @@ export class Relation<T extends Base> {
       this.loadRecords(loadedRecords);
     } else {
       const sql = this._toSql();
-      // _compileSelectSql captures the SELECT's retryability into
-      // _lastSelectRetryable at compile time. Reading the visitor's collector
-      // here would be wrong: from(ArelNode) recompiles and resets it, and set
-      // operations compile each side separately.
+      // _compileSelectSql captures the SELECT's retryability and bind values
+      // into _lastSelectRetryable/_lastSelectBinds at compile time. Reading the
+      // visitor's collector here would be wrong: from(ArelNode) recompiles and
+      // resets it, and set operations compile each side separately.
       const allowRetry = this._setOperation ? false : this._lastSelectRetryable;
       const result = await this._modelClass.connection.selectAll(
         sql,
         `${this._modelClass.name} Load`,
-        [],
+        this._lastSelectBinds,
         { allowRetry },
       );
       if (token !== this._loadToken) return [];
@@ -2453,7 +2454,11 @@ export class Relation<T extends Base> {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
     if (this._eagerLoadBypassesJoinDependency()) {
       const sql = this._toSql();
-      const result = await this._modelClass.connection.selectAll(sql, "Eager Load");
+      const result = await this._modelClass.connection.selectAll(
+        sql,
+        "Eager Load",
+        this._lastSelectBinds,
+      );
       this._records = this._instrumentInstantiation(result.toArray());
       await this._preloadAssociationsForRecords(this._records, eagerAssociations);
       return;
@@ -2466,7 +2471,7 @@ export class Relation<T extends Base> {
     // If no associations could be JOINed, fall back entirely to preload
     if (jd.nodes.length === 0) {
       const sql = this._toSql();
-      const rows = await this._modelClass.connection.execute(sql);
+      const rows = await this._modelClass.connection.execute(sql, this._lastSelectBinds);
       this._records = this._instrumentInstantiation(rows);
       if (fallbackAssocs.length > 0) {
         await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
@@ -2481,8 +2486,10 @@ export class Relation<T extends Base> {
     let limitedIds: unknown[] | undefined;
     const hasLimit = this._limitValue !== null || this._offsetValue !== null;
     if (hasLimit && jd.nodes.some((n) => n.assocType === "hasMany")) {
-      const idSql = this._modelClass.connection.toSql(this._buildEagerIdSubquery(jd, basePk));
-      const idRows = await this._modelClass.connection.execute(idSql);
+      const [idSql, idBinds] = this._compileAstWithBinds(
+        this._buildEagerIdSubquery(jd, basePk).ast,
+      );
+      const idRows = await this._modelClass.connection.execute(idSql, idBinds);
       limitedIds = (idRows as Record<string, unknown>[]).map((row) => Object.values(row)[0]);
       if (limitedIds.length === 0) {
         this._records = [];
@@ -2492,13 +2499,14 @@ export class Relation<T extends Base> {
 
     const manager = this._buildEagerJoinManager(jd, basePk, limitedIds);
 
-    let sql = this._modelClass.connection.toSql(manager);
+    const [sqlBase, eagerBinds] = this._compileAstWithBinds(manager.ast);
+    let sql = sqlBase;
     if (this._annotations.length > 0) {
       const comments = this._annotationComments();
       sql = `${sql} ${comments}`;
     }
 
-    const rows = await this._modelClass.connection.execute(sql);
+    const rows = await this._modelClass.connection.execute(sql, eagerBinds);
 
     const { parents, associations } = jd.instantiateFromRows(rows, this._isStrictLoading);
 
@@ -2622,7 +2630,9 @@ export class Relation<T extends Base> {
     // `toSql()` directly so `Relation#explain` never returns a blank
     // string. Matches Rails' behavior of always producing output even
     // for degenerate cases.
-    const effective: [string, unknown[]][] = queries.length > 0 ? queries : [[this._toSql(), []]];
+    const fallbackSql = queries.length === 0 ? this._toSql() : null;
+    const effective: [string, unknown[]][] =
+      queries.length > 0 ? queries : [[fallbackSql!, this._lastSelectBinds]];
     const clause = this.buildExplainClause(adapter, options);
     const parts: string[] = [];
     for (const [sql, binds] of effective) {
@@ -2973,9 +2983,10 @@ export class Relation<T extends Base> {
     // existence query (`select_rows(relation.arel, "#{model.name} Exists?")`,
     // finder_methods.rb) — so LogSubscriber labels it instead of falling back
     // to the adapter's generic "SQL" default.
+    const [existsSql, existsBinds] = rel._compileAstWithBinds(manager.ast);
     const rows = await rel._modelClass.connection.execute(
-      rel._modelClass.connection.toSql(manager),
-      [],
+      existsSql,
+      existsBinds,
       `${rel._modelClass.name} Exists?`,
     );
     return rows.length > 0;
@@ -3129,10 +3140,11 @@ export class Relation<T extends Base> {
     if (this._limitValue !== null) manager.take(this._limitValue);
     if (this._offsetValue !== null) manager.skip(this._offsetValue);
 
-    const sql = this._modelClass.connection.toSql(manager);
+    const [pluckSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
     const result = await this._modelClass.connection.selectAll(
-      sql,
+      pluckSql,
       `${this._modelClass.name} Pluck`,
+      pluckBinds,
     );
 
     // Type-cast results positionally through each result column's type
@@ -3189,9 +3201,11 @@ export class Relation<T extends Base> {
       um.where(node);
     }
 
+    const [updateSql, updateBinds] = this._compileAstWithBinds(um.ast);
     const count = await this._modelClass.connection.execUpdate(
-      this._arelVisitor().compile(um.ast),
+      updateSql,
       `${this._modelClass.name} Update All`,
+      updateBinds,
     );
     this.reset();
     return count;
@@ -3225,9 +3239,11 @@ export class Relation<T extends Base> {
       dm.where(node);
     }
 
+    const [deleteSql, deleteBinds] = this._compileAstWithBinds(dm.ast);
     const count = await this._modelClass.connection.execDelete(
-      this._arelVisitor().compile(dm.ast),
+      deleteSql,
       `${this._modelClass.name} Delete All`,
+      deleteBinds,
     );
     this.reset();
     return count;
@@ -3263,7 +3279,8 @@ export class Relation<T extends Base> {
       um.where(node);
     }
 
-    return this._modelClass.connection.executeMutation(this._arelVisitor().compile(um.ast));
+    const [touchSql, touchBinds] = this._compileAstWithBinds(um.ast);
+    return this._modelClass.connection.executeMutation(touchSql, touchBinds);
   }
 
   /**
@@ -3788,7 +3805,17 @@ export class Relation<T extends Base> {
    * Generate the SQL for this relation.
    */
   toSql(): string {
-    return this._toSql();
+    const sql = this._toSql();
+    const binds = this._lastSelectBinds;
+    if (binds.length === 0) return sql;
+    // Substitute bind values inline for human-readable output (mirrors Rails to_sql).
+    let i = 0;
+    return sql.replace(/\?/g, () => {
+      const val = binds[i++];
+      if (val === null || val === undefined) return "NULL";
+      if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
+      return String(val);
+    });
   }
 
   private _instrumentInstantiation(rows: Record<string, unknown>[]): T[] {
@@ -3806,7 +3833,10 @@ export class Relation<T extends Base> {
     // those clauses bind to the per-side SELECT instead of the compound.
     if (this._setOperation) {
       const leftSql = this._toSqlWithoutSetOp();
+      const leftBinds = this._lastSelectBinds.slice();
       const rightSql = this._setOperation.other._toSqlWithoutSetOp();
+      const rightBinds = this._setOperation.other._lastSelectBinds.slice();
+      this._lastSelectBinds = [...leftBinds, ...rightBinds];
       const op = {
         union: "UNION",
         unionAll: "UNION ALL",
@@ -3986,7 +4016,7 @@ export class Relation<T extends Base> {
       const alias = this._fromClause.name;
       let fromExpr: string;
       if (raw instanceof Relation) {
-        const subSql = raw.toSql();
+        const subSql = raw._toSql();
         const name = alias ?? "subquery";
         // Rails wraps the alias in SqlLiteral so quote_table_name leaves it bare.
         // Only emit bare when the alias is a safe identifier; fall back to quoted
@@ -4000,16 +4030,22 @@ export class Relation<T extends Base> {
         // raw._lastSelectRetryable only reflects the last side — treat it as
         // non-retryable, matching how toArray() classifies set operations.
         this._lastSelectRetryable &&= raw._setOperation ? false : raw._lastSelectRetryable;
+        // Sub-relation binds come before the outer WHERE binds in the final SQL
+        // (FROM subquery is positioned before WHERE clause).
+        this._lastSelectBinds = [...raw._lastSelectBinds, ...this._lastSelectBinds];
       } else if (raw instanceof Nodes.Node) {
         // Compile via the same visitor _compileSelectSql uses so identifier
         // quoting stays dialect-consistent across the whole SELECT.
         const av = this._arelVisitor();
-        fromExpr = av.compile(raw);
+        const [fromSql, fromBinds] = av.compileWithBinds(raw);
+        fromExpr = fromSql;
         // Rails compiles the whole arel (including the FROM clause) through a
         // single collector, so a non-retryable FROM node lowers the overall
         // classification. We compile it separately, so AND its retryability
         // into the captured SELECT flag rather than letting it clobber.
         this._lastSelectRetryable &&= (av as any).collector?.retryable ?? false;
+        // FROM node binds precede the outer WHERE binds in the final SQL.
+        this._lastSelectBinds = [...this._typeCastBinds(fromBinds), ...this._lastSelectBinds];
       } else if (alias) {
         fromExpr = `${raw} ${_safeAlias(alias)}`;
       } else {
@@ -4098,20 +4134,40 @@ export class Relation<T extends Base> {
   /**
    * Compile a SelectManager's AST through the adapter visitor (`_arelVisitor`).
    * Falls back to the default ANSI ToSql when no connection is established.
+   * Sets _lastSelectRetryable and _lastSelectBinds for the execution call sites.
    */
   private _compileSelectSql(manager: { ast: Nodes.Node; toSql(): string }): string {
     const v = this._arelVisitor();
-    const sql = v.compile(manager.ast);
-    // Capture the SELECT's retryability immediately after compilation. The
-    // shared adapter visitor's collector is reset on every compile() call, and
-    // _toSqlWithoutSetOp may compile again for from(ArelNode) FROM clauses —
-    // which would clobber the flag before toArray() reads it.
+    const [sql, binds] = v.compileWithBinds(manager.ast);
+    // Capture retryability immediately — FROM-clause recompiles reset the
+    // shared visitor's collector before toArray() reads the flag.
     this._lastSelectRetryable = (v as any).collector?.retryable ?? false;
+    this._lastSelectBinds = this._typeCastBinds(binds);
     return sql;
   }
 
   private _compileArelNode(node: Nodes.Node): string {
     return this._arelVisitor().compile(node);
+  }
+
+  /** Compile an Arel node, returning [sql, type-cast binds]. */
+  private _compileAstWithBinds(node: Nodes.Node): [string, unknown[]] {
+    const [sql, binds] = this._arelVisitor().compileWithBinds(node);
+    return [sql, this._typeCastBinds(binds)];
+  }
+
+  /** Cast QueryAttribute / ActiveModel::Attribute bind objects to primitive DB values. */
+  private _typeCastBinds(binds: unknown[]): unknown[] {
+    return binds.map((b) => {
+      if (b instanceof ModelAttribute) return b.valueForDatabase;
+      // Duck-type fallback: handles potential module-identity splits where
+      // instanceof fails but the Attribute interface is still satisfied.
+      if (b !== null && typeof b === "object" && "valueForDatabase" in b) {
+        const vfd = (b as { valueForDatabase: unknown }).valueForDatabase;
+        return vfd;
+      }
+      return b;
+    });
   }
 
   /**
@@ -4942,8 +4998,10 @@ export class Relation<T extends Base> {
         // quoting and adapter differences are handled by the AST visitor.
         // Grouping(SqlLiteral) renders as "(inner sql)" and TableAlias appends
         // the bare alias name (same pattern SelectManager#as uses in Rails).
+        const innerSql = inner._toSql();
+        const innerBinds = inner._lastSelectBinds.slice();
         const subAlias = new Nodes.TableAlias(
-          new Nodes.Grouping(new Nodes.SqlLiteral(inner.toSql())),
+          new Nodes.Grouping(new Nodes.SqlLiteral(innerSql)),
           subqueryAlias,
         );
         const subTable = new Table(subqueryAlias);
@@ -4954,9 +5012,8 @@ export class Relation<T extends Base> {
           new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]).as("size"),
           subColumn.maximum().as("timestamp"),
         );
-        const rows = await this._modelClass.connection.execute(
-          this._modelClass.connection.toSql(outerManager),
-        );
+        const [outerSql] = this._compileAstWithBinds(outerManager.ast);
+        const rows = await this._modelClass.connection.execute(outerSql, innerBinds);
         size = Number(rows[0]?.size ?? 0);
         timestamp = rows[0]?.timestamp;
       } else {
@@ -4967,7 +5024,10 @@ export class Relation<T extends Base> {
           this._compileArelNode(countStar.as("size")),
           this._compileArelNode(maxNode.as("timestamp")),
         ];
-        const rows = await this._modelClass.connection.execute(query.toSql());
+        const rows = await this._modelClass.connection.execute(
+          query._toSql(),
+          query._lastSelectBinds,
+        );
         size = Number(rows[0]?.size ?? 0);
         timestamp = rows[0]?.timestamp;
       }
@@ -5162,8 +5222,8 @@ export class Relation<T extends Base> {
 
   private async execMainQuery(): Promise<Record<string, unknown>[]> {
     if (this._isNone) return [];
-    const sql = this.toSql();
-    const result = await this._modelClass.connection.execute(sql);
+    const sql = this._toSql();
+    const result = await this._modelClass.connection.execute(sql, this._lastSelectBinds);
     return result;
   }
 

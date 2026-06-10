@@ -99,7 +99,19 @@ export class WhereClause {
     const wrapped = predicatesWithWrappedSqlLiterals(this.predicates);
     if (wrapped.length === 0) return "";
     const node = wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
-    return visitor.compile(node);
+    const [sql, rawBinds] = visitor.compileWithBinds(node);
+    if (rawBinds.length === 0) return sql;
+    // Substitute bind values inline for human-readable inspect output.
+    let i = 0;
+    return sql.replace(/\?/g, () => {
+      let val: unknown = rawBinds[i++];
+      if (val !== null && typeof val === "object" && "valueForDatabase" in val) {
+        val = (val as { valueForDatabase: unknown }).valueForDatabase;
+      }
+      if (val === null || val === undefined) return "NULL";
+      if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
+      return String(val);
+    });
   }
 
   isContradiction(): boolean {
