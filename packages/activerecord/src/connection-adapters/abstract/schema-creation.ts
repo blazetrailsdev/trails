@@ -144,7 +144,18 @@ export class SchemaCreation {
     // value when present and resolve only when missing. `column_options(o) →
     // column` still sees the resolved SQL type because the helpers set it
     // before the column reaches the visitor.
-    o.sqlType ??= this.typeToSql(o.type, o.options);
+    try {
+      o.sqlType ??= this.typeToSql(o.type, o.options);
+    } catch (e) {
+      // typeToSql lacks the column name; re-throw with it for a diagnosable message.
+      if (e instanceof Error && /empty or blank type/.test(e.message)) {
+        throw new Error(
+          `Column ${JSON.stringify(o.name)} has an empty or blank type — specify a valid SQL type`,
+          { cause: e },
+        );
+      }
+      throw e;
+    }
     let sql = `${this.adapter.quoteIdentifier(o.name)} ${o.sqlType}`;
     if (o.type !== "primary_key") {
       sql = this.addColumnOptionsBang(sql, this.columnOptions(o) as ColumnOptions);
