@@ -5,12 +5,13 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
-import "../index.js";
+import { registerModel } from "../index.js";
 import { useHandlerFixtures } from "../test-helpers/use-handler-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Book } from "../test-helpers/models/book.js";
+import { Author } from "../test-helpers/models/author.js";
 
 describe("FieldOrderedValuesTest", () => {
   // Mirrors Rails `fixtures :posts`. The enum/string/nil book tests destroy_all
@@ -22,6 +23,8 @@ describe("FieldOrderedValuesTest", () => {
       books: canonicalSchema.books,
     });
   });
+  registerModel(Author);
+  registerModel(Book);
 
   it("in order of", async () => {
     const order = [3, 4, 1];
@@ -36,9 +39,7 @@ describe("FieldOrderedValuesTest", () => {
     expect(await posts.toArray()).toEqual([]);
   });
 
-  it.skip("in order of with enums values", async () => {
-    // BLOCKED: in_order_of with enum keys (string labels) is unsupported —
-    // the enum type-caster does not map label → integer for the CASE/IN values.
+  it("in order of with enums values", async () => {
     await Book.destroyAll();
     await Book.create({ status: "proposed" });
     await Book.create({ status: "written" });
@@ -112,10 +113,7 @@ describe("FieldOrderedValuesTest", () => {
     expect((await books.toArray()).map((b: any) => b.format)).toEqual(order);
   });
 
-  it.skip("in order of with associations", async () => {
-    // BLOCKED: in_order_of over a joined association column ("authors.name")
-    // is unsupported on the join path.
-    const { Author } = await import("../test-helpers/models/author.js");
+  it("in order of with associations", async () => {
     await Author.destroyAll();
     await Book.destroyAll();
     const john = (await Author.create({ name: "John" })) as any;
@@ -126,17 +124,24 @@ describe("FieldOrderedValuesTest", () => {
     await bob.books.create();
     await anna.books.create();
 
+    // Rails: `books.map { |book| book.author.name }` lazily loads each author.
+    // The trails belongsTo reader is async, so mirror the lazy load explicitly.
+    const authorNames = async (rel: any) =>
+      Promise.all(
+        (await rel.toArray()).map(
+          async (book: any) => (await book.association("author").loadTarget()).name,
+        ),
+      );
+
     const order = ["Bob", "Anna", "John"];
     let books = Book.joins("author").inOrderOf("authors.name", order);
-    expect((await books.toArray()).map((book: any) => book.author.name)).toEqual(order);
+    expect(await authorNames(books)).toEqual(order);
 
     books = Book.joins("author").inOrderOf("authors.name", order);
-    expect((await books.toArray()).map((book: any) => book.author.name)).toEqual(order);
+    expect(await authorNames(books)).toEqual(order);
   });
 
-  it.skip("in order of with filter false", async () => {
-    // BLOCKED: in_order_of(filter: false) — counting non-filtered relations is
-    // unsupported (expects all 11 posts to remain with non-matching rows last).
+  it("in order of with filter false", async () => {
     const order = [3, 4, 1];
     const posts = Post.inOrderOf("id", order, false);
 
