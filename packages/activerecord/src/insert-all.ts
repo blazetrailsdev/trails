@@ -109,10 +109,11 @@ export class InsertAll {
       this.keys = new Set(Object.keys(this.inserts[0]));
     }
 
-    this._scopeAttributes = {
-      ...(relation as any)._createWithAttrs,
-      ...(relation as any)._scopeAttributes(),
-    };
+    // Rails: scope_for_create.except(model.inheritance_column) — STI type is
+    // handled by resolveSti (reverse_merge) so it must not be re-injected here.
+    const rawScopeAttrs: Record<string, unknown> = (relation as any).scopeForCreate();
+    delete rawScopeAttrs[this.model.inheritanceColumn as string];
+    this._scopeAttributes = rawScopeAttrs;
     for (const key of Object.keys(this._scopeAttributes)) {
       this.keys.add(key);
     }
@@ -188,7 +189,7 @@ export class InsertAll {
     const timestamps = this.recordTimestamps() ? this.timestampsForCreate() : undefined;
     const keysList = [...this.keysIncludingTimestamps()];
     return this.inserts.map((row) => {
-      const merged = { ...this._scopeAttributes, ...row };
+      const merged = { ...row, ...this._scopeAttributes };
       if (timestamps) {
         for (const [col, val] of Object.entries(timestamps)) {
           if (!(col in merged)) merged[col] = val;
