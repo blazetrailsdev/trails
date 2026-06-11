@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { describeIfPg, PG_TEST_URL, PostgreSQLAdapter } from "./test-helper.js";
-import { defineSchema } from "../../test-helpers/define-schema.js";
+import type { TableDefinition as PgTableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
 
 let adapter: PostgreSQLAdapter;
 
-describeIfPg("defineSchema PG-only column types", () => {
+describeIfPg("PostgreSQL adapter PG-only column types", () => {
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await adapter.exec(`CREATE EXTENSION IF NOT EXISTS hstore`);
@@ -18,19 +18,14 @@ describeIfPg("defineSchema PG-only column types", () => {
   });
 
   it("round-trips citext, hstore, uuid, interval, and oid columns", async () => {
-    await defineSchema(
-      adapter,
-      {
-        ds_pg_types: {
-          col_citext: "citext",
-          col_hstore: "hstore",
-          col_uuid: "uuid",
-          col_interval: "interval",
-          col_oid: "oid",
-        },
-      },
-      { dropExisting: true },
-    );
+    await adapter.createTable("ds_pg_types", { force: true }, (t) => {
+      const td = t as PgTableDefinition;
+      td.citext("col_citext");
+      td.hstore("col_hstore");
+      td.uuid("col_uuid");
+      td.interval("col_interval");
+      td.oid("col_oid");
+    });
 
     await adapter.executeMutation(
       `INSERT INTO "ds_pg_types" ("col_citext","col_hstore","col_uuid","col_interval","col_oid") ` +
@@ -48,16 +43,10 @@ describeIfPg("defineSchema PG-only column types", () => {
   });
 
   it("creates array columns when array:true is set", async () => {
-    await defineSchema(
-      adapter,
-      {
-        ds_pg_array: {
-          tags: { type: "integer", array: true },
-          labels: { type: "string", array: true },
-        },
-      },
-      { dropExisting: true },
-    );
+    await adapter.createTable("ds_pg_array", { force: true }, (t) => {
+      t.integer("tags", { array: true });
+      t.string("labels", { array: true });
+    });
 
     await adapter.executeMutation(
       `INSERT INTO "ds_pg_array" ("tags","labels") VALUES ('{1,2,3}', '{"a","b"}')`,
