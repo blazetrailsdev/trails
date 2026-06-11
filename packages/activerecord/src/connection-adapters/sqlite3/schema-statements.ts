@@ -11,7 +11,7 @@
 import type { DatabaseAdapter } from "../../adapter.js";
 import type { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
-import { quoteColumnName, extractValueFromDefault } from "./quoting.js";
+import { extractValueFromDefault } from "./quoting.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import { SchemaDumper } from "./schema-dumper.js";
@@ -90,20 +90,23 @@ export async function removeCheckConstraint(
   return adapter.removeCheckConstraint(tableName, expressionOrOptions);
 }
 
-function resolveMasterTable(tableName: string): { masterTable: string; name: string } {
+function resolveMasterTable(
+  adapter: DatabaseAdapter,
+  tableName: string,
+): { masterTable: string; name: string } {
   const dotIdx = tableName.lastIndexOf(".");
   if (dotIdx === -1) return { masterTable: "sqlite_master", name: tableName };
   const schema = tableName.slice(0, dotIdx);
   const name = tableName.slice(dotIdx + 1);
   if (schema === "temp") return { masterTable: "sqlite_temp_master", name };
-  return { masterTable: `${quoteColumnName(schema)}.sqlite_master`, name };
+  return { masterTable: `${adapter.quoteColumnName(schema)}.sqlite_master`, name };
 }
 
 export async function isVirtualTableExists(
   adapter: DatabaseAdapter,
   tableName: string,
 ): Promise<boolean> {
-  const { masterTable, name } = resolveMasterTable(tableName);
+  const { masterTable, name } = resolveMasterTable(adapter, tableName);
   const rows = await adapter.execute(
     `SELECT name FROM ${masterTable} WHERE type = 'table' AND name = ? AND sql LIKE '%VIRTUAL%'`,
     [name],
