@@ -9,14 +9,15 @@
 // For collections (`hasMany` / `hasAndBelongsToMany`), the
 // AssociationProxy's thenable handles the load — `await record.<name>`.
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel, AssociationNotFoundError } from "../index.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
-import { defineSchema } from "../test-helpers/define-schema.js";
+import { MigrationContext } from "../migration.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   let adapter: TestDatabaseAdapter;
+  let ctx: MigrationContext;
 
   class LoAuthor extends Base {
     declare name: string;
@@ -49,10 +50,17 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
 
   beforeAll(async () => {
     adapter = createTestAdapter();
-    await defineSchema(adapter, {
-      lo_authors: { name: "string" },
-      lo_posts: { title: "string", lo_author_id: "integer" },
-      lo_profiles: { bio: "string", lo_author_id: "integer" },
+    ctx = new MigrationContext(adapter);
+    await ctx.createTable("lo_authors", { force: true }, (t) => {
+      t.string("name");
+    });
+    await ctx.createTable("lo_posts", { force: true }, (t) => {
+      t.string("title");
+      t.integer("lo_author_id");
+    });
+    await ctx.createTable("lo_profiles", { force: true }, (t) => {
+      t.string("bio");
+      t.integer("lo_author_id");
     });
     LoAuthor.adapter = adapter;
     LoPost.adapter = adapter;
@@ -60,6 +68,11 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
     registerModel(LoAuthor);
     registerModel(LoPost);
     registerModel(LoProfile);
+  });
+  afterAll(async () => {
+    await ctx.dropTable("lo_profiles", { ifExists: true });
+    await ctx.dropTable("lo_posts", { ifExists: true });
+    await ctx.dropTable("lo_authors", { ifExists: true });
   });
   withTransactionalFixtures(() => adapter);
 
