@@ -1,35 +1,22 @@
 /**
  * Mirrors: activerecord/test/cases/unsafe_raw_sql_test.rb
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, UnknownAttributeReference } from "./index.js";
+import { describe, it, expect } from "vitest";
+import { UnknownAttributeReference, registerModel } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
-import { defineSchema } from "./test-helpers/define-schema.js";
-import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+import { Post } from "./test-helpers/models/post.js";
+import { Comment } from "./test-helpers/models/comment.js";
 
-setupHandlerSuite();
-useHandlerTransactionalFixtures();
-
-class Post extends Base {
-  static {
-    this.attribute("title", "string");
-    this.attribute("author_id", "integer");
-    this.attribute("type", "string");
-    this.attribute("tags_count", "integer");
-  }
-}
+registerModel(Post);
+registerModel(Comment);
 
 describe("UnsafeRawSqlTest", () => {
-  beforeAll(async () => {
-    await defineSchema({
-      posts: { title: "string", author_id: "integer", type: "string", tags_count: "integer" },
-    });
-
-    await Post.create({ title: "Alpha", author_id: 2, tags_count: 3 });
-    await Post.create({ title: "Beta", author_id: 1, tags_count: 1 });
-    await Post.create({ title: "Gamma", author_id: 1, tags_count: 2 });
-  });
+  // Rails `fixtures :posts, :comments` — seed the canonical rows so the
+  // ordering/pluck comparisons (Arel.sql vs string column name) read back the
+  // same set of records.
+  useHandlerFixtures(["posts", "comments"], { schema: canonicalSchema });
 
   it("order: allows string column name", async () => {
     const idsExpected = await Post.order(arelSql("title")).pluck("id");
@@ -202,8 +189,8 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("pluck: allows column names with includes", async () => {
-    const valuesExpected = await Post.pluck(arelSql("title"), arelSql("id"));
-    const values = await Post.all().pluck("title", "id");
+    const valuesExpected = await Post.includes("comments").pluck(arelSql("title"), arelSql("id"));
+    const values = await Post.includes("comments").pluck("title", "id");
     expect(values).toEqual(valuesExpected);
   });
 
@@ -243,7 +230,7 @@ describe("UnsafeRawSqlTest", () => {
 
   it("pluck: disallows invalid column names with includes", async () => {
     await expect(
-      Post.all().pluck("title", "REPLACE(title, 'misc', 'zzzz')"),
+      Post.includes("comments").pluck("title", "REPLACE(title, 'misc', 'zzzz')"),
     ).rejects.toBeInstanceOf(UnknownAttributeReference);
   });
 
@@ -257,11 +244,10 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("pluck: always allows Arel", async () => {
-    const expectedValues = (await Post.pluck("title")).map((title: unknown) => [
-      title,
-      (title as string).length,
-    ]);
-    const values = await Post.pluck("title", arelSql("length(title)"));
+    const expectedValues = (await Post.includes("comments").pluck("title")).map(
+      (title: unknown) => [title, (title as string).length],
+    );
+    const values = await Post.includes("comments").pluck("title", arelSql("length(title)"));
     expect(values).toEqual(expectedValues);
   });
 
