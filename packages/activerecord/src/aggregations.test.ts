@@ -230,11 +230,18 @@ describe("AggregationsTest", () => {
   // Rails: test_nil_return_from_converter_is_respected_when_allow_nil_is_true
   it("nil return from converter is respected when allow nil is true", async () => {
     CustomerModel.gpsConversionWasRun = false;
-    const david = customers("david") as CustomerModel & { nonBlankGpsLocation: GpsLocation | null };
-    (david as any).nonBlankGpsLocation = "";
-    await david.save();
-    await david.reload();
-    expect(david.nonBlankGpsLocation).toBeNull();
+    try {
+      const david = customers("david") as CustomerModel & {
+        nonBlankGpsLocation: GpsLocation | null;
+      };
+      (david as any).nonBlankGpsLocation = "";
+      await david.save();
+      await david.reload();
+      expect(david.nonBlankGpsLocation).toBeNull();
+    } finally {
+      // Rails resets the cattr in an `ensure` block (aggregations_test.rb:121).
+      CustomerModel.gpsConversionWasRun = false;
+    }
   });
 
   // Rails: test_nil_return_from_converter_results_in_failure_when_allow_nil_is_false
