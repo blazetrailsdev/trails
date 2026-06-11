@@ -333,6 +333,16 @@ describe("DefaultScopingTest", () => {
     );
     expect(received.sort()).toEqual(expected.sort());
 
+    // Mixed args: selectively unscope only `name` from where, plus fully unscope select.
+    const expected2 = names(await Developer.order("salary DESC").toArray());
+    const received2 = names(
+      await DeveloperOrderedBySalary.select("id")
+        .where({ name: "Jamis" })
+        .unscope({ where: "name" }, "select")
+        .toArray(),
+    );
+    expect(received2.sort()).toEqual(expected2.sort());
+
     const expected3 = names(await Developer.order("salary DESC").toArray());
     const received3 = names(
       await DeveloperOrderedBySalary.select("id")
@@ -613,13 +623,23 @@ describe("DefaultScopingTest", () => {
   });
 
   it("unscope comparison where clauses", async () => {
+    // unscoped for WHERE (`developers`.`id` <= 2) — Rails uses -Float::INFINITY..2
     const expected = names(await Developer.order("salary DESC").toArray());
     const received = names(
-      await DeveloperOrderedBySalary.where({ id: [1, 2] })
+      await DeveloperOrderedBySalary.where(Developer.arelTable.get("id").lteq(2) as any)
         .unscope({ where: "id" })
         .toArray(),
     );
     expect(received.sort()).toEqual(expected.sort());
+
+    // unscoped for WHERE (`developers`.`id` < 2) — Rails uses -Float::INFINITY...2
+    const expected2 = names(await Developer.order("salary DESC").toArray());
+    const received2 = names(
+      await DeveloperOrderedBySalary.where(Developer.arelTable.get("id").lt(2) as any)
+        .unscope({ where: "id" })
+        .toArray(),
+    );
+    expect(received2.sort()).toEqual(expected2.sort());
   });
 
   it("unscope string where clauses involved", async () => {
