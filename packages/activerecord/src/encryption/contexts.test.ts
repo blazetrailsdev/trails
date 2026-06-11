@@ -1,9 +1,10 @@
 // vendor/rails/activerecord/test/cases/encryption/contexts_test.rb
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { Base } from "../index.js";
 import "../relation.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
+import { dropAllTables } from "../test-helpers/drop-all-tables.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import {
@@ -44,6 +45,17 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
       },
       encrypted_books: TEST_SCHEMA.encrypted_books,
     });
+  });
+
+  // This suite owns a bespoke (non-canonical) table — `encrypted_posts` — in the
+  // shared handler-suite DB. Per the handler-suite contract
+  // (use-handler-transactional-fixtures.ts: "Files with bespoke schemas call
+  // `dropAllTables` explicitly"), drop everything and clear the defineSchema
+  // signature cache on teardown so a later file in the same worker re-creates its
+  // tables from scratch instead of inheriting a stale signature for a table this
+  // suite reshaped (e.g. `encrypted_books`).
+  afterAll(async () => {
+    await dropAllTables(Base.adapter);
   });
 
   beforeEach(async () => {
