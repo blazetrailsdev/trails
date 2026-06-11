@@ -9,6 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base, ExplainRegistry, registerModel } from "./index.js";
+import { buildExplainClause } from "./explain.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { useHandlerFixtures } from "./test-helpers/use-handler-fixtures.js";
@@ -28,9 +29,21 @@ describe("ExplainTest", () => {
   });
 
   itIfSupports("explain", "collecting queries for explain", async () => {
-    const message = await Car.where({ name: "honda" }).explain();
-    expect(typeof message).toBe("string");
-    expect(message.toLowerCase()).toContain("select");
+    const { queries } = await Base.collectingQueriesForExplain(async () => {
+      await Car.where({ name: "honda" }).toArray();
+    });
+
+    const [sql, binds] = queries[0];
+    expect(sql).toContain("SELECT");
+    // Rails: `if binds.any?` — when the adapter parameterizes the predicate the
+    // value rides in `binds`; otherwise the literal is interpolated into the SQL.
+    // ExplainRegistry collects plain bind values (no Attribute wrappers).
+    if (binds.length > 0) {
+      expect(binds.length).toBe(1);
+      expect(binds[binds.length - 1]).toBe("honda");
+    } else {
+      expect(sql).toContain("honda");
+    }
   });
 
   itIfSupports("explain", "relation explain with average", async () => {
@@ -95,15 +108,54 @@ describe("ExplainTest", () => {
   });
 
   itIfSupports("explain", "exec explain with no binds", async () => {
-    const plan = await Car.all().explain();
-    expect(typeof plan).toBe("string");
-    expect(plan.length).toBeGreaterThan(0);
+    // Mirrors Rails: stub the connection's `explain` to return canned plans, then
+    // assert `exec_explain` renders `<clause> <sql>\n<plan>` per query. Our impl
+    // separates blocks with a blank line (`\n\n`) rather than Rails' single `\n`.
+    const sqls = ["foo", "bar"];
+    const queries: [string, unknown[]][] = [
+      [sqls[0], []],
+      [sqls[1], []],
+    ];
+    const adapter = Base.connection as unknown as {
+      explain: (...args: unknown[]) => Promise<string>;
+    };
+    const original = adapter.explain;
+    let called = 0;
+    adapter.explain = async () => `query plan ${sqls[called++]}`;
+    try {
+      const clause = buildExplainClause(adapter);
+      const expected = sqls.map((sql) => `${clause} ${sql}\nquery plan ${sql}`).join("\n\n");
+      expect(await Base.execExplain(queries)).toBe(expected);
+    } finally {
+      adapter.explain = original;
+    }
   });
 
   itIfSupports("explain", "exec explain with binds", async () => {
-    const plan = await Car.where({ name: "honda" }).explain();
-    expect(typeof plan).toBe("string");
-    expect(plan.length).toBeGreaterThan(0);
+    // Mirrors Rails' bind variant. ExplainRegistry collects plain bind values, so
+    // `render_bind` emits the value-only inspect form (`[1]`) rather than Rails'
+    // `[["wadus", 1]]` name/value tuples (which only apply to Attribute binds).
+    const sqls = ["foo", "bar"];
+    const queries: [string, unknown[]][] = [
+      [sqls[0], [1]],
+      [sqls[1], [2]],
+    ];
+    const adapter = Base.connection as unknown as {
+      explain: (...args: unknown[]) => Promise<string>;
+    };
+    const original = adapter.explain;
+    let called = 0;
+    adapter.explain = async () => `query plan ${sqls[called++]}`;
+    try {
+      const clause = buildExplainClause(adapter);
+      const expected = [
+        `${clause} ${sqls[0]} [1]\nquery plan ${sqls[0]}`,
+        `${clause} ${sqls[1]} [2]\nquery plan ${sqls[1]}`,
+      ].join("\n\n");
+      expect(await Base.execExplain(queries)).toBe(expected);
+    } finally {
+      adapter.explain = original;
+    }
   });
 
   it("explain returns query plan string (Rails-guided)", async () => {
