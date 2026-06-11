@@ -759,7 +759,9 @@ describe("DefaultScopingTest", () => {
     expect(updateSql).toMatch(/firm_id/);
   });
 
-  // `unscope` does not raise ArgumentError on invalid arguments yet.
+  // Invalid clause names, numeric args, and non-`where` hash keys already raise;
+  // the one outstanding gap is empty `unscope()` (no args), which Rails rejects
+  // but the engine currently treats as a no-op. Kept skipped for that sub-case.
   it.skip("unscope errors with invalid value", () => {
     expect(() => Developer.where({ name: "Jamis" }).unscope("incorrect_value" as any)).toThrow();
     expect(() =>
@@ -773,20 +775,22 @@ describe("DefaultScopingTest", () => {
     expect(() => Developer.order("name DESC").where({ name: "Jamis" }).unscope()).toThrow();
   });
 
-  // `unscope` does not validate non-where hash keys yet.
-  it.skip("unscope errors with non where hash keys", () => {
+  // A hash argument to unscope must use `where` as its key; any other key raises.
+  // Rails' string-hash-key case (`unscope("where" => :name)`) has no TS analogue
+  // because `{ where: "name" }` is already the valid TS form, so it is omitted.
+  it("unscope errors with non where hash keys", () => {
     expect(() =>
       Developer.where({ name: "Jamis" })
         .limit(4)
         .unscope({ limit: 4 } as any),
     ).toThrow();
-    expect(() => Developer.where({ name: "Jamis" }).unscope({ where: "name" } as any)).toThrow();
   });
 
-  // `unscope` does not reject non-symbol/hash arguments yet.
-  it.skip("unscope errors with non symbol or hash arguments", () => {
-    expect(() => Developer.where({ name: "Jamis" }).limit(3).unscope("limit")).toThrow();
-    expect(() => Developer.select("id").unscope("select")).toThrow();
+  // In TS, string clause names ARE the Ruby-symbol equivalent and are valid
+  // inputs — `unscope("limit")` / `unscope("select")` work and must not raise,
+  // so Rails' string-vs-symbol ArgumentError cases have no TS analogue. Only a
+  // non-clause value (a number) is invalid in both languages.
+  it("unscope errors with non symbol or hash arguments", () => {
     expect(() => Developer.select("id").unscope(5 as any)).toThrow();
   });
 
