@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, beforeEach, afterEach, expect } from "vitest";
+import { describe, beforeEach, afterEach, expect } from "vitest";
 import { MigrationContext } from "./migration.js";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
@@ -18,12 +18,19 @@ describe("CommentTest", () => {
       t.string("name", { comment: "Comment should help clarify the column purpose" });
       t.boolean("obvious", { comment: "Question is: should you comment obviously named objects?" });
       t.string("content");
+      t.index(["name"], {
+        comment: '"Very important" index that powers all the performance.\nAnd it\'s fun!',
+      });
     });
     await ctx.createTable("blank_comments", { comment: " ", force: true }, (t) => {
       t.string("space_comment", { comment: " " });
       t.string("empty_comment", { comment: "" });
       t.string("nil_comment", { comment: null as any });
       t.string("absent_comment");
+      t.index(["space_comment"], { comment: " " });
+      t.index(["empty_comment"], { comment: "" });
+      t.index(["nil_comment"], { comment: null as any });
+      t.index(["absent_comment"]);
     });
     await ctx.createTable(
       "pk_commenteds",
@@ -70,12 +77,22 @@ describe("CommentTest", () => {
     expect(col.comment).toBe("I am running out of imagination");
   });
 
-  // Index comments (MySQL INDEX_COMMENT introspection, PG obj_description + COMMENT ON INDEX,
-  // and dump emission) are a separable sub-feature shipping in a follow-up PR. These two
-  // Rails-mirrored names (comment_test.rb:74, :89) are kept so the test:compare match holds.
-  it.skip("add index with comment later", () => {});
+  itIfSupports("comments", "add index with comment later", async () => {
+    await ctx.addIndex("commenteds", "obvious", {
+      name: "idx_obvious",
+      comment: "We need to see obvious comments",
+    });
+    const indexes = await (adapter as any).indexes("commenteds");
+    const index = indexes.find((idef: any) => idef.name === "idx_obvious")!;
+    expect(index.comment).toBe("We need to see obvious comments");
+  });
 
-  it.skip("blank indexes created in block", () => {});
+  itIfSupports("comments", "blank indexes created in block", async () => {
+    const indexes = await (adapter as any).indexes("blank_comments");
+    for (const index of indexes) {
+      expect(index.comment ?? null).toBeNull();
+    }
+  });
 
   itIfSupports("comments", "add comment to column", async () => {
     await ctx.changeColumn("commenteds", "content", "string", {

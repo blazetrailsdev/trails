@@ -1663,6 +1663,7 @@ export class MigrationContext {
       using?: string;
       nullsNotDistinct?: boolean;
       include?: string[];
+      comment?: string;
     }[]
   >();
   private _tableNamePrefix: string | null = null;
@@ -2048,6 +2049,7 @@ export class MigrationContext {
         nullsNotDistinct: idx.nullsNotDistinct,
         include: idx.include,
         ifNotExists: idx.ifNotExists,
+        comment: idx.comment,
       });
     }
   }
@@ -2284,6 +2286,7 @@ export class MigrationContext {
       ifNotExists?: boolean;
       include?: string[];
       using?: string;
+      comment?: string;
     },
   ): Promise<void> {
     const cols = Array.isArray(columns) ? columns : [columns];
@@ -2314,7 +2317,14 @@ export class MigrationContext {
       sql += ` INCLUDE (${options.include.map((c) => this.connection.quoteIdentifier(c)).join(", ")})`;
     if (an === "postgres" && options?.nullsNotDistinct) sql += " NULLS NOT DISTINCT";
     if (an !== "mysql" && options?.where) sql += ` WHERE ${options.where}`;
+    const comment = options?.comment?.trim() ? options.comment : undefined;
+    if (an === "mysql" && comment) sql += ` COMMENT ${this.connection.quote(comment)}`;
     await this.connection.executeMutation(sql);
+    if (an === "postgres" && comment) {
+      await this.connection.executeMutation(
+        `COMMENT ON INDEX ${this.connection.quoteIdentifier(indexName)} IS ${this.connection.quote(comment)}`,
+      );
+    }
     if (!this._indexes.has(table)) this._indexes.set(table, []);
     this._indexes.get(table)!.push({
       columns: cols,
@@ -2325,6 +2335,7 @@ export class MigrationContext {
       using: usingStr ? options?.using : undefined,
       nullsNotDistinct: options?.nullsNotDistinct,
       include: options?.include,
+      comment,
     });
   }
 

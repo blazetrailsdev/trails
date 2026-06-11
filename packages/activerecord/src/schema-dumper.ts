@@ -81,6 +81,8 @@ export interface IndexInfo {
   nullsNotDistinct?: boolean;
   /** PG covering index INCLUDE columns. */
   include?: string[];
+  /** Index comment (MySQL `INDEX_COMMENT`, PG `pg_description`). */
+  comment?: string;
 }
 
 /**
@@ -465,6 +467,7 @@ class AdapterSchemaSource implements SchemaSource {
       lengths?: number | Record<string, number>;
       opclasses?: string | Record<string, string>;
       include?: string[];
+      comment?: string;
     };
     let raw: RichIdx[];
     const adapterAny = this._adapter as unknown as { indexes?(t: string): Promise<unknown[]> };
@@ -492,6 +495,7 @@ class AdapterSchemaSource implements SchemaSource {
       lengths: idx.lengths,
       opclasses: idx.opclasses,
       include: idx.include,
+      comment: idx.comment,
     }));
   }
 }
@@ -1130,6 +1134,7 @@ export class SchemaDumper {
     if (index.nullsNotDistinct) parts.push("nullsNotDistinct: true");
     if (index.include && index.include.length > 0)
       parts.push(`include: ${JSON.stringify(index.include)}`);
+    if (index.comment) parts.push(`comment: ${JSON.stringify(index.comment)}`);
     return parts;
   }
 
