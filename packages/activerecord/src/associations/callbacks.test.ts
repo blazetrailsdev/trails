@@ -55,8 +55,8 @@ describe("AssociationCallbacksTest", () => {
   beforeAll(async () => {
     adapter = createTestAdapter();
     // Minimal throwaway posts/comments for the add/remove callback mechanics;
-    // canonical posts/comments require NOT NULL body that these models don't set
-    // (see memory `assoc_callbacks_fixture_parity_blocked`), so they stay local.
+    // canonical `posts`/`comments` declare `body` NOT NULL (test-schema.ts), and
+    // these local models create posts without a body, so they stay test-local.
     /* eslint-disable blazetrails/require-canonical-schema */
     await defineSchema(adapter, {
       comments: { body: "string", post_id: "integer" },
@@ -193,8 +193,9 @@ describe("AssociationCallbacksTest", () => {
     adapter = createTestAdapter();
     // Minimal throwaway tables for the add/remove association-callback mechanics:
     // the local Post/Comment/Profile/Client models create rows the canonical
-    // shapes can't accept (canonical posts/comments require NOT NULL body), so
-    // these stay test-local — see memory `assoc_callbacks_fixture_parity_blocked`.
+    // shapes can't accept (canonical `posts`/`comments` declare `body` NOT NULL
+    // in test-schema.ts, and these create posts without a body), so they stay
+    // test-local.
     /* eslint-disable blazetrails/require-canonical-schema */
     await defineSchema(adapter, {
       comments: { body: "string", post_id: "integer" },
