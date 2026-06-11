@@ -1,10 +1,9 @@
 // vendor/rails/activerecord/test/cases/encryption/contexts_test.rb
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base } from "../index.js";
 import "../relation.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
-import { dropAllTables } from "../test-helpers/drop-all-tables.js";
 import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import {
@@ -32,30 +31,13 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
   let titleCiphertext: unknown;
 
   beforeAll(async () => {
+    // Rails' EncryptedPost (`< Post`, `self.table_name = "posts"`) and EncryptedBook
+    // (`encrypted_books`) both ride canonical tables; contexts_test.rb declares
+    // `fixtures :posts`. Mirror that here.
     await defineSchema({
-      // `encrypted_posts` is not a canonical table: Rails' EncryptedPost rides the
-      // `posts` table, but our (larger, double-base64'd — see the skip note in
-      // encryptable-record.test.ts) ciphertext would be truncated by `posts.title`'s
-      // default VARCHAR(255) on MySQL. A dedicated table with limit-1024 ciphertext
-      // columns is required, so this entry stays inline rather than canonical.
-      // eslint-disable-next-line blazetrails/require-canonical-schema
-      encrypted_posts: {
-        title: { type: "string", limit: 1024 },
-        body: { type: "string", limit: 1024 },
-      },
+      posts: TEST_SCHEMA.posts,
       encrypted_books: TEST_SCHEMA.encrypted_books,
     });
-  });
-
-  // This suite owns a bespoke (non-canonical) table — `encrypted_posts` — in the
-  // shared handler-suite DB. Per the handler-suite contract
-  // (use-handler-transactional-fixtures.ts: "Files with bespoke schemas call
-  // `dropAllTables` explicitly"), drop everything and clear the defineSchema
-  // signature cache on teardown so a later file in the same worker re-creates its
-  // tables from scratch instead of inheriting a stale signature for a table this
-  // suite reshaped (e.g. `encrypted_books`).
-  afterAll(async () => {
-    await dropAllTables(Base.adapter);
   });
 
   beforeEach(async () => {
@@ -76,10 +58,10 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
     // encryptor).
     EncryptedPost = class EncryptedPost extends Base {
       static {
-        this._tableName = "encrypted_posts";
+        this._tableName = "posts";
         this.attribute("id", "integer");
-        this.attribute("title", "string", { limit: 1024 });
-        this.attribute("body", "string", { limit: 1024 });
+        this.attribute("title", "string");
+        this.attribute("body", "string");
         this.encrypts("title");
         this.encrypts("body");
       }
