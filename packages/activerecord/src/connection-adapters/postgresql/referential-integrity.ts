@@ -4,19 +4,30 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::ReferentialIntegrity
  */
 
-import { quoteTableName } from "./quoting.js";
-
 export interface ReferentialIntegrity {
   disableReferentialIntegrity(fn: () => Promise<void>): Promise<void>;
   checkAllForeignKeysValidBang(): Promise<void>;
 }
 
-export function disableReferentialIntegritySql(tables: string[]): string[] {
-  return tables.map((t) => `ALTER TABLE ${quoteTableName(t)} DISABLE TRIGGER ALL`);
+// Host for the *Sql helpers: quoting dispatches through the adapter instance
+// (`this.quoteTableName`) so a sub-adapter can override it polymorphically,
+// rather than binding to the dialect's freestanding quoteTableName.
+interface ReferentialIntegritySqlHost {
+  quoteTableName(name: string): string;
 }
 
-export function enableReferentialIntegritySql(tables: string[]): string[] {
-  return tables.map((t) => `ALTER TABLE ${quoteTableName(t)} ENABLE TRIGGER ALL`);
+export function disableReferentialIntegritySql(
+  this: ReferentialIntegritySqlHost,
+  tables: string[],
+): string[] {
+  return tables.map((t) => `ALTER TABLE ${this.quoteTableName(t)} DISABLE TRIGGER ALL`);
+}
+
+export function enableReferentialIntegritySql(
+  this: ReferentialIntegritySqlHost,
+  tables: string[],
+): string[] {
+  return tables.map((t) => `ALTER TABLE ${this.quoteTableName(t)} ENABLE TRIGGER ALL`);
 }
 
 // Mirrors: ReferentialIntegrity#check_all_foreign_keys_valid!
