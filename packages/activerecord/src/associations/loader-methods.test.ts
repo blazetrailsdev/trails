@@ -49,10 +49,6 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
 
   beforeAll(async () => {
     adapter = createTestAdapter();
-    // These `lo_*` tables back an internal-API test (Base#loadBelongsTo /
-    // Base#loadHasOne) with no Rails counterpart, so they are test-local by
-    // design with no canonical-schema shape to reference; created via
-    // create_table (as Rails does for ad-hoc test tables).
     const ctx = new MigrationContext(adapter);
     await ctx.createTable("lo_authors", { force: true }, (t) => {
       t.string("name");

@@ -12,9 +12,6 @@ import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-tra
 describe("RequiredAssociationsTest", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  // Mirrors Rails required_test.rb, which creates these scratch `parents` /
-  // `children` tables inline via `create_table` in setup and `drop_table`s
-  // them in teardown — they have no schema.rb / canonical counterpart.
   let ctx: MigrationContext;
   beforeAll(async () => {
     ctx = new MigrationContext(Base.connection);
@@ -191,10 +188,6 @@ describe("RequiredAssociationsTest", () => {
 describe("belongs_to required option", () => {
   setupHandlerSuite();
   useHandlerTransactionalFixtures();
-  // Test-local scratch tables for `belongs_to required:` edge cases (no Rails
-  // fixture/canonical-schema counterpart); created via create_table and dropped
-  // in teardown. The `r_`/`rg_` prefixes keep them from colliding with canonical
-  // tables across parallel forks.
   let ctx: MigrationContext;
   beforeAll(async () => {
     ctx = new MigrationContext(Base.connection);
