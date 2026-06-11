@@ -2103,7 +2103,16 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias)) {
       throw argumentError(`Invalid subquery alias "${alias}": must be a safe SQL identifier`);
     }
-    return resolved.toArel().as(alias);
+    // Rails build_from wraps `opts.arel.as(name)`, where `arel` is the full
+    // `build_arel` — joins, HAVING, nested FROM, LOCK, CTEs, etc. Use the
+    // comprehensive builder rather than the projection-only `toArel`, so the
+    // subquery stays a live AST: its binds parameterize and its retryability is
+    // determined by the actual child nodes (not unconditionally disabled).
+    const subArel =
+      typeof (resolved as any).buildArel === "function"
+        ? (resolved as any).buildArel()
+        : resolved.toArel();
+    return subArel.as(alias);
   }
   return opts;
 }

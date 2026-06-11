@@ -4021,57 +4021,13 @@ export class Relation<T extends Base> {
       manager.optimizerHints(...this._optimizerHints);
     }
 
-    let sql = this._compileSelectSql(manager);
+    // Apply from() on the manager pre-compile (mirrors Rails build_from) so the
+    // FROM source — and any subquery binds — thread through the single collector
+    // in document order, rather than being spliced into the compiled SQL.
+    const fromNode = this._buildFromNode();
+    if (fromNode !== undefined && fromNode !== null) manager.from(fromNode as any);
 
-    // Replace FROM clause if from() was used
-    if (!this._fromClause.isEmpty()) {
-      const raw = this._fromClause.value;
-      const alias = this._fromClause.name;
-      let fromExpr: string;
-      if (raw instanceof Relation) {
-        const subSql = raw._toSql();
-        const name = alias ?? "subquery";
-        // Rails wraps the alias in SqlLiteral so quote_table_name leaves it bare.
-        // Only emit bare when the alias is a safe identifier; fall back to quoted
-        // for names that would produce invalid SQL or risk injection.
-        fromExpr = `(${subSql}) ${_safeAlias(name)}`;
-        // The subquery compiles through its own collector (raw.toSql above),
-        // capturing its retryability in raw._lastSelectRetryable. Rails folds
-        // the whole arel through one collector, so AND it into ours: a raw SQL
-        // fragment inside the subquery must lower the outer classification.
-        // A set-operation subquery compiles each side separately, so
-        // raw._lastSelectRetryable only reflects the last side — treat it as
-        // non-retryable, matching how toArray() classifies set operations.
-        this._lastSelectRetryable &&= raw._setOperation ? false : raw._lastSelectRetryable;
-        // Sub-relation binds come before the outer WHERE binds in the final SQL
-        // (FROM subquery is positioned before WHERE clause).
-        this._lastSelectBinds = [...raw._lastSelectBinds, ...this._lastSelectBinds];
-      } else if (raw instanceof Nodes.Node) {
-        // Compile via the same visitor _compileSelectSql uses so identifier
-        // quoting stays dialect-consistent across the whole SELECT.
-        const av = this._arelVisitor();
-        const [fromSql, fromBinds, fromRetryable] = av.compileWithBinds(raw);
-        fromExpr = fromSql;
-        // Rails compiles the whole arel (including the FROM clause) through a
-        // single collector, so a non-retryable FROM node lowers the overall
-        // classification. We compile it separately, so AND its retryability
-        // into the captured SELECT flag rather than letting it clobber.
-        this._lastSelectRetryable &&= fromRetryable;
-        // FROM node binds precede the outer WHERE binds in the final SQL.
-        this._lastSelectBinds = [...this._typeCastBinds(fromBinds), ...this._lastSelectBinds];
-      } else if (alias) {
-        fromExpr = `${raw} ${_safeAlias(alias)}`;
-      } else {
-        fromExpr = raw;
-      }
-      // Match ANSI double-quoted or MySQL backtick-quoted identifiers, including
-      // schema-qualified chains ("schema"."table" or `schema`.`table`). The
-      // function-form replacement avoids $ mangling from special replacement sequences.
-      sql = sql.replace(
-        /FROM\s+(?:"[^"]+"|[`][^`]+[`])(?:\.(?:"[^"]+"|[`][^`]+[`]))*/,
-        () => `FROM ${fromExpr}`,
-      );
-    }
+    let sql = this._compileSelectSql(manager);
 
     // Append SQL comments from annotate()
     if (this._annotations.length > 0) {
@@ -4149,6 +4105,37 @@ export class Relation<T extends Base> {
    * Falls back to the default ANSI ToSql when no connection is established.
    * Sets _lastSelectRetryable and _lastSelectBinds for the execution call sites.
    */
+  /**
+   * Build the arel FROM source for a `from()` clause (mirrors Rails
+   * `build_from`), or `undefined` when no `from()` was set. String and Arel-node
+   * values pass through to `SelectManager#from`; a normal Relation value becomes
+   * a live `TableAlias` subquery (via `buildFrom` → `opts.arel.as(name)`), so its
+   * binds parameterize and its retryability follows the actual child nodes. All
+   * of these thread through the single outer collector (binds in document order,
+   * FROM before WHERE) with identifier quoting left to the visitor.
+   *
+   * Set-operation subqueries are the one case with no AST representation in
+   * trails (`_toSql` string-concatenates the operands), so they fall back to the
+   * full compiled SQL wrapped as a `BoundSqlLiteral`, binds inlined at the FROM
+   * position. Parameterizing those awaits a union-AST convergence — out of scope
+   * for this story.
+   */
+  private _buildFromNode(): Nodes.Node | string | undefined {
+    if (this._fromClause.isEmpty()) return undefined;
+    const raw = this._fromClause.value;
+    if (raw instanceof Relation && raw._setOperation) {
+      const subSql = raw._toSql();
+      const name = this._fromClause.name ?? "subquery";
+      // PG renders $N placeholders; BoundSqlLiteral expects positional `?`.
+      const placeholders = subSql.replace(/\$\d+/g, "?");
+      return new Nodes.BoundSqlLiteral(
+        `(${placeholders}) ${_safeAlias(name)}`,
+        raw._lastSelectBinds.slice(),
+      );
+    }
+    return this.buildFrom() as Nodes.Node | string | undefined;
+  }
+
   private _compileSelectSql(manager: { ast: Nodes.Node; toSql(): string }): string {
     const v = this._arelVisitor();
     const [sql, binds, retryable] = v.compileWithBinds(manager.ast);
